@@ -22,6 +22,11 @@ export const AUDIO_LAYER = -1
 export type AudioSlotName = 'A' | 'B'
 const SLOTS: AudioSlotName[] = ['A', 'B']
 
+/** Which live slots may open their input (the store's runtime-only state, never
+ *  saved : a session, an undo or New never opens a microphone by itself). */
+export type AudioLayerArmed = Record<AudioSlotName, boolean>
+export const NOT_ARMED: AudioLayerArmed = { A: false, B: false }
+
 export function defaultAudioLayer(): AudioLayerState {
   return { A: null, B: null, mix: 0.5, volume: 1, mute: false }
 }
@@ -90,13 +95,17 @@ function sourceKey(s: AudioLayerSlot | null): string {
   return `l:${s.deviceId ?? ''}:${s.chL ?? 0}:${s.chR ?? 1}`
 }
 
-export interface LiveInfo {
-  /** the channels the device delivered (0 : not open yet) */
+export interface SlotInfo {
+  /** a live input : the channels the device delivered (0 : not open yet) */
   channels: number
   label: string
-  /** why it could not open ('' : fine) */
+  /** why a live input could not open, or why a file cannot play ('' : fine) */
   error: string
+  /** a live input that was open and went away (unplugged) : it opens again
+   *  when it comes back */
+  lost: boolean
 }
+const NO_INFO: SlotInfo = { channels: 0, label: '', error: '', lost: false }
 
 interface Chain {
   key: string
@@ -104,6 +113,7 @@ interface Chain {
   pan: StereoPannerNode
   an: AnalyserNode // the slot's meter, after its volume and pan
   mixG: GainNode // its side of the A/B mix
+  srcG: GainNode | null // what it plays, into vol : fades in and out (a cut clicked)
   // a file
   player: ClipPlayer | null
   elSrc: MediaElementAudioSourceNode | null
@@ -116,6 +126,8 @@ interface Chain {
 }
 
 const RAMP = 0.015 // a gain or pan change glides (a stepped one clicked)
+const FADE = 0.015 // a source coming or going fades over this
+const FADE_MS = 40 // then it lets go (the fade has landed)
 
 class AudioLayerEngine {
   private st: AudioLayerState = defaultAudioLayer()
@@ -126,9 +138,13 @@ class AudioLayerEngine {
   private send: GainNode | null = null // that, in mono : the Filter voice's line-in
   private outAn: AnalyserNode | null = null
   private chains: Record<AudioSlotName, Chain | null> = { A: null, B: null }
+  private armed: AudioLayerArmed = NOT_ARMED
   private seeks: Record<AudioSlotName, number | null> = { A: null, B: null }
   private resumeAt: Record<AudioSlotName, number> = { A: 0, B: 0 } // a rebuilt file starts here
-  private live: Record<AudioSlotName, LiveInfo> = { A: { channels: 0, label: '', error: '' }, B: { channels: 0, label: '', error: '' } }
+  private live: Record<AudioSlotName, SlotInfo> = { A: NO_INFO, B: NO_INFO }
+  // the device a lost default input was : it opens again only on that one, never
+  // on whatever became the default meanwhile (a laptop's microphone)
+  private lostLabel: Record<AudioSlotName, string> = { A: '', B: '' }
   private listeners = new Set<() => void>()
   private buf = new Float32Array(2048)
   // The whole layer's sound as features (a modulator FROM "AU all") : the live
@@ -139,6 +155,7 @@ class AudioLayerEngine {
   private featAt = 0
   private syncReq = 0
   private offCtx: (() => void) | null = null
+  private offDevices: (() => void) | null = null
 
   constructor() {
     // A new audio context (Sonify healed a dead device) : everything starts over
@@ -146,15 +163,25 @@ class AudioLayerEngine {
     this.offCtx = sonifyEngine.onContext((ctx) => {
       if (this.ctx && this.ctx !== ctx) this.rebuildOn(ctx)
     })
+    // A device plugged in or out : a live input that was lost or would not open
+    // tries again.
+    const md = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined
+    if (md?.addEventListener) {
+      const fn = (): void => this.retryLive()
+      md.addEventListener('devicechange', fn)
+      this.offDevices = () => md.removeEventListener('devicechange', fn)
+    }
   }
 
-  /** The layer's state, from the store (App calls it on every change). */
-  sync(st: AudioLayerState): void {
+  /** The layer's state, from the store (App calls it on every change); `armed`
+   *  the live slots that may open their input. */
+  sync(st: AudioLayerState, armed: AudioLayerArmed = NOT_ARMED): void {
     this.st = st
+    this.armed = armed
     const active = !!(st.A || st.B)
     sonifyEngine.setLayerWanted(active)
     if (!active) {
-      this.teardown()
+      this.teardown(true)
       return
     }
     if (!this.ctx) {
@@ -203,17 +230,16 @@ class AudioLayerEngine {
   /** Onto a new context : the old graph goes, the files resume where they were. */
   private rebuildOn(ctx: AudioContext): void {
     for (const s of SLOTS) this.resumeAt[s] = this.chains[s]?.player?.time() ?? 0
-    this.teardown()
+    this.teardown(false)
     this.buildOn(ctx)
   }
 
-  private teardown(): void {
-    for (const s of SLOTS) this.dropChain(s)
-    if (this.out) {
-      sonifyEngine.setExternalInput(null)
-      sonifyEngine.setLayerSend(null)
-      try { this.out.disconnect(); this.outAn?.disconnect(); this.bus?.disconnect(); this.send?.disconnect() } catch { /* gone */ }
-    }
+  /** `fade` : what plays fades out first (the layer emptied); else at once (a
+   *  dead context, a hot update). */
+  private teardown(fade: boolean): void {
+    const ctx = this.ctx
+    for (const s of SLOTS) this.dropChain(s, fade)
+    const out = this.out, outAn = this.outAn, bus = this.bus, send = this.send
     this.out = null
     this.bus = null
     this.send = null
@@ -221,29 +247,71 @@ class AudioLayerEngine {
     this.fbufs = null
     this.feats = zero()
     this.ctx = null
+    if (!out) return
+    const end = (): void => {
+      // (a graph built again meanwhile has taken Sonify's input over already)
+      if (!this.out) {
+        sonifyEngine.setExternalInput(null)
+        sonifyEngine.setLayerSend(null)
+      }
+      try { out.disconnect(); outAn?.disconnect(); bus?.disconnect(); send?.disconnect() } catch { /* gone */ }
+    }
+    if (fade && ctx) window.setTimeout(end, FADE_MS)
+    else end()
   }
 
-  private dropChain(s: AudioSlotName): void {
+  private dropChain(s: AudioSlotName, fade: boolean): void {
     const c = this.chains[s]
     if (!c) return
     this.chains[s] = null
-    this.dropSource(c)
-    try { c.vol.disconnect(); c.pan.disconnect(); c.an.disconnect(); c.mixG.disconnect() } catch { /* gone */ }
+    const sounding = !!c.srcG
+    this.dropSource(c, fade)
+    const end = (): void => {
+      try { c.vol.disconnect(); c.pan.disconnect(); c.an.disconnect(); c.mixG.disconnect() } catch { /* gone */ }
+    }
+    if (fade && sounding && this.ctx) window.setTimeout(end, FADE_MS)
+    else end()
     videoPlayheads.delete(videoKey(AUDIO_LAYER, s))
-    this.setLive(s, { channels: 0, label: '', error: '' })
+    this.lostLabel[s] = ''
+    this.setLive(s, NO_INFO)
   }
 
-  private dropSource(c: Chain): void {
+  /** What a chain plays goes : faded out, then let go (`fade` false, or nothing
+   *  sounding : at once). A live input's device closes with it. */
+  private dropSource(c: Chain, fade: boolean): void {
     c.req++
-    c.player?.dispose()
-    try { c.elSrc?.disconnect(); c.streamSrc?.disconnect(); c.split?.disconnect(); c.merge?.disconnect() } catch { /* gone */ }
-    c.stream?.getTracks().forEach((t) => t.stop())
+    const { player, elSrc, stream, streamSrc, split, merge, srcG } = c
     c.player = null
     c.elSrc = null
     c.stream = null
     c.streamSrc = null
     c.split = null
     c.merge = null
+    c.srcG = null
+    const end = (): void => {
+      player?.dispose()
+      try { elSrc?.disconnect(); streamSrc?.disconnect(); split?.disconnect(); merge?.disconnect(); srcG?.disconnect() } catch { /* gone */ }
+      stream?.getTracks().forEach((t) => t.stop())
+    }
+    const ctx = this.ctx
+    if (fade && srcG && ctx && ctx.state === 'running') {
+      const t = ctx.currentTime
+      srcG.gain.cancelScheduledValues(t)
+      srcG.gain.setValueAtTime(srcG.gain.value, t)
+      srcG.gain.linearRampToValueAtTime(0, t + FADE)
+      window.setTimeout(end, FADE_MS)
+    } else end()
+  }
+
+  /** A new source's own gain into its chain, fading in from silence. */
+  private fadeIn(ctx: AudioContext, c: Chain): GainNode {
+    const g = ctx.createGain()
+    const t = ctx.currentTime
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(1, t + FADE)
+    g.connect(c.vol)
+    c.srcG = g
+    return g
   }
 
   /** The state onto the graph : sources (only when what a slot plays changed),
@@ -255,8 +323,7 @@ class AudioLayerEngine {
     for (const s of SLOTS) {
       const cfg = this.st[s]
       if (!cfg) {
-        this.dropChain(s)
-        this.setLive(s, { channels: 0, label: '', error: '' })
+        this.dropChain(s, true)
         continue
       }
       let c = this.chains[s]
@@ -269,14 +336,18 @@ class AudioLayerEngine {
         vol.gain.value = 0 // it fades in (below)
         vol.connect(pan).connect(mixG).connect(bus)
         pan.connect(an)
-        c = { key: '', vol, pan, an, mixG, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, req: 0 }
+        c = { key: '', vol, pan, an, mixG, srcG: null, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, req: 0 }
         this.chains[s] = c
       }
-      const key = sourceKey(cfg)
+      // a live input opens only once armed (picked, or its open button)
+      const key = cfg.kind === 'live' && !this.armed[s] ? '' : sourceKey(cfg)
       if (key !== c.key) {
-        this.dropSource(c)
+        this.dropSource(c, true)
         c.key = key
-        if (cfg.kind === 'file') this.openFile(s, c, cfg)
+        if (!key) {
+          this.lostLabel[s] = ''
+          this.setLive(s, { ...NO_INFO, label: cfg.deviceLabel ?? '' })
+        } else if (cfg.kind === 'file') this.openFile(s, c, cfg)
         else this.openLive(s, c, cfg)
       }
       const v = cfg.mute ? 0 : Math.max(0, Math.min(2, cfg.volume))
@@ -290,14 +361,20 @@ class AudioLayerEngine {
   private openFile(s: AudioSlotName, c: Chain, cfg: AudioLayerSlot): void {
     const ctx = this.ctx
     if (!ctx || !cfg.mediaId) return
+    this.setLive(s, NO_INFO)
     const p = new ClipPlayer(false)
+    // it cannot play (a film without sound, a format nothing decodes) : the slot says so
+    p.onFail = (why) => {
+      if (this.chains[s] === c && c.player === p) this.setLive(s, { ...NO_INFO, error: why || 'it cannot play' })
+    }
     p.load(cfg.mediaId, cfg.mediaPath ?? '', this.resumeAt[s])
     this.resumeAt[s] = 0
     try {
       c.elSrc = ctx.createMediaElementSource(p.audio)
-      c.elSrc.connect(c.vol)
+      c.elSrc.connect(this.fadeIn(ctx, c))
     } catch (e) {
       console.warn('[audio layer] the file cannot join the mix', e)
+      this.setLive(s, { ...NO_INFO, error: 'it cannot join the mix' })
     }
     c.player = p
   }
@@ -311,12 +388,23 @@ class AudioLayerEngine {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false,
       channelCount: { ideal: 32 }
     }
-    this.setLive(s, { channels: 0, label: cfg.deviceLabel ?? '', error: '' })
+    // (a lost input trying again stays "lost" until it is back)
+    const was = this.live[s]
+    const lostAs = this.lostLabel[s]
+    this.setLive(s, was.lost ? was : { ...NO_INFO, label: cfg.deviceLabel ?? '' })
     // The device by its id, or (another computer, the interface plugged into
     // another port : a new id) by its name.
     const open = async (): Promise<MediaStream> => {
       const md = navigator.mediaDevices
-      if (!cfg.deviceId) return md.getUserMedia({ audio, video: false })
+      if (!cfg.deviceId) {
+        // the default input lost : only the device it was, back
+        if (lostAs) {
+          const back = (await md.enumerateDevices()).find((d) => d.kind === 'audioinput' && d.label === lostAs)
+          if (!back) throw new Error('the input was disconnected')
+          return md.getUserMedia({ audio: { ...audio, deviceId: { exact: back.deviceId } }, video: false })
+        }
+        return md.getUserMedia({ audio, video: false })
+      }
       try {
         return await md.getUserMedia({ audio: { ...audio, deviceId: { exact: cfg.deviceId } }, video: false })
       } catch (e) {
@@ -339,29 +427,67 @@ class AudioLayerEngine {
       src.connect(split)
       split.connect(merge, l, 0)
       split.connect(merge, r, 1)
-      merge.connect(c.vol)
+      merge.connect(this.fadeIn(ctx, c))
       c.stream = stream
       c.streamSrc = src
       c.split = split
       c.merge = merge
-      this.setLive(s, { channels: n, label: tr?.label ?? cfg.deviceLabel ?? '', error: '' })
+      this.lostLabel[s] = ''
+      this.setLive(s, { ...NO_INFO, channels: n, label: tr?.label ?? cfg.deviceLabel ?? '' })
+      // Unplugged : the slot says so and lets it go; it opens again when the
+      // device comes back (a device change), or picked again.
+      tr?.addEventListener('ended', () => {
+        if (req !== c.req || this.chains[s] !== c) return
+        console.warn('[audio layer] live input lost', tr.label)
+        this.dropSource(c, false)
+        this.lostLabel[s] = cfg.deviceId ? '' : tr.label
+        this.setLive(s, { ...NO_INFO, label: tr.label || (cfg.deviceLabel ?? ''), error: 'the input was disconnected', lost: true })
+      })
     }).catch((e: unknown) => {
       if (req !== c.req) return
       const msg = e instanceof Error ? e.message : String(e)
       console.warn('[audio layer] live input unavailable', e)
-      this.setLive(s, { channels: 0, label: cfg.deviceLabel ?? '', error: msg || 'unavailable' })
+      const lost = this.live[s].lost
+      this.setLive(s, { ...NO_INFO, label: cfg.deviceLabel ?? '', error: lost ? this.live[s].error : (msg || 'unavailable'), lost })
     })
   }
 
-  private setLive(s: AudioSlotName, info: LiveInfo): void {
+  /** A device came or went : each armed live slot that was lost or could not
+   *  open tries again. */
+  private retryLive(): void {
+    let again = false
+    for (const s of SLOTS) {
+      const c = this.chains[s], cfg = this.st[s]
+      if (c && c.key && cfg?.kind === 'live' && this.armed[s] && this.live[s].error) {
+        c.key = ''
+        again = true
+      }
+    }
+    if (again) this.apply()
+  }
+
+  /** Open a slot's source anew (the same input picked again, its retry button) :
+   *  the performer's own act, so a lost default input opens whatever is the
+   *  default now. */
+  reopen(s: AudioSlotName): void {
+    const c = this.chains[s]
+    if (!c || !c.key) return
+    if (c.player) this.resumeAt[s] = c.player.time()
+    this.lostLabel[s] = ''
+    c.key = ''
+    this.apply()
+  }
+
+  private setLive(s: AudioSlotName, info: SlotInfo): void {
     const o = this.live[s]
-    if (o.channels === info.channels && o.label === info.label && o.error === info.error) return
+    if (o.channels === info.channels && o.label === info.label && o.error === info.error && o.lost === info.lost) return
     this.live[s] = info
     for (const fn of this.listeners) fn()
   }
 
-  /** A live slot's device as it opened (its channels, or why it could not). */
-  liveInfo(s: AudioSlotName): LiveInfo {
+  /** A slot as it is : a live input as it opened (its channels, why it could
+   *  not, or that it was lost), a file why it cannot play. */
+  slotInfo(s: AudioSlotName): SlotInfo {
     return this.live[s]
   }
 
@@ -446,6 +572,13 @@ class AudioLayerEngine {
     })
   }
 
+  /** Paused while a synced start is still cueing : it never starts (not even
+   *  for a frame), and the players go back to their own transport. */
+  cancelSync(): void {
+    this.syncReq++
+    for (const s of SLOTS) this.chains[s]?.player?.hold(false)
+  }
+
   /** The file a slot plays, and its playhead (the modulators read its sound). */
   playhead(s: AudioSlotName): { path: string; time: number } | null {
     const cfg = this.st[s], p = this.chains[s]?.player
@@ -461,9 +594,11 @@ class AudioLayerEngine {
 
   /** Silence and release everything (a dev hot update replacing this engine). */
   shutdown(): void {
-    this.teardown()
+    this.teardown(false)
     this.offCtx?.()
     this.offCtx = null
+    this.offDevices?.()
+    this.offDevices = null
     sonifyEngine.setLayerWanted(false)
   }
 }

@@ -213,9 +213,9 @@ setMediaSink(useStore.getState().sonify.sinkId ?? '')
 useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
 // The Audio Layer follows its state (the store can't import it : it imports
 // Sonify's engine, which the store imports first).
-audioLayer.sync(useStore.getState().audioLayer)
+audioLayer.sync(useStore.getState().audioLayer, useStore.getState().audioLayerArmed)
 useStore.subscribe((st, prev) => {
-  if (st.audioLayer !== prev.audioLayer) audioLayer.sync(st.audioLayer)
+  if (st.audioLayer !== prev.audioLayer || st.audioLayerArmed !== prev.audioLayerArmed) audioLayer.sync(st.audioLayer, st.audioLayerArmed)
 })
 
 // The global REC pill : visible in the top bar while a take is rolling, so you
@@ -716,6 +716,9 @@ export default function App(): JSX.Element {
             if (s.sonifyOn) st.setSonify({ ...useStore.getState().sonify, on: true })
             if (s.soniSeqOn) st.setSoniSeqOn(true)
             if (s.soniKeySeqOn) st.setSoniKeySeqOn(true)
+            // and its Audio Layer's live inputs open : an installation runs
+            // unattended (a session opened by hand leaves them closed)
+            st.armAudioLayer()
             markClean()
           }
         } catch { /* keep the fresh boot */ }

@@ -10,16 +10,18 @@ import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { VideoTransport } from './VideoTransport'
 import { useStore } from '../store'
-import { AUDIO_LAYER, audioLayer, type AudioSlotName } from '../audio/audioLayer'
+import { AUDIO_LAYER, audioLayer, type AudioSlotName, type SlotInfo } from '../audio/audioLayer'
 import { droppedPaths, dropKind, isFileDrag } from './fileDrop'
 import { showToast } from './Toast'
 
 const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
 const M_FLOOR = -60
 
-/** The audio inputs (their names show once one has been opened). */
-function useAudioInputs(): Array<{ id: string; label: string }> {
-  const [list, setList] = useState<Array<{ id: string; label: string }>>([])
+/** The audio inputs (their names show once one has been opened) : `label` the
+ *  system's own ('' until then : what is stored, never a made-up one), `name`
+ *  what the menus show. */
+function useAudioInputs(): Array<{ id: string; label: string; name: string }> {
+  const [list, setList] = useState<Array<{ id: string; label: string; name: string }>>([])
   useEffect(() => {
     let alive = true
     const md = navigator.mediaDevices
@@ -29,7 +31,7 @@ function useAudioInputs(): Array<{ id: string; label: string }> {
         setList(
           ds
             .filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications')
-            .map((d, i) => ({ id: d.deviceId, label: d.label || `input ${i + 1}` }))
+            .map((d, i) => ({ id: d.deviceId, label: d.label, name: d.label || `input ${i + 1}` }))
         )
       }).catch(() => {})
     }
@@ -45,14 +47,47 @@ function useAudioInputs(): Array<{ id: string; label: string }> {
   return list
 }
 
-/** A live slot's device as it opened (its channel count, or its error). */
-function useLiveInfo(slot: AudioSlotName): ReturnType<typeof audioLayer.liveInfo> {
-  const [info, setInfo] = useState(() => audioLayer.liveInfo(slot))
+/** A slot as it is : a live input's device as it opened (its channel count, its
+ *  error, lost), a file's error. */
+function useSlotInfo(slot: AudioSlotName): SlotInfo {
+  const [info, setInfo] = useState(() => audioLayer.slotInfo(slot))
   useEffect(() => {
-    setInfo(audioLayer.liveInfo(slot))
-    return audioLayer.subscribe(() => setInfo(audioLayer.liveInfo(slot)))
+    setInfo(audioLayer.slotInfo(slot))
+    return audioLayer.subscribe(() => setInfo(audioLayer.slotInfo(slot)))
   }, [slot])
   return info
+}
+
+/** A slot's meter in its row; in its place, a live input not open yet (its open
+ *  button), one lost or that could not open, a file that cannot play (click :
+ *  try again). */
+function SlotState({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): JSX.Element {
+  const armed = useStore((st) => st.audioLayerArmed[slot])
+  const arm = useStore((st) => st.armAudioLayer)
+  const info = useSlotInfo(slot)
+  if (s.kind === 'live' && !armed) {
+    return (
+      <button
+        type="button"
+        onClick={() => arm(slot)}
+        className="w-10 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-accent ring-1 ring-accent/50 transition-colors hover:bg-accent/15"
+        title={`Open this live input (${slotName(s)}) : a session (or an undo) never opens one by itself`}
+      >
+        open
+      </button>
+    )
+  }
+  if (!info.error) return <Meter which={slot} className="w-10 shrink-0" />
+  return (
+    <button
+      type="button"
+      onClick={() => audioLayer.reopen(slot)}
+      className="w-10 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-danger ring-1 ring-danger/40 transition-colors hover:bg-danger/15"
+      title={`${s.kind === 'file' ? 'It cannot play' : info.lost ? 'It was lost (it opens again when the device comes back)' : 'It could not open'} : ${info.error}. Click : try again`}
+    >
+      {info.lost ? 'lost' : 'failed'}
+    </button>
+  )
 }
 
 /** A level meter (RMS bar, held peak, -60..0 dBFS) on a slot after its volume,
@@ -125,7 +160,7 @@ function Chip({ label, active, onClick, title }: { label: string; active: boolea
 function slotName(s: AudioLayerSlot | null): string | null {
   if (!s) return null
   if (s.kind === 'file') return s.mediaName ?? 'sound file'
-  return s.deviceLabel ?? 'default input'
+  return s.deviceLabel ?? (s.deviceId ? 'live input' : 'default input')
 }
 
 /** The layer strip. */
@@ -134,6 +169,8 @@ export function AudioLayerPanel(): JSX.Element {
   const patch = useStore((s) => s.patchAudioLayer)
   const collapsed = useStore((s) => !!s.collapsed.audioLayer)
   const toggleSection = useStore((s) => s.toggleSection)
+  // a live input not open yet (a session never opens one by itself)
+  const closed = useStore((s) => (['A', 'B'] as const).some((sl) => s.audioLayer[sl]?.kind === 'live' && !s.audioLayerArmed[sl]))
   const a = slotName(al.A), b = slotName(al.B)
   return (
     <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel p-2">
@@ -161,6 +198,7 @@ export function AudioLayerPanel(): JSX.Element {
         <div className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted" title="What the collapsed Audio Layer holds (expand to edit)">
           <span className="min-w-0 truncate">{a && b ? `${a} + ${b}` : (a ?? b ?? 'empty')}</span>
           {al.mute && <span className="shrink-0 text-danger/80">· muted</span>}
+          {closed && <span className="shrink-0 text-accent/80" title="A live input is not open : expand the Audio Layer to open it">· not open</span>}
         </div>
       ) : (
         <>
@@ -239,7 +277,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     ...(s?.kind === 'file' ? [{ value: '__file__', label: s.mediaName ?? 'sound file', prefix: '🔊 ', group: 'file' }] : []),
     { value: '__file_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'file', title: 'A sound file (WAV, AIFF, MP3, FLAC, Ogg, AAC…) played like a film : its transport and waveform in the Inspector' },
     { value: liveVal(''), label: 'default input', prefix: '🎙 ', group: 'live input', title: "The system's default audio input, live" },
-    ...inputs.map((d): SearchOption => ({ value: liveVal(d.id), label: d.label, prefix: '🎙 ', group: 'live input', title: `${d.label}, live : its channels in the Inspector` })),
+    ...inputs.map((d): SearchOption => ({ value: liveVal(d.id), label: d.name, prefix: '🎙 ', group: 'live input', title: `${d.name}, live : its channels in the Inspector` })),
     ...(!known && s?.kind === 'live' ? [{ value: liveVal(s.deviceId ?? ''), label: `${s.deviceLabel ?? 'input'} (not found)`, prefix: '🎙 ', group: 'live input' }] : [])
   ]
   return (
@@ -296,7 +334,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
           }
         }}
       />
-      {s && <Meter which={slot} className="w-10 shrink-0" />}
+      {s && <SlotState slot={slot} s={s} />}
       {s && (
         <span onClick={(e) => e.stopPropagation()}>
           <Chip label="⊘" active={!!s.mute} onClick={() => patchSlot(slot, { mute: !s.mute })} title={`Mute slot ${slot}`} />
@@ -311,6 +349,7 @@ export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Elem
   const s = useStore((st) => st.audioLayer[slot])
   const patchSlot = useStore((st) => st.patchAudioLayerSlot)
   const setFile = useStore((st) => st.setAudioLayerFile)
+  const info = useSlotInfo(slot)
   if (!s) {
     return (
       <div className="rounded-md border border-border bg-panel p-3 text-[11px] text-muted">
@@ -337,6 +376,19 @@ export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Elem
       </div>
       {s.kind === 'file' ? (
         <>
+          {info.error && (
+            <div className="flex items-center gap-2 border-t border-border px-3 py-1.5 text-[10px] text-danger">
+              <span className="min-w-0 flex-1">It cannot play : {info.error}</span>
+              <button
+                type="button"
+                onClick={() => audioLayer.reopen(slot)}
+                className="shrink-0 rounded border border-danger/40 px-1.5 py-0.5 font-mono text-[10px] hover:bg-danger/15"
+                title="Load the file again"
+              >
+                try again
+              </button>
+            </div>
+          )}
           <VideoTransport
             layer={AUDIO_LAYER}
             slot={slot}
@@ -392,8 +444,10 @@ function PanRow({ slot, pan }: { slot: AudioSlotName; pan: number }): JSX.Elemen
 function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): JSX.Element {
   const patchSlot = useStore((st) => st.patchAudioLayerSlot)
   const setLive = useStore((st) => st.setAudioLayerLive)
+  const armed = useStore((st) => st.audioLayerArmed[slot])
+  const arm = useStore((st) => st.armAudioLayer)
   const inputs = useAudioInputs()
-  const info = useLiveInfo(slot)
+  const info = useSlotInfo(slot)
   const n = Math.max(2, info.channels)
   const chL = s.chL ?? 0, chR = s.chR ?? 1
   const chOpts: Array<{ v: string; label: string }> = []
@@ -417,7 +471,7 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
         >
           <option value="">default input</option>
           {inputs.map((d) => (
-            <option key={d.id} value={d.id}>{d.label}</option>
+            <option key={d.id} value={d.id}>{d.name}</option>
           ))}
           {!known && <option value={s.deviceId}>{`${s.deviceLabel ?? 'input'} (not found)`}</option>}
         </select>
@@ -434,13 +488,38 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
             <option key={o.v} value={o.v}>{o.label}</option>
           ))}
         </select>
-        <span
-          className={`w-12 shrink-0 text-right font-mono text-[9px] ${info.error ? 'text-danger' : 'text-muted'}`}
-          title={info.error ? `It could not open : ${info.error}` : 'The channels the device delivers (most drivers give one or two; an interface often shows its inputs as several devices, one per pair)'}
-        >
-          {info.error ? "can't open" : info.channels ? `${info.channels} ch` : 'opening…'}
-        </span>
+        {!armed ? (
+          <button
+            type="button"
+            onClick={() => arm(slot)}
+            className="w-12 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-accent ring-1 ring-accent/50 transition-colors hover:bg-accent/15"
+            title="Open this live input : a session never opens one by itself"
+          >
+            open
+          </button>
+        ) : info.error ? (
+          <button
+            type="button"
+            onClick={() => audioLayer.reopen(slot)}
+            className="w-12 shrink-0 text-right font-mono text-[9px] text-danger hover:underline"
+            title={`${info.lost ? 'It was lost (it opens again when the device comes back)' : 'It could not open'} : ${info.error}. Click : try again`}
+          >
+            {info.lost ? 'lost' : "can't open"}
+          </button>
+        ) : (
+          <span
+            className="w-12 shrink-0 text-right font-mono text-[9px] text-muted"
+            title="The channels the device delivers (most drivers give one or two; an interface often shows its inputs as several devices, one per pair)"
+          >
+            {info.channels ? `${info.channels} ch` : 'opening…'}
+          </span>
+        )}
       </div>
+      {!armed && (
+        <p className="text-[10px] leading-tight text-muted">
+          Not open : a session (or an undo) never opens a live input by itself. Open it here or in its row; picking an input opens it too.
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">level</span>
         <Meter which={slot} className="min-w-[40px] flex-1" number />

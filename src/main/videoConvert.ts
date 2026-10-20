@@ -502,13 +502,19 @@ export async function warmVideoFolder(dir: string): Promise<void> {
 }
 
 export function registerVideoConvert(): void {
-  // The Import Audio source : the file it plays. `force` : the player refused it
-  // (an odd codec in a common container, ALAC in an m4a) : the copy.
+  // The Import Audio source and the Audio Layer : the file it plays. `force` : the
+  // player refused it (an odd codec in a common container, ALAC in an m4a) : the
+  // copy. A film plays its soundtrack, from the same audio-only copy as the
+  // Collage voice's.
   ipcMain.handle('audio:playable', async (_e, path: string, force?: boolean) => {
-    if (typeof path !== 'string' || !AUDIO_EXTS.test(path)) return { ok: false, error: 'not a sound file' }
-    if (!force && NATIVE_AUDIO.test(path)) return { ok: true, path }
+    if (typeof path !== 'string') return { ok: false, error: 'not a sound file' }
+    const film = VIDEO_EXTS.test(path)
+    if (!film && !AUDIO_EXTS.test(path)) return { ok: false, error: 'not a sound file' }
+    if (!force && !film && NATIVE_AUDIO.test(path)) return { ok: true, path }
     const r = await audioForCollage(path)
-    return r.ok && r.path ? { ok: true, path: r.path } : { ok: false, error: r.error ?? (r.silent ? 'no sound in the file' : 'no copy') }
+    return r.ok && r.path
+      ? { ok: true, path: r.path }
+      : { ok: false, error: r.error ?? (r.silent ? (film ? 'the film has no sound' : 'no sound in the file') : 'no copy') }
   })
   // A sound's analysis for the audio modulators and the audio player (made once,
   // cached; audioAnalysis.ts).

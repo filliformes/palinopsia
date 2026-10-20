@@ -46,6 +46,9 @@ interface Snapshot {
   drift: number
   flow: number
   superFlicker: number
+  // The Audio Layer (its files and inputs, levels, mix) : New and Open replace
+  // it too. Which live inputs are open is not in it (see apply).
+  audioLayer: FullState['audioLayer']
 }
 
 function snap(): Snapshot {
@@ -68,7 +71,8 @@ function snap(): Snapshot {
     shutter: s.shutter,
     drift: s.drift,
     flow: s.flow,
-    superFlicker: s.superFlicker
+    superFlicker: s.superFlicker,
+    audioLayer: s.audioLayer
   }
 }
 
@@ -92,13 +96,27 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.shutter !== b.shutter ||
     a.drift !== b.drift ||
     a.flow !== b.flow ||
-    a.superFlicker !== b.superFlicker
+    a.superFlicker !== b.superFlicker ||
+    a.audioLayer !== b.audioLayer
   )
+}
+
+/** The live inputs open after an undo : an undo never opens one by itself. A
+ *  restored live slot stays open only when it is open now, on the same device;
+ *  any other comes back closed (its open button). */
+function keptOpen(restored: Snapshot['audioLayer']): FullState['audioLayerArmed'] {
+  const cur = useStore.getState()
+  const open = (sl: 'A' | 'B'): boolean => {
+    const r = restored[sl], c = cur.audioLayer[sl]
+    return r?.kind === 'live' && c?.kind === 'live' && cur.audioLayerArmed[sl] && (r.deviceId ?? '') === (c.deviceId ?? '')
+  }
+  return { A: open('A'), B: open('B') }
 }
 
 function apply(s: Snapshot): void {
   cancelMorph() // the composition is being swapped : don't ease toward a stale target
   applying = true
+  const armed = keptOpen(s.audioLayer)
   useStore.setState({
     composition: s.composition,
     scenes: s.scenes,
@@ -116,7 +134,9 @@ function apply(s: Snapshot): void {
     shutter: s.shutter,
     drift: s.drift,
     flow: s.flow,
-    superFlicker: s.superFlicker
+    superFlicker: s.superFlicker,
+    audioLayer: s.audioLayer,
+    audioLayerArmed: armed
   })
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
@@ -242,6 +262,7 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   if (a.sequence !== b.sequence) return 'sequencer'
   if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
   if (a.sonify !== b.sonify) return 'sonify'
+  if (a.audioLayer !== b.audioLayer) return 'audio layer'
   if (a.surface !== b.surface) return 'surface'
   if (
     a.density !== b.density || a.gestureTexture !== b.gestureTexture || a.coalesce !== b.coalesce ||

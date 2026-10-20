@@ -52,7 +52,7 @@ import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } fro
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
 import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
-import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
+import { audioLayer, defaultAudioLayer, NOT_ARMED, sanitizeAudioLayer, type AudioLayerArmed } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
 import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
@@ -1687,10 +1687,18 @@ interface StoreState {
   // The Audio Layer (the layers tab, under L4) : two slots, a sound file or a
   // live input each, mixed into Sonify's output (saved with the session).
   audioLayer: AudioLayerState
+  // Which live slots are open : runtime only, never saved, so loading a session,
+  // an undo or New never opens a microphone by itself (like the camera). Picking
+  // an input opens it, so does its open button, and an installation's boot.
+  audioLayerArmed: AudioLayerArmed
+  /** Open a live slot's input (no slot : every live slot, an installation's boot). */
+  armAudioLayer: (slot?: 'A' | 'B') => void
   /** A file into a slot. `keep` keeps the slot's transport, volume and pan (the
    *  clip row stepping through a folder); else a fresh slot (its volume kept). */
   setAudioLayerFile: (slot: 'A' | 'B', mediaId: string, mediaName: string, mediaPath: string, keep?: boolean) => void
-  /** A live input into a slot ('' : the default device); its channels stay. */
+  /** A live input into a slot ('' : the default device), opened : the
+   *  performer's pick. Its channels stay on the same device (another one : 1+2);
+   *  the same input picked again opens it anew. */
   setAudioLayerLive: (slot: 'A' | 'B', deviceId: string, deviceLabel: string) => void
   patchAudioLayerSlot: (slot: 'A' | 'B', patch: Partial<AudioLayerSlot>) => void
   clearAudioLayerSlot: (slot: 'A' | 'B') => void
@@ -4095,6 +4103,13 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   audioLayer: defaultAudioLayer(),
+  audioLayerArmed: NOT_ARMED,
+  armAudioLayer: (slot) =>
+    set((s) => {
+      const armed = { ...s.audioLayerArmed }
+      for (const sl of slot ? [slot] : (['A', 'B'] as const)) if (s.audioLayer[sl]?.kind === 'live') armed[sl] = true
+      return { audioLayerArmed: armed }
+    }),
   setAudioLayerFile: (slot, mediaId, mediaName, mediaPath, keep) =>
     set((s) => {
       const prev = s.audioLayer[slot]
@@ -4103,17 +4118,35 @@ export const useStore = create<StoreState>((set, get) => ({
         : { kind: 'file', volume: prev?.kind === 'file' ? prev.volume : 0.8, pan: prev?.pan ?? 0, videoPlaying: true, videoLoop: true, videoSpeed: 1 }
       return {
         audioLayer: { ...s.audioLayer, [slot]: { ...base, kind: 'file', mediaId, mediaName, mediaPath } },
+        audioLayerArmed: { ...s.audioLayerArmed, [slot]: false },
         selection: { type: 'audio', slot }
       }
     }),
-  setAudioLayerLive: (slot, deviceId, deviceLabel) =>
+  setAudioLayerLive: (slot, deviceId, deviceLabel) => {
+    const was = get()
+    const old = was.audioLayer[slot]
+    const sameDevice = old?.kind === 'live' && (old.deviceId ?? '') === (deviceId || '')
+    // the same input picked again (lost, or it would not open) : opened anew
+    const again = sameDevice && was.audioLayerArmed[slot]
     set((s) => {
       const prev = s.audioLayer[slot]
       const next: AudioLayerSlot = prev?.kind === 'live'
-        ? { ...prev, deviceId: deviceId || undefined, deviceLabel: deviceLabel || undefined }
+        ? {
+            ...prev,
+            deviceId: deviceId || undefined,
+            deviceLabel: deviceLabel || (sameDevice ? prev.deviceLabel : undefined),
+            // another device's channels are not this one's
+            ...(sameDevice ? {} : { chL: 0, chR: 1 })
+          }
         : { kind: 'live', deviceId: deviceId || undefined, deviceLabel: deviceLabel || undefined, chL: 0, chR: 1, volume: 1, pan: prev?.pan ?? 0 }
-      return { audioLayer: { ...s.audioLayer, [slot]: next }, selection: { type: 'audio', slot } }
-    }),
+      return {
+        audioLayer: { ...s.audioLayer, [slot]: next },
+        audioLayerArmed: { ...s.audioLayerArmed, [slot]: true },
+        selection: { type: 'audio', slot }
+      }
+    })
+    if (again) audioLayer.reopen(slot)
+  },
   patchAudioLayerSlot: (slot, patch) =>
     set((s) => {
       const cur = s.audioLayer[slot]
@@ -4123,12 +4156,15 @@ export const useStore = create<StoreState>((set, get) => ({
   clearAudioLayerSlot: (slot) =>
     set((s) => ({
       audioLayer: { ...s.audioLayer, [slot]: null },
+      audioLayerArmed: { ...s.audioLayerArmed, [slot]: false },
       selection: s.selection?.type === 'audio' && s.selection.slot === slot ? null : s.selection
     })),
   patchAudioLayer: (patch) => set((s) => ({ audioLayer: { ...s.audioLayer, ...patch } })),
   playAudioLayer: (on) => {
-    // cued first, so no frame starts one before the other is ready
+    // cued first, so no frame starts one before the other is ready; paused, a
+    // start still cueing never comes
     if (on) audioLayer.syncStart()
+    else audioLayer.cancelSync()
     set((s) => {
       const al = { ...s.audioLayer }
       for (const sl of ['A', 'B'] as const) {
@@ -4753,6 +4789,9 @@ export const useStore = create<StoreState>((set, get) => ({
         outXform: OUT_IDENTITY,
         outXformReset: s.outXformReset + 1,
         space: persistSpace({ ...s.space, voices: defaultVoicePlaces() }),
+        // and an empty Audio Layer (a live input it had closes)
+        audioLayer: defaultAudioLayer(),
+        audioLayerArmed: NOT_ARMED,
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -4813,6 +4852,10 @@ export const useStore = create<StoreState>((set, get) => ({
         variationBaseline: null,
         sequence: makeDefaultSequence(),
         sessionPath: null, // Generate = unsaved; Ctrl+S keeps it.
+        // An empty Audio Layer, as New (a live input it had closes); the theme
+        // brings no sound of its own there.
+        audioLayer: defaultAudioLayer(),
+        audioLayerArmed: NOT_ARMED,
         // Reset the draw-sequencer gesture (as newSession does) so a stale path
         // can't export into the generated session and reactivate.
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -4940,9 +4983,12 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
     // Where the voices sit is the piece's too (an older file : where they start).
     set({ space: persistSpace({ ...get().space, voices: sanitizeVoicePlaces(s.spaceVoices ?? null) }) })
-    // So is the Audio Layer's sound (an older file : none).
+    // So is the Audio Layer's sound (an older file : none). Its live inputs come
+    // back closed (their device and channels kept) : a session never opens a
+    // microphone by itself (an installation's boot opens them).
     set((st) => ({
       audioLayer: sanitizeAudioLayer(s.audioLayer ?? null),
+      audioLayerArmed: NOT_ARMED,
       selection: st.selection?.type === 'audio' ? null : st.selection
     }))
     // The projector warp, when the session carries one AND this computer lets

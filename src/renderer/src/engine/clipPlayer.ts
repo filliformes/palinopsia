@@ -1,10 +1,10 @@
 // ClipPlayer : a sound file played like a film. Its <audio>, its transport (play,
 // loop, the in / out trim, speed like tape or at pitch, the playhead scrubbed or
 // modulated) and its file : the original, or for a format the player can't
-// decode (AIFF, WMA, CAF) its audio-only copy, made once by ffmpeg. Shared by
-// the Import Audio visual source (engine/AudioSource.ts, which plays it straight
-// to the device) and the Audio Layer (audio/audioLayer.ts, which routes it
-// through Sonify's mix).
+// decode (AIFF, WMA, CAF) and a film (its soundtrack) its audio-only copy, made
+// once by ffmpeg. Shared by the Import Audio visual source (engine/AudioSource.ts,
+// which plays it straight to the device) and the Audio Layer
+// (audio/audioLayer.ts, which routes it through Sonify's mix).
 
 import { clipAudio } from './clipAudio'
 import { trackMediaSink, untrackMediaSink } from './mediaSink'
@@ -35,6 +35,11 @@ export class ClipPlayer {
   private loopOutMod: number | null = null
   private pos = 0 // the playhead, seconds (the element's, or where a seek is going)
   private held = false // cued for a synced start : kept paused until released
+  // Loop off, at its out point : it stays there (an ended element told to play
+  // goes back to 0, a loop) until a seek, the loop turned on or play pressed again.
+  private atEnd = false
+  /** It cannot play (no copy could be made, the copy refused too) : why. */
+  onFail: ((why: string) => void) | null = null
 
   /** `toDevice` : the element plays itself, on Sonify's device (the visual
    *  source); otherwise its sound is taken into a Web Audio graph. */
@@ -53,6 +58,7 @@ export class ClipPlayer {
   load(url: string, path: string, at = 0): void {
     this.path = path
     this.triedCopy = false
+    this.atEnd = false
     this.pos = at
     // A format the player can't decode plays from its audio-only copy, asked for
     // before playing, not after a refusal.
@@ -74,19 +80,40 @@ export class ClipPlayer {
     const api = (window as unknown as { api?: { audioPlayable?: (p: string, f?: boolean) => Promise<{ ok: boolean; path?: string; error?: string }> } }).api
     void api?.audioPlayable?.(this.path, force).then((r) => {
       if (this.disposed) return
-      if (!r?.ok || !r.path) { console.warn('[audio] cannot play', this.path, r?.error); return }
+      if (!r?.ok || !r.path) {
+        console.warn('[audio] cannot play', this.path, r?.error)
+        this.onFail?.(r?.error || 'no playable copy')
+        return
+      }
       this.setSrc(`opsia-media://local/${encodeURIComponent(r.path)}`, at)
+    }, (e: unknown) => {
+      if (!this.disposed) this.onFail?.(e instanceof Error ? e.message : String(e))
     })
   }
 
-  /** The player refused the file (an odd codec in a common container) : its copy. */
+  /** The player refused the file (an odd codec in a common container) : its copy;
+   *  the copy refused too : it cannot play. */
   private onError(): void {
-    if (this.disposed || this.triedCopy || !this.path) return
+    if (this.disposed || !this.path) return
+    if (this.triedCopy) {
+      this.onFail?.('the player cannot decode it')
+      return
+    }
     this.triedCopy = true
     this.playCopy(true, this.pos)
   }
 
   setPlayback(p: ClipPlayback): void {
+    const o = this.pb
+    if (this.atEnd) {
+      // the loop on : the next tick wraps to the in point; play pressed again
+      // (after a pause) : from the in point
+      if (p.loop !== o.loop) this.atEnd = false
+      else if (p.playing && !o.playing) {
+        this.atEnd = false
+        if (this.posMod === null) this.posMod = 0
+      }
+    }
     this.pb = p
   }
   setPosMod(v: number): void {
@@ -132,11 +159,12 @@ export class ClipPlayer {
     const d = this.duration()
     const inN = this.loopInMod ?? this.pb.inN, outN = this.loopOutMod ?? this.pb.outN
     this.loopInMod = this.loopOutMod = null
-    const posN = this.posMod
-    this.posMod = null
     const spMod = this.speedMod ?? 1
     this.speedMod = null
+    // (a seek asked for while the file loads waits for it)
     if (d <= 0 || a.readyState < 1) return
+    const posN = this.posMod
+    this.posMod = null
     if (this.held) {
       if (!a.paused) a.pause()
       return
@@ -151,6 +179,7 @@ export class ClipPlayer {
     // playhead goes there; a modulated one that moves smoothly is followed by
     // the element's own playback, a jump seeks (a scratch, a stutter).
     if (posN !== null) {
+      this.atEnd = false
       const t = lo + posN * Math.max(0, hi - lo - 0.02)
       if (Math.abs(a.currentTime - t) > 0.08 || !this.pb.playing) seek(t)
       else this.pos = t
@@ -161,13 +190,22 @@ export class ClipPlayer {
       if (posN === null) this.pos = a.currentTime
       return
     }
+    // held at the out point (loop off), unless the out point moved on past it
+    if (this.atEnd) {
+      if (!a.ended && a.currentTime < hi - 0.05) this.atEnd = false
+      else {
+        if (!a.paused) a.pause()
+        this.pos = hi
+        return
+      }
+    }
     const r = Math.min(RATE_MAX, rate)
     if (Math.abs(a.playbackRate - r) > 1e-3) a.playbackRate = r
     if (a.paused) void a.play().catch(() => { /* not ready yet */ })
     const ct = a.currentTime
     if (ct >= hi - 0.02 || a.ended) {
       if (this.pb.loop) seek(lo)
-      else { a.pause(); this.pos = hi }
+      else { a.pause(); this.pos = hi; this.atEnd = true }
     } else if (ct < lo - 0.05) seek(lo)
     else if (posN === null) this.pos = ct
   }
@@ -190,6 +228,7 @@ export class ClipPlayer {
         const inN = Math.max(0, Math.min(1, Math.min(this.pb.inN, this.pb.outN)))
         const at = d > 0 ? inN * d : 0
         a.pause()
+        this.atEnd = false
         this.pos = at
         const ready = (): void => {
           if (a.readyState >= 3) finish()
@@ -207,6 +246,7 @@ export class ClipPlayer {
   /** Start now (a synced start calls each player's in the same moment). */
   start(): void {
     this.held = false
+    this.atEnd = false
     const a = this.audio
     // (a pause meanwhile : the next tick pauses it again)
     void a.play().catch(() => { /* the next tick tries again */ })
