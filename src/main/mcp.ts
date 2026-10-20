@@ -28,6 +28,9 @@ const INSTRUCTIONS = [
 type GetWindow = () => BrowserWindow | null
 
 let server: Server | null = null
+// bumped on every start and stop : a request on a connection kept alive from an
+// earlier server (turned off, or moved to another port) is refused
+let generation = 0
 let status: McpStatus = { listening: false, port: 0 }
 let clientName = ''
 let nextId = 1
@@ -40,12 +43,15 @@ function rpcError(id: unknown, code: number, message: string): Record<string, un
   return { jsonrpc: '2.0', id: id ?? null, error: { code, message } }
 }
 
-/** Only this computer : a browser page elsewhere (DNS rebinding) never gets in. */
+/** Only this computer, and never a web page : the Host must be this machine
+ *  (DNS rebinding), an Origin, if any, a local one (a sandboxed page sends
+ *  "null" : refused). JSON only (checked in handle) : a page cannot post it
+ *  without a preflight this server never answers. */
 function allowed(req: IncomingMessage): boolean {
   const host = String(req.headers.host ?? '').toLowerCase()
   const hostOk = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)
   const origin = req.headers.origin
-  const originOk = !origin || origin === 'null' || /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(origin)
+  const originOk = !origin || /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(origin)
   return hostOk && originOk
 }
 
@@ -68,6 +74,8 @@ async function handleMessage(getWin: GetWindow, msg: Record<string, unknown>): P
   const id = msg.id
   const method = typeof msg.method === 'string' ? msg.method : ''
   const isRequest = id !== undefined && id !== null
+  // a response from the client (to nothing this server asked) : accepted, no answer
+  if (!method && ('result' in msg || 'error' in msg)) return null
   if (!method) return isRequest ? rpcError(id, -32600, 'Invalid request') : null
   const params = (msg.params && typeof msg.params === 'object' ? msg.params : {}) as Record<string, unknown>
   switch (method) {
@@ -92,7 +100,7 @@ async function handleMessage(getWin: GetWindow, msg: Record<string, unknown>): P
           title: t.title,
           description: t.description,
           inputSchema: t.inputSchema,
-          annotations: { title: t.title, readOnlyHint: !!t.readOnly, destructiveHint: false, openWorldHint: false }
+          annotations: { title: t.title, readOnlyHint: !!t.readOnly, destructiveHint: !!t.destructive, openWorldHint: false }
         }))
       })
     case 'tools/call': {
@@ -133,6 +141,9 @@ function handle(getWin: GetWindow, req: IncomingMessage, res: ServerResponse): v
     res.writeHead(405, { Allow: 'POST' })
     return void res.end()
   }
+  if (!String(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) {
+    return send(res, 415, rpcError(null, -32000, 'Send JSON (Content-Type: application/json).'))
+  }
   const chunks: Buffer[] = []
   let size = 0
   let dropped = false
@@ -168,8 +179,11 @@ function handle(getWin: GetWindow, req: IncomingMessage, res: ServerResponse): v
 }
 
 function stop(): void {
+  generation++
   if (server) {
     try { server.close() } catch { /* already down */ }
+    // keep-alive connections would go on serving : cut them
+    try { server.closeAllConnections() } catch { /* none */ }
     server = null
   }
   status = { listening: false, port: 0 }
@@ -182,8 +196,13 @@ function stop(): void {
 
 function start(getWin: GetWindow, port: number): Promise<McpStatus> {
   stop()
+  const gen = ++generation
   return new Promise((resolve) => {
     const s = createServer((req, res) => {
+      if (gen !== generation) {
+        res.writeHead(503, { Connection: 'close' })
+        return void res.end()
+      }
       try {
         handle(getWin, req, res)
       } catch (e) {

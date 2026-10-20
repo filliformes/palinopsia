@@ -19,7 +19,8 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format'
 import { makeRedirectableGL } from '../engine/Compositor'
 import { handle } from '../engine/isfTextureBridge'
 import { FX_SHADERS, GENERATORS, SHADER_BY_ID } from '../shaders/isf'
-import { categoryOf, registerUserShader, unregisterUserShader, userShaderId } from '../shaders/userShaders'
+import { categoryOf, registerUserShader, unregisterUserShader, userShaderId, userShaderIdsIn } from '../shaders/userShaders'
+import { outputCanvas } from '../engine/outputCanvas'
 import { compileIsf, lintIsf, type ShaderMark } from '../shaders/shaderCheck'
 import { useStore } from '../store'
 import { showToast } from './Toast'
@@ -233,6 +234,7 @@ export function SourceEditor(): JSX.Element {
   const draftRef = useRef(draft)
   draftRef.current = draft
   const setDraft = (d: Draft): void => {
+    draftRef.current = d
     setDraftState(d)
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* private storage */ }
   }
@@ -338,6 +340,8 @@ export function SourceEditor(): JSX.Element {
     glRef.current = g
     let raf = 0
     let lastLive = 0
+    let liveW = 1
+    let liveH = 1
     const onLost = (e: Event): void => { e.preventDefault(); cancelAnimationFrame(raf) }
     canvas.addEventListener('webglcontextlost', onLost)
     const loop = (): void => {
@@ -356,15 +360,17 @@ export function SourceEditor(): JSX.Element {
           const want = fxInputRef.current
           if (want === '__live') {
             const now = performance.now()
-            const main = [...document.querySelectorAll('canvas')].find((c) => c !== canvas && c.width > 64)
-            if (main && now - lastLive > 66) {
+            const main = outputCanvas()
+            if (main && main.width > 0 && now - lastLive > 66) {
               lastLive = now
               gl.bindTexture(gl.TEXTURE_2D, g.live)
               gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
               gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, main)
               gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+              liveW = main.width
+              liveH = main.height
             }
-            cur.setValue('inputImage', handle(g.live, W, H))
+            cur.setValue('inputImage', handle(g.live, liveW, liveH))
           } else {
             if (g.inGenId !== want) {
               try { g.inGen?.cleanup() } catch { /* gone */ }
@@ -404,6 +410,7 @@ export function SourceEditor(): JSX.Element {
       for (const x of [g.out, g.inp]) { gl.deleteTexture(x.tex); gl.deleteFramebuffer(x.fbo) }
       gl.deleteTexture(g.live)
       glRef.current = null
+      gl.getExtension('WEBGL_lose_context')?.loseContext()
     }
   }, [])
   const evNames = useRef(new Set<string>())
@@ -495,6 +502,17 @@ export function SourceEditor(): JSX.Element {
     if (confirm !== 'delete') { setConfirm('delete'); return }
     setConfirm('')
     await window.api.shadersDelete(SHADER_BY_ID[d.userId]?.name ?? d.name)
+    const st = useStore.getState()
+    const playing = userShaderIdsIn(st.composition)
+    userShaderIdsIn(st.scenes, playing)
+    if (playing.has(d.userId)) {
+      // still on screen (or in a scene) : it keeps playing, the session carries it
+      const info = st.userShaders.find((u) => u.id === d.userId)
+      if (info) upsert({ ...info, fromSession: true })
+      setDraft({ ...d, userId: null, saved: '' })
+      showToast(`“${d.name}” removed from your Shaders folder : it keeps playing where it is (the session carries it)`, 'ok', 5000)
+      return
+    }
     unregisterUserShader(d.userId)
     removeUser(d.userId)
     setDraft({ ...d, userId: null, saved: '' })

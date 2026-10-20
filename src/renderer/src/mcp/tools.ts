@@ -10,7 +10,8 @@ import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { canHostFx } from '../fxScopes'
 import { BLEND_MODES, type BlendMode, type FxInstance, type FxScope, type SourceSlot } from '@shared/types'
 import type { McpContent, McpResult } from '@shared/mcpTools'
-import { oscLeafList, routeOsc } from '../oscInput'
+import { oscLeafList, resetOscEdge, routeOsc } from '../oscInput'
+import { outputCanvas } from '../engine/outputCanvas'
 import { commitNow, undo } from '../undo'
 import { categoryOf, registerUserShader } from '../shaders/userShaders'
 import { renderStill, type ShaderMark } from '../shaders/shaderCheck'
@@ -23,12 +24,6 @@ const fail = (msg: string): never => {
 const st = (): ReturnType<typeof useStore.getState> => useStore.getState()
 const r3 = (x: number): number => Math.round(x * 1000) / 1000
 const text = (x: unknown): McpContent => ({ type: 'text', text: typeof x === 'string' ? x : JSON.stringify(x) })
-
-// ── the output canvas (App registers it) ───────────────────────────────
-let canvasOf: (() => HTMLCanvasElement | null) | null = null
-export function registerAgentCanvas(fn: (() => HTMLCanvasElement | null) | null): void {
-  canvasOf = fn
-}
 
 // ── shaders : find one, say what it is ─────────────────────────────────
 const LOCKED_MASTER: Record<string, string> = { vibe: 'fx-vibe', context: 'fx-context', finalizer: 'fx-finalizer' }
@@ -221,11 +216,12 @@ function toValue(d: IsfInputDesc, v: unknown, unitAddr: string): number | number
     }
     case 'color': {
       if (!Array.isArray(v) || v.length < 3) fail(`${where} : a color is [r, g, b] or [r, g, b, a], each 0-1.`)
-      let c = (v as unknown[]).slice(0, 4).map(num)
-      if (c.some((x) => x > 1)) c = c.map((x) => x / 255) // 0-255 given
-      c = c.map((x) => Math.max(0, Math.min(1, x)))
-      if (c.length === 3) c.push(1)
-      return c
+      const c = (v as unknown[]).slice(0, 4).map(num)
+      // 0-255 given : read from the color itself (an alpha of 1 stays 1)
+      const rgb = c.slice(0, 3)
+      const scaled = rgb.some((x) => x > 1.5) ? rgb.map((x) => x / 255) : rgb
+      const a = c.length > 3 ? (c[3] > 1.5 ? c[3] / 255 : c[3]) : 1
+      return [...scaled, a].map((x) => Math.max(0, Math.min(1, x)))
     }
     case 'point2D': {
       if (!Array.isArray(v) || v.length < 2) fail(`${where} : a point is [x, y].`)
@@ -265,7 +261,11 @@ function resolveValues(shaderId: string, values: unknown, addr: string): Resolve
 async function writeValues(u: Unit, r: Resolved): Promise<string[]> {
   const set = (vals: Record<string, number | number[]>): void => {
     const s = st()
-    if (u.kind === 'fx') s.setFxInputs(u.scope, u.inst.id, vals)
+    if (u.kind === 'fx') {
+      // setFxInputs replaces them all : the ones not named keep their values
+      const cur = (u.scope.kind === 'master' ? s.composition.master : rackOf(u.scope)).find((f) => f.id === u.inst.id)
+      s.setFxInputs(u.scope, u.inst.id, { ...(cur?.inputs ?? {}), ...vals })
+    }
     else if (u.kind === 'bg') for (const [k, v] of Object.entries(vals)) s.setBackgroundInput(k, v)
     else for (const [k, v] of Object.entries(vals)) s.setSourceInput(u.layer, u.slot, k, v)
   }
@@ -372,7 +372,7 @@ function getState(args: Record<string, unknown>): McpResult {
 }
 
 async function snapshot(args: Record<string, unknown>): Promise<McpResult> {
-  const canvas = canvasOf?.()
+  const canvas = outputCanvas()
   if (!canvas || !canvas.width) fail('The output is not running.')
   const cv = canvas as HTMLCanvasElement
   const W = Math.max(128, Math.min(1280, Math.round(Number(args.width) || 640)))
@@ -461,37 +461,48 @@ async function setControls(args: Record<string, unknown>): Promise<McpResult> {
 function setLayer(args: Record<string, unknown>): McpResult {
   const layer = layerArg(args.layer)
   const s = st()
+  // every value read and checked first : a wrong one changes nothing
   const n = (k: string, lo: number, hi: number): number | undefined => {
     if (args[k] === undefined) return undefined
     const v = Number(args[k])
     if (!Number.isFinite(v)) fail(`${k} is a number.`)
     return Math.max(lo, Math.min(hi, v))
   }
-  const done: string[] = []
-  if (layer === 'bg') {
-    const o = n('opacity', 0, 1); if (o !== undefined) { s.setBackgroundOpacity(o); done.push('opacity') }
-    const sp = n('speed', 0, 4); if (sp !== undefined) { s.setBackgroundSpeed(sp); done.push('speed') }
-    const d = n('depth', 0, 1); if (d !== undefined) { s.setBackgroundDepth(d); done.push('depth') }
-    if (typeof args.group === 'boolean') { s.setBackgroundBlendMode(args.group ? 'isolate' : 'blend'); done.push('group') }
-    return { content: [text(`bg : set ${done.join(', ') || 'nothing'}.`)] }
-  }
-  const l = s.composition.layers[layer]
   const blend = (k: string): BlendMode | undefined => {
     if (args[k] === undefined) return undefined
     const b = String(args[k]).toLowerCase().replace(/[^a-z]/g, '') as BlendMode
     if (!BLEND_MODES.includes(b)) fail(`${k} : “${String(args[k])}” is not a blend (${BLEND_MODES.join(' ')}).`)
     return b
   }
-  const o = n('opacity', 0, 1); if (o !== undefined) { s.setOpacity(layer, o); done.push('opacity') }
-  const b = blend('blend'); if (b) { s.setBlend(layer, b); done.push('blend') }
-  const mx = n('mix', 0, 1); if (mx !== undefined) { s.setSourceMix(layer, mx); done.push('mix') }
-  const sb = blend('source_blend'); if (sb) { s.setSourceBlend(layer, sb); done.push('source_blend') }
+  const done: string[] = []
+  if (layer === 'bg') {
+    const o = n('opacity', 0, 1)
+    const sp = n('speed', 0, 4)
+    const d = n('depth', 0, 1)
+    if (o !== undefined) { s.setBackgroundOpacity(o); done.push('opacity') }
+    if (sp !== undefined) { s.setBackgroundSpeed(sp); done.push('speed') }
+    if (d !== undefined) { s.setBackgroundDepth(d); done.push('depth') }
+    if (typeof args.group === 'boolean') { s.setBackgroundBlendMode(args.group ? 'isolate' : 'blend'); done.push('group') }
+    return { content: [text(`bg : set ${done.join(', ') || 'nothing'}.`)] }
+  }
+  const l = s.composition.layers[layer]
+  const o = n('opacity', 0, 1)
+  const b = blend('blend')
+  const mx = n('mix', 0, 1)
+  const sb = blend('source_blend')
+  const sp = n('speed', 0, 4)
+  const tr = n('trail', 0, 1)
+  const h = n('harmony', 0, 1)
+  if (o !== undefined) { s.setOpacity(layer, o); done.push('opacity') }
+  if (b) { s.setBlend(layer, b); done.push('blend') }
+  if (mx !== undefined) { s.setSourceMix(layer, mx); done.push('mix') }
+  if (sb) { s.setSourceBlend(layer, sb); done.push('source_blend') }
   if (typeof args.mute === 'boolean' && args.mute !== l.mute) { s.toggleMute(layer); done.push('mute') }
   if (typeof args.solo === 'boolean' && args.solo !== l.solo) { s.toggleSolo(layer); done.push('solo') }
-  const sp = n('speed', 0, 4); if (sp !== undefined) { s.setLayerSpeed(layer, sp); done.push('speed') }
+  if (sp !== undefined) { s.setLayerSpeed(layer, sp); done.push('speed') }
   if (typeof args.feedback === 'boolean' && args.feedback !== l.feedback) { s.toggleFeedback(layer); done.push('feedback') }
-  const tr = n('trail', 0, 1); if (tr !== undefined) { s.setFeedbackAmount(layer, tr); done.push('trail') }
-  const h = n('harmony', 0, 1); if (h !== undefined) { s.setHarmony(layer, h); done.push('harmony') }
+  if (tr !== undefined) { s.setFeedbackAmount(layer, tr); done.push('trail') }
+  if (h !== undefined) { s.setHarmony(layer, h); done.push('harmony') }
   return { content: [text(`L${layer + 1} : set ${done.join(', ') || 'nothing'}.`)] }
 }
 
@@ -529,22 +540,23 @@ function editEffect(args: Record<string, unknown>): McpResult {
     s.removeFx(f.scope, f.inst.id)
     return { content: [text(`${name} removed from ${rackName(f.scope)}.`)] }
   }
+  const mix = args.mix === undefined ? undefined : Number(args.mix)
+  if (mix !== undefined && !Number.isFinite(mix)) fail('mix is a number 0-1.')
+  const pos = args.position === undefined ? undefined : Math.round(Number(args.position))
+  if (pos !== undefined) {
+    if (f.inst.locked) fail(`${name} is pinned : it stays where it is.`)
+    if (!(pos >= 1)) fail('position counts from 1.')
+  }
   const done: string[] = []
   if (typeof args.enabled === 'boolean' && args.enabled !== f.inst.enabled) { s.toggleFx(f.scope, f.inst.id); done.push(args.enabled ? 'on' : 'off') }
-  if (args.mix !== undefined) {
-    const v = Number(args.mix)
-    if (!Number.isFinite(v)) fail('mix is a number 0-1.')
-    s.setFxOpacity(f.scope, f.inst.id, Math.max(0, Math.min(1, v)))
+  if (mix !== undefined) {
+    s.setFxOpacity(f.scope, f.inst.id, Math.max(0, Math.min(1, mix)))
     done.push('mix')
   }
-  if (args.position !== undefined) {
-    if (f.inst.locked) fail(`${name} is pinned : it stays where it is.`)
+  if (pos !== undefined) {
     const others = rackOf(f.scope).filter((x) => x.id !== f.inst.id)
-    const p = Math.round(Number(args.position))
-    if (!(p >= 1)) fail('position counts from 1.')
-    const beforeId = others[p - 1]?.id ?? null
-    s.moveFxTo(f.scope, f.inst.id, f.scope, beforeId)
-    done.push(`moved to ${p}`)
+    s.moveFxTo(f.scope, f.inst.id, f.scope, others[pos - 1]?.id ?? null)
+    done.push(`moved to ${pos}`)
   }
   const now = rackOf(f.scope).findIndex((x) => x.id === f.inst.id)
   return { content: [text(`${name} (${now >= 0 ? fxAddr(f.scope, now) : f.addr}) : ${done.join(', ') || 'unchanged'}.`)] }
@@ -575,14 +587,18 @@ async function writeShader(args: Record<string, unknown>): Promise<McpResult> {
   if (still.marks.length) lines.push(marksText(still.marks, source))
   if (typeof args.use === 'string' && args.use.trim()) {
     const where = args.use.trim()
-    if (info.category === 'FX') {
-      const res = await addEffect({ rack: where, shader: info.id, values: args.values })
-      lines.push(String((res.content[0] as { text?: string }).text ?? ''))
-    } else {
-      const m = where.toLowerCase().match(/^(?:l|layer)([1-4])(?:\.([ab]))?$|^(bg|background)$/)
-      if (!m) fail(`use : “${where}” is not a source slot (L1.A, L2.B, bg).`)
-      const res = await setSource({ layer: m![3] ? 'bg' : Number(m![1]), slot: (m![2] ?? 'a').toUpperCase(), shader: info.id, values: args.values })
-      lines.push(String((res.content[0] as { text?: string }).text ?? ''))
+    try {
+      if (info.category === 'FX') {
+        const res = await addEffect({ rack: where, shader: info.id, values: args.values })
+        lines.push(String((res.content[0] as { text?: string }).text ?? ''))
+      } else {
+        const m = where.toLowerCase().match(/^(?:l|layer)([1-4])(?:\.([ab]))?$|^(bg|background)$/)
+        if (!m) fail(`“${where}” is not a source slot (L1.A, L2.B, bg).`)
+        const res = await setSource({ layer: m![3] ? 'bg' : Number(m![1]), slot: (m![2] ?? 'a').toUpperCase(), shader: info.id, values: args.values })
+        lines.push(String((res.content[0] as { text?: string }).text ?? ''))
+      }
+    } catch (e) {
+      lines.push(`It is saved, but putting it to work failed : ${(e as Error).message}`)
     }
   }
   return {
@@ -667,6 +683,7 @@ function osc(args: Record<string, unknown>): McpResult {
     return { type: 's', value: String(v) }
   })
   routeOsc(address, oscArgs)
+  resetOscEdge(address)
   return { content: [text(`Sent ${address}${oscArgs.length ? ` ${oscArgs.map((a) => String(a.value)).join(' ')}` : ''}.`)] }
 }
 
@@ -701,10 +718,21 @@ export function toolWrites(name: string): boolean {
   return !!TOOLS[name]?.writes
 }
 
+// Changes run one after another (two calls at once : two undo steps, in order,
+// the Inspector restored to what it was before the first).
+let writes: Promise<unknown> = Promise.resolve()
+
 /** Run one tool. A change is one undo step and leaves the Inspector alone. */
-export async function runTool(name: string, args: Record<string, unknown>): Promise<McpResult> {
+export function runTool(name: string, args: Record<string, unknown>): Promise<McpResult> {
   const t = TOOLS[name]
-  if (!t) return { content: [text(`Unknown tool ${name}.`)], isError: true }
+  if (!t) return Promise.resolve({ content: [text(`Unknown tool ${name}.`)], isError: true })
+  if (!t.writes) return runOne(t, args)
+  const p = writes.then(() => runOne(t, args))
+  writes = p.catch(() => undefined)
+  return p
+}
+
+async function runOne(t: { run: Tool; writes: boolean }, args: Record<string, unknown>): Promise<McpResult> {
   const selection = st().selection
   if (t.writes) commitNow() // the performer's edit in progress : its own step
   try {
@@ -715,7 +743,8 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
   } finally {
     if (t.writes) {
       commitNow() // the agent's change : one step
-      if (st().selection !== selection) st().setSelection(selection)
+      // straight back (setSelection would also open a collapsed Inspector)
+      if (st().selection !== selection) useStore.setState({ selection })
     }
   }
 }

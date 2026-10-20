@@ -9,6 +9,7 @@ import { promises as fs, mkdirSync } from 'fs'
 import { basename, extname, join } from 'path'
 import { userFilesBase } from './paths'
 import { lastDir, rememberDir } from './lastDir'
+import { userShaderId } from '@shared/userShaderId'
 
 const EXT = /\.(fs|frag|glsl|isf)$/i
 
@@ -42,7 +43,24 @@ async function list(): Promise<Array<{ name: string; file: string; source: strin
       out.push({ name: basename(f, extname(f)), file: p, source: await fs.readFile(p, 'utf8'), mtime: st.mtimeMs })
     } catch { /* unreadable : skipped */ }
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name))
+  // two files that are one shader ("Foo.fs" and "Foo.frag", "Waves 2" and
+  // "Waves_2") : the newest is the one
+  const byId = new Map<string, (typeof out)[number]>()
+  for (const s of out) {
+    const id = userShaderId(s.name)
+    const had = byId.get(id)
+    if (!had || s.mtime > had.mtime) byId.set(id, s)
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Every file that is the shader called `name` (its id) : the others are
+ *  removed when it is saved again under this name; all go when it is deleted. */
+async function filesOf(name: string): Promise<string[]> {
+  const id = userShaderId(name)
+  let names: string[] = []
+  try { names = await fs.readdir(shadersDir()) } catch { return [] }
+  return names.filter((f) => EXT.test(f) && userShaderId(basename(f, extname(f))) === id).map((f) => join(shadersDir(), f))
 }
 
 export function registerUserShaders(): void {
@@ -52,17 +70,19 @@ export function registerUserShaders(): void {
     const file = join(shadersDir(), `${n}.fs`)
     try {
       await fs.writeFile(file, String(source ?? ''), 'utf8')
+      // the same shader under another spelling or extension : this one replaces it
+      for (const f of await filesOf(n)) if (f.toLowerCase() !== file.toLowerCase()) await fs.unlink(f).catch(() => {})
       return { ok: true, name: n, file }
     } catch (e) {
       return { ok: false, name: n, file, error: (e as Error).message }
     }
   })
   ipcMain.handle('shaders:delete', async (_e, name: string) => {
-    const n = fileNameOf(String(name ?? ''))
-    for (const ext of ['.fs', '.frag', '.glsl', '.isf']) {
-      try { await fs.unlink(join(shadersDir(), n + ext)); return true } catch { /* not this one */ }
+    let gone = false
+    for (const f of await filesOf(fileNameOf(String(name ?? '')))) {
+      try { await fs.unlink(f); gone = true } catch { /* not this one */ }
     }
-    return false
+    return gone
   })
   ipcMain.handle('shaders:openFile', async () => {
     const r = await dialog.showOpenDialog({

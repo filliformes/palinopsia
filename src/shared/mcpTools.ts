@@ -15,6 +15,8 @@ export interface McpToolDef {
   inputSchema: Record<string, unknown>
   /** true : it only reads (the client may run it without asking) */
   readOnly?: boolean
+  /** true : it can remove or overwrite something (an effect, a scene, a file) */
+  destructive?: boolean
 }
 
 const unit = {
@@ -163,7 +165,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         remove: { type: 'boolean' }
       },
       required: ['unit']
-    }
+    },
+    destructive: true
   },
   {
     name: 'write_shader',
@@ -179,7 +182,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         values: { type: 'object', description: 'Control values for the preview image (and for `use`).', additionalProperties: true }
       },
       required: ['name', 'source']
-    }
+    },
+    destructive: true
   },
   {
     name: 'preview_shader',
@@ -208,7 +212,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         name: { type: 'string', description: 'The name (save, rename).' }
       },
       required: ['action']
-    }
+    },
+    destructive: true
   },
   {
     name: 'list_controls',

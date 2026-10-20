@@ -55,7 +55,7 @@ import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify
 import { audioLayer, defaultAudioLayer, sanitizeAudioLayer } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
-import { registerUserShader, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
+import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
@@ -4836,15 +4836,26 @@ export const useStore = create<StoreState>((set, get) => ({
       return
     }
     // Your own shaders it plays, from the session itself : entered before the
-    // composition syncs (one already here keeps its file; the session's version
-    // plays, as it was made with it).
+    // composition syncs. One you also have, but different : yours stays as it is
+    // (your file, your menus) and the session plays its own version, entered as
+    // "<name> (session)" under its own id.
     if (s.userShaders && typeof s.userShaders === 'object') {
-      for (const u of Object.values(s.userShaders)) {
+      const remap = new Map<string, string>()
+      for (const [sid, u] of Object.entries(s.userShaders)) {
         if (!u || typeof u.name !== 'string' || typeof u.source !== 'string') continue
-        const known = get().userShaders.find((x) => x.name === u.name && !x.fromSession)
-        const info = registerUserShader(u.name, u.source, !known)
-        get().upsertUserShader(known ? { ...info, fromSession: false } : info)
+        const id = userShaderId(u.name)
+        const mine = get().userShaders.find((x) => x.id === id && !x.fromSession)
+        if (mine && SHADER_BY_ID[id] && SHADER_BY_ID[id].source !== u.source) {
+          const info = registerUserShader(`${u.name} (session)`, u.source, true)
+          get().upsertUserShader(info)
+          remap.set(sid, info.id)
+          continue
+        }
+        const info = registerUserShader(u.name, u.source, !mine)
+        get().upsertUserShader(mine ? { ...info, fromSession: false } : info)
+        if (info.id !== sid) remap.set(sid, info.id)
       }
+      if (remap.size) s = { ...s, composition: remapShaderIds(s.composition, remap), scenes: s.scenes ? remapShaderIds(s.scenes, remap) : s.scenes }
     }
     // Another session over the Morph time, layer by layer and live (morph.ts
     // relay : each new layer fades in once compiled, the old ones out). At Morph

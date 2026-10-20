@@ -452,7 +452,8 @@ function createWindow(): void {
   // Alt+E opens the Source Editor. Taken here, before the page : on Windows the
   // hidden default menu would otherwise open its Edit menu on Alt+E.
   mainWindow.webContents.on('before-input-event', (e, input) => {
-    if (input.type !== 'keyDown' || !input.alt || input.control || input.meta || input.key.toLowerCase() !== 'e') return
+    if (input.type !== 'keyDown' || !input.alt || input.control || input.meta) return
+    if (input.key.toLowerCase() !== 'e' && input.code !== 'KeyE') return
     e.preventDefault()
     mainWindow?.webContents.send('app:shortcut', 'sourceEditor')
   })

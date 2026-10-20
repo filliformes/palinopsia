@@ -68,7 +68,7 @@ import { DataflouSection } from './components/DataflouSection'
 import { LinkSection } from './components/LinkSection'
 import { AgentBadge, McpSection } from './components/McpSection'
 import { initAgent } from './mcp/agent'
-import { registerAgentCanvas } from './mcp/tools'
+import { registerOutputCanvas } from './engine/outputCanvas'
 import { placeAssemblage, unitPlace } from './assemble/place'
 import { registerUserShader, takeShaderReloads } from './shaders/userShaders'
 import { SourceEditor } from './components/SourceEditor'
@@ -857,6 +857,9 @@ export default function App(): JSX.Element {
         el?.tagName === 'TEXTAREA' ||
         el?.tagName === 'SELECT' ||
         el?.isContentEditable === true
+      // The Source Editor covers the app : its keys are its own (Esc closes it,
+      // Ctrl/Cmd+S saves the shader), nothing under it fires.
+      if (useStore.getState().sourceEditorOpen && e.key !== 'Escape') return
       // ? : the keyboard cheat-sheet (Shift+/ on most layouts). Toggles.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key === '?') {
         e.preventDefault()
@@ -1197,8 +1200,8 @@ export default function App(): JSX.Element {
       depthModePrev = ''
       // The `0` key + the Transport's flush button both fire panic through here.
       registerPanic(() => compositorRef.current?.panic())
-      // The agent's snapshot reads the output from this canvas.
-      registerAgentCanvas(() => canvas)
+      // The agent's snapshot and the Source Editor's live input read it here.
+      registerOutputCanvas(() => canvas)
       // Warm the video encoder and the sound bus up, once, after the launch has
       // settled : the first take of a session no longer waits for them (see
       // warmUpRecorder).

@@ -29,7 +29,8 @@ export function lintIsf(source: string): ShaderMark[] {
     const im = code.match(/IMG_(?:NORM_)?PIXEL\s*\(\s*\w+\s*,\s*([^)]*)\)/)
     if (im && !/^\s*\w+\s*$/.test(im[1])) out.push({ line: i + 1, level: 'warn', msg: 'IMG_NORM_PIXEL / IMG_PIXEL want a plain variable as their coordinate : put the expression in a vec2 first.' })
     for (const ev of events) {
-      if (new RegExp(`\\b${ev}\\s*[<>=!]=?\\s*[0-9.]`).test(code))
+      const name = ev.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (new RegExp(`\\b${name}\\s*[<>=!]=?\\s*[0-9.]`).test(code))
         out.push({ line: i + 1, level: 'warn', msg: `“${ev}” is an event : a bool here. Test it as it is (if (${ev})), not against a number.` })
     }
   })

@@ -249,6 +249,12 @@ function rising(address: string, v: number): boolean {
   return now && !was
 }
 
+/** Forget a trigger's last state : a press sent from elsewhere (the agent) must
+ *  not swallow the controller's next one, nor its own next one. */
+export function resetOscEdge(address: string): void {
+  edge.delete(address)
+}
+
 function route(address: string, args: Args): void {
   // Resolume's own OSC output (its addresses start /composition) feeds the
   // mapper's LEARN mode : wiggle a control in Resolume and it becomes a column.

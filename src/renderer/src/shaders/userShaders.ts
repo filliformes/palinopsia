@@ -7,6 +7,9 @@
 
 import { SHADER_BY_ID, type IsfShader } from './isf'
 import { invalidateInputs } from './isf/inputs'
+import { USER_PREFIX, userShaderId } from '@shared/userShaderId'
+
+export { USER_PREFIX, userShaderId }
 
 export interface UserShaderInfo {
   id: string
@@ -15,14 +18,7 @@ export interface UserShaderInfo {
   fromSession?: boolean // carried by a session, not (yet) a file in the Shaders folder
 }
 
-export const USER_PREFIX = 'user-'
 export const isUserShader = (id: string | null | undefined): boolean => !!id && id.startsWith(USER_PREFIX)
-
-/** The id a name gets : stable, so a session and a preset find it again. */
-export function userShaderId(name: string): string {
-  const slug = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return USER_PREFIX + (slug || 'shader')
-}
 
 /** A generator or an effect : an effect reads the picture under it (an image
  *  input named inputImage) or says it is one (CATEGORIES). */
@@ -47,7 +43,8 @@ export function registerUserShader(name: string, source: string, fromSession = f
   const prev = SHADER_BY_ID[id]
   SHADER_BY_ID[id] = { id, name, category, source, user: true } as IsfShader
   invalidateInputs(id)
-  if (prev && prev.source !== source) reloads.add(id)
+  // a new source, or one coming back after a delete : where it plays loads it
+  if (!prev || prev.source !== source) reloads.add(id)
   return { id, name, category, fromSession }
 }
 
@@ -65,6 +62,21 @@ export function takeShaderReloads(): string[] {
   const a = [...reloads]
   reloads.clear()
   return a
+}
+
+/** A copy of `value` with its shader ids renamed (`map` : old id → new) : a
+ *  session's own version of a shader you also have, played under its own id. */
+export function remapShaderIds<T>(value: T, map: Map<string, string>): T {
+  const walk = (v: unknown, depth: number): unknown => {
+    if (!v || typeof v !== 'object' || depth > 12) return v
+    if (Array.isArray(v)) return v.map((x) => walk(x, depth + 1))
+    const out: Record<string, unknown> = {}
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      out[k] = k === 'shaderId' && typeof x === 'string' && map.has(x) ? map.get(x) : walk(x, depth + 1)
+    }
+    return out
+  }
+  return walk(value, 0) as T
 }
 
 /** Every one of your shaders a value refers to (any `shaderId` in it, deep) :
