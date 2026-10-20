@@ -321,8 +321,9 @@ function persistSpace(c: SpaceConfig): SpaceConfig {
 function loadDome(): DomeConfig {
   try {
     const raw = localStorage.getItem('opsia.dome')
-    // The mapping is remembered; the dome itself always starts OFF.
-    if (raw) return { ...sanitizeDome(JSON.parse(raw)), enabled: false }
+    // The mapping is remembered; the dome itself always starts OFF, and so does
+    // its alignment grid (a setup aid : never left burned into a show).
+    if (raw) return { ...sanitizeDome(JSON.parse(raw)), enabled: false, grid: false }
   } catch {
     /* fresh defaults */
   }
@@ -4008,7 +4009,10 @@ export const useStore = create<StoreState>((set, get) => ({
   dome: loadDome(),
   setDome: (patch) => {
     const was = get().dome.enabled
-    set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch })) }))
+    // Turning the dome off puts its alignment grid away : the next time it is
+    // on, the grid is off until you ask for it.
+    const off = patch.enabled === false && was
+    set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, ...patch, ...(off ? { grid: false } : {}) })) }))
     const on = get().dome.enabled
     // the Satosphère square (if armed) comes with the dome and goes with it
     if (on && !was) enterDomeSquare(get(), set)

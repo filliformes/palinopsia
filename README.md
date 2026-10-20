@@ -1278,8 +1278,10 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   screen's border, the panorama's top and bottom, a cropped or contained frame, and the
   rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
-  red, burned into the master for projector alignment. (The Mapping section's grid and
-  warp sit out while the dome is on, on the projector window too.)
+  red, burned into the master for projector alignment. It is a setup aid : it starts off
+  every time the app opens, and turning the dome off puts it away (the rest of the dome
+  setup is remembered). (The Mapping section's grid and warp sit out while the dome is
+  on, on the projector window too.)
 - **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
   azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
   modulator or a Meta knob; right-click clears), and while bound the slider turns the

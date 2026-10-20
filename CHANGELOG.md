@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The dome's grid on output is no longer remembered** (`loadDome`, `setDome` in
+  `store.ts`) : the whole dome setup lived in localStorage, the grid with it, so once
+  turned on it came back with every dome toggle and every launch, burned into the
+  master. It now starts off at launch and turning the dome off turns it off.
 - **Cloud Study source** (`shaders/isf/CloudStudy.fs`, an ISF generator in two passes) : a
   volumetric cloud ray-marched at half resolution into the `cloud` target (30 steps,
   longer strides through open sky, 4 octaves of value noise normalized so COVERAGE is
