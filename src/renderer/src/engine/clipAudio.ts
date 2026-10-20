@@ -11,7 +11,12 @@ import type { AudioFeature, ClipAudioSrc } from '@shared/types'
 export const CLIP_FEATS = 13 // level, flux, centroid, 6 bands, pitch, noisiness, rms dB, peak dB
 const F_LEVEL = 0, F_FLUX = 1, F_CENT = 2, F_BAND = 3, F_PITCH = 9, F_NOISE = 10, F_RMS = 11, F_PEAK = 12
 const STILL_MS = 150 // a playhead unmoved this long : the clip is silent
-const JUMP_S = 0.5 // farther than this between two reads : a jump, not a sweep
+// this much farther (or nearer) than its speed takes it between two reads : a
+// jump, not a sweep (a fixed distance read every read of a fast clip as a jump)
+const JUMP_S = 0.5
+const WRAP_S = 0.03 // a step back against the way it plays, longer than this : a wrap
+const RETRY_MS = 10000 // a failed analysis is asked for again after this (then twice as long, to 5 min)
+const RETRY_MAX_MS = 300000
 
 export interface ClipAnalysis {
   duration: number
@@ -39,7 +44,15 @@ export interface ClipReadState {
   movedAt: number
   transient: number
   at: number
+  // the speed of its last three steps (clip seconds a second) : the one it plays
+  // at is their median (a seek or a wrap among them does not count)
+  r0: number
+  r1: number
+  r2: number
 }
+
+const median3 = (a: number, b: number, c: number): number =>
+  Math.max(Math.min(a, b), Math.min(Math.max(a, b), c))
 
 class ClipAudio {
   private store = new Map<string, ClipAnalysis | ClipAudioState>()
@@ -57,14 +70,30 @@ class ClipAudio {
     this.playheads = fn
   }
 
-  /** The analysis of `path`, asked for the first time it is wanted. */
+  // A failed analysis (ffmpeg busy or missing, the file on a drive not mounted
+  // yet) : when it may be asked for again, and how long the next wait is.
+  private failedAt = new Map<string, { at: number; wait: number }>()
+
+  /** The analysis of `path`, asked for the first time it is wanted (one that
+   *  failed : again, once its wait is over). */
   get(path: string): ClipAnalysis | null {
     const v = this.store.get(path)
     if (v === undefined) {
       this.request(path)
       return null
     }
+    if (v === 'failed') {
+      const f = this.failedAt.get(path)
+      if (!f || performance.now() - f.at >= f.wait) this.request(path)
+      return null
+    }
     return typeof v === 'string' ? null : v
+  }
+
+  private failed(path: string): void {
+    this.store.set(path, 'failed')
+    const f = this.failedAt.get(path)
+    this.failedAt.set(path, { at: performance.now(), wait: f ? Math.min(RETRY_MAX_MS, f.wait * 2) : RETRY_MS })
   }
 
   state(path: string): ClipAudioState | undefined {
@@ -85,10 +114,11 @@ class ClipAudio {
   private request(path: string): void {
     this.store.set(path, 'pending')
     const api = (window as unknown as { api?: { audioAnalysis?: (p: string) => Promise<{ ok: boolean; silent?: boolean; duration?: number; frames?: number; rate?: number; peakRate?: number; data?: Uint8Array; peaks?: number }> } }).api
-    if (!api?.audioAnalysis) { this.store.set(path, 'failed'); return }
+    if (!api?.audioAnalysis) { this.failed(path); return }
     void api.audioAnalysis(path).then(
       (r) => {
         if (r?.ok && r.data && r.frames) {
+          this.failedAt.delete(path)
           const data = r.data instanceof Uint8Array ? r.data : new Uint8Array(r.data as ArrayBufferLike)
           const n = r.frames * CLIP_FEATS
           const peaks = r.peaks ?? 0
@@ -101,12 +131,13 @@ class ClipAudio {
             peaks: new Int8Array(data.buffer, data.byteOffset + n, peaks * 2),
             peakCount: peaks
           })
-        } else this.store.set(path, r?.ok && r.silent ? 'silent' : 'failed')
+        } else if (r?.ok && r.silent) this.store.set(path, 'silent')
+        else this.failed(path)
         this.version++
         for (const l of this.listeners) l()
       },
       () => {
-        this.store.set(path, 'failed')
+        this.failed(path)
         this.version++
         for (const l of this.listeners) l()
       }
@@ -133,7 +164,16 @@ class ClipAudio {
     // flux : the most of it between the last read and now (a jump : here only)
     let flux = 0
     if (moved) {
-      const jump = fresh || Math.abs(t - st.t) > JUMP_S
+      if (fresh) st.r0 = st.r1 = st.r2 = 0
+      const d = t - st.t
+      // where its speed takes it since the last read (a clip at 64x moves a second
+      // a frame : a sweep, not a jump); a step back against the way it plays is
+      // a loop's wrap (however short the loop) : the new place, not a sweep
+      // across the whole loop
+      const rate = median3(st.r0, st.r1, st.r2), expect = rate * dt
+      const wrap = !fresh && Math.abs(rate) > 0.05 && d * rate < 0 && Math.abs(d) > Math.max(WRAP_S, 2 * Math.abs(expect))
+      const jump = fresh || wrap || Math.abs(d - expect) > JUMP_S + Math.abs(expect)
+      if (!fresh && dt > 0) { st.r2 = st.r1; st.r1 = st.r0; st.r0 = d / dt }
       const a = jump ? t : Math.min(st.t, t), b = jump ? t : Math.max(st.t, t)
       const f0 = Math.max(0, Math.min(an.frames - 1, Math.floor(a * an.rate) + (jump ? 0 : 1)))
       const f1 = Math.max(0, Math.min(an.frames - 1, Math.floor(b * an.rate)))
@@ -175,5 +215,5 @@ class ClipAudio {
 export const clipAudio = new ClipAudio()
 
 export function newClipReadState(): ClipReadState {
-  return { path: '', t: 0, movedAt: 0, transient: 0, at: 0 }
+  return { path: '', t: 0, movedAt: 0, transient: 0, at: 0, r0: 0, r1: 0, r2: 0 }
 }

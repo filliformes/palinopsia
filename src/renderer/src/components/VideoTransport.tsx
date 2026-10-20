@@ -562,8 +562,9 @@ function LevelRow({ layer, slot, path, volume, onVolume, audio }: {
         <span ref={numRef} className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">0.000</span>
       )}
       <span className="shrink-0 font-mono text-[9px] uppercase text-muted">vol</span>
+      {/* (an Audio Layer slot's volume is a gain to 2, like its live inputs; an <audio>'s stops at 1) */}
       <input
-        type="range" min={0} max={1} step={0.01} value={volume}
+        type="range" min={0} max={layer < 0 ? 2 : 1} step={0.01} value={volume}
         onChange={(e) => onVolume(Number(e.target.value))}
         onDoubleClick={() => onVolume(audio ? 0.8 : 0)}
         className="w-16 shrink-0 accent-accent"

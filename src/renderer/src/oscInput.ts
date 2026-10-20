@@ -922,7 +922,14 @@ function route(address: string, args: Args): void {
       if (a === 'volume') { st.patchAudioLayer({ volume: Math.max(0, Math.min(2, n)) }); return }
       if (a === 'mix') { st.patchAudioLayer({ mix: clamp01(n) }); return }
       if (a === 'mute') { st.patchAudioLayer({ mute: n >= 0.5 }); return }
-      if (a === 'play') { st.playAudioLayer(n >= 0.5); return }
+      if (a === 'play') {
+        // a start on the rising edge only (a held 1, a fader streaming over 0.5,
+        // restarted both files every message); under 0.5 pauses, on the change
+        const was = edge.get(address)
+        if (rising(address, n)) st.playAudioLayer(true)
+        else if (n < 0.5 && was !== false) st.playAudioLayer(false)
+        return
+      }
       if (a !== 'A' && a !== 'B') return
       const sl = a
       const x = al[sl]
