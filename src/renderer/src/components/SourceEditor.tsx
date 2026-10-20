@@ -15,11 +15,12 @@ import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/
 import { indentWithTab } from '@codemirror/commands'
 import { shader as glslMode } from '@codemirror/legacy-modes/mode/clike'
 import { tags as t } from '@lezer/highlight'
-import { Parser as ISFParser, Renderer as ISFRenderer } from 'interactive-shader-format'
+import { Renderer as ISFRenderer } from 'interactive-shader-format'
 import { makeRedirectableGL } from '../engine/Compositor'
 import { handle } from '../engine/isfTextureBridge'
 import { FX_SHADERS, GENERATORS, SHADER_BY_ID } from '../shaders/isf'
 import { categoryOf, registerUserShader, unregisterUserShader, userShaderId } from '../shaders/userShaders'
+import { compileIsf, lintIsf, type ShaderMark } from '../shaders/shaderCheck'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 
@@ -162,32 +163,7 @@ const defaultOf = (c: Ctl): unknown => {
   return c.min + (c.max - c.min) / 2
 }
 
-// ── the linter : two ISF traps the compiler explains badly (a reserved word,
-// a typo, a missing ; are the compiler's own errors, on their line) ─────────
-interface Mark { line: number; msg: string; level: 'error' | 'warn' }
-function lint(source: string): Mark[] {
-  const out: Mark[] = []
-  const lines = source.split('\n')
-  const headerEnd = lines.findIndex((l) => l.includes('*/'))
-  const events = new Set<string>()
-  try {
-    const m = source.match(/\/\*\s*(\{[\s\S]*?\})\s*\*\//)
-    const j = m ? (JSON.parse(m[1]) as { INPUTS?: Array<{ NAME?: string; TYPE?: string }> }) : null
-    for (const i of j?.INPUTS ?? []) if (i.TYPE === 'event' && i.NAME) events.add(i.NAME)
-  } catch { /* the header error is reported by the compiler */ }
-  lines.forEach((l, i) => {
-    if (i <= headerEnd) return
-    const code = l.replace(/\/\/.*$/, '')
-    const im = code.match(/IMG_(?:NORM_)?PIXEL\s*\(\s*\w+\s*,\s*([^)]*)\)/)
-    if (im && !/^\s*\w+\s*$/.test(im[1])) out.push({ line: i + 1, level: 'warn', msg: 'IMG_NORM_PIXEL / IMG_PIXEL want a plain variable as their coordinate : put the expression in a vec2 first.' })
-    for (const ev of events) {
-      if (new RegExp(`\\b${ev}\\s*[<>=!]=?\\s*[0-9.]`).test(code))
-        out.push({ line: i + 1, level: 'warn', msg: `“${ev}” is an event : a bool here. Test it as it is (if (${ev})), not against a number.` })
-    }
-  })
-  if (!/gl_FragColor|isf_FragColor/.test(source)) out.push({ line: Math.max(1, headerEnd + 2), level: 'warn', msg: 'Nothing writes gl_FragColor : the shader draws nothing.' })
-  return out
-}
+type Mark = ShaderMark
 
 // ── CodeMirror : GLSL colors in the app's palette, marked lines ──────────
 const setMarks = StateEffect.define<Mark[]>()
@@ -438,54 +414,16 @@ export function SourceEditor(): JSX.Element {
     const g = glRef.current
     if (!g) return
     const t0 = performance.now()
-    const lints = lint(source)
-    let r: ISFRenderer | null = null
-    let thrown: unknown = null
-    try {
-      r = new ISFRenderer(g.rgl)
-      r.loadSource(source)
-    } catch (e) {
-      thrown = e
-    }
-    if (r && r.valid && !thrown) {
+    const lints = lintIsf(source)
+    const { renderer, errors } = compileIsf(g.gl, g.rgl, source)
+    if (renderer) {
       try { g.cur?.cleanup() } catch { /* gone */ }
-      g.cur = r
+      g.cur = renderer
       setMarksState(lints)
       setStatus({ ok: true, ms: performance.now() - t0, at: Date.now() })
       return
     }
-    const errs: Mark[] = []
-    const lines = source.split('\n')
-    const msg = String((r?.error as { message?: string } | undefined)?.message ?? r?.error ?? thrown ?? '')
-    const open = Math.max(0, lines.findIndex((l) => l.includes('/*')))
-    const close = lines.findIndex((l) => l.includes('*/'))
-    if (/metadata|There is no metadata/i.test(msg)) {
-      const n = typeof r?.errorLine === 'number' ? (r.errorLine as number) : 1
-      errs.push({ line: open + n, level: 'error', msg: msg.replace(/^Error:\s*/, '') })
-    } else if (r?.fragmentShader) {
-      // The runtime throws its GLSL log away : compile the shader it built again
-      // here, read the log, and move each line back onto yours.
-      const gl = g.gl
-      const sh = gl.createShader(gl.FRAGMENT_SHADER)!
-      gl.shaderSource(sh, r.fragmentShader)
-      gl.compileShader(sh)
-      const log = gl.getShaderInfoLog(sh) ?? ''
-      gl.deleteShader(sh)
-      const prefix = ISFParser.fragmentShaderSkeleton.split('[[main]]')[0].replace('[[uniforms]]', r.model?.uniformDefs ?? '')
-      const before = prefix.split('\n').length // GLSL line of your code's first line (the "*/" line)
-      for (const l of log.split('\n')) {
-        const m = l.match(/ERROR:\s*\d+:(\d+):\s*(.*)/)
-        if (!m) continue
-        const gLine = Number(m[1])
-        const line = gLine >= before && close >= 0 ? close + 1 + (gLine - before) : 0
-        errs.push({ line: line >= 1 && line <= lines.length ? line : 0, level: 'error', msg: m[2].trim() })
-      }
-      if (!errs.length) errs.push({ line: 0, level: 'error', msg: msg || 'It does not compile.' })
-    } else {
-      errs.push({ line: 0, level: 'error', msg: msg || 'It does not compile.' })
-    }
-    try { r?.cleanup() } catch { /* never built */ }
-    setMarksState([...errs, ...lints])
+    setMarksState([...errors, ...lints])
     setStatus({ ok: false, ms: performance.now() - t0, at: Date.now() })
   }
 

@@ -66,6 +66,9 @@ import { ResolumePage } from './components/ResolumePage'
 import { ResolumeSection } from './components/ResolumeSection'
 import { DataflouSection } from './components/DataflouSection'
 import { LinkSection } from './components/LinkSection'
+import { AgentBadge, McpSection } from './components/McpSection'
+import { initAgent } from './mcp/agent'
+import { registerAgentCanvas } from './mcp/tools'
 import { placeAssemblage, unitPlace } from './assemble/place'
 import { registerUserShader, takeShaderReloads } from './shaders/userShaders'
 import { SourceEditor } from './components/SourceEditor'
@@ -407,6 +410,9 @@ export default function App(): JSX.Element {
   useEffect(() => {
     initMidi()
   }, [])
+
+  // ── The agent connection (MCP) : off unless turned on in the Connect tab ──
+  useEffect(() => initAgent(), [])
 
   // ── OSC input (Pandore plays the instrument) ────────────────────────
   useEffect(() => {
@@ -1191,6 +1197,8 @@ export default function App(): JSX.Element {
       depthModePrev = ''
       // The `0` key + the Transport's flush button both fire panic through here.
       registerPanic(() => compositorRef.current?.panic())
+      // The agent's snapshot reads the output from this canvas.
+      registerAgentCanvas(() => canvas)
       // Warm the video encoder and the sound bus up, once, after the launch has
       // settled : the first take of a session no longer waits for them (see
       // warmUpRecorder).
@@ -2149,6 +2157,7 @@ export default function App(): JSX.Element {
           MIDI<span className="tb-long"> Learn</span>
         </button>
         <RecPill />
+        <AgentBadge />
         <UndoButtons />
         <div className="flex items-center gap-0.5" title="UI zoom : Ctrl+= / Ctrl+- / Ctrl+0">
           <button className="btn px-1.5 text-[12px]" onClick={() => setUiZoom(uiZoom - 0.05)}>
@@ -2306,6 +2315,7 @@ export default function App(): JSX.Element {
               <ResolumeSection />
               <DataflouSection />
               <LinkSection />
+              <McpSection />
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.

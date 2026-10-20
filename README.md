@@ -75,6 +75,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
 - [dataflou mesh](#dataflou-mesh) : Palinopsia as a node on the mesh, its sources and destinations
 - [Ableton Link](#ableton-link) : the tempo and the bar shared with every Link app on the network
+- [Agent (MCP)](#agent-mcp) : an AI agent on this computer reads and plays Palinopsia, looks at the output, writes shaders
 - [Stack & architecture](#stack) · [Aesthetic guardrails](#aesthetic-guardrails) · [Credits & license](#credits--license)
 
 ---
@@ -2608,6 +2609,63 @@ Link runs in the main process (`native/link`, the Ableton Link SDK, GPL-2.0-or-l
 compiled in; `src/main/link.ts`); the page reads it 30 times a second and carries the
 beat on between reads (`src/renderer/src/link.ts`). Tested against a second Link peer :
 the bars agreed within about a millisecond, and tempo changes went both ways.
+
+---
+
+## Agent (MCP)
+
+Palinopsia is an **MCP server** : an AI agent on the same computer (Claude Code, or any
+client that speaks the Model Context Protocol) can read the composition, look at the
+output, and change it, with your own account in your own agent. Ask it for "a slow
+dusk over layer 2, with a grain on the master", or "write me a source that does…" : it
+writes the shader, sees it running, fixes it, and hands it to you.
+
+**Turn it on** in the Connect tab, **Agent (MCP)** section (off by default; the
+port is 9311, change it there). The section shows the address,
+`http://127.0.0.1:9311/mcp`, with a copy button, which client spoke last, and the last
+calls (● a change, ○ a look, ✕ refused). The top bar's **AGENT** light is lit while it is
+on and flashes at each call (click it : the Connect tab). Then add the address to your
+agent as an HTTP MCP server, once. For Claude Code :
+
+```bash
+claude mcp add --transport http palinopsia http://127.0.0.1:9311/mcp
+```
+
+A client that only runs local (stdio) servers can reach it through a bridge such as
+`mcp-remote`.
+
+**What it can do** (15 tools) :
+
+| Tool | |
+|---|---|
+| `get_state` | the four layers (sources, controls, mix, blend, opacity, speed, effects), the background, the master, the BPM, the World, the scenes |
+| `snapshot` | an image of the output, as the audience sees it |
+| `list_shaders` · `describe_shader` | the sources and effects, each control's range and default, a shader's ISF code |
+| `set_source` · `set_controls` · `set_layer` | a generator on a slot or the background, any unit's controls, a layer's own settings |
+| `add_effect` · `edit_effect` | effects on any rack : add (with a position and values), on/off, mix, move, remove |
+| `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work |
+| `scenes` | list, recall, save, rename, delete |
+| `list_controls` · `osc` | every OSC address and what it does, and any of them played : Sonify, the World, the field macros, Meta knobs, the output transform… |
+| `undo` | your Ctrl+Z |
+
+Units are addressed as in OSC, counted from 1 : `L1.A`, `L1.B`, `L1.fx.2`, `L1.A.fx.1`,
+`master.fx.1`, `master.vibe`, `master.context`, `master.finalizer`, `bg`, `bg.fx.1`.
+Values are in each control's own units (a color is `[r, g, b]` 0-1, a menu takes its
+label); a wrong name or value is refused before anything changes.
+
+**The rules it plays by** :
+- **Only this computer** : the server listens on 127.0.0.1 and refuses a web page's
+  request (the Origin and Host are checked).
+- **Each change is one undo step** of its own (Ctrl+Z), never folded into yours, and
+  your Inspector stays where you left it.
+- **It cannot reach the Flash safety**, the limiter that guards the output : no tool
+  touches it, and the output it changes still goes through it.
+- Sessions stay in your hands : it builds scenes in the open session, you save it.
+
+It answers in a fraction of a second, but an agent thinks for seconds : it composes and
+proposes, it does not play live. The protocol is MCP's Streamable HTTP in its plain JSON
+form (`src/main/mcp.ts`); the tools run on the page through the same store actions as
+the UI (`src/renderer/src/mcp/tools.ts`, listed in `src/shared/mcpTools.ts`).
 
 ---
 

@@ -1373,6 +1373,11 @@ export interface ExposedApi {
   shadersOpenFile: () => Promise<{ name: string; source: string } | null>
   shadersReveal: () => Promise<string>
   onAppShortcut: (cb: (name: string) => void) => () => void
+  // the agent connection (MCP, src/main/mcp.ts)
+  mcpConfigure: (enabled: boolean, port: number) => Promise<import('./mcpTools').McpStatus>
+  mcpResult: (id: number, result: import('./mcpTools').McpResult) => void
+  onMcpCall: (cb: (call: import('./mcpTools').McpCall) => void) => () => void
+  onMcpClient: (cb: (name: string) => void) => () => void
   /** The session's media : what each path is now, files found by name under a
    *  folder, a folder picker, and copies made next to the session. */
   mediaCheck: (paths: string[]) => Promise<Record<string, 'dir' | 'file' | 'none'>>

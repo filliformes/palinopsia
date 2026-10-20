@@ -7,6 +7,28 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Agent (MCP)** : Palinopsia is an MCP server for an agent on this computer
+  (`src/main/mcp.ts` : Streamable HTTP, plain JSON responses, no session ids so a client
+  survives an app restart, GET 405, notifications 202, protocol versions 2025-11-25 back to
+  2024-11-05; 127.0.0.1 only, Origin and Host checked against DNS rebinding; 4 MB bodies;
+  calls forwarded to the page over `mcp:call` / `mcp:result` with a 30 s timeout). Fifteen
+  tools (`src/shared/mcpTools.ts`, run by `src/renderer/src/mcp/tools.ts`) : get_state,
+  snapshot (JPEG of the output canvas, `registerAgentCanvas`), list_shaders,
+  describe_shader, set_source, set_controls, set_layer, add_effect, edit_effect,
+  write_shader, preview_shader, scenes, list_controls, osc (`/opsia/…` only, through
+  `routeOsc`), undo. Units addressed `L1.A`, `L1.fx.2`, `master.context`, `bg`…; values
+  in the control's units, clamped, labels for menus, 0-255 colors accepted, events fire
+  for 80 ms; every value is resolved against the shader BEFORE anything changes. Each
+  write is one undo step (`undo.ts commitNow` before and after) and the Inspector
+  selection is restored. No tool reaches `strobeSafe`. Compile + error mapping moved out
+  of the Source Editor into `shaders/shaderCheck.ts` (`lintIsf`, `compileIsf`,
+  `renderStill` : a still on a private WebGL2 context, a stock generator under an
+  effect, 12 frames leading up to the time). Connect tab **Agent (MCP)** section (on/off,
+  port, the address with copy, last client, the last calls) and the top bar's **AGENT**
+  light; per machine (`opsia.mcp`), off by default. Verified over HTTP in a test copy :
+  handshake, notifications 202, GET 405, a foreign Origin 403, every tool, a broken
+  shader's error on its line then the fixed one saved and played, three changes undone
+  one step each, the selection kept, bad values refused with nothing changed.
 - **Solid Color greys out what it is not using** (`DIMS['solid-color']`) : gradient off, the
   three stops, angle, midpoint and dither; gradient on, the flat color.
 

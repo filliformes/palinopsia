@@ -199,6 +199,13 @@ function flushPending(): boolean {
   return false
 }
 
+/** Close the step now instead of after the quiet window : the agent (MCP)
+ *  calls it before and after each change, so every change it makes is ONE undo
+ *  step of its own, never folded into the performer's edit around it. */
+export function commitNow(): void {
+  if (flushPending()) bump()
+}
+
 // Name what a step touched, so the toast says "Undone · layers" not just "Undone".
 // Leans on the reference-compare : the first slice whose reference differs wins.
 function describeDiff(a: Snapshot, b: Snapshot): string {

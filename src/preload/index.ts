@@ -11,6 +11,7 @@ import type {
   OscInEvent,
   Session
 } from '@shared/types'
+import type { McpCall } from '@shared/mcpTools'
 import type { CollageScanResult } from '@shared/collage'
 
 const api: ExposedApi = {
@@ -33,6 +34,18 @@ const api: ExposedApi = {
   shadersDelete: (name: string) => ipcRenderer.invoke('shaders:delete', name),
   shadersOpenFile: () => ipcRenderer.invoke('shaders:openFile'),
   shadersReveal: () => ipcRenderer.invoke('shaders:reveal'),
+  mcpConfigure: (enabled: boolean, port: number) => ipcRenderer.invoke('mcp:configure', enabled, port),
+  mcpResult: (id: number, result: unknown) => ipcRenderer.send('mcp:result', id, result),
+  onMcpCall: (cb: (call: McpCall) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, c: McpCall): void => cb(c)
+    ipcRenderer.on('mcp:call', h)
+    return () => { ipcRenderer.off('mcp:call', h) }
+  },
+  onMcpClient: (cb: (name: string) => void) => {
+    const h = (_e: Electron.IpcRendererEvent, n: string): void => cb(n)
+    ipcRenderer.on('mcp:client', h)
+    return () => { ipcRenderer.off('mcp:client', h) }
+  },
   onAppShortcut: (cb: (name: string) => void) => {
     const h = (_e: Electron.IpcRendererEvent, n: string): void => cb(n)
     ipcRenderer.on('app:shortcut', h)

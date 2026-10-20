@@ -32,6 +32,7 @@ import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
 import { registerMediaRefs } from './mediaRefs'
 import { registerUserShaders } from './userShaders'
+import { registerMcp } from './mcp'
 import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
@@ -728,6 +729,7 @@ app.whenReady().then(async () => {
   registerCollage()
   registerMediaRefs()
   registerUserShaders()
+  registerMcp(() => mainWindow)
   registerResolume()
   initDataflou(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
   initLink(() => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null))
