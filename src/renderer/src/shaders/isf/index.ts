@@ -13,6 +13,7 @@ import organic from './Organic.fs?raw'
 import { TEXT_FONTS } from '../../textFonts'
 import slabs from './Slabs.fs?raw'
 import contour from './Contour.fs?raw'
+import impasto from './Impasto.fs?raw'
 import gridDrift from './GridDrift.fs?raw'
 import tenPrint from './TenPrint.fs?raw'
 import particleDrift from './ParticleDrift.fs?raw'
@@ -895,6 +896,19 @@ export const GENERATORS: IsfShader[] = [
       nonlinear: [0, 0.7],
       audioScatter: [0, 0.5],
       audioLight: [0, 0.6]
+    }
+  },
+  {
+    // A ray-marched cloud at half resolution, repainted at full resolution in
+    // thick oil (strokes along the forms, a mixed palette, impasto, canvas).
+    id: 'impasto',
+    name: 'Impasto',
+    category: 'Generator',
+    source: impasto,
+    curated: {
+      coverage: [0.4, 0.7], scale: [0.6, 1.6], detail: [0.3, 0.8], drift: [-0.25, 0.25], evolve: [0.05, 0.35],
+      horizon: [0.3, 0.9], sun: [-0.8, 0.8], sunHeight: [0.1, 0.6], glow: [0.2, 0.8], shadow: [0.4, 0.9],
+      brush: [0.3, 0.8], mixing: [0.2, 0.7], impasto: [0.3, 0.8], canvas: [0.1, 0.45], audio: [0, 0]
     }
   },
   {

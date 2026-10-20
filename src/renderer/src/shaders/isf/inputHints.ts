@@ -878,6 +878,26 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     audioLight: 'Each band lights more of its cells as its own frequency band gets loud (bass at the bottom, treble at the top) : a spectrum-analyzer reading. 0 = off.',
     reseed: 'RESEED ▸ : re-deal every band (widths, picks, accents) at once. Press it, send OSC, or bind a modulator.'
   },
+  impasto: {
+    coverage: 'How much of the sky the cloud covers : a few clouds, toward an overcast.',
+    scale: 'The size of the billows : low for one great mass, high for a sky of small puffs (a mackerel sky).',
+    detail: 'How eroded the billows are : smooth soft masses at 0, torn, wispy edges at 1.',
+    drift: 'The wind : the cloud moves across (negative : the other way).',
+    evolve: 'How fast the billows churn and change shape.',
+    horizon: 'The view : looking up into a wall of cloud at 0, along a cloud deck running to the horizon (a strip of land below) at 1.',
+    sun: 'Where the sun is, round the view (0 : behind the cloud, ahead of you).',
+    sunHeight: 'How high the sun stands : low and raking (long shades, warm light) to high.',
+    glow: 'The silver lining : the cloud’s edges glowing toward the sun.',
+    shadow: 'How dark the cloud’s own shade is, on the side away from the sun.',
+    brush: 'The size of the brush strokes, laid along the forms (0 : the cloud as rendered, no strokes).',
+    mixing: 'How far the colors are mixed : a few flat tones from the palette knife at 0, smooth blends, wet in wet, at 1.',
+    impasto: 'How thick the paint stands : its ridges and bristle marks catch the light.',
+    canvas: 'The canvas weave, showing where the paint runs thin (the open sky).',
+    audio: 'The billows swell with the bass of the live sound.',
+    sky: 'The sky behind the cloud.',
+    light: 'The sunlight on the cloud.',
+    shade: 'The cloud’s shade.'
+  },
   contour: {
     rate: 'How fast the basin drifts. Changes glide from the current picture, no jump.',
     scale: 'Size of the terrain : low = a few wide hills, high = many small ones.',

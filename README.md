@@ -65,7 +65,7 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-43-generators) (43 generators) · [Effects](#effects) (53 FX) ·
+- [Sources](#sources-44-generators) (44 generators) · [Effects](#effects) (53 FX) ·
   [Native nodes](#native-nodes) (26) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 - [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
@@ -1985,9 +1985,9 @@ don't flood your history.
 
 ---
 
-## Sources (43 generators)
+## Sources (44 generators)
 
-43 sources produce an image from nothing (all but two : Collage plays a folder of films,
+44 sources produce an image from nothing (all but two : Collage plays a folder of films,
 Silhouette reads the Body camera). Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
 Randomize sub-ranges and its own preset bank.
@@ -2000,6 +2000,7 @@ Randomize sub-ranges and its own preset bank.
 | **Drift Field** | Slow directional noise flow posterized into matte bands over near-black, with an accent tint and a restrained edge chroma-split. |
 | **Slabs** | Sparse horizontal slabs on a stepped clock with slice-jitter and a rare accent cell : the slice/shuffle glitch register, built to be blended. |
 | **Contour** | Slow marching contour lines over a drifting, domain-warped noise basin : topographic matte line-work. |
+| **Impasto** | A ray-traced sky of billowing cloud, repainted in thick oil. The cloud is a volume marched through and lit by a low sun (its own soft shade, a silver lining toward the light, the thick cores still glowing), then painted over in strokes : each laid along the forms, carrying the color under its middle, running dry into streaks at its tail, mixed down to a palette and standing up off a canvas weave that shows where the paint is thin. The cloud : **coverage**, **scale** (one great mass … a mackerel sky of small puffs), **detail** (smooth … torn, wispy edges), **drift** (the wind), **evolve** (the churn), **horizon** (looking up into a wall of cloud at 0, a deck running to the horizon, a strip of land below, at 1), **audio** (the billows swell with the bass). The light : **sun** (round the view), **sun height**, **glow** (the silver lining), **shadow**, and the **sky**, **light** and **shade** colors. The paint : **brush** (the strokes' size; 0 is the cloud as rendered), **mix** (a few flat tones from the palette knife … smooth blends, wet in wet), **impasto** (how thick the paint stands, catching the light), **canvas**. On the full dome (fill) it is stretched like any source but kept square, strokes too. Nine presets (Golden hour, Storm front, Mackerel sky, Nocturne, Wall of cloud, Palette knife, Glaze, Pastel dawn, Breathing sky), the **Oil on Canvas** master chain (the paint's texture over any picture), the **Oil Sky** Generate theme. |
 | **Grid Drift** | A flat grid whose rows and columns breathe out of alignment, occasionally slipping whole lanes, with sparse filled cells. |
 | **Ten Print** | The Commodore one-liner maze : every cell one diagonal, / or \, dealt by a seeded coin-flip. **Reseed ▸** re-deals the lattice on a trigger; audio scatter shivers the maze apart segment by segment. |
 | **Particle Drift** | Sparse points carried through a flow direction with capsule trails, wandering inside their cells. |

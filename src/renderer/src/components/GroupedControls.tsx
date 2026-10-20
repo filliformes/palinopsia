@@ -43,6 +43,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('edges', 'gap', 'torn', 'contour', 'curve', 'contourMode', 'fxFirst'),
     g('deal', 'deal', 'rate', 'xfade', 'churn', 'freeze')
   ],
+  impasto: [
+    g('cloud', 'coverage', 'scale', 'detail', 'drift', 'evolve', 'horizon', 'audio'),
+    g('light', 'sun', 'sunHeight', 'glow', 'shadow', 'sky', 'light', 'shade'),
+    g('paint', 'brush', 'mixing', 'impasto', 'canvas')
+  ],
   'gen-lattice': [
     g('points', 'form', 'count', 'size', 'vary', 'jitter', 'ink', 'ground'),
     g('camera', 'tilt', 'turn', 'height', 'lens', 'fly', 'spin', 'streak', 'fog'),

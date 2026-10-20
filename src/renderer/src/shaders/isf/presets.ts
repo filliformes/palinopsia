@@ -1230,6 +1230,17 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Spectrum stack', values: { rate: 0.4, bands: 32, density: 0.08, jitter: 0.2, drift: 0.15, accent: 0.15, chaos: 0, nonlinear: 0.2, audioScatter: 0, audioLight: 0.8 } }
   ],
 
+  impasto: [
+    { name: 'Golden hour', values: { coverage: 0.5, scale: 1, detail: 0.55, drift: 0.12, evolve: 0.15, horizon: 0.78, sun: 0.45, sunHeight: 0.12, glow: 0.8, shadow: 0.65, brush: 0.55, mixing: 0.45, impasto: 0.55, canvas: 0.25, audio: 0, sky: [0.36, 0.42, 0.58, 1], light: [1, 0.78, 0.5, 1], shade: [0.42, 0.32, 0.4, 1] } },
+    { name: 'Storm front', values: { coverage: 0.74, scale: 0.8, detail: 0.75, drift: 0.3, evolve: 0.35, horizon: 0.7, sun: -0.35, sunHeight: 0.25, glow: 0.5, shadow: 0.95, brush: 0.7, mixing: 0.3, impasto: 0.75, canvas: 0.15, audio: 0, sky: [0.3, 0.34, 0.4, 1], light: [0.95, 0.92, 0.85, 1], shade: [0.2, 0.2, 0.25, 1] } },
+    { name: 'Mackerel sky', values: { coverage: 0.48, scale: 2.2, detail: 0.85, drift: 0.08, evolve: 0.1, horizon: 0.7, sun: 0.4, sunHeight: 0.45, glow: 0.4, shadow: 0.5, brush: 0.4, mixing: 0.55, impasto: 0.45, canvas: 0.3, audio: 0, sky: [0.3, 0.45, 0.66, 1], light: [1, 0.96, 0.9, 1], shade: [0.55, 0.6, 0.72, 1] } },
+    { name: 'Nocturne', values: { coverage: 0.5, scale: 1.2, detail: 0.5, drift: 0.05, evolve: 0.08, horizon: 0.6, sun: 0.1, sunHeight: 0.55, glow: 0.8, shadow: 0.7, brush: 0.65, mixing: 0.35, impasto: 0.5, canvas: 0.35, audio: 0, sky: [0.04, 0.06, 0.12, 1], light: [0.72, 0.78, 0.92, 1], shade: [0.1, 0.11, 0.17, 1] } },
+    { name: 'Wall of cloud', values: { coverage: 0.7, scale: 1, detail: 0.6, drift: 0.1, evolve: 0.2, horizon: 0, sun: 0.6, sunHeight: 0.3, glow: 0.55, shadow: 0.75, brush: 0.6, mixing: 0.4, impasto: 0.6, canvas: 0.2, audio: 0, sky: [0.2, 0.26, 0.4, 1], light: [1, 0.86, 0.66, 1], shade: [0.3, 0.28, 0.4, 1] } },
+    { name: 'Palette knife', values: { coverage: 0.6, scale: 1.1, detail: 0.5, drift: 0.12, evolve: 0.15, horizon: 0.6, sun: 0.3, sunHeight: 0.3, glow: 0.5, shadow: 0.7, brush: 0.9, mixing: 0.05, impasto: 0.9, canvas: 0.1, audio: 0, sky: [0.26, 0.34, 0.5, 1], light: [1, 0.84, 0.6, 1], shade: [0.36, 0.3, 0.44, 1] } },
+    { name: 'Glaze', values: { coverage: 0.5, scale: 0.9, detail: 0.4, drift: 0.06, evolve: 0.1, horizon: 0.55, sun: 0.2, sunHeight: 0.4, glow: 0.6, shadow: 0.55, brush: 0.25, mixing: 0.9, impasto: 0.2, canvas: 0.45, audio: 0, sky: [0.3, 0.4, 0.56, 1], light: [1, 0.9, 0.75, 1], shade: [0.42, 0.4, 0.52, 1] } },
+    { name: 'Pastel dawn', values: { coverage: 0.45, scale: 1.3, detail: 0.55, drift: 0.1, evolve: 0.12, horizon: 0.8, sun: 0.35, sunHeight: 0.08, glow: 0.5, shadow: 0.45, brush: 0.5, mixing: 0.6, impasto: 0.45, canvas: 0.3, audio: 0, sky: [0.42, 0.46, 0.62, 1], light: [0.95, 0.75, 0.68, 1], shade: [0.55, 0.48, 0.6, 1] } },
+    { name: 'Breathing sky', values: { coverage: 0.5, scale: 1, detail: 0.55, drift: 0.12, evolve: 0.2, horizon: 0.65, sun: 0.25, sunHeight: 0.3, glow: 0.55, shadow: 0.65, brush: 0.55, mixing: 0.45, impasto: 0.55, canvas: 0.25, audio: 0.7, sky: [0.3, 0.42, 0.62, 1], light: [1, 0.88, 0.7, 1], shade: [0.42, 0.38, 0.5, 1] } }
+  ],
   contour: [
     { name: 'Survey map', values: { rate: 0.06, scale: 2.2, levels: 12, width: 0.1, warp: 0.4, fill: 0.1, major: 5, audioSwell: 0 } },
     { name: 'Dense relief', values: { rate: 0.08, scale: 3.5, levels: 20, width: 0.08, warp: 0.6, fill: 0.05, major: 0, audioSwell: 0 } },

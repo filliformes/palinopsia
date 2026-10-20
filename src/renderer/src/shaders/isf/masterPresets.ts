@@ -646,6 +646,18 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { mixSrc: 1, contrast: 1, saturation: 0.85, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.47, 0.49, 0.53, 1], highTint: [0.54, 0.52, 0.48, 1] }
   },
   {
+    // Over any picture : the paint's own texture (Toile's strokes and line) on
+    // top of a warm varnish, a little grain of the canvas.
+    name: 'Oil on Canvas',
+    group: 'Node recipes',
+    fx: [
+      { shaderId: 'node-toile', inputs: { radius: 0.45, sharp: 0.5, paint: 1, strokes: 0, line: 0.15, threshold: 0.5, mix: 0.7 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.08, saturation: 1.1, lift: 0.02 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.06, size: 1.4, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.46, 0.56, 1], highTint: [0.58, 0.52, 0.42, 1] }
+  },
+  {
     name: 'Codec Rot',
     group: 'Node recipes',
     fx: [

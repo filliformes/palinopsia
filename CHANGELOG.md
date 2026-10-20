@@ -7,6 +7,23 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Impasto source** (`shaders/isf/Impasto.fs`, an ISF generator in two passes) : a
+  volumetric cloud ray-marched at half resolution into the `cloud` target (30 steps,
+  longer strides through open sky, 4 octaves of value noise normalized so COVERAGE is
+  the share of sky; one look toward the sun for the shade plus a multiple-scattering
+  floor so backlit cores never go dark; a soft shoulder over the highlights), then
+  repainted at full resolution : a jittered field of strokes (5 x 5 cells, the top one
+  wins) laid along the luminance contours, each taking the color under its middle
+  quantized to the palette (MIX), pulled toward the color under it (wet in wet), dry-brush
+  streaks at its tail, its relief (a soft rise from the rim, bristle grooves) lit from
+  the upper left, over a basket-weave canvas. Integrated clocks `PH_drift` / `PH_evolve`
+  wrapped at the noise period; `DOME_FILL` keeps the view and the strokes square on the
+  dome. Nine presets, hints, keywords, a blurb, grouped Inspector columns (cloud / light
+  / paint), the **Oil on Canvas** master chain (Toile paint + grade + grain), the **Oil
+  Sky** Generate theme. Verified in a test copy : 60 fps at 1080p and 4K, flat and on the
+  dome master, no shader errors. (A first version smeared the cloud along its contours
+  with a line integral : it read as blur, not paint; strokes with closed ridges read as
+  cobblestones : the rim ridge became a soft rise.)
 - **Lattice : four more forms** (`engine/LatticeSource.ts`; `form` 2-5) : **tunnel** (rings
   of points along the flight, wrapped round the camera like the plane's cells, 2.5
   lattices long; height = radius; well = a throat ahead, ripple along it, audio round
