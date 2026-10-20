@@ -16,3 +16,14 @@ export function tempoEdited(bpm: number): void {
     try { fn(bpm) } catch (e) { console.warn('[tempo] listener', e) }
   }
 }
+
+// A BPM being typed in the box : each keystroke sets Palinopsia's own tempo, but
+// none is settled (typing "130" passes through 1 and 13, both clamped to the
+// floor of 20). While it lasts, Link neither hears the box nor writes the
+// session's tempo over it; the box ends it, then sends the settled number
+// through tempoEdited().
+let typing = false
+export function tempoTyping(on: boolean): void {
+  typing = on
+}
+export const isTempoTyping = (): boolean => typing

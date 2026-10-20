@@ -12,7 +12,7 @@ import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { loadSoniPreset } from './soniPresets'
 import type { SoniConfig } from './sonify'
-import { RATE_BEATS, soniClockStart } from './soniClock'
+import { rateBeats, soniBar, soniClockEpoch, soniClockStart } from './soniClock'
 
 // BY INDEX : a saved sequencer step's voice mask is a boolean per position, so a
 // new voice is APPENDED (a mask saved before Signal reads it as off).
@@ -22,6 +22,7 @@ let lastStepAt = 0 // ms (free rate) or beats (beat rates)
 let wasOn = false
 let waiting = false // a beat start waits for the bar the key sequencer is on
 let onBeat = false // the rate the last step was timed on (a switch re-anchors)
+let epoch = -1 // the beat clock's count this sequence is aligned on (soniClockEpoch)
 
 // ── Advance modes (ported from dataFLOU's factory.ts) ─────────────────────
 // Bounce : forward order, but each cycle's step durations shrink geometrically
@@ -75,6 +76,7 @@ export function tickSonifySeq(now: number, beats: number): void {
     // then time from there.
     wasOn = true
     onBeat = beat
+    epoch = soniClockEpoch()
     if (beat) {
       const ks = st.soniKeySeq
       lastStepAt = soniClockStart(ks.on && ks.rate !== 'free')
@@ -88,8 +90,25 @@ export function tickSonifySeq(now: number, beats: number): void {
     // Switched between free and the beat : time from here on the new clock.
     onBeat = beat
     waiting = false
+    epoch = soniClockEpoch()
     lastStepAt = t
     return
+  }
+  // Bounce uses a per-step (accelerating) dwell; forward/drift use a uniform one.
+  const base = beat ? rateBeats(rate as Exclude<typeof rate, 'free'>) : sq.stepMs
+  const dwell = sq.mode === 'bounce' ? bounceStepDuration(base, len, sq.bounceDecay, sq.cur) : base
+  if (beat && epoch !== soniClockEpoch()) {
+    // The beat clock was counted afresh (Ableton Link came on or off, its bar
+    // changed size) : back onto its bars. A start still waiting waits for the
+    // next one; a running sequence keeps stepping, from the grid point of the
+    // bar it is in (no step fires early for it).
+    epoch = soniClockEpoch()
+    const bar = soniBar()
+    if (waiting) lastStepAt = Math.ceil(beats / bar - 1e-6) * bar
+    else {
+      const top = Math.floor(beats / bar) * bar
+      lastStepAt = top + Math.floor((beats - top) / dwell) * dwell
+    }
   }
   if (waiting) {
     if (beats < lastStepAt) return
@@ -97,14 +116,15 @@ export function tickSonifySeq(now: number, beats: number): void {
     applyStep(sq.cur)
     return
   }
-  // Bounce uses a per-step (accelerating) dwell; forward/drift use a uniform one.
-  const base = beat ? RATE_BEATS[rate as Exclude<typeof rate, 'free'>] : sq.stepMs
-  const dwell = sq.mode === 'bounce' ? bounceStepDuration(base, len, sq.bounceDecay, sq.cur) : base
   if (t - lastStepAt < dwell) return
   // Step on the grid, not on the frame that noticed it : `= now` added up each
   // step's lateness (up to a frame) and the sequence ran a few percent slow.
-  // A long stall (a hidden window) re-anchors instead of catching up in a burst.
-  lastStepAt = t - lastStepAt > dwell * 2 ? t : lastStepAt + dwell
+  // A long stall skips the steps it missed instead of catching up in a burst :
+  // on the beat it stays on the grid (Ableton Link's bars keep coming, and a
+  // re-anchor on the late frame left the sequence off them for good); in free
+  // time it re-anchors on the frame.
+  if (beat) lastStepAt += Math.floor((t - lastStepAt) / dwell) * dwell
+  else lastStepAt = t - lastStepAt > dwell * 2 ? t : lastStepAt + dwell
   const next = sq.mode === 'drift' ? advanceDrift(sq.cur, len, sq.bias, sq.edge) : (sq.cur + 1) % len
   st.setSoniSeqCur(next)
   applyStep(next)

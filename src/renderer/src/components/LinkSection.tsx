@@ -59,7 +59,9 @@ export function LinkSection(): JSX.Element {
         </button>
         <button
           onClick={() => setLinkSettings({ enabled: !settings.enabled })}
-          disabled={missing}
+          // missing : nothing to turn on, but an "enabled" left from before can
+          // always be turned off
+          disabled={missing && !settings.enabled}
           className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
             missing
               ? 'bg-danger/20 text-danger ring-1 ring-danger'
@@ -69,7 +71,7 @@ export function LinkSection(): JSX.Element {
           }`}
           title={
             missing
-              ? `Ableton Link is missing from this build : ${state.error ?? ''}`
+              ? `Ableton Link is missing from this build : ${state.error ?? ''}${settings.enabled ? ' (click : turn it off)' : ''}`
               : on
                 ? 'Disable Ableton Link : Palinopsia leaves the session and keeps its own tempo'
                 : 'Enable Ableton Link : share the tempo and the bar with every Link app on this network'

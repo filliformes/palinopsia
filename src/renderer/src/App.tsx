@@ -1496,8 +1496,10 @@ export default function App(): JSX.Element {
         // Sonify sequencers : the step sequence evolves the sound, the key
         // sequence its root / scale, both on one Sonify beat clock (independent
         // of the scene sequencer above). No-ops unless started in the seq view.
+        // With Ableton Link, on the beat as it sounds : the latency lead is the
+        // picture's (a projector's delay), the sound does not wait for it.
         {
-          const beats = soniClockTick(now, c.bpm, linkNow, linkQuantum())
+          const beats = soniClockTick(now, c.bpm, linkBeats(now, false), linkQuantum())
           tickSonifySeq(now, beats)
           tickKeySeq(now, beats)
         }

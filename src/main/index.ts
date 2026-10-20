@@ -36,7 +36,7 @@ import { registerMcp } from './mcp'
 import { installAvcaptureHost } from './avcaptureHost'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
-import { initLink } from './link'
+import { closeLink, initLink } from './link'
 import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
@@ -360,6 +360,9 @@ function shutdown(): void {
   hiveSendStop()
   outputSender.dispose()
   lightSender.dispose()
+  // leave the Link session now : the installation's relaunch exits with
+  // app.exit(), which skips will-quit (where Link would otherwise close)
+  closeLink()
   globalShortcut.unregisterAll()
 }
 

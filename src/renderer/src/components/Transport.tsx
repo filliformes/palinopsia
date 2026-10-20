@@ -15,7 +15,7 @@ import { useSyncExternalStore } from 'react'
 import { randomizeMetaKnobs } from '../metaSmooth'
 import type { RandomizeScope } from '../randomize'
 import { useStore } from '../store'
-import { tempoEdited } from '../tempoEvents'
+import { tempoEdited, tempoTyping } from '../tempoEvents'
 import { LinkBadge } from './LinkSection'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
@@ -135,6 +135,22 @@ export function Transport(): JSX.Element {
     tempoEdited(v)
   }
 
+  // The box : each keystroke sets Palinopsia's own BPM as it always did, but
+  // Ableton Link hears only the number it settles on (Enter, or leaving the
+  // box), never the floor of 20 that "1" and "13" clamp to on the way to "130".
+  function typeBpm(v: number): void {
+    tempoTyping(true)
+    setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
+  }
+  function commitBpm(v: number): void {
+    tempoTyping(false)
+    if (useStore.getState().composition.bpm !== v) setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
+    tempoEdited(v)
+  }
+  // an edit left on nothing parsable (emptied, then out) ends too, and so does
+  // the bar going away mid-edit
+  useEffect(() => () => tempoTyping(false), [])
+
   // Tap tempo : each click on BPM records a beat; the average of the last few
   // intervals sets the tempo (shown in the box beside it). A >2s gap starts fresh.
   const tapTimes = useRef<number[]>([])
@@ -186,14 +202,15 @@ export function Transport(): JSX.Element {
             BPM
           </button>
         </span>
-        <div className="relative w-10">
+        <div className="relative w-10" onBlur={() => tempoTyping(false)}>
           <MidiLearnOverlay id="transport:bpm" />
           <BoundedNumberInput
             value={bpm}
             min={20}
             max={800}
             integer
-            onChange={setBpm}
+            onChange={typeBpm}
+            onCommit={commitBpm}
             className="input w-full px-1 py-0.5 text-right text-[11px]"
           />
         </div>

@@ -15,6 +15,7 @@ import type { CompositionState, SceneEntry, SequenceState, World } from '@shared
 import { useStore } from './store'
 import { cancelMorph } from './morph'
 import { showToast } from './components/Toast'
+import { tempoEdited } from './tempoEvents'
 
 const CAPACITY = 100
 const QUIET_MS = 300
@@ -121,8 +122,10 @@ function apply(s: Snapshot): void {
   localStorage.setItem('opsia.world', s.world)
   // Sonify goes through setSonify so the sound engine (and its localStorage)
   // update too — but keep the machine-local on-state + output device as they are.
+  // A step that left the sound alone leaves it alone here too : the same object
+  // stays, so the step's other side still compares equal on the sound.
   const curSoni = useStore.getState().sonify
-  useStore.getState().setSonify({ ...s.sonify, on: curSoni.on, sinkId: curSoni.sinkId })
+  if (s.sonify !== curSoni) useStore.getState().setSonify({ ...s.sonify, on: curSoni.on, sinkId: curSoni.sinkId })
   applying = false
 }
 
@@ -206,6 +209,22 @@ export function commitNow(): void {
   if (flushPending()) bump()
 }
 
+/** The step changed the BPM and nothing else : a tempo typed, tapped, sent by
+ *  MIDI or OSC. Undoing or redoing it is a tempo set by hand, so Ableton Link
+ *  hears it like the edit itself (./tempoEvents.ts). Any other step that
+ *  carries an older BPM leaves the tempo to Link while other apps are linked :
+ *  ./link.ts writes the session's back, silently, before the next frame, rather
+ *  than an undone layer edit setting every linked app's tempo. */
+function onlyTempo(a: Snapshot, b: Snapshot): boolean {
+  const c1 = a.composition as unknown as Record<string, unknown>
+  const c2 = b.composition as unknown as Record<string, unknown>
+  if (c1.bpm === c2.bpm) return false
+  for (const k of Object.keys(a) as Array<keyof Snapshot>) if (k !== 'composition' && a[k] !== b[k]) return false
+  for (const k in c1) if (k !== 'bpm' && c1[k] !== c2[k]) return false
+  for (const k in c2) if (!(k in c1)) return false
+  return true
+}
+
 // Name what a step touched, so the toast says "Undone · layers" not just "Undone".
 // Leans on the reference-compare : the first slice whose reference differs wins.
 function describeDiff(a: Snapshot, b: Snapshot): string {
@@ -216,6 +235,7 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
     if (c1.metaKnobs !== c2.metaKnobs) return 'meta knobs'
     if (c1.master !== c2.master) return 'master FX'
     if (c1.background !== c2.background) return 'background'
+    if (c1.bpm !== c2.bpm) return 'tempo'
     return 'composition'
   }
   if (a.scenes !== b.scenes || a.activeSceneId !== b.activeSceneId) return 'scenes'
@@ -261,9 +281,14 @@ export function undo(): void {
   future.push(cur)
   if (future.length > CAPACITY) future.shift()
   apply(prev)
-  committed = prev
+  // what the store holds now (the sound is a fresh object when the step touched
+  // it) : baselined on `prev` itself, the next store change of any kind read as
+  // an edit, recorded a phantom step and threw the redo away
+  committed = snap()
   bump()
   notifyHistory('Undone', describeDiff(prev, cur))
+  // a tempo set by hand, undone by hand : Ableton Link hears it too
+  if (onlyTempo(prev, cur)) tempoEdited(prev.composition.bpm)
 }
 
 export function redo(): void {
@@ -274,9 +299,10 @@ export function redo(): void {
   past.push(cur)
   if (past.length > CAPACITY) past.shift()
   apply(next)
-  committed = next
+  committed = snap()
   bump()
   notifyHistory('Redone', describeDiff(next, cur))
+  if (onlyTempo(next, cur)) tempoEdited(next.composition.bpm)
 }
 
 export function canUndo(): boolean {

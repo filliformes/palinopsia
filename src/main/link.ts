@@ -20,6 +20,10 @@ let loadError = ''
 let cfg: LinkConfig = { enabled: false, quantum: 4 }
 let timer: ReturnType<typeof setInterval> | null = null
 let win: () => BrowserWindow | null = () => null
+// Link's instance (and its network threads) is only made once it is enabled :
+// the page asking at startup whether Link is there at all must not start it.
+let started = false
+let closed = false
 
 /** Load the addon once (dlopen bypasses the bundler). In dev getAppPath() is
  *  the project root; packaged builds unpack it (asarUnpack). */
@@ -37,13 +41,31 @@ function addon(): LinkAddon | null {
   return mod
 }
 
+// The stamp is the system's wall clock, the one clock both processes read alike
+// at any moment. Each side's performance.timeOrigin is the wall clock taken when
+// that process (or page) started, so a clock adjustment, or the drift between
+// the wall clock and the monotonic one over the hours before a page reload, set
+// the two apart by a constant and the beat landed that far off. Date.now()
+// counts whole milliseconds : the highest of its recent readings against
+// performance.now() is the exact offset, and a slow leak follows the drift.
+// The page does the same on its side (src/renderer/src/link.ts).
+let wallOff = NaN
+function wallNow(): number {
+  const p = performance.now()
+  const s = Date.now() - p
+  if (!(Math.abs(s - wallOff) < 2)) wallOff = s // the first reading, or the clock moved
+  else wallOff = Math.max(s, wallOff - 0.005)
+  return p + wallOff
+}
+
 function read(): LinkState {
   const m = addon()
-  if (!m) return { available: false, error: loadError, enabled: false, peers: 0, tempo: 120, beat: 0, phase: 0, at: Date.now() }
+  const off = { enabled: false, peers: 0, tempo: 120, beat: 0, phase: 0, quantum: cfg.quantum, at: wallNow() }
+  if (!m) return { available: false, error: loadError, ...off }
+  if (!started || closed) return { available: true, ...off }
   const s = m.state(cfg.quantum)
-  // stamped right after the read : the page's clock (performance.timeOrigin +
-  // performance.now()) and this one share the system's
-  const at = performance.timeOrigin + performance.now()
+  // stamped right after the read
+  const at = wallNow()
   return {
     available: true,
     enabled: !!s.enabled,
@@ -51,6 +73,7 @@ function read(): LinkState {
     tempo: s.tempo ?? 120,
     beat: s.beat ?? 0,
     phase: s.phase ?? 0,
+    quantum: cfg.quantum,
     at
   }
 }
@@ -65,8 +88,11 @@ function configure(next: Partial<LinkConfig>): LinkState {
     enabled: next.enabled ?? cfg.enabled,
     quantum: Math.max(1, Math.min(16, Math.round(next.quantum ?? cfg.quantum)))
   }
-  const m = addon()
-  if (m) m.enable(cfg.enabled)
+  const m = closed ? null : addon()
+  if (m && (cfg.enabled || started)) {
+    started = true
+    m.enable(cfg.enabled)
+  }
   if (cfg.enabled && m && !timer) timer = setInterval(push, 33)
   if ((!cfg.enabled || !m) && timer) {
     clearInterval(timer)
@@ -75,17 +101,24 @@ function configure(next: Partial<LinkConfig>): LinkState {
   return read()
 }
 
+/** Leave the session cleanly : peers see Palinopsia go at once, not after a
+ *  timeout. Called on quit (will-quit) and from main's shutdown(), which the
+ *  installation's relaunch runs before its app.exit() (that one skips will-quit). */
+export function closeLink(): void {
+  if (closed) return
+  closed = true
+  if (timer) clearInterval(timer)
+  timer = null
+  try { if (started) mod?.close() } catch { /* quitting */ }
+}
+
 export function initLink(getWindow: () => BrowserWindow | null): void {
   win = getWindow
   ipcMain.handle('link:configure', (_e, c: Partial<LinkConfig>) => configure(c && typeof c === 'object' ? c : {}))
+  // also asked at startup with Link off : is it in this build at all?
   ipcMain.handle('link:state', () => read())
   ipcMain.on('link:tempo', (_e, bpm: number) => {
-    if (typeof bpm === 'number' && Number.isFinite(bpm)) mod?.setTempo(Math.max(20, Math.min(999, bpm)))
+    if (started && !closed && typeof bpm === 'number' && Number.isFinite(bpm)) mod?.setTempo(Math.max(20, Math.min(999, bpm)))
   })
-  // Leave the session cleanly : peers see Palinopsia go at once, not after a timeout.
-  app.on('will-quit', () => {
-    if (timer) clearInterval(timer)
-    timer = null
-    try { mod?.close() } catch { /* quitting */ }
-  })
+  app.on('will-quit', closeLink)
 }

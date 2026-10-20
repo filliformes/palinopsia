@@ -17,6 +17,10 @@ import { registerLiveOverlay } from './liveOverlay'
 interface Props {
   value: number
   onChange: (v: number) => void
+  // The edit settled (blur / Enter) on this number. onChange follows every
+  // keystroke that parses, so typing "130" passes through 1 and 13 : a
+  // consumer that must only hear the final number (Ableton Link) listens here.
+  onCommit?: (v: number) => void
   min?: number
   max?: number
   integer?: boolean
@@ -41,6 +45,7 @@ interface Props {
 export function BoundedNumberInput({
   value,
   onChange,
+  onCommit,
   min = -Infinity,
   max = Infinity,
   integer = false,
@@ -122,6 +127,7 @@ export function BoundedNumberInput({
     }
     const clamped = Math.max(min, Math.min(max, n))
     if (clamped !== value) onChange(clamped)
+    onCommit?.(clamped)
     setStr(formatValue(clamped, integer, maxFrac))
   }
 

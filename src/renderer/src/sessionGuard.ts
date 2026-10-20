@@ -26,24 +26,34 @@ function fnv(s: string): string {
   return `${(h >>> 0).toString(36)}:${s.length}`
 }
 
-// Ableton Link with other apps linked : the tempo is the session's (./link.ts
+// Ableton Link on : the tempo is the network's, not the piece's (./link.ts
 // registers the test; no import, which would loop through the store).
 let tempoShared: () => boolean = () => false
 export function setTempoShared(fn: () => boolean): void {
   tempoShared = fn
 }
 
-function fingerprint(): string {
-  // The warp counts only when it is the session's own : turning "save with
-  // session" on or off, or nudging this computer's warp, changes no piece.
-  // Nor does a tempo other linked apps set.
-  const st = useStore.getState()
-  const { warp, ...rest } = st.exportSession()
-  const own = tempoShared() && rest.composition ? { ...rest, composition: { ...rest.composition, bpm: 0 } } : rest
-  return fnv(JSON.stringify(st.warpFromSession ? { ...own, warp } : own))
+interface Prints {
+  full: string
+  /** without the tempo, for while Ableton Link is on */
+  noTempo: string
 }
 
-let baseline: string | null = null
+function prints(): Prints {
+  // The warp counts only when it is the session's own : turning "save with
+  // session" on or off, or nudging this computer's warp, changes no piece.
+  // Nor does the tempo while Ableton Link is on : any linked app may set it,
+  // and apps coming or going (alone yours leads, linked theirs wins) must not
+  // turn the session "changed". Both prints are kept for the clean session, so
+  // Link turned on or off since is compared against the right one.
+  const st = useStore.getState()
+  const { warp, ...rest } = st.exportSession()
+  const print = (o: typeof rest): string => fnv(JSON.stringify(st.warpFromSession ? { ...o, warp } : o))
+  const full = print(rest)
+  return { full, noTempo: rest.composition ? print({ ...rest, composition: { ...rest.composition, bpm: 0 } }) : full }
+}
+
+let baseline: Prints | null = null
 let lastInput = 0
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -62,12 +72,12 @@ if (typeof window !== 'undefined') {
  *  fresh New / Generate not worth asking about. Changes the engine makes while
  *  it settles over the next 1.5 s are absorbed unless you touched something. */
 export function markClean(): void {
-  baseline = fingerprint()
+  baseline = prints()
   const at = performance.now()
   if (settleTimer) clearTimeout(settleTimer)
   settleTimer = setTimeout(() => {
     settleTimer = null
-    if (lastInput < at) baseline = fingerprint()
+    if (lastInput < at) baseline = prints()
   }, 1500)
 }
 
@@ -80,7 +90,9 @@ export function markDirty(): void {
 }
 
 export function isDirty(): boolean {
-  return baseline === null || fingerprint() !== baseline
+  if (baseline === null) return true
+  const now = prints()
+  return tempoShared() ? now.noTempo !== baseline.noTempo : now.full !== baseline.full
 }
 
 export type LeaveChoice = 'save' | 'discard' | 'cancel'

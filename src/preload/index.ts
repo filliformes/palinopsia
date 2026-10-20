@@ -101,6 +101,7 @@ const api: ExposedApi = {
 
   // ── Ableton Link ─────────────────────────────────────────────────
   linkConfigure: (cfg) => ipcRenderer.invoke('link:configure', cfg),
+  linkState: () => ipcRenderer.invoke('link:state'),
   linkSetTempo: (bpm) => ipcRenderer.send('link:tempo', bpm),
   onLinkState: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, s: Parameters<typeof cb>[0]): void => cb(s)

@@ -25,7 +25,7 @@ import { runSilently } from '../undo'
 import { visionBus } from '../engine/visionIn'
 import { registerKeyEveryBase, sonifyModValues } from '../engine/modulation'
 import { sameNotes, sonifyEngine, type SoniConfig } from './sonify'
-import { RATE_BEATS, soniClockStart } from './soniClock'
+import { rateBeats, soniBar, soniClockEpoch, soniClockStart } from './soniClock'
 import { advanceDrift } from './soniSeq'
 import {
   BRIGHT, DIATONIC, affinity, diatonicRing, fifthsPos, isScale, keyId, mod12, rootAtFifths, sameKey, euclidHit,
@@ -41,6 +41,7 @@ const rt = {
   nextBeat: 0,
   nextMs: 0,
   periodBeats: 0, // the tick period last used (a rate change re-aligns)
+  epoch: -1, // the beat clock's count it is aligned on (soniClockEpoch)
   periodMs: 0,
   jit: 1, // VARY : this wait's factor on EVERY
   tick: 0, // ticks since start (the Euclidean rhythm counts them)
@@ -376,6 +377,7 @@ function start(ks: SoniKeySeq, cur: Key, now: number): void {
   rt.lastCut = 0
   rt.periodBeats = 0
   rt.periodMs = 0
+  rt.epoch = soniClockEpoch()
   rt.waiting = ks.rate !== 'free'
   if (rt.waiting) {
     const sq = useStore.getState().soniSeq
@@ -418,7 +420,15 @@ function due(ks: SoniKeySeq, now: number, beats: number): boolean {
     return true
   }
   rt.periodMs = 0
-  const rb = RATE_BEATS[ks.rate]
+  const rb = rateBeats(ks.rate)
+  if (rt.epoch !== soniClockEpoch()) {
+    // The beat clock was counted afresh (Ableton Link came on or off, its bar
+    // changed size) : a start still waiting waits for the next of its bars, a
+    // running clock re-aligns on them (as for a new rate, just below).
+    rt.epoch = soniClockEpoch()
+    if (rt.waiting) rt.startBeat = Math.ceil(beats / soniBar() - 1e-6) * soniBar()
+    else rt.periodBeats = 0
+  }
   if (rt.waiting) {
     if (beats < rt.startBeat) return false
     rt.waiting = false
@@ -522,6 +532,6 @@ export function keySeqPhase(now: number, beats: number): number {
   if (!ks.on || !rt.started || (ks.mode === 'picture' && ks.picSource === 'cuts')) return -1
   if (ks.rate === 'free') return Math.max(0, Math.min(1, 1 - (rt.nextMs - now) / Math.max(1, rt.periodMs || ks.freeMs)))
   if (rt.waiting) return 0
-  const rb = RATE_BEATS[ks.rate]
+  const rb = rateBeats(ks.rate)
   return Math.max(0, Math.min(1, 1 - (rt.nextBeat - beats) / rb))
 }

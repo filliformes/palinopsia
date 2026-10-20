@@ -1332,6 +1332,8 @@ export interface ExposedApi {
   onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
   // Ableton Link (src/main/link.ts)
   linkConfigure: (cfg: Partial<LinkConfig>) => Promise<LinkState>
+  /** The state without configuring anything : at startup, is Link in this build? */
+  linkState: () => Promise<LinkState>
   linkSetTempo: (bpm: number) => void
   onLinkState: (cb: (s: LinkState) => void) => () => void
 
@@ -1560,7 +1562,7 @@ export interface LinkConfig {
 }
 
 /** The Link session as read in the main process, stamped with when (`at`, ms
- *  on the shared performance.timeOrigin + now() clock). */
+ *  on the system's wall clock, see src/main/link.ts). */
 export interface LinkState {
   available: boolean
   error?: string
@@ -1569,5 +1571,7 @@ export interface LinkState {
   tempo: number
   beat: number
   phase: number
+  /** the quantum `beat` was read for (a bar change re-maps the beat count) */
+  quantum?: number
   at: number
 }
