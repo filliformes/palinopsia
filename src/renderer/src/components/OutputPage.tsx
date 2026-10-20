@@ -344,20 +344,17 @@ export function OutputPage({
           Output · Mapping
         </span>
         <div className="flex-1" />
-        {/* Out to a window of its own (beside the instrument, on another
-            screen), or back in over the instrument. Remembered : O opens it
-            where you left it. */}
-        <button
-          onClick={() => setOutputPageWindow(!inWindow)}
-          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
-          title={
-            inWindow
-              ? 'Put the Output page back over the instrument'
-              : 'Open the Output page in a window of its own, beside the instrument (another screen, or moved aside) : every control stays live while you play'
-          }
-        >
-          {inWindow ? '⇲ back into the app' : '↗ open in a window'}
-        </button>
+        {/* In its own window (from the Output button's right-click menu) : back
+            in over the instrument. */}
+        {inWindow && (
+          <button
+            onClick={() => setOutputPageWindow(false)}
+            className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+            title="Put the Output page back over the instrument"
+          >
+            ⇲ back into the app
+          </button>
+        )}
         <button
           onClick={() => setOutputPageOpen(false)}
           className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"

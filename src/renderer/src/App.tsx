@@ -922,8 +922,9 @@ export default function App(): JSX.Element {
         useStore.getState().toggleMixerView()
         return
       }
-      // O: open/close the Output / Mapping view. In its own window, O brings
-      // that window up (it closes from its title bar or its close button).
+      // O: open/close the Output / Mapping view (in the app). While it is in its
+      // own window, O brings that window up (it closes from its title bar or
+      // its close button).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         const st = useStore.getState()

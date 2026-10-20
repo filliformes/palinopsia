@@ -136,9 +136,8 @@ export function OutputPageWindow({ canvasRef }: { canvasRef: RefObject<HTMLCanva
     rootObs.observe(document.documentElement, { attributes: true })
     const unKeys = forwardKeys(w)
 
-    // Closed from its own title bar : the page closes (it stays a window
-    // page : O opens it there again). Not when this closes it : the listener
-    // is gone by then.
+    // Closed from its own title bar : the page closes (next time it opens in
+    // the app). Not when this closes it : the listener is gone by then.
     const onGone = (): void => {
       saveBounds(w!)
       popup = null

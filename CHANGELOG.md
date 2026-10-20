@@ -64,8 +64,9 @@ that CI builds into cross-platform releases.
   main puts it back on a screen if that one is gone), closes with the control window or
   on its reload, and denies navigation. Store : `outputPageWindow` (remembered), with
   `outputPageOpen` still meaning "the page shows"; O / Output page… raise its window
-  (`outputPage:focus`). Header buttons ↗ open in a window / ⇲ back into the app, a menu
-  item on the Output button. `liveOverlay` and `Blink` work in the element's own
+  (`outputPage:focus`). Opened only from the Output button's menu (Output page in a
+  window), never remembered : closing the page resets it, so it otherwise always opens
+  in the app (Vincent). ⇲ back into the app in the window's header. `liveOverlay` and `Blink` work in the element's own
   document. Verified in a test copy : styles, live mirror, HUD, dome simulator, a click
   and a forwarded key (M), dock back and out again, closing from the window, O reopening
   it, a reload closing it.

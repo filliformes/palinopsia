@@ -205,7 +205,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `P` / `Shift+P` | Open Vibe Palette / cycle its presets |
 | `C` / `Shift+C` | Open Context / cycle its presets |
 | `M` / `F` / `G` | Right column → Mixer / Finishing / **Feel** (Layers is the default view : `M` toggles Mixer↔Layers, or click the tab) |
-| `O` | Output / Mapping page (in its own window : brings it forward) |
+| `O` | Output / Mapping page (while it is in its own window : brings it forward) |
 | `W` | World editor |
 | `Q` | Sequence page |
 | `S` | **Sonify** page (image-to-sound engine) |
@@ -1083,14 +1083,14 @@ bottom:
   window on the screen the controls are on, showing what the projector gets (the
   domemaster on the dome), to tweak while watching it; **Close Output** while one is
   open; **Output page…**; **Output page in a window**.
-- **The Output page in a window of its own** : **↗ open in a window** in the page's
-  header (or the Output button's right-click menu) takes the whole page out of the
-  instrument into its own window, to keep beside it or on another screen : the mapping,
-  the dome simulator, the senders and the recorder stay in view and live while you
-  play. Your keys still play the instrument from there (typing in its fields stays in
-  them). **⇲ back into the app** puts it back over the instrument; closing the window
-  closes the page. It is remembered : once out, `O` opens it in its window (and brings
-  that window forward), where you last left it.
+- **The Output page in a window of its own** : right-click the Output button, **Output
+  page in a window**, and the whole page opens in its own window, to keep beside the
+  instrument or on another screen : the mapping, the dome simulator, the senders and
+  the recorder stay in view and live while you play. Your keys still play the
+  instrument from there (typing in its fields stays in them). **⇲ back into the app**
+  puts it back over the instrument; closing the window closes the page. The page
+  otherwise always opens in the app (`O`, the Output button); while it is in its window,
+  `O` brings that window forward. The window comes back where you last left it.
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window shows the control window's exact pixels, streamed at the
   projector's own resolution and keystoned on its side. A tap of `Esc` on a
