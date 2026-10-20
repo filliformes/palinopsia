@@ -112,7 +112,8 @@ export interface SourceSlot extends ShaderInstance {
   grainSync?: number
   // Source framing (video + capture): sample transform applied on upload.
   // How the whole picture sits in the layer : 'stretch' fills it whatever the
-  // aspect (the default, the old look), 'cover' fills it with the aspect kept
+  // aspect (the default, the old look; unset under full-dome fill it is 'cover' :
+  // dome.ts defaultSourceFit), 'cover' fills it with the aspect kept
   // (edges cut), 'contain' shows all of it with the aspect kept (transparent around).
   fit?: 'stretch' | 'cover' | 'contain'
   zoom?: number // scale about centre, default 1

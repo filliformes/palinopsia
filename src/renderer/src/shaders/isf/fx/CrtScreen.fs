@@ -69,7 +69,10 @@ void main() {
     vec2 sq = uv * 2.0 - 1.0;
     dr = length(vec2(sq.x * sqrt(1.0 - 0.5 * sq.y * sq.y), sq.y * sqrt(1.0 - 0.5 * sq.x * sq.x))) / DOME_FILL;
   }
-  col *= 1.0 - vignette * (DOME_FILL > 0.0 ? smoothstep(0.9, 1.0 / DOME_FILL + 0.02, dr) : smoothstep(0.15, 0.5, r2));
+  // (to the frame's own rim, 1 / DOME_FILL, which comes before the horizon when
+  // the frame is scaled down inside the dome : then it starts a little inside it)
+  float domeEnd = 1.0 / max(DOME_FILL, 0.001) + 0.02;
+  col *= 1.0 - vignette * (DOME_FILL > 0.0 ? smoothstep(min(0.9, domeEnd - 0.12), domeEnd, dr) : smoothstep(0.15, 0.5, r2));
 
   // Rounded bezel : black outside the glass (on the warped coords). Kept in UV,
   // so at 16:9 the corners stretch like a 4:3 tube's bezel.

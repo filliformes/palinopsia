@@ -164,3 +164,17 @@ export function sanitizeDome(raw: unknown): DomeConfig {
     }
   }
 }
+
+/** Full dome FILL on : the whole flat frame spread over the whole disc. */
+export function isDomeFill(d: Pick<DomeConfig, 'enabled' | 'mode' | 'fit'> | null | undefined): boolean {
+  return !!d && d.enabled && d.mode === 'fisheye' && d.fit === 'fill'
+}
+
+/** A film's (or a capture's, an assemblage's) framing fit when the slot has none
+ *  of its own : under full-dome fill (a square composition spread over the disc)
+ *  it covers the frame (stretched, a 16:9 film came out squashed); else it
+ *  stretches over the layer (the old look). One rule for the engine and the
+ *  Inspector. */
+export function defaultSourceFit(domeFill: boolean): 'stretch' | 'cover' {
+  return domeFill ? 'cover' : 'stretch'
+}

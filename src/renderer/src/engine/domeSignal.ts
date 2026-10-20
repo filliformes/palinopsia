@@ -7,7 +7,8 @@
 //   uniform float DOME_FILL;
 //
 // gets, every draw, the horizon's radius on the disc while fill is on (180 /
-// aperture : 0.857 for a 210° dome, 1 for 180°) and 0 otherwise. The frame
+// aperture / scale : 0.857 for a 210° dome at scale 1, 1 for 180°; above 1 when
+// the frame is scaled down inside the dome) and 0 otherwise. The frame
 // point's place on the dome : squareToDisc(uv·2 − 1) (Fong), its length / DOME_FILL
 // = 1 at the horizon, more below it. Set by the Compositor's setDome; uploaded
 // beside the integrated phases (isfTextureBridge).

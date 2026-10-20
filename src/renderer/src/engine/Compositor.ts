@@ -59,7 +59,7 @@ installTextureBridge();
 
 import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig, DomeModField } from '@shared/dome';
-import { DOME_MOD_RANGE } from '@shared/dome';
+import { DOME_MOD_RANGE, defaultSourceFit, isDomeFill } from '@shared/dome';
 import { DomeStage } from './dome';
 import { domeFill, setDomeFill } from './domeSignal';
 import { OutXformStage, outXformActive } from './outXform';
@@ -1269,7 +1269,7 @@ export class ISFLayer {
       cropB: s.cropB ?? 0,
       // under full-dome fill (a square composition) a film left on the default
       // covers the frame : stretched, a 16:9 film came out squashed
-      fit: s.fit ?? (domeFill() > 0 ? 'cover' : 'stretch'),
+      fit: s.fit ?? defaultSourceFit(domeFill() > 0),
       feather: s.feather ?? 0,
       mirror: s.mirror ?? 'off',
       // People only where there is a picture of the world to look at.
@@ -2653,10 +2653,7 @@ export class Compositor {
    *  the square master and back; the internal render size never changes. */
   setDome(cfg: DomeConfig | null): void {
     this.domeCfg = cfg && cfg.enabled ? cfg : null;
-    // The shaders' DOME_FILL : the horizon's radius on the disc while full-dome
-    // fill spreads the frame over it (domeSignal.ts).
-    const d = this.domeCfg;
-    setDomeFill(d && d.mode === 'fisheye' && d.fit === 'fill' ? 180 / Math.max(90, d.aperture) : 0);
+    this.syncDomeFill();
     const cw = this.domeCfg ? this.domeCfg.res : this.w;
     const ch = this.domeCfg ? this.domeCfg.res : this.h;
     if (this.canvas.width !== cw || this.canvas.height !== ch) {
@@ -2672,6 +2669,19 @@ export class Compositor {
     if (!this.domeCfg || !Number.isFinite(value)) return;
     const r = DOME_MOD_RANGE[field];
     this.domeCfg = { ...this.domeCfg, [field]: Math.max(r.min, Math.min(r.max, value)) };
+    if (field === 'scale') this.syncDomeFill();
+  }
+
+  /** The shaders' DOME_FILL (domeSignal.ts) : the horizon's radius on the
+   *  frame's disc while full-dome fill spreads the frame over the dome. The
+   *  horizon sits at 180 / aperture of the master's radius, and the frame's disc
+   *  is the master's divided by the scale (dome.ts : z = rot(q) / scale), so a
+   *  scaled-up frame puts the horizon nearer its center. (The offset moves the
+   *  frame's center off the zenith : that is left out, the horizon stays a circle
+   *  about the frame's center.) */
+  private syncDomeFill(): void {
+    const d = this.domeCfg;
+    setDomeFill(isDomeFill(d) && d ? 180 / Math.max(90, d.aperture) / Math.max(0.05, d.scale) : 0);
   }
   /** The dome slider's value this frame, null while the dome is off. */
   domeParam(field: DomeModField): number | null {

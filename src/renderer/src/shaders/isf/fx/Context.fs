@@ -374,8 +374,12 @@ void main() {
     vec2 sq = uv * 2.0 - 1.0;
     domeRr = length(vec2(sq.x * sqrt(1.0 - 0.5 * sq.y * sq.y), sq.y * sqrt(1.0 - 0.5 * sq.x * sq.x)));
   }
+  // (it ends at the frame's own rim, 1 / DOME_FILL : with the frame scaled down
+  // inside the dome that rim comes before the horizon, and the fall starts a
+  // little inside it instead)
+  float domeEnd = 1.0 / max(DOME_FILL, 0.001) + 0.02;
   float vig = DOME_FILL > 0.0
-    ? 1.0 - smoothstep(0.9, 1.0 / DOME_FILL + 0.02, domeRr / DOME_FILL)
+    ? 1.0 - smoothstep(min(0.9, domeEnd - 0.12), domeEnd, domeRr / DOME_FILL)
     : 1.0 - smoothstep(0.35, 0.95, length(dv));
   col *= mix(1.0, 0.35 + 0.65 * vig, depth);
 

@@ -90,14 +90,15 @@ void main(){
   if (uMode == 0) {
     // The BACK SEAM : unless the turns land the picture back on itself (whole
     // turns, even ones with mirror seams), the frame's two edges meet behind
-    // the audience in a hard cut. Within 12° of it, each side blends toward
-    // the other, so they meet halfway. Where the seam was already clean both
-    // samples are the same picture and nothing changes.
-    float a = mod(az - uRot + PI, 2.0 * PI) - PI;
-    col = wrapAt(a, el);
-    float toSeam = PI - abs(a);
+    // the audience in a hard cut. It stays at the physical back (az = ±180°)
+    // whatever the rotate and spin : the picture turns, the cut does not.
+    // Within 12° of it, each side blends toward the other's continuation, so
+    // they meet halfway. Where the seam was already clean both samples are the
+    // same picture and nothing changes.
+    col = wrapAt(az - uRot, el);
+    float toSeam = PI - abs(az);
     float sw = radians(12.0);
-    if (toSeam < sw) col = mix(col, wrapAt(a > 0.0 ? a - 2.0 * PI : a + 2.0 * PI, el), 0.5 * (1.0 - toSeam / sw));
+    if (toSeam < sw) col = mix(col, wrapAt((az > 0.0 ? az - 2.0 * PI : az + 2.0 * PI) - uRot, el), 0.5 * (1.0 - toSeam / sw));
   } else if (uMode == 1) {
     vec3 D = vec3(sin(theta) * sin(az), cos(theta), -sin(theta) * cos(az));
     vec3 back = uSurround > 0.001 ? wrapAt(az - uRot, el) * uSurround : vec3(0.0);
@@ -125,7 +126,12 @@ void main(){
     vec2 p;
     if (uFit == 0) {
       vec2 z = mat2(c, s, -s, c) * q / uScale;
-      vec2 a = uOffset * min(1.0, 0.9 / max(length(uOffset), 1e-6)); // never onto the rim itself
+      // The two offset sliders (a square, -1..1 each) onto a disc of radius 0.9
+      // (Fong's square → disc, the inverse of discToSquare) : every bit of their
+      // travel moves the picture, and it never reaches the rim itself.
+      // shared/spatial.ts's pictureToDirection mirrors this.
+      vec2 oc = clamp(uOffset, -1.0, 1.0);
+      vec2 a = 0.9 * vec2(oc.x * sqrt(1.0 - 0.5 * oc.y * oc.y), oc.y * sqrt(1.0 - 0.5 * oc.x * oc.x));
       p = length(z) <= 1.0 ? discToSquare(discShift(z, a)) * 0.5 + 0.5 : vec2(-1.0);
     } else if (uFit == 1) {
       p = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;       // the height spans the circle

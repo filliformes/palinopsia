@@ -4,6 +4,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { SourceSlot } from '@shared/types'
+import { defaultSourceFit, isDomeFill } from '@shared/dome'
 import { useStore } from '../store'
 import { personStatus, type PersonStatus } from '../engine/personMask'
 
@@ -174,7 +175,10 @@ export function SourceFraming({
   const cropR = state.cropR ?? 0
   const cropT = state.cropT ?? 0
   const cropB = state.cropB ?? 0
-  const fit = state.fit ?? 'stretch'
+  // A slot with no fit of its own shows what the engine draws (cover under
+  // full-dome fill, else stretch).
+  const domeFill = useStore((s) => isDomeFill(s.dome))
+  const fit = state.fit ?? defaultSourceFit(domeFill)
   const feather = state.feather ?? 0
   const mirror = state.mirror ?? 'off'
   const person = state.person ?? 'off'
@@ -189,7 +193,8 @@ export function SourceFraming({
         <div className="flex-1" />
         <button
           onClick={() =>
-            set({ zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0, fit: 'stretch', feather: 0 })
+            // fit back to the default (none of its own), which follows the dome
+            set({ zoom: 1, panX: 0, panY: 0, cropL: 0, cropR: 0, cropT: 0, cropB: 0, fit: undefined, feather: 0 })
           }
           className="rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent"
           title="Reset framing (the mirror stays : it is how the camera hangs)"

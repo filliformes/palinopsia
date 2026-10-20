@@ -391,8 +391,24 @@ export function pictureToDirection(
     qx = ((px - 0.5) * 2 * aspect) / k
     qy = ((py - 0.5) * 2) / k
   }
-  // dome.ts : qq = rot(q) / scale − offset  →  q = rot⁻¹((qq + offset) · scale)
-  const tx = (qx + dome.offsetX) * dome.scale, ty = (qy + dome.offsetY) * dome.scale
+  let tx: number, ty: number
+  if (dome.fit === 'fill') {
+    // dome.ts (fill) : z = rot(q) / scale, then the disc automorphism
+    // w = (z − a) / (1 − conj(a)·z), the frame point at discToSquare(w). Back :
+    // z = (w + a) / (1 + conj(a)·w), q = rot⁻¹(z · scale). `a` : the offset
+    // square onto the 0.9 disc, exactly as the shader maps it.
+    const ox = Math.max(-1, Math.min(1, dome.offsetX)), oy = Math.max(-1, Math.min(1, dome.offsetY))
+    const ax = 0.9 * ox * Math.sqrt(1 - 0.5 * oy * oy), ay = 0.9 * oy * Math.sqrt(1 - 0.5 * ox * ox)
+    const nx = qx + ax, ny = qy + ay
+    const dx = 1 + ax * qx + ay * qy, dy = ax * qy - ay * qx // |d| ≥ 1 − 0.9 : never 0
+    const dd = dx * dx + dy * dy
+    tx = ((nx * dx + ny * dy) / dd) * dome.scale
+    ty = ((ny * dx - nx * dy) / dd) * dome.scale
+  } else {
+    // dome.ts : qq = rot(q) / scale − offset  →  q = rot⁻¹((qq + offset) · scale)
+    tx = (qx + dome.offsetX) * dome.scale
+    ty = (qy + dome.offsetY) * dome.scale
+  }
   const c = Math.cos(rot * D2R), s = Math.sin(rot * D2R)
   const mx = c * tx + s * ty, my = -s * tx + c * ty
   const r = Math.min(1, Math.hypot(mx, my)) // past the rim : on the rim
