@@ -1,6 +1,8 @@
 // Codec Mosh : the real datamosh. The picture goes through an actual H.264
-// encoder and decoder (WebCodecs, the graphics card's own), and the stream
-// between the two is broken on purpose, the way datamoshers edit their files :
+// encoder and decoder (WebCodecs : the graphics card's encoder when it has one,
+// the processor's decoder, which smears a broken stream rather than refusing
+// it), and the stream between the two is broken on purpose, the way
+// datamoshers edit their files :
 //
 // - a keyframe WITHHELD : at a cut (or ▸ mosh) the encoder starts over from the
 //   new picture, but the decoder never hears of it. The new motion then drags
@@ -30,6 +32,8 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 /** The long edge the picture is encoded at, per `size` : fine · medium · coarse · huge. */
 const SIZES = [960, 640, 416, 256]
 const CODEC = 'avc1.42001f' // baseline (no B-frames : every frame is decodable at once), level 3.1
+/** No frame for this long (the unit or its layer off) : the codec closes (checkIdle). */
+const IDLE_MS = 2000
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
@@ -76,13 +80,29 @@ export class CodecMoshNode implements ConvNode {
   private enc: VideoEncoder | null = null
   private dec: VideoDecoder | null = null
   private starting = false
-  private failed = false
+  // no codec would start : the input passes through until then, and the wait
+  // doubles at each failure in a row (5 s … 1 min), never a stop for good
+  private failUntil = 0
+  private failCount = 0
   private quantizer = false // per-frame quality (no reconfigure) when the encoder takes it
   private cfgKey = ''
   private encW = 0
   private encH = 0
-  private intents: Intent[] = []
+  // why each frame was encoded, by its timestamp : a realtime encoder may drop a
+  // frame, and matching by order then gave every later chunk its neighbor's purpose
+  private intents = new Map<number, Intent>()
   private decodedKey = false // the decoder has had a keyframe since its last (re)start
+  // the decoders this machine offers, the processor's first (see startCodec)
+  private decCfgs: VideoDecoderConfig[] = []
+  private decIdx = 0
+  private decOut = false // the decoder has given a frame since it was configured
+  private decRetryAt = 0
+  private decErrors: number[] = []
+  // a unit switched off (or its layer) is never rendered : its codec closes
+  // after a while without a frame, and opens again with the next one
+  private lastRenderAt = 0
+  private idleTimer: ReturnType<typeof setInterval> | null = null
+  private idle = false
   private latest: VideoFrame | null = null
   private ts = 0
   private decTs = 0
@@ -149,15 +169,19 @@ export class CodecMoshNode implements ConvNode {
   }
 
   // ── codec ───────────────────────────────────────────────────────────────
-  private async startCodec(w: number, h: number, quality: number): Promise<void> {
+  /** Open the encoder for `w`x`h` (and the decoder, openDecoder). `bq` is the
+   *  quality the bitrate is chosen from without per-frame quality; the key the
+   *  frame loop compares is made by the same codecKey(), so the two never
+   *  disagree (they did : a reconfigure every few frames in bitrate mode). */
+  private async startCodec(w: number, h: number, bq: number): Promise<void> {
     if (this.starting || typeof VideoEncoder === 'undefined') return
     this.starting = true
     const base: VideoEncoderConfig = { codec: CODEC, width: w, height: h, latencyMode: 'realtime', avc: { format: 'annexb' } }
     const tries: VideoEncoderConfig[] = [
       { ...base, bitrateMode: 'quantizer', hardwareAcceleration: 'prefer-hardware' },
       { ...base, bitrateMode: 'quantizer', hardwareAcceleration: 'prefer-software' },
-      { ...base, bitrate: bitrateFor(quality, w, h), hardwareAcceleration: 'prefer-hardware' },
-      { ...base, bitrate: bitrateFor(quality, w, h) }
+      { ...base, bitrate: bitrateFor(bq, w, h), hardwareAcceleration: 'prefer-hardware' },
+      { ...base, bitrate: bitrateFor(bq, w, h) }
     ]
     let cfg: VideoEncoderConfig | null = null
     // the graphics card's encoders are few (a handful of streams at once) : once
@@ -167,43 +191,105 @@ export class CodecMoshNode implements ConvNode {
         if ((await VideoEncoder.isConfigSupported(t)).supported) { cfg = t; break }
       } catch { /* next */ }
     }
+    // The decoder : the processor's first. The broken stream is the effect, and
+    // a software decoder conceals a missing or wrong reference (it smears, the
+    // mosh) where the graphics card's tends to refuse the frame outright.
+    const decTries: VideoDecoderConfig[] = [
+      { codec: CODEC, hardwareAcceleration: 'prefer-software', optimizeForLatency: true },
+      { codec: CODEC, optimizeForLatency: true }
+    ]
+    const decCfgs: VideoDecoderConfig[] = []
+    for (const t of decTries) {
+      try {
+        if ((await VideoDecoder.isConfigSupported(t)).supported) decCfgs.push(t)
+      } catch { /* next */ }
+    }
     this.starting = false
     if (this.disposed) return
-    if (!cfg) { this.failed = true; console.warn('[codecMosh] no H.264 encoder here'); return }
+    if (!cfg) { this.fail('no H.264 encoder here'); return }
+    if (!decCfgs.length) { this.fail('no H.264 decoder here'); return }
     this.stopCodec()
+    this.decCfgs = decCfgs
+    if (this.decIdx >= decCfgs.length) this.decIdx = 0
     this.quantizer = cfg.bitrateMode === 'quantizer'
     try {
-      const enc = new VideoEncoder({
-        output: (chunk) => this.onChunk(chunk),
+      const enc: VideoEncoder = new VideoEncoder({
+        output: (chunk) => { if (enc === this.enc) this.onChunk(chunk) },
         error: (e) => {
+          if (enc !== this.enc) return
           console.warn('[codecMosh] encoder', e.message)
           if (cfg?.hardwareAcceleration === 'prefer-hardware') this.hwFailed = true
           this.restartSoon()
         }
       })
       enc.configure(cfg)
-      const dec = new VideoDecoder({
+      this.enc = enc
+      this.encW = w
+      this.encH = h
+      this.cfgKey = codecKey(w, h, this.quantizer, bq)
+      this.intents.clear()
+      console.info(`[codecMosh] H.264 ${w}x${h}, ${cfg.hardwareAcceleration === 'prefer-hardware' ? 'graphics card' : cfg.hardwareAcceleration === 'prefer-software' ? 'processor' : 'any'} encoder, ${this.quantizer ? 'per-frame quality' : 'bitrate ' + cfg.bitrate}`)
+    } catch (e) {
+      this.fail(`start : ${(e as Error).message}`)
+      return
+    }
+    this.openDecoder()
+  }
+
+  /** A fresh decoder (from decCfgs[decIdx]); it starts at the clean keyframe
+   *  asked for here. The encoder and the state of the mosh carry on. */
+  private openDecoder(): void {
+    const cfg = this.decCfgs[this.decIdx]
+    if (!cfg || !this.enc) return
+    try {
+      const dec: VideoDecoder = new VideoDecoder({
         output: (f) => {
-          if (this.disposed) { f.close(); return }
+          if (this.disposed || dec !== this.dec) { f.close(); return }
+          this.decOut = true
+          this.failCount = 0
           this.latest?.close()
           this.latest = f
         },
-        error: (e) => { console.warn('[codecMosh] decoder', e.message); this.restartSoon() }
+        error: (e) => this.onDecoderError(dec, e)
       })
-      dec.configure({ codec: CODEC, hardwareAcceleration: cfg.hardwareAcceleration ?? 'no-preference', optimizeForLatency: true })
-      this.enc = enc
+      dec.configure(cfg)
       this.dec = dec
-      this.encW = w
-      this.encH = h
-      this.cfgKey = `${w}x${h}${this.quantizer ? '' : ':' + bitrateFor(quality, w, h)}`
-      this.intents = []
+      this.decOut = false
       this.decodedKey = false
       this.wantClean = true
-      console.info(`[codecMosh] H.264 ${w}x${h}, ${cfg.hardwareAcceleration === 'prefer-hardware' ? 'graphics card' : cfg.hardwareAcceleration === 'prefer-software' ? 'processor' : 'any'} encoder, ${this.quantizer ? 'per-frame quality' : 'bitrate ' + cfg.bitrate}`)
+      console.info(`[codecMosh] ${cfg.hardwareAcceleration === 'prefer-software' ? 'processor' : 'any'} decoder`)
     } catch (e) {
-      console.warn('[codecMosh] start', (e as Error).message)
-      this.failed = true
+      this.fail(`decoder : ${(e as Error).message}`)
     }
+  }
+
+  /** The decoder refused. Only it starts again : the encoder and the mosh keep
+   *  going, the picture holds its last decoded frame, and a fresh decoder
+   *  resumes at the next (clean) keyframe. One that refused before giving a
+   *  single frame can't take this stream at all (its setup was refused, or
+   *  this machine's version of it) : the next decoder on the list instead of
+   *  the same one again; none left, the whole codec waits and tries again. */
+  private onDecoderError(dec: VideoDecoder, e: DOMException | Error): void {
+    if (this.disposed || dec !== this.dec) return
+    console.warn('[codecMosh] decoder', e.message)
+    try { if (dec.state !== 'closed') dec.close() } catch { /* closing */ }
+    this.dec = null
+    this.decodedKey = false
+    const now = performance.now()
+    if (e.name === 'NotSupportedError' || !this.decOut) {
+      this.decIdx++
+      if (this.decIdx >= this.decCfgs.length) {
+        this.decIdx = 0
+        this.fail('no decoder here takes the stream')
+        return
+      }
+      this.decRetryAt = now
+      return
+    }
+    // a decoder refusing again and again waits a second between two tries
+    this.decErrors = this.decErrors.filter((t) => now - t < 3000)
+    this.decErrors.push(now)
+    this.decRetryAt = this.decErrors.length > 2 ? now + 1000 : now
   }
 
   private stopCodec(): void {
@@ -211,10 +297,10 @@ export class CodecMoshNode implements ConvNode {
     try { if (this.dec && this.dec.state !== 'closed') this.dec.close() } catch { /* closing */ }
     this.enc = null
     this.dec = null
-    this.intents = []
+    this.intents.clear()
   }
 
-  /** A codec broke (a stream it refused) : start again from a clean keyframe,
+  /** The encoder broke (a frame it refused) : start again from a clean keyframe,
    *  after a second (a codec that keeps refusing must not restart every frame). */
   private restartSoon(): void {
     this.stopCodec()
@@ -225,6 +311,16 @@ export class CodecMoshNode implements ConvNode {
   private sideWas = false
   private hwFailed = false
 
+  /** No codec would start : pass the input through, and try again later. */
+  private fail(why: string): void {
+    this.stopCodec()
+    this.cfgKey = ''
+    this.failCount++
+    const wait = Math.min(60_000, 5000 * 2 ** (this.failCount - 1))
+    this.failUntil = performance.now() + wait
+    console.warn(`[codecMosh] ${why} : trying again in ${Math.round(wait / 1000)} s`)
+  }
+
   private decode(type: 'key' | 'delta', data: Uint8Array): void {
     const dec = this.dec
     if (!dec || dec.state !== 'configured') return
@@ -233,17 +329,21 @@ export class CodecMoshNode implements ConvNode {
       dec.decode(new EncodedVideoChunk({ type, timestamp: (this.decTs += 16667), data }))
       if (type === 'key') this.decodedKey = true
     } catch (e) {
-      console.warn('[codecMosh] decode', (e as Error).message)
-      this.restartSoon()
+      this.onDecoderError(dec, e as Error)
     }
   }
 
   private bloom = 0
   private drop = 0
 
-  /** Each chunk out of the encoder, in order, with why it was asked for. */
+  /** Each chunk out of the encoder, with why it was asked for. */
   private onChunk(chunk: EncodedVideoChunk): void {
-    const intent = this.intents.shift() ?? 'normal'
+    const intent = this.intents.get(chunk.timestamp) ?? 'normal'
+    // forget it, and any frame before it the encoder dropped (oldest first)
+    for (const t of this.intents.keys()) {
+      if (t > chunk.timestamp) break
+      this.intents.delete(t)
+    }
     if (this.disposed) return
     const data = new Uint8Array(chunk.byteLength)
     chunk.copyTo(data)
@@ -266,14 +366,15 @@ export class CodecMoshNode implements ConvNode {
     const enc = this.enc
     if (!enc || enc.state !== 'configured' || w !== this.encW || h !== this.encH) return
     let frame: VideoFrame | null = null
+    const ts = (this.ts += 16667)
     try {
-      frame = new VideoFrame(px, { format: 'RGBA', codedWidth: w, codedHeight: h, timestamp: (this.ts += 16667) })
+      frame = new VideoFrame(px, { format: 'RGBA', codedWidth: w, codedHeight: h, timestamp: ts })
       const opts: VideoEncoderEncodeOptions & { avc?: { quantizer?: number } } = { keyFrame }
       if (this.quantizer) opts.avc = { quantizer: Math.round(51 - quality * 33) } // 51 (starved) … 18 (clean)
-      this.intents.push(intent)
+      this.intents.set(ts, intent)
       enc.encode(frame, opts)
     } catch (e) {
-      this.intents.pop()
+      this.intents.delete(ts)
       console.warn('[codecMosh] encode', (e as Error).message)
       this.restartSoon()
     } finally {
@@ -283,13 +384,23 @@ export class CodecMoshNode implements ConvNode {
 
   // ── per frame ───────────────────────────────────────────────────────────
   render(ctx: NodeContext): WebGLTexture {
-    if (this.disposed || this.failed || typeof VideoEncoder === 'undefined') return ctx.host
+    if (this.disposed || typeof VideoEncoder === 'undefined') return ctx.host
+    const now = performance.now()
+    this.lastRenderAt = now
+    if (!this.idleTimer) this.idleTimer = setInterval(() => this.checkIdle(), 1000)
+    if (now < this.failUntil) return ctx.host
     const gl = this.gl
     const inp = ctx.inputs
     const cw = ctx.chain.w
     const ch = ctx.chain.h
     if (cw < 16 || ch < 16) return ctx.host // the warm-up's 8x8 : nothing to encode
     this.ensureGL()
+    if (this.idle) {
+      // back from a pause : what the readback ring held is a picture from before it
+      this.idle = false
+      this.read!.dropInFlight()
+      this.wantClean = true
+    }
     const dt = Math.max(0, ctx.dt)
 
     const sizeIdx = Math.max(0, Math.min(3, Math.round(num(inp.size, 1))))
@@ -309,15 +420,17 @@ export class CodecMoshNode implements ConvNode {
     const ew = cw >= ch ? L : Math.max(64, Math.round((L * cw) / ch / 16) * 16)
     const eh = cw >= ch ? Math.max(64, Math.round((L * ch) / cw / 16) * 16) : L
     // a size (or, without per-frame quality, a bitrate) change restarts the codec,
-    // at most every 0.4 s so a modulated knob can't thrash it
-    const now = performance.now()
+    // at most every 0.4 s so a modulated knob can't thrash it; the bitrate comes
+    // from the quality last settled on (lastQuality), here and in startCodec
     if (sizeIdx !== this.lastSize || (!this.quantizer && Math.abs(quality - this.lastQuality) > 0.04)) {
       this.lastSize = sizeIdx
       this.lastQuality = quality
       this.sizeAt = now
     }
-    const key = `${ew}x${eh}${this.quantizer ? '' : ':' + bitrateFor(this.lastQuality < 0 ? quality : this.lastQuality, ew, eh)}`
-    if (key !== this.cfgKey && !this.starting && now - this.sizeAt > 400 && now >= this.retryAt) void this.startCodec(ew, eh, quality)
+    const key = codecKey(ew, eh, this.quantizer, this.lastQuality)
+    if (key !== this.cfgKey && !this.starting && now - this.sizeAt > 400 && now >= this.retryAt) void this.startCodec(ew, eh, this.lastQuality)
+    // a decoder that refused : a fresh one (the encoder runs on)
+    if (this.enc && !this.dec && !this.starting && now >= this.decRetryAt) this.openDecoder()
 
     // a gap in the frames (just inserted, re-enabled, PANIC) : start clean
     if (ctx.frame !== undefined && this.lastFrame >= 0 && ctx.frame !== this.lastFrame + 1) this.wantClean = true
@@ -342,9 +455,14 @@ export class CodecMoshNode implements ConvNode {
     this.cutCool = Math.max(0, this.cutCool - dt)
 
     // ── the newest readback → the encoder ──
-    const grid = this.read!.takeLatest()
+    // collected only when the encoder can take it : collecting is a round trip
+    // to the GPU, for nothing while the encoder is behind. A ring filled
+    // meanwhile is let go unread, so what goes in once it catches up is recent.
+    const ready = !!this.enc && this.enc.state === 'configured' && this.enc.encodeQueueSize <= 2
+    if (!ready && this.read!.full) this.read!.dropInFlight()
+    const grid = ready ? this.read!.takeLatest() : null
     const cells = side ? 2 : 1
-    if (grid && this.enc && grid.w === this.encW && grid.h === this.encH * cells && this.enc.encodeQueueSize <= 2) {
+    if (grid && grid.w === this.encW && grid.h === this.encH * cells) {
       const n = this.encW * this.encH * 4
       const host = grid.grid.subarray(0, n)
       const motion = side ? grid.grid.subarray(n, 2 * n) : null
@@ -453,8 +571,25 @@ export class CodecMoshNode implements ConvNode {
     return false
   }
 
+  /** Once a second : no frame for IDLE_MS (the unit or its layer switched off,
+   *  the rack not drawn) closes the codec. The next render opens it again,
+   *  from a clean keyframe. */
+  private checkIdle(): void {
+    if (this.disposed || performance.now() - this.lastRenderAt < IDLE_MS) return
+    if (this.starting) return // its answer is on the way : closed at the next look
+    this.stopCodec()
+    this.cfgKey = ''
+    this.latest?.close()
+    this.latest = null
+    this.idle = true
+    if (this.idleTimer) clearInterval(this.idleTimer)
+    this.idleTimer = null
+  }
+
   dispose(): void {
     this.disposed = true
+    if (this.idleTimer) clearInterval(this.idleTimer)
+    this.idleTimer = null
     this.stopCodec()
     this.latest?.close()
     this.latest = null
@@ -484,8 +619,16 @@ function holdFor(refresh: number): number {
 }
 
 /** Without per-frame quality : a bitrate from `quality`, 40 kb/s (starved) …
- *  ~6 Mb/s at 640x360, scaled by the encoded area. */
+ *  ~6 Mb/s at 640x360, scaled by the encoded area. Never under 10 kb/s : the
+ *  smallest sizes starved rounded to 0, which no encoder takes. */
 function bitrateFor(quality: number, w: number, h: number): number {
   const at360 = 40_000 * Math.pow(150, clamp01(quality))
-  return Math.round((at360 * (w * h)) / (640 * 360) / 10_000) * 10_000
+  return Math.max(10_000, Math.round((at360 * (w * h)) / (640 * 360) / 10_000) * 10_000)
+}
+
+/** What the running codec was opened for : a new size, or (without per-frame
+ *  quality) a new bitrate, opens it again. One function for the frame loop and
+ *  startCodec, so the two always agree. */
+function codecKey(w: number, h: number, quantizer: boolean, quality: number): string {
+  return `${w}x${h}${quantizer ? '' : ':' + bitrateFor(quality, w, h)}`
 }
