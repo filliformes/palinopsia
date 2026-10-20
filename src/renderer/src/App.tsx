@@ -805,8 +805,12 @@ export default function App(): JSX.Element {
     // (a device picked while the input runs reopens it : it used to wait for
     // the input to be switched off and on)
     const want = audioDeviceId ?? ''
+    // (an open overtaken by another device or Audio off says nothing : the bus
+    // let it go)
+    let current = true
     if (wantLocal && (!audioBus.localActive || audioBus.requested !== want)) {
       void audioBus.startLocal(audioDeviceId, audioDeviceLabel).then((ok) => {
+        if (!current) return
         // (said in Both too : there it fell back to nothing, silently)
         if (!ok) showToast('Could not open the audio input : check the device and the system\'s microphone permission', 'warn', 6000)
         else if (audioBus.opened === 'default')
@@ -818,6 +822,7 @@ export default function App(): JSX.Element {
       audioBus.stopLocal()
     }
     return () => {
+      current = false
       audioBus.mode = 'off'
     }
   }, [audioEnabled, audioSource, audioDeviceId, audioDeviceLabel])

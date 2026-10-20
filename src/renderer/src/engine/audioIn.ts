@@ -287,10 +287,18 @@ class AudioBus {
    *  it was found again under when its name matched. A different id asked for
    *  reopens the input. */
   requested = ''
+  // Each open's token : a newer one (another device, the input turned off) makes
+  // an open still waiting on the system stale, and what it got is let go (it left
+  // the microphone open, or a second stream and context running unheard).
+  private req = 0
+  // The input unplugged while open : it opens again when a device comes back.
+  private lost: { id: string; label: string } | null = null
+  private offDevices: (() => void) | null = null
 
   // ── Local Web Audio ────────────────────────────────────────────────
   async startLocal(deviceId?: string | null, label?: string | null): Promise<boolean> {
     this.stopLocal()
+    const req = ++this.req
     this.opened = 'none'
     this.requested = deviceId ?? ''
     // The Audio Layer : no microphone, its analyser is read each frame (the
@@ -301,6 +309,7 @@ class AudioBus {
       this.opened = 'chosen'
       return true
     }
+    let stream: MediaStream | null = null
     try {
       // Disable the browser's voice processing : an interface / line input (a
       // Move on inputs 1&2) wants the RAW signal, and AGC would flatten the very
@@ -315,23 +324,42 @@ class AudioBus {
       // default input, said so (a remembered device that was gone left the
       // input silent, the menu reading "Default input", no word of it).
       const md = navigator.mediaDevices
-      let stream: MediaStream | null = null
       let opened: 'chosen' | 'default' = 'chosen'
+      // a newer open (or Audio off) came while this one waited : let it go
+      const stale = (): boolean => {
+        if (req === this.req) return false
+        stream?.getTracks().forEach((t) => t.stop())
+        stream = null
+        return true
+      }
+      let foundAs = ''
       if (deviceId) {
         try {
           stream = await md.getUserMedia({ audio: { ...audioC, deviceId: { exact: deviceId } }, video: false })
         } catch {
           const same = label ? (await md.enumerateDevices()).find((d) => d.kind === 'audioinput' && d.label === label) : undefined
+          if (stale()) return false
           if (same) {
             try {
               stream = await md.getUserMedia({ audio: { ...audioC, deviceId: { exact: same.deviceId } }, video: false })
-              this.requested = same.deviceId
+              foundAs = same.deviceId
             } catch { /* below */ }
           }
           if (!stream) opened = 'default'
         }
+        if (stale()) return false
       }
       if (!stream) stream = await md.getUserMedia({ audio: audioC, video: false })
+      if (stale()) return false
+      if (foundAs) this.requested = foundAs
+      // Unplugged while open : it opens again once a device comes back.
+      const tr = stream.getAudioTracks()[0]
+      tr?.addEventListener('ended', () => {
+        if (req !== this.req) return
+        console.warn('[audio] the input was disconnected', tr.label)
+        this.lost = { id: this.requested, label: tr.label || (label ?? '') }
+        this.watchDevices()
+      })
       const ctx = new AudioContext()
       const src = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
@@ -369,13 +397,46 @@ class AudioBus {
       this.opened = opened
       return true
     } catch (e) {
+      // a stream got before the failure (the context would not start) is let go
+      if (stream && stream !== this.stream) (stream as MediaStream).getTracks().forEach((t) => t.stop())
+      // (a stale open's failure is not this input's)
+      if (req !== this.req) return false
       console.error('[audio] local input failed:', (e as Error).name, (e as Error).message)
       this.localOn = false
       return false
     }
   }
 
+  /** While the input is lost : a device plugged in opens it again (the same
+   *  one, by its id or its name; never another that became the default). */
+  private watchDevices(): void {
+    const md = navigator.mediaDevices
+    if (this.offDevices || !md?.addEventListener) return
+    const fn = (): void => {
+      const l = this.lost
+      if (!l) return
+      void md.enumerateDevices().then((ds) => {
+        if (this.lost !== l) return
+        const back = ds.find((d) => d.kind === 'audioinput' && ((l.id && d.deviceId === l.id) || (!!l.label && d.label === l.label)))
+        if (!back) return
+        const opening = this.startLocal(back.deviceId, l.label)
+        const mine = this.req // (startLocal took its token before its first wait)
+        // not ready yet (an interface still waking) : the next device change
+        // tries again, unless something else opened or closed the input since
+        void opening.then((ok) => {
+          if (!ok && this.req === mine) { this.lost = l; this.watchDevices() }
+        })
+      }).catch(() => {})
+    }
+    md.addEventListener('devicechange', fn)
+    this.offDevices = () => md.removeEventListener('devicechange', fn)
+  }
+
   stopLocal(): void {
+    this.req++
+    this.lost = null
+    this.offDevices?.()
+    this.offDevices = null
     this.stream?.getTracks().forEach((t) => t.stop())
     this.ctx?.close().catch(() => {})
     this.stream = null
