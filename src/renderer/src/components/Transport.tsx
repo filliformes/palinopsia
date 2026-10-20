@@ -22,6 +22,8 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { ToastDock } from './Toast'
 import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
 import { Blink } from './Blink'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+import { showToast } from './Toast'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -95,6 +97,25 @@ export function Transport(): JSX.Element {
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
   const outputOn = useStore((s) => s.outputActive)
+  // Right-click on Output : open it in a window beside the controls (the picture
+  // the projector gets, the domemaster on the dome) to tweak while watching it.
+  const [outMenu, setOutMenu] = useState<{ x: number; y: number } | null>(null)
+  const openWindowedOutput = async (): Promise<void> => {
+    try {
+      await window.api.outputOpen(-1, true) // -1 : the screen the controls are on
+      useStore.getState().setOutputActive(true)
+    } catch (e) {
+      showToast(`The output window did not open : ${(e as Error).message}`, 'warn')
+    }
+  }
+  const outItems: MenuItem[] = [
+    { label: 'Open Output in a window', onClick: () => void openWindowedOutput() },
+    ...(outputOn
+      ? [{ label: 'Close Output', onClick: () => { void window.api.outputClose().then(() => useStore.getState().setOutputActive(false)) } }]
+      : []),
+    { label: '', divider: true },
+    { label: 'Output page…', onClick: () => setOutputPageOpen(true) }
+  ]
   const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
   const bodyOn = useStore((s) => s.bodyControl.enabled)
   const proximity = useStore((s) => s.proximity)
@@ -345,11 +366,16 @@ export function Transport(): JSX.Element {
         {/* Output : fullscreen / mapping / record / senders (also O). */}
         <button
           onClick={() => setOutputPageOpen(true)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setOutMenu({ x: e.clientX, y: e.clientY })
+          }}
           className={`${TBTN} ${outputOn ? TBTN_LIT : TBTN_IDLE}`}
-          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on"
+          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on. Right-click : open it in a window, to tweak while watching it"
         >
           {outputOn ? '◉ Output' : '⛶ Output'}
         </button>
+        {outMenu && <ContextMenu x={outMenu.x} y={outMenu.y} items={outItems} onClose={() => setOutMenu(null)} />}
         {/* Body : embodied control (MediaPipe Hands + Pose + Face). Lights while
             the camera is live (a privacy tell) (also B). */}
         <button

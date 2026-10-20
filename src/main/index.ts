@@ -552,7 +552,11 @@ function outputEscMode(): 'hold' | 'close' | 'return' {
 
 function openOutputWindow(displayId: number, windowed = false): void {
   const displays = screen.getAllDisplays()
-  const d = displays.find((x) => x.id === displayId) ?? screen.getPrimaryDisplay()
+  // -1 : the screen the control window is on (a window beside the controls)
+  const d =
+    displayId === -1 && mainWindow && !mainWindow.isDestroyed()
+      ? screen.getDisplayMatching(mainWindow.getBounds())
+      : displays.find((x) => x.id === displayId) ?? screen.getPrimaryDisplay()
   if (outputWindow) {
     // Same mode as the live window → fast path : re-home it on the requested
     // display (windowed re-centres; fullscreen fills the display) and focus.

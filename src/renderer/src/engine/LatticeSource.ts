@@ -22,7 +22,7 @@
 
 import { EngineGL, SlotClock, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator } from './nativeGenerators'
-import { domeView } from './domeSignal'
+import { domeFill } from './domeSignal'
 
 const VS = `#version 300 es
 precision highp float;
@@ -37,8 +37,7 @@ uniform vec3 uCamW, uCamWP;   // and the camera there (world units), now and STR
 uniform float uRot, uRotP;    // their own turn (FLY), now and STREAK seconds ago
 uniform vec3 uFace;           // the unit direction from their centre toward the camera
 uniform float uReach01;       // REACH as set (0..1) : the new forms scale it their own way
-uniform int uDome;            // full-dome FILL : each point drawn at its true direction on the dome
-uniform float uHalfAp, uDomeAz, uDomeEl; // the dome's half aperture, where the forward view lands (radians)
+uniform int uSquare;          // full-dome FILL : the view kept square, so round stays round on the dome
 uniform float uS;             // cell size, world units
 uniform vec3 uCam;            // camera position, in CELLS, wrapped at 4096
 uniform vec3 uRight, uUp, uBack;          // camera basis now
@@ -87,33 +86,13 @@ float band(float x) {
   return texelFetch(uAudioTex, ivec2(bi, 1), 0).r;
 }
 
-// Elliptical grid mapping (Fong), disc → square : dome.ts reads the frame there
-// for a point of its disc, so drawing at it lands the point where it belongs.
-vec2 discToSquare(vec2 d) {
-  float u2 = d.x * d.x, v2 = d.y * d.y, t = 2.0 * sqrt(2.0);
-  float x = 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 + t * d.x)) - 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 - t * d.x));
-  float y = 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 + t * d.y)) - 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 - t * d.y));
-  return clamp(vec2(x, y), -1.0, 1.0);
-}
-// A camera-space direction on the dome's disc : the camera's forward lands at
-// the dome's azimuth and elevation, its up toward the zenith; the dome is
-// equidistant (its radius is the angle from the zenith over the half aperture,
-// the front at the bottom). xy : the disc point, z : its radius (over 1 : out).
-vec3 domeDisc(vec3 v) {
-  vec3 d = normalize(v); // x right, y up, z back
-  float cE = cos(uDomeEl), sE = sin(uDomeEl);
-  vec3 D = vec3(d.x, d.y * cE - d.z * sE, d.y * sE + d.z * cE);
-  float th = acos(clamp(D.y, -1.0, 1.0));
-  float az = atan(D.x, -D.z) + uDomeAz;
-  float r = th / uHalfAp;
-  return vec3(r * sin(az), -r * cos(az), r);
-}
-
+// Under full-dome FILL the dome spreads the frame's width and its height over the
+// same circle, so a wide frame would draw a sphere as an oval : the view is kept
+// square there (as wide as it is tall), and round stays round on the dome.
 vec2 toPx(vec3 v) {
-  if (uDome == 1) return (discToSquare(domeDisc(v).xy) * 0.5 + 0.5) * uRes;
   float depth = max(-v.z, 1e-4);
   vec2 s = v.xy * uF / depth;                      // frame heights from the centre
-  return (vec2(s.x * uRes.y / uRes.x, s.y) + 0.5) * uRes;
+  return (vec2(uSquare == 1 ? s.x : s.x * uRes.y / uRes.x, s.y) + 0.5) * uRes;
 }
 
 // PLANE and VOLUME : the infinite grid of cells wrapped round the camera.
@@ -140,7 +119,7 @@ void gridPoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) {
   float lum = 0.0;
   if (uHasSide == 1 && uSide > 0.001) {
     vec3 v0 = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
-    if (uDome == 1 || -v0.z > 1e-3) {
+    if (-v0.z > 1e-3) {
       vec2 uv = clamp(toPx(v0) / uRes, 0.0, 1.0);
       vec4 s = textureLod(uSideTex, uv, 0.0);
       lum = dot(s.rgb, vec3(0.2126, 0.7152, 0.0722)) * s.a;
@@ -188,7 +167,7 @@ void gridPoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) {
 float sideAt(vec3 P) {
   if (uHasSide == 0 || uSide < 0.001) return 0.0;
   vec3 v0 = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
-  if (uDome == 0 && -v0.z <= 1e-3) return 0.0;
+  if (-v0.z <= 1e-3) return 0.0;
   vec2 uv = clamp(toPx(v0) / uRes, 0.0, 1.0);
   vec4 sd = textureLod(uSideTex, uv, 0.0);
   return dot(sd.rgb, vec3(0.2126, 0.7152, 0.0722)) * sd.a;
@@ -334,21 +313,14 @@ void main() {
 
   vec3 v = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
   float depth = -v.z;
-  // On the dome everything round the camera is seen, down to the dome's rim;
-  // flat, what is in front of it.
-  bool dome = uDome == 1;
-  float dist = length(v);
-  bool hidden = dome ? (dist < 0.05 || domeDisc(v).z > 1.0) : depth < 0.05;
-  if (hidden || amp < 0.002) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  if (depth < 0.05 || amp < 0.002) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   vec3 vp = vec3(dot(Pp, uRightP), dot(Pp, uUpP), dot(Pp, uBackP));
   vec2 pc = toPx(v);
-  vec2 pp = (dome ? length(vp) > 0.05 && domeDisc(vp).z <= 1.0 : -vp.z > 0.05) ? toPx(vp) : pc;
+  vec2 pp = -vp.z > 0.05 ? toPx(vp) : pc;
 
   // Radius in pixels, floored at 0.75 (1.5 across) : below that the dot keeps
-  // its size and loses brightness by the area it lost. On the dome, from the
-  // angle the dot fills (the frame's half is the dome's half aperture), a little
-  // larger than true so the points still read as points over a whole dome.
-  float rPx = dome ? 2.0 * uDot * sizeK / dist / uHalfAp * 0.5 * uRes.y : uDot * sizeK * uF / depth * uRes.y;
+  // its size and loses brightness by the area it lost.
+  float rPx = uDot * sizeK * uF / depth * uRes.y;
   // ...and capped near the lens : a point passing the camera swelled into a soft
   // ball filling a sixth of the frame (seen in the starfield). Points stay points.
   rPx = min(rPx, uRes.y * 0.018 * sizeK);
@@ -559,10 +531,11 @@ export class LatticeSource implements NativeGenerator {
     // A shape sits at the world's centre and the camera circles it : TILT and
     // TURN place it round the shape, HEIGHT is its distance (low : inside),
     // SPIN carries it round. A tunnel's radius is HEIGHT.
-    // On the full dome the shape comes nearer : a dome is a far wider view than a
-    // frame, and at the frame's distance a globe was a 40° speck ahead.
-    const dv = domeView()
-    const dist = SHAPE_R * (0.6 + height * 0.27) * (dv && shape ? 0.65 : 1)
+    // On the full dome (fill) the frame is stretched over the whole dome, its
+    // edges bent down to the rim : a shape that filled the frame wrapped the
+    // dome. There it stands back, to sit in the middle, overhead, kept round.
+    const fill = domeFill() > 0
+    const dist = SHAPE_R * (0.6 + height * 0.27) * (fill && shape ? 1.8 : 1)
     const camW: V3 = [-B.f[0] * dist, -B.f[1] * dist, -B.f[2] * dist]
     const camWP: V3 = [-Bp.f[0] * dist, -Bp.f[1] * dist, -Bp.f[2] * dist]
     // each shape about the sphere's size in the frame
@@ -605,7 +578,7 @@ export class LatticeSource implements NativeGenerator {
       .f3('uWell', ...well)
       .f1('uWellAmt', Math.max(0, num(I, 'well', 0.5))).f1('uReach', reach)
       .f1('uReach01', Math.max(0, Math.min(1, num(I, 'reach', 0.3))))
-      .i1('uDome', dv ? 1 : 0).f1('uHalfAp', dv?.halfAp ?? 1.8).f1('uDomeAz', dv?.az ?? 0).f1('uDomeEl', dv?.el ?? 0.44)
+      .i1('uSquare', fill ? 1 : 0)
       .f1('uRipple', Math.max(0, num(I, 'ripple', 0.3))).f1('uRings', Math.max(0.25, num(I, 'rings', 3)))
       .f1('uRipplePh', this.ripplePh)
       .f1('uSwell', Math.max(0, num(I, 'swell', 0))).f1('uSwellPh', this.swellPh)

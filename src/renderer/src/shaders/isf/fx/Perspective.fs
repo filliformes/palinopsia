@@ -32,6 +32,10 @@
 uniform float PH_travel; // wrap 2
 uniform float PH_drift; // wrap 2
 uniform float PH_waveRate; // wrap 1
+// The horizon's radius under full-dome fill, else 0 (engine/domeSignal.ts) :
+// there the dome spreads the frame's width and height over the same circle, so
+// the view is kept square (round stays round on the dome).
+uniform float DOME_FILL;
 
 const float PI = 3.14159265;
 // 80 degrees at the end of tilt and turn : at 90 the plane is seen edge on and
@@ -131,7 +135,7 @@ vec2 wrapUv(vec2 s) {
 
 void main() {
   vec2 uv = isf_FragNormCoord;
-  float aspect = RENDERSIZE.x / RENDERSIZE.y;
+  float aspect = DOME_FILL > 0.0 ? 1.0 : RENDERSIZE.x / RENDERSIZE.y;
   float px = 1.0 / RENDERSIZE.y;
 
   // LENS is the focal length, from 6 frame heights (a 9 degree telephoto, almost

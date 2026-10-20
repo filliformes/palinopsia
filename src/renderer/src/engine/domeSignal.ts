@@ -20,14 +20,3 @@ export const domeFill = (): number => fill
 export function setDomeFill(v: number): void {
   fill = Number.isFinite(v) && v > 0 ? v : 0
 }
-
-/** The dome as a 3D source can draw for it (the Lattice) : under full-dome
- *  FILL, its half aperture and where a camera's forward view lands (the
- *  Fulldome section's azimuth and elevation, the same that seat a screen), in
- *  radians. Null otherwise : the source draws its usual flat frame. */
-export interface DomeView { halfAp: number; az: number; el: number }
-let view: DomeView | null = null
-export const domeView = (): DomeView | null => view
-export function setDomeView(v: DomeView | null): void {
-  view = v
-}

@@ -16,16 +16,22 @@ that CI builds into cross-platform releases.
   own points). The three shapes sit at the world's centre and the camera orbits them
   (tilt / turn / height = distance, spin carries it round), their streak from their own
   turn. The grid forms' code moved unchanged into `gridPoint`, the new ones in
-  `shapePoint`; a `uReach01` uniform because `uReach` is in world units. **Drawn for the
-  full dome** under fisheye + fill (`domeSignal.ts domeView`, set beside DOME_FILL, and
-  resynced when azimuth / elevation are modulated) : every form projects each point
-  equidistantly (forward at the Fulldome azimuth / elevation, up toward the zenith)
-  through Fong's disc-to-square, the very mapping dome.ts reads, so the dome shows true
-  directions (points behind the camera visible, culled at the rim, dot radius from its
-  angle); the shapes come to 0.65 of their distance there. Ten presets, two Generate
-  themes (Warp Tunnel, Orbit), hints, keywords, the reach grey-out. Verified in a test
-  copy : every form flat and on the dome master (grid), plane and volume unchanged, no
-  shader errors, 60 fps.
+  `shapePoint`; a `uReach01` uniform because `uReach` is in world units. **On the full
+  dome** (fisheye + fill, `domeFill() > 0`) : stretched like any source, but the view is
+  kept square (`uSquare` : x not divided by the aspect, since fill spreads the frame's
+  width and height over the same circle) and the sphere, torus and galaxy stand back
+  (distance x 1.8) to sit in the middle, overhead and round, clear of the bent rim. (A
+  first version drew every point at its true direction on the dome; Vincent wanted the
+  stretched look, framed in the middle : replaced.) Ten presets, two Generate themes
+  (Warp Tunnel, Orbit), hints, keywords, the reach grey-out. Verified in a test copy :
+  every form flat and on the dome master (grid), plane and volume unchanged, no shader
+  errors, 60 fps.
+- **Perspective on the full dome** keeps its proportions : under fill (`DOME_FILL > 0`) its
+  view is square, the rest as before.
+- **Right-click the Output button** (`Transport.tsx`, the shared ContextMenu) : Open Output
+  in a window (main's `openOutputWindow(-1, true)` : the screen the control window is on),
+  Close Output while one is open, Output page…. Verified : the menu, the window opening
+  (`#output` target) and closing.
 
 - **The modulator type menu in five families** (`MOD_GROUPS` in `ModulationPanel.tsx`,
   `<optgroup>`s) : waves (lfo, ramp, adsr), rhythms (arp, euclid, turing, cellular), random
