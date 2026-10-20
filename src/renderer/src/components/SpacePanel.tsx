@@ -40,9 +40,12 @@ const MODE_HINT: Record<SpaceMode, string> = {
   objects: 'Every voice leaves on its own channels and its position goes over OSC to a renderer that owns the room : SpatGRIS (the SAT Satosphère\'s 93.5) or anything that speaks ADM-OSC.'
 }
 
-// one color per voice, then the FX return (the map and the rows share them)
-const HUES = [28, 200, 120, 330, 52, 265, 175, 0, 300, 90]
-const voiceColor = (s: number, a = 1): string => (s === SPACE_FX ? `rgba(160,160,160,${a})` : `hsla(${HUES[s]},80%,60%,${a})`)
+// one color per voice, then the FX return (the map and the rows share them).
+// A voice past the list (one added later) still gets a color of its own : a
+// missing hue made an invalid color, and the map drew it in the last one used.
+const HUES = [28, 200, 120, 330, 52, 265, 175, 0, 300, 90, 232]
+const voiceColor = (s: number, a = 1): string =>
+  s === SPACE_FX ? `rgba(160,160,160,${a})` : `hsla(${HUES[s] ?? Math.round((s * 137.5) % 360)},80%,60%,${a})`
 
 /** `chip` : Sonify's own M button; `assign` / `renderAssign` : the page's assign
  *  box, shown right under the voice whose M was clicked. */
@@ -82,6 +85,10 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
   }
   // the piece groups the channels allow (objects); all 30 on speakers
   const pieceMax = space.mode === 'objects' ? Math.max(0, SPACE_MAX_CH - (space.firstChannel - 1) - SPACE_SOURCES * per) : SPACE_PIECES
+  // a count asked (or saved) over what the channels hold is kept, for mono or
+  // speakers, but said : only `pieceMax` of them play
+  const piecesCut = space.mode === 'objects' && space.pieces > pieceMax
+  const monoMax = Math.max(0, SPACE_MAX_CH - (space.firstChannel - 1) - SPACE_SOURCES)
   const groups = spaceEngine.groups
   const p0 = space.firstChannel + SPACE_SOURCES * per
   const [open, setOpen] = useState<SpaceVoice | null>(null)
@@ -211,12 +218,18 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
               <span className="flex-1" />
               <button onClick={() => setSpace({ mirror: !space.mirror })} className={chip(space.mirror)} title="Swap left and right (a room or a renderer numbered the other way round)">mirror</button>
             </Row>
-            <Row label="pieces" hint="The Collage voice's pieces as sources of their own : each piece (or, past the count, each group of nearby pieces) sounds where it is in the picture, on the dome. 0 : the voice is one pair like the others. As objects, each takes a channel after the voices.">
-              <Stepper value={Math.min(space.pieces, pieceMax)} min={0} max={pieceMax} onChange={(v) => setSpace({ pieces: v })} title="How many Collage piece sources (0 = off)" />
+            <Row label="pieces" hint={`The Collage voice's pieces as sources of their own : each piece (or, past the count, each group of nearby pieces) sounds where it is in the picture, on the dome. 0 : the voice is one pair like the others. As objects, each takes a channel after the voices${space.mode === 'objects' ? ` : at most ${pieceMax} with these channels` : ''}.`}>
+              <Stepper value={Math.min(space.pieces, pieceMax)} min={0} max={pieceMax} onChange={(v) => setSpace({ pieces: v })} title={`How many Collage piece sources (0 = off)${space.mode === 'objects' ? `; at most ${pieceMax} with these channels` : ''}`} />
               <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">
-                {space.pieces > 0 ? `${groups} source${groups === 1 ? '' : 's'}${space.mode === 'objects' && space.pieces > pieceMax ? ` (the channels allow ${pieceMax})` : ''}` : 'off'}
+                {space.pieces > 0 ? `${groups} source${groups === 1 ? '' : 's'}` : 'off'}
               </span>
             </Row>
+            {piecesCut && (
+              <div className="pl-[62px] font-mono text-[9px] leading-snug text-[rgb(var(--c-danger))]">
+                {space.pieces} asked, {pieceMax} play : the voices take channels {space.firstChannel}-{space.firstChannel + SPACE_SOURCES * per - 1} of {SPACE_MAX_CH}.
+                {space.pairs && monoMax > pieceMax ? ` Mono voices make room for ${Math.min(space.pieces, monoMax)}.` : ''}
+              </div>
+            )}
             <RangeRow label="turn" value={space.rotate} min={-180} max={180} step={1} neutral={0} onChange={(v) => setSpace({ rotate: v })} shown={`${Math.round(space.rotate)}°`} title="Turn the whole sound scene : line the sound's front up with the picture's front in the room" />
             <RangeRow label="glide" value={space.glide} min={0} max={2} step={0.01} neutral={0.25} onChange={(v) => setSpace({ glide: v })} shown={`${space.glide.toFixed(2)} s`} title="How softly a voice that follows the picture moves (its latest notes jump; the sound slides)" />
             {domeOn ? (

@@ -10,7 +10,7 @@ import { isValidElement, useEffect, useRef, useState, type PointerEvent as React
 import { Blink } from './Blink'
 import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
-import { randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
+import { collageFilmed, randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
 import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, SCALE_SHORT, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
 import { modTargetKey, useStore } from '../store'
@@ -600,14 +600,15 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     }, 500)
     return () => window.clearInterval(t)
   }, [])
-  // Is there anything for the film voices to hear : a Collage source, an
-  // Assemblage source, on a layer (or the background, for the Collage)?
+  // Is there anything for the film voices to hear : a Collage source with
+  // films (a folder or saved edits), an Assemblage source, on a layer (or the
+  // background, for the Collage)?
   const hasCollage = useStore((s) =>
-    s.composition.layers.some((l) => l.sourceA?.shaderId === 'gen-collage' || l.sourceB?.shaderId === 'gen-collage') ||
-    s.composition.background?.source?.shaderId === 'gen-collage')
+    s.composition.layers.some((l) => collageFilmed(l.sourceA) || collageFilmed(l.sourceB)) ||
+    collageFilmed(s.composition.background?.source))
   const hasAsm = useStore((s) => s.composition.layers.some((l) => l.sourceA?.kind === 'assemble' || l.sourceB?.kind === 'assemble'))
   const voiceIdle = (k: string): string | null =>
-    k === 'collage' && !hasCollage ? 'No Collage source on a layer or the background : this voice has nothing to hear (it stays playable).'
+    k === 'collage' && !hasCollage ? 'No Collage source with films on a layer or the background : this voice has nothing to hear (it stays playable).'
       : k === 'assemblage' && !hasAsm ? 'No Assemblage source on a layer : this voice has nothing to hear (it stays playable).'
         : null
   const chip = (p: SonifyModParam, inactive = false): JSX.Element => (

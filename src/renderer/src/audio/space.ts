@@ -2,7 +2,8 @@
 // conventions and the panning). ~30 Hz from the App loop, after Sonify :
 //
 //   1. where each voice is : following the picture (what Sonify already reads
-//      there : the sweep, the probes, the latest onsets, the Collage pieces),
+//      there : the sweep, the probes, the latest onsets, the Collage pieces;
+//      the Assemblage's clips where they sit on the Assemble map),
 //      through the dome mapping, or at a fixed place; plus its spin, the
 //      venue's turn and mirror, and a glide so a jumping centroid moves softly.
 //      A modulator, a Meta knob or OSC can move every place (space.<voice>.<field>
@@ -64,6 +65,7 @@ export interface SpacePoint {
 const NV = SPACE_VOICES.length
 const FX_PLACE = { el: 30, width: 180, hspan: 0.5, vspan: 0.5 } // the reverb / delay : all around, overhead
 const COLLAGE = SPACE_VOICES.indexOf('collage')
+const ASSEMBLAGE = SPACE_VOICES.indexOf('assemblage')
 
 // a place's modulation is the base's (the store) unless the overlay holds a value
 registerSpaceModBase((param) => {
@@ -277,6 +279,18 @@ class SpaceEngine {
       if (sw > 1e-6) set(8, sx / sw, sy / sw)
     } catch { /* no wall */ }
     this.centroid(9, sonifyEngine.signalDots, 3)
+    // Assemblage : where the clips it plays sit on the Assemble map (their note
+    // and pan come from there too; the map's y runs down, like the picture's),
+    // weighted by how much each edit shows
+    {
+      let sx = 0, sy = 0, sw = 0
+      for (const s of sonifyEngine.assemblageSets)
+        for (const pc of s.pieces) {
+          const w = s.level * pc.keep
+          sx += pc.x * w; sy += pc.y * w; sw += w
+        }
+      if (sw > 1e-6) set(ASSEMBLAGE, sx / sw, sy / sw)
+    }
   }
 
   private centroid(v: number, dots: Float32Array, stride: number): void {

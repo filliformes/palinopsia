@@ -20,6 +20,11 @@ import type { SoniConfig } from './sonify'
 
 type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord' | 'signal'
 
+/** A Collage source with films to hear : fed by a folder, or by saved
+ *  assemblages (an empty one has nothing for the Collage voice). */
+export const collageFilmed = (s: SourceSlot | null | undefined): boolean =>
+  s?.shaderId === 'gen-collage' && ((s.collagePool?.length ?? 0) > 0 || (s.collageEdls?.length ?? 0) > 0)
+
 // Register tables : shader/node id → (voice, weight). Weights are taste.
 const AFFINITY: Array<[RegExp, Voice, number]> = [
   // glitch / data damage → Raster
@@ -109,11 +114,9 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
   })
   // A Collage with films : on a layer or the background, fed by a folder or
   // by saved assemblages.
-  const filmed = (s: SourceSlot | null | undefined): boolean =>
-    s?.shaderId === 'gen-collage' && ((s.collagePool?.length ?? 0) > 0 || (s.collageEdls?.length ?? 0) > 0)
   const hasCollage =
-    c.layers.some((l) => !l.mute && (filmed(l.sourceA) || filmed(l.sourceB))) ||
-    (!!c.background && c.background.opacity > 0 && filmed(c.background.source))
+    c.layers.some((l) => !l.mute && (collageFilmed(l.sourceA) || collageFilmed(l.sourceB))) ||
+    (!!c.background && c.background.opacity > 0 && collageFilmed(c.background.source))
   // An Assemblage on a layer : its edit's own sound.
   const hasAsm = c.layers.some((l) => !l.mute && (l.sourceA?.kind === 'assemble' || l.sourceB?.kind === 'assemble'))
   // Master rack shapes everything : half weight.
