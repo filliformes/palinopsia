@@ -105,6 +105,27 @@ export interface AssembleClip {
   inSec: number
   durSec: number
   speed: number
+  // The ORIGINAL file (absolute) when `file` is a converted copy : Sonify's
+  // Assemblage voice plays its sound (a copy has none). Absent when `file` is
+  // the original, and in edits made before it existed (rebuilt from the
+  // corpus folder + fileName then).
+  src?: string
+}
+
+/** A clip's (or a unit's) ORIGINAL file : `file` itself when it has the
+ *  original's name, else the corpus folder + the name (a converted copy lives
+ *  in the cache; the original sits in the folder the corpus was read from). */
+export function originalPathOf(file: string, fileName: string, folder: string | null | undefined): string {
+  const base = file.split(/[\\/]/).pop() ?? ''
+  if (!folder || !fileName || base === fileName) return file
+  const sep = folder.includes('\\') ? '\\' : '/'
+  return folder.replace(/[\\/]+$/, '') + sep + fileName
+}
+
+/** The `src` a clip cut from `unit` carries (only when it plays a copy). */
+export function clipSrcOf(unit: { file: string; fileName: string }, folder: string): { src?: string } {
+  const src = originalPathOf(unit.file, unit.fileName, folder)
+  return src !== unit.file ? { src } : {}
 }
 
 export type CurveShape =

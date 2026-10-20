@@ -323,10 +323,11 @@ class Leveler {
 class RingBank {
   constructor(sr) {
     this.sr = sr > 0 ? sr : 48000;
-    this.freq = new Float64Array(RB_N);
+    this.freq = new Float64Array(RB_N); // where each band rings (folded under the ceiling, see setFreqs)
+    this.note = new Float64Array(RB_N); // each band's note as asked
     this.rin = 0; // Ring In as last applied (linear)
-    this.pos = new Float64Array(RB_N); // each band's place in semitones above the lowest
-    for (let b = 0; b < RB_N; b++) { this.freq[b] = 110 * Math.pow(2, b / 12); this.pos[b] = b; }
+    this.pos = new Float64Array(RB_N); // each band's place in semitones above the lowest (of the notes asked)
+    for (let b = 0; b < RB_N; b++) { this.freq[b] = this.note[b] = 110 * Math.pow(2, b / 12); this.pos[b] = b; }
     const M = RB_N * 2; // [band·2 + side]
     this.ic1 = new Float64Array(M); this.ic2 = new Float64Array(M);
     this.a1 = new Float64Array(M); this.a2 = new Float64Array(M); this.a3 = new Float64Array(M); this.kk = new Float64Array(M);
@@ -357,7 +358,10 @@ class RingBank {
     const key = T60.toFixed(4) + '|' + tilt.toFixed(3) + '|' + kmul + '|' + this.fver;
     if (key === this.mkKey) return this.mk;
     this.mkKey = key;
-    const f0 = this.freq[0] / 1.4, f1 = Math.min(this.freq[RB_N - 1] * 1.4, NYQ_FRAC * this.sr);
+    // across the bands as they ring (folded bands are no longer in order)
+    let lo = this.freq[0], hi = this.freq[0];
+    for (let b = 1; b < RB_N; b++) { const v = this.freq[b]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const f0 = lo / 1.4, f1 = Math.min(hi * 1.4, NYQ_FRAC * this.sr);
     const NG = 96;
     let acc = 0;
     for (let j = 0; j < NG; j++) {
@@ -378,10 +382,20 @@ class RingBank {
     return this.mk;
   }
   setFreqs(f, remeasure = true) {
-    const n = Math.min(RB_N, f.length);
-    for (let b = 0; b < n; b++) this.freq[b] = f[b] > 10 ? f[b] : 10;
-    const f0 = this.freq[0];
-    for (let b = 0; b < RB_N; b++) this.pos[b] = 12 * Math.log2(this.freq[b] / f0);
+    const n = Math.min(RB_N, f.length), ceil = NYQ_FRAC * this.sr;
+    for (let b = 0; b < n; b++) {
+      const v = f[b] > 10 ? f[b] : 10;
+      this.note[b] = v;
+      // A note over the ceiling (a high octave range, a transposed root) rings
+      // an octave down, or two, its pitch class kept. Clamped, every such band
+      // stacked on one whistle at the ceiling.
+      let r = v;
+      for (let k = 0; k < 24 && r > ceil; k++) r *= 0.5;
+      this.freq[b] = r > ceil ? ceil : r;
+    }
+    // the cutoff and the shape stay on the notes asked (the page shows them so)
+    const f0 = this.note[0];
+    for (let b = 0; b < RB_N; b++) this.pos[b] = 12 * Math.log2(this.note[b] / f0);
     if (remeasure) this.fver++;
   }
   reset() { this.ic1.fill(0); this.ic2.fill(0); this.dryP = 0; this.wetP = 0; this.agc = 1; }
@@ -1192,6 +1206,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (key === 'fl') this.rebuildFilterCoefs();
       // the bank's make-up gain is measured again every 16th block and at the end
       else if (key === 'rg') this.ring.setFreqs(c, u >= 1 || (this.block & 15) === 0);
+      else if (key === 'ra') this.ring2.setFreqs(c, u >= 1 || (this.block & 15) === 0);
     }
     if (this.pg) { this.pg.t += dt; if (this.pg.t >= this.pg.dur) this.pg = null; }
   }

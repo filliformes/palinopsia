@@ -10,8 +10,18 @@
 // on one element, clip N+1 is loaded and seeked on the other, paused on its
 // first frame. The cut is then just a swap of which element we upload from.
 
-import type { AssembleClip } from '@shared/assemble'
+import { originalPathOf, type AssembleClip } from '@shared/assemble'
 import { uploadVideoFrame } from './VideoSource'
+
+/** What Sonify's Assemblage voice hears of an edit (soundInfo). */
+export interface AssembleSoundInfo {
+  el: HTMLVideoElement | null // the video on screen
+  path: string | null // its clip's ORIGINAL file
+  unitId: string // its corpus unit
+  cut: number // changes at every cut
+  files: string[] // every clip's original, once each (one array until the list changes)
+  next: { path: string; at: number } | null // the clip it cuts to next : its original and in-point
+}
 
 /** Chromium refuses rates outside roughly this band. */
 const RATE_MIN = 0.0625
@@ -43,6 +53,11 @@ export class AssembleSource {
   private finished = false
   private cutSerial = 0 // bumps at every cut (Sonify's Assemblage voice strikes on it)
   private folder: string | null = null // the corpus folder : the clips' ORIGINAL files are in it
+  // soundInfo's `files`, and what they were built from
+  private soundFiles: string[] = []
+  private soundFor: AssembleClip[] | null = null
+  private soundN = -1
+  private soundDir: string | null = null
   // Live (target-driven) mode : instead of walking a fixed list, ask for the
   // next clip one clip ahead of the cut. The lag is deliberate — the match then
   // reflects the image as it looked DURING the previous shot, which is exactly
@@ -365,19 +380,32 @@ export class AssembleSource {
     this.folder = folder || null
   }
 
+  /** A clip's ORIGINAL file : its own `src` (a clip carries the folder of the
+   *  corpus it was cut from), else the edit's corpus folder + its name. */
+  private originalOf(clip: AssembleClip): string {
+    return clip.src ?? originalPathOf(clip.file, clip.fileName, this.folder)
+  }
+
   /** For Sonify's Assemblage voice : the video on screen, the clip's ORIGINAL
-   *  file, its corpus unit, and a serial that changes at every cut. */
-  soundInfo(): { el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number } | null {
+   *  file, its corpus unit, a serial that changes at every cut, every original
+   *  the edit plays (their audio copies made ahead) and the clip it cuts to next
+   *  (its player loaded ahead). */
+  soundInfo(): AssembleSoundInfo | null {
     const clip = this.clips[this.idx]
     if (!clip) return null
     const el = this.decks[this.live]?.el ?? null
-    let path = clip.file
-    const base = clip.file.split(/[\\/]/).pop() ?? ''
-    if (this.folder && clip.fileName && base !== clip.fileName) {
-      const sep = this.folder.includes('\\') ? '\\' : '/'
-      path = this.folder.replace(/[\\/]+$/, '') + sep + clip.fileName
+    // (live mode pushes onto the list and trims it : its length tells)
+    if (this.soundFor !== this.clips || this.soundN !== this.clips.length || this.soundDir !== this.folder) {
+      this.soundFor = this.clips
+      this.soundN = this.clips.length
+      this.soundDir = this.folder
+      this.soundFiles = [...new Set(this.clips.map((c) => this.originalOf(c)))]
     }
-    return { el, path, unitId: clip.unitId, cut: this.cutSerial }
+    const nc = this.primedFor >= 0 ? this.clips[this.primedFor] : undefined
+    return {
+      el, path: this.originalOf(clip), unitId: clip.unitId, cut: this.cutSerial, files: this.soundFiles,
+      next: nc ? { path: this.originalOf(nc), at: nc.inSec } : null
+    }
   }
 
   private nextIndex(): number {

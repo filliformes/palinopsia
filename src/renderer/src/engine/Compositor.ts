@@ -46,7 +46,7 @@ import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
 import { AudioSource } from './AudioSource';
-import { AssembleSource } from './AssembleSource';
+import { AssembleSource, type AssembleSoundInfo } from './AssembleSource';
 import { CaptureSource } from './CaptureSource';
 import { PersonMask } from './personMask';
 import { HiveSource } from './HiveSource';
@@ -2064,8 +2064,8 @@ export class Compositor {
   /** Every Assemblage source playing on a layer, for Sonify's Assemblage voice :
    *  the video on screen, its clip's original file, its corpus unit, the cut
    *  serial, and how visible it is (like the Collage walls). */
-  assembleSounds(): Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }> {
-    const out: Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }> = [];
+  assembleSounds(): Array<AssembleSoundInfo & { id: string; level: number }> {
+    const out: Array<AssembleSoundInfo & { id: string; level: number }> = [];
     const anySolo = this.layers.some((l) => l.solo);
     this.layers.forEach((L, i) => {
       const vis = (anySolo ? L.solo : !L.mute) ? L.opacity : 0;

@@ -14,6 +14,7 @@
 import {
   LIVE_DESC_N,
   DESC_N,
+  clipSrcOf,
   distance,
   zscore,
   type AssembleClip,
@@ -97,7 +98,9 @@ function makeMatcher(
     const consumed = durSec * speed
     const slack = Math.max(0, u.dur - consumed)
     const inSec = Math.max(0, Math.min(u.start + rng() * slack, Math.max(0, u.fileDur - consumed)))
-    return { unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed }
+    // (its original file from THIS corpus's folder : the slot's own folder is the
+    // edit's, and the Assemble tab may have read another one since)
+    return { unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed, ...clipSrcOf(u, corpus.folder) }
   }
 }
 

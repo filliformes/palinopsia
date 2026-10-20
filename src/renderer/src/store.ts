@@ -853,6 +853,23 @@ export function makeDefaultComposition(): CompositionState {
   }
 }
 
+// An Assemblage slot saved before the slot kept its corpus folder (mediaPath) :
+// the bank's saved edit of that id knows it. The folder holds the clips'
+// originals, with their sound (Sonify's Assemblage voice; a converted copy has
+// none). The bank is machine-local : without that edit in it, the clips that
+// play from a copy stay silent, as before.
+function withAssembleFolder(sl: SourceSlot): SourceSlot {
+  if (sl.kind !== 'assemble' || sl.mediaPath || !sl.mediaId) return sl
+  let bank: Assemblage[]
+  try {
+    bank = useStore.getState().assemblages
+  } catch {
+    return sl // (called before the store exists)
+  }
+  const folder = bank.find((a) => a.id === sl.mediaId)?.folder
+  return folder ? { ...sl, mediaPath: folder } : sl
+}
+
 // Migrate a composition loaded from disk (or a recalled scene) up to the current
 // schema : backfill new layer/background/master/modulator/metaKnob fields so an
 // older session — or a scene inside one — can never hand the engine an undefined
@@ -877,6 +894,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
     // Normalize layers from older session files : new fields get defaults.
     layers: c.layers.map((l) => ({
       ...l,
+      ...(l.sourceA ? { sourceA: withAssembleFolder(l.sourceA) } : {}),
+      ...(l.sourceB ? { sourceB: withAssembleFolder(l.sourceB) } : {}),
       feedbackAmount: l.feedbackAmount ?? 0.6,
       sourceMix: l.sourceMix ?? 0.5,
       sourceBlend: l.sourceBlend ?? 'normal',

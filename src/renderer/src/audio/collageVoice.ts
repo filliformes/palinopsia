@@ -82,6 +82,7 @@ export interface CollageSoundPiece {
 export interface CollageSoundDeck {
   el: HTMLVideoElement | null // the video the sound follows (null = no film)
   path: string | null // the file to hear (the original when the wall plays a cache)
+  next?: { path: string; at: number } | null // the file it cuts to next and where (an edit) : loaded ahead
 }
 export interface CollageSoundSet {
   id: string // which Collage (layer + slot, or the background)
@@ -133,6 +134,8 @@ interface DeckPlayer {
   nextSince: number
   fading: Array<{ p: Player; until: number }>
   spare: Player | null // faded out, paused and loaded : the next jump's player
+  pre: Player | null // an edit's next clip, loaded and positioned ahead, paused : the cut's new player
+  preAt: number // where `pre` was positioned (the next clip's in-point)
   path: string // the file asked for
   video: HTMLVideoElement | null
   onSeek: () => void
@@ -195,6 +198,14 @@ const SWITCH_XF = 0.08 // a film taking a new clip outside a deal (churn)
 const SPLICE_XF = 0.04 // a film jumping within its clip (window loop, re-cue)
 const NEXT_WAIT_S = 1.5 // a new player that never sounds still takes over
 const RETIRE_MAX = 192 // fading-out piece chains kept at most
+
+/** A band over the ceiling rings an octave down, or two, its pitch class kept.
+ *  Clamped, a high note's 2nd and 3rd harmonics (and, at the top of a
+ *  transposed range, the note itself) all stacked on one whistle there. */
+function foldUnder(f: number, ceil: number): number {
+  for (let k = 0; k < 24 && f > ceil; k++) f *= 0.5
+  return f > ceil ? ceil : f
+}
 
 // A fade is scheduled a little ahead (AHEAD) and approaches its target from
 // whatever the gain really holds then (setTargetAtTime starts from the live
@@ -360,7 +371,9 @@ export class CollageVoice {
       // loads restarted the 1.5 s timeout for ever, the deck stuck on its old clip)
       const waiting = !!d.next
       if (d.next) this.killPlayer(d.next)
-      d.next = this.makePlayer(path, d.bus, 0)
+      // the edit's next clip, loaded ahead (see preload) : no load at the cut
+      if (d.pre && d.pre.path === path) { d.next = d.pre; d.pre = null }
+      else d.next = this.makePlayer(path, d.bus, 0)
       d.nextT = T
       if (!waiting) d.nextSince = this.ctx.currentTime
     }
@@ -386,7 +399,7 @@ export class CollageVoice {
       first.wantIn = true
       const dp: DeckPlayer = {
         bus, hp, lp, out, cur: first, next: null, nextT: 0, nextSince: 0, fading: [], spare: null,
-        path, video: null, onSeek: () => {}, used: true
+        pre: null, preAt: NaN, path, video: null, onSeek: () => {}, used: true
       }
       dp.onSeek = (): void => this.resyncDeck(dp, true)
       d = dp
@@ -512,6 +525,27 @@ export class CollageVoice {
     }
   }
 
+  /** An edit's next clip in another file : its player made and positioned at
+   *  the clip's in-point ahead of the cut, paused and silent, so the cut's sound
+   *  waits for no load (a new player opened its file at the cut). Made once the
+   *  deck sounds and its handover is done : never loading alongside a player
+   *  that is still starting. */
+  private preload(d: DeckPlayer, nx: { path: string; at: number } | null | undefined): void {
+    const want = nx && nx.path && nx.path !== d.path && !silentFilms.has(nx.path) ? nx : null
+    if (d.pre && (!want || d.pre.path !== want.path)) { this.killPlayer(d.pre); d.pre = null }
+    if (!want) return
+    if (!d.pre) {
+      if (d.next || d.cur.wantIn) return
+      d.pre = this.makePlayer(want.path, d.bus, 0)
+      d.preAt = NaN
+    }
+    const a = d.pre.audio
+    if (a.readyState >= 1 && d.preAt !== want.at) {
+      const dur = a.duration
+      try { a.currentTime = Number.isFinite(dur) && dur > 0 ? want.at % dur : want.at; d.preAt = want.at } catch { /* not seekable yet */ }
+    }
+  }
+
   private bindVideo(d: DeckPlayer, v: HTMLVideoElement | null): void {
     if (d.video === v) return
     d.video?.removeEventListener('seeked', d.onSeek)
@@ -560,9 +594,9 @@ export class CollageVoice {
     return p
   }
 
-  /** A short noise burst into a piece's resonators only (not its dry film) : the
-   *  cut is heard as the note ringing, even over a quiet clip. */
-  private strike(p: PieceChain, level: number): void {
+  /** A short noise burst into a piece's resonators only (not its dry film), at
+   *  `at` (ctx s) : the cut is heard as the note ringing, even over a quiet clip. */
+  private strike(p: PieceChain, level: number, at: number): void {
     const ctx = this.ctx
     if (!this.burst) {
       const n = Math.round(ctx.sampleRate * 0.012)
@@ -581,7 +615,7 @@ export class CollageVoice {
     src.connect(g)
     for (const f of p.bp) g.connect(f)
     src.onended = (): void => { try { src.disconnect(); g.disconnect() } catch { /* gone */ } }
-    src.start(ctx.currentTime + AHEAD)
+    src.start(at)
   }
 
   private dropPiece(p: PieceChain): void {
@@ -602,6 +636,7 @@ export class CollageVoice {
     this.killPlayer(d.cur)
     if (d.next) this.killPlayer(d.next)
     if (d.spare) this.killPlayer(d.spare)
+    if (d.pre) this.killPlayer(d.pre)
     for (const f of d.fading) this.killPlayer(f.p)
     try { d.bus.disconnect(); d.hp.forEach((f) => f.disconnect()); d.lp.forEach((f) => f.disconnect()); d.out.disconnect() } catch { /* already gone */ }
     this.decks.delete(key)
@@ -629,7 +664,7 @@ export class CollageVoice {
     if (!!cfg.tape !== this.tape) {
       this.tape = !!cfg.tape
       for (const d of this.decks.values())
-        for (const p of [d.cur, d.next, d.spare, ...d.fading.map((f) => f.p)]) if (p) p.audio.preservesPitch = !this.tape
+        for (const p of [d.cur, d.next, d.spare, d.pre, ...d.fading.map((f) => f.p)]) if (p) p.audio.preservesPitch = !this.tape
     }
     for (const d of this.decks.values()) d.used = false
     for (const p of this.pieces.values()) p.used = false
@@ -687,6 +722,7 @@ export class CollageVoice {
         this.bindVideo(d, dk.el)
         this.resyncDeck(d)
         this.stepDeck(d, now)
+        this.preload(d, dk.next)
         d.used = true
         deckKeys.set(pc.deck, key)
         nFilms++
@@ -738,7 +774,7 @@ export class CollageVoice {
           // Left at Web Audio's defaults (350 Hz, Q 1, centre) it glided from
           // there while fading in, a chirp at every piece that appeared.
           for (let h = 0; h < HARM.length; h++) {
-            p.bp[h].frequency.value = Math.min(nyq, f0 * HARM[h])
+            p.bp[h].frequency.value = foldUnder(f0 * HARM[h], nyq)
             p.bp[h].Q.value = Q
             p.bpG[h].gain.value = wet * hw[h]
           }
@@ -747,12 +783,21 @@ export class CollageVoice {
           // a deal's or a handover's piece crossfades in (xf) at its level
           if (dealt || handover) p.inG.gain.value = norm * pc.keep * inLin
         }
+        // A cut's strike rings the new note from its first sample : gliding there
+        // (40 ms, the strike 10 ms in), the struck resonators swept to it.
+        const at = now + AHEAD
         for (let h = 0; h < HARM.length; h++) {
-          glide(p, TG_F + h, p.bp[h].frequency, Math.min(nyq, f0 * HARM[h]), now)
+          const fh = foldUnder(f0 * HARM[h], nyq)
+          if (struck) {
+            const fp = p.bp[h].frequency
+            try { fp.cancelAndHoldAtTime(at) } catch { /* nothing to hold */ }
+            fp.setValueAtTime(fh, at)
+            p.tg[TG_F + h] = fh
+          } else glide(p, TG_F + h, p.bp[h].frequency, fh, now)
           glide(p, TG_Q + h, p.bp[h].Q, Q, now)
           glide(p, TG_G + h, p.bpG[h].gain, wet * hw[h], now)
         }
-        if (struck) this.strike(p, (cfg.accent ?? 0) * set.level)
+        if (struck) this.strike(p, (cfg.accent ?? 0) * set.level, at)
         glide(p, TG_DRY, p.dry.gain, 1 - cfg.reso, now)
         glide(p, TG_PAN, p.pan.pan, panV, now)
         glide(p, TG_IN, p.inG.gain, norm * pc.keep * inLin, now)

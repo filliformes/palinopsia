@@ -18,6 +18,7 @@ import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
 import { soniBeats } from './soniClock'
 import { SONI_WORKLET_URL } from './soniWorklet'
 import { CollageVoice, type CollageSoundSet } from './collageVoice'
+import type { AssembleSoundInfo } from '../engine/AssembleSource'
 import { SPACE_MAX_CH } from '@shared/spatial'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 
@@ -345,6 +346,45 @@ function resampleNotes(src: Float32Array, n: number): Float32Array {
   return out
 }
 
+/** A resonator note table that slides to its next one over a key glide (the
+ *  Collage and Assemblage pieces' notes : the worklet glides its own tables). */
+class NoteGlide {
+  notes: Float32Array = new Float32Array(0)
+  private from: Float32Array | null = null
+  private t0 = 0
+  private dur = 0
+  private cur = new Float32Array(0)
+
+  /** A new table : it glides there over `glide` s from where the notes are now
+   *  (0 : a jump). A table re-sent unchanged (any slider move re-sends it)
+   *  leaves a glide running. */
+  set(notes: Float32Array, glide: number): void {
+    if (notes.length === this.notes.length && notes.every((f, i) => f === this.notes[i])) return
+    if (glide > 0 && notes.length && this.notes.length) {
+      // a scale of another length (minor's 7 notes to a pentatonic's 5) : the
+      // notes now, read at each new note's place across the range, so they
+      // glide like every other voice's (they jumped)
+      const cur = this.now()
+      this.from = cur.length === notes.length ? Float32Array.from(cur) : resampleNotes(cur, notes.length)
+      this.t0 = performance.now()
+      this.dur = glide * 1000
+    } else this.from = null
+    this.notes = notes
+  }
+
+  /** The notes now : the table, or mid-glide toward it. */
+  now(): Float32Array {
+    const from = this.from, to = this.notes
+    if (!from) return to
+    const u = (performance.now() - this.t0) / this.dur
+    if (u >= 1 || from.length !== to.length) { this.from = null; return to }
+    const e = u * u * (3 - 2 * u)
+    if (this.cur.length !== to.length) this.cur = new Float32Array(to.length)
+    for (let i = 0; i < to.length; i++) this.cur[i] = from[i] * Math.pow(to[i] / from[i], e)
+    return this.cur
+  }
+}
+
 /** Spectra synced : one sweep a bar. SSTV synced : one line a 16th note. */
 const syncSweepHz = (bpm: number): number => bpm / 60 / 4
 const syncLineHz = (bpm: number): number => (bpm / 60) * 4
@@ -528,7 +568,7 @@ export interface SpaceMsg {
 interface GridReader {
   readSonifyGrids: (taps: Array<{ kind: 'master' | 'layer'; layer: number } | null>, outs: Uint8Array[]) => boolean[]
   collageSounds?: () => CollageSoundSet[]
-  assembleSounds?: () => Array<{ id: string; level: number; el: HTMLVideoElement | null; path: string | null; unitId: string; cut: number }>
+  assembleSounds?: () => Array<AssembleSoundInfo & { id: string; level: number }>
 }
 
 /** A clip's place when the corpus map isn't known : stable per clip. */
@@ -592,20 +632,19 @@ class SonifyEngine {
   // The Collage voice : a native graph (players + per-piece resonators) into the
   // worklet's second input, alive while the voice is on.
   private collage: CollageVoice | null = null
-  private collageNotes: Float32Array = new Float32Array(0)
+  private collageNotes = new NoteGlide()
   // The Assemblage voice : a second CollageVoice on the worklet's fourth input.
   private asm: CollageVoice | null = null
-  private asmNotes: Float32Array = new Float32Array(0)
+  private asmNotes = new NoteGlide()
   private asmOffAt = 0
   private unitPlace: ((unitId: string) => [number, number] | null) | null = null
+  /** What the Assemblage voice plays now (one piece per edit, at its clip's
+   *  place on the Assemble map) : Space follows it. Empty while it is off. */
+  assemblageSets: CollageSoundSet[] = []
   // Key glide (the key sequencer) : the next config's pitches slide over this
   // many seconds instead of jumping (one shot, see glideNext). The worklet glides
-  // its own tables; the Collage resonators' notes glide here.
+  // its own tables; the Collage and Assemblage resonators' notes glide here.
   private glideOnce = 0
-  private colFrom: Float32Array | null = null
-  private colT0 = 0
-  private colDur = 0
-  private colNow = new Float32Array(0)
   // luma grids per tap : cur + prev (for flow), plus the RGBA readback scratch
   // One RGBA grid per tap, filled by one readback for both; `rgba` is the one
   // being analyzed (blockColour reads it).
@@ -1342,18 +1381,6 @@ class SonifyEngine {
     this.glideOnce = Math.max(0, Math.min(8, sec || 0))
   }
 
-  /** The Collage resonators' notes now : the table, or mid-glide toward it. */
-  private collageNotesNow(): Float32Array {
-    const from = this.colFrom, to = this.collageNotes
-    if (!from) return to
-    const u = (performance.now() - this.colT0) / this.colDur
-    if (u >= 1 || from.length !== to.length) { this.colFrom = null; return to }
-    const e = u * u * (3 - 2 * u)
-    if (this.colNow.length !== to.length) this.colNow = new Float32Array(to.length)
-    for (let i = 0; i < to.length; i++) this.colNow[i] = from[i] * Math.pow(to[i] / from[i], e)
-    return this.colNow
-  }
-
   pushConfig(cfg: SoniConfig): void {
     // The output EQ, when it changed (its own node, its own message).
     if (this.eqNode) {
@@ -1405,24 +1432,11 @@ class SonifyEngine {
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.flow.loOct, cfg.flow.hiOct)
       : new Float32Array(0)
     // the Collage resonators' notes : centre = the lowest, the frame's edge = the
-    // highest. A glide starts from where they are now; a table re-sent unchanged
-    // (any slider move re-sends it) leaves a glide running.
-    const notes = scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct))
-    const sameNotes = notes.length === this.collageNotes.length && notes.every((f, i) => f === this.collageNotes[i])
-    if (!sameNotes) {
-      if (glide > 0 && notes.length && this.collageNotes.length) {
-        // a scale of another length (minor's 7 notes to a pentatonic's 5) : the
-        // notes now, read at each new note's place across the range, so they
-        // glide like every other voice's (they jumped)
-        const cur = this.collageNotesNow()
-        this.colFrom = cur.length === notes.length ? Float32Array.from(cur) : resampleNotes(cur, notes.length)
-        this.colT0 = performance.now()
-        this.colDur = glide * 1000
-      } else this.colFrom = null
-      this.collageNotes = notes
-    }
-    // the Assemblage resonators' notes : the map's centre = the lowest
-    this.asmNotes = scaleTable(effRoot(cfg), cfg.scale, cfg.assemblage.loOct, Math.max(cfg.assemblage.loOct + 1, cfg.assemblage.hiOct))
+    // highest. A glide starts from where they are now.
+    this.collageNotes.set(scaleTable(effRoot(cfg), cfg.scale, cfg.collage.loOct, Math.max(cfg.collage.loOct + 1, cfg.collage.hiOct)), glide)
+    // the Assemblage resonators' notes : the map's centre = the lowest (they
+    // glide too : they jumped while the Collage's slid)
+    this.asmNotes.set(scaleTable(effRoot(cfg), cfg.scale, cfg.assemblage.loOct, Math.max(cfg.assemblage.loOct + 1, cfg.assemblage.hiOct)), glide)
     // Signal's scale table. Built whatever `snap` says : snap BLENDS the free
     // frequency with this one, so the quantized end must always exist.
     this.signalFreqs = scaleTable(effRoot(cfg), cfg.scale, cfg.signal.loOct, cfg.signal.hiOct)
@@ -1639,6 +1653,7 @@ class SonifyEngine {
     if (!node || !this.cfg.on) {
       if (this.collage) { this.collage.dispose(); this.collage = null }
       if (this.asm) { this.asm.dispose(); this.asm = null }
+      this.assemblageSets = []
       return
     }
     // ~30 Hz. (33 against a two-frame period of 33.3 ms at 60 Hz let frame
@@ -1669,7 +1684,7 @@ class SonifyEngine {
           lp: c.lp ?? 20000,
           hpSlope: c.hpSlope === 12 ? 12 : 24,
           lpSlope: c.lpSlope === 12 ? 12 : 24
-        }, this.collageNotesNow())
+        }, this.collageNotes.now())
       } else if (this.collage) {
         // fade it out, then release it (at once, the films stopped mid-wave)
         if (!this.collageOffAt) { this.collage.silence(); this.collageOffAt = nowMs }
@@ -1686,6 +1701,7 @@ class SonifyEngine {
     // placed by its corpus unit on the Assemble map.
     try {
       const a = this.cfg.assemblage
+      this.assemblageSets = []
       if (a.on && this.ctx) {
         this.asmOffAt = 0
         if (!this.asm) {
@@ -1694,10 +1710,16 @@ class SonifyEngine {
         }
         const mv = sonifyModValues
         const rows = comp.assembleSounds?.() ?? []
+        // (`files` : the edit's originals, their audio copies made ahead of the cuts;
+        // `next` : the clip the edit cuts to next, its player loaded ahead)
         const sets: CollageSoundSet[] = rows.map((r) => {
           const [x, y] = this.unitPlace?.(r.unitId) ?? hashPlace(r.unitId)
-          return { id: r.id, level: r.level, aspect: 1, pieces: [{ x, y, deck: 0, keep: 1 }], decks: [{ el: r.el, path: r.path }], cut: r.cut }
+          return {
+            id: r.id, level: r.level, aspect: 1, pieces: [{ x, y, deck: 0, keep: 1 }],
+            decks: [{ el: r.el, path: r.path, next: r.next }], cut: r.cut, files: r.files
+          }
         })
+        this.assemblageSets = sets
         this.asm.update(sets, {
           reso: mv.get('asmReso') ?? a.reso,
           ring: mv.get('asmRing') ?? a.ring,
@@ -1710,7 +1732,7 @@ class SonifyEngine {
           lpSlope: a.lpSlope === 12 ? 12 : 24,
           accent: mv.get('asmAccent') ?? a.accent,
           tape: a.tape
-        }, this.asmNotes)
+        }, this.asmNotes.now())
       } else if (this.asm) {
         if (!this.asmOffAt) { this.asm.silence(); this.asmOffAt = nowMs }
         else if (nowMs - this.asmOffAt > 80) { this.asm.dispose(); this.asm = null; this.asmOffAt = 0 }
