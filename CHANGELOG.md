@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The modulator type menu in five families** (`MOD_GROUPS` in `ModulationPanel.tsx`,
+  `<optgroup>`s) : waves (lfo, ramp, adsr), rhythms (arp, euclid, turing, cellular), random
+  (random, sh, slew, chaos), gestures (organic, motion, physics), listening (audio, vision,
+  body, homeostat), instead of one alphabetical list.
 - **Shaping a modulation binding** (`ModAssignment.shape`, `engine/modShape.ts`) : per
   binding, between the modulator and depth / mode, in this order : **combine** with one or
   two other modulator slots (+ − × min max, clamped 0..1), **threshold** (cut : the part

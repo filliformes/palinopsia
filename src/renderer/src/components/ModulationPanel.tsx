@@ -20,9 +20,16 @@ import type { ClipAudioSrc } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 
-// Alphabetical : the dropdown shows the raw type id, so keep this sorted so the
-// list reads in order (add new types in their alphabetical slot).
-const MOD_TYPES: ModulatorType[] = ['adsr', 'arp', 'audio', 'body', 'cellular', 'chaos', 'euclid', 'homeostat', 'lfo', 'motion', 'organic', 'physics', 'ramp', 'random', 'sh', 'slew', 'turing', 'vision']
+// The type menu, in families (a new type goes in the one it belongs to) :
+// shapes in time, patterns on a clock, chance, gestures with a body of their
+// own, and what follows the room (the sound, the picture, the performer).
+const MOD_GROUPS: Array<{ label: string; title: string; types: ModulatorType[] }> = [
+  { label: 'waves', title: 'Shapes in time : a repeating wave, a one-shot sweep, an envelope', types: ['lfo', 'ramp', 'adsr'] },
+  { label: 'rhythms', title: 'Patterns on a clock : steps, euclidean pulses, a mutating loop, cells', types: ['arp', 'euclid', 'turing', 'cellular'] },
+  { label: 'random', title: 'Chance : random values, sample and hold, a glide, chaos', types: ['random', 'sh', 'slew', 'chaos'] },
+  { label: 'gestures', title: 'Movement with a life of its own : drifting, traced, physical', types: ['organic', 'motion', 'physics'] },
+  { label: 'listening', title: 'Follows the room : the sound, the picture, your body, a quality held steady', types: ['audio', 'vision', 'body', 'homeostat'] }
+]
 const CELL_RULES = [30, 90, 110, 150]
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
 const ARP_MODES: ArpMode[] = ['up', 'down', 'upDown', 'random', 'drunk']
@@ -154,10 +161,14 @@ function ModCard({ index }: { index: number }): JSX.Element {
             'The modulator type : what kind of moving signal this slot produces. Bind it to parameters with their M button.'
           }
         >
-          {MOD_TYPES.map((t) => (
-            <option key={t} value={t} title={modulatorBlurb(t)}>
-              {t}
-            </option>
+          {MOD_GROUPS.map((g) => (
+            <optgroup key={g.label} label={g.label} title={g.title}>
+              {g.types.map((t) => (
+                <option key={t} value={t} title={modulatorBlurb(t)}>
+                  {t}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         <button

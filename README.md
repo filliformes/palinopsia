@@ -601,12 +601,19 @@ gesture, so gliding a knob costs nothing.
 
 ## Modulation brain (8 modulators + matrix)
 
-Eight modulator slots, each of a chosen **type** : `lfo` (7 shapes) · `ramp` ·
-`adsr` · `arp` · `random` · `s&h` · `slew` · `chaos` · `audio` (follower) ·
-`organic` · `physics` · `motion` · `vision` · `body` · `homeostat` · `euclid` ·
-`turing` · `cellular` (the modulator types are dropdown-listed alphabetically), with a clock
-(free Hz or BPM division), type-specific params, a live meter, and retrigger. Slot 8
-(`⊛`) is reserved for the active World's audio routing and is skipped by Randomize.
+Eight modulator slots, each of a chosen **type**, picked from a menu in five families :
+
+| Family | Types |
+|---|---|
+| **waves** (shapes in time) | `lfo` (7 shapes) · `ramp` · `adsr` |
+| **rhythms** (patterns on a clock) | `arp` · `euclid` · `turing` · `cellular` |
+| **random** (chance) | `random` · `sh` (sample and hold) · `slew` · `chaos` |
+| **gestures** (movement with a life of its own) | `organic` · `motion` · `physics` |
+| **listening** (follows the room) | `audio` · `vision` · `body` · `homeostat` |
+
+Each has a clock (free Hz or BPM division), type-specific params, a live meter, and
+retrigger. The modulator the active World installs for its audio routing carries `⊛`
+(wherever it sits) and Randomize leaves it alone; change it or its bindings and it is yours.
 
 Three **generative** types (borrowed from the LZX Videomancer vocabulary) join the
 stepped family and take **SLIP** like the rest:
