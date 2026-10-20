@@ -7,6 +7,26 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Lattice : four more forms** (`engine/LatticeSource.ts`; `form` 2-5) : **tunnel** (rings
+  of points along the flight, wrapped round the camera like the plane's cells, 2.5
+  lattices long; height = radius; well = a throat ahead, ripple along it, audio round
+  the wall), **sphere** (a Fibonacci globe), **torus** (rolled through itself by fly) and
+  **galaxy** (two log-spiral arms turning as one while points stream out along them and
+  fade back in at the core, so the arms never wind up; well = a flattened bulge of its
+  own points). The three shapes sit at the world's centre and the camera orbits them
+  (tilt / turn / height = distance, spin carries it round), their streak from their own
+  turn. The grid forms' code moved unchanged into `gridPoint`, the new ones in
+  `shapePoint`; a `uReach01` uniform because `uReach` is in world units. **Drawn for the
+  full dome** under fisheye + fill (`domeSignal.ts domeView`, set beside DOME_FILL, and
+  resynced when azimuth / elevation are modulated) : every form projects each point
+  equidistantly (forward at the Fulldome azimuth / elevation, up toward the zenith)
+  through Fong's disc-to-square, the very mapping dome.ts reads, so the dome shows true
+  directions (points behind the camera visible, culled at the rim, dot radius from its
+  angle); the shapes come to 0.65 of their distance there. Ten presets, two Generate
+  themes (Warp Tunnel, Orbit), hints, keywords, the reach grey-out. Verified in a test
+  copy : every form flat and on the dome master (grid), plane and volume unchanged, no
+  shader errors, 60 fps.
+
 - **The modulator type menu in five families** (`MOD_GROUPS` in `ModulationPanel.tsx`,
   `<optgroup>`s) : waves (lfo, ramp, adsr), rhythms (arp, euclid, turing, cellular), random
   (random, sh, slew, chaos), gestures (organic, motion, physics), listening (audio, vision,

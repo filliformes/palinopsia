@@ -1255,6 +1255,46 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45
   }),
   mk({
+    id: 'warp-tunnel', name: 'Warp Tunnel', family: 'Space',
+    blurb: 'Down an endless tube of dots, the walls streaming past, rings pulsing along it.',
+    world: 'synthetic',
+    context: { haze: 0, bloom: 0.08, trails: 0 },
+    palette: [K, [0.2, 0.22, 0.28, 1], [0.93, 0.95, 0.97, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.15,
+    pickInputs: {
+      'gen-lattice': {
+        form: [2], fly: [0.3, 0.5, 0.8], streak: [0.3, 0.5, 0.7], height: [7, 9, 11], tilt: [0], turn: [0, 0.1, -0.1],
+        ripple: [0, 0.3, 0.5], rings: [3, 4, 6], pace: [0.4, 0.6], well: [0, 0.4], reach: [0.3, 0.45], swell: [0, 0.2],
+        jitter: [0, 0.15], vary: [0.1, 0.3], count: [180, 220], size: [0.28, 0.35], fog: [0.4, 0.5], lens: [0.7, 0.8],
+        spin: [0], audio: [0], side: [0]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45
+  }),
+  mk({
+    id: 'orbit', name: 'Orbit', family: 'Space',
+    blurb: 'Circling a single figure of dots : a turning globe, a ring rolling through itself, a wheeling galaxy.',
+    world: 'synthetic',
+    context: { haze: 0, bloom: 0.06, trails: 0 },
+    palette: [K, [0.2, 0.23, 0.28, 1], [0.93, 0.95, 0.97, 1]],
+    sources: ['gen-lattice'],
+    stack: [['gen-lattice']],
+    bgSources: ['drift-field'], bgOpacity: 0.15,
+    pickInputs: {
+      'gen-lattice': {
+        form: [3, 4, 5], fly: [0.1, 0.2, 0.3], spin: [0, 0.02, -0.02], tilt: [0.15, 0.35, 0.55], turn: [0, 0.5, -0.5],
+        height: [8, 10, 12], well: [0, 0.5, 0.7], reach: [0.25, 0.4], ripple: [0, 0.4], rings: [3, 4], pace: [0.4, 0.6],
+        swell: [0, 0.2], jitter: [0, 0.2], vary: [0.2, 0.5], count: [180, 220], size: [0.3, 0.4], fog: [0.35, 0.5],
+        lens: [0.55, 0.65], streak: [0], audio: [0], side: [0]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.45
+  }),
+  mk({
     id: 'crystal-room', name: 'Crystal Room', family: 'Space',
     blurb: 'Inside a perfect lattice of points : every row runs to its vanishing point.',
     world: 'synthetic',

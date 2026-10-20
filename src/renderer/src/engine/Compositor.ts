@@ -61,7 +61,7 @@ import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig, DomeModField } from '@shared/dome';
 import { DOME_MOD_RANGE, defaultSourceFit, isDomeFill } from '@shared/dome';
 import { DomeStage } from './dome';
-import { domeFill, setDomeFill } from './domeSignal';
+import { domeFill, setDomeFill, setDomeView } from './domeSignal';
 import { OutXformStage, outXformActive } from './outXform';
 import type { OutXform, OutXformField } from '@shared/outXform';
 import { OUT_IDENTITY, OUTX_MOD_RANGE } from '@shared/outXform';
@@ -2687,7 +2687,7 @@ export class Compositor {
     if (!this.domeCfg || !Number.isFinite(value)) return;
     const r = DOME_MOD_RANGE[field];
     this.domeCfg = { ...this.domeCfg, [field]: Math.max(r.min, Math.min(r.max, value)) };
-    if (field === 'scale') this.syncDomeFill();
+    if (field === 'scale' || field === 'azimuth' || field === 'elevation') this.syncDomeFill();
   }
 
   /** The shaders' DOME_FILL (domeSignal.ts) : the horizon's radius on the
@@ -2700,6 +2700,8 @@ export class Compositor {
   private syncDomeFill(): void {
     const d = this.domeCfg;
     setDomeFill(isDomeFill(d) && d ? 180 / Math.max(90, d.aperture) / Math.max(0.05, d.scale) : 0);
+    const rad = Math.PI / 180;
+    setDomeView(isDomeFill(d) && d ? { halfAp: (Math.max(90, d.aperture) / 2) * rad, az: d.azimuth * rad, el: d.elevation * rad } : null);
   }
   /** The dome slider's value this frame, null while the dome is off. */
   domeParam(field: DomeModField): number | null {

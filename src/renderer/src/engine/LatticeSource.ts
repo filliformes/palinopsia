@@ -22,13 +22,23 @@
 
 import { EngineGL, SlotClock, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator } from './nativeGenerators'
+import { domeView } from './domeSignal'
 
 const VS = `#version 300 es
 precision highp float;
 precision highp int;
 precision highp sampler2D;
-uniform int uForm;            // 0 plane, 1 volume
-uniform int uN;               // cells per side
+uniform int uForm;            // 0 plane, 1 volume, 2 tunnel, 3 sphere, 4 torus, 5 galaxy
+uniform int uN;               // cells per side (tunnel : rings along it; sphere, galaxy : points)
+uniform int uNA, uNB;         // tunnel : points round a ring; torus : round the tube (A), round the ring (B)
+uniform float uR0;            // tunnel : its radius; sphere, torus, galaxy : their radius
+uniform float uDist, uExt;    // sphere, torus, galaxy : the camera's distance from the centre, their extent
+uniform vec3 uCamW, uCamWP;   // and the camera there (world units), now and STREAK seconds ago
+uniform float uRot, uRotP;    // their own turn (FLY), now and STREAK seconds ago
+uniform vec3 uFace;           // the unit direction from their centre toward the camera
+uniform float uReach01;       // REACH as set (0..1) : the new forms scale it their own way
+uniform int uDome;            // full-dome FILL : each point drawn at its true direction on the dome
+uniform float uHalfAp, uDomeAz, uDomeEl; // the dome's half aperture, where the forward view lands (radians)
 uniform float uS;             // cell size, world units
 uniform vec3 uCam;            // camera position, in CELLS, wrapped at 4096
 uniform vec3 uRight, uUp, uBack;          // camera basis now
@@ -77,15 +87,38 @@ float band(float x) {
   return texelFetch(uAudioTex, ivec2(bi, 1), 0).r;
 }
 
+// Elliptical grid mapping (Fong), disc → square : dome.ts reads the frame there
+// for a point of its disc, so drawing at it lands the point where it belongs.
+vec2 discToSquare(vec2 d) {
+  float u2 = d.x * d.x, v2 = d.y * d.y, t = 2.0 * sqrt(2.0);
+  float x = 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 + t * d.x)) - 0.5 * sqrt(max(0.0, 2.0 + u2 - v2 - t * d.x));
+  float y = 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 + t * d.y)) - 0.5 * sqrt(max(0.0, 2.0 - u2 + v2 - t * d.y));
+  return clamp(vec2(x, y), -1.0, 1.0);
+}
+// A camera-space direction on the dome's disc : the camera's forward lands at
+// the dome's azimuth and elevation, its up toward the zenith; the dome is
+// equidistant (its radius is the angle from the zenith over the half aperture,
+// the front at the bottom). xy : the disc point, z : its radius (over 1 : out).
+vec3 domeDisc(vec3 v) {
+  vec3 d = normalize(v); // x right, y up, z back
+  float cE = cos(uDomeEl), sE = sin(uDomeEl);
+  vec3 D = vec3(d.x, d.y * cE - d.z * sE, d.y * sE + d.z * cE);
+  float th = acos(clamp(D.y, -1.0, 1.0));
+  float az = atan(D.x, -D.z) + uDomeAz;
+  float r = th / uHalfAp;
+  return vec3(r * sin(az), -r * cos(az), r);
+}
+
 vec2 toPx(vec3 v) {
+  if (uDome == 1) return (discToSquare(domeDisc(v).xy) * 0.5 + 0.5) * uRes;
   float depth = max(-v.z, 1e-4);
   vec2 s = v.xy * uF / depth;                      // frame heights from the centre
   return (vec2(s.x * uRes.y / uRes.x, s.y) + 0.5) * uRes;
 }
 
-void main() {
+// PLANE and VOLUME : the infinite grid of cells wrapped round the camera.
+void gridPoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) {
   float n = float(uN);
-  int k = gl_InstanceID;
   vec3 cell;
   if (uForm == 0) cell = vec3(float(k % uN), 0.0, float(k / uN));
   else cell = vec3(float(k % uN), float((k / uN) % uN), float(k / (uN * uN)));
@@ -97,7 +130,7 @@ void main() {
 
   // Camera-relative position, world units. The plane lies at the camera's height
   // below it (uCam.y holds that height for the plane).
-  vec3 P = (idx - uCam + jit) * uS;
+  P = (idx - uCam + jit) * uS;
   if (uForm == 0) P.y = -uCam.y;
   vec3 flatP = P;
 
@@ -107,7 +140,7 @@ void main() {
   float lum = 0.0;
   if (uHasSide == 1 && uSide > 0.001) {
     vec3 v0 = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
-    if (-v0.z > 1e-3) {
+    if (uDome == 1 || -v0.z > 1e-3) {
       vec2 uv = clamp(toPx(v0) / uRes, 0.0, 1.0);
       vec4 s = textureLod(uSideTex, uv, 0.0);
       lum = dot(s.rgb, vec3(0.2126, 0.7152, 0.0722)) * s.a;
@@ -115,8 +148,8 @@ void main() {
   }
 
   float R = uReach;
-  float sizeK = mix(1.0, 0.5 + 2.6 * pow(h.z, 4.0), uVary);
-  float amp = mix(1.0, 0.45 + 0.55 * h.y, uVary);
+  sizeK = mix(1.0, 0.5 + 2.6 * pow(h.z, 4.0), uVary);
+  amp = mix(1.0, 0.45 + 0.55 * h.y, uVary);
   if (uForm == 0) {
     float r = length(P.xz - uWell.xz);
     float y = -uWellAmt * 0.8 * R / (1.0 + (r * r) / (R * R));
@@ -147,18 +180,175 @@ void main() {
   float half_n = 0.5 * n * uS;
   amp *= 1.0 - smoothstep(uEdge * half_n, half_n, cheb);
   amp *= 1.0 - smoothstep(uFogStart * half_n, half_n, uForm == 0 ? length(flatP.xz) : length(flatP));
+  Pp = P + uDelta;
+}
+
+// The sidechain's brightness where an undisplaced point (camera-relative)
+// appears : the other layer is read where the camera sees the point.
+float sideAt(vec3 P) {
+  if (uHasSide == 0 || uSide < 0.001) return 0.0;
+  vec3 v0 = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
+  if (uDome == 0 && -v0.z <= 1e-3) return 0.0;
+  vec2 uv = clamp(toPx(v0) / uRes, 0.0, 1.0);
+  vec4 sd = textureLod(uSideTex, uv, 0.0);
+  return dot(sd.rgb, vec3(0.2126, 0.7152, 0.0722)) * sd.a;
+}
+float wrapPi(float a) { return a - 6.2831853 * floor(a / 6.2831853 + 0.5); }
+vec3 rotY(vec3 v, float a) { float c = cos(a), sn = sin(a); return vec3(c * v.x - sn * v.z, v.y, sn * v.x + c * v.z); }
+
+// A galaxy's point at turn rot : two arms of a log spiral, crowding toward the
+// core. The spiral turns as one (FLY) while every point streams out along its
+// arm and comes back in at the core, faded at both ends (fade) : the arms stay
+// arms however long it turns (a disc that sheared would wind them into rings).
+vec3 galaxyPt(vec3 h3, vec3 h2, float rot, out float r, out float fade) {
+  float q0 = fract(h3.y + rot * 0.04);
+  fade = smoothstep(0.0, 0.08, q0) * (1.0 - smoothstep(0.82, 1.0, q0));
+  float q = 1.4 * (0.03 + 0.97 * pow(q0, 1.6));
+  r = uR0 * q * (1.0 + (h2.z - 0.5) * 0.12);
+  float arm = floor(h3.x * 2.0) * 3.14159265;
+  float spread = (h2.x - 0.5) * (0.35 + uJitter * 1.4);
+  float th = arm + 2.8 * log(1.0 + 4.0 * q) + spread + rot;
+  return vec3(r * cos(th), (h2.y - 0.5) * uR0 * 0.04, r * sin(th));
+}
+
+// TUNNEL, SPHERE, TORUS, GALAXY : the same points on other shapes. The well,
+// the ripple, the swell, the sound and the sidechain push each point along its
+// shape's own outward direction.
+void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) {
+  float fk = float(k);
+  vec3 h = hash33(vec3(fk, 3.0, 7.0) + 11.0);
+  vec3 h2 = hash33(vec3(7.0, fk, 3.0) + 23.0);
+  sizeK = mix(1.0, 0.5 + 2.6 * pow(h.z, 4.0), uVary);
+  amp = mix(1.0, 0.45 + 0.55 * h.y, uVary);
+  if (uForm == 2) {
+    // TUNNEL : rings of points along the flight, the camera on the axis. The
+    // rings wrap round it like the plane's cells, so the tunnel never ends.
+    int nA = uNA;
+    float nR = float(uN);
+    float ia = float(k % nA), ir = float(k / nA);
+    float zc = cellNear(ir, uCam.z, nR);
+    float idz = mod(zc, 4096.0);
+    vec3 jt = (hash33(vec3(ia, idz, 5.0)) - 0.5) * uJitter;
+    // every other ring half a step round : the wall is woven, not ruled
+    float th = (ia + 0.5 * mod(idz, 2.0) + jt.x) * 6.2831853 / float(nA);
+    vec3 rad = vec3(cos(th), sin(th), 0.0);
+    float z = (zc - uCam.z + jt.z) * uS; // along the tunnel, ahead is negative
+    float R = uR0;
+    vec3 B = rad * R + vec3(0.0, 0.0, z);
+    float L = 4.0 + uReach01 * 40.0; // the reach, along the tunnel
+    float disp = -uWellAmt * 0.7 * R * exp(-pow((z + L) / (L * 0.5), 2.0)); // a throat ahead
+    disp += uRipple * 0.25 * R * sin(z * 6.2831853 * uRings / L + uRipplePh); // rings running along
+    disp += uSwell * 0.3 * R * vnoise(vec2(cos(th) * 2.0 + idz / 8.0, sin(th) * 2.0) + vec2(uSwellPh, uSwellPh * 0.6));
+    // the spectrum round the wall : bass at the floor, treble overhead
+    disp += uAudio * 0.5 * R * band(abs(wrapPi(th + 1.5707963)) / 3.14159265);
+    disp -= uSide * 0.5 * R * sideAt(B); // the other layer stands in from the wall
+    disp = max(disp, -0.95 * R);
+    P = B + rad * disp;
+    Pp = P + uDelta;
+    // the far ends fade (the wrap must never show); FOG fades them sooner
+    float hn = 0.5 * nR * uS;
+    amp *= 1.0 - smoothstep(uEdge * hn, hn, abs(z));
+    amp *= 1.0 - smoothstep(uFogStart * hn, hn, abs(z));
+    return;
+  }
+  if (uForm == 3) {
+    // SPHERE : points spread evenly over a globe (a Fibonacci lattice), FLY turning it.
+    float N = float(uN);
+    float y = 1.0 - 2.0 * (fk + 0.5) / N;
+    float rr = sqrt(max(0.0, 1.0 - y * y));
+    float th = mod(fk * 2.39996323, 6.2831853);
+    vec3 l = normalize(vec3(rr * cos(th), y, rr * sin(th)) + (h2 - 0.5) * uJitter * 0.35);
+    vec3 nrm = rotY(l, uRot);
+    float ang = acos(clamp(dot(nrm, uFace), -1.0, 1.0)); // 0 facing the camera, pi behind
+    float RA = 0.15 + uReach01 * 1.6; // the reach, an angle
+    float R = uR0;
+    float disp = -uWellAmt * 0.6 * R * exp(-(ang * ang) / (RA * RA)); // a dent where it faces you
+    disp += uRipple * 0.12 * R * sin(ang * 6.2831853 * uRings / (RA * 2.0) - uRipplePh) * exp(-ang / (RA * 3.0));
+    disp += uSwell * 0.15 * R * (vnoise(nrm.xy * 2.5 + uSwellPh) + 0.5 * vnoise(nrm.yz * 2.5 - uSwellPh * 0.7));
+    disp += uAudio * 0.35 * R * band(ang / 3.14159265);
+    disp += uSide * 0.35 * R * sideAt(nrm * R - uCamW);
+    disp = max(disp, -0.9 * R);
+    P = nrm * (R + disp) - uCamW;
+    Pp = rotY(l, uRotP) * (R + disp) - uCamWP;
+  } else if (uForm == 4) {
+    // TORUS : a ring of points, FLY rolling them round the tube, through itself.
+    int nV = uNA, nU = uNB;
+    float iu = float(k % nU), iv = float(k / nU);
+    float R = uR0, r = uR0 * 0.4;
+    float u = (iu + (h2.x - 0.5) * uJitter) * 6.2831853 / float(nU);
+    float vb = (iv + 0.5 * mod(iu, 2.0) + (h2.y - 0.5) * uJitter) * 6.2831853 / float(nV);
+    vec3 c = vec3(cos(u), 0.0, sin(u));
+    vec3 nrm = cos(vb + uRot) * c + vec3(0.0, sin(vb + uRot), 0.0);
+    float du = wrapPi(u - atan(uFace.z, uFace.x)); // round the ring from the side facing you
+    float RA = 0.2 + uReach01 * 2.6;
+    float disp = -uWellAmt * 0.8 * r * exp(-(du * du) / (RA * RA)); // the tube pinches there
+    disp += uRipple * 0.3 * r * sin(abs(du) * 6.2831853 * uRings / (RA * 2.0) - uRipplePh);
+    disp += uSwell * 0.4 * r * vnoise(vec2(cos(u) * 3.0 + cos(vb), sin(u) * 3.0 + sin(vb)) + uSwellPh);
+    disp += uAudio * 0.6 * r * band(abs(du) / 3.14159265);
+    disp += uSide * 0.6 * r * sideAt(c * R + nrm * r - uCamW);
+    disp = max(disp, -0.9 * r);
+    P = c * R + nrm * (r + disp) - uCamW;
+    vec3 nrmP = cos(vb + uRotP) * c + vec3(0.0, sin(vb + uRotP), 0.0);
+    Pp = c * R + nrmP * (r + disp) - uCamWP;
+  } else {
+    // GALAXY : a spiral disc; the well is its bulge, the ripple a density wave.
+    vec3 h3 = hash33(vec3(fk, 17.0, 5.0) + 41.0);
+    float rr, fd;
+    vec3 g = galaxyPt(h3, h2, uRot, rr, fd);
+    float R = uR0;
+    float RR = R * (0.15 + uReach01 * 1.2); // the reach, a radius
+    vec3 gp = vec3(0.0);
+    bool bulge = h3.z < uWellAmt * 0.3;
+    if (bulge) {
+      // the bulge : a share of the points (WELL) leave the arms for a soft,
+      // flattened ball at the core, crowding toward its heart
+      vec3 hb = hash33(vec3(fk, 29.0, 13.0) + 7.0);
+      float cz = hb.x * 2.0 - 1.0, ph = hb.y * 6.2831853;
+      vec3 dir = vec3(sqrt(max(0.0, 1.0 - cz * cz)) * cos(ph), cz * 0.55, sqrt(max(0.0, 1.0 - cz * cz)) * sin(ph));
+      vec3 b = dir * RR * pow(hb.z, 1.4);
+      g = rotY(b, uRot);
+      gp = rotY(b, uRotP);
+      rr = length(b.xz);
+      fd = 1.0;
+    }
+    amp *= fd;
+    float y = 0.0;
+    y += uRipple * 0.12 * R * sin(rr * 6.2831853 * uRings / (RR * 2.0) - uRipplePh) * exp(-rr / (RR * 3.0));
+    y += uSwell * 0.12 * R * vnoise(g.xz / R * 2.0 + uSwellPh);
+    y += uAudio * 0.3 * R * band(rr / (R * 1.4));
+    y += uSide * 0.3 * R * sideAt(g - uCamW);
+    P = g + vec3(0.0, y, 0.0) - uCamW;
+    float rp, fp;
+    Pp = (bulge ? gp : galaxyPt(h3, h2, uRotP, rp, fp)) + vec3(0.0, y, 0.0) - uCamWP;
+  }
+  // FOG : the far side dims, toward the back of the shape
+  float depth = -dot(P, uBack);
+  amp *= 1.0 - (1.0 - uFogStart) * 0.95 * clamp((depth - (uDist - uExt)) / (2.0 * uExt), 0.0, 1.0);
+}
+
+void main() {
+  vec3 P, Pp;
+  float amp, sizeK;
+  if (uForm >= 2) shapePoint(gl_InstanceID, P, Pp, amp, sizeK);
+  else gridPoint(gl_InstanceID, P, Pp, amp, sizeK);
 
   vec3 v = vec3(dot(P, uRight), dot(P, uUp), dot(P, uBack));
   float depth = -v.z;
-  if (depth < 0.05 || amp < 0.002) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
-  vec3 Pp = P + uDelta;
+  // On the dome everything round the camera is seen, down to the dome's rim;
+  // flat, what is in front of it.
+  bool dome = uDome == 1;
+  float dist = length(v);
+  bool hidden = dome ? (dist < 0.05 || domeDisc(v).z > 1.0) : depth < 0.05;
+  if (hidden || amp < 0.002) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   vec3 vp = vec3(dot(Pp, uRightP), dot(Pp, uUpP), dot(Pp, uBackP));
   vec2 pc = toPx(v);
-  vec2 pp = -vp.z > 0.05 ? toPx(vp) : pc;
+  vec2 pp = (dome ? length(vp) > 0.05 && domeDisc(vp).z <= 1.0 : -vp.z > 0.05) ? toPx(vp) : pc;
 
   // Radius in pixels, floored at 0.75 (1.5 across) : below that the dot keeps
-  // its size and loses brightness by the area it lost.
-  float rPx = uDot * sizeK * uF / depth * uRes.y;
+  // its size and loses brightness by the area it lost. On the dome, from the
+  // angle the dot fills (the frame's half is the dome's half aperture), a little
+  // larger than true so the points still read as points over a whole dome.
+  float rPx = dome ? 2.0 * uDot * sizeK / dist / uHalfAp * 0.5 * uRes.y : uDot * sizeK * uF / depth * uRes.y;
   // ...and capped near the lens : a point passing the camera swelled into a soft
   // ball filling a sixth of the frame (seen in the starfield). Points stay points.
   rPx = min(rPx, uRes.y * 0.018 * sizeK);
@@ -216,6 +406,7 @@ void main() {
 const WRAP = 4096
 const MAX_LEAN = 1.3963 // 80 degrees : straight down or up the basis degenerates
 const EXTENT = 64 // the lattice's side in world units, whatever the count
+const SHAPE_R = 12 // the sphere's, the torus's and the galaxy's radius, world units
 
 type V3 = [number, number, number]
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -245,6 +436,7 @@ export class LatticeSource implements NativeGenerator {
   private cam: V3 = [Math.random() * WRAP, 0, Math.random() * WRAP]
   private yaw = 0
   private ripplePh = Math.random() * Math.PI * 2
+  private rot = 0 // the sphere's, torus's, galaxy's own turn (FLY), radians
   private swellPh = Math.random() * 512
   private cellS = 0
   private audioTex: WebGLTexture | null = null
@@ -298,12 +490,21 @@ export class LatticeSource implements NativeGenerator {
     if (!this.cov) this.cov = g.target(this.w, this.h, { float: false })
     const I = this.inputs
     const dt = this.clock.tick(clockSec)
-    const form = Math.round(num(I, 'form', 0)) === 1 ? 1 : 0
+    const form = Math.max(0, Math.min(5, Math.round(num(I, 'form', 0))))
+    const shape = form >= 3 // sphere, torus, galaxy : a thing the camera circles
     const count = Math.max(16, Math.min(256, num(I, 'count', 200)))
-    // A volume holds its count per side cubed : a fifth as many per side keeps it
-    // near the plane's point count (200 -> 40 per side, 64 000 points).
-    const n = form === 0 ? Math.round(count) : Math.max(6, Math.min(56, Math.round(count / 5)))
-    const s = EXTENT / n
+    // How many points, per form (each a uniform, never a reallocation) :
+    // plane count², volume (count/5)³ (200 -> 64 000), tunnel count rings of
+    // count/2, sphere and galaxy about count²/4, torus (count/2) x (count/5).
+    const n =
+      form === 0 || form === 2 ? Math.round(count)
+        : form === 1 ? Math.max(6, Math.min(56, Math.round(count / 5)))
+          : Math.max(64, Math.min(16384, Math.round((count * count) / (form === 5 ? 3.3 : 4))))
+    const nA = form === 2 ? Math.max(12, Math.min(128, Math.round(count / 2))) : Math.max(8, Math.min(64, Math.round(count / 5)))
+    const nB = Math.max(16, Math.min(128, Math.round(count / 2)))
+    const instances = form === 0 ? n * n : form === 1 ? n * n * n : form === 2 ? n * nA : form === 4 ? nA * nB : n
+    // a tunnel is two and a half lattices long : its far end is a small hole
+    const s = form === 2 ? (EXTENT * 2.5) / n : EXTENT / (form === 1 || form === 0 ? n : 200)
     // A count change keeps the camera where it is in the world : the cells are
     // re-dealt, the scene does not jump.
     if (this.cellS > 0 && Math.abs(this.cellS - s) > 1e-9) {
@@ -319,11 +520,19 @@ export class LatticeSource implements NativeGenerator {
     // FLY : forward along the heading (level, over a plane) or along the view (in
     // a volume), in world units per second.
     const fly = num(I, 'fly', 0.15) * 6
-    const vel: V3 = form === 0 ? norm([B.f[0], 0, B.f[2]]).map((x) => x * fly) as V3 : (B.f.map((x) => x * fly) as V3)
+    // a tunnel is flown along its axis whatever the view; a shape turns instead
+    const vel: V3 =
+      form === 0 ? (norm([B.f[0], 0, B.f[2]]).map((x) => x * fly) as V3)
+        : form === 2 ? [0, 0, -fly]
+          : shape ? [0, 0, 0]
+            : (B.f.map((x) => x * fly) as V3)
     this.cam[0] = wrapC(this.cam[0] + (vel[0] * dt) / s)
     this.cam[2] = wrapC(this.cam[2] + (vel[2] * dt) / s)
     if (form === 1) this.cam[1] = wrapC(this.cam[1] + (vel[1] * dt) / s)
     const height = Math.max(0.3, num(I, 'height', 10))
+    // The shapes' own turn : FLY spins the globe, rolls the torus, wheels the galaxy.
+    const turnRate = num(I, 'fly', 0.15) * 1.2 // radians per second at full
+    if (shape) this.rot = (this.rot + turnRate * dt) % (Math.PI * 200)
 
     const pace = num(I, 'pace', 0.3)
     this.ripplePh = (this.ripplePh + pace * 2 * Math.PI * dt) % (Math.PI * 2)
@@ -347,12 +556,30 @@ export class LatticeSource implements NativeGenerator {
     const streakSec = Math.max(0, Math.min(1, num(I, 'streak', 0))) * 0.5
     const Bp = basis(yaw - spin * streakSec, down)
     const delta: V3 = [vel[0] * streakSec, vel[1] * streakSec, vel[2] * streakSec]
+    // A shape sits at the world's centre and the camera circles it : TILT and
+    // TURN place it round the shape, HEIGHT is its distance (low : inside),
+    // SPIN carries it round. A tunnel's radius is HEIGHT.
+    // On the full dome the shape comes nearer : a dome is a far wider view than a
+    // frame, and at the frame's distance a globe was a 40° speck ahead.
+    const dv = domeView()
+    const dist = SHAPE_R * (0.6 + height * 0.27) * (dv && shape ? 0.65 : 1)
+    const camW: V3 = [-B.f[0] * dist, -B.f[1] * dist, -B.f[2] * dist]
+    const camWP: V3 = [-Bp.f[0] * dist, -Bp.f[1] * dist, -Bp.f[2] * dist]
+    // each shape about the sphere's size in the frame
+    const r0 = form === 4 ? SHAPE_R * 0.75 : form === 5 ? SHAPE_R * 0.8 : SHAPE_R
+    const ext = form === 4 ? r0 * 1.4 : form === 5 ? r0 * 1.4 : r0
 
     const fog = Math.max(0, Math.min(1, num(I, 'fog', 0.35)))
     const size = Math.max(0, num(I, 'size', 0.35))
     // Dot radius in world units : on the plane a share of the cell (size 1, the
-    // dots touch), in a volume a much smaller one (stars, not balls).
-    const dotR = size * (form === 0 ? 0.5 : 0.08) * s
+    // dots touch), in a volume a much smaller one (stars, not balls); on a shape,
+    // a share of the spacing between its points.
+    const spacing =
+      form === 3 ? SHAPE_R * Math.sqrt((4 * Math.PI) / n)
+        : form === 4 ? (2 * Math.PI * SHAPE_R * 0.75 * 0.4) / nA
+          : form === 5 ? SHAPE_R * 0.8 * 1.4 * Math.sqrt(Math.PI / n) * 1.6
+            : s
+    const dotR = size * (form === 1 ? 0.08 : 0.5) * spacing
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.cov.fbo)
     gl.viewport(0, 0, this.w, this.h)
@@ -362,6 +589,11 @@ export class LatticeSource implements NativeGenerator {
     const hasSide = this.sideTex && num(I, 'side', 0) > 0.001 ? 1 : 0
     this.dots.use()
       .i1('uForm', form).i1('uN', n).f1('uS', s)
+      .i1('uNA', nA).i1('uNB', nB)
+      .f1('uR0', form === 2 ? height : r0).f1('uDist', dist).f1('uExt', ext)
+      .f3('uCamW', ...camW).f3('uCamWP', ...camWP)
+      .f1('uRot', this.rot).f1('uRotP', this.rot - turnRate * streakSec)
+      .f3('uFace', -B.f[0], -B.f[1], -B.f[2])
       .f3('uCam', this.cam[0], form === 0 ? height : this.cam[1], this.cam[2])
       .f3('uRight', ...B.r).f3('uUp', ...B.u).f3('uBack', ...B.b)
       .f3('uRightP', ...Bp.r).f3('uUpP', ...Bp.u).f3('uBackP', ...Bp.b)
@@ -372,6 +604,8 @@ export class LatticeSource implements NativeGenerator {
       .f1('uJitter', Math.max(0, Math.min(1, num(I, 'jitter', 0))))
       .f3('uWell', ...well)
       .f1('uWellAmt', Math.max(0, num(I, 'well', 0.5))).f1('uReach', reach)
+      .f1('uReach01', Math.max(0, Math.min(1, num(I, 'reach', 0.3))))
+      .i1('uDome', dv ? 1 : 0).f1('uHalfAp', dv?.halfAp ?? 1.8).f1('uDomeAz', dv?.az ?? 0).f1('uDomeEl', dv?.el ?? 0.44)
       .f1('uRipple', Math.max(0, num(I, 'ripple', 0.3))).f1('uRings', Math.max(0.25, num(I, 'rings', 3)))
       .f1('uRipplePh', this.ripplePh)
       .f1('uSwell', Math.max(0, num(I, 'swell', 0))).f1('uSwellPh', this.swellPh)
@@ -388,7 +622,7 @@ export class LatticeSource implements NativeGenerator {
     gl.enable(gl.BLEND)
     gl.blendEquation(gl.MAX)
     gl.blendFunc(gl.ONE, gl.ONE)
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, form === 0 ? n * n : n * n * n)
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, instances)
     gl.disable(gl.BLEND)
     gl.blendEquation(gl.FUNC_ADD)
     gl.bindVertexArray(null)

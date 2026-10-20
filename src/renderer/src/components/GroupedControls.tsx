@@ -213,7 +213,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('ripple')) put(d, ['rings'], 'Ripple is at 0.')
     if (zero('ripple') && zero('swell')) put(d, ['pace'], 'Ripple and swell are at 0 : nothing to pace.')
     if (zero('fly') && zero('spin')) put(d, ['streak'], 'Fly and spin are at 0 : nothing moves to streak.')
-    if (is('form', 0) && ['well', 'ripple', 'swell', 'audio', 'side'].every(zero))
+    if (!is('form', 1) && ['well', 'ripple', 'swell', 'audio', 'side'].every(zero))
       put(d, ['reach'], 'Well, ripple, swell, audio and sidechain are at 0 : nothing to reach.')
     return d
   },
