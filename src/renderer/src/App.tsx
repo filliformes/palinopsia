@@ -2236,7 +2236,9 @@ export default function App(): JSX.Element {
           <div
             ref={previewRef}
             className={`relative overflow-hidden rounded-md border border-border bg-black ${bigPreview ? 'min-h-0 flex-1' : previewH === null ? 'min-h-[160px] flex-1' : 'shrink-0'}`}
-            style={!bigPreview && previewH !== null ? { height: previewH } : undefined}
+            // never past what the column holds (a smaller window, a bigger UI
+            // zoom, another display) : the bar and some panels always stay below
+            style={!bigPreview && previewH !== null ? { height: previewH, maxHeight: `calc(100% - ${PREVIEW_ROOM}px)` } : undefined}
           >
             <canvas
               ref={canvasRef}
@@ -2657,6 +2659,10 @@ function MasterRackStrip(): JSX.Element {
   )
 }
 
+/** What a sized preview leaves under it in its column : the bar and a strip of
+ *  the panels (px, in the column's own units). */
+const PREVIEW_ROOM = 70
+
 /** The bar under the preview : drag to size the preview (the panels below then
  *  scroll), double-click to let it take what the panels leave again. Pointer
  *  deltas go through the preview's own box, so the UI zoom (CSS zoom) is right. */
@@ -2684,7 +2690,7 @@ function PreviewSizer({
         if (!pv || !col) return
         const r = pv.getBoundingClientRect()
         const k = pv.offsetHeight > 0 ? r.height / pv.offsetHeight : 1
-        drag.current = { y: e.clientY, h: pv.offsetHeight, k, max: Math.max(120, col.offsetHeight - 70), id: e.pointerId, last: pv.offsetHeight }
+        drag.current = { y: e.clientY, h: pv.offsetHeight, k, max: Math.max(120, col.offsetHeight - PREVIEW_ROOM), id: e.pointerId, last: pv.offsetHeight }
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
       }}
       onPointerMove={(e) => {
