@@ -108,6 +108,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
           out.parasites = 'Parasites need grain above 0 and the crt or vhs character.'
           return out
         }
+        // a character something moves : either may act at any moment
+        if (ctx.driven.has('character')) return out
         if (c === 2 || c === 3) out.chroma = 'Chroma grain only acts with the digital or film character.'
         else out.parasites = 'Parasites only act with the crt or vhs character (and grain above 0).'
         return out
@@ -185,7 +187,8 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       dim: (v, ctx): Record<string, string> => {
         const out: Record<string, string> = {}
         // With the Background slot empty the engine falls back to this color.
-        if (Math.round(num(v, 'outBgSource', 0)) === 1 && !ctx.bgEmpty)
+        // (a fill source something moves may come back to the color at any moment)
+        if (!ctx.driven.has('outBgSource') && Math.round(num(v, 'outBgSource', 0)) === 1 && !ctx.bgEmpty)
           out.outBgColor = 'The outside is filled by the Background layer, not this color.'
         if (ctx.dome)
           out.outPostWarp = 'The fulldome output is on : a domemaster has no projector warp, so the shape stays in the picture.'
