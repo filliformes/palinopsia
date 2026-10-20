@@ -4904,7 +4904,7 @@ export const useStore = create<StoreState>((set, get) => ({
   sequencePageOpen: false,
   setSequencePageOpen: (on) => set({ sequencePageOpen: on }),
 
-  newSession: () =>
+  newSession: () => {
     // A blank slate. Goes through the normal composition write path, so it
     // lands in undo history : an accidental New is one Ctrl+Z away.
     set((s) => {
@@ -4953,11 +4953,15 @@ export const useStore = create<StoreState>((set, get) => ({
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
         collapsed
       }
-    }),
-  generateTheme: (themeId) =>
+    })
+    // what wants to know (the session's media status) hears a new one came in
+    emitSessionLoaded()
+  },
+  generateTheme: (themeId) => {
     // Generate : a fresh, unsaved session built to a theme recipe (themes.ts).
     // Full diegetic scene : visuals + the theme's World (coupling + Context mood +
     // audio routing) + field-macro / temperament biases. Undoable (morph write path).
+    if (!THEME_BY_ID[themeId]) return
     set((s) => {
       const theme = THEME_BY_ID[themeId]
       if (!theme) return s
@@ -5024,7 +5028,11 @@ export const useStore = create<StoreState>((set, get) => ({
         flow: theme.flow,
         superFlicker: theme.superFlicker
       }
-    }),
+    })
+    // a new session (it may reuse the Collage films of the one before) : its
+    // media status starts over
+    emitSessionLoaded()
+  },
   loadSession: (s) => {
     // session.ts only checks version + objectness, so a malformed-but-v1 file can
     // still reach here. normalizeComposition dereferences s.composition.layers, and

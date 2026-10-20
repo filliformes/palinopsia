@@ -378,7 +378,7 @@ export function generate({ corpus, params, seed, map, liveTarget }: GenerateInpu
     const slack = Math.max(0, u.dur - consumed)
     const inSec = Math.max(0, Math.min(u.start + offsetDraw * slack, Math.max(0, u.fileDur - consumed)))
 
-    clips.push({ unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed, ...clipSrcOf(u, corpus.folder) })
+    clips.push({ unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed, ...(u.src ? { src: u.src } : clipSrcOf(u, corpus.folder)) })
     t += durSec
     prev = zTail[bestIdx] // the next join is measured from how THIS clip ends
     recent.push(bestIdx)

@@ -2,7 +2,7 @@
 // kind each is, and a drag handler pair for a drop target that lights while a
 // file drag is over it. A layer's A / B row takes a film, a sound or a folder
 // (a Collage of it); an Audio Layer slot takes a sound (or a film's
-// soundtrack); the window takes a session file.
+// soundtrack); a session file opens wherever it lands.
 
 import type { DragEvent } from 'react'
 import { useStore } from '../store'
@@ -41,15 +41,32 @@ export function droppedPaths(e: DragEvent | globalThis.DragEvent): Array<{ path:
 /** The last segment of a path (a file's or a folder's name). */
 export const baseName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
+// A session file opens wherever it is dropped (a layer row, an Audio Layer slot,
+// an effect, the window) : the app's open-a-path, registered by the app.
+let sessionOpener: ((path: string) => void) | null = null
+export function setSessionDropOpener(fn: ((path: string) => void) | null): void {
+  sessionOpener = fn
+}
+/** A session file among the dropped ones : it opens (asked about the one being
+ *  left, like Open), and the drop is taken. */
+export function openDroppedSession(items: Array<{ path: string }>): boolean {
+  const s = items.find((it) => dropKind(it.path) === 'session')
+  if (!s || !sessionOpener) return false
+  sessionOpener(s.path)
+  return true
+}
+
 /** A dropped folder onto a layer slot : the slot becomes a Collage of its
- *  films (the Collage's own folder scan : unreadable formats converted once). */
+ *  films (the Collage's own folder scan : unreadable formats converted once).
+ *  Read first : a folder with no film leaves the slot (and what modulates it)
+ *  as it was. */
 export async function collageFromFolder(layer: number, slot: 'A' | 'B', folder: string): Promise<void> {
-  const st = useStore.getState()
-  const cur = st.composition.layers[layer]?.[slot === 'A' ? 'sourceA' : 'sourceB']
-  if (cur?.shaderId !== 'gen-collage') st.setSourceShader(layer, slot, 'gen-collage')
   showToast(`Collage : reading ${baseName(folder)}…`)
-  const res = await window.api.collageScan(folder)
-  if (res.ok && res.clips.length) {
+  const res = await window.api.collageScan(folder).catch(() => null)
+  if (res?.ok && res.clips.length) {
+    const st = useStore.getState()
+    const cur = st.composition.layers[layer]?.[slot === 'A' ? 'sourceA' : 'sourceB']
+    if (cur?.shaderId !== 'gen-collage') st.setSourceShader(layer, slot, 'gen-collage')
     useStore.getState().setCollagePool(layer, slot, folder, res.clips)
     showToast(`Collage : ${res.clips.length} film${res.clips.length === 1 ? '' : 's'} from ${baseName(folder)}${res.skipped.length ? ` (${res.skipped.length} unreadable, skipped)` : ''}`)
   } else {

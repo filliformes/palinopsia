@@ -11,7 +11,7 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 import { VideoTransport } from './VideoTransport'
 import { useStore } from '../store'
 import { AUDIO_LAYER, audioLayer, type AudioSlotName, type SlotInfo } from '../audio/audioLayer'
-import { droppedPaths, dropKind, isFileDrag } from './fileDrop'
+import { droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
 import { showToast } from './Toast'
 
 const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
@@ -263,7 +263,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
   const [dropOver, setDropOver] = useState(false)
   const dropIn = (e: React.DragEvent): void => {
     const items = droppedPaths(e)
-    if (!items.length) return
+    if (!items.length || openDroppedSession(items)) return // a session file opens, wherever it lands
     const { path, name } = items[0]
     const kind = dropKind(path)
     if (kind === 'audio' || kind === 'video') setFile(slot, `opsia-media://local/${encodeURIComponent(path)}`, name, path)

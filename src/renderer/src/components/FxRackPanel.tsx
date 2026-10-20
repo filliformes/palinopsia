@@ -16,6 +16,7 @@ import { showToast } from './Toast'
 import { ContextMenu } from './ContextMenu'
 import { useFxMenuItems } from './fxMenu'
 import { SearchSelect, type SearchOption } from './SearchSelect'
+import { isFileDrag } from './fileDrop'
 
 // The unit being dragged, shared by every rack so a chip can be dropped into
 // ANOTHER rack (a layer ↔ the Master FX) as well as reordered in its own.
@@ -80,6 +81,9 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
       }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => {
+        // a file from the desktop is not an effect : it goes on to what holds
+        // this rack (a session opens, else the window says where films go)
+        if (!fxDrag && isFileDrag(e)) return
         e.preventDefault()
         e.stopPropagation()
         setOver(false)
@@ -287,11 +291,15 @@ function FxUnit({
       onContextMenu={onContextMenu}
       onDragStart={onDragStart}
       onDragOver={(e) => {
+        if (!fxDrag && isFileDrag(e)) return // a file from the desktop : not ours
         e.preventDefault()
         e.stopPropagation() // so the row's tail-drop indicator doesn't override this chip
         onOver?.()
       }}
       onDrop={(e) => {
+        // a file from the desktop is not an effect : it goes on to what holds
+        // this rack (a session opens, else the window says where films go)
+        if (!fxDrag && isFileDrag(e)) return
         e.preventDefault()
         e.stopPropagation() // don't fall through to the row's tail drop
         onDropOn?.(e)

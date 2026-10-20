@@ -98,9 +98,10 @@ function makeMatcher(
     const consumed = durSec * speed
     const slack = Math.max(0, u.dur - consumed)
     const inSec = Math.max(0, Math.min(u.start + rng() * slack, Math.max(0, u.fileDur - consumed)))
-    // (its original file from THIS corpus's folder : the slot's own folder is the
-    // edit's, and the Assemble tab may have read another one since)
-    return { unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed, ...clipSrcOf(u, corpus.folder) }
+    // its original : recorded at analysis, or (older corpora) THIS corpus's folder
+    // + its name (the slot's own folder is the edit's, and the Assemble tab may
+    // have read another one since)
+    return { unitId: u.id, file: u.file, fileName: u.fileName, inSec, durSec, speed, ...(u.src ? { src: u.src } : clipSrcOf(u, corpus.folder)) }
   }
 }
 

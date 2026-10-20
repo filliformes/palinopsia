@@ -17,7 +17,8 @@ import {
   powerSaveBlocker,
   systemPreferences
 } from 'electron'
-import { join } from 'path'
+import { dirname, join } from 'path'
+import { pathToFileURL } from 'url'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import type { Session, LightConfig } from '@shared/types'
 import { OscSender } from './osc'
@@ -391,6 +392,27 @@ function windowIcon(): string | undefined {
   return existsSync(p) ? p : undefined
 }
 
+// Never let a window navigate away from the app itself (the dev server, or the
+// packaged index.html : not any file:// URL, which is what a film dropped on a
+// window would open). A first-party bug can't turn into a full-page redirect
+// either. In-page hash changes never come here.
+const rendererIndex = (): string => join(__dirname, '../renderer/index.html')
+const fileUrlKey = (u: string): string => {
+  try { return decodeURI(u.split(/[?#]/)[0]).replace(/\\/g, '/').toLowerCase() } catch { return u.toLowerCase() }
+}
+function guardNavigation(win: BrowserWindow): void {
+  let home = '' // the app's own URL as the window wrote it (its first load)
+  win.webContents.once('did-navigate', (_e, url) => { home = url })
+  win.webContents.on('will-navigate', (e, url) => {
+    const devUrl = process.env.ELECTRON_RENDERER_URL
+    const key = fileUrlKey(url)
+    const allowed = devUrl
+      ? url.startsWith(devUrl)
+      : (!!home && key === fileUrlKey(home)) || key === fileUrlKey(pathToFileURL(rendererIndex()).href)
+    if (!allowed) e.preventDefault()
+  })
+}
+
 function createWindow(): void {
   // A fresh window must re-arm the save-before-quit intercept. On macOS the app
   // survives its last window's close (which latched `appQuitting = true` via
@@ -494,19 +516,12 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Never let the renderer navigate the main window away from the app itself
-  // (dev server URL or the packaged file://). A first-party bug can't turn into
-  // a full-page redirect to a remote origin.
-  mainWindow.webContents.on('will-navigate', (e, url) => {
-    const devUrl = process.env.ELECTRON_RENDERER_URL
-    const allowed = devUrl ? url.startsWith(devUrl) : url.startsWith('file://')
-    if (!allowed) e.preventDefault()
-  })
+  guardNavigation(mainWindow)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    mainWindow.loadFile(rendererIndex())
   }
 }
 
@@ -688,6 +703,10 @@ function finalizeOutputWindow(kind: 'full' | 'windowed' | 'span'): void {
     }, 1000)
   })
   win.webContents.on('console-message', (e) => logFrom('output', e.level, e.message))
+  // A file dropped on the projector never replaces the show (the view refuses
+  // drops too); nor does anything else take the window away from the app.
+  guardNavigation(win)
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   if (kioskActive()) {
     guardKioskKeys(win)
     // Above everything (a system notice, an update toast) in an installation, on
@@ -698,7 +717,7 @@ function finalizeOutputWindow(kind: 'full' | 'windowed' | 'span'): void {
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(`${process.env.ELECTRON_RENDERER_URL}#output`)
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'output' })
+    win.loadFile(rendererIndex(), { hash: 'output' })
   }
   // A DIRECT renderer↔renderer MessagePort for streaming the composited frame :
   // the control window transfers each finished RGBA8 frame (zero-copy) and the
@@ -1125,12 +1144,13 @@ app.whenReady().then(async () => {
       return 'none'
     }
   })
-  safeHandle('session:load', (_e, path) => {
-    // Warm the session folder's clips in the background (pre-convert DXV/HAP/
-    // ProRes into the all-intra cache) so every clip beside the session is
-    // instant to load. Fire-and-forget : never delays the session itself.
-    void import('path').then(({ dirname }) => warmVideoFolder(dirname(path as string))).catch(() => {})
-    return sessionIO.loadFromPath(path as string)
+  safeHandle('session:load', (_e, path) => sessionIO.loadFromPath(path as string))
+  // A session's load went through (read, valid, the question about the one
+  // being left answered) : warm its folder's clips in the background (pre-convert
+  // DXV/HAP/ProRes into the all-intra cache) so every clip beside the session is
+  // instant to load. Fire-and-forget : never delays the session itself.
+  safeHandle('session:warm', (_e, path) => {
+    if (typeof path === 'string' && /\.json$/i.test(path)) void warmVideoFolder(dirname(path)).catch(() => {})
   })
   safeHandle('session:setCurrent', (_e, s) => autosave.setCurrentSession(s as Session))
 

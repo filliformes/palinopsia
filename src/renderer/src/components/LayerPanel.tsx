@@ -18,7 +18,7 @@ import { registerLiveOverlay } from './liveOverlay'
 import { showToast } from './Toast'
 import { placeAssemblage } from '../assemble/place'
 import { playableVideoUrl } from './videoImport'
-import { collageFromFolder, droppedPaths, dropKind, isFileDrag } from './fileDrop'
+import { collageFromFolder, droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -746,6 +746,7 @@ function SourceRow({
   const [dropOver, setDropOver] = useState(false)
   async function onDropFiles(e: DragEvent): Promise<void> {
     const items = droppedPaths(e)
+    if (openDroppedSession(items)) return // a session file opens, wherever it lands
     if (!items.length || (scope.kind !== 'sourceA' && scope.kind !== 'sourceB')) return
     const layer = scope.layer, slotName = scope.kind === 'sourceA' ? 'A' : 'B'
     const { path, name } = items[0]

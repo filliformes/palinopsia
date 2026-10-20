@@ -1287,6 +1287,9 @@ export interface ExposedApi {
   sessionOpenVersion: (path: string) => Promise<{ session: Session; path: string } | null>
   sessionVersionCount: (path: string) => Promise<number>
   sessionLoad: (path: string) => Promise<Session>
+  /** A session's load went through : the films beside its file are readied in
+   *  the background (an exotic codec converted once). */
+  sessionWarm: (path: string) => Promise<void>
 
   // Autosave / crash recovery
   autosaveCrashCheck: () => Promise<{ crashed: boolean; entries: AutosaveEntry[] }>
@@ -1381,12 +1384,16 @@ export interface ExposedApi {
   mcpResult: (id: number, result: import('./mcpTools').McpResult) => void
   onMcpCall: (cb: (call: import('./mcpTools').McpCall) => void) => () => void
   onMcpClient: (cb: (name: string) => void) => () => void
-  /** The session's media : what each path is now, files found by name under a
-   *  folder, a folder picker, and copies made next to the session. */
+  /** The session's media : what each path is now, where missing ones went
+   *  (found by name under a folder, keyed by the missing path), a folder picker,
+   *  and copies made into the session's "<name> media" folder. */
   mediaCheck: (paths: string[]) => Promise<Record<string, 'dir' | 'file' | 'none'>>
-  mediaFind: (root: string, names: string[]) => Promise<Record<string, string>>
+  mediaFind: (root: string, wants: string[]) => Promise<Record<string, { path: string; dir: boolean; score: number }>>
   mediaPickFolder: (title: string) => Promise<string | null>
-  mediaCollect: (items: Array<{ src: string; dest: string }>) => Promise<{ ok: boolean; map: Record<string, string>; bytes: number; error?: string }>
+  mediaCollect: (
+    sessionPath: string,
+    items: Array<{ src: string; dest: string }>
+  ) => Promise<{ ok: boolean; map: Record<string, string>; bytes: number; refused?: number; error?: string }>
   onMediaCollectProgress: (fn: (p: { done: number; total: number; bytes: number }) => void) => () => void
   collageScan: (folder: string) => Promise<import('./collage').CollageScanResult>
   // The same scan, except EVERY clip is force-transcoded to 720p all-intra : the

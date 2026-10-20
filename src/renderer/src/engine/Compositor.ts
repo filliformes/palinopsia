@@ -466,6 +466,19 @@ export function makeRedirectableGL(gl: WebGL2RenderingContext): {
   return { gl: proxy as WebGL2RenderingContext, state };
 }
 
+// An edit's files in one string, made once per edit array (the store hands the
+// same array every frame until it changes).
+const edlFilesMemo = new WeakMap<AssembleClip[], string>();
+function edlFiles(edl: AssembleClip[] | undefined): string {
+  if (!edl) return '';
+  let k = edlFilesMemo.get(edl);
+  if (k === undefined) {
+    k = edl.map((c) => c.file).join('\n');
+    edlFilesMemo.set(edl, k);
+  }
+  return k;
+}
+
 /** Load an ISF source into a fresh renderer; null on compile failure.
  *  Wrapped in try/catch because the ISF parser can THROW (not just set
  *  valid=false) on some sources : an uncaught throw here would propagate out
@@ -968,6 +981,10 @@ export class ISFLayer {
   private assembleB: AssembleSource | null = null;
   private assembleIdA: string | null = null;
   private assembleIdB: string | null = null;
+  // The edit's files, so the same edit with files moved (relinked, a converted
+  // copy made again) reloads instead of playing the old paths.
+  private assembleFilesA = '';
+  private assembleFilesB = '';
   // Live capture slots (kind:'capture'). Like video: a slot is one kind at once.
   private captureA: CaptureSource | null = null;
   private captureB: CaptureSource | null = null;
@@ -1084,7 +1101,8 @@ export class ISFLayer {
   setAssemble(slot: 'A' | 'B', id: string | null, edl: AssembleClip[] | undefined, loop: boolean, folder: string | null = null): void {
     const curId = slot === 'A' ? this.assembleIdA : this.assembleIdB;
     const cur = slot === 'A' ? this.assembleA : this.assembleB;
-    if (id === curId) {
+    const files = edlFiles(edl);
+    if (id === curId && files === (slot === 'A' ? this.assembleFilesA : this.assembleFilesB)) {
       // Same edit : `loop` (and the corpus folder) can change without a re-id.
       cur?.setLoop(loop);
       cur?.setFolder(folder);
@@ -1097,8 +1115,8 @@ export class ISFLayer {
       next.setPlaylist(edl, loop);
       next.setFolder(folder);
     }
-    if (slot === 'A') { this.assembleA = next; this.assembleIdA = id; }
-    else { this.assembleB = next; this.assembleIdB = id; }
+    if (slot === 'A') { this.assembleA = next; this.assembleIdA = id; this.assembleFilesA = files; }
+    else { this.assembleB = next; this.assembleIdB = id; this.assembleFilesB = files; }
   }
 
   /** The live AssembleSource on a slot, if any. The renderer uses this to hand

@@ -27,6 +27,7 @@ const api: ExposedApi = {
   sessionOpenVersion: (path: string) => ipcRenderer.invoke('session:openVersion', path),
   sessionVersionCount: (path: string) => ipcRenderer.invoke('session:versionCount', path),
   sessionLoad: (path: string) => ipcRenderer.invoke('session:load', path),
+  sessionWarm: (path: string) => ipcRenderer.invoke('session:warm', path),
   pathKind: (path: string) => ipcRenderer.invoke('path:kind', path),
   // ── Your own shaders (the Source Editor, src/main/userShaders.ts) ──
   shadersList: () => ipcRenderer.invoke('shaders:list'),
@@ -52,9 +53,9 @@ const api: ExposedApi = {
     return () => { ipcRenderer.off('app:shortcut', h) }
   },
   mediaCheck: (paths: string[]) => ipcRenderer.invoke('media:check', paths),
-  mediaFind: (root: string, names: string[]) => ipcRenderer.invoke('media:find', root, names),
+  mediaFind: (root: string, wants: string[]) => ipcRenderer.invoke('media:find', root, wants),
   mediaPickFolder: (title: string) => ipcRenderer.invoke('media:pickFolder', title),
-  mediaCollect: (items: Array<{ src: string; dest: string }>) => ipcRenderer.invoke('media:collect', items),
+  mediaCollect: (sessionPath: string, items: Array<{ src: string; dest: string }>) => ipcRenderer.invoke('media:collect', sessionPath, items),
   onMediaCollectProgress: (fn: (p: { done: number; total: number; bytes: number }) => void) => {
     const h = (_e: unknown, p: { done: number; total: number; bytes: number }): void => fn(p)
     ipcRenderer.on('media:collectProgress', h)

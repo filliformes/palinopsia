@@ -88,6 +88,21 @@ export function OutputView(): JSX.Element {
     }
   }, [])
 
+  // A file dropped on the projector does nothing : the page would otherwise
+  // open it in place of the show (main refuses that navigation too).
+  useEffect(() => {
+    const refuse = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'
+    }
+    window.addEventListener('dragover', refuse)
+    window.addEventListener('drop', refuse)
+    return () => {
+      window.removeEventListener('dragover', refuse)
+      window.removeEventListener('drop', refuse)
+    }
+  }, [])
+
   // One second, then gone for the life of the window : long enough to read six
   // words, short enough that it is never part of the picture. A projector feed
   // being filmed or recorded keeps 1 s of text and no more.

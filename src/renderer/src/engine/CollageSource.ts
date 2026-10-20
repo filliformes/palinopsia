@@ -1914,7 +1914,9 @@ export class CollageSource {
     }
     if (edls !== this.edlRef) {
       this.edlRef = edls
-      const ek = edls.map((e) => e.id).join('|')
+      // (their files too : an edit relinked, or its converted copies made again,
+      // plays the new files)
+      const ek = edls.map((e) => `${e.id}:${(e.clips ?? []).map((c) => c.file).join(',')}`).join('|')
       if (ek !== this.edlKey) {
         this.edls = edls.slice()
         this.edlKey = ek

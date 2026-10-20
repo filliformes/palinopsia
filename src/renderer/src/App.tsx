@@ -94,7 +94,7 @@ import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
 import { ConfirmModal, SaveChangesModal } from './components/PromptModal'
 import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
 import { recentSessions } from './recentSessions'
-import { baseName, droppedPaths, dropKind, isFileDrag } from './components/fileDrop'
+import { baseName, droppedPaths, isFileDrag, openDroppedSession, setSessionDropOpener } from './components/fileDrop'
 import { ContextMenu as RecentMenu } from './components/ContextMenu'
 import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
 import { sessionMedia } from './sessionMedia'
@@ -2001,14 +2001,15 @@ export default function App(): JSX.Element {
       if (!isFileDrag(e)) return
       e.preventDefault()
       const items = droppedPaths(e)
-      if (!items.length) return
-      const session = items.find((it) => dropKind(it.path) === 'session')
-      if (session) { void openPathRef.current(session.path); return }
+      if (!items.length || openDroppedSession(items)) return
       showToast("Drop a film, a sound file or a folder on a layer's A or B row, a sound on an Audio Layer slot, or a session file anywhere", 'ok', 6000)
     }
+    // a session file dropped on a layer row, an Audio Layer slot… opens too
+    setSessionDropOpener((path) => void openPathRef.current(path))
     window.addEventListener('dragover', over)
     window.addEventListener('drop', drop)
     return () => {
+      setSessionDropOpener(null)
       window.removeEventListener('dragover', over)
       window.removeEventListener('drop', drop)
     }

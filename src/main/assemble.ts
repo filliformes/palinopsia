@@ -335,16 +335,19 @@ export async function analyzeFolder(
       if (existsSync(cf)) {
         try {
           mine = JSON.parse(readFileSync(cf, 'utf8')) as AssembleUnit[]
-          // An old cache row may predate the conversion : re-point it.
-          if (mine && mine.some((u) => u.file !== playPath)) {
-            mine = mine.map((u) => ({ ...u, file: playPath }))
+          // An old cache row may predate the conversion (or the original's
+          // record) : re-point it.
+          if (mine && mine.some((u) => u.file !== playPath || u.src !== path)) {
+            mine = mine.map((u) => ({ ...u, file: playPath, src: path }))
           }
         } catch {
           mine = null // corrupt cache : just re-analyse
         }
       }
       if (!mine) {
-        mine = await analyzeFile(playPath, name, opts)
+        // each unit keeps its ORIGINAL too : a session's media make the converted
+        // copy again from it, and collect it, on another computer
+        mine = (await analyzeFile(playPath, name, opts)).map((u) => ({ ...u, src: path }))
         try {
           writeFileSync(cf, JSON.stringify(mine))
         } catch {

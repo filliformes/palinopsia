@@ -76,8 +76,12 @@ export const DESC_LABELS: Record<DescriptorName, string> = {
 /** One analysed segment of one file : the atom the editor assembles. */
 export interface AssembleUnit {
   id: string
-  file: string // absolute path on disk
+  file: string // absolute path on disk : the PLAYABLE file (a converted copy when the codec needs one)
   fileName: string
+  // The ORIGINAL file (absolute), when `file` is a converted copy or not : what
+  // a session's media make again, relink and collect. Absent in older corpora
+  // (then the corpus folder + fileName).
+  src?: string
   start: number // seconds into the file
   dur: number // seconds
   fileDur: number // the whole file's length, so in-points can be clamped
@@ -102,14 +106,14 @@ export interface AssembleClip {
   unitId: string
   file: string
   fileName: string
+  // The ORIGINAL file (absolute) : what Sonify's Assemblage voice plays (a
+  // converted copy has no sound) and what a session's media make again, relink
+  // and collect. Absent in edits made before it existed (then the corpus
+  // folder + fileName).
+  src?: string
   inSec: number
   durSec: number
   speed: number
-  // The ORIGINAL file (absolute) when `file` is a converted copy : Sonify's
-  // Assemblage voice plays its sound (a copy has none). Absent when `file` is
-  // the original, and in edits made before it existed (rebuilt from the
-  // corpus folder + fileName then).
-  src?: string
 }
 
 /** A clip's (or a unit's) ORIGINAL file : `file` itself when it has the
