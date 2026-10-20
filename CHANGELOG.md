@@ -7,6 +7,26 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Oil Cloud source** (`shaders/isf/OilCloud.fs`, an ISF generator in two passes) : one
+  billowing volume, after the volumetric cloud Vincent showed, ray-traced and painted.
+  The field is a core plus turbulence (`|2n-1|` : round crests, sharp creases), four
+  octaves of value noise turned between octaves, a one-lookup stir (a push whose heading
+  turns through the space : a twist about the vertical sheared it into bands and blew
+  the lighting to white and blue), DENSITY 2 weighing the fine octaves. The march only
+  gathers coverage (sphere-bounded, strides outside sized by the field, and past the
+  first two octaves an upper bound lets clearly-empty space skip the fine ones); the
+  light is read once per ray where it is half hidden : the field's slope toward the
+  light, one shadow look, a crease look straight outward, a cool back light. Lighting
+  per step cost 24 fps at 4K : once per ray, 60. The paint pass is Cloud Study's
+  strokes, palette per stroke and relief, with premultiplied color so strokes paint
+  the silhouette, then straight alpha over GROUND (transparent : no dark fringe). On
+  the dome the trace is full size up to about 2100 px a side (`$DOME_FILL` in the pass
+  size : the runtime reads a uniform there, and replaces each `$WIDTH` / `$HEIGHT` only
+  once), so it stays crisp; the spin and churn are integrated clocks. Ten presets, hints,
+  keywords, a blurb, grouped Inspector columns (shape / view / paint), the **Warm and
+  Cool** master chain, the **Oil Cloud** Generate theme (Space). Verified in a test copy
+  : 60 fps at 1080p and 4K flat, on the dome from 1080p and 2048², 58 at 2880²; crisp
+  1:1 crops flat and on the dome; every preset; no shader errors.
 - **The dome's grid on output is no longer remembered** (`loadDome`, `setDome` in
   `store.ts`) : the whole dome setup lived in localStorage, the grid with it, so once
   turned on it came back with every dome toggle and every launch, burned into the

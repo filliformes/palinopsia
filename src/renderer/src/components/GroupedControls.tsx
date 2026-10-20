@@ -43,6 +43,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('edges', 'gap', 'torn', 'contour', 'curve', 'contourMode', 'fxFirst'),
     g('deal', 'deal', 'rate', 'xfade', 'churn', 'freeze')
   ],
+  'oil-cloud': [
+    g('shape', 'grow', 'density', 'density2', 'swirl', 'evolve', 'audio'),
+    g('view', 'rotation', 'zoom', 'light', 'lit', 'warm', 'cool', 'ground'),
+    g('paint', 'brush', 'mixing', 'impasto')
+  ],
   'cloud-study': [
     g('cloud', 'coverage', 'scale', 'detail', 'drift', 'evolve', 'horizon', 'audio'),
     g('light', 'sun', 'sunHeight', 'glow', 'shadow', 'sky', 'light', 'shade'),

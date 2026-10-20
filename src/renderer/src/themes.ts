@@ -660,6 +660,25 @@ export const THEMES: Theme[] = [
     vibe: { saturation: 0.15, contrast: 1.3 }, finalizer: { grain: 0.2, black: 0.03 }
   }),
   mk({
+    id: 'oil-cloud', name: 'Oil Cloud', family: 'Space',
+    blurb: 'One billowing cloud turning in the dark, ray-traced and painted in oil, warm toward the light, cool in its folds.',
+    world: 'synthetic',
+    context: { haze: 0, bloom: 0.12, trails: 0 },
+    palette: [K, [0.1, 0.3, 0.95, 1], [1.0, 0.78, 0.3, 1]],
+    sources: ['oil-cloud'],
+    stack: [['oil-cloud']],
+    bgSources: ['solid-color'], bgOpacity: 0,
+    pickInputs: {
+      'oil-cloud': {
+        grow: [0.45, 0.6, 0.75], density: [0.55, 0.7, 0.85], density2: [0.35, 0.5, 0.7], rotation: [0.06, 0.12, -0.1],
+        zoom: [0.35, 0.45, 0.55], light: [-0.4, 0.25, 0.5], evolve: [0.1, 0.2], swirl: [0.35, 0.5, 0.7],
+        brush: [0.2, 0.3, 0.45], mixing: [0.35, 0.5, 0.7], impasto: [0.4, 0.55], audio: [0]
+      }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal', 'lighten'], layers: [1, 1], useB: 0, feedback: 0, density: 0.4
+  }),
+  mk({
     id: 'oil-sky', name: 'Oil Sky', family: 'Cinematic / Atmospheric',
     blurb: 'A cloudscape painted in thick oil, the sun low behind it, the paint catching the light.',
     world: 'synthetic',

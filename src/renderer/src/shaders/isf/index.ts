@@ -14,6 +14,7 @@ import { TEXT_FONTS } from '../../textFonts'
 import slabs from './Slabs.fs?raw'
 import contour from './Contour.fs?raw'
 import cloudStudy from './CloudStudy.fs?raw'
+import oilCloud from './OilCloud.fs?raw'
 import gridDrift from './GridDrift.fs?raw'
 import tenPrint from './TenPrint.fs?raw'
 import particleDrift from './ParticleDrift.fs?raw'
@@ -909,6 +910,19 @@ export const GENERATORS: IsfShader[] = [
       coverage: [0.4, 0.7], scale: [0.6, 1.6], detail: [0.3, 0.8], drift: [-0.25, 0.25], evolve: [0.05, 0.35],
       horizon: [0.3, 0.9], sun: [-0.8, 0.8], sunHeight: [0.1, 0.6], glow: [0.2, 0.8], shadow: [0.4, 0.9],
       brush: [0.3, 0.8], mixing: [0.2, 0.7], impasto: [0.3, 0.8], canvas: [0.1, 0.45], audio: [0, 0]
+    }
+  },
+  {
+    // One billowing mass of cloud, ray-marched at half resolution and lit in
+    // two temperatures, repainted at full resolution in oil strokes.
+    id: 'oil-cloud',
+    name: 'Oil Cloud',
+    category: 'Generator',
+    source: oilCloud,
+    curated: {
+      grow: [0.35, 0.85], density: [0.45, 0.9], density2: [0.25, 0.8], rotation: [-0.25, 0.25], zoom: [0.3, 0.7],
+      light: [-0.8, 0.8], evolve: [0.05, 0.35], swirl: [0.2, 0.8], brush: [0.15, 0.55], mixing: [0.3, 0.8],
+      impasto: [0.3, 0.7], audio: [0, 0]
     }
   },
   {

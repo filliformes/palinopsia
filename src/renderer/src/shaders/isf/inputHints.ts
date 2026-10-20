@@ -878,6 +878,24 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     audioLight: 'Each band lights more of its cells as its own frequency band gets loud (bass at the bottom, treble at the top) : a spectrum-analyzer reading. 0 = off.',
     reseed: 'RESEED ▸ : re-deal every band (widths, picks, accents) at once. Press it, send OSC, or bind a modulator.'
   },
+  'oil-cloud': {
+    grow: 'How far the puffs swell out from the core : a tight ball at 0, a sprawling, bursting cloud at 1.',
+    density: 'From wisps of smoke (low) to solid paint with a hard skin (high).',
+    density2: 'The second, finer layer of puffs : smooth great billows at 0, broken into many small ones at 1.',
+    rotation: 'How fast the cloud turns (negative : the other way).',
+    zoom: 'How close you stand : the whole cloud far off at 0, its billows filling the frame at 1.',
+    light: 'Where the light comes from, round the cloud (0 : from the front, above). The warm side follows it.',
+    evolve: 'How fast the billows churn and change shape.',
+    swirl: 'How folded the billows are, like stirred paint : plain puffs at 0, swirls and curls at 1.',
+    brush: 'The size of the brush strokes, laid along the forms (0 : the cloud as traced, no strokes).',
+    mixing: 'How far the colors are mixed : a few flat tones from the palette knife at 0, smooth blends, wet in wet, at 1.',
+    impasto: 'How thick the paint stands : its ridges and bristle marks catch the light.',
+    audio: 'The cloud swells with the bass of the live sound.',
+    lit: 'The color of the faces toward the light (their crests go white).',
+    warm: 'The color where the light turns away : the band between lit and shade.',
+    cool: 'The color of the shade, the folds turned from the light.',
+    ground: 'What lies around the cloud. Its transparency lets the layers below through.'
+  },
   'cloud-study': {
     coverage: 'How much of the sky the cloud covers : a few clouds, toward an overcast.',
     scale: 'The size of the billows : low for one great mass, high for a sky of small puffs (a mackerel sky).',

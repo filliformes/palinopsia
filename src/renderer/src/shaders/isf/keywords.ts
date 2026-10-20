@@ -100,6 +100,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   ash: ['particles', 'ash', 'snow', 'embers', 'texture', 'audio'],
   'column-scan': ['scan', 'lines', 'displace', 'waveform', 'oscillator', 'audio', 'oscilloscope'],
   congeal: ['feedback', 'flow', 'organic', 'warp', 'field', 'audio', 'trails'],
+  'oil-cloud': ['cloud', 'volumetric', 'volume', 'raymarch', 'ray tracing', 'oil', 'paint', 'painting', 'painterly', 'impasto', 'billow', 'smoke', 'explosion', 'nebula', 'blob', '3d'],
   'cloud-study': ['cloud', 'study', 'clouds', 'sky', 'oil', 'paint', 'painting', 'painterly', 'impasto', 'volumetric', 'raymarch', 'ray tracing', 'brush', 'canvas', 'sunset'],
   contour: ['contour', 'topographic', 'lines', 'noise', 'matte', 'map', 'audio'],
   differential: ['polyrhythm', 'oscillator', 'waves', 'harmonograph', 'geometry', 'contour'],

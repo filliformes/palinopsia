@@ -658,6 +658,16 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.46, 0.56, 1], highTint: [0.58, 0.52, 0.42, 1] }
   },
   {
+    // The painter's two temperatures over any picture : warm lights, cool
+    // shades, the colors deepened, a little grain of the canvas.
+    name: 'Warm and Cool',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { contrast: 1.12, saturation: 1.18, lift: 0.0 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.3, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.06, saturation: 1.1, gamma: 1, autoLevel: 0.1, splitTone: 0.5, shadowTint: [0.3, 0.42, 0.7, 1], highTint: [0.75, 0.55, 0.3, 1] }
+  },
+  {
     name: 'Codec Rot',
     group: 'Node recipes',
     fx: [
