@@ -155,6 +155,10 @@ export function WorldVisualizer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const paramsRef = useRef<Params>({ coupling, context, audio })
   paramsRef.current = { coupling, context, audio }
+  // Your layers' generators only matter while they are the material : a layer
+  // change must not rebuild the preview over a built-in pair.
+  const mineA = sourceIdx < 0 ? mine?.a ?? null : null
+  const mineB = sourceIdx < 0 ? mine?.b ?? null : null
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -220,7 +224,7 @@ export function WorldVisualizer({
 
     // ── Two real ISF generators through the redirect proxy ────────────
     const { gl: rgl, state } = makeRedirectableGL(gl)
-    const pair = sourceIdx < 0 && mine ? { name: 'yours', a: mine.a, b: mine.b } : WORLD_SOURCE_PAIRS[Math.max(0, sourceIdx) % WORLD_SOURCE_PAIRS.length]
+    const pair = mineA && mineB ? { name: 'yours', a: mineA, b: mineB } : WORLD_SOURCE_PAIRS[Math.max(0, sourceIdx) % WORLD_SOURCE_PAIRS.length]
     const loadGen = (id: string): ISFRenderer | null => {
       const src = SHADER_BY_ID[id]?.source
       if (!src) return null
@@ -324,7 +328,7 @@ export function WorldVisualizer({
         gl.deleteFramebuffer(t.fbo)
       }
     }
-  }, [sourceIdx, mine?.a, mine?.b])
+  }, [sourceIdx, mineA, mineB])
 
   return (
     <canvas

@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
-import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES, WORLD_AUTOMOD_SLOT } from '@shared/types'
+import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
@@ -136,10 +136,10 @@ function ModCard({ index }: { index: number }): JSX.Element {
             →{drives}
           </span>
         )}
-        {index === WORLD_AUTOMOD_SLOT && (
+        {m.fromWorld && (
           <span
             className="shrink-0 font-mono text-[9px] text-accent2"
-            title="Reserved for the active World's audio routing : set it in the World editor. Skipped by Randomize."
+            title="Installed by the World's audio routing : set it in the World editor (W). Randomize leaves it alone. Change it or its bindings here and it becomes yours."
           >
             ⊛
           </span>

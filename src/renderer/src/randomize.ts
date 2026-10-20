@@ -27,6 +27,7 @@ import type {
 import { AUTO_MOD_BUDGET, WORLD_AUTOMOD_SLOT } from '@shared/types'
 import { curatedRange, FX_SHADERS, GENERATORS, NATIVE_NODES } from './shaders/isf'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
+import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
 
@@ -477,7 +478,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
   const enabledMods: number[] = []
   c.modulators.forEach((m, mi) => {
     if (!m.enabled) return
-    if (mi === WORLD_AUTOMOD_SLOT) return // reserved for the World's audio routing
+    if (m.fromWorld) return // the World's audio routing : its own, whatever its slot
     enabledMods.push(mi)
     const n = drawCount([0.1, 0.5, 0.4]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
@@ -524,6 +525,14 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
 // the whole frame on every swing : a strobe. Never bound by a theme.
 const MOTION_SKIP = /seed|^flip$/i
 
+/** The slot a fresh composition keeps for the World's audio route : the
+ *  World's modulator when one is there, else M8, where its route lands first
+ *  (a composition of yours reserves nothing : randomizeStructural). */
+function worldKeep(c: CompositionState): number {
+  const wm = worldModIndex(c)
+  return wm >= 0 ? wm : WORLD_AUTOMOD_SLOT
+}
+
 export function themedMotion(c: CompositionState, recipe: MotionRecipe): CompositionState {
   const n = recipe.mods[0] + Math.floor(rnd() * (recipe.mods[1] - recipe.mods[0] + 1))
   if (n <= 0) return c
@@ -537,7 +546,8 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
     )
   })
   if (!targets.length) return c
-  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
+  const keep = worldKeep(c)
+  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== keep)
   for (let i = slots.length - 1; i > 0; i--) {
     const j = Math.floor(rnd() * (i + 1))
     ;[slots[i], slots[j]] = [slots[j], slots[i]]
@@ -546,7 +556,7 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
   const logRate = (): number =>
     Math.pow(10, range(Math.log10(recipe.rate[0]), Math.log10(recipe.rate[1])))
   const modulators = c.modulators.map((m, i): ModulatorConfig => {
-    if (i === WORLD_AUTOMOD_SLOT) return m
+    if (i === keep) return m
     if (!chosen.includes(i)) return { ...m, enabled: false }
     return {
       ...freshModulator(m, true),
@@ -726,7 +736,8 @@ export function seedRandomStart(base: CompositionState): CompositionState {
   }
   // Guaranteed motion : two fresh modulators + a small matrix over the seeded
   // layer, so the boot scene breathes even when the generator itself is slow.
-  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
+  const keep = worldKeep(next)
+  const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== keep)
   const chosen = new Set([pick(slots), pick(slots)])
   next = {
     ...next,
@@ -920,17 +931,20 @@ function randomizeStructural(
     // them (type included), and roll a fresh capped matrix over whatever
     // sources/FX exist at this point.
     const enabledCount = 2 + drawCount([0.25, 0.35, 0.3, 0.1]) // 2..5
-    // Slot 8 (WORLD_AUTOMOD_SLOT) is reserved for the active World's audio
-    // routing : leave it out of the randomizer so a World's bond survives.
-    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== WORLD_AUTOMOD_SLOT)
+    // The World's audio modulator (its flag, whatever its slot) and the
+    // bindings it installed are left out of the randomizer, so a World's bond
+    // survives. Every other slot is yours to re-roll, M8 included.
+    const wm = worldModIndex(next)
+    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== wm)
     for (let i = slots.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
       ;[slots[i], slots[j]] = [slots[j], slots[i]]
     }
     const chosen = new Set(slots.slice(0, enabledCount))
-    const modulators = next.modulators.map((m, i) => freshModulator(m, chosen.has(i)))
+    const worldRows = next.modMatrix.filter((a) => isWorldRow(next, a))
+    const modulators = next.modulators.map((m, i) => (i === wm ? m : freshModulator(m, chosen.has(i))))
     next = { ...next, modulators }
-    next = { ...next, modMatrix: randomMatrix(next) }
+    next = { ...next, modMatrix: [...worldRows, ...randomMatrix(next)] }
   }
 
   return next

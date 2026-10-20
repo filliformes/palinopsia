@@ -12,7 +12,7 @@
 
 import { useSyncExternalStore } from 'react'
 import type { CompositionState, SceneEntry, SequenceState, World } from '@shared/types'
-import { useStore } from './store'
+import { saveUserWorlds, useStore } from './store'
 import { cancelMorph } from './morph'
 import { showToast } from './components/Toast'
 import { tempoEdited } from './tempoEvents'
@@ -115,6 +115,10 @@ function keptOpen(restored: Snapshot['audioLayer']): FullState['audioLayerArmed'
 
 function apply(s: Snapshot): void {
   cancelMorph() // the composition is being swapped : don't ease toward a stale target
+  // Your Worlds as undo / redo leaves them are what the next launch opens with,
+  // as after any edit (else a World undone came back at the next launch, and
+  // one brought back by undo was gone again).
+  if (s.worlds !== useStore.getState().worlds) saveUserWorlds(s.worlds)
   applying = true
   const armed = keptOpen(s.audioLayer)
   useStore.setState({

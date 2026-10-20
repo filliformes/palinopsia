@@ -5,7 +5,9 @@
 // Apply will change, and apply it (over the MORPH time). "Take from the
 // composition" reads a World back from what is on screen. The World amount (in
 // the header, modulatable) blends the active World's mood from what it found.
-// Editing the ACTIVE world updates the composite in real time.
+// Editing the ACTIVE world updates the composite in real time. Three columns
+// when they fit, two (then one) and a scrolling page when they don't
+// (styles.css, .world-main). A render error stays inside the page.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AudioFeature, CouplingMode, ModTarget, World, WorldAudioTarget } from '@shared/types'
@@ -13,13 +15,16 @@ import { WORLD_AUDIO_TARGETS } from '@shared/types'
 import { AUDIO_FEATURES } from '../engine/audioIn'
 import { modTargetKey, useStore } from '../store'
 import { SHADER_BY_ID } from '../shaders/isf'
-import { builtinChanged, WORLD_CONTEXT_KEYS, WORLD_FILM_KEYS, worldEffects, worldLayers } from '../worlds'
+import {
+  builtinChanged, sanitizeWorld, WORLD_CONTEXT_KEYS, WORLD_COUPLING_MODES, WORLD_FILM_KEYS, worldEffects, worldLayers
+} from '../worlds'
 import { WorldVisualizer, WORLD_SOURCE_PAIRS, liveAudio, simAudio, type SimAudio } from './WorldVisualizer'
 import { AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
+import { ErrorBoundary } from './ErrorBoundary'
 
 const SIM_SHAPES: SimAudio['shape'][] = ['pulse', 'sine', 'ramp', 'noise']
 
-const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
+const COUPLING_MODES = WORLD_COUPLING_MODES
 const COUPLING_INFO: Record<string, string> = {
   off: 'off : the two voices are independent (no audio binding)',
   lean: 'lean : audio gently pushes the A/B balance toward B (continuous)',
@@ -45,85 +50,7 @@ function lsBool(key: string, d: boolean): boolean {
 }
 
 export function WorldPage(): JSX.Element {
-  const worlds = useStore((s) => s.worlds)
-  const activeId = useStore((s) => s.world)
-  const composition = useStore((s) => s.composition)
-  const setWorld = useStore((s) => s.setWorld)
-  const addWorld = useStore((s) => s.addWorld)
-  const updateWorld = useStore((s) => s.updateWorld)
-  const deleteWorld = useStore((s) => s.deleteWorld)
-  const resetWorld = useStore((s) => s.resetWorld)
-  const takeWorld = useStore((s) => s.takeWorldFromComposition)
   const close = useStore((s) => s.setWorldPageOpen)
-
-  // Which world the editor is pointed at (defaults to the active one).
-  const [selId, setSelId] = useState(activeId)
-  const [filter, setFilter] = useState('')
-  const w = worlds.find((x) => x.id === selId) ?? worlds[0]
-  const isActive = w.id === activeId
-  const changed = w.builtin && builtinChanged(w)
-
-  const shown = useMemo(() => {
-    const f = filter.trim().toLowerCase()
-    return f ? worlds.filter((x) => (x.name + ' ' + x.blurb).toLowerCase().includes(f)) : worlds
-  }, [worlds, filter])
-
-  // ← → ↑ ↓ step through the (filtered) bank, Enter applies : not while typing.
-  const shownRef = useRef(shown)
-  shownRef.current = shown
-  const selRef = useRef(selId)
-  selRef.current = selId
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
-      const list = shownRef.current
-      if (!list.length) return
-      const i = Math.max(0, list.findIndex((x) => x.id === selRef.current))
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-        e.preventDefault(); e.stopPropagation()
-        setSelId(list[(i + 1) % list.length].id)
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-        e.preventDefault(); e.stopPropagation()
-        setSelId(list[(i - 1 + list.length) % list.length].id)
-      } else if (e.key === 'Enter') {
-        e.preventDefault(); e.stopPropagation()
-        setWorld(selRef.current)
-      }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [setWorld])
-
-  // Visualizer test material + simulated (or live) audio driver.
-  const [sourceIdx, setSourceIdx] = useState(0)
-  const [audio, setAudio] = useState<SimAudio>({ shape: 'pulse', freqHz: 2, rhythmic: true, gain: 0.9 })
-  const setAud = (p: Partial<SimAudio>): void => setAudio((a) => ({ ...a, ...p }))
-  // Your own layers' generators as material (the first two that are generators).
-  const mine = useMemo(() => {
-    const ids: string[] = []
-    for (const l of composition.layers)
-      for (const s of [l.sourceA, l.sourceB]) {
-        const d = s?.shaderId ? SHADER_BY_ID[s.shaderId] : undefined
-        if (s?.kind === 'generator' && d && !d.native && !ids.includes(d.id)) ids.push(d.id)
-      }
-    return ids.length >= 2 ? { a: ids[0], b: ids[1] } : ids.length === 1 ? { a: ids[0], b: ids[0] } : null
-  }, [composition.layers])
-  const [jsonOpen, setJsonOpen] = useState(() => lsBool('opsia.worldJsonOpen', false))
-
-  const setCoupling = (partial: Partial<typeof w.coupling>): void =>
-    updateWorld(w.id, { coupling: { ...w.coupling, ...partial } })
-  const setContext = (k: string, v: number): void =>
-    updateWorld(w.id, { context: { ...w.context, [k]: v } })
-  const setFilm = (k: string, v: number): void =>
-    updateWorld(w.id, { finalizer: { ...(w.finalizer ?? FILM_START), [k]: v } })
-  const setAutoMod = (partial: Partial<NonNullable<typeof w.autoMod>>): void => {
-    const base = w.autoMod ?? { feature: 'transient' as AudioFeature, target: 'haze' as WorldAudioTarget, depth: 0.4 }
-    updateWorld(w.id, { autoMod: { ...base, ...partial } })
-  }
-  const layersOn = worldLayers(w)
-  const effects = worldEffects(w, composition)
-
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
       {/* header */}
@@ -140,7 +67,122 @@ export function WorldPage(): JSX.Element {
           ✕ Close
         </button>
       </div>
+      {/* a render error shows here, with Close above it, instead of taking the app down */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ErrorBoundary>
+          <WorldEditor />
+        </ErrorBoundary>
+      </div>
+    </div>
+  )
+}
 
+function WorldEditor(): JSX.Element {
+  const worlds = useStore((s) => s.worlds)
+  const activeId = useStore((s) => s.world)
+  const composition = useStore((s) => s.composition)
+  const setWorld = useStore((s) => s.setWorld)
+  const addWorld = useStore((s) => s.addWorld)
+  const updateWorld = useStore((s) => s.updateWorld)
+  const deleteWorld = useStore((s) => s.deleteWorld)
+  const resetWorld = useStore((s) => s.resetWorld)
+  const saveAsMine = useStore((s) => s.saveWorldAsMine)
+  const takeWorld = useStore((s) => s.takeWorldFromComposition)
+
+  // Which world the editor is pointed at (defaults to the active one).
+  const [selId, setSelId] = useState(activeId)
+  const [filter, setFilter] = useState('')
+  const w = worlds.find((x) => x.id === selId) ?? worlds[0]
+  const isActive = w.id === activeId
+  const changed = w.builtin && builtinChanged(w)
+
+  const shown = useMemo(() => {
+    const f = filter.trim().toLowerCase()
+    return f ? worlds.filter((x) => (x.name + ' ' + x.blurb).toLowerCase().includes(f)) : worlds
+  }, [worlds, filter])
+
+  // ← → ↑ ↓ step through the (filtered) bank, Enter applies : not while typing in
+  // a field (the filter takes ↑ ↓ and Enter itself, ← → stay its caret's), and
+  // Enter on a focused button presses that button (a World in the bank applies).
+  // A held Enter applies once.
+  const shownRef = useRef(shown)
+  shownRef.current = shown
+  const selRef = useRef(selId)
+  selRef.current = selId
+  const step = (dir: 1 | -1): void => {
+    const list = shownRef.current
+    if (!list.length) return
+    const i = list.findIndex((x) => x.id === selRef.current)
+    // the selected one filtered out : ↓ lands on the first match, ↑ on the last
+    const j = i < 0 ? (dir > 0 ? 0 : list.length - 1) : (i + dir + list.length) % list.length
+    setSelId(list[j].id)
+  }
+  const applySelected = (): void => {
+    const list = shownRef.current
+    // the selected one filtered out : the first match
+    const id = list.some((x) => x.id === selRef.current) ? selRef.current : list[0]?.id
+    if (!id) return
+    setSelId(id)
+    setWorld(id)
+  }
+  const keysRef = useRef({ step, applySelected })
+  keysRef.current = { step, applySelected }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault(); e.stopPropagation()
+        keysRef.current.step(1)
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault(); e.stopPropagation()
+        keysRef.current.step(-1)
+      } else if (e.key === 'Enter') {
+        if (t?.closest('button, a, summary, [role="button"]') && !t.closest('[data-world-item]')) return
+        e.preventDefault(); e.stopPropagation()
+        if (!e.repeat) keysRef.current.applySelected()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // Visualizer test material + simulated (or live) audio driver.
+  const [sourceIdx, setSourceIdx] = useState(0)
+  const [audio, setAudio] = useState<SimAudio>({ shape: 'pulse', freqHz: 2, rhythmic: true, gain: 0.9 })
+  const setAud = (p: Partial<SimAudio>): void => setAudio((a) => ({ ...a, ...p }))
+  // Your own layers' generators as material (the first two that are generators).
+  const mine = useMemo(() => {
+    const ids: string[] = []
+    for (const l of composition.layers)
+      for (const s of [l.sourceA, l.sourceB]) {
+        const d = s?.shaderId ? SHADER_BY_ID[s.shaderId] : undefined
+        if (s?.kind === 'generator' && d && !d.native && !ids.includes(d.id)) ids.push(d.id)
+      }
+    return ids.length >= 2 ? { a: ids[0], b: ids[1] } : ids.length === 1 ? { a: ids[0], b: ids[0] } : null
+  }, [composition.layers])
+  // Your layers gone as material : back to the first built-in pair (the menu
+  // would else show a choice it no longer has).
+  useEffect(() => {
+    if (!mine && sourceIdx < 0) setSourceIdx(0)
+  }, [mine, sourceIdx])
+  const [jsonOpen, setJsonOpen] = useState(() => lsBool('opsia.worldJsonOpen', false))
+
+  const setCoupling = (partial: Partial<typeof w.coupling>): void =>
+    updateWorld(w.id, { coupling: { ...w.coupling, ...partial } })
+  const setContext = (k: string, v: number): void =>
+    updateWorld(w.id, { context: { ...w.context, [k]: v } })
+  const setFilm = (k: string, v: number): void =>
+    updateWorld(w.id, { finalizer: { ...(w.finalizer ?? FILM_START), [k]: v } })
+  const setAutoMod = (partial: Partial<NonNullable<typeof w.autoMod>>): void => {
+    const base = w.autoMod ?? { feature: 'transient' as AudioFeature, target: 'haze' as WorldAudioTarget, depth: 0.4 }
+    updateWorld(w.id, { autoMod: { ...base, ...partial } })
+  }
+  const layersOn = worldLayers(w)
+  const effects = worldEffects(w, composition)
+
+  return (
       <div className="flex min-h-0 flex-1">
         {/* ── World bank ────────────────────────────────────────────── */}
         <aside className="flex w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-panel2/40 p-2">
@@ -159,7 +201,12 @@ export function WorldPage(): JSX.Element {
             placeholder="filter"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            title="Show only the Worlds whose name or description has this. Then ← → or ↑ ↓ step through them, Enter applies."
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); step(1) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); step(-1) }
+              else if (e.key === 'Enter') { e.preventDefault(); if (!e.repeat) applySelected() }
+            }}
+            title="Show only the Worlds whose name or description has this. ↑ ↓ step through them (here too), Enter applies; ← → step too, outside the filter."
           />
           {shown.map((x) => (
             <div
@@ -168,7 +215,7 @@ export function WorldPage(): JSX.Element {
                 x.id === selId ? 'bg-accent/15 ring-1 ring-accent/50' : 'hover:bg-panel3/40'
               }`}
             >
-              <button className="min-w-0 flex-1 text-left" onClick={() => setSelId(x.id)} onDoubleClick={() => setWorld(x.id)} title="Click : edit · double-click : apply">
+              <button data-world-item className="min-w-0 flex-1 text-left" onClick={() => setSelId(x.id)} onDoubleClick={() => setWorld(x.id)} title="Click : edit · double-click or Enter : apply">
                 <span className={`block truncate text-[12px] ${x.id === activeId ? 'text-accent' : 'text-fg'}`}>
                   {x.id === activeId ? '● ' : ''}
                   {x.name}
@@ -195,7 +242,7 @@ export function WorldPage(): JSX.Element {
         </aside>
 
         {/* ── Editor ────────────────────────────────────────────────── */}
-        <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4">
+        <main className="world-main flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
           {/* name + apply + take + built-in state */}
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -229,13 +276,8 @@ export function WorldPage(): JSX.Element {
                 <span className="font-mono text-[10px] text-[rgb(217_164_65)]" title="This built-in differs from how it ships (this session only)">● changed</span>
                 <button
                   className="btn text-[11px]"
-                  onClick={() => {
-                    const id = addWorld(w.id)
-                    updateWorld(id, { name: w.name.replace(/ copy$/, '') + ' (mine)' })
-                    resetWorld(w.id)
-                    setSelId(id)
-                  }}
-                  title="Keep these settings as your own World, and put the built-in back as it ships"
+                  onClick={() => setSelId(saveAsMine(w.id))}
+                  title="Keep these settings as your own World (it takes over as the active one, the picture unchanged), and put the built-in back as it ships"
                 >
                   save as mine
                 </button>
@@ -262,8 +304,8 @@ export function WorldPage(): JSX.Element {
             ))}
           </div>
 
-          <div className="grid min-h-0 max-w-6xl flex-1 grid-cols-[minmax(260px,320px)_minmax(260px,320px)_minmax(0,1fr)] gap-4">
-           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
+          <div className="world-grid grid min-h-0 max-w-6xl flex-1 grid-cols-[minmax(260px,320px)_minmax(260px,320px)_minmax(280px,1fr)] gap-4">
+           <div className="world-col no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
             {/* Coupling */}
             <Section title="A/B Coupling : how the two voices bond">
               <SelRow label="mode" value={w.coupling.mode} options={COUPLING_MODES}
@@ -321,7 +363,7 @@ export function WorldPage(): JSX.Element {
             </Section>
 
            </div>
-           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
+           <div className="world-col no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
             {/* Context mood */}
             <Section title="Context mood : depth finalizer">
               {WORLD_CONTEXT_KEYS.map(({ k, label, hint }) => (
@@ -357,14 +399,16 @@ export function WorldPage(): JSX.Element {
               />
               <p className="mt-1 font-mono text-[9px] leading-tight text-muted">
                 Installs an audio modulator in the first free slot from M8 down (or the one a World installed
-                before), never one of yours. Needs the audio input on to move.
+                before), never one of yours. Change it or its binding and it becomes yours. Needs the audio
+                input on to move.
               </p>
             </Section>
            </div>
 
            {/* right column : the visualizer + its audio driver, then the JSON
-               (folded by default; open, it takes the remaining height) */}
-           <div className="no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
+               (folded by default; open, it takes the remaining height). Narrow,
+               it goes under the other two, across both. */}
+           <div className="world-col world-col-wide no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
               <Section title="World Visualizer : real generators · simulated or live audio · A/B">
                 <div className="mx-auto w-full max-w-[380px]">
                   <WorldVisualizer
@@ -494,7 +538,6 @@ export function WorldPage(): JSX.Element {
           </div>
         </main>
       </div>
-    </div>
   )
 }
 
@@ -552,29 +595,55 @@ function JsonEditor({
 }): JSX.Element {
   const [text, setText] = useState(() => worldToJson(world))
   const [err, setErr] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null) // applied, with values fixed
   const dirty = useRef(false)
   // Follow the form while the user isn't editing the text (and on world switch).
   useEffect(() => {
     if (!dirty.current) setText(worldToJson(world))
   }, [world])
+  // Another World : its own text, and nothing said about the last one.
+  useEffect(() => {
+    dirty.current = false
+    setText(worldToJson(world))
+    setErr(null)
+    setNote(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world.id])
 
   const apply = (): void => {
     try {
       const o = JSON.parse(text)
-      if (typeof o !== 'object' || !o) throw new Error('not an object')
-      const patch: Partial<World> = {}
-      if (typeof o.name === 'string') patch.name = o.name
-      if (typeof o.blurb === 'string') patch.blurb = o.blurb
-      if (o.coupling && typeof o.coupling === 'object') patch.coupling = o.coupling
-      if (Array.isArray(o.layers)) patch.layers = [0, 1, 2, 3].map((i) => o.layers[i] !== false)
-      if (o.context && typeof o.context === 'object') patch.context = o.context
-      patch.finalizer = o.finalizer && typeof o.finalizer === 'object' ? o.finalizer : undefined
-      patch.autoMod = o.autoMod ?? null
-      onApply(patch)
+      if (typeof o !== 'object' || !o || Array.isArray(o)) throw new Error('not an object')
+      // What the text leaves out stays as it is (the coupling field by field),
+      // except the film and the audio routing : absent = none. Then the World
+      // goes through the same check as one read from a file, so nothing typed
+      // here can break the page or the picture : what had to change is named.
+      const isObj = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v)
+      const fixed: string[] = []
+      const clean = sanitizeWorld(
+        {
+          ...world,
+          name: typeof o.name === 'string' ? o.name : world.name,
+          blurb: typeof o.blurb === 'string' ? o.blurb : world.blurb,
+          coupling: isObj(o.coupling) ? { ...world.coupling, ...o.coupling } : o.coupling === undefined ? world.coupling : o.coupling,
+          layers: o.layers === undefined ? world.layers : o.layers,
+          context: o.context === undefined ? world.context : o.context,
+          finalizer: o.finalizer ?? undefined,
+          autoMod: o.autoMod ?? null
+        },
+        fixed
+      )
+      if (!clean) throw new Error('not a World')
+      const { name, blurb, coupling, layers, context, finalizer, autoMod } = clean
+      onApply({ name, blurb, coupling, layers, context, finalizer, autoMod })
       setErr(null)
+      setNote(fixed.length ? `applied; fixed : ${fixed.join(', ')}` : null)
       dirty.current = false
+      // the text shows the World as it now is (fixed values included)
+      setText(worldToJson({ ...world, ...clean }))
     } catch (e) {
       setErr((e as Error).message)
+      setNote(null)
     }
   }
 
@@ -599,12 +668,14 @@ function JsonEditor({
             dirty.current = false
             setText(worldToJson(world))
             setErr(null)
+            setNote(null)
           }}
           title="Discard edits and reload from the World"
         >
           Revert
         </button>
         {err && <span className="font-mono text-[10px] text-danger">⚠ {err}</span>}
+        {!err && note && <span className="font-mono text-[10px] text-[rgb(217_164_65)]" title="Out-of-range or unknown values were brought back to what the World takes">{note}</span>}
       </div>
     </div>
   )
@@ -697,6 +768,7 @@ function SlideRow({
   onChange: (v: number) => void
   title?: string
 }): JSX.Element {
+  const v = Number.isFinite(value) ? value : min // never a readout that throws
   return (
     <div className={`flex items-center gap-2 ${dim ? 'opacity-50' : ''}`} title={title}>
       <span className="w-16 shrink-0 font-mono text-[10px] text-muted">{label}</span>
@@ -705,11 +777,11 @@ function SlideRow({
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={v}
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1 accent-accent"
       />
-      <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">{step >= 1 ? Math.round(value) : value.toFixed(2)}</span>
+      <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">{step >= 1 ? Math.round(v) : v.toFixed(2)}</span>
     </div>
   )
 }

@@ -43,13 +43,23 @@ export function consumeSceneChange(): number | null {
 
 /** Move from `from` (what the store held) to `target` over `ms` : an all-live
  *  ease when the structure matches, else a relay (see the header). Starts from
- *  what is actually showing when another morph is under way. */
-export function beginSceneMorph(from: CompositionState, target: CompositionState, ms: number, now: number): void {
+ *  what is actually showing when another morph is under way. `couplingFromTarget`
+ *  (a World applied) : every layer takes the target's coupling at once, so a
+ *  new coupling mode is no reason to hand the layers over (only the mood eases). */
+export function beginSceneMorph(
+  from: CompositionState,
+  target: CompositionState,
+  ms: number,
+  now: number,
+  opts?: { couplingFromTarget?: boolean }
+): void {
   if (ms <= 20) {
     cancelMorph() // effectively instant : the target, at once
     return
   }
-  const src = (state || relay) && lastRendered ? lastRendered : from
+  let src = (state || relay) && lastRendered ? lastRendered : from
+  if (opts?.couplingFromTarget)
+    src = { ...src, layers: src.layers.map((l, i) => (target.layers[i] ? { ...l, coupling: target.layers[i].coupling } : l)) }
   if (relay || !sameStructure(src, target)) {
     beginRelayMorph(from, target, ms, now)
     return
@@ -174,9 +184,20 @@ function lerpFx(a: FxInstance[], b: FxInstance[], k: number): FxInstance[] {
   })
 }
 
+// The World's change on each key (worldShift) eases with the values it rides,
+// so the World amount's picture (the value minus what is left of that change)
+// moves from one side's to the other's instead of jumping at the first frame.
+function lerpShift(a: Record<string, number> | undefined, b: Record<string, number> | undefined, k: number): Record<string, number> | undefined {
+  if (!a || !b || k >= 1) return b
+  const out: Record<string, number> = {}
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) out[key] = lerpN(a[key] ?? 0, b[key] ?? 0, k)
+  return out
+}
+
 function lerpComposition(a: CompositionState, b: CompositionState, k: number): CompositionState {
   return {
     ...b,
+    worldShift: lerpShift(a.worldShift, b.worldShift, k),
     bpm: lerpN(a.bpm, b.bpm, k),
     layers: b.layers.map((bl: LayerState, i: number) => {
       const al = a.layers[i]
@@ -591,6 +612,7 @@ function relayedComposition(now: number, target: CompositionState): CompositionS
   envelopes = env
   return {
     ...target,
+    worldShift: lerpShift(a.worldShift, target.worldShift, k),
     bpm: lerpN(a.bpm, target.bpm, k),
     layers,
     background,

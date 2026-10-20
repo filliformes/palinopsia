@@ -1344,6 +1344,22 @@ input[type='range'].live-overlay {
   }
 }
 
+/* ── World page : three columns when they fit ─────────────────────────────────
+   The editor is a size container, measured in its own CSS pixels (so the UI
+   zoom counts). Too narrow for the three (260 + 260 + 280 and the gaps), the
+   visualizer and the live code go under the other two, across both, and the
+   page scrolls; narrower still, one column. At usual sizes nothing scrolls the
+   page (no scrollbar), each column scrolls on its own. */
+.world-main { container: worldmain / inline-size; }
+@container worldmain (max-width: 840px) {
+  .world-main .world-grid { flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .world-main .world-col { overflow: visible; }
+  .world-main .world-col-wide { grid-column: 1 / -1; }
+}
+@container worldmain (max-width: 560px) {
+  .world-main .world-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── Top bar : one line at any usual window size ─────────────────────────────
    The header is a size container; its row gives up room in steps as it narrows,
    measured in its own CSS pixels (so the UI zoom counts) : first the SESSION /

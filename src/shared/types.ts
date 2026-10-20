@@ -216,7 +216,8 @@ export interface World {
 }
 
 // Where a World's default audio modulator lands. Kept to a few safe Context
-// inputs (all valid mod targets); the World reserves modulator slot 8 for it.
+// inputs (all valid mod targets); its modulator goes to the first free slot from
+// M8 down (WORLD_AUTOMOD_SLOT).
 export type WorldAudioTarget = 'none' | 'haze' | 'bloom' | 'trails' | 'depth' | 'lightGlow' | 'voidEdge'
 export const WORLD_AUDIO_TARGETS: WorldAudioTarget[] = ['none', 'haze', 'bloom', 'trails', 'depth', 'lightGlow', 'voidEdge']
 // Modulator slot the World prefers for its audio-routing default (0-based) : it
@@ -594,8 +595,12 @@ export type ArpMode = 'up' | 'down' | 'upDown' | 'random' | 'drunk'
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
-  // Installed by a World's audio routing : the next World replaces it (yours never)
+  // Installed by a World's audio routing : the next World replaces it (yours never).
+  // Cleared the moment you change it or its bindings : from then on it is yours.
   fromWorld?: boolean
+  // The ids of the bindings that World installed with it : the only rows a World
+  // ever removes (one you add to it is yours, and makes the modulator yours).
+  worldRows?: string[]
   // Clock : shared vocabulary with dataFLOU: free Hz or BPM-synced division.
   sync: 'free' | 'bpm'
   rateHz: number
@@ -841,6 +846,10 @@ export interface CompositionState {
   // The mood a World found when it was applied (its Context / film keys, as they
   // were) : the World amount blends from these to the World's own.
   worldBase?: Record<string, number>
+  // What the World changed each of those keys by (its value minus worldBase,
+  // the non-zero ones) : the change the World amount fades. A morph eases it
+  // with the rest, so a fade never jumps when the World or the scene changes.
+  worldShift?: Record<string, number>
 }
 
 // ── Scenes (brief §7, §10.7) : recallable full-instrument states ──────

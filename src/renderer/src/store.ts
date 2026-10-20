@@ -59,47 +59,66 @@ import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
 import { resetCouplingState } from './engine/coupling'
-import { applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, sansBlur, worldFromComposition } from './worlds'
+import {
+  adoptLegacyWorldMod, applyWorldToComposition, BUILTIN_WORLDS, cloneWorld, deriveSceneTags, dropWorldKeys, isWorldRow,
+  sanitizeWorld, sanitizeWorldBase, sansBlur, worldFromComposition, worldModIndex, worldRouteSkip
+} from './worlds'
 import { setWorldAmountBase } from './engine/worldAmount'
+import { showToast } from './components/Toast'
 
 // User worlds (builtin === false) persist to localStorage; built-ins ship in code.
-function saveUserWorlds(worlds: World[]): void {
+export function saveUserWorlds(worlds: World[]): void {
   try {
     localStorage.setItem('opsia.userWorlds', JSON.stringify(worlds.filter((w) => !w.builtin)))
   } catch {
     /* quota / serialization : non-fatal */
   }
 }
-// A stored user world is well-formed only if it carries the fields
-// applyWorldToComposition dereferences : id/name + coupling & context OBJECTS
-// (a missing `coupling` spreads to `{}` and silently breaks A/B coupling) and an
-// autoMod that is either an object or null. Malformed entries are dropped.
-function isValidWorld(w: unknown): w is World {
-  if (!w || typeof w !== 'object') return false
-  const o = w as Record<string, unknown>
-  return (
-    typeof o.id === 'string' &&
-    typeof o.name === 'string' &&
-    !!o.coupling && typeof o.coupling === 'object' &&
-    !!o.context && typeof o.context === 'object' &&
-    typeof o.autoMod === 'object' // object or null (typeof null === 'object'); not undefined
-  )
-}
+// A stored user world goes through sanitizeWorld (numbers finite and in range,
+// the coupling and the audio routing well formed) : a World edited into nonsense
+// can never break the page or the picture, at this launch or the next. One that
+// is not a World at all (no id), or reuses a built-in's id, is dropped.
 function loadWorlds(): World[] {
   try {
     const u = JSON.parse(localStorage.getItem('opsia.userWorlds') || '[]')
-    return [...BUILTIN_WORLDS, ...(Array.isArray(u) ? u.filter(isValidWorld) : [])]
+    const out = [...BUILTIN_WORLDS]
+    for (const raw of Array.isArray(u) ? u : []) {
+      const w = sanitizeWorld(raw)
+      if (w && !out.some((x) => x.id === w.id)) out.push({ ...w, builtin: false })
+    }
+    return out
   } catch {
     return [...BUILTIN_WORLDS]
   }
 }
 // Add a World to the bank if its id isn't already present (session/scene
-// restore of a world this install doesn't have). Persists user worlds.
+// restore of a world this install doesn't have), sanitized first. Persists
+// user worlds.
 function ensureWorld(worlds: World[], w: World | null | undefined): World[] {
-  if (!w || worlds.some((x) => x.id === w.id)) return worlds
-  const merged = [...worlds, w]
+  const clean = sanitizeWorld(w)
+  if (!clean || worlds.some((x) => x.id === clean.id)) return worlds
+  const merged = [...worlds, { ...clean, builtin: false }]
   saveUserWorlds(merged)
   return merged
+}
+// The World a session or scene names, when the bank has it (else the one active).
+function worldIdIn(worlds: World[], w: World | null | undefined, cur: string): string {
+  return w && typeof w.id === 'string' && worlds.some((x) => x.id === w.id) ? w.id : cur
+}
+// The user changes the World's modulator, or one of its bindings : from then on
+// it is theirs, and no World takes it back or deletes it.
+function releaseWorldMod(mods: ModulatorConfig[], i: number): ModulatorConfig[] {
+  if (!mods[i]?.fromWorld) return mods
+  return mods.map((m, j) => {
+    if (j !== i) return m
+    const { worldRows: _rows, ...rest } = m
+    return { ...rest, fromWorld: false }
+  })
+}
+// ...the modulator a binding rides, when that one is the World's.
+function releaseWorldModOfRow(c: CompositionState, id: string): ModulatorConfig[] {
+  const a = c.modMatrix.find((x) => x.id === id)
+  return a ? releaseWorldMod(c.modulators, a.mod) : c.modulators
 }
 function uniqueWorldName(worlds: World[], base: string): string {
   const names = new Set(worlds.map((w) => w.name))
@@ -464,8 +483,9 @@ const FINALIZER_FILM_KEYS = [
 
 export function clearFinalizerFilm(c: CompositionState): CompositionState {
   const film = new Set<string>(FINALIZER_FILM_KEYS)
+  // The World's film goes with it : nothing of it is left for the World amount to fade.
   return {
-    ...c,
+    ...dropWorldKeys(c, film),
     master: (c.master ?? []).map((f) =>
       f.shaderId === 'fx-finalizer'
         ? { ...f, inputs: { ...Object.fromEntries(Object.entries(f.inputs).filter(([k]) => !film.has(k))), filmGauge: 1 } }
@@ -935,7 +955,7 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       return [...rest, vibe, context, finalizer]
     })(),
     // Always 8 slots : a short array pads with disabled defaults (worlds.ts writes
-    // modulators[WORLD_AUTOMOD_SLOT] directly, which would else punch holes), a long
+    // the World's modulator slot directly, which would else punch holes), a long
     // one truncates, and each stored slot field-MERGES onto the default so a new
     // block (e.g. `audio`) can't read undefined.
     modulators: (() => {
@@ -943,6 +963,10 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       return makeDefaultModulators().map((d, i) => ({ ...d, ...(m[i] ?? {}) }))
     })(),
     modMatrix: c.modMatrix ?? [],
+    // The mood a World found and what it changed : numbers only (a session file
+    // can carry anything).
+    worldBase: sanitizeWorldBase(c.worldBase),
+    worldShift: sanitizeWorldBase(c.worldShift, true),
     // 16 knobs now : older 32-knob sessions truncate; short arrays pad. Field-
     // MERGE each stored knob onto the default so a knob predating a field (e.g.
     // `destinations`) can't leave it undefined.
@@ -1665,6 +1689,10 @@ interface StoreState {
   setWorldAmount: (v: number) => void
   // A built-in edited this session back to how it ships.
   resetWorld: (id: string) => void
+  // An edited built-in kept as a user World of its own (a unique name), the
+  // built-in put back as it ships; the active one hands over to the copy with
+  // nothing re-applied. Returns the copy's id.
+  saveWorldAsMine: (id: string) => string
   // The composition's coupling / Context mood / film / audio routing into a
   // World : a built-in gets a new user World; returns the World edited.
   takeWorldFromComposition: (id: string) => string
@@ -3413,7 +3441,8 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: {
         ...s.composition,
-        modulators: s.composition.modulators.map((m, idx) =>
+        // a World's modulator you change is yours from then on
+        modulators: releaseWorldMod(s.composition.modulators, i).map((m, idx) =>
           idx === i ? { ...m, ...partial } : m
         )
       }
@@ -3438,10 +3467,14 @@ export const useStore = create<StoreState>((set, get) => ({
       const existing = st.composition.modMatrix.find(
         (a) => a.mod === mod && modTargetKey(a.target) === key
       )
+      // A binding on the World's modulator, changed or added : the modulator is
+      // yours from then on (a World never takes it back).
+      const modulators = releaseWorldMod(st.composition.modulators, mod)
       if (existing) {
         return {
           composition: {
             ...st.composition,
+            modulators,
             modMatrix: st.composition.modMatrix.map((a) =>
               a.id === existing.id ? { ...a, depth } : a
             )
@@ -3460,7 +3493,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // New bindings default to Multiply (VCA scaling of the base).
       const entry: ModAssignment = { id: uid(), mod, target, depth, mode }
       return {
-        composition: { ...st.composition, modMatrix: [...matrix, entry] }
+        composition: { ...st.composition, modulators, modMatrix: [...matrix, entry] }
       }
     })
     return result
@@ -3472,8 +3505,10 @@ export const useStore = create<StoreState>((set, get) => ({
       const c = st.composition
       // Eligible SOURCES : the ENABLED modulators (what's actually running); fall
       // back to all 8 slots when none are enabled, so the action is never a no-op.
-      const on = c.modulators.map((m, i) => (m.enabled ? i : -1)).filter((i) => i >= 0)
-      const mods = on.length ? on : c.modulators.map((_, i) => i)
+      // The World's own modulator and its bindings are left alone (like Randomize).
+      const wm = worldModIndex(c)
+      const on = c.modulators.map((m, i) => (m.enabled && i !== wm ? i : -1)).filter((i) => i >= 0)
+      const mods = on.length ? on : c.modulators.map((_, i) => i).filter((i) => i !== wm)
       if (!mods.length) return {}
       const pickMod = (): number => mods[Math.floor(Math.random() * mods.length)]
       // Depth : a musical magnitude with an occasional inversion (both modes read
@@ -3484,7 +3519,7 @@ export const useStore = create<StoreState>((set, get) => ({
       let changed = false
       // (a) re-roll every existing assignment sitting on one of these targets.
       let matrix = c.modMatrix.map((a) => {
-        if (!candKeys.has(modTargetKey(a.target))) return a
+        if (!candKeys.has(modTargetKey(a.target)) || isWorldRow(c, a)) return a
         changed = true
         return { ...a, mod: pickMod(), depth: pickDepth() }
       })
@@ -3517,10 +3552,18 @@ export const useStore = create<StoreState>((set, get) => ({
     })
     return ok
   },
+  // A World's binding removed by hand : the World forgets it (its modulator stays
+  // the World's, to clear or re-route at the next apply). Muted, re-scaled or
+  // switched : the modulator is yours from then on.
   removeAssignment: (id) =>
     set((s) => ({
       composition: {
         ...s.composition,
+        modulators: s.composition.modulators.some((m) => m.fromWorld && Array.isArray(m.worldRows) && m.worldRows.includes(id))
+          ? s.composition.modulators.map((m) =>
+              m.fromWorld && Array.isArray(m.worldRows) && m.worldRows.includes(id) ? { ...m, worldRows: m.worldRows.filter((r) => r !== id) } : m
+            )
+          : s.composition.modulators,
         modMatrix: s.composition.modMatrix.filter((a) => a.id !== id)
       }
     })),
@@ -3528,6 +3571,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: {
         ...s.composition,
+        modulators: releaseWorldModOfRow(s.composition, id),
         modMatrix: s.composition.modMatrix.map((a) => (a.id === id ? { ...a, muted: !a.muted } : a))
       }
     })),
@@ -3535,6 +3579,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: {
         ...s.composition,
+        modulators: releaseWorldModOfRow(s.composition, id),
         modMatrix: s.composition.modMatrix.map((a) =>
           a.id === id ? { ...a, depth: Math.max(-10, Math.min(10, depth)) } : a
         )
@@ -3544,6 +3589,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       composition: {
         ...s.composition,
+        modulators: releaseWorldModOfRow(s.composition, id),
         modMatrix: s.composition.modMatrix.map((a) => (a.id === id ? { ...a, mode } : a))
       }
     })),
@@ -3727,16 +3773,23 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   worlds: startWorlds,
   world: startWorld.id,
-  setWorld: (id) =>
-    set((s) => {
-      const w = s.worlds.find((x) => x.id === id) ?? s.worlds[0]
-      localStorage.setItem('opsia.world', w.id)
-      // Applying a World biases the current composition (undoable), over the
-      // MORPH time like a scene recall.
-      const composition = applyWorldToComposition(s.composition, w)
-      beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
-      return { world: w.id, composition }
-    }),
+  setWorld: (id) => {
+    const s = get()
+    const w = s.worlds.find((x) => x.id === id) ?? s.worlds[0]
+    localStorage.setItem('opsia.world', w.id)
+    // Applying a World biases the current composition (undoable), over the
+    // MORPH time like a scene recall. The coupling lands at once (its mode is a
+    // switch : morphed, every layer would hand over through a crossfade), so
+    // only the mood and the film ease.
+    const prev = s.worlds.find((x) => x.id === s.world)
+    const composition = applyWorldToComposition(s.composition, w, prev)
+    beginSceneMorph(s.composition, composition, s.morphMs, performance.now(), { couplingFromTarget: true })
+    set({ world: w.id, composition })
+    // A routing that could not go in says so, wherever the World was picked
+    // (here, the top bar, OSC, MIDI) : a full matrix never fails silently.
+    const skip = worldRouteSkip(s.composition, w)
+    if (skip) showToast(`World ${w.name} : audio routing skipped, ${skip}`, 'warn', 5200)
+  },
   worldAmount: (() => {
     const v = lsNum('opsia.worldAmount')
     const a = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1
@@ -3753,24 +3806,46 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const o = BUILTIN_WORLDS.find((x) => x.id === id)
       if (!o) return {}
+      const edited = s.worlds.find((w) => w.id === id)
       const worlds = s.worlds.map((w) => (w.id === id ? structuredClone(o) : w))
       saveUserWorlds(worlds)
       const fresh = worlds.find((w) => w.id === id)!
-      return s.world === id ? { worlds, composition: applyWorldToComposition(s.composition, fresh) } : { worlds }
+      return s.world === id ? { worlds, composition: applyWorldToComposition(s.composition, fresh, edited) } : { worlds }
     }),
+  saveWorldAsMine: (id) => {
+    const s = get()
+    const w = s.worlds.find((x) => x.id === id)
+    const o = BUILTIN_WORLDS.find((x) => x.id === id)
+    if (!w || !o) return id
+    // A name of its own (OSC picks a World by name).
+    const nw = cloneWorld(w, uniqueWorldName(s.worlds, `${w.name.replace(/ copy$/, '')} (mine)`))
+    const worlds = [...s.worlds.map((x) => (x.id === id ? structuredClone(o) : x)), nw]
+    saveUserWorlds(worlds)
+    if (s.world !== id) {
+      set({ worlds })
+      return nw.id
+    }
+    // The active one : the copy takes its place as it is (nothing re-applied, so
+    // the picture stays where it is) and the built-in goes back as it ships.
+    localStorage.setItem('opsia.world', nw.id)
+    set({ worlds, world: nw.id })
+    return nw.id
+  },
   takeWorldFromComposition: (id) => {
     const s = get()
     const w = s.worlds.find((x) => x.id === id)
     if (!w) return id
     const got = worldFromComposition(s.composition)
+    // (through the same check as any World : a session can carry odd values)
     if (w.builtin) {
-      const nw = { ...cloneWorld(w, uniqueWorldName(s.worlds, `${w.name} (taken)`)), ...got }
+      const taken = { ...cloneWorld(w, uniqueWorldName(s.worlds, `${w.name} (taken)`)), ...got }
+      const nw = sanitizeWorld(taken) ?? taken
       const worlds = [...s.worlds, nw]
       saveUserWorlds(worlds)
       set({ worlds })
       return nw.id
     }
-    const worlds = s.worlds.map((x) => (x.id === id ? { ...x, ...got } : x))
+    const worlds = s.worlds.map((x) => (x.id === id ? sanitizeWorld({ ...x, ...got }) ?? x : x))
     saveUserWorlds(worlds)
     set({ worlds })
     return id
@@ -3786,12 +3861,17 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   updateWorld: (id, partial) =>
     set((s) => {
-      const worlds = s.worlds.map((w) => (w.id === id ? { ...w, ...partial } : w))
+      const before = s.worlds.find((w) => w.id === id)
+      if (!before) return {}
+      // Whatever the edit, the World stays one the page and the picture can use.
+      const edited = sanitizeWorld({ ...before, ...partial, id, builtin: before.builtin }) ?? before
+      const worlds = s.worlds.map((w) => (w.id === id ? edited : w))
       saveUserWorlds(worlds)
-      // If the edited world is the active one, re-apply it live.
-      const active = worlds.find((w) => w.id === s.world)
-      return active && s.world === id
-        ? { worlds, composition: applyWorldToComposition(s.composition, active) }
+      // If the edited world is the active one, re-apply it live : what it sets
+      // (a new name or description changes nothing on screen).
+      const sets = (['coupling', 'context', 'finalizer', 'autoMod', 'layers'] as const).some((k) => k in partial)
+      return s.world === id && sets
+        ? { worlds, composition: applyWorldToComposition(s.composition, edited, before) }
         : { worlds }
     }),
   deleteWorld: (id) =>
@@ -3805,7 +3885,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // composition matches the selector (else it'd keep the deleted bias).
       localStorage.setItem('opsia.world', 'synthetic')
       const syn = worlds.find((x) => x.id === 'synthetic') ?? worlds[0]
-      return { worlds, world: 'synthetic', composition: applyWorldToComposition(s.composition, syn) }
+      return { worlds, world: 'synthetic', composition: applyWorldToComposition(s.composition, syn, w) }
     }),
   renameWorld: (id, name) => get().updateWorld(id, { name }),
   worldPageOpen: false,
@@ -4766,8 +4846,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // Restore the scene's World for the selector label (composition already
       // carries its baked effect); add it to the bank if this install lacks it.
       const worlds = ensureWorld(s.worlds, scene.world)
-      const world = scene.world ? scene.world.id : s.world
-      if (scene.world) localStorage.setItem('opsia.world', world)
+      const world = worldIdIn(worlds, scene.world, s.world)
+      if (world !== s.world) localStorage.setItem('opsia.world', world)
       // Normalize defensively (idempotent) : a scene may predate a schema field.
       // Recall the scene's sound patch too (keep the local on-state + device).
       if (scene.sonify) {
@@ -4889,8 +4969,8 @@ export const useStore = create<StoreState>((set, get) => ({
       )
       beginSceneMorph(s.composition, composition, Math.max(0, crossfadeMs), performance.now())
       const worlds = ensureWorld(s.worlds, scene.world)
-      const world = scene.world ? scene.world.id : s.world
-      if (scene.world) localStorage.setItem('opsia.world', world)
+      const world = worldIdIn(worlds, scene.world, s.world)
+      if (world !== s.world) localStorage.setItem('opsia.world', world)
       // Recall the scene's sound patch too (keep the local on-state + device) —
       // a sequencer-driven set played every scene with the wrong (frozen) sound.
       if (scene.sonify) {
@@ -4969,21 +5049,25 @@ export const useStore = create<StoreState>((set, get) => ({
       let comp = buildThemeComposition(theme, collageClipsFor(s.composition))
       const world = s.worlds.find((w) => w.id === theme.world) ?? null
       const worlds = ensureWorld(s.worlds, world)
-      if (world) comp = applyWorldToComposition(comp, world)
       // The theme's Context and Finalizer overrides win over the World's (a Film
-      // Wall's damage survives the World resetting the film stage).
-      if (theme.context || theme.finalizer) {
-        comp = {
-          ...comp,
-          master: comp.master.map((f) =>
-            f.shaderId === 'fx-context' && theme.context
-              ? { ...f, inputs: { ...f.inputs, ...sansBlur(theme.context) } }
-              : f.shaderId === 'fx-finalizer' && theme.finalizer
-                ? { ...f, inputs: { ...f.inputs, ...theme.finalizer } }
-                : f
-          )
-        }
-      }
+      // Wall's damage survives the World resetting the film stage). They go on
+      // before the World too, so the mood the World finds (the World amount at
+      // 0) is the theme's own; a key the theme sets stays the theme's, out of the
+      // World amount's reach.
+      const ctxOver = theme.context ? sansBlur(theme.context) : {}
+      const finOver = theme.finalizer ?? {}
+      const withTheme = (c: CompositionState): CompositionState => ({
+        ...c,
+        master: c.master.map((f) =>
+          f.shaderId === 'fx-context'
+            ? { ...f, inputs: { ...f.inputs, ...ctxOver } }
+            : f.shaderId === 'fx-finalizer'
+              ? { ...f, inputs: { ...f.inputs, ...finOver } }
+              : f
+        )
+      })
+      comp = withTheme(comp)
+      if (world) comp = dropWorldKeys(withTheme(applyWorldToComposition(comp, world)), [...Object.keys(ctxOver), ...Object.keys(finOver)])
       // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
       // at 0, a clean cut once the new one has compiled.
       if (s.morphMs > 20) beginRelayMorph(s.composition, comp, s.morphMs, performance.now())
@@ -5068,7 +5152,9 @@ export const useStore = create<StoreState>((set, get) => ({
     // relay : each new layer fades in once compiled, the old ones out). At Morph
     // 0 : hold the last frame until the new one is ready, then dissolve.
     const before = get()
-    const incoming = normalizeComposition(s.composition)
+    // A session from before a World flagged its modulator : its slot 8 is
+    // recognized once, here (adoptLegacyWorldMod), never again after.
+    const incoming = adoptLegacyWorldMod(normalizeComposition(s.composition))
     if (before.morphMs > 20) beginRelayMorph(before.composition, incoming, before.morphMs, performance.now())
     else {
       cancelMorph()
@@ -5078,8 +5164,8 @@ export const useStore = create<StoreState>((set, get) => ({
     // Restore the session's World (self-contained → add to bank if missing).
     const cur = get()
     const worlds = ensureWorld(cur.worlds, s.world)
-    const world = s.world ? s.world.id : cur.world
-    if (s.world) localStorage.setItem('opsia.world', world)
+    const world = worldIdIn(worlds, s.world, cur.world)
+    if (world !== cur.world) localStorage.setItem('opsia.world', world)
     // Theme travels with the self-contained session (like world + sequencer).
     // Older files without a saved theme keep the current one.
     const savedTheme = migrateThemeName((s.ui as { theme?: ThemeName } | undefined)?.theme)
@@ -5094,7 +5180,7 @@ export const useStore = create<StoreState>((set, get) => ({
       world,
       // Scenes migrate too : recalling one must never push an un-normalized
       // composition (missing Background slab / finalizer tail) live.
-      scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: normalizeComposition(sc.composition) })),
+      scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: adoptLegacyWorldMod(normalizeComposition(sc.composition)) })),
       activeSceneId: null,
       variationBaseline: null,
       // The old selection can dangle onto an FX unit the loaded session lacks, and

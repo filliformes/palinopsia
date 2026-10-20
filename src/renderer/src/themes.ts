@@ -55,7 +55,8 @@ export interface Theme {
   /** Flow ↔ Interruption (bipolar, 0.5 = neutral) : liquid ↔ stutter. */
   flow: number
   superFlicker: number
-  /** Context finalizer overrides applied AFTER the World (theme wins). */
+  /** Context finalizer overrides, on before the World (the mood it finds) and
+   *  again after it (theme wins). */
   context?: Record<string, number | number[]>
   /** Finalizer overrides (grain character / grade leanings). */
   finalizer?: Record<string, number | number[]>
