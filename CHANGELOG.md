@@ -5,6 +5,102 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Fixed (the v1.3.0 audit)
+
+A full audit of everything new since v1.2.10 (seven reviews, ~110 findings, each one
+verified before fixing), then the fixes, checked in a test copy where a machine can.
+
+- **Privacy** : a session (Open, Recent, a drop, crash Restore, kiosk boot) no longer
+  reopens a saved live input of the Audio Layer : live slots load closed
+  (`audioLayerArmed`, runtime only), an **open** button arms them, installation boot arms
+  them. The audio tab's input has a request token (a pending open after Audio off, or a
+  device switch mid-open, no longer leaves a microphone or an AudioContext behind). Verified :
+  0 getUserMedia calls on load.
+- **Agent (MCP)** : sandboxed pages (`Origin: null`) refused, JSON content type required
+  (no preflight-free post); turning it off closes kept-alive connections and bumps a
+  generation (old connections get 503); `set_controls` on an effect merges (it reset the
+  others); writes are serialised and restore the selection with `setState` (no Inspector
+  expand); `set_layer` / `edit_effect` validate everything first; color alpha read alone;
+  `write_shader` reports a failed `use` after saving; the `osc` tool resets the trigger
+  edge (`resetOscEdge`); `destructiveHint` on edit_effect, write_shader, scenes; client
+  responses get 202.
+- **Source Editor** : `setDraft` updates the ref at once (opening another shader kept the
+  previous name, so Ctrl+S overwrote it); one id rule shared by main and page
+  (`shared/userShaderId.ts`, a hash for non-Latin names); main replaces twin files of the
+  same id and lists the newest; a session's differing copy is entered as
+  "<name> (session)" with its ids remapped (`remapShaderIds`); deleting a playing shader
+  keeps it registered as from-the-session; a shader saved after a delete reloads where it
+  plays; the preview loses its GL context on close; the live-picture input uses the
+  engine canvas (`engine/outputCanvas.ts`) at its size; shortcuts wait under the editor;
+  Alt+E by `code` too; event names escaped in the linter.
+- **Audio Layer / clip audio** : films dropped on a slot play their soundtrack
+  (`audio:playable` takes films); an unplugged input shows **lost** and comes back on
+  `devicechange`; loop off holds at the out point; New / Generate empty the layer; OSC
+  play on the rising edge; in Space the layer joins after the master (no 100× boost on a
+  sharp pull, audible at master 0); undo covers the layer (never opening an input);
+  15 ms fades on clear / swap; a pending synced start cancels on pause; a device change
+  resets channels to 1+2, no invented labels; seeks wait for a loading file; clip flux
+  judges jumps by the clip's own speed; the file slot volume reaches 200 %; failed
+  analyses retry (10 s, doubling to 5 min).
+- **World** : `sanitizeWorld` everywhere (storage, sessions, scenes, the JSON editor,
+  take) and an error boundary around the page (a bad value crashed the app on every
+  launch); the amount fades only the World's own change (`composition.worldShift`), so
+  hand edits, modulators and macros keep working below 1, switches step at 0.5 only while
+  still where the World put them; the found mood re-captured on each apply (Generate
+  after its theme); the World's modulator tracked by its binding ids, yours once edited,
+  the old-session guess once at load; switching Worlds over MORPH eases (coupling taken
+  ahead, no layer relay); responsive columns (two below 840 px, one below 560, scrolling
+  there); save as mine keeps the picture and names uniquely; a full matrix says so;
+  keys (filter, Enter on buttons, repeat); take from composition reads every film key;
+  finalizer defaults; worldBase validated; worlds persisted after undo; Randomize skips
+  the flagged modulator wherever it is.
+- **Sonify** : the Assemblage Ring bank follows a key glide (`stepGlides` 'ra'); its
+  resonator notes glide; the cut accent strikes on the new note; bands over the ceiling
+  fold down an octave (octave 9 no longer whistles) and makeup is measured where they
+  ring; clips carry their original (`AssembleClip.src`), live mode included, old sessions
+  through the bank; the next clip's player is loaded ahead and the edit's files prepared
+  ahead; Space : an 11th color, the Assemblage follows its clips, the pieces row states
+  its limit; full Assemblage OSCQuery; the Collage card needs films.
+- **Assemble** : new / vary / picking an edit keep the slot's FX, framing, speed and
+  bindings; the tab picks up the selected slot's edit (save, export, vary); unnamed edits
+  are "new edit" (the Inspector showed nothing); messages for a folder with no usable
+  video, and a vary from another folder.
+- **Fulldome** : the panorama's back seam stays behind the audience under rotate / spin;
+  Space inverts the fill offset's disc map exactly (verified to 1e-12° on 2000 random
+  settings); the offset sliders map square-to-disc (no dead travel); DOME_FILL follows
+  the scale; films default to cover under fill in the Inspector too, Reset clears the
+  fit; the Satosphère square composition only while the dome is on, the previous size
+  back when it goes off.
+- **Ableton Link** : a typed BPM reaches Link on Enter / blur only (it sent 20 BPM at each
+  keystroke; verified with a second peer : it saw 120, then 130); a peer's tempo never
+  becomes an undo step, undoing a hand tempo edit sends it; redo survives non-edits
+  (undo/redo commit `snap()`; the sound reapplied only when it changed); no "Save
+  changes?" when peers come and go; the Sonify bars re-align on a quantum change and
+  follow Link's bar; a stall keeps the step grid; wall-clock stamps on both sides; Sonify
+  ignores the picture's latency lead; MISSING shown at startup and switchable off;
+  `closeLink()` on relaunch; `_HAS_EXCEPTIONS=1` on Windows (built and loaded locally).
+- **Codec Mosh** : one config key (no restart loop in bitrate mode); the decoder prefers
+  software, resets alone on an error (the mosh holds, resumes at the next keyframe),
+  falls back on a configure failure; chunks matched by timestamp; readback only when the
+  encoder can take it; the codec closes after 2 s unrendered (a disabled unit) and
+  reopens clean; a 10 kb/s floor and retries instead of a permanent stop.
+- **Session media** : relink touches only missing paths and only toward files that exist,
+  scores candidates by matching trailing path parts, maps a found folder's children
+  through it; converted copies recognised by name in any `video-cache` folder (another
+  computer's); collect checks size + date or first / last MB before reusing a copy,
+  copies through `.part`, repoints folders only after a successful run with something
+  copied, unique names for same-name folders, the deepest holder for nested ones; EDL
+  clips record their original, rebuild covers scenes and edits; status cleared on New /
+  Generate, late results dropped; 100,000 paths checked in batches; NFC names; main
+  checks every collect destination and media type.
+- **GUI** : the sized preview never hides its sizer (max-height); both windows navigate
+  only to the app (a drop on the output window did); a session file opens from any drop
+  target, an empty folder drop leaves the slot alone, a drop on an FX chip passes
+  through; folders warm only after a load is accepted; the Finishing grey-outs respect a
+  modulated character / outside fill.
+- **License** : LICENSE, LICENSE-EXCEPTIONS.md and THIRD_PARTY_NOTICES.md ship in every
+  build's resources.
+
 ### Added
 
 - **Agent (MCP)** : Palinopsia is an MCP server for an agent on this computer

@@ -308,7 +308,14 @@ Select a slot (its **A** / **B** button) for its controls in the Inspector :
   alone, mono on both sides, that the pan places; most drivers give one or two channels,
   and an interface often shows its inputs as several devices, one per pair), its level
   and volume (to 200 %), and a **pan**. A device saved with a session is found again by
-  its name if its id changed.
+  its name if its id changed. **A live input never opens by itself** : one in a session
+  you open (or brought back by undo) waits closed, the slot showing **open** (its row, the
+  Inspector; the folded strip says "not open"); picking an input opens it, and an
+  installation opens its inputs at boot. Unplugged, the slot says **lost** and comes back
+  by itself when the device returns (a lost default input waits for that same device,
+  never the laptop's microphone); picking it again reopens it.
+- a **film** dropped on a slot plays its soundtrack; a file that cannot play says
+  **failed** (click it to try again).
 
 The layer plays **into Sonify's mix**, after Sonify's own volume and after its delay and
 reverb (it stays dry) : the output EQ, the
@@ -779,9 +786,19 @@ the composite live.
   by simulated audio or the **live sound** (the audio tab's input).
 - **The live code (JSON)** is folded until you open it (remembered).
 - **World amount** (the header, with its **M**, and OSC `/opsia/world/amount`) : how much
-  of the active World's mood is on, 0 = the mood it found before the first World, 1 =
-  all of it. It fades the Context mood and the film the World set, frame by frame
-  (`engine/worldAmount.ts`); per machine, like the field macros.
+  of the active World's mood is on, 0 = the mood it found when it was applied (your own
+  values, or a Generate theme's), 1 = all of it. It fades only the World's own change to
+  the Context mood and the film, frame by frame (`engine/worldAmount.ts`) : below 1 your
+  sliders, your modulators and the field macros still move those keys, and a switch (film
+  hold, gauge, dirt) set by hand stays yours. Per machine, like the field macros.
+- **The World's modulator** carries ⊛ wherever it sits. Change it or its binding and it
+  is yours : Worlds and Randomize leave it alone from then on. A full modulation matrix
+  says so (a toast, an amber line) instead of skipping the routing silently.
+- **save as mine** on the active, edited built-in keeps the picture as it is and makes
+  the copy (a unique name) the active World. A World with a broken value (the JSON editor,
+  an old file) is repaired, and says what it fixed.
+- Switching Worlds over MORPH eases the mood and the film only : the layers never fade out
+  and back in.
 
 ## Audio in
 
@@ -1177,7 +1194,9 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   back; **dome 2048²** and **dome 2880²** are also in the composition sizes),
   **NDI at 60 fps** (its guide : 4096 × 4096 at 60 fps, live over NDI), and Sonify's
   voices as objects for the venue's SpatGRIS (see [Space](#space--the-voices-in-the-room)).
-  Dome on / off and NDI on / off stay yours.
+  Dome on / off and NDI on / off stay yours. The square composition applies while the
+  dome is on (pressed with it off : as soon as it goes on) and the previous size comes
+  back when the dome goes off.
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
   The dome records in **DXV3** at full 4096² (see Record). The live master stops at 4K :
@@ -2283,10 +2302,15 @@ picture (an image input named `inputImage` makes it an effect).
   a new version while it plays reloads it live, everywhere it plays.
 - **Sessions carry them.** A session keeps the source of every shader of yours it plays
   (in its layers and its scenes), so it opens the same on another computer; a shader
-  restored that way is marked as coming from the session until you save it.
+  restored that way is marked as coming from the session until you save it. A session
+  whose version of a shader differs from yours plays its own, entered as
+  "<name> (session)" : yours stays as it is. Names that differ only by punctuation
+  ("Waves 2", "Waves_2") are one shader : saving one replaces the other.
+- **delete** on a shader that plays : the file goes, and it keeps playing where it is (the
+  session carries it).
 - Closing (`Esc`, `Alt+E`, **Close**) keeps what you were writing for next time, quit
   included. **delete** removes the shader from your folder (a second click confirms); it
-  stays open, unsaved.
+  stays open, unsaved. While the editor is open, the app's own shortcuts wait.
 
 Shaders made with other ISF hosts mostly open as they are. Palinopsia's own extras work
 in yours too : `uniform float PH_speed;` is `TIME` integrated at the control called
@@ -2655,9 +2679,11 @@ label); a wrong name or value is refused before anything changes.
 
 **The rules it plays by** :
 - **Only this computer** : the server listens on 127.0.0.1 and refuses a web page's
-  request (the Origin and Host are checked).
+  request (the Origin and Host are checked, and it takes JSON only). Turning it off cuts
+  every open connection at once.
 - **Each change is one undo step** of its own (Ctrl+Z), never folded into yours, and
-  your Inspector stays where you left it.
+  your Inspector stays where you left it. Changes run one at a time, and a wrong name or
+  value is refused before anything moves.
 - **It cannot reach the Flash safety**, the limiter that guards the output : no tool
   touches it, and the output it changes still goes through it.
 - Sessions stay in your hands : it builds scenes in the open session, you save it.
