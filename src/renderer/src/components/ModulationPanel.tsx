@@ -8,6 +8,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
 import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
+import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
@@ -918,6 +919,17 @@ function Meter({ index }: { index: number }): JSX.Element {
   )
 }
 
+// What a binding's shaping does, in a few words (the chip's tooltip).
+function shapeSummary(s: import('@shared/types').ModShape): string {
+  const ops: Record<string, string> = { add: '+', sub: '−', mul: '×', min: 'min', max: 'max' }
+  const parts: string[] = []
+  if (s.with?.length && s.op) parts.push(`combined ${ops[s.op]} ${s.with.map((m) => `M${m + 1}`).join(', ')}`)
+  if ((s.threshold ?? 0) > 0) parts.push(`threshold ${s.threshold!.toFixed(2)} (${s.thresholdMode === 'gate' ? 'gate' : 'cut'})`)
+  if (s.integrate === 'flow') parts.push(`integrated (flow ${s.rate ?? 0.25}/s, ${s.ends === 'wrap' ? 'wrap' : 'bounce'})`)
+  if (s.integrate === 'step') parts.push(`integrated (a notch of ${s.step ?? 0.125} per hit, ${s.ends === 'wrap' ? 'wrap' : 'bounce'})`)
+  return `Shaped : ${parts.join(' · ')}`
+}
+
 // ── Matrix summary : every assignment, with depth + remove ────────────
 function MatrixSummary(): JSX.Element {
   const matrix = useStore((s) => s.composition.modMatrix)
@@ -975,6 +987,9 @@ function MatrixSummary(): JSX.Element {
           title={a.muted ? `${describe(a)} : off. Click to turn it on.` : `${describe(a)} : click to turn it off (depth and binding are kept)`}
         >
           <span className={a.muted ? 'text-muted' : 'text-accent'}>M{a.mod + 1}</span>
+          {shapeActive(a.shape) && (
+            <span className="text-accent2" title={shapeSummary(a.shape!)}>⌇</span>
+          )}
           <span className={`max-w-[160px] truncate text-muted ${a.muted ? 'line-through' : ''}`}>
             {describe(a)}
           </span>

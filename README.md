@@ -720,6 +720,32 @@ binding an LFO to a freshly-added effect's `torn`, `contour` or any zeroed slide
 looked like broken modulation. You can still flip the mode per assignment from
 the `mul`/`rep` chip in the Modulate panel.
 
+### Shaping a binding : combine, threshold, integrate
+
+The **⌇** button at the end of a binding's row opens its **shaping**, a stage between the
+modulator and the parameter (lit while something is on; the binding's chip under the
+modulators shows ⌇ too, its tooltip saying what). In this order, then depth and mode as
+above :
+
+- **combine** this modulator with one or two others, through **+** (either pushes it up),
+  **−** (an LFO minus the kick ducks on the kick), **×** (bass × LFO : the LFO swings only
+  while there is bass), **min** (it moves only when all do) or **max** (any one drives it).
+- **threshold** : only what passes the line moves the parameter, so room noise or a
+  quiet passage does nothing. **cut** keeps the part above the line, opened back to the
+  whole range; **gate** is on above it and off under it (with a little hysteresis, so a
+  value hovering on the line never chatters).
+- **integrate** : the value pushes a position that **stays where it got to** instead of
+  falling back to the base. **flow** : the value drives it (louder = faster, nothing = it
+  holds; the amount is turns a second at full value). **step** : each hit pushes it one
+  notch (the amount is the notch, a fraction of a turn : 0.125 = 45° on an angle), eased
+  in over 60 ms. The kick turns a rotation, a hue or a camera one notch per beat. At an end
+  it **bounces** back, or **wraps** round (an angle, a hue). ⟲ puts it back to the middle,
+  the parameter at its base; a session opens with every position there.
+
+A meter on top shows the modulator as it comes (the tick : the threshold) and what the
+shaping gives. Threshold then integrate makes "only real hits push it" : an audio
+modulator on the kick, gate at 0.6, step 0.125, wrap, bound to a rotation.
+
 ![The modulation brain and the Meta knobs](docs/images/interface-modulation.jpg)
 
 *The eight modulators (`D` toggles the row) over the sixteen Meta knobs and the

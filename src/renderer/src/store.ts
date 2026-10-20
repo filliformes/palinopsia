@@ -16,6 +16,7 @@ import type {
   LayerState,
   ModAssignment,
   ModMode,
+  ModShape,
   ModTarget,
   ModulatorConfig,
   SceneEntry,
@@ -48,6 +49,7 @@ import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
+import { sanitizeModShape } from './engine/modShape'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
@@ -962,7 +964,13 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       const m = c.modulators ?? []
       return makeDefaultModulators().map((d, i) => ({ ...d, ...(m[i] ?? {}) }))
     })(),
-    modMatrix: c.modMatrix ?? [],
+    // a binding's shaping, checked (a hand-edited file, an older or newer one)
+    modMatrix: (c.modMatrix ?? []).map((a) => {
+      if (!a.shape) return a
+      const shape = sanitizeModShape(a.shape, a.mod)
+      const { shape: _old, ...rest } = a
+      return shape ? { ...rest, shape } : rest
+    }),
     // The mood a World found and what it changed : numbers only (a session file
     // can carry anything).
     worldBase: sanitizeWorldBase(c.worldBase),
@@ -1502,6 +1510,9 @@ interface StoreState {
   setAssignmentDepth: (id: string, depth: number) => void
   toggleAssignmentMuted: (id: string) => void
   setAssignmentMode: (id: string, mode: ModMode) => void
+  // The binding's shaping (combine, threshold, integrate) : a patch over what it
+  // has; a field set to undefined goes, and an all-off shape is none.
+  setAssignmentShape: (id: string, patch: Partial<ModShape>) => void
 
   // The currently-selected source/FX whose ISF INPUTS the auto-UI renders.
   selection: Selection
@@ -3591,6 +3602,21 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         modulators: releaseWorldModOfRow(s.composition, id),
         modMatrix: s.composition.modMatrix.map((a) => (a.id === id ? { ...a, mode } : a))
+      }
+    })),
+  setAssignmentShape: (id, patch) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        modulators: releaseWorldModOfRow(s.composition, id),
+        modMatrix: s.composition.modMatrix.map((a) => {
+          if (a.id !== id) return a
+          const merged: Record<string, unknown> = { ...(a.shape ?? {}), ...patch }
+          for (const k of Object.keys(merged)) if (merged[k] === undefined) delete merged[k]
+          const shape = sanitizeModShape(merged, a.mod)
+          const { shape: _old, ...rest } = a
+          return shape ? { ...rest, shape } : rest
+        })
       }
     })),
 

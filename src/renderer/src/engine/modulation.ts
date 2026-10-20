@@ -12,6 +12,7 @@
 // touch the React store, so nothing re-renders at 60 Hz.
 
 import { setWorldAmountMod, worldAmountBase } from './worldAmount'
+import { pruneShapes, shapeValue } from './modShape'
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
@@ -1454,6 +1455,9 @@ export function applyMetaGlides(
   }
 }
 
+// The shaping stage's clock (integrate needs the time between two frames).
+let lastApplyAt = 0
+
 export function applyModulation(
   comp: ModComp,
   c: CompositionState,
@@ -1478,10 +1482,16 @@ export function applyModulation(
     shaped01: number
   ): void => writeModTarget(comp, c, descFor, t, shaped01)
 
+  const now = performance.now()
+  const dt = lastApplyAt ? Math.min(0.1, (now - lastApplyAt) / 1000) : 0
+  lastApplyAt = now
+  pruneShapes(c.modMatrix)
+
   for (const a of c.modMatrix) {
     if (a.muted) continue // muted : the parameter keeps this frame's base value
-    const v = values[a.mod]
-    if (v === undefined) continue
+    if (values[a.mod] === undefined) continue
+    // the binding's shaping (combine, threshold, integrate), before depth and mode
+    const v = a.shape ? shapeValue(a, values, dt) : values[a.mod]
     if (a.target.kind === 'meta') {
       // Meta target: the modulator drives the knob's POSITION (as a hand on the
       // dial would), then the knob's curve shapes THAT position on its way to

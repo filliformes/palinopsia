@@ -770,6 +770,30 @@ export interface ModAssignment {
   depth: number // -1..+1 : swing/scale amount
   mode?: ModMode // undefined = 'replace' (back-compat with pre-mode sessions)
   muted?: boolean // off for now : kept with its depth, the parameter sits at its own value
+  // How the modulator's value is shaped on its way here (engine/modShape.ts),
+  // before depth and mode : combined with other modulators, thresholded,
+  // integrated. Absent : the modulator as it is (every older session).
+  shape?: ModShape
+}
+
+// The shaping stage of one binding, in this order : COMBINE (this binding's
+// modulator with one or two others), THRESHOLD (only what passes the line),
+// INTEGRATE (the value pushes a running position that holds where it got to).
+export type ModCombineOp = 'add' | 'sub' | 'mul' | 'min' | 'max'
+export interface ModShape {
+  // combine : the other modulators (slots, 1 or 2) and the operator
+  with?: number[]
+  op?: ModCombineOp
+  // threshold : 0 = off. cut : the part above the line, opened back to 0..1;
+  // gate : on (1) above the line, off (0) under it
+  threshold?: number
+  thresholdMode?: 'cut' | 'gate'
+  // integrate : off, flow (the value drives the position : louder = faster,
+  // nothing = it holds) or step (each hit pushes it one notch)
+  integrate?: 'off' | 'flow' | 'step'
+  rate?: number // flow : turns per second at full value (0.01..4)
+  step?: number // step : one notch, a fraction of a turn (0.01..0.5)
+  ends?: 'wrap' | 'bounce' // past the end : around again (an angle, a hue) or back (anything else)
 }
 
 // The cap is deliberate (simplexité): bounded modulation stays followable.

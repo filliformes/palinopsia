@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
 import type { ModMode, ModTarget } from '@shared/types'
@@ -19,6 +20,7 @@ import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
+import { ModShapeEditor, ShapeToggle } from './ModShapeEditor'
 
 /** The modulation matrix is full : say so (a click that does nothing reads as
  *  broken), and how to make room. */
@@ -571,6 +573,8 @@ export function AssignRow({
   // Live bindings only : a dead one (its effect removed) is cleared to make room.
   const used = useStore((s) => s.composition.modMatrix.filter((a) => targetAlive(s.composition, a.target)).length)
   const full = used >= MAX_MOD_ASSIGNMENTS
+  // the binding whose shaping is open under its row (one at a time)
+  const [shapeOpen, setShapeOpen] = useState<string | null>(null)
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -613,7 +617,8 @@ export function AssignRow({
         const mode: ModMode = b.mode ?? 'replace'
         const mult = mode === 'multiply'
         return (
-          <div key={b.id} className="flex items-center gap-1">
+          <div key={b.id} className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
             <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
             {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it).
                 A toggle has one law, so it shows a fixed label instead. */}
@@ -668,6 +673,10 @@ export function AssignRow({
               onChange={(v) => setAssignmentDepth(b.id, v)}
               className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
             />
+            {/* the binding's shaping : combine, threshold, integrate */}
+            <ShapeToggle id={b.id} open={shapeOpen === b.id} onToggle={() => setShapeOpen(shapeOpen === b.id ? null : b.id)} />
+          </div>
+          {shapeOpen === b.id && <ModShapeEditor id={b.id} />}
           </div>
         )
       })}

@@ -5,6 +5,25 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added (after the audit)
+
+- **Shaping a modulation binding** (`ModAssignment.shape`, `engine/modShape.ts`) : per
+  binding, between the modulator and depth / mode, in this order : **combine** with one or
+  two other modulator slots (+ − × min max, clamped 0..1), **threshold** (cut : the part
+  above the line opened back to 0..1; gate : 0/1 with 0.04 hysteresis), **integrate**
+  (flow : position += value × rate × dt; step : one notch per rising hit, past 0.5 after
+  falling under 0.25, eased in over 60 ms; bounce or wrap; integrators per binding id, at
+  0.5 on load, ⟲ resets, pruned when bindings go). `applyModulation` times its frames for
+  it. Editor under the binding's row (`components/ModShapeEditor.tsx` : the ⌇ toggle in
+  `AssignRow`, a raw / shaped meter with the threshold tick, rows that fit the narrow
+  Modulate column), ⌇ on the matrix chips with a summary. `setAssignmentShape` (a patch;
+  editing a World's binding makes it yours); `sanitizeModShape` on load (own slot,
+  duplicates and out-of-range slots dropped, ranges clamped, all-off = none). Older
+  sessions unchanged. Verified : 21 unit checks of the math (combine, cut, gate
+  hysteresis, flow holding, step per hit, bounce, wrap, threshold + step, sanitize, reset);
+  in the app a square LFO through gate + step climbs a notch per pulse, bounces, and holds
+  when the modulator stops; a session round trip sanitizes a hand-edited shape; undo.
+
 ### Fixed (the v1.3.0 audit)
 
 A full audit of everything new since v1.2.10 (seven reviews, ~110 findings, each one
