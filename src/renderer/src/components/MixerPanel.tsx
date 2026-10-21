@@ -22,6 +22,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { PromptModal } from './PromptModal'
 import { registerLiveOverlay } from './liveOverlay'
 import { couplingWords, mixTitle, mixWord } from './abMix'
+import { useModSlide } from './useModSlide'
 import { PinZone, usePin } from './Pin'
 import { layerPin, layerSpeedPin } from '../persist'
 
@@ -68,7 +69,8 @@ export function MixerPanel(): JSX.Element {
         if (word) {
           const mod = liveModValues.get(modTargetKey({ kind: 'layer', layer: i, field: 'mix' }))
           const v = live ?? mod ?? l.sourceMix
-          word.textContent = `${mixWord(l.sourceBlend)} ${v.toFixed(2)}`
+          const text = `${mixWord(l.sourceBlend)} ${v.toFixed(2)}`
+          if (word.textContent !== text) word.textContent = text // only on a change : no layout every frame
         }
         const meter = meterRefs.current[i]
         if (meter) {
@@ -212,29 +214,37 @@ function MixerColumn({
   const a = slotName(l.sourceA)
   const b = slotName(l.sourceB)
   const hasB = b !== null
-  const keyOf = (field: ModField): string => modTargetKey({ kind: 'layer', layer: index, field })
+  const keyOf = (field: ModField | 'opacity' | 'blend'): string => modTargetKey({ kind: 'layer', layer: index, field })
   const boundCount = useStore(
     useShallow((s) => {
-      const mk = keyOf('mix'), hk = keyOf('harmony')
       const onMeta = (k: string): boolean => s.composition.metaKnobs.some((m) => m.destinations.some((d) => modTargetKey(d) === k))
-      return [
-        s.composition.modMatrix.filter((x) => modTargetKey(x.target) === mk).length + (onMeta(mk) ? 1 : 0),
-        s.composition.modMatrix.filter((x) => modTargetKey(x.target) === hk).length + (onMeta(hk) ? 1 : 0)
-      ]
+      const count = (k: string): number => s.composition.modMatrix.filter((x) => modTargetKey(x.target) === k).length + (onMeta(k) ? 1 : 0)
+      return [count(keyOf('mix')), count(keyOf('harmony')), count(keyOf('opacity')), count(keyOf('blend'))]
     })
   )
-  const [mixBound, hueBound] = [boundCount[0] > 0, boundCount[1] > 0]
+  const [mixBound, hueBound, opaBound, blendBound] = [boundCount[0] > 0, boundCount[1] > 0, boundCount[2] > 0, boundCount[3] > 0]
 
-  // Bound sliders follow their live value (the app-wide behaviour).
+  // Bound sliders follow their live value (the app-wide behaviour), the blend
+  // menu its live mode; a drag on a modulated slider moves its base by as much
+  // as the thumb moves.
   const mixRef = useRef<HTMLInputElement | null>(null)
   const hueRef = useRef<HTMLInputElement | null>(null)
+  const blendRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const offs: Array<() => void> = []
     if (mixBound && mixRef.current) offs.push(registerLiveOverlay({ el: mixRef.current, key: keyOf('mix'), format: (x) => String(x) }))
     if (hueBound && hueRef.current) offs.push(registerLiveOverlay({ el: hueRef.current, key: keyOf('harmony'), format: (x) => String(x) }))
+    if (blendBound && blendRef.current)
+      offs.push(registerLiveOverlay({
+        el: blendRef.current,
+        key: keyOf('blend'),
+        format: (x) => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
+      }))
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mixBound, hueBound, index])
+  }, [mixBound, hueBound, blendBound, index])
+  const mixSlide = useModSlide(mixBound, l.sourceMix, 0, 1, (v) => setSourceMix(index, v))
+  const hueSlide = useModSlide(hueBound, l.harmony, -1, 1, (v) => setHarmony(index, Math.abs(v) < 0.04 ? 0 : v))
 
   // The HUE swatches : A's color and where B lands (its mean through the
   // harmony), from the engine's few-times-a-second measure.
@@ -326,10 +336,10 @@ function MixerColumn({
               max={1}
               step={0.01}
               value={l.sourceMix}
-              onChange={(e) => setSourceMix(index, Number(e.target.value))}
+              {...mixSlide}
               onDoubleClick={() => setSourceMix(index, 0.5)}
               className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
-              title={mixTitle(l.sourceBlend)}
+              title={mixBound ? `${mixTitle(l.sourceBlend)} : modulated (a drag moves the base by as much as you move it)` : mixTitle(l.sourceBlend)}
             />
             {/* where the coupling puts it now */}
             <span
@@ -342,13 +352,16 @@ function MixerColumn({
           <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
         </div>
         </PinZone>
+        {/* the Mixer's loop writes it (never React : its text would be swapped
+            under it), seeded at mount so it never shows empty */}
         <span
-          ref={wordRef}
+          ref={(el) => {
+            wordRef(el)
+            if (el && !el.textContent) el.textContent = `${mixWord(l.sourceBlend)} ${l.sourceMix.toFixed(2)}`
+          }}
           className={`block text-center font-mono text-[9px] tabular-nums ${mixBound ? 'text-accent2' : coupled ? 'text-accent' : 'text-muted'}`}
           title={mixTitle(l.sourceBlend)}
-        >
-          {mixWord(l.sourceBlend)} {l.sourceMix.toFixed(2)}
-        </span>
+        />
       </div>
 
       {/* ── HUE : B's colors set against A's. Middle : B untouched. */}
@@ -368,7 +381,7 @@ function MixerColumn({
               max={1}
               step={0.01}
               value={l.harmony}
-              onChange={(e) => setHarmony(index, Math.abs(Number(e.target.value)) < 0.04 ? 0 : Number(e.target.value))}
+              {...hueSlide}
               onDoubleClick={() => setHarmony(index, 0)}
               className={`w-full min-w-0 ${hueBound ? 'accent-accent2' : 'accent-accent'}`}
               title={`Harmony ${l.harmony.toFixed(2)} : left pulls B onto A's colors (matched), right pushes it onto their opposite (clashing), the middle leaves B as it is. Double-click : the middle`}
@@ -387,20 +400,22 @@ function MixerColumn({
       {/* ── CPL : the sound moving the mix. */}
       <Section label={audioOff ? 'CPL · no audio in' : 'CPL'} />
       <div className={`flex shrink-0 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`} title={audioOff ? 'The audio input is off (audio tab) : the coupling waits for it' : undefined}>
+        {/* the mode, then what drives it on a line of its own (side by side,
+            a column cut the words short); a band's number beside the word band */}
+        <select
+          className={`input w-full appearance-none !px-0.5 !py-0.5 text-center !text-[9px] ${coupled ? 'text-accent' : ''}`}
+          style={{ backgroundImage: 'none' }}
+          value={l.coupling.mode}
+          onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
+          title={COUPLING_TITLE}
+        >
+          {COUPLING_MODES.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
         <div className="flex min-w-0 gap-1">
-          <select
-            className={`input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px] ${coupled ? 'text-accent' : ''}`}
-            style={{ backgroundImage: 'none' }}
-            value={l.coupling.mode}
-            onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
-            title={COUPLING_TITLE}
-          >
-            {COUPLING_MODES.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
           <select
             className="input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
             style={{ backgroundImage: 'none' }}
@@ -415,22 +430,22 @@ function MixerColumn({
               </option>
             ))}
           </select>
+          {l.coupling.feature === 'band' && !cplOff && (
+            <select
+              className="input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
+              style={{ backgroundImage: 'none' }}
+              value={l.coupling.band ?? 0}
+              onChange={(e) => setCoupling(index, { band: Number(e.target.value) })}
+              title="Which band of the spectrum (1 : the lowest)"
+            >
+              {Array.from({ length: AUDIO_BANDS }, (_, k) => (
+                <option key={k} value={k}>
+                  {k + 1}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
-        {l.coupling.feature === 'band' && !cplOff && (
-          <select
-            className="input w-full appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
-            style={{ backgroundImage: 'none' }}
-            value={l.coupling.band ?? 0}
-            onChange={(e) => setCoupling(index, { band: Number(e.target.value) })}
-            title="Which band of the spectrum (1 : the lowest)"
-          >
-            {Array.from({ length: AUDIO_BANDS }, (_, k) => (
-              <option key={k} value={k}>
-                band {k + 1}
-              </option>
-            ))}
-          </select>
-        )}
         {/* the sound it listens to, live */}
         <span className="relative block h-1.5 overflow-hidden rounded-sm bg-panel3/70" title={cplOff ? 'Coupling off' : `What it hears : ${couplingWords(l.coupling)}`}>
           <span ref={meterRef} className="absolute inset-y-0 left-0 bg-accent" style={{ width: 0 }} />
@@ -455,11 +470,12 @@ function MixerColumn({
 
       {/* ── LAYER : how it lands on the stack. */}
       <Section label="LAYER">
-        <ActiveTag a={a} b={b} mute={l.mute} solo={l.solo} anySolo={anySolo} opacity={l.opacity} />
+        {/* a modulated opacity : what it is now (read with the swatches, 4 times a second) */}
+        <ActiveTag a={a} b={b} mute={l.mute} solo={l.solo} anySolo={anySolo} opacity={opaBound ? (liveModValues.get(keyOf('opacity')) ?? l.opacity) : l.opacity} />
       </Section>
       <div className="flex min-h-0 w-full flex-1 gap-1">
         <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'opacity' })} label={`L${index + 1} opacity`}>
-          <VFader label="OPA" value={l.opacity} min={0} max={1} step={0.01} onChange={(v) => setOpacity(index, v)} midiId={`layer:${index}:opacity`} />
+          <VFader label="OPA" value={l.opacity} min={0} max={1} step={0.01} onChange={(v) => setOpacity(index, v)} midiId={`layer:${index}:opacity`} liveKey={opaBound ? keyOf('opacity') : undefined} />
         </PinZone>
         <PinZone pin={layerSpeedPin(index)} label={`L${index + 1} speed`}>
           <VFader label="SPD" value={l.speed} min={0} max={20} step={0.05} onChange={(v) => setLayerSpeed(index, v)} />
@@ -467,11 +483,12 @@ function MixerColumn({
       </div>
       <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'blend' })} label={`L${index + 1} blend`}>
       <select
-        className="input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px]"
+        ref={blendRef}
+        className={`input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
         style={{ backgroundImage: 'none' }}
         value={l.blend}
         onChange={(e) => setBlend(index, e.target.value as BlendMode)}
-        title="How this layer lands on the layers below"
+        title={blendBound ? 'How this layer lands on the layers below : modulated, it shows the mode playing now' : 'How this layer lands on the layers below'}
       >
         {BLEND_MODES.map((m) => (
           <option key={m} value={m}>
@@ -575,7 +592,9 @@ function MiniKnob({ label, value, def, onChange, title }: { label: string; value
   const pt = (deg: number): string => `${c + r * Math.cos(rad(deg))} ${c + r * Math.sin(rad(deg))}`
   const down = (e: ReactPointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    // on the knob's own box : the value arc leaves the DOM at 0, and a capture
+    // on it went with it (the drag then stuck to the mouse)
+    e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { y: e.clientY, v: value, id: e.pointerId }
   }
   const move = (e: ReactPointerEvent<HTMLDivElement>): void => {
@@ -595,6 +614,7 @@ function MiniKnob({ label, value, def, onChange, title }: { label: string; value
         onPointerMove={move}
         onPointerUp={up}
         onPointerCancel={up}
+        onLostPointerCapture={up}
         onDoubleClick={() => onChange(def)}
       >
         <svg width={PX} height={PX}>
@@ -612,7 +632,10 @@ function MiniKnob({ label, value, def, onChange, title }: { label: string; value
 }
 
 // One vertical fader : label on top, the fader filling the column, an editable
-// readout at the bottom (rounded : a long float clipped in the box).
+// readout at the bottom (rounded : a long float clipped in the box; from 10 up,
+// one decimal, so "12.4" fits where "12.35" was cut). With a liveKey (it is
+// modulated) the thumb and the number follow the live value, and a drag moves
+// the base by as much as the thumb moves.
 function VFader({
   label,
   value,
@@ -621,7 +644,8 @@ function VFader({
   step,
   neutral = 1,
   onChange,
-  midiId
+  midiId,
+  liveKey
 }: {
   label: string
   value: number
@@ -631,31 +655,42 @@ function VFader({
   neutral?: number
   onChange: (v: number) => void
   midiId?: string
+  liveKey?: string
 }): JSX.Element {
+  const ref = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!liveKey || !el) return
+    return registerLiveOverlay({ el, key: liveKey, format: (x) => String(x) })
+  }, [liveKey])
+  const slide = useModSlide(!!liveKey, value, min, max, onChange)
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-1">
       <span className="shrink-0 font-mono text-[9px] uppercase text-muted">{label}</span>
       <span className="relative flex min-h-[40px] flex-1 justify-center">
         {midiId && <MidiLearnOverlay id={midiId} />}
         <input
+          ref={ref}
           type="range"
           min={min}
           max={max}
           step={step}
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          {...slide}
           onDoubleClick={() => onChange(neutral)}
           // Modern vertical range: writing-mode makes it vertical, rtl puts the
           // minimum at the bottom (up = more).
           style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-          className="min-h-[40px] flex-1 accent-accent"
-          title={`${label} ${value.toFixed(2)} : double-click resets to ${neutral}`}
+          className={`min-h-[40px] flex-1 ${liveKey ? 'accent-accent2' : 'accent-accent'}`}
+          title={liveKey ? `${label} ${value.toFixed(2)} : modulated (a drag moves the base by as much as you move it)` : `${label} ${value.toFixed(2)} : double-click resets to ${neutral}`}
         />
       </span>
       <BoundedNumberInput
         value={Math.round(value * 100) / 100}
         min={min}
         max={max}
+        maxFrac={Math.abs(value) >= 10 ? 1 : 2}
+        liveKey={liveKey}
         onChange={onChange}
         // ! overrides the unlayered .input padding/font so the full number fits.
         className="input w-full shrink-0 !px-0.5 !py-0.5 text-center !text-[9px]"

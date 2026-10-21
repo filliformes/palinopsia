@@ -3,11 +3,14 @@
 // smooth, or a color chord's colors, darks at the left, lights at the right),
 // its stops as swatches at their places along it (click one to recolor it), and
 // how many stops it uses as 2 · 3 · 4 · 5. A chord shows the colors it makes.
+// Each stop and the count can be made persistent (right-click), as every other
+// control.
 
 import { useEffect, useRef } from 'react'
 import type { ModTarget } from '@shared/types'
-import { modTargetKey } from '../store'
+import { modTargetKey, useStore } from '../store'
 import { ModButton, useBound } from './AutoControls'
+import { PinZone } from './Pin'
 
 type Values = Record<string, number | number[]>
 type RGB = [number, number, number]
@@ -73,13 +76,15 @@ export function VibePaletteStrip({
   const blend = clamp01(num(values, 'blend', 1))
   const colors = Array.from({ length: n }, (_, i) => vibeStopColor(values, i))
   const key = colors.map(hex).join() + blend
+  const uiZoom = useStore((s) => s.uiZoom) // a zoom change redraws it at the new size
 
   // The palette map, one column per pixel : Vibe.fs's (t, i, f, k), luma = x.
   useEffect(() => {
     const cv = cvRef.current
     if (!cv) return
     const draw = (): void => {
-      const w = Math.max(2, Math.round(cv.clientWidth * (window.devicePixelRatio || 1)))
+      // its width on screen (under the UI zoom, a CSS zoom : clientWidth is unzoomed)
+      const w = Math.max(2, Math.round(cv.getBoundingClientRect().width * (window.devicePixelRatio || 1)))
       if (cv.width !== w) { cv.width = w; cv.height = 1 }
       const g = cv.getContext('2d')
       if (!g) return
@@ -100,7 +105,7 @@ export function VibePaletteStrip({
     ro.observe(cv)
     return () => ro.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, n])
+  }, [key, n, uiZoom])
 
   const stopsTarget = modTargetFor('stops')
   const stopsBound = useBound(modTargetKey(stopsTarget))
@@ -118,8 +123,8 @@ export function VibePaletteStrip({
           const pos = n > 1 ? i / (n - 1) : 0
           const name = `stop ${i + 1}${i === 0 ? ' (darks)' : i === n - 1 ? ' (lights)' : ''}`
           return (
+            <PinZone key={i} pin={modTargetKey(modTargetFor(KEYS[i]))} label={`stop ${i + 1}`}>
             <label
-              key={i}
               className={`absolute top-0 h-[18px] w-[18px] overflow-hidden rounded border ${chord ? 'cursor-default border-border' : 'cursor-pointer border-border hover:border-accent'}`}
               style={{ left: `calc(${pos} * (100% - 18px))`, background: hex(c) }}
               title={chord
@@ -139,10 +144,12 @@ export function VibePaletteStrip({
                 />
               )}
             </label>
+            </PinZone>
           )
         })}
       </div>
       {/* how many stops it uses */}
+      <PinZone pin={modTargetKey(stopsTarget)} label="color stops">
       <div className="flex items-center gap-1.5">
         <span className="w-24 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted" title="How many colors the picture's light is spread over">stops used</span>
         <div className="flex overflow-hidden rounded border border-border">
@@ -161,6 +168,7 @@ export function VibePaletteStrip({
         {chord && <span className="truncate font-mono text-[9px] text-muted" title="A color chord sets the palette (its section below)">{HARMONIES[harmony]} chord</span>}
         <ModButton target={stopsTarget} bound={stopsBound} label="color stops" />
       </div>
+      </PinZone>
     </div>
   )
 }

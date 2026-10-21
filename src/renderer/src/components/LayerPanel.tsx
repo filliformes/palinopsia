@@ -15,6 +15,7 @@ import { keywordsFor } from '../shaders/isf/keywords'
 import { makeDefaultMask, modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
+import { useModSlide } from './useModSlide'
 import { showToast } from './Toast'
 import { placeAssemblage } from '../assemble/place'
 import { playableVideoUrl } from './videoImport'
@@ -96,21 +97,33 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const opacityRef = useRef<HTMLInputElement | null>(null)
   const mixRef = useRef<HTMLInputElement | null>(null)
   const blendRef = useRef<HTMLSelectElement | null>(null)
+  // a modulated slider : a drag moves the base by as much as the thumb moves
+  const opacitySlide = useModSlide(opacityBound, layer.opacity, 0, 1, (v) => setOpacity(index, v))
+  const mixSlide = useModSlide(mixBound, layer.sourceMix, 0, 1, (v) => setSourceMix(index, v))
+  // The blend tab's word, live too while modulated (the loop fills it, never
+  // React : seeded at mount, back to the base once the modulation stops).
+  const blendTabRef = useRef<HTMLSpanElement | null>(null)
+  const blendBase = useRef(layer.blend)
+  blendBase.current = layer.blend
   useEffect(() => {
     const offs: Array<() => void> = []
     if (opacityBound && opacityRef.current)
       offs.push(registerLiveOverlay({ el: opacityRef.current, key: modTargetKey(layerTarget('opacity')), format: (x) => String(x) }))
     if (mixBound && mixRef.current)
       offs.push(registerLiveOverlay({ el: mixRef.current, key: modTargetKey(layerTarget('mix')), format: (x) => String(x) }))
+    // (the select lives in the blend drawer : registered each time it opens)
     if (blendBound && blendRef.current)
-      offs.push(registerLiveOverlay({
-        el: blendRef.current,
-        key: modTargetKey(layerTarget('blend')),
-        format: (x) => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
-      }))
+      offs.push(registerLiveOverlay({ el: blendRef.current, key: modTargetKey(layerTarget('blend')), format: blendOf }))
+    const tab = blendTabRef.current
+    if (blendBound && tab) {
+      const show = (m: string): void => {
+        if (tab.textContent !== m) tab.textContent = m
+      }
+      offs.push(registerLiveOverlay({ key: modTargetKey(layerTarget('blend')), apply: (x) => show(blendOf(x)), idle: () => show(blendBase.current) }))
+    }
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opacityBound, mixBound, blendBound, collapsed, index])
+  }, [opacityBound, mixBound, blendBound, collapsed, index, outTab])
 
   // The M chip beside a layer control : accent when bound, accent2 while its
   // binding row is open. Right-click clears every modulation on that field.
@@ -231,10 +244,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             max={1}
             step={0.01}
             value={layer.opacity}
-            onChange={(e) => setOpacity(index, Number(e.target.value))}
+            {...opacitySlide}
             onDoubleClick={() => setOpacity(index, 1)}
             className={`w-full ${opacityBound ? 'accent-accent2' : 'accent-accent'}`}
-            title={`Opacity ${layer.opacity.toFixed(2)} : double-click resets to 1`}
+            title={`Opacity ${layer.opacity.toFixed(2)} : ${opacityBound ? 'modulated (a drag moves the base by as much as you move it)' : 'double-click resets to 1'}`}
           />
         </span>
         </PinZone>
@@ -360,14 +373,15 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       max={1}
                       step={0.01}
                       value={layer.sourceMix}
-                      onChange={(e) => setSourceMix(index, Number(e.target.value))}
+                      {...mixSlide}
                       onDoubleClick={() => setSourceMix(index, 0.5)}
                       className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
-                      title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one above and this mixes it with A'}
+                      title={!hasB ? 'No Source B : pick one above and this mixes it with A' : mixBound ? `${mixTitle(layer.sourceBlend)} : modulated (a drag moves the base by as much as you move it)` : mixTitle(layer.sourceBlend)}
                     />
                   </span>
                   <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
-                  {/* the mix in percent, typed or read */}
+                  {/* the mix in percent, typed or read : as wide as its longest
+                      number ("33.3", in its own font : a wider Mac monospace too) */}
                   <span className="flex shrink-0 items-center gap-0.5" title={mixTitle(layer.sourceBlend)}>
                     <BoundedNumberInput
                       value={Math.round(layer.sourceMix * 1000) / 10}
@@ -375,7 +389,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       max={100}
                       maxFrac={1}
                       onChange={(v) => setSourceMix(index, v / 100)}
-                      className={`input w-[1.75rem] !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
+                      className={`input w-[calc(4ch+7px)] !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
                     />
                     <span className="font-mono text-[9px] text-muted">%</span>
                   </span>
@@ -432,18 +446,23 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[4] }}>
               <StepLabel n={4} title="Out : how the layer lands on the layers below" small />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {/* Each tab as wide as its words (the short ones give room to
+                  the long), the blend's mode alone, the feedback's amount never
+                  cut : a long mode or mask name gives way first. */}
               <div className="flex min-w-0 overflow-hidden rounded border border-border">
                 {(
                   [
-                    ['blend', `blend ${layer.blend}`, blendBound],
-                    ['mask', `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.mode > 0 && layer.mask.invert ? ' inv' : ''}`, false],
-                    ['feedback', layer.feedback ? `feedback ${layer.feedbackAmount.toFixed(2)}` : 'feedback off', false]
+                    ['blend', layer.blend, blendBound],
+                    ['mask', layer.mask.mode > 0 ? `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.invert ? ' inv' : ''}` : 'no mask', false],
+                    ['feedback', layer.feedback ? `fb ${layer.feedbackAmount.toFixed(2)}` : 'fb off', false]
                   ] as Array<[OutTab, string, boolean]>
                 ).map(([k, text, mod]) => (
                   <button
                     key={k}
                     onClick={() => setOutTab(outTab === k ? null : k)}
-                    className={`min-w-0 flex-1 truncate border-r border-border px-1 py-0.5 font-mono text-[10px] last:border-r-0 transition-colors ${
+                    className={`flex-auto border-r border-border px-1 py-0.5 font-mono text-[10px] last:border-r-0 transition-colors ${
+                      k === 'feedback' ? 'shrink-0 whitespace-nowrap' : 'min-w-0 truncate'
+                    } ${
                       outTab === k
                         ? 'bg-accent/20 text-accent'
                         : mod
@@ -452,9 +471,18 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                             ? 'text-text hover:bg-panel3/60'
                             : 'text-muted hover:bg-panel3/60 hover:text-text'
                     }`}
-                    title={`${k === 'blend' ? 'How this layer lands on the layers below' : k === 'mask' ? 'Where this layer shows : its own brightness, a fade, or a window' : 'Trails : the layer samples its own previous frame'} (click to ${outTab === k ? 'close' : 'open'})`}
+                    title={`${k === 'blend' ? 'Blend : how this layer lands on the layers below' : k === 'mask' ? 'Mask : where this layer shows : its own brightness, a fade, or a window' : 'Feedback : trails, the layer samples its own previous frame'} (click to ${outTab === k ? 'close' : 'open'})`}
                   >
-                    {text}
+                    {k === 'blend' && mod ? (
+                      <span
+                        ref={(el) => {
+                          blendTabRef.current = el
+                          if (el && !el.textContent) el.textContent = text
+                        }}
+                      />
+                    ) : (
+                      text
+                    )}
                   </button>
                 ))}
               </div>
@@ -537,15 +565,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="Layer time : scales every source and FX clock on this layer (1 = realtime) : double-click resets"
             />
-            <div className="w-[2.2rem] shrink-0">
-              <BoundedNumberInput
-                value={Math.round(layer.speed * 100) / 100}
-                min={0}
-                max={20}
-                onChange={(v) => setLayerSpeed(index, v)}
-                className="input w-full !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
-              />
-            </div>
+            {/* as wide as its longest number ("12.35") */}
+            <BoundedNumberInput
+              value={Math.round(layer.speed * 100) / 100}
+              min={0}
+              max={20}
+              onChange={(v) => setLayerSpeed(index, v)}
+              className="input w-[calc(5ch+7px)] shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
+            />
             </PinZone>
             {/* VARY : the global Vary, aimed at this layer alone; a modulation
                 target like the other layer fields, so a modulator can fire it. */}
@@ -557,7 +584,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               Vary
               <Blink n={varyPulse} color="accent2" />
             </button>
-            {modChip('vary', 'M')}
+            {modChip('vary', 'Vary (a modulator fires it)')}
             <input
               type="range"
               min={0}
@@ -569,15 +596,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="How far one Vary moves this layer : double-click resets"
             />
-            <div className="w-[2.2rem] shrink-0">
-              <BoundedNumberInput
-                value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
-                min={0}
-                max={1}
-                onChange={(v) => setLayerVary(index, v)}
-                className="input w-full !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
-              />
-            </div>
+            <BoundedNumberInput
+              value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
+              min={0}
+              max={1}
+              maxFrac={2}
+              onChange={(v) => setLayerVary(index, v)}
+              className="input w-[calc(4ch+7px)] shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
+            />
           </div>
           {/* The binding row this chip opens. Without it the M toggled state
               that nothing rendered, so the chip looked dead. */}
@@ -645,6 +671,9 @@ function ToggleChip({
     </button>
   )
 }
+
+// A modulated blend's live value : an index that cycles through the modes.
+const blendOf = (x: number): string => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
 
 // Per-layer spatial mask : mode + invert, then the mode's own params. Multiplies
 // the layer's contribution to the stack (beyond blend + opacity).

@@ -1,10 +1,36 @@
 // ContextMenu : shared right-click menu. Fixed-positioned at the cursor,
 // closes on outside mousedown / Escape. Items can be actions, dividers, or
 // rows with a trailing delete affordance (used by preset lists).
+//
+// It opens in the window's menu host (MenuHost, at the end of the zoomed
+// chrome), never in place : under a dimmed control (opacity 40 %) a menu took
+// the dimming, could not rise above that control's neighbours, and showed its
+// tooltip over the items. React events still bubble from the menu to the
+// component that opened it, so its stopPropagation rules hold.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import { effectiveZoom } from './uiZoom'
+
+// One host per window (the instrument, the Output page's own window).
+const hosts = new Map<Document, HTMLElement>()
+
+/** Where this window's menus open : put once at the end of the zoomed chrome
+ *  (inside it, so a menu still measures the UI zoom; no box of its own). */
+export function MenuHost(): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const doc = el.ownerDocument
+    hosts.set(doc, el)
+    return () => {
+      if (hosts.get(doc) === el) hosts.delete(doc)
+    }
+  }, [])
+  return <div ref={ref} className="contents" />
+}
 
 export interface MenuItem {
   label: string
@@ -32,6 +58,16 @@ export function ContextMenu({
   header?: ReactNode
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
+  // Which window it opened in : a hidden mark in place finds that window's
+  // host before paint, and the menu renders there (a window without a host
+  // keeps it in place).
+  const markRef = useRef<HTMLSpanElement | null>(null)
+  const [host, setHost] = useState<HTMLElement | 'inline' | null>(null)
+  useLayoutEffect(() => {
+    const doc = markRef.current?.ownerDocument
+    const h = doc ? hosts.get(doc) : undefined
+    setHost(h?.isConnected ? h : 'inline')
+  }, [])
   // The cursor (x, y) is in viewport pixels; the menu sits in the zoomed chrome
   // (see uiZoom.ts) : measured before paint, so it opens right at the cursor.
   const [z, setZ] = useState(1)
@@ -39,7 +75,7 @@ export function ContextMenu({
   useLayoutEffect(() => {
     const zz = effectiveZoom(ref.current)
     if (Math.abs(zz - z) > 0.005) setZ(zz)
-  }, [z, uiZoom])
+  }, [z, uiZoom, host])
 
   useEffect(() => {
     const down = (e: MouseEvent): void => {
@@ -75,11 +111,12 @@ export function ContextMenu({
     maxHeight: vh - top - 8
   }
 
-  return (
+  const menu = (
     <div
       ref={ref}
       style={style}
-      className="fixed z-50 flex min-w-[180px] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
+      // above every page and modal : it is always the latest thing opened
+      className="fixed z-[300] flex min-w-[180px] flex-col overflow-y-auto rounded border border-border bg-panel2 py-1 shadow-lg"
     >
       {header && (
         <div className="sticky top-0 z-10 border-b border-border bg-panel2 px-3 py-1 font-mono text-[9px] uppercase tracking-wide text-muted">
@@ -122,5 +159,11 @@ export function ContextMenu({
         )
       )}
     </div>
+  )
+  return (
+    <>
+      <span ref={markRef} hidden />
+      {host === 'inline' ? menu : host ? createPortal(menu, host) : null}
+    </>
   )
 }

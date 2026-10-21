@@ -273,9 +273,12 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   // cursor on pointer-down and only restores on pointer-up/cancel otherwise).
   useEffect(() => () => { if (dragRef.current) document.body.style.cursor = '' }, [])
 
+  // The capture goes on the dial's own box, never on what was pressed : the
+  // value arc leaves the DOM at 0, and a capture on it went with it (the drag
+  // then stuck to the mouse, with the app's cursor hidden).
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (e.button !== 0) return
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    e.currentTarget.setPointerCapture(e.pointerId)
     dragRef.current = { startY: e.clientY, startValue: knobDisplayValue(index), pointerId: e.pointerId }
     document.body.style.cursor = 'none'
   }
@@ -288,17 +291,24 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
     // Direct 1:1 tracking : no tween lag (the pointer is the smoothing).
     setKnobImmediate(index, next)
   }
+  function endDrag(): void {
+    commitKnob(index) // one undo checkpoint per gesture
+    dragRef.current = null
+    document.body.style.cursor = ''
+  }
   function onPointerUp(e: ReactPointerEvent<HTMLDivElement>): void {
     const d = dragRef.current
     if (!d || e.pointerId !== d.pointerId) return
     try {
-      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+      e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
       /* ignore */
     }
-    commitKnob(index) // one undo checkpoint per gesture
-    dragRef.current = null
-    document.body.style.cursor = ''
+    endDrag()
+  }
+  // The capture lost some other way (the release landed nowhere) : the drag ends.
+  function onLostCapture(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (dragRef.current?.pointerId === e.pointerId) endDrag()
   }
 
   // Dial geometry : min at 7:30, max at 4:30 (LaunchControl orientation).
@@ -332,6 +342,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onLostPointerCapture={onLostCapture}
         onDoubleClick={() => setKnobTarget(index, 0, knob.smoothMs)}
         title={`${knob.name} : drag vertically · Shift = fine · double-click resets. The number is what it sends now, through its curve (${knob.curve}).`}
       >
