@@ -34,12 +34,16 @@ that CI builds into cross-platform releases.
   store re-exports it). Not yet : a whole effect unit or source slot, modulator cards,
   Sonify's controls.
 
-- **The gate hair comes only by hand** (Vincent : the hair stuck on an edge of the frame was
-  annoying). The Peint and Pressé Worlds and the Nitrate and Projection Booth Generate
-  themes no longer set `filmHair` (0.25, 0.5, 0.3, 0.4 before); Randomize never touched it.
-  The Finalizer's **gate hair** slider stays, at 0 by default; dust, scratches and the rest
-  of the film damage are unchanged. A scene or session that already has the hair keeps it
-  until the slider goes to 0.
+- **The gate hair is removed** (Vincent : "I don't want any gate hair"; it first went
+  hand-only, the Peint and Pressé Worlds and the Nitrate and Projection Booth themes no
+  longer setting it). The slider and the feature are gone : the Finalizer's `filmHair`
+  input and its pass (`Finalizer.fs`), the hair's uniforms and state in
+  `engine/filmDamage.ts`, the Compositor's `fdHair`, the World film key (`worlds.ts` : the
+  film keys, `FILM_OFF`, `FILM_MARKS`, the editor row and description), the Finishing
+  section's row, its hint and New's film key list. Older sessions are migrated on load
+  (`normalizeComposition`) : their `filmHair` value, the modulation rows and Meta
+  destinations aimed at it and its World fade keys are dropped, and so is a pin on it.
+  Dust, scratches, gauge, dirt and burst are unchanged.
 
 - **The layer strip, compact : the Rail** (`LayerPanel.tsx`, layout C of two compact mockups,
   Vincent : feedback must not change the height, Speed and Vary on one line). The stage
@@ -223,6 +227,190 @@ that CI builds into cross-platform releases.
   hysteresis, flow holding, step per hit, bounce, wrap, threshold + step, sanitize, reset);
   in the app a square LFO through gate + step climbs a notch per pulse, bounces, and holds
   when the modulator stops; a session round trip sanitizes a hand-edited shape; undo.
+
+### Fixed (audit round 2)
+
+A second audit of everything since v1.2.10, about 95 fixes in seven areas. Vincent's calls :
+fix them all except the room EQ (a session keeps carrying its own output EQ and glue; the
+`eqPresets.ts` header now says so), and remove the gate hair (above). Checked in a test copy
+where a machine can : the BPM box (typing leaves 120, Escape restores it, 140 + Enter then
+one Ctrl+Z gives 120), the dome grid after loading a session saved with it on, an older
+session with `filmHair` and a binding on it, `impasto`, a pin menu on a dimmed control, a
+0..65535 control, the Lattice tunnel, Oil Cloud, Cloud Study, Codec Mosh and the harmony
+(no console or compile errors; Oil Cloud 60 fps at 1080p, 58-60 at 4K, 54-56 at 2880², as
+before).
+
+- **Sound** : the Filter voice's line-in opens its input only once armed
+  (`sonify.ts armLineIn` : its **line-in** button, or an installation's boot) : a session, a
+  scene, a Sonify preset or a sequencer step's patch, or an undo never opens the
+  microphone, an open line-in stays open through them, and the button shows a closed one
+  (a dim ring, "Click : open it"; `SonifyPage.tsx`); at launch a saved line-in waits for
+  one click, OSC `linein 1` and the MIDI voice toggles reopen it only once armed by hand.
+  A sound analysis cut short (ffmpeg stalled and killed or exiting with an error, the app
+  quitting) is no longer cached for good : the run uses what it read, the next launch
+  analyzes again (`main/audioAnalysis.ts`, which also packs its frames and waveform in
+  growing typed arrays and reuses its pitch buffer : far less memory on long files).
+  Sonify switched off while the Audio Layer holds the engine fades the Collage and
+  Assemblage voices out first (no click). The output EQ editor's keys and the Sonify
+  loops rest under the Source Editor (`sonifyUi.tsx` : Esc and Delete reached the hidden
+  EQ). Audio Layer live inputs (`audio/audioLayer.ts`) : an armed input that fails with
+  its device present tries again by itself (5, 10, 20, 40 s, then every minute); one whose
+  graph fails to build lets its device go; another channel pair rewires in place under a
+  short dip instead of reopening the device; one not open yet starts no sound engine and
+  does not light the audio tab's "Audio Layer". Import Audio files resume where they were
+  when the engine is rebuilt (render scale, composition size, GPU reset; `AudioSource.ts`,
+  `Compositor.ts`). New and Generate fade the Audio Layer out over the Morph time instead
+  of cutting it (an undo during the fade brings it back). The Audio Layer's sound is
+  analyzed once a frame when the audio tab's input and an `AU all` modulator both read it
+  (`engine/audioIn.ts`, the pitch correlation buffer per analyzer).
+- **Tempo and control** : Escape in a number box goes back to the value from before the
+  edit and commits nothing, and leaving a box you emptied does the same
+  (`BoundedNumberInput.tsx` : dirty cleared before the blur), so a half-typed BPM never
+  reaches Ableton Link (Escape in the BPM box sent about 20 BPM to every peer). The BPM box
+  keeps what you type to itself until Enter or blur (`Transport.tsx`, `onChange` now
+  optional; the `tempoTyping` flag in `tempoEvents.ts` is gone) : no dip to 20 while
+  typing, and undo records one step from the old BPM to the settled one. The Link
+  session's tempo is written through `undo.writeLinkTempo` (no flush of a pending edit in
+  its quiet window, throttled to 10 Hz during a ramp), so a peer's ramp no longer splits
+  your drag into one step per frame; a content-equal composition copy is no change for
+  undo. With Link peers the engine runs at the session tempo, not the scene pad's or a
+  morph's blended BPM (modulators, video grain sync, Sonify). A non-finite BPM : `tickLink`
+  skips it, `propose` checks and clamps 20..999, `normalizeComposition` defaults it to 120
+  (a session saved without one stalled Link and the Sonify sequencers), the Sonify clock
+  never latches NaN (`soniClock.ts`). MIDI clock out follows Link's beat when Link is on,
+  and Start (and a resync) waits for the next Link bar (`midi.ts`). Link reads redraw the
+  badge and section only when what they show changed (`link.ts`). OSC (`oscInput.ts`) :
+  `coupling/band` is advertised and mirrored as an int 0..5 (as a 0..1 float, a fader built
+  from the advertisement sent 1.0 at the top : band 1), `coupling/feature` as an int 0..6,
+  and a 0..1 float spreads over the first six features again (noisiness by index 6 or
+  name); feedback no longer streams `/opsia/audiolayer/play` (a destination sending its
+  state back restarted both files mid-show; the per-slot `play` still goes); an unknown
+  name on `/opsia/layer{n}/source/{A|B}` leaves the slot as it is (`none` empties it); the
+  OSCQuery tree is published again (at most twice a second) when its leaf list changes
+  (sources, effects, videos, the Body camera), not only when OSC in starts;
+  `/opsia/audio/noisiness` is accepted and advertised. MIDI Learn : the A/B hue is a
+  continuous target (`MidiPanel.tsx` : a pad could bind to it and then did nothing). Undoing a
+  pin toggle says "Undone · persistent" (`undo.ts`).
+- **Store, sessions and Persistent** (`persist.ts`, `store.ts`) : the Meta dice and
+  Randomize Meta leave a pinned knob alone, and a dice glide leaves pinned destinations
+  alone on its way and at settle (`metaSmooth.ts metaGlideComposition`; a hand on a knob
+  still moves them). A World amount below 1 no longer pulls a pinned Context or film key
+  (the graft carries the live `worldBase` / `worldShift` entry of a pinned key). The World
+  page's edit, reset and delete of the active World go through the gate. The Inspector's
+  dice (and its MIDI pad) and the Finishing stages' dice and reset leave pinned inputs
+  (`Inspector.tsx`, `FinishingTouches.tsx`; a preset stays a hand action). Layer Vary
+  anchors on the grafted layer when the layer holds a pin. A pinned Meta knob drops
+  destinations that are another source's control or a gone unit's in the arriving
+  composition, and keeps its Context and Finalizer destinations through a Generate (the
+  finishing units adopt the live id for its targets). Opening a session no longer turns on
+  the dome's alignment grid : it keeps this computer's grid, and saves never carry it on.
+  Sequencer steps with a sound patch no longer record an undo step each. The graft skips
+  the rebuild when the arriving rows already match; **Set in every scene** leaves a scene
+  whose full matrix would lose rows as it is and says so, and no longer counts a scene that
+  already had the value as set. **Init background** respects pins. Relink, Collect and
+  rebuild also rewrite the Variation baseline (`sessionMedia.ts`). A hand source swap drops
+  that slot's pinned inputs (layer slots, the Background). The pin list (`SceneBank.tsx`)
+  says "Background shadow", shows "not in the picture" for a Background input the source
+  lacks, and describes pins only while open. `impasto` sessions, scenes and presets load as
+  Cloud Study. Dead bindings to Stutter's removed fire input are dropped on load. The pos
+  pair axes and the COMPACT toggles can be pinned (`AutoControls.tsx`). The rack dice and
+  Randomize keep pinned effect units in place and deal the rest around them (Generate
+  builds its effects anew).
+- **Engine and shaders** : Lattice (`LatticeSource.ts`) : the TUNNEL's throat squared by
+  hand (`pow` of a negative base is undefined : the far part of the tunnel could vanish);
+  the GALAXY's stream along the arms is its own phase (the arms jumped 13 % every 100
+  turns); SWELL's phase wraps at 5120 (it re-dealt itself at every wrap on the tunnel, the
+  sphere and the plane). Cloud Study (`CloudStudy.fs`) : the wind rides each octave times
+  1, 2, 4, 8, outside the 2.03 scaling (the finer billows re-randomized when DRIFT or
+  EVOLVE wrapped). Oil Cloud (`OilCloud.fs`) : under dome fill each trace side caps itself
+  at 2100 (a wide frame was traced nearly full width and cut to about half its height);
+  a cheaper march for the same picture (each noise wraps its cell once, the fine octaves
+  are skipped deep inside once the light point is found, the stir at SWIRL 0), Cloud Study
+  too. A/B harmony (`abHarmony.ts`) : the means ease over time per layer (a cut lands at
+  once) and the turn's direction holds near the antipode (B's hue flickered there);
+  `atan(0, 0)` and NaN samples guarded; the Mixer swatch follows. Relay morph (`morph.ts`,
+  `Compositor.ts`) : a layer with the same sound on both sides hands over in place (one
+  copy, no restart; its picture dips at mid-morph instead of a live crossfade), outgoing
+  and incoming sounds fade with their pictures instead of being cut. Mod shaping
+  (`modShape.ts`) : a gate with a threshold under 0.04 closes again; a morph's ghost
+  binding keeps its integrator and gate (a FLOW or STEP binding holds its position through
+  a scene change) and combines with the old modulators. Coupling GATE : a Schmitt edge at
+  high tightness (`coupling.ts` : no A/B chatter on the threshold). Codec Mosh
+  (`codecMosh.ts`) : back from idle or a failure, the input passes through until the new
+  decoder's first frame (it flashed an old one); a clean keyframe that never reached the
+  decoder is asked for again (the mosh could sit frozen).
+- **Source Editor and the Agent (MCP)** (`SourceEditor.tsx`) : each mount makes its own
+  canvas, so StrictMode's second mount no longer gets the GL context the first cleanup
+  lost (in the dev app every compile reported an error : the "error in the Source Editor");
+  the context is still released when the editor really closes. The preview is rebuilt on
+  `webglcontextrestored` (or "restart it") after a GPU reset, and compiles are not reported
+  as errors against a lost context. A `long` with MIN / MAX and no VALUES is a menu only up
+  to 64 entries, else an integer slider (`inputs.ts longShape`, read alike by the
+  Inspector, OSC, modulation and the agent's `toValue` : a wide range froze or crashed the
+  app); the editor caps its option list and sits in its own error boundary. Saving code
+  that does not compile writes the file but keeps the last good version playing ("Saved,
+  not loaded : it has errors"); **use** refuses code with errors. Opening another shader
+  starts a fresh editor state (Ctrl+Z brought the previous shader's text back under the
+  new name). The editor notices its shader changed elsewhere (the agent, another save, a
+  session) : "changed elsewhere : reload / keep mine", Save asks before writing over it,
+  and **use** never plays a version that is not on screen. A save or delete still in
+  flight when another shader opens no longer grafts the old name and id onto the new
+  draft. The replace question uses the name main saves under (`fileNameOf`, now in
+  `shared/userShaderId.ts`) and also asks before replacing a session's own shader. Link
+  and vertex-stage errors are read from their own logs (`shaderCheck.ts` : never
+  "[object Object]"). An input's optional `"HINT"` in the ISF header is its hover help, in
+  the editor and the Inspector (`inputHints.ts`). Alt+E ignores key repeat (held, it
+  flickered the editor open and shut); on a Mac it is Cmd+Option+E (`main/index.ts`), so
+  Option+E types the acute accent again. Every overwritten or deleted shader version is
+  kept in `Shaders/.history/<name>/` (the newest 30; `main/userShaders.ts`). A session's
+  "<name> (session)" copy never overwrites a shader of yours of that name : it takes the
+  next free "(session 2)". Installation boot waits for the Shaders listing before loading
+  its session, so the session's own version of a shader stays its own. Agent
+  (`mcp/tools.ts`, `shared/mcpTools.ts`) : its `undo` takes back only its own steps, runs in
+  the write queue, and says so when a change made no undo step (a saved shader file, the
+  output transform); `write_shader` refuses to write over one of the performer's shaders
+  (or a session's) unless `replace: true`, and may rewrite its own; the `osc` tool sends
+  numbers as 0..1 floats, ints only to index addresses or as `{"int": n}` (so `1` is the top
+  of a menu, not index 1).
+- **Panels** : right-click menus open in one host per window at the end of the zoomed
+  chrome (`ContextMenu.tsx` portal, a `MenuHost` in App and in the Output page window) :
+  on a grayed-out control they were dimmed, buried under neighbors or covered by a stray
+  tooltip; now opaque, above every page and modal. The Mixer coupling knobs and the Meta
+  knobs (`MetaBar.tsx`) capture the pointer on their own box and end the drag on lost
+  capture (dragged to 0, a knob stayed stuck to the mouse, the cursor hidden). The layer
+  blend's modulation overlay attaches to the blend drawer's menu whenever it opens, and
+  the blend tab shows the mode playing now. The layer strip's number boxes are sized to
+  their longest number in their own font (mix % "33.3", speed "12.35", Vary two
+  decimals), in every theme; Mixer faders show one decimal from 10 up. The OUT tabs size
+  to their words (the blend mode alone, "no mask", "fb 0.85" : the feedback amount was
+  cut; `LayerPanel.tsx`). The Mixer's CPL puts the mode on its own line, the feature (and
+  band) under it, so "transient" and "centroid" are no longer clipped. Mixer opacity
+  follows its modulation (thumb and number), the blend menu its live mode, and the active
+  tag reads the live opacity. The pinned bar joins a control's ring and inset shadow
+  instead of replacing them (`styles.css`). Modulated layer and Mixer sliders (opacity,
+  A/B mix, HUE, OPA) : a drag moves the base by as much as the thumb moves, and on release
+  the thumb follows the modulator again (`useModSlide.ts`, FloatControl's rule). The Vibe
+  palette's stops and stop count can be pinned. The palette strip draws at its on-screen
+  width under the UI zoom (`VibePaletteStrip.tsx`). The Mixer loop writes the mix words
+  only when they change, into spans React never fills. The Vary M chip's title names what
+  it modulates.
+- **Worlds, Output and the app** : the gate hair removed (see above). **Watch the Output
+  in a window** (renamed from "Open Output in a window", which read like "Output page in a
+  window") never takes a fullscreen or spanned output off its projector : main refuses
+  (`main/index.ts`) and a toast says why. In the Output page window, Esc, Enter, the
+  arrows, Delete and Backspace stay there (Esc still leaves MIDI Learn) instead of closing
+  or stepping pages on the other screen, and Alt+E is caught there too (not on macOS); the
+  World page's keys no longer fire under a page drawn over it, nor throw on an event sent
+  to the window. The Output page window's dome simulator, live slider overlay, resource
+  HUD and shaping meter run on that window's own rAF, the simulator on its DPR
+  (`DomeSim.tsx`, `liveOverlay.ts`, `ModShapeEditor.tsx`) : they stay live with the
+  instrument minimized, sharp on a screen with another scale. Edits in the Output page
+  window count as your hands on the controls (`sessionGuard.ts watchUserInput`), so
+  leaving after opening a session asks to save. The Oil on Canvas, Warm and Cool, Codec
+  Rot and Keyframe Hunger chains leave Vibe `mixSrc` alone (`masterPresets.ts` : their
+  warm and cool live in the split-tone, which works over any palette). Oil Cloud and Cloud
+  Study stay out of the Randomize source pool and the Background dice (`randomize.ts`;
+  still in every picker, on OSC and in their themes).
 
 ### Fixed (the v1.3.0 audit)
 

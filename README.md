@@ -218,7 +218,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `B` | **Body** page : embodied control (a camera → gestures + modulators) |
 | `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
-| `Alt+E` | **Source Editor** : write a shader of your own, or a copy of a built-in one |
+| `Alt+E` (`Cmd+Option+E` on a Mac) | **Source Editor** : write a shader of your own, or a copy of a built-in one |
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `V` | **Big preview** : fold the panels under the preview away, and back (the preview's **⤢ big**) |
@@ -245,7 +245,9 @@ In **Sonify** (also in the cheat-sheet) :
 **MIDI:** the **MIDI Learn** toolbar button (top bar), or the `L` key from
 anywhere : maps any controller; see [MIDI](#midi).
 **Everywhere:** double-click a slider/knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
-video **in / out** trim handles. Right-click a control or a layer for
+video **in / out** trim handles. In a **number box**, what you type takes effect on
+`Enter` or when you leave the box; `Esc` goes back to the value from before the edit and
+changes nothing (leaving a box you emptied does the same). Right-click a control or a layer for
 [**Persistent**](#persistent--controls-and-layers-that-stay) (scenes, Randomize and
 Generate leave it as it plays) and **Set in every scene**.
 **Feedback:** a brief **toast**, docked in the empty middle of the
@@ -271,7 +273,8 @@ that turns that source's whole chain off, or all back on), **MIX** (where A and 
 meet : the slider, the mix in **percent** in a box you can type in, the mode),
 **FX** (the effects on the mixed picture, with the same **power** button), and
 **OUT** (how the layer lands on the layers below : three tabs, **blend**,
-**mask** and **feedback**, each showing where it stands; a click opens its drawer,
+**mask** and **feedback**, each as wide as its words and showing where it stands, e.g.
+`normal · no mask · fb 0.85`; a click opens its drawer,
 another closes it; feedback on or off keeps the layer's height). **Speed** and
 **Vary**, which act on the whole layer, share the last line, under a rule. A
 typical layer takes about a third less height than before. Each of the **4 layers** carries:
@@ -282,12 +285,12 @@ typical layer takes about a third less height than before. Each of the **4 layer
 | **A/B mix** (`MIX`) | `sourceBlend` (how B meets A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix`, whose meaning follows the mode and is named beside it : **A↔B** (normal : 0 = A only, 1 = B only), **blend** (the other per-pixel modes : 0 = A, 1 = the full blend), **depth** (weave), **key** (lumakey), **hunger** (consume). Dimmed until B has a source. A **≈** chip shows the layer is coupled to the sound (click : the Mixer). The A/B **hue** harmony and the **coupling** are set in the [Mixer](#the-mixer). |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
-| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)) : the Out stage's **blend** tab. |
+| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)) : the Out stage's **blend** tab, which shows the mode playing now (a modulated one too). |
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : its place on an **X/Y pad**, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. In the Out stage's **mask** tab. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
 | **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
-| **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `feedback off` or its trail). |
+| **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `fb off` or its trail, `fb 0.85`). |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.
@@ -299,7 +302,8 @@ only the modulation aimed at the effects that went is dropped.
 A layer's **opacity, A/B mix and blend mode** are themselves [modulation](#modulation-brain-8-modulators--matrix)
 targets : a small **M** chip beside each opens the same M1–8 binding row as any
 Inspector control. Bound sliders turn the modulated colour and move with the
-signal; the blend dropdown cycles its modes. So is the A/B **hue** harmony, from its M
+signal (grab one and it moves from where it stands; let go and it follows its modulator
+again); the blend dropdown cycles its modes. So is the A/B **hue** harmony, from its M
 chip in the [Mixer](#the-mixer) (the knob's middle leaves B untouched). Per-FX **dry/wet opacity** is
 modulatable too : select a loaded effect and its opacity slider grows the same
 **M** pill. (These are compositor-level, so they apply as a final per-frame
@@ -334,7 +338,9 @@ Select a slot (its **A** / **B** button) for its controls in the Inspector :
   Inspector; the folded strip says "not open"); picking an input opens it, and an
   installation opens its inputs at boot. Unplugged, the slot says **lost** and comes back
   by itself when the device returns (a lost default input waits for that same device,
-  never the laptop's microphone); picking it again reopens it.
+  never the laptop's microphone); picking it again reopens it. An input that fails to
+  open while its device is there tries again by itself (after 5, 10, 20, 40 s, then every
+  minute). Another channel pair switches in place, without reopening the device.
 - a **film** dropped on a slot plays its soundtrack; a file that cannot play says
   **failed** (click it to try again).
 
@@ -346,7 +352,9 @@ its voices silent. A modulator can listen **FROM** a file slot (`AU A`, `AU B`) 
 from a layer's clip, or from **`AU all`** : the layer's whole sound (both slots mixed, a
 live input too, after their volumes), analysed as it plays with the audio input's own
 maths. The layer is saved with the session (an older session opens with it
-empty) and answers to `/opsia/audiolayer/…` (see [OSC](#osc-implementation)). The Import
+empty) and answers to `/opsia/audiolayer/…` (see [OSC](#osc-implementation)). **New** and
+**Generate** fade it out over the MORPH time, as the picture glides (an undo during the
+fade brings it back). The Import
 audio source in a layer still plays its own file, as before.
 
 The **Background** has one source (from a curated set of grounds), its own full FX
@@ -388,9 +396,9 @@ top to bottom in the order the picture flows :
   (**clash**). The swatches show A's color and where B's lands (each source's color is
   its average weighted by brightness, so a figure on black reads as itself). A grey B
   takes the color as a tint.
-- **CPL**, the coupling : the sound moving the mix. Mode (lean · hocket · cut · gate ·
-  drift), what in the sound drives it (and which band, for **band**), a live meter of
-  what it hears, **amt** and **tight** knobs. **cut** flashes to B as the sound rises
+- **CPL**, the coupling : the sound moving the mix. The mode (lean · hocket · cut · gate ·
+  drift) on one line, what in the sound drives it on the next (and which band, for
+  **band**), a live meter of what it hears, **amt** and **tight** knobs. **cut** flashes to B as the sound rises
   past its threshold and fires again only once it has fallen back (a held note flashes
   once instead of parking the layer on B); **gate**'s tightness hardens its edge. A
   recalled scene keeps a drifting layer's momentum.
@@ -577,19 +585,21 @@ camera through *Continuity Camera*, listed with the others.
 
 Left → right:
 
-- **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time), and a
+- **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time); a tempo typed
+  in the box takes effect on `Enter` or when you leave the box (`Esc` puts the old one
+  back), so it never dips while you type, and it is one undo step. A
   **LINK n** badge beside it says the tempo is shared with [Ableton Link](#ableton-link) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
   default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
   Generate all morph over this, live) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
 - **`{ }`** (opens the [Source Editor](#source-editor--your-own-shaders-alte), also
-  `Alt+E`) · **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
+  `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
   learned pad). Messages (a refused effect drop, a saved recording) appear in the
   toolbar's empty middle, always in the same place, over nothing; a long instruction
   grows upward from there.
 - **Output** (opens the Output / mapping page; lights while the external output is on;
-  right-click : open or close an Output window, or the
+  right-click : **Watch the Output in a window** or close it, or the
   [Output page in a window](#output--mapping-key-o) of its own) · **Body** (opens the embodied-control
   page; lights while the camera is live; also key `B`) · **Seq** (opens the
   sequencer; lights when running) · **Sonify** (opens Sonify; lights while the sound
@@ -873,7 +883,7 @@ the composite live.
 - **Context mood** : trails, bloom, depth, haze, light, void, material (a dim key is not
   part of the World until you move it; blur stays yours).
 - **Film character** : on or off, then hold, draw fps, timing, boil, flutter, blanks,
-  dust, scratch, gate hair, granulation, splice (the Finalizer's film). A World without
+  dust, scratch, granulation, splice (the Finalizer's film). A World without
   film switches the film off.
 - **Audio routing** : an audio modulator on a Context key (haze, bloom, trails, depth,
   light, void), installed in the **first free modulator slot from M8 down**, or the one
@@ -1019,7 +1029,9 @@ ledger with per-row clear.
 
 **MIDI output.** The same panel also picks a **MIDI output** device and sends
 Opsia's tempo out over it: a 24-PPQN **clock** + **Start/Stop transport** (both
-toggleable), so an external instrument locks to Opsia's BPM. A **thru / merge**
+toggleable), so an external instrument locks to Opsia's BPM. With
+[Ableton Link](#ableton-link) on, the clock follows Link's beat and Start (or a resync)
+waits for the next Link bar, so the device's bars line up with every linked app's. A **thru / merge**
 pass forwards the learned input to that output (with a loop guard), so one USB
 cable both plays Opsia and drives the gear downstream. Built to sync an **Ableton
 Move** over USB-C: Opsia is the visual sibling, the Move keeps the beat.
@@ -1157,15 +1169,18 @@ bottom:
   Recordings, NDI and Spout get the picture before the warp, so there the shape is
   pre-bent to come out right on the projector.
 - **Fulldome** : render a square **domemaster** for a dome (see [Fulldome](#fulldome) below).
-- **Right-click the Output button** (bottom bar) : **Open Output in a window**, a
+- **Right-click the Output button** (bottom bar) : **Watch the Output in a window**, a
   window on the screen the controls are on, showing what the projector gets (the
-  domemaster on the dome), to tweak while watching it; **Close Output** while one is
-  open; **Output page…**; **Output page in a window**.
+  domemaster on the dome), to tweak while watching it (an output already fullscreen or
+  spanning the projectors stays where it is : a message says to close it first);
+  **Close Output** while one is open; **Output page…**; **Output page in a window**.
 - **The Output page in a window of its own** : right-click the Output button, **Output
   page in a window**, and the whole page opens in its own window, to keep beside the
   instrument or on another screen : the mapping, the dome simulator, the senders and
-  the recorder stay in view and live while you play. Your keys still play the
-  instrument from there (typing in its fields stays in them). **⇲ back into the app**
+  the recorder stay in view and live while you play, even with the instrument
+  minimized. Your keys still play the instrument from there (typing in its fields stays
+  in them), except `Esc`, `Enter`, the arrows, `Delete` and `Backspace`, which stay in
+  that window. **⇲ back into the app**
   puts it back over the instrument; closing the window closes the page. The page
   otherwise always opens in the app (`O`, the Output button); while it is in its window,
   `O` brings that window forward. The window comes back where you last left it.
@@ -1357,8 +1372,9 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   rim), **flip**, and a
   **grid on output** : 10° rings, 30° spokes, the horizon in cyan, the front meridian in
   red, burned into the master for projector alignment. It is a setup aid : it starts off
-  every time the app opens, and turning the dome off puts it away (the rest of the dome
-  setup is remembered). (The Mapping section's grid and warp sit out while the dome is
+  every time the app opens, turning the dome off puts it away (the rest of the dome
+  setup is remembered), and a session never carries it (opening one leaves this
+  computer's grid as it is; a save writes it off). (The Mapping section's grid and warp sit out while the dome is
   on, on the projector window too.)
 - **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
   azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
@@ -1379,7 +1395,7 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   the Output page keeps full frame rate even with a 4K master.
   **master** shows the flat domemaster instead. Double-click the view to reset the camera.
 - The dome mapping lives on the machine (the venue) **and** travels with the session (the
-  piece). The dome itself always starts **off** (a restart or a session load never switches
+  piece), its grid excepted. The dome itself always starts **off** (a restart or a session load never switches
   it on) and its section starts collapsed. The section's **↺** puts every dome setting and
   the simulator back to their defaults, leaving the dome on or off as it is.
 
@@ -1468,7 +1484,7 @@ takeover: the live composite mirrored large with the **probes drawn on it** : be
 | **Events** | Edges and motion are **struck as discrete notes** : a salience field (**spatial** Sobel edges : fires on a still · **motion** frame-difference · **blend** : a moving edge dominates) picks one peak per region and plucks the strongest as scale-quantized notes : pitch from height, velocity from strength, pan from position, and **highs decaying sooner** (a struck-string touch). sine / triangle / saw / square. | after Remo DeVico's *Aural Mirror* : articulation, rhythm |
 | **Raster** | Audification : a draggable **probe rect** read row-major as raw samples : the rect's contents *are* the waveform (edges buzz, gradients hum, datamosh blocks tick). One full scan = the period, so pitch is a note or free Hz; **smooth** 0 is the hard aliased register. | Ikeda · Yeo/Berger raster scanning : harsh, digital |
 | **Transmission** | The SSTV register : the image scanned line-by-line as a **monophonic FM voice** (black 1500 Hz → white 2300 Hz) with the 1200 Hz **sync tick** as a metronome. Line rate free or synced (one line per 16th). The melody *is* the image rows. | slow-scan TV : narrative, decodable |
-| **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line : **noise**, **live line-in** or the **AU** ([Audio Layer](#the-audio-layer) : its slots mixed to mono before its own volume and mute, so a muted layer can be heard only through the filters; no microphone) played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash) over their own octave range. **loop** replays one frozen stretch of the noise : a few hundred milliseconds flutters, a few milliseconds buzzes (0 = free noise). | Metasynth's Filter room · Pelletier's wind |
+| **Filter** | Sonify **without synthesizing** : 48 band-pass filters whose gains come from the image under the (sweepable) line : **noise**, **live line-in** (it opens the input only from its **line-in** button, or at an installation's boot : a session, a scene, a preset or an undo never opens the microphone, and one saved on waits for a click, its button ringed dim until then) or the **AU** ([Audio Layer](#the-audio-layer) : its slots mixed to mono before its own volume and mute, so a muted layer can be heard only through the filters; no microphone) played *through* the frame. Same **reading path** + **breathe** as Spectra. Wide resonance = wind, narrow = flute; band centres can snap to the scale (a resonant harmonic wash) over their own octave range. **loop** replays one frozen stretch of the noise : a few hundred milliseconds flutters, a few milliseconds buzzes (0 = free noise). | Metasynth's Filter room · Pelletier's wind |
 | **Collage** | The **films of a Collage source, heard all at once** (each from a small audio-only copy of its file, made once and kept; the films are never announced to the system, so the media keys and Now Playing leave the instrument alone) : every film plays its own sound in its own loop window and speed (held to its picture within a few hundredths of a second, seeks and re-deals included), and every **piece** of the wall is its own voice : a **point source** placed by its position in the frame (left pieces left, centre centre; the film folds to mono so a centred piece really sits in the middle, at the same loudness wherever it is), then rung through a **harmonic resonator** (band-passes on a note and its 2nd and 3rd harmonics) tuned to the Sonify **key / scale** by the piece's **distance from the centre** : the centre sings the lowest note, the pieces rise toward the frame's edges in every direction (up to 64 pieces, 64 resonances). **resonance** goes from the plain films to only the tuned rings (as loud either way), **ring** from a broad colour to a singing tone, **harmonics** weights the overtones, **range** sets the octaves (the top up to oct 9), **width** the stereo spread. Nothing cuts : a new **deal** crossfades, the old pieces fading out as the new ones come in, over the Collage's own **crossfade** time (a quick declick at 0), and a film taking a new clip or looping its window splices with a short crossfade, the old sound playing on until the new one sounds. Masked pieces fall silent, a hidden or muted layer goes quiet, a fading one fades. It hears the ORIGINAL files, so an optimised wall (whose caches carry no sound) still sings, each through an **audio-only copy** made once in the background (the original's sound track, copied as it is : the same sound, sample for sample, at a hundredth of the size; an iPhone clip is 15 to 36 Mbit/s of picture for 0.15 of sound). A **Ring bank** (inspired by the S-4) then rings the whole voice through 48 resonant band-passes on the key / scale across its range : **wet** (mix or send), **decay** (12 ms of plain filtering up to 10 s of singing, *sustain* or *choke*), **cutoff** (in Hz : where the slope sits across the bands, from half an octave under the lowest band to an octave over the highest, where the bank is open; it follows the **range**, so a higher top octave reaches higher; past 20 kHz it reads *open*; typeable), **peak**, **slope** (low-pass, band-pass, high-pass), **tone**, **tilt** (highs ring longer, or lows), **waves** and **noise** (a travelling or random level across the bands, free or locked to the tempo in straight, triplet or dotted divisions), **detune** (the bands wander, the two sides apart) and a **voicing** (Clean, SEM, MS-20, Steiner, K35 : the filters of Loopex; the driven ones clip inside each band, so their grit never turns the pieces' notes into a ring-modulator rasp). It keeps the voice at its own level; wet 0 is the plain voice. **The films in**, before everything, for a windy or hot recording : **films in** (-24 to +12 dB, the films' level into the resonators), **hp** (a high-pass on every film, 20 Hz = off up to 1 kHz : wind rumble) and **lp** (a low-pass, 20 kHz = off down to 1 kHz : crackle), each **12 or 24 dB per octave** (the chip beside its label; Butterworth, flat to the corner), **comp** (ONE compressor on all the films together, never one per film, so it costs next to nothing : a loud film comes down and a quiet one comes up a little, so the wall holds one level; one knob turns the threshold down, -8 to -30 dB, and the ratio up, 1.5:1 to 6:1, over a soft knee with the makeup automatic; slow enough that wind never ripples it; the number beside its label is what it takes off now; measured : two films 26 dB apart come out 16 dB apart at 50 %, 6 dB at 100 %), and **ring in** (-24 to +12 dB : how hard the films drive the Ring bank; down, its wet is quieter and its bands clip less, the plain films untouched). Their values can be **typed** (click the readout : `4250`, `4.2k`, `off`, `-6`). The Ring bank's controls are greyed while its **wet** is 0 (they shape the bank, so they are heard once it is up). Only active while a Collage with films is in the composition; with none on a layer or the background its card (and its mixer row) is greyed, still playable. | a sound collage : the wall's own audio, tuned and placed by the picture |
 | **Assemblage** | An **Assemblage source's own sound, cut with the picture** (the Collage's engine, a second instance on its own input) : each cut plays its clip's **original** film from its in point (an audio-only copy, like the Collage's; even when the picture plays a converted copy, which has no sound : the slot remembers its corpus folder), a short crossfade at every cut. The clip's **place on the Assemble map** gives its note (the map's centre sings the lowest, its edges the highest, on the key / scale over **range**) and its pan (**width**), so look-alike clips sing alike and the matching becomes a melody (without the corpus loaded, each clip keeps a stable place of its own). **cut accent** strikes the resonators at every cut, so the edit's rhythm is heard even over a quiet clip. **pitch** : **tape** (a clip's speed changes its pitch, slowed = lower; the default) or **keep**. Then the Collage's chain : films in, hp / lp, comp (its own), resonance, ring, harmonics, gain, pan and its own **Ring bank**. Its level follows the layer (opacity, mute, A/B mix). Greyed while no Assemblage is on a layer. Measured : the cuts walk through the clips' own sound at their in points, the voice alone peaks the output at 0.22, off releases its players. In Space it is source 11 : the FX return and the Collage pieces each moved up by one (re-check a SpatGRIS session made before). | an edit heard : every cut its own sound, the matching sung |
 | **Signal** | **Read heads walk the picture on a clock**, and every cell they cross that is brighter than a threshold fires one **micro-grain** : the picture IS the pattern, nothing here is a stored rhythm. One to four heads each read their own band of the bar; **spread** pulls their sweeps to 12, 10 and 7 sixteenths of each other so they drift out of step and back, a polymeter taken from the image. Nine grains : **pip** and **ping** (windowed tones), **damped** (a struck sine), **noise**, **click**, **fm**, **square**, **tri**, **pink**, from a 0.2 ms tick to a 500 ms ring. Onsets land on their exact sample rather than on the audio block, so a fast grid stays a grid. Pitch from the place along the bar, **snap** from free frequency to the scale (its middle is microtonal); **path** horizontal / vertical / radial / spiral, as Spectra; rate free or locked to the beat clock both Sonify sequencers share. Each read takes the brightest point of its cell, so thin marks fire too. Point it at a **Lowercase** layer and its marks play themselves. | after the author's *Signal* instrument for Move : microsound, data sonification, test-equipment pings |
@@ -1994,12 +2010,15 @@ again re-rolls a fresh variation within the same theme.
 ### Persistent : controls and layers that stay
 
 **Right-click a control** (any parameter in the Inspector or the
-Finishing stages, a layer's opacity, A·B mix, blend or speed, the Mixer's faders,
+Finishing stages, the pos X/Y sliders and the small toggles included, the Vibe palette's
+color stops and stop count, a layer's opacity, A·B mix, blend or speed, the Mixer's faders,
 crossfader, hue and blend, the Background's opacity, speed and shadow, a Meta knob; not
 yet Sonify's controls or a modulator's card) → **Persistent**, and no scene, Randomize, Variation, the sequencer, the scene pad,
-Generate, a World or a Mixer, layer, background or master preset changes it any more :
+Generate, a World (its amount and the World page's edits included), a dice (the Meta
+knobs', an effect's own, the Finishing stages' and their reset), **Init background** or a
+Mixer, layer, background or master preset changes it any more :
 it stays as it plays while everything around it moves (and never moves in a morph).
-Its modulation stays with it. **Right-click a layer** (or its column header in the
+Its modulation stays with it. Swapping a source by hand unpins that slot's controls. **Right-click a layer** (or its column header in the
 Mixer) → **Persistent layer** holds the whole layer : its sources, effects, mix, mask,
 feedback and modulation; its dice, Init, presets and Paste then say so and do nothing.
 Your own hand still moves a persistent control (a drag, a typed number, MIDI or OSC
@@ -2008,7 +2027,8 @@ border; **◆ n persistent** in the scene bank lists them (× unpins one, a pin 
 effect or a source that is not in the picture now is dimmed : it holds again when that
 comes back). Pins belong to the session, not to a scene : they are saved with it, New
 clears them, Generate keeps them. A control on an effect holds wherever that same
-effect is (an effect a Generate or a dice put in is a new one), a source's control
+effect is : the rack dice and Randomize keep a persistent effect in its place and deal the
+others around it (an effect a Generate puts in is a new one), a source's control
 wherever that source plays the same shader; the Vibe, Context and Finalizer are always
 the same three. The same menu has **Set in every scene** (**Set this layer in every
 scene** for a layer) : what plays now is written once into every scene that has it
@@ -2073,7 +2093,8 @@ Built-in guarantees so a roll always *plays*:
   (levels, gamma, gains, bloom, haze) in tight neutral bands; the Flash-safety
   limiter guards the output regardless.
 - The Vibe Palette, Context, the Background, and World slot-8 routing survive
-  every global roll.
+  every global roll. **Oil Cloud** and **Cloud Study** are never dealt (by Randomize or
+  the Background dice) : pick them by hand.
 - **Deliberate settings stay put:** anaglyph 3D, the film hold, the output shape, Vibe's
   chord mode, the film damage and Context's blur are never rolled (by Randomize, the
   walk or Vary); a pinned dice range keeps the current value; palettes (Palette,
@@ -2380,7 +2401,7 @@ none is picked, so all five run in any rack.
 |---|---|
 | **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
 | **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe / Arc or a modulator add blur, haze, trails or depth on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce`), and its **neutral** button puts those macros back to 0.5. |
-| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-53-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), a **gate hair**, the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand (the **gate hair** only by hand : no built-in World or Generate theme puts it in), so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
+| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-53-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
 
 In the **Finishing** view (key `F`) each stage is split into labeled sections : Vibe
 Palette (palette · color chord · tone · split-tone), Context (softness · distance ·
@@ -2438,7 +2459,8 @@ and the stack (the brighter side eats).
 
 ## Source Editor : your own shaders (`Alt+E`)
 
-`Alt+E` (or **`{ }`** in the Transport bar) opens a page for writing shaders : the code
+`Alt+E` (`Cmd+Option+E` on a Mac, so Option+E still types accents; or **`{ }`** in the
+Transport bar) opens a page for writing shaders : the code
 in the middle, your shaders and every built-in one on the left, a live preview on the
 right. They are ISF, the format every generator and effect in Palinopsia is written in :
 a JSON header between `/*` and `*/` declares the controls, the GLSL below draws the
@@ -2463,23 +2485,32 @@ top.*
   computed coordinate, an `event` compared with a number, no `gl_FragColor`.
 - **Try it.** The controls the header declares appear under the preview (sliders,
   menus, toggles, colors, points, a fire button for an event) and play it there. An
-  effect reads a built-in generator, or the live picture.
+  effect reads a built-in generator, or the live picture. A control's `"HINT"` in the
+  header is its hover help, here and in the Inspector (the agent reads it too). A whole
+  number (`long`) with a range and no listed values is a menu up to 64 entries, a slider
+  beyond.
 - **Keep it.** **Save** (or `Ctrl/Cmd+S`) writes `<name>.fs` into the **Shaders** folder
   beside your Sessions and Recorded folders (`folder` shows it). Saved, it is one of **my
   shaders** : listed first in the source menus (a generator) or the effect menus (an
   effect), with its controls in the Inspector, modulatable like any built-in. The **use**
   buttons save it and put it to work at once : on the selected source slot (a
   generator), on the selected layer's effects or the master effects (an effect). Saving
-  a new version while it plays reloads it live, everywhere it plays.
+  a new version while it plays reloads it live, everywhere it plays. Saved with errors,
+  the file is written but the last good version keeps playing ("Saved, not loaded : it
+  has errors"), and **use** waits until it compiles. If the shader you are editing is
+  changed elsewhere (the agent, a session), the editor says so : **reload** or **keep
+  mine**. Every version written over or deleted is kept in `Shaders/.history` (the
+  newest 30 per shader).
 - **Sessions carry them.** A session keeps the source of every shader of yours it plays
   (in its layers and its scenes), so it opens the same on another computer; a shader
   restored that way is marked as coming from the session until you save it. A session
   whose version of a shader differs from yours plays its own, entered as
-  "<name> (session)" : yours stays as it is. Names that differ only by punctuation
+  "<name> (session)" (or "(session 2)" if that name is yours already) : yours stays as
+  it is. Names that differ only by punctuation
   ("Waves 2", "Waves_2") are one shader : saving one replaces the other.
 - **delete** on a shader that plays : the file goes, and it keeps playing where it is (the
   session carries it).
-- Closing (`Esc`, `Alt+E`, **Close**) keeps what you were writing for next time, quit
+- Closing (`Esc`, `Alt+E` / `Cmd+Option+E`, **Close**) keeps what you were writing for next time, quit
   included. **delete** removes the shader from your folder (a second click confirms); it
   stays open, unsaved. While the editor is open, the app's own shortcuts wait.
 
@@ -2575,14 +2606,14 @@ another protocol and is not shown.
 | `…/sourceblend` | i / f / s | A/B blend mode |
 | `…/mute` · `…/solo` · `…/feedback` | bool | Toggles (≥ 0.5) |
 | `…/vary` | trigger | **Vary** this layer : a variant at its own amount (its Vary button) |
-| `…/source/{A\|B}` | s | Set source shader (id / name / `none`) |
+| `…/source/{A\|B}` | s | Set source shader (id / name; `none` empties the slot, a name it does not know leaves it as it is) |
 | `…/source/{A\|B}/{input}` | f · color · point2D | A source shader input |
 | `…/source/{A\|B}/fx/{i}/{input}` | f · color · point2D | A Source-FX unit input |
 | `…/fx/{i}/{input}` | f · color · point2D | A Layer-FX unit input |
 | `…/coupling/mode` | i / f / s | `off·lean·hocket·cut·gate·drift` |
 | `…/coupling/amount` · `…/tightness` | f | Coupling depth / tightness |
-| `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch·noisiness` |
-| `…/coupling/band` | i / f | The band feature's band : `0`–`5` (int), or `0..1` across the six |
+| `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch·noisiness` : an index `0`–`6` or a name reaches all seven, a `0..1` float spreads over the first six (as it always did); advertised and mirrored as an int |
+| `…/coupling/band` | i / f | The band feature's band : `0`–`5` (int), or `0..1` across the six; advertised and mirrored as an int |
 | `…/harmony` | f | A/B hue : `0` B matched to A · `0.5` untouched · `1` B on A's complement |
 
 **Video transport** : `/opsia/layer{n}/video[/{A|B}]/…`. Without an explicit
@@ -2644,7 +2675,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
 | `/opsia/output/reset` | trigger | Back to the frame as it is |
 | `/opsia/audiolayer/volume · mix · mute` | f / bool | The **Audio Layer** : its volume (a gain, 0..2, 1 = as it comes), A to B (0.5 = both whole), mute (≥ 0.5) |
-| `/opsia/audiolayer/play` | bool | Both files from their in points together (≥ 0.5), or both paused |
+| `/opsia/audiolayer/play` | bool | Both files from their in points together (≥ 0.5), or both paused (never sent back by feedback, so an echo can't restart them; the per-slot `play` is) |
 | `/opsia/audiolayer/{A\|B}/volume · pan · mute` | f / bool | A slot's volume (a gain, 0..2), pan (-1..1), mute (≥ 0.5) |
 | `/opsia/audiolayer/{A\|B}/play · loop · ignoreglobal · keeppitch · speed · position · in · out` | f / bool | A file slot's transport, the video transport's conventions (speed 0..1 log, position a one-shot seek) |
 | `/opsia/sonify/eq/preset` | s / i | Recall a saved **output EQ** : its name, or its number in the menu (0 or `flat` : flat); the bypass switch and the glue stay |
@@ -2687,7 +2718,7 @@ outbound value is a single float `f`** (enums/bools normalized). Streamed: every
 layer control, meta knobs, BPM (raw), the three master finalizers' float inputs,
 background controls + source inputs, all macros/temperament, world (1-based
 index) and its amount, the coupling switch, the output transform, the Sonify patch and
-Space, the Audio Layer, and `seq/run` : plus, while a slot holds a video, its transport
+Space, the Audio Layer (but not its both-files `audiolayer/play`), and `seq/run` : plus, while a slot holds a video, its transport
 (`video/{A|B}/play·direction·loop·speed·in·out·grain·grain*`). **Not** streamed:
 `/opsia/audio/*`, `/opsia/seq/skip`, and `video/…/position` (the playhead flies
 at frame rate; it's advertised for discovery but never echoed).
@@ -2717,10 +2748,12 @@ An HTTP server on **OSC port + 1** (loopback only) serves a self-describing addr
 tree so Pandore / dataFLOU auto-bind every parameter. `?HOST_INFO` reports the OSC
 port, UDP transport, and a WebSocket value-stream on the same HTTP port
 (`LISTEN` / `IGNORE` per path; pushes `{FULL_PATH, VALUE}` frames while a client is
-attached). Advertised leaves are typed `f` with `RANGE`, `VALUE` and `DESCRIPTION`.
-The advertised tree covers the streamable set plus the audio sensors and `seq/skip`;
-source/FX-unit inputs and scene/randomize triggers are **handled but not advertised**
-(address them directly).
+attached). Advertised leaves are typed `f` (index addresses `i`) with `RANGE`, `VALUE`
+and `DESCRIPTION`. The advertised tree covers the streamable set plus the audio sensors
+and `seq/skip`; source/FX-unit inputs and scene/randomize triggers are **handled but not
+advertised** (address them directly). While OSC in listens, the tree is published again
+(at most twice a second) whenever what it lists changes : a source, an effect, a video
+or sound loaded, the Body camera.
 
 ### Setup
 
@@ -2795,16 +2828,21 @@ Link app on the same network (Live, DJ software, phone apps), with no setup. The
 While Link is enabled :
 
 - **The BPM is shared.** With other apps linked, their tempo is Palinopsia's : a
-  session, a scene, Randomize or a morph can't move it. Changing the BPM yourself
+  session, a scene, Randomize or a morph can't move it, and while the scene pad blends
+  scenes saved at other tempos, the modulators, the grain sync and Sonify stay on the
+  shared one. Changing the BPM yourself
   (the box, tap tempo, a MIDI control, OSC `/opsia/bpm`, dataflou) changes it for every
-  app. Alone, Palinopsia leads. A **LINK n** badge beside the BPM says the tempo is
+  app; the box sends it only on `Enter` or when you leave it (`Esc` cancels), so the
+  others never hear a half-typed tempo. Alone, Palinopsia leads. A **LINK n** badge beside the BPM says the tempo is
   the session's, and a tempo set that way doesn't ask "Save changes?".
 - **The bar is shared.** Modulators synced to the BPM slide onto the shared grid
   (in about a third of a second, never a jump) : a 1/1 LFO peaks where every app's
   bar starts, an arp, S&H, random, chaos, Euclid, Turing, cellular or physics clock
   steps on the shared beats, and a Euclid pattern starts on everyone's grid (unless
   SLIP holds its steps). The Sonify sequencers count Link's beats and, started on the
-  beat, wait for the top of the next Link bar. The MIDI clock out follows the tempo.
+  beat, wait for the top of the next Link bar. The [MIDI clock out](#midi) follows Link's
+  beat, and its Start (or a resync) waits for the next Link bar, so the gear it drives
+  lands on the same downbeat.
 - Organic stays free (its wobble is the point), and so do modulators on Hz.
 
 Link runs in the main process (`native/link`, the Ableton Link SDK, GPL-2.0-or-later,
@@ -2845,10 +2883,10 @@ A client that only runs local (stdio) servers can reach it through a bridge such
 | `list_shaders` · `describe_shader` | the sources and effects, each control's range and default, a shader's ISF code |
 | `set_source` · `set_controls` · `set_layer` | a generator on a slot or the background, any unit's controls, a layer's own settings (opacity, blend, A/B mix and mode, mute, solo, speed, feedback and trail, the A/B hue harmony from −1 to 1) or the background's |
 | `add_effect` · `edit_effect` | effects on any rack : add (with a position and values), on/off, mix, move, remove |
-| `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work |
+| `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work. It rewrites its own shaders freely, but never one of yours unless told to replace it (`replace: true`; the old version stays in `Shaders/.history`) |
 | `scenes` | list, recall, save, rename, delete |
-| `list_controls` · `osc` | every OSC address and what it does, and any of them played : Sonify, the World, the field macros, Meta knobs, the output transform… |
-| `undo` | your Ctrl+Z |
+| `list_controls` · `osc` | every OSC address and what it does, and any of them played : Sonify, the World, the field macros, Meta knobs, the output transform… Numbers go as `0..1` floats, as on the wire (`1` is the top of a menu); an int only to an index address, or as `{"int": n}` |
+| `undo` | takes back its own last change, never yours (once you changed something after it, or for a change that made no undo step, it says so and undoes nothing) |
 
 Units are addressed as in OSC, counted from 1 : `L1.A`, `L1.B`, `L1.fx.2`, `L1.A.fx.1`,
 `master.fx.1`, `master.vibe`, `master.context`, `master.finalizer`, `bg`, `bg.fx.1`.
@@ -2860,7 +2898,8 @@ label); a wrong name or value is refused before anything changes.
   request (the Origin and Host are checked, and it takes JSON only). Turning it off cuts
   every open connection at once.
 - **Each change is one undo step** of its own (Ctrl+Z), never folded into yours, and
-  your Inspector stays where you left it. Changes run one at a time, and a wrong name or
+  your Inspector stays where you left it. Its own `undo` takes back only its changes.
+  Saving a shader file is not an undo step : `Shaders/.history` keeps what it replaced. Changes run one at a time, and a wrong name or
   value is refused before anything moves.
 - **It cannot reach the Flash safety**, the limiter that guards the output : no tool
   touches it, and the output it changes still goes through it.

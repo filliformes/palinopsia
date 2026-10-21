@@ -320,7 +320,7 @@
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>volume</td><td class="arg">f 0..2</td><td class="desc">The <b>Audio Layer</b>'s volume, a gain (1 = as it comes).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>mix</td><td class="arg">f 0..1</td><td class="desc">A to B : 0.5 plays both whole, toward an end the other one fades out.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>mute</td><td class="arg">≥ 0.5</td><td class="desc">Mute the Audio Layer.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>play</td><td class="arg">≥ 0.5</td><td class="desc">Both files from their in points <b>together</b> (≥ 0.5), or both paused.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>play</td><td class="arg">≥ 0.5</td><td class="desc">Both files from their in points <b>together</b> (≥ 0.5), or both paused. Advertised, but never sent back by the feedback, so a destination that echoes its state can't restart the files mid-show (the per-slot <code>play</code> is sent).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/volume · pan · mute</td><td class="arg">f</td><td class="desc">A slot's volume (a gain, 0..2), <b>pan</b> (-1 left .. 1 right), mute (≥ 0.5). A file or a live input.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/play · loop · ignoreglobal · keeppitch</td><td class="arg">≥ 0.5</td><td class="desc">A file slot's <b>transport</b>; keep the pitch when its speed changes.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/speed · position · in · out</td><td class="arg">f 0..1</td><td class="desc">A file slot's speed (log, like a video's; a sound plays 1/16× to 16×), a one-shot seek, the trim points.</td></tr>
@@ -343,7 +343,7 @@
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
-          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator : a <code>shaderId</code> (a shader of your own from the Source Editor goes by its <code>user-…</code> id), a built-in's display <b>name</b>, or <code>none</code>. The one already there keeps its settings; an unknown name empties the slot, like <code>none</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator : a <code>shaderId</code> (a shader of your own from the Source Editor goes by its <code>user-…</code> id), a built-in's display <b>name</b>, or <code>none</code>. The one already there keeps its settings. <code>none</code> empties the slot; a name it does not know leaves the slot as it is.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A source shader <b>input</b>, scaled to its range.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-source</b> FX unit <code>i</code>.</td></tr>
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-layer</b> FX unit <code>i</code>.</td></tr>
@@ -370,8 +370,8 @@
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/mode</td><td class="arg">i · f · s</td><td class="desc">Bond character : <code>off · lean · hocket · cut · gate · drift</code>.</td></tr>
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/amount</td><td class="arg">f 0..1</td><td class="desc">Coupling <b>depth</b>.</td></tr>
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/tightness</td><td class="arg">f 0..1</td><td class="desc">Vestigial (0) ↔ obvious (1).</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/feature</td><td class="arg">i · f · s</td><td class="desc">The audio <b>feature</b> that drives it : <code>level · flux · transient · centroid · band · pitch · noisiness</code> (index 0 to 6).</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/band</td><td class="arg">i 0..5 · f 0..1</td><td class="desc">Which of the six <b>bands</b> the <code>band</code> feature listens to : a whole number, <code>0</code> the lowest to <code>5</code> the highest, or a fraction 0..1 across the six. A whole number counts as the band whatever its type tag, so a float <code>1.0</code> is band 1 (the second) : send <code>0.99</code> or <code>5</code> for the highest.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/feature</td><td class="arg">i 0..6 · f · s</td><td class="desc">The audio <b>feature</b> that drives it : <code>level · flux · transient · centroid · band · pitch · noisiness</code>. An index (0 to 6) or a name reaches all seven; a float 0..1 spreads over the first six, <code>level</code> to <code>pitch</code>, as it always did, so <code>noisiness</code> takes index <code>6</code> or its name. Advertised and mirrored as a whole number 0..6.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/band</td><td class="arg">i 0..5 · f 0..1</td><td class="desc">Which of the six <b>bands</b> the <code>band</code> feature listens to : a whole number, <code>0</code> the lowest to <code>5</code> the highest, or a fraction 0..1 across the six. A whole number counts as the band whatever its type tag (a float <code>1.0</code> is band 1, the second). Advertised and mirrored as a whole number 0..5, so a fader built from the advertisement reaches every band.</td></tr>
         </tbody>
       </table>
     </div>
@@ -507,6 +507,7 @@
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>transient</td><td class="arg">f 0..1</td><td class="desc"><b>Onset</b> / attack energy.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>centroid</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>brightness</b>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>pitch</td><td class="arg">f 0..1</td><td class="desc">Estimated <b>pitch</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audio/</span>noisiness</td><td class="arg">f 0..1</td><td class="desc"><b>Noisiness</b> (spectral flatness) : a clear tone at 0, noise at 1.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>band/<span class="v">{1-6}</span></td><td class="arg">f 0..1</td><td class="desc">Energy in one of six frequency <b>bands</b>.</td></tr>
         </tbody>
       </table>
@@ -669,23 +670,23 @@
           <code>i</code>, the picture's features read-only. Shader inputs on sources and FX racks are not listed
           (address them by name); the three finishing units' and the Background ground's float inputs are.</p>
         <p>On this computer only (it listens on <code>127.0.0.1</code>; on <code>port-1</code> when the OSC port is 65535).
-          The tree is read when OSC in starts (at launch, or when IN is switched on or its port changes), so the rows
-          that follow what is loaded (a slot's film or sound, the Audio Layer's slots, the ground's inputs, the body
-          features) are the ones there then : switch IN off and on to read it again.</p>
+          The tree follows what is loaded : while OSC in listens, it is published again (at most twice a second)
+          whenever the rows change, a source or an effect loaded, a slot's film or sound, the Audio Layer's slots,
+          the ground's inputs, the Body camera and its features.</p>
         <p class="flow">http://127.0.0.1:<span class="a">port+1</span>/  ·  ?HOST_INFO</p>
       </div>
       <div class="card">
         <h3>OSCQuery · WebSocket</h3>
         <p>A live value-stream on the same port for web / no-UDP clients, every 100 ms while one is attached.
           With no <code>LISTEN</code> a client gets every path; <code>LISTEN</code> narrows it to the paths named,
-          <code>IGNORE</code> drops one. Triggers, seeks and the audio sensors are never streamed.</p>
+          <code>IGNORE</code> drops one. Triggers, seeks, the audio sensors and <code>/opsia/audiolayer/play</code> are never streamed.</p>
         <p class="flow">→ {COMMAND:<span class="a">"LISTEN"</span>, DATA:"/opsia/…"}<br>← {FULL_PATH, VALUE:[v]}</p>
       </div>
       <div class="card">
         <h3>Outbound feedback</h3>
         <p>A throttled diff-and-send loop (every 100 ms) pushes only <b>changed</b> controls back to a configured
           host:port : the same <code>/opsia/…</code> addresses and values as OSCQuery advertises, indices as ints.
-          It follows what is loaded live. Triggers, seeks and the audio sensors are never echoed. Pandore's UI tracks Opsia's.</p>
+          It follows what is loaded live. Triggers, seeks, the audio sensors and <code>/opsia/audiolayer/play</code> are never echoed. Pandore's UI tracks Opsia's.</p>
         <p class="flow"><span class="a">Opsia</span> → UDP → host:port</p>
       </div>
       <div class="card">
@@ -699,7 +700,9 @@
       live, with its address, values and destination.</p>
     <p class="blurb">The same addresses are played by two other routes : the <b>dataflou</b> mesh (each of its
       destinations is an <code>/opsia/…</code> address, played once per change) and the <b>Agent (MCP)</b>'s
-      <code>osc</code> tool (<code>/opsia/…</code> only; a trigger it sends fires every time).</p>
+      <code>osc</code> tool (<code>/opsia/…</code> only; a trigger it sends fires every time). The agent's numbers go as
+      0..1 floats, as on the wire, so <code>1</code> is the top of a menu; an int goes only to an index address, or as
+      <code>{"int": n}</code>.</p>
   </section>
 
   <footer>
