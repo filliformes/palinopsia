@@ -7,6 +7,14 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **50add, a blend mode** (Vincent, placed just before add) : an additive crossfade.
+  Layer blend : opacity 0 the stack alone, 0.5 the layer added on it at full, 1 the
+  layer alone (`B·min(1, 2−2a) + T·min(1, 2a)`); A/B mix : the same with A and B, the
+  slider reads A↔B. Shader index 19 (`modeIndex`), second in `BLEND_MODES` (so OSC
+  indices after normal moved up one); dealt by Randomize; the Agent's blend list.
+  Measured : red under green, 0 / 0.25 / 0.5 / 0.75 / 1 give red, red + half green,
+  yellow, half red + green, green.
+
 - **Persistent controls and layers, and Set in every scene** (Vincent : a code change had
   him re-enter parameters across a set's scenes). Right-click a control → **Persistent** :
   scenes (recall, the sequencer, the scene pad), Randomize, Variation, the layer dice,

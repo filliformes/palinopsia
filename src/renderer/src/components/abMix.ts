@@ -5,7 +5,7 @@ import type { BlendMode, LayerCoupling } from '@shared/types'
 
 /** A short word for the slider in this mode. */
 export function mixWord(mode: BlendMode): string {
-  if (mode === 'normal') return 'A↔B'
+  if (mode === 'normal' || mode === '50add') return 'A↔B'
   if (mode === 'weave') return 'depth'
   if (mode === 'lumakey') return 'key'
   if (mode === 'consume') return 'hunger'
@@ -15,6 +15,7 @@ export function mixWord(mode: BlendMode): string {
 /** The slider's tooltip in this mode. */
 export function mixTitle(mode: BlendMode): string {
   if (mode === 'normal') return 'A to B : 0 is A alone, 1 is B alone. Double-click resets to 0.5'
+  if (mode === '50add') return 'A to B, added in the middle : 0 is A alone, 0.5 is A plus B, 1 is B alone. Double-click resets to 0.5'
   if (mode === 'weave') return 'Weave depth : how far each source displaces the other (the two always show half and half). Double-click resets to 0.5'
   if (mode === 'lumakey') return 'Key : how bright A must be to show; B fills the rest. Double-click resets to 0.5'
   if (mode === 'consume') return 'Hunger : how hard the two sources eat into each other (they never settle back to A alone). Double-click resets to 0.5'

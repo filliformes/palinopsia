@@ -605,7 +605,7 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
 // they blow out too easily for the matte register).
 const BLENDS = [
   'normal', 'add', 'subtract', 'multiply', 'screen', 'overlay', 'softlight',
-  'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap', 'lightercolor'
+  'hardlight', 'darken', 'lighten', 'difference', 'exclusion', 'wrap', 'lightercolor', '50add'
 ] as const
 // The A/B source mix can also use the relation modes (Weave / Lumakey / the
 // stateful Consume). They work on layers too, but a blind layer draw keeps to the

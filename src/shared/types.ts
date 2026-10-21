@@ -26,9 +26,13 @@ export type BlendMode =
   | 'lumakey'
   | 'consume'
   | 'lightercolor'
+  // 50 add : an additive crossfade. Opacity 0 shows the layers below, 0.5 adds the
+  // layer on top of them at full, 1 shows the layer alone (the stack faded out).
+  | '50add'
 
 export const BLEND_MODES: BlendMode[] = [
   'normal',
+  '50add', // (just before add, as Vincent asked; its shader index stays 19)
   'add',
   'subtract',
   'multiply',

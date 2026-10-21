@@ -121,7 +121,7 @@ export const MCP_TOOLS: McpToolDef[] = [
       properties: {
         layer: { type: ['number', 'string'], description: '1-4, or "bg".' },
         opacity: { type: 'number' },
-        blend: { type: 'string', description: 'normal add subtract multiply screen overlay softlight hardlight darken lighten difference exclusion dodge burn wrap weave lumakey consume lightercolor' },
+        blend: { type: 'string', description: 'normal 50add add subtract multiply screen overlay softlight hardlight darken lighten difference exclusion dodge burn wrap weave lumakey consume lightercolor' },
         mix: { type: 'number' },
         source_blend: { type: 'string' },
         mute: { type: 'boolean' },

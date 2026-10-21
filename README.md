@@ -285,7 +285,7 @@ typical layer takes about a third less height than before. Each of the **4 layer
 | **A/B mix** (`MIX`) | `sourceBlend` (how B meets A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix`, whose meaning follows the mode and is named beside it : **A↔B** (normal : 0 = A only, 1 = B only), **blend** (the other per-pixel modes : 0 = A, 1 = the full blend), **depth** (weave), **key** (lumakey), **hunger** (consume). Dimmed until B has a source. A **≈** chip shows the layer is coupled to the sound (click : the Mixer). The A/B **hue** harmony and the **coupling** are set in the [Mixer](#the-mixer). |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
-| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)) : the Out stage's **blend** tab, which shows the mode playing now (a modulated one too). |
+| **Blend** (`BLEND`) | How the layer composites onto the stack below ([20 blend modes](#blend-modes)) : the Out stage's **blend** tab, which shows the mode playing now (a modulated one too). |
 | **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : its place on an **X/Y pad**, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. In the Out stage's **mask** tab. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
@@ -2432,10 +2432,15 @@ last word on the frame.
 
 ### Blend modes
 
-19 modes, shared by the layer→stack blend and (via `sourceBlend`) the A/B mix,
-in index order (for OSC): `normal, add, subtract, multiply, screen, overlay,
+20 modes, shared by the layer→stack blend and (via `sourceBlend`) the A/B mix,
+in index order (for OSC): `normal, 50add, add, subtract, multiply, screen, overlay,
 softlight, hardlight, darken, lighten, difference, exclusion, dodge, burn, wrap,
 weave, lumakey, consume, lightercolor`.
+
+**50add** is an additive crossfade, the mixer's way of fading clips : the layer's
+opacity at 0 shows the layers below alone, at 0.5 it adds the layer on top of them
+at full, at 1 it shows the layer alone (the stack faded out under it). On the A/B
+mix the same with A and B : 0 is A, 0.5 is A plus B, 1 is B.
 
 **lightercolor** (TouchDesigner / Photoshop's *Lighter Color*) keeps the WHOLE pixel
 of whichever side is brighter, so hues never mix channel by channel the way

@@ -106,6 +106,9 @@ vec3 blendMode(int mode, vec3 b, vec3 t){
   // lighter color : the WHOLE pixel of whichever
   // side is brighter wins, so hues never mix channel by channel like lighten.
   if(mode==18) return dot(t, vec3(0.299,0.587,0.114)) > dot(b, vec3(0.299,0.587,0.114)) ? t : b;
+  // 50 add : its crossfade lives in each pass's main() (it uses the opacity / the
+  // mix itself); a plain add where a pass has no amount.
+  if(mode==19) return min(b+t, 1.0);
   return t;                                                 // fallback (15-17 live in main())
 }`;
 
@@ -167,6 +170,12 @@ void main(){
     c = blendMode(mode, B.rgb, T.rgb);
   }
   float a = T.a * opacity * maskValue(uv, T.rgb);
+  if (mode == 19) {
+    // 50 ADD : an additive crossfade. 0 the stack alone, 0.5 the layer added on
+    // top of it at full, 1 the layer alone (the stack faded out under it).
+    o = vec4(min(B.rgb * min(1.0, 2.0 - 2.0 * a) + T.rgb * min(1.0, 2.0 * a), 1.0), max(B.a, a));
+    return;
+  }
   o = vec4(mix(B.rgb, c, a), max(B.a, a));
 }`;
 
@@ -241,6 +250,11 @@ void main(){
     float edge = 1.0 - abs(phi - 0.5) * 2.0;         // 1 at the migrating boundary
     vec3 embrace = (A.rgb + B.rgb) * 0.5;
     o = vec4(mix(front, embrace, edge * 0.4), max(A.a, B.a));
+    return;
+  }
+  if(mode==19){
+    // 50 ADD : A alone at 0, A plus B at 0.5, B alone at 1.
+    o = vec4(min(A.rgb * min(1.0, 2.0 - 2.0 * x) + B.rgb * min(1.0, 2.0 * x), 1.0), max(A.a, B.a * min(1.0, 2.0 * x)));
     return;
   }
   vec3 c = blendMode(mode, A.rgb, B.rgb);
@@ -1877,7 +1891,7 @@ export class Compositor {
     normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, overlay: 5,
     softlight: 6, hardlight: 7, darken: 8, lighten: 9, difference: 10,
     exclusion: 11, dodge: 12, burn: 13, wrap: 14, weave: 15, lumakey: 16, consume: 17,
-    lightercolor: 18
+    lightercolor: 18, '50add': 19
   };
 
   constructor(public canvas: HTMLCanvasElement, public w = 1920, public h = 1080) {
