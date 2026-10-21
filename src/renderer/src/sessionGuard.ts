@@ -59,14 +59,23 @@ let settleTimer: ReturnType<typeof setTimeout> | null = null
 
 // Your own hands on the controls : what separates an edit from the engine
 // settling a freshly loaded session (collage pools rescanned, defaults filled).
-if (typeof window !== 'undefined') {
-  const touch = (): void => {
-    lastInput = performance.now()
-  }
-  window.addEventListener('pointerdown', touch, true)
-  window.addEventListener('keydown', touch, true)
-  window.addEventListener('wheel', touch, { capture: true, passive: true })
+// The Output page's own window listens too (watchUserInput).
+const touch = (): void => {
+  lastInput = performance.now()
 }
+/** Count a window's pointer, keys and wheel as your hands on the controls.
+ *  Returns the undo. */
+export function watchUserInput(w: Window): () => void {
+  w.addEventListener('pointerdown', touch, true)
+  w.addEventListener('keydown', touch, true)
+  w.addEventListener('wheel', touch, { capture: true, passive: true })
+  return () => {
+    w.removeEventListener('pointerdown', touch, true)
+    w.removeEventListener('keydown', touch, true)
+    w.removeEventListener('wheel', touch, { capture: true })
+  }
+}
+if (typeof window !== 'undefined') watchUserInput(window)
 
 /** The session on screen now matches its file (just loaded or saved), or is a
  *  fresh New / Generate not worth asking about. Changes the engine makes while

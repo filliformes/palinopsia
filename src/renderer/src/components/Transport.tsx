@@ -99,17 +99,22 @@ export function Transport(): JSX.Element {
   const outputOn = useStore((s) => s.outputActive)
   // Right-click on Output : open it in a window beside the controls (the picture
   // the projector gets, the domemaster on the dome) to tweak while watching it.
+  // A fullscreen or spanned output stays on its projector (main refuses, says why).
   const [outMenu, setOutMenu] = useState<{ x: number; y: number } | null>(null)
   const openWindowedOutput = async (): Promise<void> => {
     try {
-      await window.api.outputOpen(-1, true) // -1 : the screen the controls are on
+      const r = await window.api.outputOpen(-1, true) // -1 : the screen the controls are on
+      if (typeof r === 'string') {
+        showToast(r, 'warn')
+        return
+      }
       useStore.getState().setOutputActive(true)
     } catch (e) {
       showToast(`The output window did not open : ${(e as Error).message}`, 'warn')
     }
   }
   const outItems: MenuItem[] = [
-    { label: 'Open Output in a window', onClick: () => void openWindowedOutput() },
+    { label: 'Watch the Output in a window', onClick: () => void openWindowedOutput() },
     ...(outputOn
       ? [{ label: 'Close Output', onClick: () => { void window.api.outputClose().then(() => useStore.getState().setOutputActive(false)) } }]
       : []),

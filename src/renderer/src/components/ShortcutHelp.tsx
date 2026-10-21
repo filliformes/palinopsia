@@ -88,7 +88,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Right-click an M', 'Clear all the modulation on that control'],
       ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],
       ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
-      ['Right-click Output', 'Output in a window · the Output page in a window']
+      ['Right-click Output', 'Watch the Output in a window · the Output page in a window']
     ]
   },
   {

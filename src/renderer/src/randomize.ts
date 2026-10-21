@@ -261,7 +261,13 @@ const DERIVED_COLORS: Record<string, (out: Record<string, number | number[]>, sk
 // (a string, a sidechain), so a random draw would just say "OPSIA" at strangers.
 // Native engines that need nothing from the user (`dice` : Reaction, the
 // organic engines) stay in, as their ISF forerunners were.
-const RANDOM_GENERATORS = GENERATORS.filter((g) => !g.native || g.dice)
+// The ray-marched volumes (Oil Cloud, Cloud Study) stay out of every dice too :
+// each holds 60 fps alone, but dealt on several slots at once, or as the ground
+// under four layers, at 4K or on the dome they would drop frames. They stay in
+// the pickers, OSC and their Generate themes.
+const HEAVY_GENERATORS = new Set(['oil-cloud', 'cloud-study'])
+const RANDOM_GENERATORS = GENERATORS.filter((g) => (!g.native || g.dice) && !HEAVY_GENERATORS.has(g.id))
+const BG_DICE_SOURCES = BG_SOURCES.filter((g) => !HEAVY_GENERATORS.has(g.id))
 function randomSlot(): SourceSlot {
   const gen = pick(RANDOM_GENERATORS)
   return { kind: 'generator', shaderId: gen.id, inputs: randomizeInputs(gen.id, {}) }
@@ -671,7 +677,7 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
  *  Draws from the curated background source set; keeps opacity + speed +
  *  depth + blendMode (the user's framing of the ground survives the dice). */
 export function randomizeBackground(cur: BackgroundState | undefined): BackgroundState {
-  const gen = pick(BG_SOURCES)
+  const gen = pick(BG_DICE_SOURCES)
   return {
     ...cur,
     source: { kind: 'generator', shaderId: gen.id, inputs: randomizeInputs(gen.id, {}) },

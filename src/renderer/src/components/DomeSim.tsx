@@ -193,12 +193,16 @@ export function DomeSim({ cfg, cam, flat = false }: {
     let seen = -1
     let texSize = 0
 
+    // The clock and the pixel ratio of the window the canvas is in : the Output
+    // page can sit in a window of its own, on another screen (another DPI), and
+    // keep painting while the controls are minimized (their rAF stalls).
+    const view = canvas.ownerDocument.defaultView ?? window
     let raf = 0
     const draw = (): void => {
-      raf = requestAnimationFrame(draw)
+      raf = view.requestAnimationFrame(draw)
       const c = cfgRef.current
       const cm = cam.current!
-      const dpr = window.devicePixelRatio || 1
+      const dpr = view.devicePixelRatio || 1
       const W = Math.max(2, Math.round(canvas.clientWidth * dpr)), H = Math.max(2, Math.round(canvas.clientHeight * dpr))
       if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H }
       const halfAp = (c.aperture * Math.PI) / 360
@@ -277,9 +281,9 @@ export function DomeSim({ cfg, cam, flat = false }: {
       gl.drawElements(gl.TRIANGLES, nIdx, gl.UNSIGNED_INT, 0)
       gl.bindVertexArray(null)
     }
-    raf = requestAnimationFrame(draw)
+    raf = view.requestAnimationFrame(draw)
     return () => {
-      cancelAnimationFrame(raf)
+      view.cancelAnimationFrame(raf)
       gl.deleteTexture(tex)
       gl.deleteBuffer(flatBuf); gl.deleteVertexArray(flatVao); gl.deleteProgram(flatProg)
       gl.deleteBuffer(bPos); gl.deleteBuffer(bAng); gl.deleteBuffer(bIdx)

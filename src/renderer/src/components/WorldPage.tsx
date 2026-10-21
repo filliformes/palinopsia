@@ -36,7 +36,7 @@ const COUPLING_INFO: Record<string, string> = {
 // A World switched to film starts from a gentle hand-made character.
 const FILM_START: Record<string, number> = {
   filmHold: 1, filmRate: 8, filmJitter: 0.3, filmBoil: 0.35, filmFlutter: 0.2, filmBlank: 0,
-  filmDust: 0.2, filmScratch: 0.2, filmHair: 0, filmGranule: 0, filmSplice: 0
+  filmDust: 0.2, filmScratch: 0.2, filmGranule: 0, filmSplice: 0
 }
 const AMOUNT_TARGET: ModTarget = { kind: 'world', field: 'amount' }
 
@@ -129,9 +129,13 @@ function WorldEditor(): JSX.Element {
   keysRef.current = { step, applySelected }
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      const t = e.target as HTMLElement | null
+      // (an event sent to the window itself has no element for a target)
+      const t = e.target instanceof Element ? (e.target as HTMLElement) : null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
+      // A page drawn over this one has the keys : Enter here would apply a World out of sight.
+      const st = useStore.getState()
+      if (st.sourceEditorOpen || st.sequencePageOpen || st.bodyPageOpen || st.resolumePageOpen) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault(); e.stopPropagation()
         keysRef.current.step(1)
@@ -344,7 +348,7 @@ function WorldEditor(): JSX.Element {
                   className={`rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
                     w.finalizer ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
                   }`}
-                  title="A film World holds frames and wears dust, scratches and hair; without film, applying it switches the film off"
+                  title="A film World holds frames and wears dust and scratches; without film, applying it switches the film off"
                 >
                   {w.finalizer ? 'film on' : 'film off'}
                 </button>

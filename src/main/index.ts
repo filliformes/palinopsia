@@ -553,6 +553,17 @@ function createWindow(): void {
       if (/^https?:\/\//i.test(d.url)) shell.openExternal(d.url)
       return { action: 'deny' }
     })
+    // Alt+E opens the Source Editor from here too, taken before the page as in the
+    // control window : its hidden menu bar would else open an Edit menu. Not on
+    // macOS (no such menu; Option+E is the accent key, the page forwards it).
+    if (process.platform !== 'darwin') {
+      child.webContents.on('before-input-event', (e, input) => {
+        if (input.type !== 'keyDown' || !input.alt || input.control || input.meta) return
+        if (input.key.toLowerCase() !== 'e' && input.code !== 'KeyE') return
+        e.preventDefault()
+        mainWindow?.webContents.send('app:shortcut', 'sourceEditor')
+      })
+    }
     child.on('closed', () => {
       if (outputPageWindow === child) outputPageWindow = null
     })
@@ -1029,6 +1040,14 @@ app.whenReady().then(async () => {
     }))
   })
   safeHandle('output:open', (_e, displayId, windowed) => {
+    // -1 (Watch the Output in a window, beside the controls) never takes a live
+    // projector off its screen : a fullscreen or spanned output stays, and the
+    // renderer gets why for a toast.
+    if (displayId === -1 && outputWindow && !outputWindow.isDestroyed() && (outputKind === 'full' || outputKind === 'span')) {
+      return outputKind === 'span'
+        ? 'The Output spans the projectors : it stays there. Close it first to watch it in a window here.'
+        : 'The Output is fullscreen on its screen : it stays there. Close it first to watch it in a window here.'
+    }
     openOutputWindow(displayId as number, windowed as boolean)
     return true
   })

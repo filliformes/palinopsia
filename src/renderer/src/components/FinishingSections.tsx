@@ -148,19 +148,18 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       id: 'damage',
       title: 'film damage',
       color: C.earth,
-      inputs: ['filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt', 'filmBurst'],
+      inputs: ['filmDust', 'filmScratch', 'filmGauge', 'filmDirt', 'filmBurst'],
       labels: { filmDust: 'dust', filmScratch: 'scratch', filmGauge: 'gauge', filmBurst: 'burst ▸' },
       dim: (v, ctx): Record<string, string> => {
-        const any = live(v, ctx, 'filmDust', 0) || live(v, ctx, 'filmScratch', 0) || live(v, ctx, 'filmHair', 0)
+        const any = live(v, ctx, 'filmDust', 0) || live(v, ctx, 'filmScratch', 0)
         if (any) return {}
-        const why = 'Dust, scratch and hair are all 0 : there is no damage to size or place.'
+        const why = 'Dust and scratch are both 0 : there is no damage to size or place.'
         return { filmGauge: why, filmDirt: why }
       },
       summary: (v) => {
         const on = [
           num(v, 'filmDust', 0) > 0.001 && 'dust',
-          num(v, 'filmScratch', 0) > 0.001 && 'scratch',
-          num(v, 'filmHair', 0) > 0.001 && 'hair'
+          num(v, 'filmScratch', 0) > 0.001 && 'scratch'
         ].filter(Boolean)
         return on.length ? on.join(' · ') : 'clean'
       }
