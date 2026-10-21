@@ -1539,8 +1539,10 @@ and steepens its skirt, and a bell at 6 is a gentler, wider one). The card shows
 curve in miniature with the **input** and **output** meters (the same meters as the
 master's), and a **presets** menu (also in the editor) : **flat**, the EQs you saved,
 **＋ save as…** (a name; the same name asks before replacing) and **✕ delete** for the
-one in use. A saved EQ is its twelve bands and its input and output gains; recalling
-one keeps the bypass switch and the glue as they are. The menu shows the preset's name
+one in use. A saved EQ is its twelve bands, its input and output gains and its **glue**
+(on / off, amount, voice); recalling one brings all of it and keeps the bypass switch
+(a preset saved before the glue was part of it leaves the glue as it is; **flat**
+leaves it too). The menu shows the preset's name
 while the EQ is set to it. They are kept on this computer (the EQ belongs to the room),
 and `/opsia/sonify/eq/preset` recalls one over OSC (a name, or its number in the menu;
 0 or `flat` : flat). **⤢ edit** pops it out into a large editor : the curve over the live

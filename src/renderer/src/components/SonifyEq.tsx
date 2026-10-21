@@ -333,8 +333,8 @@ function EqPresetMenu({ eq, setEq, className = '' }: { eq: SoniEq; setEq: (next:
           else { const p = eqPresets.get(v); if (p) setEq(eqPresets.applied(eq, p)) }
         }}
         title={cur
-          ? `The EQ is set to "${cur}". Recall another saved EQ, save this one under a name, or delete "${cur}". A recall keeps the bypass switch and the glue. Saved on this computer.`
-          : 'Saved EQs : recall one (its bands and its input and output gains; the bypass switch and the glue stay), or save this one under a name. Saved on this computer.'}
+          ? `The EQ is set to "${cur}". Recall another saved EQ, save this one under a name, or delete "${cur}". A recall brings its glue too and keeps the bypass switch. Saved on this computer.`
+          : 'Saved EQs : recall one (its bands, its input and output gains and its glue; the bypass switch stays), or save this one under a name. Flat leaves the glue as it is. Saved on this computer.'}
       >
         <option value="">{list.length ? 'presets' : 'no presets'}</option>
         <option value="__flat">flat</option>

@@ -7,6 +7,12 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **An Output EQ preset carries the Glue** (Vincent, from the shelf) : saving stores the
+  glue (on / off, amount, voice) with the bands and gains (`eqPresets.ts`, `withGlue`);
+  a recall brings it back and keeps the bypass switch; presets saved before keep the glue
+  playing; **flat** leaves it; the menu shows a preset's name only while the glue matches
+  too. OSC `/opsia/sonify/eq/preset` recalls the same way.
+
 - **Blend menus : our own list, always opening downward** (Vincent : the layer's blend
   menu opened upward : Chromium flips a native `<select>` that doesn't fit below).
   `components/BlendSelect.tsx` replaces the four blend-mode selects (layer A/B mode and
