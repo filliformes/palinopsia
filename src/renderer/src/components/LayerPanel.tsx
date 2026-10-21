@@ -399,7 +399,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             <FxChips
               scope={{ kind: 'layer', layer: index }}
               fx={layer.fx}
-              leading={<FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />}
+              leading={
+                <>
+                  <FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />
+                  {/* the whole chain off, or all back on (as on each source) */}
+                  {layer.fx.length > 0 && <ChainSwitch scope={{ kind: 'layer', layer: index }} fx={layer.fx} />}
+                </>
+              }
             />
           </Stage>
           <StageArrow />
@@ -709,8 +715,8 @@ function PowerIcon({ size = 10 }: { size?: number }): JSX.Element {
   )
 }
 
-// One source's whole effect chain on or off : lit while every unit is on, half
-// lit while some are off; a click turns them all off, or all back on.
+// One effect chain on or off (a source's, the layer's) : lit while every unit
+// is on, half lit while some are off; a click turns them all off, or all back on.
 function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['scope']; fx: Parameters<typeof FxChips>[0]['fx'] }): JSX.Element {
   const toggleRackChain = useStore((s) => s.toggleRackChain)
   const on = fx.filter((f) => f.enabled).length
