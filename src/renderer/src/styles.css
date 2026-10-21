@@ -89,9 +89,23 @@
 }
 
 /* A pinned control : a thin bar just left of it (Pin.tsx PinZone wraps it
-   with no box of its own, so the layout never moves). */
+   with no box of its own, so the layout never moves). The bar joins the
+   control's own shadows, never replaces them : a ring (Tailwind's, e.g. a
+   modulated blend's accent2 ring) and an entry box's inset (--input-inset). */
 [data-pinned] > *:first-child {
-  box-shadow: -4px 0 0 -2px rgb(var(--c-pin));
+  box-shadow:
+    -4px 0 0 -2px rgb(var(--c-pin)),
+    var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow, 0 0 #0000);
+}
+[data-pinned] > .input:first-child {
+  box-shadow:
+    -4px 0 0 -2px rgb(var(--c-pin)),
+    var(--tw-ring-offset-shadow, 0 0 #0000),
+    var(--tw-ring-shadow, 0 0 #0000),
+    var(--tw-shadow, 0 0 #0000),
+    var(--input-inset, 0 0 #0000);
 }
 
 /* ======== Theme palettes ======== */

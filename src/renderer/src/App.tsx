@@ -97,7 +97,7 @@ import { ConfirmModal, SaveChangesModal } from './components/PromptModal'
 import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
 import { recentSessions } from './recentSessions'
 import { baseName, droppedPaths, isFileDrag, openDroppedSession, setSessionDropOpener } from './components/fileDrop'
-import { ContextMenu as RecentMenu } from './components/ContextMenu'
+import { ContextMenu as RecentMenu, MenuHost } from './components/ContextMenu'
 import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
 import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
@@ -2429,6 +2429,8 @@ export default function App(): JSX.Element {
       {leaveAsk && <SaveChangesModal title={leaveAsk.title} detail={leaveAsk.detail} onChoose={leaveAsk.done} />}
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       <Toaster />
+      {/* every right-click menu opens here, over everything */}
+      <MenuHost />
     </div>
   )
 }

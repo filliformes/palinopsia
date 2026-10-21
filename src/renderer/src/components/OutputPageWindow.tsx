@@ -13,6 +13,7 @@ import { useStore } from '../store'
 import { watchUserInput } from '../sessionGuard'
 import { OutputPage } from './OutputPage'
 import { Toaster, showToast } from './Toast'
+import { MenuHost } from './ContextMenu'
 
 const BOUNDS_KEY = 'opsia.outputPageBounds'
 
@@ -183,6 +184,7 @@ export function OutputPageWindow({ canvasRef }: { canvasRef: RefObject<HTMLCanva
     <div className="flex flex-col bg-bg font-app text-text" style={{ zoom: uiZoom, height: `calc(100vh / ${uiZoom})` }}>
       <OutputPage canvasRef={canvasRef} inWindow />
       <Toaster undocked />
+      <MenuHost />
     </div>,
     host
   )
