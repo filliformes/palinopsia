@@ -205,6 +205,7 @@ function MixerColumn({
   const setCoupling = useStore((s) => s.setCoupling)
   const couplingOn = useStore((s) => s.couplingOn)
   const audioOff = useStore((s) => !s.audioEnabled)
+  const anySolo = useStore((s) => s.composition.layers.some((x) => x.solo))
 
   const a = slotName(l.sourceA)
   const b = slotName(l.sourceB)
@@ -434,7 +435,9 @@ function MixerColumn({
       </div>
 
       {/* ── LAYER : how it lands on the stack. */}
-      <Section label="LAYER" />
+      <Section label="LAYER">
+        <ActiveTag a={a} b={b} mute={l.mute} solo={l.solo} anySolo={anySolo} opacity={l.opacity} />
+      </Section>
       <div className="flex min-h-0 w-full flex-1 gap-1">
         <VFader label="OPA" value={l.opacity} min={0} max={1} step={0.01} onChange={(v) => setOpacity(index, v)} midiId={`layer:${index}:opacity`} />
         <VFader label="SPD" value={l.speed} min={0} max={20} step={0.05} onChange={(v) => setLayerSpeed(index, v)} />
@@ -463,6 +466,30 @@ function Section({ label, children }: { label: string; children?: ReactNode }): 
       <span className="truncate">{label}</span>
       {children}
     </div>
+  )
+}
+
+// Does the layer show in the stack ? Active : it has a source and nothing
+// hides it (the same rule the compositor draws by : a soloed layer elsewhere
+// hides every other one, else mute does). The title says why not.
+function ActiveTag({ a, b, mute, solo, anySolo, opacity }: { a: string | null; b: string | null; mute: boolean; solo: boolean; anySolo: boolean; opacity: number }): JSX.Element {
+  const why =
+    a === null && b === null
+      ? 'no source : pick one in the layer'
+      : anySolo && !solo
+        ? 'another layer is soloed'
+        : !anySolo && mute
+          ? 'muted'
+          : opacity <= 0
+            ? 'opacity at 0'
+            : null
+  return (
+    <span
+      className={`shrink-0 normal-case tracking-normal ${why ? 'text-muted/60' : 'text-accent'}`}
+      title={why ? `Inactive : ${why}` : 'Active : this layer shows in the stack'}
+    >
+      {why ? 'inactive' : 'active'}
+    </span>
   )
 }
 

@@ -276,16 +276,16 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
       {!collapsed && (
         <>
           {/* The layer reads top to bottom in the order the picture goes
-              through it, its four steps numbered on a rail down the left :
-              (1) the two sources, side by side, (2) where they meet, (3) the
-              effects on the mixed picture, (4) how it lands on the layers below
-              (tabs, a drawer opened on demand). Speed and Vary, which act on all
-              of it, share the last line, under a rule. No boxes, no titles :
-              as compact as the old strip. */}
+              through it, its four steps named in the left margin, each on a
+              panel of its color : IN the two sources, side by side, MIX where
+              they meet, FX the effects on the mixed picture, OUT how it lands
+              on the layers below (tabs, a drawer opened on demand). Speed and
+              Vary, which act on all of it, share the last line, under a rule.
+              No boxes, no title lines : as compact as the old strip. */}
           <div className="relative flex min-w-0 flex-col gap-1.5">
             {/* 1 · SOURCES */}
             <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[1] }}>
-              <RailBadge n={1} title="Sources : what the layer shows (A and B, each with its own effects)" />
+              <StepLabel n={1} title="Sources : what the layer shows (A and B, each with its own effects)" />
               <div className="flex min-w-0 flex-1 items-start gap-1.5">
                 <SourceRow
                   card
@@ -329,7 +329,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 The A/B harmony and the coupling live in the Mixer (M) : the ≈
                 chip says this layer is coupled. */}
             <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[2] }}>
-              <RailBadge n={2} title={hasB ? `Mix : how A and B meet (${mixWord(layer.sourceBlend)})` : 'Mix : no Source B yet, pick one above'} />
+              <StepLabel n={2} title={hasB ? `Mix : how A and B meet (${mixWord(layer.sourceBlend)})` : 'Mix : no Source B yet, pick one above'} />
               <div className={`flex min-w-0 flex-1 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`}>
                 <div className="flex min-h-[26px] min-w-0 items-center gap-1.5">
                   <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
@@ -392,7 +392,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
             {/* 3 · LAYER FX : the effects on the mixed picture */}
             <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[3] }}>
-              <RailBadge n={3} title="Layer FX : the effects on the mixed picture" />
+              <StepLabel n={3} title="Layer FX : the effects on the mixed picture" />
               <div className="flex min-h-[26px] min-w-0 flex-1 items-center">
                 <FxChips
                   scope={{ kind: 'layer', layer: index }}
@@ -411,7 +411,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             {/* 4 · OUT : how it lands on the layers below. Each tab says where
                 it stands; a click opens its drawer, another closes it. */}
             <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[4] }}>
-              <RailBadge n={4} title="Out : how the layer lands on the layers below" small />
+              <StepLabel n={4} title="Out : how the layer lands on the layers below" small />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
               <div className="flex min-w-0 overflow-hidden rounded border border-border">
                 {(
@@ -736,10 +736,8 @@ function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['
   )
 }
 
-// A step's number (the order the picture goes through the layer), in the step's
-// color, centered on its row's first line; the title says what the step does.
 // Each step's color (styles.css --c-step1..4 : sources, mix, layer FX, out) :
-// its badge, its panel's tint, an edge where it needs one.
+// its word, its panel's tint, an edge where it needs one.
 const STEP_TINT: Record<number, string> = {
   1: 'rgb(var(--c-step1) / 0.1)', 2: 'rgb(var(--c-step2) / 0.1)', 3: 'rgb(var(--c-step3) / 0.1)', 4: 'rgb(var(--c-step4) / 0.1)'
 }
@@ -747,14 +745,19 @@ const STEP_EDGE: Record<number, string> = {
   1: 'rgb(var(--c-step1) / 0.5)', 2: 'rgb(var(--c-step2) / 0.5)', 3: 'rgb(var(--c-step3) / 0.5)', 4: 'rgb(var(--c-step4) / 0.5)'
 }
 
-function RailBadge({ n, title, small = false }: { n: number; title: string; small?: boolean }): JSX.Element {
+// A step's word in the left margin (IN, MIX, FX, OUT : the order the picture
+// goes through the layer), in the step's color, centered on its row's first
+// line; the title says what the step does. As narrow as the number it replaced.
+const STEP_WORD: Record<number, string> = { 1: 'IN', 2: 'MIX', 3: 'FX', 4: 'OUT' }
+
+function StepLabel({ n, title, small = false }: { n: number; title: string; small?: boolean }): JSX.Element {
   return (
     <span
-      className={`relative z-10 flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full font-sans text-[9px] font-medium ${small ? 'mt-[3px]' : 'mt-[5px]'}`}
-      style={{ background: `rgb(var(--c-step${n}))`, color: 'rgb(24 24 24)' }}
+      className={`w-[17px] shrink-0 cursor-default select-none font-mono text-[9px] leading-[13px] ${small ? 'mt-[4px]' : 'mt-[6px]'}`}
+      style={{ color: `rgb(var(--c-step${n}))` }}
       title={title}
     >
-      {n}
+      {STEP_WORD[n]}
     </span>
   )
 }

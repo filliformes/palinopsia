@@ -27,7 +27,11 @@ that CI builds into cross-platform releases.
   each step on a soft panel of its own color (styles.css `--c-step1..4`, blue, orange,
   violet, teal, at a tenth : the same in every theme), the badges in those colors, the
   rail gone; each panel takes 2 px of the gaps above and below, so the height is
-  unchanged (232 px); the Out drawer sits inside step 4's panel (326 → 323).
+  unchanged (232 px); the Out drawer sits inside step 4's panel (326 → 323). Then
+  (Vincent : the old strip's words in the margin said what each part did) : the badges
+  become words, **IN**, **MIX**, **FX**, **OUT**, each in its step's color, centered on
+  the step's first line (`StepLabel`, as narrow as the badge, the tooltips kept);
+  heights unchanged (typical 228 px, luma mask + feedback 320).
 - **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
   three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
   Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,
@@ -58,6 +62,11 @@ that CI builds into cross-platform releases.
   means in each mode (`abMix.ts` : A↔B, blend, depth, key, hunger), dims without a B and
   shows a ≈ chip while coupled (click : the Mixer). Its mode menu is as wide as its
   longest mode (no fixed width : "lightercolor" was cut), the same width in every mode.
+  Then (Vincent : nothing said whether a layer had anything on it) : beside each
+  column's LAYER title, **active** or **inactive** (`ActiveTag`), by the compositor's
+  own rule : a source in A or B, not muted (or soloed, when any layer is), opacity
+  above 0. The tooltip names the reason (no source, muted, opacity at 0, another layer
+  soloed).
 - **The A/B harmony is relative to A** (`engine/abHarmony.ts`) : it rotated B's hue by a
   fixed angle whatever A was (so "consonant" did nothing, and a red A with a cyan B
   became consonant at 1). Now −1 pulls B's mean hue onto A's, 1 onto A's complement, 0

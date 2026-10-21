@@ -254,13 +254,14 @@ down : the Background strip first, then Layer 1 to Layer 4, then the
 [Audio Layer](#the-audio-layer) (the sound).
 
 Each layer's strip reads top to bottom in the order the picture goes through it,
-in four numbered steps, each on a faint panel of its own color (sources blue, mix
-orange, layer FX violet, out teal) : **1 Sources** (A and B side by side, each with its
+in four steps, each on a faint panel of its own color (sources blue, mix orange,
+layer FX violet, out teal) and named in the left margin in that color (hover a name
+for what the step does) : **IN** (sources A and B side by side, each with its
 picker and "+ fx" on one line, its effects under them, led by a **power** button
-that turns that source's whole chain off, or all back on), two lines running down
-from them into **2 Mix** (where A and B meet : the slider, the mix in **percent**
-in a box you can type in, the mode), **3 Layer FX** (with the same **power** button) (the effects on the mixed picture), and
-**4 Out** (how the layer lands on the layers below : three tabs, **blend**,
+that turns that source's whole chain off, or all back on), **MIX** (where A and B
+meet : the slider, the mix in **percent** in a box you can type in, the mode),
+**FX** (the effects on the mixed picture, with the same **power** button), and
+**OUT** (how the layer lands on the layers below : three tabs, **blend**,
 **mask** and **feedback**, each showing where it stands; a click opens its drawer,
 another closes it; feedback on or off keeps the layer's height). **Speed** and
 **Vary**, which act on the whole layer, share the last line, under a rule. A
@@ -383,7 +384,10 @@ top to bottom in the order the picture flows :
   past its threshold and fires again only once it has fallen back (a held note flashes
   once instead of parking the layer on B); **gate**'s tightness hardens its edge. A
   recalled scene keeps a drifting layer's momentum.
-- **LAYER**, how it lands on the stack : opacity and speed faders, the blend.
+- **LAYER**, how it lands on the stack : opacity and speed faders, the blend. Beside
+  its title, **active** or **inactive** : whether the layer shows in the stack at all.
+  Inactive when it has no source, is muted, sits at opacity 0, or another layer is
+  soloed; the tooltip says which.
 
 A column without a Source B shows its A·B part dimmed. The **M** chips (mix, hue) open
 the modulator row under the four columns. The header holds the mix presets (they keep
