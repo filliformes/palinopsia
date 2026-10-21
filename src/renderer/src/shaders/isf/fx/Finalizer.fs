@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain, video-editor-style, and an OPACITY that fades the whole output toward black) for the finishing grade, a round of SHARPEN, and the physically-modeled GRAIN (film / digital sensor / CRT / VHS) over the whole graded picture so it shares one grain structure (grain size counts 1080p pixels and scales with the output). The output shape fill, film damage and the cameraless granulation are added after this shader, natively, so they carry no grain. All neutral at defaults.",
+  "DESCRIPTION": "Finalizer : the last always-on master stage after Context: a final 'EQ/compressor' for the whole output. LEVELS (input black/white + gamma + per-channel R/G/B gain, video-editor-style, and an OPACITY that fades the whole output toward black) for the finishing grade, a round of SHARPEN, and the physically-modeled GRAIN (film / digital sensor / CRT / VHS) over the whole graded picture so it shares one grain structure (grain size counts 1080p pixels and scales with the output; on the dome, film and digital grain are drawn after the mapping, in the master's own pixels, where the size counts pixels of a 4096 master). The output shape fill, film damage and the cameraless granulation are added after this shader, natively, so they carry no grain. All neutral at defaults.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Color", "Master"],
@@ -62,15 +62,11 @@
 // pipeline slot, none reachable from ISF. Declared here only so the auto-UI shows
 // them in the Finalizer; this shader ignores them.
 
+// (hash21 / vnoise : the parasites' helpers, below)
 float hash21(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
-}
-vec2 hash22(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.xx + p3.yz) * p3.zy);
 }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -78,11 +74,14 @@ float vnoise(vec2 p) {
   return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
              mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-float gauss(float u1, float u2) {
-  return sqrt(-2.0 * log(max(u1, 1e-6))) * cos(6.2831853 * u2);
-}
 
 // @parasites
+// @grain
+
+// 1 while the dome stage draws the film and digital grain itself, after the
+// mapping, in master pixels (lib/finalGrain.glsl, engine/domeSignal.ts) : this
+// shader then leaves them out, so the dome never blows the grain up 2-4x.
+uniform float DOME_GRAIN;
 
 // LEVELS grade at a UV (input black/white → gamma → per-channel gain). Pulled
 // out so the anaglyph stage can grade a horizontally-displaced second "eye".
@@ -158,34 +157,12 @@ void main() {
   // a 4K or 4096 master (it used to shrink 2-4x there).
   float gs = max(grainSize, 1.0) * max(1.0, RENDERSIZE.y / 1080.0);
   if (grain > 0.001) {
+    // Film and digital (lib/finalGrain.glsl) : on the dome, drawn by the dome
+    // stage in master pixels instead.
     if (character == 1) {
-      float seed = mod(floor(TIME * 24.0), 32749.0);
-      vec2 jit = hash22(vec2(seed, 1.0)) * 64.0;
-      vec2 p = gl_FragCoord.xy / (gs * 1.9) + jit;
-      float g = vnoise(p) * 0.62 + vnoise(p * 2.3 + 11.0) * 0.38 - 0.5;
-      g = sign(g) * pow(abs(g) * 2.0, 1.3) * 0.5;
-      float mid = pow(1.0 - abs(2.0 * l - 1.0), 0.6);
-      vec3 gn = vec3(g);
-      if (chroma > 0.001) {
-        gn = mix(vec3(g), vec3(vnoise(p + vec2(19.0, 3.0)) - 0.5, g, vnoise(p + vec2(7.0, 23.0)) - 0.5) * 1.1, chroma);
-      }
-      add = gn * grain * 1.15 * mid;
+      if (DOME_GRAIN < 0.5) add = finalFilmGrain(gl_FragCoord.xy, gs, l, TIME, chroma, grain);
     } else if (character == 0) {
-      float fs = mod(floor(TIME * 30.0), 4096.0);
-      // One sensel per grain cell : the hash needs whole-number-spaced input
-      // (an unfloored coordinate made the size knob do nothing). The frame
-      // offset is wrapped small so the hash keeps its precision.
-      vec2 pxg = floor(gl_FragCoord.xy / gs);
-      vec2 fo = vec2(mod(fs * 37.0, 1024.0), mod(fs * 91.0, 1024.0));
-      float shot = gauss(hash21(pxg + fo), hash21(pxg + fo + 57.0)) * sqrt(clamp(l, 0.02, 1.0));
-      float read = gauss(hash21(pxg + fo + 123.0), hash21(pxg + fo + 199.0)) * 0.5;
-      float prnu = (hash21(pxg) - 0.5) * 0.12 * l;
-      vec3 gn = vec3(shot * 0.7 + read * 0.45 + prnu);
-      if (chroma > 0.001) {
-        float cn = hash21(floor(pxg * 0.5) + fo * 0.5) - 0.5;
-        gn += vec3(cn, -cn * 0.3, -cn) * chroma * 0.35 * (1.0 - l * 0.7);
-      }
-      add = gn * grain * 0.55;
+      if (DOME_GRAIN < 0.5) add = finalDigitalGrain(gl_FragCoord.xy, gs, l, TIME, chroma, grain);
     } else if (character == 2) {
       float row = floor(gl_FragCoord.y / gs);
       float seed = mod(floor(TIME * 50.0), 4096.0);

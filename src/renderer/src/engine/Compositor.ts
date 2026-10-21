@@ -60,8 +60,8 @@ installTextureBridge();
 import type { BlendMode, LayerMask } from '@shared/types';
 import type { DomeConfig, DomeModField } from '@shared/dome';
 import { DOME_MOD_RANGE, defaultSourceFit, isDomeFill } from '@shared/dome';
-import { DomeStage } from './dome';
-import { domeFill, setDomeFill } from './domeSignal';
+import { DomeStage, type DomeGrain } from './dome';
+import { domeFill, setDomeFill, setDomeGrain } from './domeSignal';
 import { OutXformStage, outXformActive } from './outXform';
 import type { OutXform, OutXformField } from '@shared/outXform';
 import { OUT_IDENTITY, OUTX_MOD_RANGE } from '@shared/outXform';
@@ -1823,6 +1823,10 @@ export class Compositor {
   // `lastPresent` stays the FLAT composite : snapshots, vision and sonify read it.
   private dome: DomeStage | null = null;
   private domeCfg: DomeConfig | null = null;
+  // The Finalizer's grain, which the dome stage draws after the mapping while the
+  // dome is on (film / digital : the Finalizer leaves them out then, DOME_GRAIN).
+  private domeGrain: DomeGrain = { amount: 0, character: 1, size: 1.5, chroma: 0, alpha: 1 };
+  private domeGrainOpac = 1; // the Finalizer unit's dry / wet
   // Output transform (flat output only) : the finished frame moved as one
   // picture. `outTex` is what the canvas and every capture show while it is
   // active; `lastPresent` stays the unmoved frame (crossfade and freeze copies,
@@ -2763,6 +2767,8 @@ export class Compositor {
   private syncDomeFill(): void {
     const d = this.domeCfg;
     setDomeFill(isDomeFill(d) && d ? 180 / Math.max(90, d.aperture) / Math.max(0.05, d.scale) : 0);
+    // any mapping : the dome stage draws the Finalizer's film / digital grain
+    setDomeGrain(!!d);
   }
   /** The dome slider's value this frame, null while the dome is off. */
   domeParam(field: DomeModField): number | null {
@@ -3092,6 +3098,15 @@ export class Compositor {
     this.fdGauge = Math.round(numf(fi.filmGauge, 1));
     this.fdDirt = Math.round(numf(fi.filmDirt, 0));
     this.fdBurst = numf(fi.filmBurst, 0);
+    // Its grain, for the dome stage (drawn there in master pixels).
+    this.domeGrainOpac = fin ? fin.opacity ?? 1 : 0;
+    this.domeGrain = {
+      amount: numf(fi.grain, 0) * this.domeGrainOpac,
+      character: Math.round(numf(fi.character, 1)),
+      size: numf(fi.grainSize, 1.5),
+      chroma: numf(fi.chroma, 0),
+      alpha: numf(fi.alpha, 1)
+    };
 
     // Context PBR surface: feed the selected material's maps (or the neutral
     // flat set) into the Context unit's image inputs every frame. Lazy : no
@@ -3148,6 +3163,12 @@ export class Compositor {
           case 'filmGauge': this.fdGauge = Math.round(value); break;
           case 'filmDirt': this.fdDirt = Math.round(value); break;
           case 'filmBurst': this.fdBurst = value; break;
+          // (the grain : the shader takes it, the dome stage reads it too)
+          case 'grain': this.domeGrain.amount = value * this.domeGrainOpac; break;
+          case 'character': this.domeGrain.character = Math.round(value); break;
+          case 'grainSize': this.domeGrain.size = value; break;
+          case 'chroma': this.domeGrain.chroma = value; break;
+          case 'alpha': this.domeGrain.alpha = value; break;
         }
       }
       return;
@@ -3740,10 +3761,11 @@ export class Compositor {
       try {
         if (!this.dome) this.dome = new DomeStage(gl);
         gl.bindVertexArray(this.vao);
-        this.domeTex = this.dome.render(present, this.w / this.h, this.domeCfg, timeMs / 1000);
+        this.domeTex = this.dome.render(present, this.w, this.h, this.domeCfg, timeMs / 1000, this.domeGrain);
       } catch (e) {
         console.error((e as Error).message);
         this.domeCfg = null;
+        setDomeGrain(false); // the Finalizer draws its grain again
       }
     }
     // Present to canvas : warped (keystone quad) or straight full-screen.

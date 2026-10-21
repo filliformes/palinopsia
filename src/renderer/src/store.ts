@@ -322,6 +322,10 @@ function persistSpace(c: SpaceConfig): SpaceConfig {
   }, 300)
   return c
 }
+// Flash safety's default (mild), and the tighter one the dome takes while the
+// performer has left it there (strong : setDome).
+const STROBE_SAFE_DEFAULT = 0.35
+const STROBE_SAFE_DOME = 0.7
 function loadDome(): DomeConfig {
   try {
     const raw = localStorage.getItem('opsia.dome')
@@ -1837,6 +1841,9 @@ interface StoreState {
   // Strobe-safety limiter (photosensitive) : 0 = off, higher = tighter flash cap.
   strobeSafe: number
   setStrobeSafe: (v: number) => void
+  // While the dome holds Flash safety at its tighter default : the level to give
+  // back when the dome turns off (null : the level is yours). Never persisted.
+  strobeSafeDomeBack: number | null
   // Sonify (the S page) : the image-to-sound engine's whole config. Persisted
   // to localStorage (per-machine, like OSC config), pushed to the engine on
   // every write : one write path, same as everything else.
@@ -4218,6 +4225,16 @@ export const useStore = create<StoreState>((set, get) => ({
     // the Satosphère square (if armed) comes with the dome and goes with it
     if (on && !was) enterDomeSquare(get(), set)
     else if (!on && was) leaveDomeSquare(get(), set)
+    // Flash safety : a flash fills the whole field of view on a dome. Left at its
+    // default (mild), it tightens to strong while the dome is on and gives mild
+    // back when the dome goes off; a level set by hand (any other, or one picked
+    // while the dome is on) stays yours.
+    const fs = get()
+    if (on && !was && Math.abs(fs.strobeSafe - STROBE_SAFE_DEFAULT) < 0.005) {
+      set({ strobeSafe: STROBE_SAFE_DOME, strobeSafeDomeBack: fs.strobeSafe })
+    } else if (!on && was && fs.strobeSafeDomeBack !== null) {
+      set({ strobeSafe: fs.strobeSafeDomeBack, strobeSafeDomeBack: null })
+    }
   },
   outXform: OUT_IDENTITY,
   setOutXform: (patch) => set((s) => ({ outXform: sanitizeOutXform({ ...s.outXform, ...patch }) })),
@@ -4473,13 +4490,15 @@ export const useStore = create<StoreState>((set, get) => ({
   // (only >~17% full-field mean-luminance jumps get damped) but nets real strobes.
   strobeSafe: (() => {
     const n = lsNum('opsia.strobeSafe')
-    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : STROBE_SAFE_DEFAULT
   })(),
   setStrobeSafe: (v) => {
     const s = Math.max(0, Math.min(1, v))
     localStorage.setItem('opsia.strobeSafe', String(s))
-    set({ strobeSafe: s })
+    // by hand : the dome's tighter default (if in force) gives nothing back
+    set({ strobeSafe: s, strobeSafeDomeBack: null })
   },
+  strobeSafeDomeBack: null,
   sonifyPageOpen: false,
   setSonifyPageOpen: (on) => set({ sonifyPageOpen: on }),
   sourceEditorOpen: false,

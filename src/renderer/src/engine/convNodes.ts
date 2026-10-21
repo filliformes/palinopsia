@@ -12,6 +12,9 @@
 
 import { glGeneration } from './glGeneration'
 import { CodecMoshNode } from './codecMosh'
+import { domeFill } from './domeSignal'
+// The dome's disc helpers, shared with the ISF shaders' "// @dome" (Feedback).
+import DOME_GLSL from '../shaders/isf/lib/dome.glsl?raw'
 
 export interface ChainLike {
   next(): { fbo: WebGLFramebuffer; tex: WebGLTexture }
@@ -303,6 +306,7 @@ uniform float uKeyThresh, uKeySoft, uBorder, uBorderHue, uHueCurve, uDelayMix, u
 uniform int uBlend, uKeyMode, uRingCols, uRingRows, uDelayTileR, uDelayTileG, uDelayTileB, uRoute, uPlacement;
 ${GLSL_HASH}
 ${GLSL_PM}
+${DOME_GLSL}
 // One tile of the delay ring atlas at uv, inset half a texel (no seam bleeding in
 // from the neighboring tile).
 vec4 ringTap(int tile, vec2 uv){
@@ -332,12 +336,25 @@ void main(){
   // + drift. Rotation runs in aspect-true space, so the spiral stays rigid at
   // 16:9 instead of shearing into an ellipse. Small values → structure emerges
   // slowly, stays matte.
-  vec2 c = vUV - uPivot;
-  c.x *= uAspect;
-  float ca = cos(uRot), sa = sin(uRot);
-  c = mat2(ca, -sa, sa, ca) * (c * uScaleZ); // uScaleZ = (1 - zoom)^frames : zoom>0 magnifies outward
-  c.x /= uAspect;
-  vec2 ruv = c + uPivot + uOff;
+  vec2 ruv;
+  if (DOME_FILL > 0.0) {
+    // On the full dome the loop zooms and turns on the dome's disc, about the
+    // pivot carried to the middle and back (lib/dome.glsl) : its echoes nest as
+    // rounds and no corner of the frame ever swings into view. Past the rim reads
+    // past the frame (the live picture there, below).
+    vec2 a = domeDisc(uPivot);
+    float al = length(a);
+    if (al > 0.95) a *= 0.95 / al;
+    vec2 z = domeRot(domeShift(domeDisc(vUV), a) * uScaleZ, -uRot);
+    ruv = dot(z, z) <= 1.0 ? domeFrame(domeShift(z, -a)) + uOff : vec2(-1.0);
+  } else {
+    vec2 c = vUV - uPivot;
+    c.x *= uAspect;
+    float ca = cos(uRot), sa = sin(uRot);
+    c = mat2(ca, -sa, sa, ca) * (c * uScaleZ); // uScaleZ = (1 - zoom)^frames : zoom>0 magnifies outward
+    c.x /= uAspect;
+    ruv = c + uPivot + uOff;
+  }
   vec4 host = texture(uHost, vUV);
 
   // Self-displacement by the buffer's own hue/value (the "alive" term : organic
@@ -2723,6 +2740,7 @@ export class FeedbackNode implements ConvNode {
       gl.uniform1f(p.u('uRot'), clampf(num(inp.rotate, 0), -0.3, 0.3) * tmul * f)
       gl.uniform2f(p.u('uOff'), clampf(num(inp.driftX, 0), -0.1, 0.1) * f, clampf(num(inp.driftY, 0), -0.1, 0.1) * f)
       gl.uniform2f(p.u('uPivot'), pvx, pvy)
+      gl.uniform1f(p.u('DOME_FILL'), domeFill())
       gl.uniform1f(p.u('uWarp'), clampf(num(inp.warp, 0.4), 0, 1) * f)
       gl.uniform1f(p.u('uHue'), clampf(num(inp.hue, 0), -0.5, 0.5) * f)
       gl.uniform1f(p.u('uHueCurve'), clampf(num(inp.hueCurve, 0), 0, 1))

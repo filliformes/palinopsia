@@ -11,9 +11,14 @@
   ]
 }*/
 
+// @dome
+
 void main() {
   vec2 uv = isf_FragNormCoord;
-  vec2 dir = vec2(cos(angle), sin(angle));
+  // On the full dome the angle turns with the point's place (lib/dome.glsl) :
+  // at the front it reads as flat, and all round a vertical streak runs up to
+  // the zenith and down the walls, a horizontal one round the dome.
+  vec2 dir = domeDir(uv, vec2(cos(angle), sin(angle)));
   const int TAPS = 16;
   // Interleaved gradient noise (Jimenez 2014) : a per-pixel offset that slides
   // every tap between its fixed steps, so SMOOTH fills the gaps between the

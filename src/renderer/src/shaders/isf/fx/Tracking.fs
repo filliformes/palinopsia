@@ -23,6 +23,8 @@
 uniform float PH_rate;
 uniform float PH_roll; // wrap 16.666666666666668
 
+// @dome
+
 const float TAU = 6.28318530718;
 
 float hash(vec2 p) {
@@ -45,13 +47,24 @@ float wd(float a, float b) {
 
 void main() {
   vec2 uv = isf_FragNormCoord;
+  // On the full dome (lib/dome.glsl) the tape's lines are RINGS round the
+  // zenith : the band sits low on the walls (the frame's bottom) and creeps up
+  // them to the zenith, and the wobble twists the rings round the dome instead
+  // of shifting rows sideways. Across the lines (yy) : up the frame, or up the
+  // dome from the frame's rim (0) to the zenith (1), half a frame height (lk :
+  // units of yy in a frame height).
+  bool dome = DOME_FILL > 0.0;
+  vec2 pol = dome ? domePolar(uv) : vec2(0.0);
+  float yy = dome ? 1.0 - pol.y : uv.y;
+  float xx = dome ? pol.x + 0.5 : uv.x;
+  float lk = dome ? 2.0 : 1.0;
   float t = mod(floor(TIME * 6.0 + PH_rate * 44.0), 32749.0); // field-rate flutter
-  float line = floor(uv.y * 300.0);
+  float line = floor(yy * 300.0 / lk);
 
   // ── The tracking band: `position` places it, `roll` creeps it upward. ──
   float center = fract(position + PH_roll * 0.06);
-  float bandHalf = band * 0.5 * (0.8 + 0.2 * hash(vec2(t, 1.0)));
-  float d = wd(uv.y, center);
+  float bandHalf = band * 0.5 * lk * (0.8 + 0.2 * hash(vec2(t, 1.0)));
+  float d = wd(yy, center);
   float inBand = 1.0 - smoothstep(bandHalf * 0.4, bandHalf, d);
 
   // ── Auto-wandering FREEZE line (the reference's actualXLine): a narrow row
@@ -59,7 +72,7 @@ void main() {
   // row snaps to the line : one row smeared across a stripe of the frame. ──
   float fLine = mod(0.5 + ((1.0 + sin(0.34 * TIME)) / 2.0 + (1.0 + sin(TIME)) / 3.0 +
     (1.0 + cos(2.1 * TIME)) / 3.0 + (1.0 + cos(0.027 * TIME)) / 2.0) / 3.5, 1.0);
-  float fWidth = freeze * 0.06 * ((1.0 + sin(1.2 * TIME)) / 2.0 +
+  float fWidth = freeze * 0.06 * lk * ((1.0 + sin(1.2 * TIME)) / 2.0 +
     (1.0 + cos(3.91 * TIME)) / 3.0 + (1.0 + cos(0.014 * TIME)) / 2.0) / 3.5;
 
   // Per-line wobble: strong inside the band, a whisper elsewhere.
@@ -70,19 +83,25 @@ void main() {
   // never-still jitter), scaled like the reference's analogDistort/RENDERSIZE.
   // The hash needs whole-number inputs (a continuous uv.y makes it a sawtooth) :
   // one draw per tape line (480, like the parasites) and per field, wrapped.
-  float rX = rand3(vec3(floor(uv.y * 480.0), floor(fLine * 4096.0), mod(floor(TIME * 59.94), 4096.0)));
+  float rX = rand3(vec3(floor(yy * 480.0 / lk), floor(fLine * 4096.0), mod(floor(TIME * 59.94), 4096.0)));
   // 9 px of a 1080p frame's half-width, taken relative to the frame height so
   // the jitter is the same share of the frame at 4K or on the dome.
   shift += distort * 18.0 * rX / (1080.0 * RENDERSIZE.x / RENDERSIZE.y);
 
   vec2 c = vec2(fract(uv.x + shift), uv.y);
-  if (freeze > 0.001 && wd(uv.y, fLine) < fWidth) c.y = fLine; // the frozen row
+  bool frozen = freeze > 0.001 && wd(yy, fLine) < fWidth;
+  if (frozen) c.y = fLine; // the frozen row
+  if (dome) {
+    // the ring turned as far round as a flat line shifts across at the horizon;
+    // the frozen line is a ring, read at its own radius
+    c = domeFrame(domeRot(domeDisc(uv) * ((1.0 - (frozen ? fLine : yy)) / max(pol.y, 1e-5)), 2.0 * shift / domeHorizon()));
+  }
   vec4 s = IMG_NORM_PIXEL(inputImage, c);
 
   // Inside the band: luminance flutter + white dropout dashes.
   float flutter = 1.0 - inBand * noise * 0.4 * hash(vec2(line, t + 7.0));
   float dash = inBand * step(0.94 - noise * 0.08, hash(vec2(line, t + 13.0))) *
-    step(hash(vec2(floor(uv.x * 24.0), line + t)), 0.4);
+    step(hash(vec2(floor(xx * (dome ? 64.0 : 24.0)), line + t)), 0.4);
   vec3 col = s.rgb * flutter + vec3(0.9) * dash;
 
   // ── Tinted chroma bleed (the reference's signature): the red channel
@@ -109,7 +128,7 @@ void main() {
   }
 
   // Head-switch flash rides the band's lower edge (wraps with the roll).
-  float headSwitch = (1.0 - smoothstep(0.0, 0.012, wd(uv.y, fract(center - bandHalf)))) * 0.5;
+  float headSwitch = (1.0 - smoothstep(0.0, 0.012 * lk, wd(yy, fract(center - bandHalf)))) * 0.5;
   col += vec3(headSwitch);
 
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), s.a);

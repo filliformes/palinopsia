@@ -43,6 +43,8 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// @dome
+
 // Spectrum (row 1, log-spaced : 0 bass .. 1 treble), 0..1. Bare-identifier coord.
 float spec(float u) {
   vec2 ac = vec2(clamp(u, 0.0, 1.0), 0.75);
@@ -81,9 +83,12 @@ void main() {
       if (hash12(cell * 1.7) < 0.35) continue; // sparse flock
       float h1 = hash12(cell + 9.1);
       float h2 = hash12(cell + 3.7);
-      // This bird's wind.
+      // This bird's wind. On the full dome HEADING is taken from the bird's own
+      // place (lib/dome.glsl) : up is to the zenith, down the walls, sideways
+      // round the dome, so the flock wheels about the zenith instead of all
+      // streaming one way across it. Flat : one heading, as ever.
       float a = wind0 + (vnoise(cell * cf + drift) - 0.5) * 2.0 * spread;
-      vec2 w = vec2(cos(a), sin(a));
+      vec2 w = domeDir((cell + 0.5) / vec2(count * aspect, count), vec2(cos(a), sin(a)));
       vec2 perp = vec2(-w.y, w.x);
       // Travelling density waves : each bird surges along its heading on a
       // phase that varies smoothly across the flock (a noise field turning

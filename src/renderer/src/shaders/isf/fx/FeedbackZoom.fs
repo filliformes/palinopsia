@@ -24,6 +24,8 @@
 // ∫drift dt, so a drift change alters the pace from here on, never the place.
 uniform float PH_drift;
 
+// @dome
+
 // Layer clock : a 1×1 latch keeps fract(TIME) in 16 bits, so each frame can
 // read the previous frame's clock and step the feedback by the LAYER's time
 // (Speed, freeze and the background's slow clock carry through).
@@ -77,15 +79,31 @@ void main() {
   vec2 ctr = center + wander * easedDrift(dts) * 0.18 * vec2(1.0 / aspect, 1.0);
 
   // Sample the previous feedback frame through the inverse zoom/twist.
-  vec2 p = uv - ctr;
-  p.x *= aspect;
   float tw = twist * dts;
-  float cs = cos(-tw);
-  float sn = sin(-tw);
-  p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
-  p /= pow(zoom, dts);
-  p.x /= aspect;
-  vec2 sc = p + ctr;
+  vec2 sc;
+  bool inside;
+  if (DOME_FILL > 0.0) {
+    // On the full dome the tunnel twists and zooms on the dome's disc, about its
+    // center carried to the middle and back (lib/dome.glsl) : the echoes nest as
+    // rounds and no corner of the frame ever swings into view. Past the rim is
+    // where the zoomed frame leaves the picture (EDGE, below).
+    vec2 a = domeDisc(ctr);
+    float al = length(a);
+    if (al > 0.95) a *= 0.95 / al;
+    vec2 z = domeRot(domeShift(domeDisc(uv), a), -tw) / pow(zoom, dts);
+    inside = dot(z, z) <= 1.0;
+    sc = domeFrame(domeShift(z, -a));
+  } else {
+    vec2 p = uv - ctr;
+    p.x *= aspect;
+    float cs = cos(-tw);
+    float sn = sin(-tw);
+    p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+    p /= pow(zoom, dts);
+    p.x /= aspect;
+    sc = p + ctr;
+    inside = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;
+  }
   vec2 c = clamp(sc, 0.0, 1.0);
   vec4 prev = IMG_NORM_PIXEL(fbz, c);
   vec4 live = IMG_NORM_PIXEL(inputImage, uv);
@@ -94,7 +112,6 @@ void main() {
   if (clear || prev.a < 0.5 / 255.0) prev = live;
   // Where the zoomed frame leaves the picture : live (no echo there), black (a
   // nested frame), or the clamped edge texel (the border smears inward).
-  bool inside = sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0;
   if (!inside) {
     if (edge == 0) prev = live;
     else if (edge == 1) prev = vec4(0.0, 0.0, 0.0, live.a);

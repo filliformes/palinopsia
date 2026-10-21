@@ -21,6 +21,8 @@
   ]
 }*/
 
+// @dome
+
 float sdBox(vec2 p, vec2 b) {
   vec2 d = abs(p) - b;
   return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
@@ -102,12 +104,20 @@ void main() {
   if (shape == 0) {
     // Inverse transform: center, un-rotate, un-zoom, un-pan.
     vec2 p = uv - 0.5;
-    p.x *= aspect;
-    float cs = cos(-rotate);
-    float sn = sin(-rotate);
-    p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
-    p /= max(zoom, 0.001);
-    p.x /= aspect;
+    if (DOME_FILL > 0.0) {
+      // On the full dome the frame is a disc about the zenith : ROTATE turns it
+      // there (lib/dome.glsl), so no corner of the frame ever swings into view.
+      // Zoom and pan as flat.
+      if (rotate != 0.0) p = domeFrame(domeRot(domeDisc(uv), -rotate)) - 0.5;
+      p /= max(zoom, 0.001);
+    } else {
+      p.x *= aspect;
+      float cs = cos(-rotate);
+      float sn = sin(-rotate);
+      p = vec2(p.x * cs - p.y * sn, p.x * sn + p.y * cs);
+      p /= max(zoom, 0.001);
+      p.x /= aspect;
+    }
     vec2 c = p + 0.5 - vec2(posX, posY) * 0.5;
 
     if (wrap) {

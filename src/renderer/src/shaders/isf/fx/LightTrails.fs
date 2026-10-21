@@ -20,6 +20,8 @@
 
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
+// @dome
+
 // Layer clock : a 1×1 latch keeps fract(TIME) in 16 bits, so each frame can
 // read the previous frame's clock and step the decay by the LAYER's time
 // (Speed, freeze and the background's slow clock carry through; reverse
@@ -50,7 +52,10 @@ float hash13(vec3 p3) {
 // The buffer pass and the output pass both compute it, so the output shows
 // THIS frame's light (no one-frame lag).
 vec3 decayedTrail(vec2 uv, float dts) {
-  vec2 d = vec2(cos(angle), sin(angle)) * drift * dts;
+  // On the full dome the drift's angle turns with the point's place
+  // (lib/dome.glsl) : trails drift up to the zenith or down the walls all round,
+  // or round the dome, never one way across it.
+  vec2 d = domeDir(uv, vec2(cos(angle), sin(angle))) * drift * dts;
   vec2 sc = uv - d;
   vec4 pv = IMG_NORM_PIXEL(buf, sc);
   // Nothing drifts in from outside the frame : clamp-to-edge would pull the

@@ -892,7 +892,7 @@ export function OutputPage({
             </div>
           </Section>
 
-          <Section title="Flash safety" defaultCollapsed info="A safety net on the final image, after the common flash-safety guidance (no more than three flashes a second). It measures brightness in linear light, plus saturated red, over regions of the frame, and counts each region's flashes over the last second. A region that flashes faster than the limit (Shutter, Superimposition, Frame-Weave, film blanks, strobe-paced cuts…) is held to a gentle pulse until it stops; cuts, motion and everything else pass untouched. Mild is on by default. It lowers the risk; it can't promise that no harmful flash ever gets through.">
+          <Section title="Flash safety" defaultCollapsed info="A safety net on the final image, after the common flash-safety guidance (no more than three flashes a second). It measures brightness in linear light, plus saturated red, over regions of the frame, and counts each region's flashes over the last second. A region that flashes faster than the limit (Shutter, Superimposition, Frame-Weave, film blanks, strobe-paced cuts…) is held to a gentle pulse until it stops; cuts, motion and everything else pass untouched. Mild is on by default; left there, it tightens to strong while the Fulldome output is on (a flash fills the whole view on a dome) and goes back to mild after. It lowers the risk; it can't promise that no harmful flash ever gets through.">
 
             <div className="flex items-center gap-2">
               <input
