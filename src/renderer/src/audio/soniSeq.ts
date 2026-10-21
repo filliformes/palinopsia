@@ -12,7 +12,7 @@ import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { loadSoniPreset } from './soniPresets'
 import { sonifyEngine, type SoniConfig } from './sonify'
-import { rateBeats, soniBar, soniClockEpoch, soniClockStart } from './soniClock'
+import { rateBeats, soniBar, soniClockEpoch, soniClockStart, soniNextBar } from './soniClock'
 
 // BY INDEX : a saved sequencer step's voice mask is a boolean per position, so a
 // new voice is APPENDED (a mask saved before Signal reads it as off).
@@ -99,12 +99,12 @@ export function tickSonifySeq(now: number, beats: number): void {
   const dwell = sq.mode === 'bounce' ? bounceStepDuration(base, len, sq.bounceDecay, sq.cur) : base
   if (beat && epoch !== soniClockEpoch()) {
     // The beat clock was counted afresh (Ableton Link came on or off, its bar
-    // changed size) : back onto its bars. A start still waiting waits for the
-    // next one; a running sequence keeps stepping, from the grid point of the
+    // changed size, a play alone put a new grid on now) : back onto its bars. A
+    // start still waiting waits for the next one (or the play's); a running sequence keeps stepping, from the grid point of the
     // bar it is in (no step fires early for it).
     epoch = soniClockEpoch()
     const bar = soniBar()
-    if (waiting) lastStepAt = Math.ceil(beats / bar - 1e-6) * bar
+    if (waiting) lastStepAt = soniNextBar()
     else {
       const top = Math.floor(beats / bar) * bar
       lastStepAt = top + Math.floor((beats - top) / dwell) * dwell

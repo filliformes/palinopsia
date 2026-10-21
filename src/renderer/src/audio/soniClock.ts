@@ -25,6 +25,14 @@ let quantum = 4
 // Counts the times the clock was re-counted onto new bars (Link on or off, its
 // bar resized) : a running sequencer seeing it change re-aligns on them.
 let epoch = 0
+// Link's beat at the last tick : a jump in its count shows against it.
+let lastLink: number | null = null
+// Ableton Link's start / stop sync : the first bar of the session's play, on
+// Link's count, while it plays (else null). Set by ../link.ts.
+let playAt: number | null = null
+// A play's bar is still the one to start on this many beats after it : the
+// news of a play can reach here a few frames after the bar it starts on.
+const LATE = 0.25
 
 /** Advance the clock (once per frame). A stall (a hidden window) counts as a
  *  quarter second at most : the sequencers carry on instead of catching up.
@@ -45,11 +53,28 @@ export function soniClockTick(now: number, bpm: number, link: number | null = nu
       quantum = nq
       linkOffset = Math.round((beats - link) / quantum) * quantum
       epoch++
+    } else if (lastLink != null && now - last < 250) {
+      // Link's count jumped : a linked app put beat 0 on the bar its play
+      // starts on (whole bars : the offset takes them, the count goes on), or,
+      // alone, Palinopsia's own play put it on now (a new grid : the count is
+      // brought onto its bars, as for a new bar size)
+      const ahead = ((now - last) * Math.max(1, bpm)) / 60000
+      const jump = link - lastLink - ahead
+      if (Math.abs(jump) > 0.05) {
+        const bars = Math.round(jump / quantum) * quantum
+        if (Math.abs(jump - bars) < 0.05) linkOffset -= bars
+        else {
+          linkOffset = Math.round((beats + ahead - link) / quantum) * quantum
+          epoch++
+        }
+      }
     }
+    lastLink = link
     beats = link + linkOffset
     last = now
     return beats
   }
+  lastLink = null
   if (linkOffset != null) {
     linkOffset = null
     epoch++ // back to bars of 4, on this clock's own count
@@ -75,12 +100,30 @@ export function rateBeats(rate: Exclude<SoniSeqRate, 'free'>): number {
   return rate === 'b1' || rate === 'b2' ? b : (b / 4) * soniBar()
 }
 
+/** Ableton Link's play (start / stop sync) : the first bar it starts on, on
+ *  Link's count; null while it is stopped or the sync is off. */
+export function soniClockPlayAt(linkBeat: number | null): void {
+  playAt = linkBeat != null && Number.isFinite(linkBeat) ? linkBeat : null
+}
+
+/** The bar a start waiting for one begins on : the bar Link's play starts on
+ *  while it is to come or only just gone, else the next bar. */
+export function soniNextBar(): number {
+  const bar = soniBar()
+  if (linkOffset != null && playAt != null) {
+    const at = playAt + linkOffset
+    if (at >= beats - LATE && at <= beats + bar) return at
+  }
+  return Math.ceil(beats / bar - 1e-6) * bar
+}
+
 /** Where a sequencer starting now on the beat begins : the next bar when the
  *  other one already runs on the beat (they stay in phase), else right now,
  *  which becomes the top of a bar. */
 export function soniClockStart(otherOnBeat: boolean): number {
-  // Ableton Link : always the next Link bar (the count is shared, never reset)
-  if (linkOffset != null) return Math.ceil(beats / quantum - 1e-6) * quantum
+  // Ableton Link : always the next Link bar (the count is shared, never reset),
+  // or the one its play starts on
+  if (linkOffset != null) return soniNextBar()
   if (otherOnBeat) return Math.ceil(beats / 4 - 1e-6) * 4
   beats = 0
   return 0

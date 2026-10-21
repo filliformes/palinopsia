@@ -35,11 +35,15 @@ export function MidiPanel(): JSX.Element {
   const [activity, setActivity] = useState('')
   const [wired, setWired] = useState(0)
   const [clockRunning, setClockRunning] = useState(false)
+  // the follower started (with Ableton Link's start / stop sync the clock runs
+  // on while Link is stopped, the follower stopped)
+  const [clockFollowing, setClockFollowing] = useState(false)
   useEffect(() => {
     const id = window.setInterval(() => {
       setActivity(midi.lastMsg)
       setWired(midi.wiredCount)
       setClockRunning(midi.clockRunning())
+      setClockFollowing(midi.clockFollowing())
     }, 150)
     return () => window.clearInterval(id)
   }, [])
@@ -172,9 +176,9 @@ export function MidiPanel(): JSX.Element {
               onClick={() => setClockOut(!clockOut)}
               disabled={!outputName}
               className={`${pillCls(clockOut)} disabled:opacity-40`}
-              title="Send MIDI clock (24 PPQN) + Start/Stop at the app BPM, so the device follows Opsia's tempo. With Ableton Link enabled, the clock follows Link's beat and Start waits for the next Link bar. The device must be set to external / MIDI-clock sync."
+              title="Send MIDI clock (24 PPQN) + Start/Stop at the app BPM, so the device follows Opsia's tempo. With Ableton Link enabled, the clock follows Link's beat and Start waits for the next Link bar; with its start / stop sync, Start and Stop follow Link's play and stop (filled dot : the device was started), and turning the clock on plays every linked app. The device must be set to external / MIDI-clock sync."
             >
-              clock {clockOut && clockRunning ? '●' : ''}
+              clock {clockOut && clockRunning ? (clockFollowing ? '●' : '○') : ''}
             </button>
             <button
               onClick={() => midi.resyncClock()}
