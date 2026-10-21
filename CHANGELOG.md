@@ -18,7 +18,12 @@ that CI builds into cross-platform releases.
   typical layer 351 → 254, luma mask + feedback 471 → 322, shape mask + feedback + 5
   effects 537 → 368 (the boxed stages had been 421 / 447 / 507 / 527). Then : the % box
   as wide as "100", the speed and vary boxes as wide as "16.15" (measured : no clipping),
-  the layer's "+ fx" the size of the sources', a thin line between A and B.
+  the layer's "+ fx" the size of the sources', a thin line between A and B. Then : an
+  effect chip's ← → move arrows show on hover only, as a small tab over its top edge
+  (`FxRackPanel.tsx`, every rack : they took ~30 px per chip, so two effects now share a
+  line in a source's half), and FB is back in the layer header beside S and ⊘ (the
+  feedback tab keeps its state and trail). Typical layer 257 → 232 px, luma mask +
+  feedback 351 → 326 (the old strip : 383 / 474).
 - **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
   three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
   Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,

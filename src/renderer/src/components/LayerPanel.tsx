@@ -225,6 +225,12 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
           <ToggleChip label="⊘" active={layer.mute} onClick={() => toggleMute(index)} title="Mute" />
+          <ToggleChip
+            label="FB"
+            active={layer.feedback}
+            onClick={() => toggleFeedback(index)}
+            title="Feedback : this layer samples its own previous frame (trails; their length in the feedback tab)"
+          />
           <span className="relative inline-flex">
             <MidiLearnOverlay id={`rand:layer:${index}`} />
             <button

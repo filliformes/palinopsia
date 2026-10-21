@@ -305,7 +305,7 @@ function FxUnit({
         onDropOn?.(e)
       }}
       title="Drag to reorder, or into another rack (a layer ↔ the Master FX) to move it there; hold Ctrl or Alt while dropping to copy instead. Right-click for copy and paste." 
-      className={`flex min-w-0 shrink-0 cursor-grab items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
+      className={`group relative flex min-w-0 shrink-0 cursor-grab items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
         selected ? 'border-accent/70' : 'border-border'
       }`}
     >
@@ -325,22 +325,28 @@ function FxUnit({
       >
         {SHADER_BY_ID[f.shaderId ?? '']?.name ?? f.shaderId}
       </button>
-      <button
-        className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
-        onClick={() => moveFx(scope, f.id, -1)}
-        disabled={i === 0}
-        title="Move earlier in the chain"
-      >
-        ←
-      </button>
-      <button
-        className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-text disabled:opacity-30"
-        onClick={() => moveFx(scope, f.id, 1)}
-        disabled={i === count - 1}
-        title="Move later in the chain"
-      >
-        →
-      </button>
+      {/* the move arrows show on hover only, floating over the chip's top edge
+          (they take no room in the row : two chips fit where one did) */}
+      {count > 1 && (
+        <span className="absolute -top-[15px] right-0 z-20 hidden items-center rounded-t border border-b-0 border-border bg-panel2 px-0.5 group-hover:flex">
+          <button
+            className="px-0.5 font-mono text-[10px] leading-[14px] text-muted hover:text-text disabled:opacity-30"
+            onClick={() => moveFx(scope, f.id, -1)}
+            disabled={i === 0}
+            title="Move earlier in the chain"
+          >
+            ←
+          </button>
+          <button
+            className="px-0.5 font-mono text-[10px] leading-[14px] text-muted hover:text-text disabled:opacity-30"
+            onClick={() => moveFx(scope, f.id, 1)}
+            disabled={i === count - 1}
+            title="Move later in the chain"
+          >
+            →
+          </button>
+        </span>
+      )}
       <button
         className="shrink-0 px-0.5 font-mono text-[10px] text-muted hover:text-danger"
         onClick={() => removeFx(scope, f.id)}
