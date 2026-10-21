@@ -834,9 +834,23 @@ function persistMacro(key: string, v: number): void {
   )
 }
 
-function readMacro(key: string): number {
-  const v = localStorage.getItem(key)
-  return v !== null && Number.isFinite(Number(v)) ? Number(v) : 0.5
+// The Feel macros belong to the session (Session.feel) : each starts neutral,
+// New resets them, a Generate sets them for the session it makes, a session
+// brings its own back. They used to live on this computer (localStorage), so a
+// Generate's Density went on dimming the upper layers of every session after.
+type FeelMacros = NonNullable<Session['feel']>
+export const FEEL_NEUTRAL: FeelMacros = { density: 0.5, gestureTexture: 0.5, coalesce: 0.5, tonicity: 0, drift: 0, flow: 0.5 }
+function sanitizeFeel(f: unknown): FeelMacros {
+  const o = (f && typeof f === 'object' ? f : {}) as Record<string, unknown>
+  const v = (k: keyof FeelMacros): number => {
+    const n = Number(o[k])
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : FEEL_NEUTRAL[k]
+  }
+  return { density: v('density'), gestureTexture: v('gestureTexture'), coalesce: v('coalesce'), tonicity: v('tonicity'), drift: v('drift'), flow: v('flow') }
+}
+// (the keys they were kept under on this computer : gone, so none comes back)
+for (const k of ['opsia.density', 'opsia.gestureTexture', 'opsia.coalesce', 'opsia.tonicity', 'opsia.drift', 'opsia.flow']) {
+  try { localStorage.removeItem(k) } catch { /* private storage */ }
 }
 
 // Default macro-form sequencer: off, seconds clock, gentle dwell, subtle
@@ -3929,24 +3943,25 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   // Field macros (Slab 2c): each 0.5 = neutral deadzone. density (sparse↔dense),
   // gestureTexture (gesture↔texture motion character), coalesce (grain↔mass).
-  density: readMacro('opsia.density'),
-  setDensity: (v) => { persistMacro('opsia.density', v); set({ density: v }) },
-  gestureTexture: readMacro('opsia.gestureTexture'),
-  setGestureTexture: (v) => { persistMacro('opsia.gestureTexture', v); set({ gestureTexture: v }) },
-  coalesce: readMacro('opsia.coalesce'),
-  setCoalesce: (v) => { persistMacro('opsia.coalesce', v); set({ coalesce: v }) },
+  // The Feel macros are the session's (FEEL_NEUTRAL, Session.feel) : neutral at launch.
+  density: FEEL_NEUTRAL.density,
+  setDensity: (v) => set({ density: v }),
+  gestureTexture: FEEL_NEUTRAL.gestureTexture,
+  setGestureTexture: (v) => set({ gestureTexture: v }),
+  coalesce: FEEL_NEUTRAL.coalesce,
+  setCoalesce: (v) => set({ coalesce: v }),
   // Temperament controls rest at 0 (off), not the 0.5 deadzone of the field macros.
-  tonicity: (() => { const v = lsNum('opsia.tonicity'); return Number.isFinite(v) ? v : 0 })(),
-  setTonicity: (v) => { persistMacro('opsia.tonicity', v); set({ tonicity: v }) },
+  tonicity: FEEL_NEUTRAL.tonicity,
+  setTonicity: (v) => set({ tonicity: v }),
   // Shutter + Superimposition are strobe-like performance effects : always start
   // at 0 on load (they never persist a lingering strobe across sessions/reloads).
   shutter: 0,
   setShutter: (v) => set({ shutter: v }),
-  drift: (() => { const v = lsNum('opsia.drift'); return Number.isFinite(v) ? v : 0 })(),
-  setDrift: (v) => { persistMacro('opsia.drift', v); set({ drift: v }) },
-  // Flow ↔ Interruption is bipolar : rests at 0.5 (neutral) and persists like drift.
-  flow: (() => { const v = lsNum('opsia.flow'); return Number.isFinite(v) ? v : 0.5 })(),
-  setFlow: (v) => { persistMacro('opsia.flow', v); set({ flow: v }) },
+  drift: FEEL_NEUTRAL.drift,
+  setDrift: (v) => set({ drift: v }),
+  // Flow ↔ Interruption is bipolar : rests at 0.5 (neutral).
+  flow: FEEL_NEUTRAL.flow,
+  setFlow: (v) => set({ flow: v }),
   superFlicker: 0,
   setSuperFlicker: (v) => set({ superFlicker: v }),
   markSignalEnabled: localStorage.getItem('opsia.markSignalEnabled') === '1',
@@ -5260,6 +5275,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return {
         name: 'Untitled',
         composition: built,
+        ...FEEL_NEUTRAL, // the Feel macros start neutral (they are the session's)
         pins: [], // New is a clean slate : nothing persistent
         selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
@@ -5324,14 +5340,7 @@ export const useStore = create<StoreState>((set, get) => ({
         cancelMorph()
         requestSceneChange(0)
       }
-      // Field macros + persisted temperament (shutter/superFlicker stay state-only :
-      // strobes never persist across a reload).
-      localStorage.setItem('opsia.density', String(theme.density))
-      localStorage.setItem('opsia.gestureTexture', String(theme.gestureTexture))
-      localStorage.setItem('opsia.coalesce', String(theme.coalesce))
-      localStorage.setItem('opsia.tonicity', String(theme.tonicity))
-      localStorage.setItem('opsia.drift', String(theme.drift))
-      localStorage.setItem('opsia.flow', String(theme.flow))
+      // (its Feel macros are set below : the generated session's own, saved with it)
       if (world) localStorage.setItem('opsia.world', theme.world)
       return {
         name: theme.name,
@@ -5435,6 +5444,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     set({
       name: s.name,
+      // the session's Feel macros (an older file : neutral)
+      ...sanitizeFeel(s.feel),
       theme: savedTheme ?? cur.theme,
       worlds,
       world,
@@ -5547,6 +5558,7 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: s.composition,
       scenes: s.scenes,
       ...(s.pins.length ? { pins: s.pins } : {}),
+      feel: { density: s.density, gestureTexture: s.gestureTexture, coalesce: s.coalesce, tonicity: s.tonicity, drift: s.drift, flow: s.flow },
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
       sonify: { ...s.sonify, on: false, sinkId: '' },

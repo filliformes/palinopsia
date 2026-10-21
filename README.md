@@ -631,8 +631,11 @@ picture.
 Eight whole-image macros in their own right-column tab, each a wide slider with
 poles, a live readout, and a one-line description. They write **on top of** the
 composition each frame (they stack with modulators and each other, never
-clobber), persist across restarts (except the strobing ones), and are all OSC
-endpoints.
+clobber) and are all OSC endpoints. **They belong to the session** : Density,
+Gesture ⇄ Texture, Coalesce, Tonicity, Drift and Flow are saved with it and come
+back with it, New sets them neutral, and a Generate sets them for the session it
+makes (an older session opens with them neutral). The strobing ones (Shutter,
+Superimposition) always start at 0, and Proximity stays this computer's.
 
 **Field : spatial + material** (bipolar, neutral 0.5):
 

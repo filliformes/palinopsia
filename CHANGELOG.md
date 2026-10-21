@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The Feel macros belong to the session** (Vincent, after asking why a layer at
+  opacity 1 still let 10 % of the one below through : it was Density at 0.4, left by a
+  Generate). Density, Gesture ⇄ Texture, Coalesce, Tonicity, Drift and Flow were kept on
+  the computer (localStorage) and set by 59 Generate themes, so a Generate's Density
+  went on fading the upper layers (L1 to 95 %, L4 to 80 %) of every session after. Now
+  `Session.feel` carries them, `loadSession` restores them (`sanitizeFeel`; an older
+  file : `FEEL_NEUTRAL`), New resets them, Generate sets them for its own session, and
+  the old localStorage keys are removed at launch. Shutter and Superimposition stay
+  runtime (strobes), Proximity stays the computer's. Changes to them count as session
+  changes (the guard prints the export).
+
 - **50add, a blend mode** (Vincent, placed just before add) : an additive crossfade.
   Layer blend : opacity 0 the stack alone, 0.5 the layer added on it at full, 1 the
   layer alone (`B·min(1, 2−2a) + T·min(1, 2a)`); A/B mix : the same with A and B, the

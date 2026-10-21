@@ -1130,6 +1130,10 @@ export interface Session {
   // Persistence : the pinned controls and layers (renderer persist.ts keys),
   // which scenes, Randomize, Generate and the World leave alone. Absent : none.
   pins?: string[]
+  // The Feel macros (field macros + temperament) : the session's own, so a
+  // Generate's Density no longer follows you into every session after. Absent
+  // (an older file) : neutral. Shutter and Superimposition stay out (strobes).
+  feel?: { density: number; gestureTexture: number; coalesce: number; tonicity: number; drift: number; flow: number }
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown
