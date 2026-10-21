@@ -7,6 +7,18 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Blend menus : our own list, always opening downward** (Vincent : the layer's blend
+  menu opened upward : Chromium flips a native `<select>` that doesn't fit below).
+  `components/BlendSelect.tsx` replaces the four blend-mode selects (layer A/B mode and
+  OUT blend, Mixer A·B mode and LAYER blend) : the list portals into the window's menu
+  host (`menuHostOf(doc)`), sits right under the button with the room left to the
+  window's bottom as its max height (scrolling inside, the current mode centered),
+  keyboard + type-ahead, live modulated label through the overlay loop (per window), pin
+  bar kept. Readable names in `abMix.ts` (`blendLabel` : 50 add, soft light, hard light,
+  luma key, lighter color...), also on the OUT tab; stored values, OSC and order unchanged.
+  Right-click menus now listen to and fit the window they open in (the Output page
+  window too).
+
 - **The Feel macros belong to the session** (Vincent, after asking why a layer at
   opacity 1 still let 10 % of the one below through : it was Density at 0.4, left by a
   Generate). Density, Gesture ⇄ Texture, Coalesce, Tonicity, Drift and Flow were kept on

@@ -2440,6 +2440,11 @@ in index order (for OSC): `normal, 50add, add, subtract, multiply, screen, overl
 softlight, hardlight, darken, lighten, difference, exclusion, dodge, burn, wrap,
 weave, lumakey, consume, lightercolor`.
 
+The blend menus (the layer's blend and A/B mode, the Mixer's) are the app's own list :
+they always open downward under their button (scrolling inside when the window has no
+room left), with readable names (**50 add**, **soft light**, **luma key**, **lighter
+color**...); OSC and sessions keep the names above.
+
 **50add** is an additive crossfade, the mixer's way of fading clips : the layer's
 opacity at 0 shows the layers below alone, at 0.5 it adds the layer on top of them
 at full, at 1 it shows the layer alone (the stack faded out under it). On the A/B
