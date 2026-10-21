@@ -1,7 +1,8 @@
 // The output EQ's saved configurations : the twelve bands and the input and
-// output gains, under a name. Kept on this computer (the EQ tunes the room, not
-// the piece : sessions, presets and scenes leave it alone), recalled from the
-// EQ card's menu or over OSC. A recall keeps the bypass switch and the glue.
+// output gains, under a name. Kept on this computer (the EQ tunes the room :
+// Sonify presets and scenes leave it alone; a session carries its own EQ and
+// glue, and opening it brings them), recalled from the EQ card's menu or over
+// OSC. A recall keeps the bypass switch and the glue.
 
 import { normalizeEq, type SoniEq } from './eqMath'
 

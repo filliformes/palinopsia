@@ -108,8 +108,14 @@ class Analyzer {
   private peakCount = 0
   private hopCount = 0
   private hopPeak = 0 // the loudest sample since the last frame
-  readonly feats: number[] = []
-  readonly peaks: number[] = []
+  private bands = new Float64Array(BANDS)
+  private acBuf = new Float32Array(FFT) // the pitch's window, one for the run
+  // The frames and the waveform, packed as they come, grown by doubling (plain
+  // arrays held ~5.7 M boxed numbers an hour of sound, ~230 MB for a 10 h file)
+  feats = new Uint8Array(AA_FEATS * AA_RATE * 60)
+  featN = 0
+  peaks = new Int8Array(2 * AA_PEAK_RATE * 60)
+  peakN = 0
 
   push(x: Float32Array): void {
     for (let i = 0; i < x.length; i++) {
@@ -121,7 +127,9 @@ class Analyzer {
       if (v < this.peakMin) this.peakMin = v
       if (v > this.peakMax) this.peakMax = v
       if (++this.peakCount === PEAK_N) {
-        this.peaks.push(Math.max(-127, Math.min(127, Math.round(this.peakMin * 127))), Math.max(-127, Math.min(127, Math.round(this.peakMax * 127))))
+        if (this.peakN + 2 > this.peaks.length) { const g = new Int8Array(this.peaks.length * 2); g.set(this.peaks); this.peaks = g }
+        this.peaks[this.peakN++] = Math.max(-127, Math.min(127, Math.round(this.peakMin * 127)))
+        this.peaks[this.peakN++] = Math.max(-127, Math.min(127, Math.round(this.peakMax * 127)))
         this.peakMin = 1; this.peakMax = -1; this.peakCount = 0
       }
       if (++this.hopCount === HOP) { this.hopCount = 0; this.analyse() }
@@ -152,13 +160,13 @@ class Analyzer {
       bytes[k] = Math.max(0, Math.min(255, Math.floor((255 / 70) * (db + 100))))
     }
     const N = BINS
-    const bands: number[] = []
+    const bands = this.bands
     for (let b = 0; b < BANDS; b++) {
       const lo = Math.floor(Math.pow(N, b / BANDS))
       const hi = Math.max(lo + 1, Math.floor(Math.pow(N, (b + 1) / BANDS)))
       let s = 0
       for (let i = lo; i < hi && i < N; i++) s += bytes[i]
-      bands.push(Math.min(1, (s / ((hi - lo) * 255)) * 1.5))
+      bands[b] = Math.min(1, (s / ((hi - lo) * 255)) * 1.5)
     }
     let num = 0, den = 0
     for (let i = 0; i < N; i++) { num += i * bytes[i]; den += bytes[i] }
@@ -179,7 +187,13 @@ class Analyzer {
     const q = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)))
     // the meters' own reading : the window's true RMS and the hop's peak, dBFS
     const qdb = (lin: number): number => (lin > 0 ? Math.max(0, Math.min(255, Math.round(((20 * Math.log10(lin) + 90) / 90) * 255))) : 0)
-    this.feats.push(q(level), q(flux), q(centroid), ...bands.map(q), q(this.pitch), q(noisiness), qdb(Math.sqrt(sq / FFT)), qdb(this.hopPeak))
+    if (this.featN + AA_FEATS > this.feats.length) { const g = new Uint8Array(this.feats.length * 2); g.set(this.feats); this.feats = g }
+    const f = this.feats
+    let n = this.featN
+    f[n++] = q(level); f[n++] = q(flux); f[n++] = q(centroid)
+    for (let b = 0; b < BANDS; b++) f[n++] = q(bands[b])
+    f[n++] = q(this.pitch); f[n++] = q(noisiness); f[n++] = qdb(Math.sqrt(sq / FFT)); f[n++] = qdb(this.hopPeak)
+    this.featN = n
     this.hopPeak = 0
   }
 
@@ -188,7 +202,7 @@ class Analyzer {
    *  samples, made an hour of sound cost minutes. */
   private autoCorrelate(): number {
     const ring = this.ring
-    const buf = new Float32Array(FFT)
+    const buf = this.acBuf
     let rms = 0
     for (let i = 0; i < FFT; i++) { const s = ring[(this.pos + i) & (FFT - 1)]; buf[i] = s; rms += s * s }
     rms = Math.sqrt(rms / FFT)
@@ -279,13 +293,15 @@ function run(src: string, out: string, none: string): Promise<AudioAnalysis> {
     const an = new Analyzer()
     let err = ''
     let carry: Buffer | null = null
-    let idle = setTimeout(() => { try { child.kill() } catch { /* gone */ } }, IDLE_MS)
+    let stalled = false
+    const stall = (): void => { stalled = true; try { child.kill() } catch { /* gone */ } }
+    let idle = setTimeout(stall, IDLE_MS)
     child.stdout.on('error', () => {})
     child.stderr.on('error', () => {})
     child.stderr.on('data', (d: Buffer) => { err += d.toString(); if (err.length > 65536) err = err.slice(-32768) })
     child.stdout.on('data', (d: Buffer) => {
       clearTimeout(idle)
-      idle = setTimeout(() => { try { child.kill() } catch { /* gone */ } }, IDLE_MS)
+      idle = setTimeout(stall, IDLE_MS)
       const b = carry ? Buffer.concat([carry, d]) : d
       const whole = b.length - (b.length % 4)
       carry = whole < b.length ? Buffer.from(b.subarray(whole)) : null
@@ -298,31 +314,38 @@ function run(src: string, out: string, none: string): Promise<AudioAnalysis> {
     child.on('close', (code) => {
       clearTimeout(idle)
       children.delete(child)
-      const frames = an.feats.length / AA_FEATS
+      const frames = an.featN / AA_FEATS
       if (frames === 0) {
         // no sound stream : silent for good, but only when ffmpeg did read the file
-        if (/Input #0/.test(err) && !/Stream #\d+:\d+[^\n]*: Audio:/.test(err)) {
+        if (!stalled && /Input #0/.test(err) && !/Stream #\d+:\d+[^\n]*: Audio:/.test(err)) {
           try { writeFileSync(none, '') } catch { /* best effort */ }
           return resolve({ ok: true, silent: true })
         }
         return resolve({ ok: false, error: code === 0 ? 'no sound' : `ffmpeg exited ${code}` })
       }
-      const peaks = an.peaks.length / 2
+      const peaks = an.peakN / 2
       const data = new Uint8Array(frames * AA_FEATS + peaks * 2)
-      data.set(an.feats)
+      data.set(an.feats.subarray(0, an.featN))
       const pk = new Int8Array(data.buffer, frames * AA_FEATS, peaks * 2)
-      pk.set(an.peaks)
+      pk.set(an.peaks.subarray(0, an.peakN))
       const duration = frames / AA_RATE
-      const head = Buffer.from(JSON.stringify({ v: VERSION, frames, peaks, duration }), 'utf8')
-      const len = Buffer.alloc(4)
-      len.writeUInt32LE(head.length, 0)
-      const tmp = `${out}.tmp`
-      try {
-        writeFileSync(tmp, Buffer.concat([len, head, Buffer.from(data.buffer)]))
-        renameSync(tmp, out)
-      } catch {
-        try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
-      }
+      // Only a whole run is kept for good. Killed (stalled on a sleeping drive,
+      // the app quitting) or failing mid-file, it holds only the start : cached,
+      // the waveform stopped there and the modulators read its last frame for
+      // the rest, forever after. This run still plays what it read; the next
+      // request analyses again.
+      if (code === 0 && !stalled) {
+        const head = Buffer.from(JSON.stringify({ v: VERSION, frames, peaks, duration }), 'utf8')
+        const len = Buffer.alloc(4)
+        len.writeUInt32LE(head.length, 0)
+        const tmp = `${out}.tmp`
+        try {
+          writeFileSync(tmp, Buffer.concat([len, head, Buffer.from(data.buffer)]))
+          renameSync(tmp, out)
+        } catch {
+          try { if (existsSync(tmp)) unlinkSync(tmp) } catch { /* best effort */ }
+        }
+      } else console.warn(`[audio analysis] partial (${stalled ? 'stalled' : `ffmpeg exited ${code}`}), not cached : ${src}`)
       resolve({ ok: true, duration, frames, rate: AA_RATE, peakRate: AA_PEAK_RATE, data, peaks })
     })
   })

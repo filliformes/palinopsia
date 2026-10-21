@@ -88,11 +88,27 @@ export function mixGain(slot: AudioSlotName, mix: number): number {
 }
 
 /** What a slot plays : a change of it rebuilds its source (anything else is a
- *  gain, a pan or the transport). */
+ *  gain, a pan, the transport, or a live input's channels : rewired in place). */
 function sourceKey(s: AudioLayerSlot | null): string {
   if (!s) return ''
   if (s.kind === 'file') return `f:${s.mediaId ?? ''}`
-  return `l:${s.deviceId ?? ''}:${s.chL ?? 0}:${s.chR ?? 1}`
+  return `l:${s.deviceId ?? ''}`
+}
+
+/** A live slot's channel pair on a device of `n` channels (a mono pick : the
+ *  same channel on both sides). */
+function channelPair(s: AudioLayerSlot, n: number): [number, number] {
+  const l = Math.min(n - 1, Math.max(0, s.chL ?? 0))
+  const rr = s.chR ?? 1
+  return [l, rr < 0 ? l : Math.min(n - 1, Math.max(0, rr))]
+}
+const pairKey = (s: AudioLayerSlot): string => `${s.chL ?? 0}:${s.chR ?? 1}`
+
+/** Can the layer sound : a file, or a live input armed (one not open yet holds
+ *  no engine and lights nothing : nothing can sound through it). */
+export function layerSounds(st: AudioLayerState, armed: AudioLayerArmed): boolean {
+  const can = (x: AudioLayerSlot | null, a: boolean): boolean => !!x && (x.kind === 'file' || a)
+  return can(st.A, armed.A) || can(st.B, armed.B)
 }
 
 export interface SlotInfo {
@@ -122,6 +138,8 @@ interface Chain {
   streamSrc: MediaStreamAudioSourceNode | null
   split: ChannelSplitterNode | null
   merge: ChannelMergerNode | null
+  ch: string // the channel pair wired (chL:chR)
+  rewireT: number // a channel change waiting for its dip to land
   req: number
 }
 
@@ -145,6 +163,10 @@ class AudioLayerEngine {
   // the device a lost default input was : it opens again only on that one, never
   // on whatever became the default meanwhile (a laptop's microphone)
   private lostLabel: Record<AudioSlotName, string> = { A: '', B: '' }
+  // an armed input that would not open with its device there : it tries again
+  // on its own, slower each time
+  private retryT: Record<AudioSlotName, number> = { A: 0, B: 0 }
+  private retryN: Record<AudioSlotName, number> = { A: 0, B: 0 }
   private listeners = new Set<() => void>()
   private buf = new Float32Array(2048)
   // The whole layer's sound as features (a modulator FROM "AU all") : the live
@@ -153,7 +175,13 @@ class AudioLayerEngine {
   private fbufs: FrameBufs | null = null
   private featWantedAt = 0
   private featAt = 0
+  private busFed = false // the audio tab's input (set to the layer) analysed it this frame
   private syncReq = 0
+  // New and Generate empty the layer over the Morph time, as the picture glides
+  // (a 15 ms cut under a morph of seconds) : the next emptying's fade, then the
+  // fade under way
+  private releaseMs = 0
+  private releaseT = 0
   private offCtx: (() => void) | null = null
   private offDevices: (() => void) | null = null
 
@@ -178,7 +206,12 @@ class AudioLayerEngine {
   sync(st: AudioLayerState, armed: AudioLayerArmed = NOT_ARMED): void {
     this.st = st
     this.armed = armed
-    const active = !!(st.A || st.B)
+    const release = this.releaseMs
+    this.releaseMs = 0
+    // a file, or a live input armed : a closed one starts no engine
+    const active = layerSounds(st, armed)
+    if (this.releaseT) this.endRelease(active)
+    if (!active && release > FADE_MS && this.fadeAway(release)) return
     sonifyEngine.setLayerWanted(active)
     if (!active) {
       this.teardown(true)
@@ -189,7 +222,7 @@ class AudioLayerEngine {
       this.opening = true
       void sonifyEngine.context().then((ctx) => {
         this.opening = false
-        if (!(this.st.A || this.st.B)) return
+        if (!layerSounds(this.st, this.armed)) return
         this.buildOn(ctx)
       }).catch((e) => {
         this.opening = false
@@ -198,6 +231,43 @@ class AudioLayerEngine {
       return
     }
     this.apply()
+  }
+
+  /** The next emptying of the layer (New, Generate) fades over `ms`, the Morph
+   *  time, instead of 15 ms. */
+  releaseOver(ms: number): void {
+    this.releaseMs = Math.max(0, Math.min(30000, ms || 0))
+  }
+
+  /** The whole layer fades out over `ms`, everything playing on under it, then
+   *  goes (the engine kept for it until then). False : nothing to fade. */
+  private fadeAway(ms: number): boolean {
+    const ctx = this.ctx, out = this.out
+    if (!ctx || !out || ctx.state !== 'running') return false
+    const t = ctx.currentTime
+    out.gain.cancelScheduledValues(t)
+    out.gain.setValueAtTime(out.gain.value, t)
+    out.gain.linearRampToValueAtTime(0, t + ms / 1000)
+    this.releaseT = window.setTimeout(() => {
+      this.releaseT = 0
+      if (layerSounds(this.st, this.armed)) return
+      sonifyEngine.setLayerWanted(false)
+      this.teardown(false)
+    }, ms + FADE_MS)
+    return true
+  }
+
+  /** A state arrives while the layer fades away : filled again (an undo of the
+   *  New, a file picked), it comes back up from where the fade was. */
+  private endRelease(back: boolean): void {
+    window.clearTimeout(this.releaseT)
+    this.releaseT = 0
+    const ctx = this.ctx, out = this.out
+    if (back && ctx && out) {
+      const t = ctx.currentTime
+      out.gain.cancelScheduledValues(t)
+      out.gain.setValueAtTime(out.gain.value, t)
+    }
   }
 
   private buildOn(ctx: AudioContext): void {
@@ -273,6 +343,7 @@ class AudioLayerEngine {
     else end()
     videoPlayheads.delete(videoKey(AUDIO_LAYER, s))
     this.lostLabel[s] = ''
+    this.stopRetry(s)
     this.setLive(s, NO_INFO)
   }
 
@@ -280,6 +351,8 @@ class AudioLayerEngine {
    *  sounding : at once). A live input's device closes with it. */
   private dropSource(c: Chain, fade: boolean): void {
     c.req++
+    window.clearTimeout(c.rewireT)
+    c.rewireT = 0
     const { player, elSrc, stream, streamSrc, split, merge, srcG } = c
     c.player = null
     c.elSrc = null
@@ -336,7 +409,7 @@ class AudioLayerEngine {
         vol.gain.value = 0 // it fades in (below)
         vol.connect(pan).connect(mixG).connect(bus)
         pan.connect(an)
-        c = { key: '', vol, pan, an, mixG, srcG: null, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, req: 0 }
+        c = { key: '', vol, pan, an, mixG, srcG: null, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, ch: '', rewireT: 0, req: 0 }
         this.chains[s] = c
       }
       // a live input opens only once armed (picked, or its open button)
@@ -346,10 +419,11 @@ class AudioLayerEngine {
         c.key = key
         if (!key) {
           this.lostLabel[s] = ''
+          this.stopRetry(s)
           this.setLive(s, { ...NO_INFO, label: cfg.deviceLabel ?? '' })
         } else if (cfg.kind === 'file') this.openFile(s, c, cfg)
         else this.openLive(s, c, cfg)
-      }
+      } else if (cfg.kind === 'live' && c.merge && pairKey(cfg) !== c.ch) this.rewire(c, cfg)
       const v = cfg.mute ? 0 : Math.max(0, Math.min(2, cfg.volume))
       c.vol.gain.setTargetAtTime(v, t, RAMP)
       c.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, cfg.pan || 0)), t, RAMP)
@@ -418,21 +492,38 @@ class AudioLayerEngine {
       if (req !== c.req || this.chains[s] !== c || !ctx) { stream.getTracks().forEach((tr) => tr.stop()); return }
       const tr = stream.getAudioTracks()[0]
       const n = Math.max(1, Math.min(32, tr?.getSettings().channelCount ?? 2))
-      const src = ctx.createMediaStreamSource(stream)
-      const split = ctx.createChannelSplitter(n)
-      const merge = ctx.createChannelMerger(2)
-      const l = Math.min(n - 1, Math.max(0, cfg.chL ?? 0))
-      const rr = cfg.chR ?? 1
-      const r = rr < 0 ? l : Math.min(n - 1, Math.max(0, rr))
-      src.connect(split)
-      split.connect(merge, l, 0)
-      split.connect(merge, r, 1)
-      merge.connect(this.fadeIn(ctx, c))
+      // (the channels as they are now : picked again while it was opening)
+      const now = this.st[s]
+      const chs = now?.kind === 'live' ? now : cfg
+      let src: MediaStreamAudioSourceNode | null = null
+      let split: ChannelSplitterNode | null = null
+      let merge: ChannelMergerNode | null = null
+      let g: GainNode | null = null
+      try {
+        src = ctx.createMediaStreamSource(stream)
+        split = ctx.createChannelSplitter(n)
+        merge = ctx.createChannelMerger(2)
+        const [l, r] = channelPair(chs, n)
+        src.connect(split)
+        split.connect(merge, l, 0)
+        split.connect(merge, r, 1)
+        g = this.fadeIn(ctx, c)
+        merge.connect(g)
+      } catch (e) {
+        // the graph would not build (a context closed under it, a driver error) :
+        // the device is let go, not left open with nothing wired to it
+        stream.getTracks().forEach((t) => t.stop())
+        try { src?.disconnect(); split?.disconnect(); merge?.disconnect(); g?.disconnect() } catch { /* gone */ }
+        if (g && c.srcG === g) c.srcG = null
+        throw e
+      }
       c.stream = stream
       c.streamSrc = src
       c.split = split
       c.merge = merge
+      c.ch = pairKey(chs)
       this.lostLabel[s] = ''
+      this.retryN[s] = 0
       this.setLive(s, { ...NO_INFO, channels: n, label: tr?.label ?? cfg.deviceLabel ?? '' })
       // Unplugged : the slot says so and lets it go; it opens again when the
       // device comes back (a device change), or picked again.
@@ -449,7 +540,62 @@ class AudioLayerEngine {
       console.warn('[audio layer] live input unavailable', e)
       const lost = this.live[s].lost
       this.setLive(s, { ...NO_INFO, label: cfg.deviceLabel ?? '', error: lost ? this.live[s].error : (msg || 'unavailable'), lost })
+      // (a lost one waits for its device to come back : a device change)
+      if (!lost) this.retryLater(s, c)
     })
+  }
+
+  /** An armed input that would not open with its device there (its driver still
+   *  waking at an installation's boot, held by another app) : no device change
+   *  will come, so it tries again on its own, at 5, 10, 20, 40 s, then every
+   *  minute. Only ever an armed slot : nothing opens that was not asked to. */
+  private retryLater(s: AudioSlotName, c: Chain): void {
+    window.clearTimeout(this.retryT[s])
+    const ms = Math.min(60000, 5000 * Math.pow(2, this.retryN[s]++))
+    this.retryT[s] = window.setTimeout(() => {
+      this.retryT[s] = 0
+      const cfg = this.st[s], info = this.live[s]
+      if (this.chains[s] !== c || !c.key || cfg?.kind !== 'live' || !this.armed[s] || !info.error || info.lost) return
+      c.key = ''
+      this.apply()
+    }, ms)
+  }
+
+  private stopRetry(s: AudioSlotName): void {
+    window.clearTimeout(this.retryT[s])
+    this.retryT[s] = 0
+    this.retryN[s] = 0
+  }
+
+  /** Another channel pair of the open device : rewired in place under a short
+   *  dip (reopening the device for it left a gap of a few hundred ms, longer on
+   *  an interface that re-initialises). */
+  private rewire(c: Chain, cfg: AudioLayerSlot): void {
+    const ctx = this.ctx, split = c.split, merge = c.merge, g = c.srcG
+    if (!ctx || !split || !merge) return
+    c.ch = pairKey(cfg)
+    const [l, r] = channelPair(cfg, split.numberOfOutputs)
+    const swap = (): void => {
+      c.rewireT = 0
+      if (c.split !== split || c.merge !== merge) return // the source went meanwhile
+      try { split.disconnect(merge) } catch { /* not connected */ }
+      split.connect(merge, l, 0)
+      split.connect(merge, r, 1)
+    }
+    window.clearTimeout(c.rewireT)
+    if (!g || ctx.state !== 'running') { swap(); return }
+    const t = ctx.currentTime
+    g.gain.cancelScheduledValues(t)
+    g.gain.setValueAtTime(g.gain.value, t)
+    g.gain.linearRampToValueAtTime(0, t + FADE)
+    c.rewireT = window.setTimeout(() => {
+      swap()
+      if (c.srcG !== g) return
+      const t2 = ctx.currentTime
+      g.gain.cancelScheduledValues(t2)
+      g.gain.setValueAtTime(0, t2)
+      g.gain.linearRampToValueAtTime(1, t2 + FADE)
+    }, FADE_MS)
   }
 
   /** A device came or went : each armed live slot that was lost or could not
@@ -474,6 +620,7 @@ class AudioLayerEngine {
     if (!c || !c.key) return
     if (c.player) this.resumeAt[s] = c.player.time()
     this.lostLabel[s] = ''
+    this.stopRetry(s)
     c.key = ''
     this.apply()
   }
@@ -505,9 +652,11 @@ class AudioLayerEngine {
    *  ignoring it plays at its own). Publishes the playheads for the timeline, the
    *  level meter and the modulators listening to a slot. */
   tick(globalSpeed: number): void {
-    // the whole layer's features, while a modulator reads them (half a second)
+    // the whole layer's features, while a modulator reads them (half a second);
+    // the audio tab's input set to the layer analysed them already this frame
     const now = performance.now()
-    if (this.outAn && this.fbufs && now - this.featWantedAt < 500) {
+    if (this.busFed) { this.busFed = false; this.featAt = now }
+    else if (this.outAn && this.fbufs && now - this.featWantedAt < 500) {
       const dt = this.featAt ? Math.min(0.1, (now - this.featAt) / 1000) : 1 / 60
       this.featAt = now
       analyseFrame(this.outAn, this.fbufs, this.feats, dt, this.ctx?.sampleRate ?? 48000)
@@ -544,10 +693,16 @@ class AudioLayerEngine {
     return { rms: Math.sqrt(sum / b.length), peak: pk }
   }
 
-  /** The layer's analyser (its whole sound, after its volume), for the audio
-   *  tab's input set to the Audio Layer. Null while the layer is empty. */
-  analyser(): { an: AnalyserNode; sampleRate: number } | null {
-    return this.outAn && this.ctx ? { an: this.outAn, sampleRate: this.ctx.sampleRate } : null
+  /** The layer's whole sound (after its volume) analysed for this frame, for the
+   *  audio tab's input set to the Audio Layer : its features (the ones "AU all"
+   *  reads, so it is analysed once a frame) and its analyser's buffers. Null
+   *  while the layer is empty. */
+  analyseNow(dt: number): { an: AnalyserNode; sampleRate: number; feats: AudioFeatures; bufs: FrameBufs } | null {
+    const an = this.outAn, fb = this.fbufs, ctx = this.ctx
+    if (!an || !fb || !ctx) return null
+    analyseFrame(an, fb, this.feats, dt, ctx.sampleRate)
+    this.busFed = true
+    return { an, sampleRate: ctx.sampleRate, feats: this.feats, bufs: fb }
   }
 
   /** One feature of the whole layer's sound (the mix, live input included, after
@@ -594,7 +749,10 @@ class AudioLayerEngine {
 
   /** Silence and release everything (a dev hot update replacing this engine). */
   shutdown(): void {
+    window.clearTimeout(this.releaseT)
+    this.releaseT = 0
     this.teardown(false)
+    for (const s of SLOTS) this.stopRetry(s)
     this.offCtx?.()
     this.offCtx = null
     this.offDevices?.()

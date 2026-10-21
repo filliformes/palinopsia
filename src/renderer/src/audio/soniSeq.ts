@@ -11,7 +11,7 @@
 import { useStore } from '../store'
 import { runSilently } from '../undo'
 import { loadSoniPreset } from './soniPresets'
-import type { SoniConfig } from './sonify'
+import { sonifyEngine, type SoniConfig } from './sonify'
 import { rateBeats, soniBar, soniClockEpoch, soniClockStart } from './soniClock'
 
 // BY INDEX : a saved sequencer step's voice mask is a boolean per position, so a
@@ -152,6 +152,7 @@ function applyStep(i: number): void {
       const cfg = loadSoniPreset(step.preset)
       if (cfg) {
         const key = st.soniKeySeq.on ? { root: cur.root, scale: cur.scale, rootOct: cur.rootOct } : {}
+        sonifyEngine.loadingSound() // (a closed line-in stays closed)
         useStore.getState().setSonify({ ...cfg, ...key, on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig)
         return
       }

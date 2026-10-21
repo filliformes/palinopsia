@@ -6,7 +6,7 @@
 // per-voice snap), two image taps (master or any layer), and an output-device
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
-import { isValidElement, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { isValidElement, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { Blink } from './Blink'
 import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
@@ -567,6 +567,10 @@ function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx
   )
 }
 
+// whether the Filter's line-in is armed, as the page reads it
+const subLineArm = (fn: () => void): (() => void) => sonifyEngine.onLineArm(fn)
+const lineArmedNow = (): boolean => sonifyEngine.lineInArmed()
+
 export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const setOpen = useStore((s) => s.setSonifyPageOpen)
   const cfg = useStore((s) => s.sonify)
@@ -619,6 +623,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const assignBox = (...ps: SonifyModParam[]): JSX.Element | null => (assign && ps.includes(assign) ? <SonifyAssign param={assign} /> : null)
 
   const set = (next: SoniConfig): void => setSonify(next)
+  // the Filter's line-in may open its input (its button arms it)
+  const lineArmed = useSyncExternalStore(subLineArm, lineArmedNow)
   // Every write starts from the store as it is NOW, not from this render's
   // config : a Shift-drag kept the onChange of its grab, and each move wrote
   // back the whole config of that moment (undoing the key sequencer, a Meta
@@ -685,8 +691,9 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   }
   const loadPreset = (n: string): void => {
     const c = n ? loadSoniPreset(n) : null
-    // A preset is a sound : the room EQ stays this room's
-    if (c) setSonify({ ...c, on: cfg.on, sinkId: cfg.sinkId, eq: cfg.eq })
+    // A preset is a sound : the room EQ stays this room's (and a closed line-in
+    // stays closed)
+    if (c) { sonifyEngine.loadingSound(); setSonify({ ...c, on: cfg.on, sinkId: cfg.sinkId, eq: cfg.eq }) }
     setPresetName(n)
   }
   const delPreset = (n: string): void => {
@@ -1547,9 +1554,11 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
                 title="Internal noise through the image's bands (wide resonance = wind, narrow = flute)"
               >noise</button>
               <button
-                onClick={() => pv('filter', { lineIn: true, lineFrom: 'input' })}
-                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn && cfg.filter.lineFrom !== 'layer' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
-                title="Live line/mic input filtered by the frame"
+                onClick={() => { sonifyEngine.armLineIn(); pv('filter', { lineIn: true, lineFrom: 'input' }) }}
+                className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.filter.lineIn && cfg.filter.lineFrom !== 'layer' ? (lineArmed ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-accent ring-1 ring-accent/50') : 'bg-panel3/60 text-muted'}`}
+                title={cfg.filter.lineIn && cfg.filter.lineFrom !== 'layer' && !lineArmed
+                  ? 'Live line/mic input filtered by the frame : not open yet (a session, a scene, a preset or an undo never opens the microphone by itself). Click : open it'
+                  : 'Live line/mic input filtered by the frame'}
               >line-in</button>
               <button
                 onClick={() => pv('filter', { lineIn: true, lineFrom: 'layer' })}

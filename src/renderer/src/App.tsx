@@ -198,7 +198,7 @@ sonifyEngine.setUnitPlace(unitPlace)
 // "AU all" : the Audio Layer's whole sound, analysed live; and the audio tab's
 // input set to the Audio Layer reads its analyser.
 clipAudio.setMixReader((name, band) => audioLayer.mixFeature(name, band))
-audioBus.setLayerSource(() => audioLayer.analyser())
+audioBus.setLayerSource((dt) => audioLayer.analyseNow(dt))
 clipAudio.setPlayheads((layer, slot) => {
   if (layer === AUDIO_LAYER) return audioLayer.playhead(slot)
   const ph = videoPlayheads.get(videoKey(layer, slot))
@@ -726,6 +726,9 @@ export default function App(): JSX.Element {
           }
         } catch { /* keep the fresh boot */ }
       }
+      // the Filter voice's line-in too, for good (no one is there to open it
+      // again after a scene or a sequencer step)
+      sonifyEngine.armLineIn(true)
       await openKioskOutput(!!k.windowed)
     })()
     // The output closed without the exit hatch (a stray key, a crash it could not

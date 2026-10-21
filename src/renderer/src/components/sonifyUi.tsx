@@ -40,11 +40,12 @@ export function parseDb(text: string): number | null {
   return m ? Number(m[1]) : null
 }
 
-/** Something hides the Sonify page (another full page over it, the window
- *  minimized) : its drawing loops skip the frame. */
+/** Something hides the Sonify page (another full page over it, the Source
+ *  Editor, the window minimized) : its drawing loops skip the frame and its key
+ *  handlers rest (the EQ editor's took Esc and Delete from under the editor). */
 export function sonifyCovered(): boolean {
   const s = useStore.getState()
-  return document.hidden || s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen
+  return document.hidden || s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen || s.sourceEditorOpen
 }
 
 /** The on / play pill of a card's header. */

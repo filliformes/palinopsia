@@ -5052,7 +5052,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const cur = s.sonify
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
         const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
-        queueMicrotask(() => useStore.getState().setSonify(next))
+        queueMicrotask(() => { sonifyEngine.loadingSound(); useStore.getState().setSonify(next) })
       }
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
@@ -5221,7 +5221,10 @@ export const useStore = create<StoreState>((set, get) => ({
     // The sound lands inside this same call, after the composition : the
     // sequencer runs it silently (runSilently), and a microtask landed after
     // that had closed, so every step with a sound patch was an undo step.
-    if (sound) get().setSonify(sound)
+    if (sound) {
+      sonifyEngine.loadingSound() // (a line-in closed now stays closed : sonify.ts)
+      get().setSonify(sound)
+    }
   },
   sequencePageOpen: false,
   setSequencePageOpen: (on) => set({ sequencePageOpen: on }),
@@ -5247,8 +5250,9 @@ export const useStore = create<StoreState>((set, get) => ({
       // drawn-film artifacts — film is still one World-pick away from the selector.
       const built = clearFinalizerFilm(activeWorld ? applyWorldToComposition(fresh, activeWorld) : fresh)
       // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
-      // at 0, a clean cut once the new one has compiled.
-      if (s.morphMs > 20) beginRelayMorph(s.composition, built, s.morphMs, performance.now())
+      // at 0, a clean cut once the new one has compiled. (The Audio Layer fades
+      // out over it too.)
+      if (s.morphMs > 20) { beginRelayMorph(s.composition, built, s.morphMs, performance.now()); audioLayer.releaseOver(s.morphMs) }
       else {
         cancelMorph()
         requestSceneChange(0)
@@ -5314,7 +5318,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
       // at 0, a clean cut once the new one has compiled.
       comp = keep(s, comp) // what you pinned rides through a Generate too
-      if (s.morphMs > 20) beginRelayMorph(s.composition, comp, s.morphMs, performance.now())
+      // (the Audio Layer fades out over the Morph time too)
+      if (s.morphMs > 20) { beginRelayMorph(s.composition, comp, s.morphMs, performance.now()); audioLayer.releaseOver(s.morphMs) }
       else {
         cancelMorph()
         requestSceneChange(0)
@@ -5511,6 +5516,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // a session saved before the output EQ existed keeps this room's (it
       // brought back a flat EQ with the glue off)
       const hasEq = !!(s.sonify as Partial<SoniConfig>).eq
+      sonifyEngine.loadingSound() // (a closed line-in stays closed)
       get().setSonify({
         ...defaultSoniConfig(),
         ...(s.sonify as Partial<SoniConfig>),
