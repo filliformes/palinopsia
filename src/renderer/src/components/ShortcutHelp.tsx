@@ -3,6 +3,8 @@
 // sync BY HAND with App's global onKey handler : when a shortcut changes there,
 // change it here. Closes on backdrop click or Esc (App owns the Esc path).
 
+import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
+
 const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
   {
     title: 'Full-page views',
@@ -13,7 +15,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['S', 'Sonify (image → sound)'],
       ['B', 'Body (embodied control)'],
       ['K', 'Resolume OSC mapper'],
-      ['Alt+E', 'Source Editor : write a shader, or a copy of any one, as your own (again : close it)']
+      [SOURCE_EDITOR_KEY, 'Source Editor : write a shader, or a copy of any one, as your own (again : close it)']
     ]
   },
   {

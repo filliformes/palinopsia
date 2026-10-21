@@ -262,11 +262,28 @@ function flushPending(): boolean {
   return false
 }
 
+// The steps the agent (MCP) made : its own undo takes back those, never yours.
+const agentSteps = new WeakSet<Snapshot>()
+
 /** Close the step now instead of after the quiet window : the agent (MCP)
  *  calls it before and after each change, so every change it makes is ONE undo
- *  step of its own, never folded into the performer's edit around it. */
-export function commitNow(): void {
+ *  step of its own, never folded into the performer's edit around it. True
+ *  when it closed a step; `agent` marks it the agent's. */
+export function commitNow(agent = false): boolean {
+  if (!flushPending()) return false
+  if (agent) agentSteps.add(past[past.length - 1])
+  bump()
+  return true
+}
+
+/** The agent's undo : one step, only while the last one is its own (nothing of
+ *  the performer's since, not even an edit still settling). */
+export function undoAgentStep(): boolean {
   if (flushPending()) bump()
+  const top = past[past.length - 1]
+  if (!top || !agentSteps.has(top)) return false
+  undo()
+  return true
 }
 
 /** The step changed the BPM and nothing else : a tempo typed, tapped, sent by

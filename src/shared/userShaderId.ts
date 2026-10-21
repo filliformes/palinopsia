@@ -20,3 +20,9 @@ export function userShaderId(name: string): string {
   }
   return `${USER_PREFIX}shader-${h.toString(36)}`
 }
+
+/** The name a file can carry (a shader's name IS its file name) : main saves
+ *  under it, so the page computes the id from it too (a long name, or one made
+ *  of reserved characters, is another shader than its raw spelling says). */
+export const fileNameOf = (name: string): string =>
+  name.replace(/[\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'shader'

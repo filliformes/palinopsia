@@ -2,7 +2,8 @@
 // the same store actions as the UI : the engine, sessions, undo, OSC feedback
 // all see an agent's change as they see the performer's. Each change is ONE
 // undo step (commitNow before and after), and the performer's Inspector stays
-// where it was. Nothing here reaches the Flash safety limiter.
+// where it was; the agent's undo takes back only its own steps. Nothing here
+// reaches the Flash safety limiter.
 
 import { useStore } from '../store'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, type IsfShader } from '../shaders/isf'
@@ -12,8 +13,8 @@ import { BLEND_MODES, type BlendMode, type FxInstance, type FxScope, type Source
 import type { McpContent, McpResult } from '@shared/mcpTools'
 import { oscLeafList, resetOscEdge, routeOsc } from '../oscInput'
 import { outputCanvas } from '../engine/outputCanvas'
-import { commitNow, undo } from '../undo'
-import { categoryOf, registerUserShader } from '../shaders/userShaders'
+import { commitNow, undoAgentStep } from '../undo'
+import { categoryOf, fileNameOf, registerUserShader, userShaderId } from '../shaders/userShaders'
 import { renderStill, type ShaderMark } from '../shaders/shaderCheck'
 
 class ToolError extends Error {}
@@ -24,6 +25,9 @@ const fail = (msg: string): never => {
 const st = (): ReturnType<typeof useStore.getState> => useStore.getState()
 const r3 = (x: number): number => Math.round(x * 1000) / 1000
 const text = (x: unknown): McpContent => ({ type: 'text', text: typeof x === 'string' ? x : JSON.stringify(x) })
+// a result of a changing tool that only read this time (scenes : list)
+const readOnly = new WeakSet<McpResult>()
+const read = (r: McpResult): McpResult => (readOnly.add(r), r)
 
 // ── shaders : find one, say what it is ─────────────────────────────────
 const LOCKED_MASTER: Record<string, string> = { vibe: 'fx-vibe', context: 'fx-context', finalizer: 'fx-finalizer' }
@@ -80,6 +84,7 @@ function describeControl(d: IsfInputDesc): Record<string, unknown> {
   if (d.type === 'float' || d.type === 'point2D') {
     if (d.min !== undefined) o.min = d.min
     if (d.max !== undefined) o.max = d.max
+    if (d.integer) o.whole_numbers = true
   }
   if (d.type === 'long') {
     const vals = d.values ?? []
@@ -232,7 +237,8 @@ function toValue(d: IsfInputDesc, v: unknown, unitAddr: string): number | number
     }
     default: {
       const n = num(v)
-      return Math.max(lo ?? -Infinity, Math.min(hi ?? Infinity, n))
+      const c = Math.max(lo ?? -Infinity, Math.min(hi ?? Infinity, n))
+      return d.integer ? Math.round(c) : c // a count (or a long over a wide range)
     }
   }
 }
@@ -569,12 +575,23 @@ function marksText(marks: ShaderMark[], source: string): string {
     .join('\n')
 }
 
+// The shaders the agent wrote since the app started : it may write those again
+// freely; any other of the performer's is replaced only when it says so.
+const agentWrote = new Set<string>()
+
 async function writeShader(args: Record<string, unknown>): Promise<McpResult> {
   const name = String(args.name ?? '').trim()
   const source = String(args.source ?? '')
   if (!name) fail('Name it.')
   if (!source.trim()) fail('source is the whole ISF file.')
   if (source.length > 2_000_000) fail('That source is too big.')
+  // the id of the file name main saves under (cut, reserved characters made spaces)
+  const id = userShaderId(fileNameOf(name))
+  const theirs = SHADER_BY_ID[id]
+  if (theirs && !agentWrote.has(id) && args.replace !== true) {
+    const whose = st().userShaders.find((u) => u.id === id)?.fromSession ? 'the session\'s own shader' : 'one of the performer\'s own shaders'
+    fail(`“${theirs.name}” (${id}) is ${whose} : pick another name, or pass replace: true to write over it (its old file is kept in the Shaders folder's .history).`)
+  }
   const still = renderStill(source, { width: 512, values: (args.values as Record<string, unknown>) ?? undefined })
   if (!still.ok) {
     return { content: [text(`It does not compile; nothing was saved.\n${marksText(still.marks, source)}`)], isError: true }
@@ -583,6 +600,7 @@ async function writeShader(args: Record<string, unknown>): Promise<McpResult> {
   if (!r?.ok) fail(`It compiles, but saving failed : ${r?.error ?? 'the Shaders folder refused it'}.`)
   const info = registerUserShader(r.name, source)
   st().upsertUserShader(info)
+  agentWrote.add(info.id)
   const lines = [`Saved as one of the performer's shaders : ${info.name} (${info.id}), ${info.category === 'FX' ? 'an effect' : 'a source'}, in the Shaders folder.`]
   if (still.marks.length) lines.push(marksText(still.marks, source))
   if (typeof args.use === 'string' && args.use.trim()) {
@@ -633,7 +651,7 @@ function scenes(args: Record<string, unknown>): McpResult {
   }
   switch (args.action) {
     case 'list':
-      return { content: [text(list.map((x, i) => ({ scene: i + 1, name: x.name, ...(s.activeSceneId === x.id ? { active: true } : {}) })))] }
+      return read({ content: [text(list.map((x, i) => ({ scene: i + 1, name: x.name, ...(s.activeSceneId === x.id ? { active: true } : {}) })))] })
     case 'recall': {
       const sc = pick()
       s.recallScene(sc.id)
@@ -668,7 +686,7 @@ function listControls(args: Record<string, unknown>): McpResult {
   const prefix = String(args.prefix ?? '').trim()
   const all = oscLeafList().filter((l) => !prefix || l.path.startsWith(prefix))
   const CAP = 500
-  const lines = all.slice(0, CAP).map((l) => `${l.path} : ${l.desc}`)
+  const lines = all.slice(0, CAP).map((l) => `${l.path} : ${l.desc}${l.int ? ' [an index : a whole number is sent as an OSC int]' : ''}`)
   if (all.length > CAP) lines.push(`... and ${all.length - CAP} more : narrow with a prefix.`)
   return { content: [text(lines.length ? lines.join('\n') : `Nothing starts with ${prefix}.`)] }
 }
@@ -677,9 +695,18 @@ function osc(args: Record<string, unknown>): McpResult {
   const address = String(args.address ?? '').trim()
   if (!address.startsWith('/opsia/')) fail('Only Palinopsia\'s own addresses (/opsia/…) : list_controls has them.')
   const raw = Array.isArray(args.args) ? args.args : args.args === undefined ? [] : [args.args]
+  // JSON can't tell 1.0 from 1 : a number is a 0-1 float (1 = the top, the
+  // last of a menu), an OSC int only where the address takes an index
+  // (list_controls marks those), or when the agent says so ({"int": 3}).
+  const index = !!oscLeafList().find((l) => l.path === address)?.int
   const oscArgs = raw.slice(0, 64).map((v) => {
     if (typeof v === 'boolean') return { type: v ? 'T' : 'F', value: v }
-    if (typeof v === 'number') return { type: Number.isInteger(v) ? 'i' : 'f', value: v }
+    if (typeof v === 'number') return { type: index && Number.isInteger(v) ? 'i' : 'f', value: v }
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const o = v as Record<string, unknown>
+      if (typeof o.int === 'number' && Number.isFinite(o.int)) return { type: 'i', value: Math.round(o.int) }
+      if (typeof o.float === 'number' && Number.isFinite(o.float)) return { type: 'f', value: o.float }
+    }
     return { type: 's', value: String(v) }
   })
   routeOsc(address, oscArgs)
@@ -687,16 +714,27 @@ function osc(args: Record<string, unknown>): McpResult {
   return { content: [text(`Sent ${address}${oscArgs.length ? ` ${oscArgs.map((a) => String(a.value)).join(' ')}` : ''}.`)] }
 }
 
+/** Undo the agent's own last changes, never the performer's : it stops at the
+ *  first step that is not the agent's (the performer changed something since,
+ *  or the change made no step). */
 function undoTool(args: Record<string, unknown>): McpResult {
   const n = Math.max(1, Math.min(20, Math.round(Number(args.steps) || 1)))
-  commitNow()
-  for (let i = 0; i < n; i++) undo()
-  return { content: [text(`Undid ${n} step${n === 1 ? '' : 's'}.`)] }
+  let done = 0
+  while (done < n && undoAgentStep()) done++
+  if (!done) {
+    return {
+      content: [text('Nothing undone : the last change is not yours (the performer changed something since, or yours made no undo step). Set it back by hand instead.')],
+      isError: true
+    }
+  }
+  const short = done < n ? ` (${n - done} more asked : the step before is not yours, so it stays)` : ''
+  return { content: [text(`Undid ${done} of your change${done === 1 ? '' : 's'}${short}.`)] }
 }
 
 // ── the dispatcher ─────────────────────────────────────────────────────
 type Tool = (args: Record<string, unknown>) => McpResult | Promise<McpResult>
-const TOOLS: Record<string, { run: Tool; writes: boolean }> = {
+// writes : a change (one undo step); queued : runs in turn with the changes
+const TOOLS: Record<string, { run: Tool; writes: boolean; queued?: boolean }> = {
   get_state: { run: getState, writes: false },
   snapshot: { run: snapshot, writes: false },
   list_shaders: { run: listShaders, writes: false },
@@ -711,11 +749,11 @@ const TOOLS: Record<string, { run: Tool; writes: boolean }> = {
   scenes: { run: scenes, writes: true },
   list_controls: { run: listControls, writes: false },
   osc: { run: osc, writes: true },
-  undo: { run: undoTool, writes: false }
+  undo: { run: undoTool, writes: false, queued: true }
 }
 
 export function toolWrites(name: string): boolean {
-  return !!TOOLS[name]?.writes
+  return !!(TOOLS[name]?.writes || TOOLS[name]?.queued) // (an undo changes things too)
 }
 
 // Changes run one after another (two calls at once : two undo steps, in order,
@@ -726,7 +764,7 @@ let writes: Promise<unknown> = Promise.resolve()
 export function runTool(name: string, args: Record<string, unknown>): Promise<McpResult> {
   const t = TOOLS[name]
   if (!t) return Promise.resolve({ content: [text(`Unknown tool ${name}.`)], isError: true })
-  if (!t.writes) return runOne(t, args)
+  if (!t.writes && !t.queued) return runOne(t, args)
   const p = writes.then(() => runOne(t, args))
   writes = p.catch(() => undefined)
   return p
@@ -735,16 +773,28 @@ export function runTool(name: string, args: Record<string, unknown>): Promise<Mc
 async function runOne(t: { run: Tool; writes: boolean }, args: Record<string, unknown>): Promise<McpResult> {
   const selection = st().selection
   if (t.writes) commitNow() // the performer's edit in progress : its own step
+  let result: McpResult
   try {
-    return await t.run(args ?? {})
+    result = await t.run(args ?? {})
   } catch (e) {
     const msg = e instanceof ToolError ? e.message : `It went wrong : ${(e as Error).message}`
-    return { content: [text(msg)], isError: true }
-  } finally {
-    if (t.writes) {
-      commitNow() // the agent's change : one step
-      // straight back (setSelection would also open a collapsed Inspector)
-      if (st().selection !== selection) useStore.setState({ selection })
-    }
+    result = { content: [text(msg)], isError: true }
   }
+  if (t.writes) {
+    // the agent's change : one step, its own (its undo may take it back)
+    const stepped = commitNow(true)
+    // straight back (setSelection would also open a collapsed Inspector)
+    if (st().selection !== selection) useStore.setState({ selection })
+    // a file, the output transform, a change to nothing : undo can't reach it,
+    // and the agent is told so (its undo would otherwise have nothing to take)
+    if (!stepped && !result.isError && !readOnly.has(result)) result = withNote(result, 'Not an undo step : undo cannot take this back.')
+  }
+  return result
+}
+
+/** A line added to a result's text. */
+function withNote(r: McpResult, note: string): McpResult {
+  const i = r.content.findIndex((c) => c.type === 'text')
+  if (i < 0) return { ...r, content: [...r.content, text(`(${note})`)] }
+  return { ...r, content: r.content.map((c, k) => (k === i && c.type === 'text' ? { type: 'text', text: `${c.text}\n(${note})` } : c)) }
 }

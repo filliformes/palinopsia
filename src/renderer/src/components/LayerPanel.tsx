@@ -34,6 +34,7 @@ import { useFlash } from './useFlash'
 import { Blink } from './Blink'
 import { PinZone, usePinItems } from './Pin'
 import { layerPin, layerSpeedPin } from '../persist'
+import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
   const layer = useStore((s) => s.composition.layers[index])
@@ -1086,7 +1087,7 @@ function SourceRow({
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             // The body silhouette joins the live entries, then living matter, then
             // analog video, then every other generator.
-            ...userGens.map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: 'One of your shaders (the Source Editor, Alt+E)' })),
+            ...userGens.map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: `One of your shaders (the Source Editor, ${SOURCE_EDITOR_KEY})` })),
             ...inPickerOrder(GENERATORS_ALPHA).map(
               (g): SearchOption => ({
                 value: g.id,

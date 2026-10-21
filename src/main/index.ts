@@ -476,11 +476,15 @@ function createWindow(): void {
   })
   if (kioskActive()) guardKioskKeys(mainWindow)
   // Alt+E opens the Source Editor. Taken here, before the page : on Windows the
-  // hidden default menu would otherwise open its Edit menu on Alt+E.
+  // hidden default menu would otherwise open its Edit menu on Alt+E. On a Mac,
+  // Option+E is the acute accent (é, á...) and stays the page's : Cmd+Option+E
+  // there. Held down, it toggles once (the key's repeats are swallowed).
   mainWindow.webContents.on('before-input-event', (e, input) => {
-    if (input.type !== 'keyDown' || !input.alt || input.control || input.meta) return
+    if (input.type !== 'keyDown' || !input.alt || input.control) return
+    if (input.meta !== (process.platform === 'darwin')) return
     if (input.key.toLowerCase() !== 'e' && input.code !== 'KeyE') return
     e.preventDefault()
+    if (input.isAutoRepeat) return
     mainWindow?.webContents.send('app:shortcut', 'sourceEditor')
   })
 

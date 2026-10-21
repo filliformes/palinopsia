@@ -71,7 +71,7 @@ import { AgentBadge, McpSection } from './components/McpSection'
 import { initAgent } from './mcp/agent'
 import { registerOutputCanvas } from './engine/outputCanvas'
 import { placeAssemblage, unitPlace } from './assemble/place'
-import { registerUserShader, takeShaderReloads } from './shaders/userShaders'
+import { markUserShadersReady, registerUserShader, takeShaderReloads, userShadersReady } from './shaders/userShaders'
 import { SourceEditor } from './components/SourceEditor'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
@@ -574,16 +574,19 @@ export default function App(): JSX.Element {
   const worldPageOpen = useStore((s) => s.worldPageOpen)
   const sourceEditorOpen = useStore((s) => s.sourceEditorOpen)
   // Your own shaders (the Shaders folder) : entered at start, the menus list them;
-  // Alt+E (caught in the main process) opens the Source Editor.
+  // Alt+E (Cmd+Option+E on a Mac; caught in the main process) opens the Source Editor.
   useEffect(() => {
     let alive = true
-    void window.api.shadersList?.().then((list) => {
-      if (!alive || !Array.isArray(list)) return
-      const st = useStore.getState()
-      const infos = list.map((f) => registerUserShader(f.name, f.source))
-      const sessionOnly = st.userShaders.filter((u) => u.fromSession && !infos.some((i) => i.id === u.id))
-      st.setUserShaders([...infos, ...sessionOnly])
-    })
+    void (window.api.shadersList?.() ?? Promise.resolve(null)).then((list) => {
+      if (!alive) return
+      if (Array.isArray(list)) {
+        const st = useStore.getState()
+        const infos = list.map((f) => registerUserShader(f.name, f.source))
+        const sessionOnly = st.userShaders.filter((u) => u.fromSession && !infos.some((i) => i.id === u.id))
+        st.setUserShaders([...infos, ...sessionOnly])
+      }
+      markUserShadersReady() // the installation boot loads its session now
+    }, () => { if (alive) markUserShadersReady() })
     const off = window.api.onAppShortcut?.((n) => {
       if (n === 'sourceEditor') { const st = useStore.getState(); st.setSourceEditorOpen(!st.sourceEditorOpen) }
     })
@@ -709,6 +712,9 @@ export default function App(): JSX.Element {
       kioskMode = true // an installation never stops on a "Save changes?" dialog
       if (k.sessionPath) {
         try {
+          // your shaders first : the session's own versions of them stay its own
+          // (loaded before, a file's version replaced the one it was saved with)
+          await Promise.race([userShadersReady, new Promise((r) => setTimeout(r, 5000))])
           const s = await window.api.sessionLoad(k.sessionPath)
           if (s) {
             const st = useStore.getState()

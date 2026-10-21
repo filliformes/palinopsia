@@ -24,6 +24,7 @@ import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
 import { Blink } from './Blink'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { showToast } from './Toast'
+import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -317,11 +318,11 @@ export function Transport(): JSX.Element {
         </button>
       </div>
 
-      {/* The Source Editor (Alt+E) : your own shaders */}
+      {/* The Source Editor (Alt+E, Cmd+Option+E on a Mac) : your own shaders */}
       <button
         onClick={() => useStore.getState().setSourceEditorOpen(!useStore.getState().sourceEditorOpen)}
         className={`${TBTN} ml-3 ${sourceEditorOpen ? TBTN_LIT : TBTN_IDLE}`}
-        title="Source Editor (Alt+E) : write a shader, or start from a copy of any built-in one, and keep it as your own (my shaders, in the source and FX menus)"
+        title={`Source Editor (${SOURCE_EDITOR_KEY}) : write a shader, or start from a copy of any built-in one, and keep it as your own (my shaders, in the source and FX menus)`}
       >
         {'{ }'}
       </button>

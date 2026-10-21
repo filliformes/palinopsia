@@ -172,13 +172,14 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'write_shader',
     title: 'Write a shader',
     description:
-      'Compile an ISF shader (a JSON header between /* and */ declaring the controls, then GLSL ES 1.00 : gl_FragColor, isf_FragNormCoord, RENDERSIZE, TIME, IMG_NORM_PIXEL(image, coord) where coord is a plain vec2 variable; an image input named inputImage makes it an effect; "uniform float PH_speed;" is TIME integrated at the control "speed", jump-free). Errors come back on their lines; once it compiles, it is saved as one of the performer\'s shaders (the Source Editor\'s Shaders folder, "my shaders" in the menus) and an image of it running alone comes back. Saving under the name of an existing one of yours replaces it (and reloads it where it plays). Optionally put it to work.',
+      'Compile an ISF shader (a JSON header between /* and */ declaring the controls, then GLSL ES 1.00 : gl_FragColor, isf_FragNormCoord, RENDERSIZE, TIME, IMG_NORM_PIXEL(image, coord) where coord is a plain vec2 variable; an image input named inputImage makes it an effect; "uniform float PH_speed;" is TIME integrated at the control "speed", jump-free). Errors come back on their lines; once it compiles, it is saved as one of the performer\'s shaders (the Source Editor\'s Shaders folder, "my shaders" in the menus) and an image of it running alone comes back. Writing again a shader you wrote replaces it (and reloads it where it plays); the name of one of the performer\'s own is refused unless replace is true. Saving the file is not an undo step. Optionally put it to work.',
     inputSchema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'Its name (its id becomes user-<name>).' },
         source: { type: 'string', description: 'The whole ISF file.' },
         use: { type: 'string', description: 'Once saved : a generator onto a source slot (L1.A, bg), an effect onto a rack (L1, L1.A, master, bg).' },
+        replace: { type: 'boolean', description: 'true : write over the performer\'s own shader of that name (its old file is kept in the Shaders folder\'s history). Ask them first.' },
         values: { type: 'object', description: 'Control values for the preview image (and for `use`).', additionalProperties: true }
       },
       required: ['name', 'source']
@@ -230,12 +231,12 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'osc',
     title: 'Send an OSC control',
     description:
-      'Drive any control by its OSC address, exactly as a controller would (list_controls has them). Continuous controls take a 0-1 float scaled to their range; triggers fire on 1.',
+      'Drive any control by its OSC address, exactly as a controller would (list_controls has them). Numbers go as 0-1 floats scaled to the control\'s range (1 is the top, the last of a menu); triggers fire on 1. An address list_controls marks as an index takes a whole number as that index; {"int": n} sends an OSC int anywhere.',
     inputSchema: {
       type: 'object',
       properties: {
         address: { type: 'string', description: 'e.g. /opsia/world, /opsia/sonify/on, /opsia/meta/3' },
-        args: { type: 'array', description: 'Its arguments : numbers, strings, booleans.', items: {} }
+        args: { type: 'array', description: 'Its arguments : numbers, strings, booleans, or {"int": n} for an explicit OSC int.', items: {} }
       },
       required: ['address']
     }
@@ -243,7 +244,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   {
     name: 'undo',
     title: 'Undo',
-    description: 'Undo the last change (the performer\'s Ctrl+Z : each of your changes is one step).',
+    description: 'Undo your own last change(s) : each change you make is one undo step. It never undoes the performer\'s : once they changed something after you, or for a change that made no step (a saved shader file, the output transform), it says so and undoes nothing.',
     inputSchema: {
       type: 'object',
       properties: { steps: { type: 'number', description: 'How many (default 1, at most 20).' } }
