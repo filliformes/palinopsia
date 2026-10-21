@@ -41,6 +41,7 @@ import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
+import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
@@ -733,9 +734,20 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number; audioLayer?: AudioLayerState }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'au') {
+      // A pan at the center, a playhead (a place : a multiple of it means
+      // little) : Replace, a swing a binding is heard at at once.
+      if (t.field === 'playhead') return 0
+      const al = st.audioLayer
+      const b = al ? auBaseOf(al, t) : null
+      if (b === null) return 0.5
+      if (t.field === 'pan') return Math.abs(b)
+      const r = auSpan(t.field)
+      return (b - r.min) / (r.max - r.min)
+    }
     if (t.kind === 'dome') {
       if (!st.dome) return 0.5
       const r = DOME_MOD_RANGE[t.field]
@@ -2127,6 +2139,13 @@ function dropBgTargets(c: CompositionState, prev: SourceSlot | null): Compositio
   return dropTargets(c, (t) => t.kind === 'bgSource')
 }
 
+/** An Audio Layer slot emptied by hand, or a file turned into another source :
+ *  the bindings on what it no longer has go (`fileOnly` : its transport's;
+ *  volume and pan go on with the slot). Else dead rows, eating the cap. */
+export function dropAuSlotTargets(c: CompositionState, slot: 'A' | 'B', fileOnly = false): CompositionState {
+  return dropTargets(c, (t) => t.kind === 'au' && t.slot === slot && (!fileOnly || auFileField(t.field)))
+}
+
 /** Same instrument in the slot? Identity is kind + shader + media, not inputs. */
 function sameSource(a: SourceSlot | null, b: SourceSlot | null): boolean {
   if (!a || !b) return a === b
@@ -2161,7 +2180,10 @@ function restoreMachineWarp(
   set({ warpCorners: corners, warpEnabled: localStorage.getItem('opsia.warpEnabled') === '1', warpFeather: storedWarpFeather(), warpFromSession: false })
 }
 
-export function targetAlive(c: CompositionState, t: ModTarget): boolean {
+/** `al` : the Audio Layer, outside the composition (a binding on an empty slot,
+ *  or on a live input's transport, is dead); without it, alive. */
+export function targetAlive(c: CompositionState, t: ModTarget, al?: AudioLayerState): boolean {
+  if (t.kind === 'au') return !al || auTargetAlive(al, t)
   if (t.kind === 'fx') {
     const s = t.scope
     const arr =
@@ -3670,7 +3692,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // emptied) : they still count against the cap, and a matrix full of them
       // read as "modulation stopped working" (nothing happened on a click).
       let matrix = st.composition.modMatrix
-      if (matrix.length >= MAX_MOD_ASSIGNMENTS) matrix = matrix.filter((a) => targetAlive(st.composition, a.target))
+      if (matrix.length >= MAX_MOD_ASSIGNMENTS) matrix = matrix.filter((a) => targetAlive(st.composition, a.target, st.audioLayer))
       if (matrix.length >= MAX_MOD_ASSIGNMENTS) {
         result = false
         return {}
@@ -3715,7 +3737,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // (b) optionally seed a random subset of the still-unassigned candidates.
       // Full : dead bindings go first (as in assignMod); still full, the caller says so.
       if (addNew && matrix.length >= MAX_MOD_ASSIGNMENTS) {
-        const alive = matrix.filter((a) => targetAlive(c, a.target))
+        const alive = matrix.filter((a) => targetAlive(c, a.target, st.audioLayer))
         if (alive.length < matrix.length) { matrix = alive; changed = true }
       }
       if (addNew) {
@@ -4556,7 +4578,9 @@ export const useStore = create<StoreState>((set, get) => ({
       return {
         audioLayer: { ...s.audioLayer, [slot]: next },
         audioLayerArmed: { ...s.audioLayerArmed, [slot]: true },
-        selection: { type: 'audio', slot }
+        selection: { type: 'audio', slot },
+        // (a file's transport modulation, on a live input : dead rows)
+        composition: prev?.kind === 'file' ? dropAuSlotTargets(s.composition, slot, true) : s.composition
       }
     })
     if (again) audioLayer.reopen(slot)
@@ -4571,6 +4595,8 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       audioLayer: { ...s.audioLayer, [slot]: null },
       audioLayerArmed: { ...s.audioLayerArmed, [slot]: false },
+      // its modulation goes with it (a binding on an empty slot is a dead row)
+      composition: dropAuSlotTargets(s.composition, slot),
       selection: s.selection?.type === 'audio' && s.selection.slot === slot ? null : s.selection
     })),
   patchAudioLayer: (patch) => set((s) => ({ audioLayer: { ...s.audioLayer, ...patch } })),

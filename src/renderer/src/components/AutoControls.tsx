@@ -606,7 +606,7 @@ export function AssignRow({
     )
   )
   // Live bindings only : a dead one (its effect removed) is cleared to make room.
-  const used = useStore((s) => s.composition.modMatrix.filter((a) => targetAlive(s.composition, a.target)).length)
+  const used = useStore((s) => s.composition.modMatrix.filter((a) => targetAlive(s.composition, a.target, s.audioLayer)).length)
   const full = used >= MAX_MOD_ASSIGNMENTS
   // the binding whose shaping is open under its row (one at a time)
   const [shapeOpen, setShapeOpen] = useState<string | null>(null)

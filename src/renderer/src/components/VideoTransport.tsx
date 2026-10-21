@@ -12,7 +12,11 @@ import { showToast } from './Toast'
 import { pathFromMediaUrl, playableVideoUrl } from './videoImport'
 import { clipAudio } from '../engine/clipAudio'
 import { modTargetKey, useStore } from '../store'
-import { AssignRow } from './AutoControls'
+import { AssignRow, useBound } from './AutoControls'
+import { registerLiveOverlay } from './liveOverlay'
+import { useModSlide } from './useModSlide'
+import { liveModValues } from '../engine/modulation'
+import { auTrim } from '@shared/auMod'
 
 const SMIN = 1 / 64
 const SMAX = 128
@@ -39,7 +43,7 @@ function loadCacheDir(): Promise<string> {
 }
 
 /** The Audio Layer's file slots : the same transport on their own state (their
- *  own store actions; their playhead under layer -1). No modulation row yet. */
+ *  own store actions; their playhead under layer -1). */
 export interface TransportOps {
   patch: (p: TransportPatch) => void
   swap: (url: string, name: string, path: string) => void
@@ -47,7 +51,12 @@ export interface TransportOps {
   setVolume: (v: number) => void
   /** more buttons at the end of the transport row */
   extra?: ReactNode
+  /** its mod row's targets (the Audio Layer's own, ModTarget kind 'au'), by the
+   *  transport's names; modulated, the speed, the trim and the volume show
+   *  their live values */
+  mod?: TransportMods
 }
+type TransportMods = Partial<Record<'position' | 'speed' | 'loopIn' | 'loopOut' | 'vol', ModTarget>>
 type TransportPatch = Parameters<ReturnType<typeof useStore.getState>['setVideoPlayback']>[2]
 
 export function VideoTransport({
@@ -158,6 +167,63 @@ export function VideoTransport({
   const durRef = useRef<HTMLSpanElement | null>(null)
   const dragging = useRef<'in' | 'out' | 'seek' | null>(null)
   const [scrubbing, setScrubbing] = useState(false)
+
+  // The Audio Layer's modulated speed, trim and volume (ops.mod) : their live
+  // values on the speed slider and its number, the timeline's in / out and the
+  // volume slider, painted by the shared liveOverlay loop (never React).
+  const modKey = (n: keyof TransportMods): string | null => {
+    const t = ops?.mod?.[n]
+    return t ? modTargetKey(t) : null
+  }
+  const speedKey = modKey('speed'), inKey = modKey('loopIn'), outKey = modKey('loopOut'), volKey = modKey('vol')
+  const speedMod = useBound(speedKey).length > 0
+  const inMod = useBound(inKey).length > 0
+  const outMod = useBound(outKey).length > 0
+  const volMod = useBound(volKey).length > 0
+  const speedRef = useRef<HTMLInputElement | null>(null)
+  const speedTxtRef = useRef<HTMLSpanElement | null>(null)
+  const regionRef = useRef<HTMLDivElement | null>(null)
+  const inRef = useRef<HTMLDivElement | null>(null)
+  const outRef = useRef<HTMLDivElement | null>(null)
+  const base = useRef({ speed, inN, outN })
+  base.current = { speed, inN, outN }
+  const speedSlide = useModSlide(speedMod, tFromSpeed(speed), 0, 1, (t) => set({ videoSpeed: speedFromT(t) }))
+  useEffect(() => {
+    if (!speedMod || !speedKey) return
+    const offs: Array<() => void> = []
+    if (speedRef.current) offs.push(registerLiveOverlay({ el: speedRef.current, key: speedKey, format: (v) => String(tFromSpeed(v)) }))
+    const txt = speedTxtRef.current
+    if (txt) {
+      const show = (v: number): void => {
+        const s = fmtSpeed(v)
+        if (txt.textContent !== s) txt.textContent = s
+      }
+      offs.push(registerLiveOverlay({ key: speedKey, apply: show, idle: () => show(base.current.speed) }))
+    }
+    return () => offs.forEach((o) => o())
+  }, [speedMod, speedKey])
+  useEffect(() => {
+    const keys = [inMod ? inKey : null, outMod ? outKey : null].filter((k): k is string => !!k)
+    if (!keys.length) return
+    const place = (i: number, o: number): void => {
+      if (regionRef.current) {
+        regionRef.current.style.left = `${i * 100}%`
+        regionRef.current.style.right = `${(1 - o) * 100}%`
+      }
+      if (inRef.current) inRef.current.style.left = `${i * 100}%`
+      if (outRef.current) outRef.current.style.left = `${o * 100}%`
+    }
+    // (in kept before out, as the engine keeps them)
+    const paint = (): void => {
+      const b = base.current
+      place(...auTrim(inKey ? liveModValues.get(inKey) : undefined, outKey ? liveModValues.get(outKey) : undefined, b.inN, b.outN))
+    }
+    const offs = keys.map((k) => registerLiveOverlay({ key: k, apply: paint, idle: paint }))
+    return () => {
+      offs.forEach((o) => o())
+      place(base.current.inN, base.current.outN) // where React drew them
+    }
+  }, [inMod, outMod, inKey, outKey])
   // Move the playhead : a one-shot seek (0..1 within the trim) the render loop
   // routes through the playhead's seam : it lands paused or playing.
   const seekTo = (p: number): void => {
@@ -318,10 +384,12 @@ export function VideoTransport({
         >
         {audio && origPath && <WaveStrip path={origPath} />}
         <div
+          ref={regionRef}
           className="absolute inset-y-0 bg-accent/15"
           style={{ left: `${inN * 100}%`, right: `${(1 - outN) * 100}%` }}
         />
         <div
+          ref={inRef}
           className="absolute inset-y-0 -ml-1 w-2 cursor-ew-resize rounded-l bg-accent/80 hover:bg-accent"
           style={{ left: `${inN * 100}%` }}
           onPointerDown={startDrag('in')}
@@ -332,6 +400,7 @@ export function VideoTransport({
           title={`In point : ${(inN * 100).toFixed(0)}% : double-click resets to start`}
         />
         <div
+          ref={outRef}
           className="absolute inset-y-0 -ml-1 w-2 cursor-ew-resize rounded-r bg-accent/80 hover:bg-accent"
           style={{ left: `${outN * 100}%` }}
           onPointerDown={startDrag('out')}
@@ -400,19 +469,32 @@ export function VideoTransport({
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">speed</span>
         <input
+          ref={speedRef}
           type="range"
           min={0}
           max={1}
           step={0.001}
           value={tFromSpeed(speed)}
-          onChange={(e) => set({ videoSpeed: speedFromT(Number(e.target.value)) })}
+          {...speedSlide}
           onDoubleClick={() => set({ videoSpeed: 1 })}
-          className="min-w-0 flex-1 accent-accent"
-          title={audio ? `Speed ${fmtSpeed(speed)} : like tape, the pitch moves with it (keep pitch holds it); 1/16 to 16x, slower is silent; double-click to reset (×layer ×global)` : `Clip speed ${fmtSpeed(speed)} : double-click to reset (×layer ×global)`}
+          className={`min-w-0 flex-1 ${speedMod ? 'accent-accent2' : 'accent-accent'}`}
+          title={`${audio ? `Speed ${fmtSpeed(speed)} : like tape, the pitch moves with it (keep pitch holds it); 1/16 to 16x, slower is silent; double-click to reset (×layer ×global)` : `Clip speed ${fmtSpeed(speed)} : double-click to reset (×layer ×global)`}${speedMod ? '. Modulated : a drag moves the base by as much as you move it.' : ''}`}
         />
-        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
-          {fmtSpeed(speed)}
-        </span>
+        {/* modulated, the loop writes its number (seeded at mount, never React) */}
+        {speedMod ? (
+          <span
+            key="live"
+            ref={(el) => {
+              speedTxtRef.current = el
+              if (el && !el.textContent) el.textContent = fmtSpeed(speed)
+            }}
+            className="w-12 shrink-0 text-right font-mono text-[10px] text-accent2"
+          />
+        ) : (
+          <span key="base" className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">
+            {fmtSpeed(speed)}
+          </span>
+        )}
       </div>
 
       {/* The sound : its level at the playhead (RMS), and how loud it plays. */}
@@ -423,6 +505,7 @@ export function VideoTransport({
         volume={ops ? ops.volume : audio ? (typeof state.inputs.volume === 'number' ? state.inputs.volume : 0.8) : state.videoVolume ?? 0}
         onVolume={(v) => (ops ? ops.setVolume(v) : audio ? useStore.getState().setSourceInput(layer, slot, 'volume', v) : set({ videoVolume: v }))}
         audio={audio}
+        modKey={volMod ? volKey : null}
       />
 
       {/* Granular : 3 seek-head voices scattering grains around the playhead.
@@ -480,8 +563,9 @@ export function VideoTransport({
         )}
       </div>}
 
-      {/* Modulation : playhead / speed / grain params as mod targets. */}
-      {!ops && <VideoModRow layer={layer} slot={slot} grainOn={!audio && (state.grainOn ?? false)} audio={audio} />}
+      {/* Modulation : playhead / speed / grain params as mod targets (an Audio
+          Layer slot : its own, ops.mod). */}
+      {(!ops || ops.mod) && <VideoModRow layer={layer} slot={slot} grainOn={!audio && (state.grainOn ?? false)} audio={audio} custom={ops?.mod} />}
     </div>
   )
 }
@@ -491,9 +575,14 @@ export function VideoTransport({
 // the clip has sound right there even while the film plays muted. A stopped
 // playhead reads silence. Then its volume : 0 keeps a film silent.
 const M_FLOOR = -60
-function LevelRow({ layer, slot, path, volume, onVolume, audio }: {
+function LevelRow({ layer, slot, path, volume, onVolume, audio, modKey = null }: {
   layer: number; slot: 'A' | 'B'; path: string; volume: number; onVolume: (v: number) => void; audio: boolean
+  /** the volume modulated (an Audio Layer slot) : its live-value key */
+  modKey?: string | null
 }): JSX.Element {
+  const volRef = useRef<HTMLInputElement | null>(null)
+  const volSlide = useModSlide(!!modKey, volume, 0, layer < 0 ? 2 : 1, onVolume)
+  useEffect(() => (modKey && volRef.current ? registerLiveOverlay({ el: volRef.current, key: modKey, format: (x) => String(x) }) : undefined), [modKey])
   const barRef = useRef<HTMLDivElement | null>(null)
   const tickRef = useRef<HTMLDivElement | null>(null)
   const numRef = useRef<HTMLSpanElement | null>(null)
@@ -564,13 +653,15 @@ function LevelRow({ layer, slot, path, volume, onVolume, audio }: {
       <span className="shrink-0 font-mono text-[9px] uppercase text-muted">vol</span>
       {/* (an Audio Layer slot's volume is a gain to 2, like its live inputs; an <audio>'s stops at 1) */}
       <input
+        ref={volRef}
         type="range" min={0} max={layer < 0 ? 2 : 1} step={0.01} value={volume}
-        onChange={(e) => onVolume(Number(e.target.value))}
+        {...volSlide}
         onDoubleClick={() => onVolume(audio ? 0.8 : 0)}
-        className="w-16 shrink-0 accent-accent"
-        title={audio
+        className={`w-16 shrink-0 ${modKey ? 'accent-accent2' : 'accent-accent'}`}
+        title={(audio
           ? `Volume ${Math.round(volume * 100)} % (double-click : 80 %)${layer < 0 ? ', into the Audio Layer\'s mix' : ", on Sonify's output device"}`
-          : `The film's own sound : ${volume > 0 ? `${Math.round(volume * 100)} %` : 'silent'} (double-click : silent), on Sonify's output device. Heard while it plays forward at its own pace (reverse, the grains or a modulated playhead stay silent); a muted layer is silent.`}
+          : `The film's own sound : ${volume > 0 ? `${Math.round(volume * 100)} %` : 'silent'} (double-click : silent), on Sonify's output device. Heard while it plays forward at its own pace (reverse, the grains or a modulated playhead stay silent); a muted layer is silent.`)
+          + (modKey ? '. Modulated : a drag moves the base by as much as you move it.' : '')}
       />
       <span className="w-8 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">{volume > 0 ? Math.round(volume * 100) : 'off'}</span>
     </div>
@@ -619,19 +710,23 @@ function WaveStrip({ path }: { path: string }): JSX.Element {
 // LFO = a loop, S&H = jump-cuts, audio = a sound-driven scrub) or to the clip
 // SPEED (rate multiplier). On imported/converted all-intra clips the seeks are
 // frame-accurate, so a modulated playhead reads smooth.
-function VideoModRow({ layer, slot, grainOn, audio = false }: { layer: number; slot: 'A' | 'B'; grainOn: boolean; audio?: boolean }): JSX.Element {
+// An Audio Layer slot (`custom`) : its own targets (ModTarget kind 'au'), the
+// playhead a scrub that follows the modulator's moves (ClipPlayer.setScrubMod).
+function VideoModRow({ layer, slot, grainOn, audio = false, custom }: { layer: number; slot: 'A' | 'B'; grainOn: boolean; audio?: boolean; custom?: TransportMods }): JSX.Element {
   const [open, setOpen] = useState<string | null>(null)
-  const inputs: Array<[string, string]> = [
-    ['playhead', 'position'],
-    ['speed', 'speed'],
-    ['in', 'loopIn'],
-    ['out', 'loopOut'],
-    // the film's volume (an audio slot's is its `volume` control, with its own M)
-    ...(audio ? [] : ([['vol', 'vol']] as Array<[string, string]>)),
-    ...(grainOn ? ([['gr·size', 'grainSize'], ['gr·spray', 'grainSpray']] as Array<[string, string]>) : [])
-  ]
+  const inputs: Array<[string, string]> = custom
+    ? ([['playhead', 'position'], ['speed', 'speed'], ['in', 'loopIn'], ['out', 'loopOut'], ['vol', 'vol']] as Array<[string, keyof TransportMods]>).filter(([, n]) => !!custom[n])
+    : [
+        ['playhead', 'position'],
+        ['speed', 'speed'],
+        ['in', 'loopIn'],
+        ['out', 'loopOut'],
+        // the film's volume (an audio slot's is its `volume` control, with its own M)
+        ...(audio ? [] : ([['vol', 'vol']] as Array<[string, string]>)),
+        ...(grainOn ? ([['gr·size', 'grainSize'], ['gr·spray', 'grainSpray']] as Array<[string, string]>) : [])
+      ]
   const targets: Record<string, ModTarget> = {}
-  for (const [, input] of inputs) targets[input] = { kind: 'source', layer, slot, input }
+  for (const [, input] of inputs) targets[input] = custom?.[input as keyof TransportMods] ?? { kind: 'source', layer, slot, input }
   const matrix = useStore(useShallow((s) => s.composition.modMatrix))
   const boundFor = (input: string): typeof matrix => {
     const key = modTargetKey(targets[input])
@@ -652,8 +747,12 @@ function VideoModRow({ layer, slot, grainOn, audio = false }: { layer: number; s
             }`}
             title={
               input === 'position'
-                ? 'Bind a modulator to the playhead : a saw LFO loops, S&H jump-cuts, audio scrubs. With grain on, this steers the cloud.'
-                : `Bind a modulator to ${label}`
+                ? custom
+                  ? 'Bind a modulator to the playhead (a place in the trim) : it jumps where the modulator moves it, then plays on from there. S&H cuts, a slow sweep grains, a fast one scratches; a held modulator lets it play.'
+                  : 'Bind a modulator to the playhead : a saw LFO loops, S&H jump-cuts, audio scrubs. With grain on, this steers the cloud.'
+                : custom && input === 'speed'
+                  ? 'Bind a modulator to the speed : it moves over 1/16 to 16x by octaves (like tape, or at its pitch with keep pitch)'
+                  : `Bind a modulator to ${label}`
             }
           >
             M·{label}

@@ -11,6 +11,7 @@ import { DIVISIONS, modEngine } from '../engine/modulation'
 import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
+import { auLabel } from '@shared/auMod'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -968,6 +969,7 @@ function MatrixSummary(): JSX.Element {
     if (t.kind === 'dome') return `Dome ${DOME_MOD_RANGE[t.field].label}`
     if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
     if (t.kind === 'world') return 'World amount'
+    if (t.kind === 'au') return auLabel(t)
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

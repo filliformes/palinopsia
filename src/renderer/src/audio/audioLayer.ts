@@ -13,6 +13,8 @@ import type { AudioLayerSlot, AudioLayerState } from '@shared/types'
 import { ClipPlayer } from '../engine/clipPlayer'
 import { analyseFrame, frameBufs, readFeature, zero, type AudioFeatureName, type AudioFeatures, type FrameBufs } from '../engine/audioIn'
 import { videoKey, videoPlayheads } from '../engine/videoState'
+import { setAuModBase, takeAuMods, type AuModFrame, type AuSlotMods } from '../engine/audioLayerMod'
+import { auTrim } from '@shared/auMod'
 import { sonifyEngine } from './sonify'
 
 /** The Audio Layer's index where the video seams key by layer (playheads,
@@ -205,6 +207,7 @@ class AudioLayerEngine {
    *  the live slots that may open their input. */
   sync(st: AudioLayerState, armed: AudioLayerArmed = NOT_ARMED): void {
     this.st = st
+    setAuModBase(st)
     this.armed = armed
     const release = this.releaseMs
     this.releaseMs = 0
@@ -430,6 +433,7 @@ class AudioLayerEngine {
       c.mixG.gain.setTargetAtTime(mixGain(s, this.st.mix), t, RAMP)
     }
     out.gain.setTargetAtTime(this.st.mute ? 0 : Math.max(0, Math.min(2, this.st.volume)), t, RAMP)
+    this.holdMods(t)
   }
 
   private openFile(s: AudioSlotName, c: Chain, cfg: AudioLayerSlot): void {
@@ -652,6 +656,9 @@ class AudioLayerEngine {
    *  ignoring it plays at its own). Publishes the playheads for the timeline, the
    *  level meter and the modulators listening to a slot. */
   tick(globalSpeed: number): void {
+    // what the modulators put on its controls this frame
+    const mods = takeAuMods()
+    this.applyMods(mods)
     // the whole layer's features, while a modulator reads them (half a second);
     // the audio tab's input set to the layer analysed them already this frame
     const now = performance.now()
@@ -674,11 +681,103 @@ class AudioLayerEngine {
         ignoreGlobal: !!cfg.ignoreGlobalSpeed
       })
       p.setKeepPitch(!!cfg.keepPitch)
+      this.modTransport(p, cfg, mods[s])
       const sk = this.seeks[s]
       if (sk !== null) { p.setPosMod(sk); this.seeks[s] = null }
       p.tick(cfg.ignoreGlobalSpeed ? 1 : globalSpeed)
       videoPlayheads.set(videoKey(AUDIO_LAYER, s), { time: p.time(), duration: p.duration() })
     }
+  }
+
+  // ── Modulation (ModTarget kind 'au') : per-frame overrides, the store's
+  // values staying the base. The gains and pans a modulator holds now, by key
+  // ('vol' the layer's volume; 'A.vol', 'A.pan', 'A.mix' a slot's volume, pan
+  // and side of the mix) : the value it asked for, and what was sent.
+  private modHeld = new Map<string, { raw: number; sent: number }>()
+
+  /** This frame's modulation onto the gains and pans : each glides there (RAMP,
+   *  never a step : no zipper, no click), and back to its stored value on the
+   *  first frame nothing modulates it. */
+  private applyMods(m: AuModFrame): void {
+    const ctx = this.ctx, out = this.out
+    if (!ctx || !out) {
+      this.modHeld.clear()
+      return
+    }
+    const t = ctx.currentTime
+    // (fading away under a New or a Generate : the fade has the layer's volume)
+    if (!this.releaseT) this.modParam('vol', out.gain, m.volume, t)
+    for (const s of SLOTS) {
+      const c = this.chains[s]
+      if (!c) {
+        for (const k of ['vol', 'pan', 'mix']) this.modHeld.delete(`${s}.${k}`)
+        continue
+      }
+      this.modParam(`${s}.mix`, c.mixG.gain, m.mix, t)
+      this.modParam(`${s}.vol`, c.vol.gain, m[s].volume, t)
+      this.modParam(`${s}.pan`, c.pan.pan, m[s].pan, t)
+    }
+  }
+
+  private modParam(key: string, p: AudioParam, raw: number | undefined, t: number): void {
+    const held = this.modHeld.get(key)
+    if (raw === undefined) {
+      if (!held) return
+      this.modHeld.delete(key)
+      p.setTargetAtTime(this.modValue(key, this.storedOf(key)), t, RAMP) // let go : home
+      return
+    }
+    const v = this.modValue(key, raw)
+    if (held && Math.abs(held.sent - v) < 1e-4) {
+      held.raw = raw
+      return
+    }
+    this.modHeld.set(key, { raw, sent: v })
+    p.setTargetAtTime(v, t, RAMP)
+  }
+
+  /** apply() has just put the stored values on : what a modulator holds stays
+   *  where it holds it (else every store change pulled it home for a frame). */
+  private holdMods(t: number): void {
+    for (const [key, h] of this.modHeld) {
+      const s = key === 'vol' ? null : (key[0] as AudioSlotName)
+      const c = s ? this.chains[s] : null
+      const p = !s ? this.out?.gain : key.endsWith('.mix') ? c?.mixG.gain : key.endsWith('.vol') ? c?.vol.gain : c?.pan.pan
+      if (!p) continue
+      h.sent = this.modValue(key, h.raw)
+      p.setTargetAtTime(h.sent, t, RAMP)
+    }
+  }
+
+  /** What a param gets for a value of its control : a volume under its mute, a
+   *  pan in -1..1, a side of the A/B mix by the mix law. */
+  private modValue(key: string, raw: number): number {
+    if (key === 'vol') return this.st.mute ? 0 : Math.max(0, Math.min(2, raw))
+    const s = key[0] as AudioSlotName
+    if (key.endsWith('.mix')) return mixGain(s, raw)
+    if (key.endsWith('.vol')) return this.st[s]?.mute ? 0 : Math.max(0, Math.min(2, raw))
+    return Math.max(-1, Math.min(1, raw))
+  }
+
+  private storedOf(key: string): number {
+    if (key === 'vol') return this.st.volume
+    if (key.endsWith('.mix')) return this.st.mix
+    const cfg = this.st[key[0] as AudioSlotName]
+    return key.endsWith('.vol') ? (cfg?.volume ?? 0) : (cfg?.pan || 0)
+  }
+
+  /** A file's transport under modulation this frame : its speed (over its
+   *  stored one : the global speed still multiplies it, keep pitch still holds
+   *  the pitch), its trim (the in kept before the out : the modulated end gives
+   *  way) and its playhead (a scrub, ClipPlayer.setScrubMod). */
+  private modTransport(p: ClipPlayer, cfg: AudioLayerSlot, m: AuSlotMods): void {
+    if (m.speed !== undefined) p.setSpeedMod(m.speed / Math.max(1e-6, cfg.videoSpeed ?? 1))
+    if (m.trimIn !== undefined || m.trimOut !== undefined) {
+      const [i, o] = auTrim(m.trimIn, m.trimOut, cfg.videoIn ?? 0, cfg.videoOut ?? 1)
+      p.setMod('loopIn', i)
+      p.setMod('loopOut', o)
+    }
+    if (m.playhead !== undefined) p.setScrubMod(m.playhead)
   }
 
   /** A slot's level (or the layer's : `null`), after its volume : RMS and peak,

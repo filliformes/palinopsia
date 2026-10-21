@@ -743,6 +743,11 @@ export type ModTarget =
   // The World amount : how much of the active World's mood is on (0 = the mood
   // it found, 1 = all of it). A final override like the Background's.
   | { kind: 'world'; field: 'amount' }
+  // The Audio Layer (session state outside the composition) : its volume and
+  // A/B mix; a slot's volume and pan, and a sound file's playhead, speed and
+  // trim (shared/auMod.ts). A final override on the audio engine, each frame.
+  | { kind: 'au'; slot?: undefined; field: import('./auMod').AuLayerModField }
+  | { kind: 'au'; slot: 'A' | 'B'; field: import('./auMod').AuSlotModField }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).

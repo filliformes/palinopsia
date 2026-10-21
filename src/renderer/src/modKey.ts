@@ -12,6 +12,7 @@ export function modTargetKey(t: ModTarget): string {
   if (t.kind === 'dome') return `dome:${t.field}`
   if (t.kind === 'outx') return `outx:${t.field}`
   if (t.kind === 'world') return 'world:amount'
+  if (t.kind === 'au') return t.slot ? `au:${t.slot}:${t.field}` : `au:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
