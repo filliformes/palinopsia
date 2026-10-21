@@ -257,7 +257,7 @@ function MixerColumn({
   const css = (c: number[] | null | undefined): string =>
     c ? `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})` : 'rgb(var(--c-panel3))'
   const swA = hasB ? css(sw?.a) : css(null)
-  const swB = hasB && sw ? css(harmonizeRgb(sw.b, sw.a, sw.b, l.harmony)) : css(null)
+  const swB = hasB && sw ? css(harmonizeRgb(sw.b, sw.a, sw.b, l.harmony, sw.side)) : css(null)
 
   const coupled = couplingOn && hasB && l.coupling.mode !== 'off'
   const cplOff = l.coupling.mode === 'off'

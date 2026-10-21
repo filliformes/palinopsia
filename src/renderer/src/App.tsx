@@ -85,7 +85,7 @@ import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
-import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, morphDebug } from './morph'
+import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, relaySoundEnvelopes, morphDebug } from './morph'
 
 import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
 import { keepPersistent } from './persist'
@@ -1569,6 +1569,8 @@ export default function App(): JSX.Element {
         //     so no modulator or macro can override it.
         const relayEnv = relayEnvelopes()
         if (relayEnv) relayEnv.forEach((k, i) => { if (k < 0.999) comp!.scaleLayerOpacity(i, k) })
+        // ...and its sound with it (an outgoing sound fades instead of being cut)
+        relaySoundEnvelopes()?.forEach((k, i) => { if (k < 0.999) comp!.scaleLayerSound(i, k) })
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // Timer clock (the window doesn't paint) : wait for THIS render before

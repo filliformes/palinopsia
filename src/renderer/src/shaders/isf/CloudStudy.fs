@@ -32,7 +32,9 @@
 
 // The wind and the churn run on integrated clocks (no jump when they move),
 // wrapped where the noise repeats (256 noise cells : drift moves 0.5 a second,
-// evolve 0.3), so a show of days never loses precision nor jumps.
+// evolve 0.3), so a show of days never loses precision nor jumps. Each octave
+// takes the wind times a whole number (1, 2, 4, 8 : density()), so the wrap's
+// 256 stays a whole number of periods in every one of them.
 uniform float PH_drift; // wrap 512
 uniform float PH_evolve; // wrap 853.3333
 // Under full-dome fill the view is kept square (the dome stretches the frame's
@@ -41,9 +43,9 @@ uniform float DOME_FILL;
 
 const float PI = 3.14159265;
 
-// Hash without Sine (THIRD_PARTY_NOTICES), on cells wrapped at 256.
+// Hash without Sine (THIRD_PARTY_NOTICES), on cells already wrapped at 256 (vnoise3).
 float hash13(vec3 p3) {
-  p3 = fract(mod(p3, 256.0) * 0.1031);
+  p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);
 }
@@ -57,14 +59,17 @@ vec2 hash22(vec2 p) {
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.xx + p3.yz) * p3.zy);
 }
+// The cell wrapped once and its far corner wrapped on from it (exact on whole
+// numbers) : the same values as wrapping each of the 8 corners, for 2 wraps.
 float vnoise3(vec3 p) {
-  vec3 i = floor(p);
+  vec3 i = mod(floor(p), 256.0);
+  vec3 j = mod(i + 1.0, 256.0);
   vec3 f = fract(p);
   vec3 u = f * f * (3.0 - 2.0 * f);
-  float a = hash13(i), b = hash13(i + vec3(1.0, 0.0, 0.0));
-  float c = hash13(i + vec3(0.0, 1.0, 0.0)), d = hash13(i + vec3(1.0, 1.0, 0.0));
-  float e = hash13(i + vec3(0.0, 0.0, 1.0)), g = hash13(i + vec3(1.0, 0.0, 1.0));
-  float h = hash13(i + vec3(0.0, 1.0, 1.0)), k = hash13(i + vec3(1.0, 1.0, 1.0));
+  float a = hash13(i), b = hash13(vec3(j.x, i.y, i.z));
+  float c = hash13(vec3(i.x, j.y, i.z)), d = hash13(vec3(j.x, j.y, i.z));
+  float e = hash13(vec3(i.x, i.y, j.z)), g = hash13(vec3(j.x, i.y, j.z));
+  float h = hash13(vec3(i.x, j.y, j.z)), k = hash13(j);
   return mix(mix(mix(a, b, u.x), mix(c, d, u.x), u.y), mix(mix(e, g, u.x), mix(h, k, u.x), u.y), u.z);
 }
 float vnoise2(vec2 p) {
@@ -83,17 +88,22 @@ float spec(float x) {
 // The cloud's density at q (noise space). Billows from the first octaves,
 // DETAIL erodes their edges with the finer ones; COVER sets how much of the
 // noise is cloud. The slab gives flat bases and tops thinning to rounded crowns.
-float density(vec3 q, float slabY, float cover, int octaves) {
+// The wind rides each octave outside its 2.03 scaling, doubled per octave : a
+// whole number of times the wrap's 256 cells (scaled by 2.03, the finer billows
+// re-dealt in one frame when the clocks wrapped).
+float density(vec3 q, vec3 wind, float slabY, float cover, int octaves) {
   float s = 0.0;
   float wsum = 0.0;
   float a = 0.55;
   vec3 p = q;
+  vec3 wo = wind;
   for (int o = 0; o < 4; o++) {
     if (o >= octaves) break;
     float w = o < 2 ? a : a * (0.3 + detail * 1.5);
-    s += w * vnoise3(p);
+    s += w * vnoise3(p + wo);
     wsum += w;
     p = p * 2.03 + vec3(17.1, 9.2, 3.7);
+    wo *= 2.0;
     a *= 0.5;
   }
   s /= wsum; // about 0.5, give or take 0.12
@@ -142,11 +152,11 @@ vec4 cloudPass(vec2 uv) {
     if (t > t1) break;
     vec3 pos = d * t;
     float sy = (pos.y - yb) / (yt - yb);
-    vec3 q = pos * sc + wind;
-    float den = density(q, sy, cover, 4);
+    vec3 q = pos * sc;
+    float den = density(q, wind, sy, cover, 4);
     if (den > 0.004) {
       // the light reaching here : one look toward the sun through the cloud
-      float denL = density(q + L * 0.3, sy + L.y * 0.3 / (sc * (yt - yb)), cover, 2);
+      float denL = density(q + L * 0.3, wind, sy + L.y * 0.3 / (sc * (yt - yb)), cover, 2);
       // (and the light scattered on inside it : the thick core still glows,
       // never a dark hole ringed by its lit edge)
       float lit = max(exp(-shadow * 4.5 * denL), 0.4 * exp(-shadow * 1.1 * denL));

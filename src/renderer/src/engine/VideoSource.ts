@@ -101,12 +101,16 @@ export class VideoSource {
   // layer not muted. Silent (muted) otherwise, as every film was before.
   private volMod: number | null = null
   private audible = true
+  private gain = 1 // this frame's scale on it (a relay morph's hand-over : setGain)
   private nativeNow = false
   setVolMod(v: number): void {
     this.volMod = Math.max(0, Math.min(1, v))
   }
   setAudible(on: boolean): void {
     this.audible = on
+  }
+  setGain(g: number): void {
+    this.gain = Math.max(0, Math.min(1, g))
   }
   setPosMod(v: number): void {
     this.posMod = Math.max(0, Math.min(1, v))
@@ -488,7 +492,7 @@ void main(){
     try {
       this.tickInner(rawDt, mul, bpm)
     } finally {
-      const vol = this.volMod ?? this.pb.volume ?? 0
+      const vol = (this.volMod ?? this.pb.volume ?? 0) * this.gain
       this.volMod = null
       const hear = vol > 0.001 && this.audible && this.nativeNow && this.pb.playing && !this.grain.on
       if (this.video.muted === hear) this.video.muted = !hear
