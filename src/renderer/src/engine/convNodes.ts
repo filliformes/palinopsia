@@ -12,6 +12,7 @@
 
 import { glGeneration } from './glGeneration'
 import { CodecMoshNode } from './codecMosh'
+import { FieldStoreNode } from './fieldStore'
 
 export interface ChainLike {
   next(): { fbo: WebGLFramebuffer; tex: WebGLTexture }
@@ -5187,6 +5188,7 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-pulfrich') return new PulfrichNode(gl)
   if (shaderId === 'node-corrode') return new CorrodeNode(gl)
   if (shaderId === 'node-decimate') return new DecimateNode(gl)
+  if (shaderId === 'node-fieldstore') return new FieldStoreNode(gl)
   if (shaderId === 'node-eternalism') return new EternalismNode(gl)
   if (shaderId === 'node-afterimage') return new AfterimageNode(gl)
   if (shaderId === 'node-melt') return new MeltNode(gl)
@@ -5207,6 +5209,6 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

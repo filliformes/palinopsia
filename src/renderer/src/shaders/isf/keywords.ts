@@ -37,6 +37,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'node-pulfrich': ['3d', 'stereo', 'depth', 'delay', 'anaglyph'],
   'node-corrode': ['corrode', 'decay', 'weather', 'rust', 'grunge'],
   'node-decimate': ['sample rate', 'decimate', 'stutter', 'hold', 'time-lapse'],
+  'node-fieldstore': ['frame store', 'stamp', 'trail', 'freeze', 'key', 'mosaic', 'sample and hold'],
 
   // ── Rack FX ──────────────────────────────────────────────────────────
   'fx-abstraction': ['abstract', 'posterize', 'displace', 'simplify', 'reduce'],

@@ -24,6 +24,7 @@ const SELF_CONTAINED = new Set([
   'node-pulfrich',
   'node-corrode',
   'node-decimate',
+  'node-fieldstore', // reads a sidechain only for its key, else this rack's own picture
   'node-melt',
   'node-faultline',
   'node-ibfv',

@@ -637,6 +637,47 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-sediment'], nativeChance: 0.85,
     blends: ['screen', 'darken'], feedback: 0.4, drift: 0.2, gestureTexture: 0.55
   }),
+  // Field Store : persistence without decay. Hard stamps kept in a coarse store,
+  // never fading; no layer feedback and no Context trails (they would soften the
+  // stamps back into the usual trail).
+  mk({
+    id: 'field-store', name: 'Field Store', family: 'Feedback / Afterimage',
+    blurb: 'Hard stamps that never fade : moving forms leave crisp copies of themselves in a coarse store, kept until wiped.',
+    world: 'parametric',
+    context: { trails: 0, haze: 0 },
+    palette: [K, [0.08, 0.16, 0.2, 1], [0.85, 0.62, 0.3, 1], [0.92, 0.9, 0.84, 1]],
+    sources: ['particle-drift', 'murmuration', 'shapes', 'ash', 'filaments', 'drift-field'],
+    layerFx: ['fx-grade', 'fx-posterize'],
+    stackFx: [['node-fieldstore'], ['node-fieldstore']],
+    pickInputs: {
+      'node-fieldstore': {
+        mode: [0, 0, 1, 2, 3], show: [0], key: [0, 0, 1], threshold: [0.35, 0.45, 0.55], invert: [0],
+        clock: [1, 1, 2, 4], every: [3, 4, 6, 8], size: [1, 2, 2], bits: [3, 4, 4],
+        slideX: [0, 0, 0.22, -0.22], slideY: [0, 0, 0.16, -0.16], keep: [0], mix: [1]
+      }
+    },
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.15, feedback: 0, drift: 0.2, density: 0.45
+  }),
+  mk({
+    id: 'revealed', name: 'Revealed', family: 'Feedback / Afterimage',
+    blurb: 'Only what moves is written : the picture assembles out of the dark where motion passed, and stays.',
+    world: 'monomedia',
+    context: { trails: 0, haze: 0 },
+    palette: [INK, [0.14, 0.12, 0.1, 1], [0.7, 0.66, 0.58, 1], [0.93, 0.9, 0.84, 1]],
+    // sources that keep moving : the motion key writes nothing over a still one
+    sources: ['murmuration', 'particle-drift', 'shapes', 'ash', 'filaments'],
+    layerFx: ['fx-grade'],
+    stackFx: [['node-fieldstore'], ['node-fieldstore']],
+    pickInputs: {
+      'node-fieldstore': {
+        mode: [5, 5, 7], show: [0], key: [2], threshold: [0.18, 0.25, 0.32], invert: [0],
+        clock: [0, 0, 1], every: [2, 3], size: [2, 2, 3], bits: [4, 5],
+        slideX: [0], slideY: [0, 0, 0.12], keep: [0], mix: [1]
+      }
+    },
+    bgOpacity: 0,
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2, feedback: 0, drift: 0.15, density: 0.5
+  }),
   mk({
     id: 'pulfrich', name: 'Pulfrich', family: 'Feedback / Afterimage',
     blurb: 'Lateral motion tips into depth : a red/cyan stereo pair born from a temporal eye-delay.',

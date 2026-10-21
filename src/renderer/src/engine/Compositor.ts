@@ -32,6 +32,7 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
 import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './convNodes';
+import { dropKeptStores } from './fieldStore';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
 import { NATIVE_GENERATOR_IDS, nativeGeneratorFactory, syncNativeSlot, type NativeSlot } from './nativeGenerators';
@@ -2378,6 +2379,9 @@ export class Compositor {
     for (const layer of this.layers) layer.flush();
     this.masterRack.flushNodes();
     this.bgRack.flushNodes();
+    // a Field Store kept across scenes parked its store on the flush : let it go,
+    // so the rebuilt one starts empty too
+    dropKeptStores();
   }
 
   /** Compile ONE shader (or native node) and immediately discard it : startup
