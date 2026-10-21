@@ -189,6 +189,12 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Points of light on a dark ground : the field stays a white dot on near-black.
   'gen-lattice': /^(ink|ground)$/,
   'sync-osc': /^loA$/,
+  // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
+  // set it racing), Crawl's ground (clear hides the picture under it) and Store
+  // Zoom's mirror and endless scroll are staging, set by hand.
+  'fx-shatter': /^(sync|flip)$/,
+  'fx-crawl': /^ground$/,
+  'fx-store-zoom': /^(mirror|scrollX|scrollY)$/,
   // Feedback Zoom : a rolled center can land the tunnel in a corner; the dice
   // rolls `drift` instead, which lets the center wander on its own.
   'fx-feedback-zoom': /^center$/
@@ -245,6 +251,7 @@ const tinted = (sLo: number, sHi: number, vLo: number, vHi: number) =>
 const DERIVED_COLORS: Record<string, (out: Record<string, number | number[]>, skip?: RegExp) => void> = {
   'fx-palette': (o, sk) => ramp(o, ['colorA', 'colorB', 'colorC', 'colorD', 'colorE'], sk),
   'fx-colorizer': (o, sk) => ramp(o, ['low', 'mid', 'high'], sk),
+  'fx-crawl': (o, sk) => ramp(o, ['colorA', 'colorB', 'colorC', 'colorD', 'colorE'], sk),
   'fx-vibe': (o, sk) => {
     ramp(o, ['colorA', 'colorB', 'colorC', 'colorD', 'colorE'], sk)
     tinted(0.04, 0.2, 0.45, 0.58)(o, 'shadowTint') // split-tone tints roam near neutral gray

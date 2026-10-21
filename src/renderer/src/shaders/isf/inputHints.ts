@@ -459,6 +459,48 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     complement: '1 = the ghost takes the complementary color (red leaves cyan, white a pale gray), 0 = a plain luminance ghost.',
     threshold: 'Only stimuli brighter than this burn an afterimage.'
   },
+  // ── Frame-store tricks ───────────────────────────────────────────────
+  'fx-shatter': {
+    rate: 'How often a fresh still is grabbed, per second. Between grabs whatever moves shows the pattern; at each grab it vanishes and grows back. 0 = only on grab ▸ (or a modulator on it).',
+    sync: 'Grabs on the tempo instead : once a bar, every half note, quarter or eighth (counted on the layer\'s clock). Free uses the grab rate.',
+    grab: 'GRAB ▸ : take a fresh still now. Press it, send OSC, or bind a modulator (a beat or an audio onset grabs on the music).',
+    pattern: 'CHECKER · LINES (bars) · COLUMNS · DIAGONALS · BRICKS · DITHER (an ordered dot screen) · CELLS (random blocks) · KEY (the picture\'s own darks show the still, so a moving bright subject leaves its last grab behind).',
+    scale: 'Pattern cell size in 1080p pixels, rounded to whole pixels (it scales with the output) : fine reads as a shimmer, coarse as blocks.',
+    density: 'Share of the pattern that shows the held still : 0 = all live (nothing shows), 0.5 = half, 1 = the still everywhere (a plain freeze). With KEY, the brightness under which the still shows.',
+    flip: 'How often the pattern trades its two halves, per second (6 at most) : moving parts shimmer between the still and the live picture. The share stays the same, so a fine pattern never flashes as a whole. Not used by KEY.',
+    slide: 'Moves the pattern, in cells per second : the bars roll up or down, the other patterns move sideways. Not used by KEY.',
+    wet: 'Blends the shattered picture over the untouched one.'
+  },
+  'fx-crawl': {
+    threshold: 'How much a pixel\'s brightness must change since its last stamp to be stamped again : low = the faintest movement draws, high = only strong changes. Slow drifts add up and count too.',
+    fade: 'Seconds before a stamp fades back to the picture (up to a minute) : longer keeps more history on screen.',
+    clear: 'CLEAR ▸ : forget the whole history; the picture as it is now becomes the reference.',
+    ground: 'What shows where nothing changed : LIVE the picture · BLACK · CLEAR transparent (only the contours, over the layers below).',
+    wet: 'How strongly the history colors cover the ground.',
+    band: 'Seconds of history one turn of the palette spans : short = thin, close contours behind fast motion; long = wide, slow bands.',
+    cycle: 'Turns the palette through the history, in turns per second (0.5 at most) : the contours crawl along the path of the motion, back the other way below 0. 0 = a still map of when.',
+    steps: 'Cuts the palette into this many hard bands : the contour lines. 0 = smooth.',
+    palette: 'RAMP : the color stops below · PICTURE : each place\'s own color, run from near-black to pale.',
+    stops: 'How many of the colors below the ramp uses (2 to 5), dark end first.',
+    colorA: 'First stop : the dark end of the ramp.',
+    colorB: 'Second stop (the light end with 2 stops).',
+    colorC: 'Third stop (used from 3 stops).',
+    colorD: 'Fourth stop (used from 4 stops).',
+    colorE: 'Fifth stop : the light end with 5 stops.'
+  },
+  'fx-store-zoom': {
+    zoom: 'How much the store is enlarged. It moves in the store\'s whole-number steps, so most values hold each store pixel for uneven runs (2, 3, 2, 3) : the stepped hardware look. Below 1 the store shrinks and repeats.',
+    stretch: 'Up makes the blocks taller, down makes them wider (up to four times).',
+    magnify: '1 : the zoom enlarges the picture (a frozen store). 0 : the picture stays in place and is only cut into the zoom\'s uneven blocks (live video through a zoomed store). Between : some of both.',
+    mirror: 'Reflects the picture, on one axis, where the read address runs off the end of the store : the axis moves with pan and zoom. Pan to bring it into the frame (or zoom out).',
+    panX: 'Moves the read address sideways; the picture wraps around (1 = one whole turn).',
+    panY: 'Moves the read address up or down; the picture wraps around (1 = one whole turn).',
+    scrollX: 'Pans sideways on its own, in store widths per second, wrapping endlessly.',
+    scrollY: 'Pans up or down on its own, in store heights per second, wrapping endlessly.',
+    lines: 'The store\'s resolution in lines : 256 is the classic low-resolution store, lower is coarser, 1080 is fine.',
+    wide: 'The store pixel\'s width against its height : 1 = square, 1.5 = the wide pixels of a store clocked at the color subcarrier.',
+    wet: 'Blends the store\'s picture over the untouched one.'
+  },
   'fx-optical-rain': {
     amount: 'How much of the image shatters into falling streaks.',
     rain: 'Fall speed of the streaks.',

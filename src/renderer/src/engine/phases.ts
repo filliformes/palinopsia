@@ -29,6 +29,8 @@
 // all carry through. Each phase starts at a random offset so two layers
 // running the same generator never move in lockstep.
 
+import { tempoBpm } from './tempoSignal'
+
 type Get = (name: string) => number
 
 /** Integrands that are not a plain product of inputs, by uniform name. */
@@ -52,8 +54,23 @@ const INTEGRANDS: Record<string, (v: Get) => number> = {
   // vector (like Scan) : turning flow bends the path, changing speed or count
   // changes the pace, and none of them flings the accumulated offset.
   PH_pdriftX: (v) => v('speed') * v('count') * Math.cos(v('flow')),
-  PH_pdriftY: (v) => v('speed') * v('count') * Math.sin(v('flow'))
+  PH_pdriftY: (v) => v('speed') * v('count') * Math.sin(v('flow')),
+  // Shatter : the grab clock (one grab per whole step), at `rate` Hz or on a
+  // beat division of the transport tempo (sync 1 bar · 1/2 · 1/4 · 1/8 = ¼, ½,
+  // 1, 2 grabs a beat, 4/4), never past 8 grabs a second (flash safety).
+  PH_shatterGrab: (v) => {
+    const s = Math.round(v('sync'))
+    const hz = s > 0 ? (tempoBpm() / 60) * (SHATTER_PER_BEAT[s] ?? 1) : v('rate')
+    return Math.min(Math.max(hz, 0), 8)
+  },
+  // Crawl : the clock each change is stamped with, and the palette index (one
+  // cycle per `band` seconds of history, plus the `cycle` rotation, so at cycle 0
+  // a stamped pixel keeps its color).
+  PH_crawlClock: () => 1,
+  PH_crawlIdx: (v) => 1 / Math.max(v('band'), 0.05) + v('cycle')
 }
+
+const SHATTER_PER_BEAT = [0, 0.25, 0.5, 1, 2]
 
 function smooth(a: number, b: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))

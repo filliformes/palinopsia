@@ -991,6 +991,37 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Mono ghost', values: { sensitivity: 0.5, persistence: 0.65, strength: 0.6, complement: 0.0, threshold: 0.5 } },
     { name: 'Everywhere', values: { sensitivity: 0.7, persistence: 0.6, strength: 0.5, complement: 1.0, threshold: 0.25 } }
   ],
+  // ── Frame-store tricks : Shatter, Crawl, Store Zoom ──
+  'fx-shatter': [
+    { name: 'Moving checker', values: { rate: 1.5, sync: 0, pattern: 0, scale: 3, density: 0.5, flip: 0, slide: 0, wet: 1 } },
+    { name: 'Fine shimmer', values: { rate: 2, sync: 0, pattern: 0, scale: 1, density: 0.5, flip: 4, slide: 0, wet: 1 } },
+    { name: 'Rolling bars', values: { rate: 1, sync: 0, pattern: 1, scale: 4, density: 0.5, flip: 0, slide: 1.5, wet: 1 } },
+    { name: 'Dither ghost', values: { rate: 0.8, sync: 0, pattern: 5, scale: 2, density: 0.35, flip: 0, slide: 0, wet: 1 } },
+    { name: 'Brickwork', values: { rate: 1.2, sync: 0, pattern: 4, scale: 8, density: 0.5, flip: 0, slide: 0, wet: 1 } },
+    { name: 'Crumbling cells', values: { rate: 0.5, sync: 0, pattern: 6, scale: 6, density: 0.6, flip: 1, slide: 0, wet: 1 } },
+    { name: 'Catch-up', values: { rate: 2, sync: 0, pattern: 7, scale: 3, density: 0.45, flip: 0, slide: 0, wet: 1 } },
+    { name: 'Grab on the beat', values: { rate: 1.5, sync: 3, pattern: 2, scale: 6, density: 0.5, flip: 0, slide: -1, wet: 1 } }
+  ],
+  'fx-crawl': [
+    { name: 'Isochrones', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 1, cycle: 0.1, steps: 8, palette: 0, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Fine contours', values: { threshold: 0.06, fade: 6, ground: 0, wet: 1, band: 0.25, cycle: 0.15, steps: 12, palette: 0, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Ember wake', values: { threshold: 0.08, fade: 10, ground: 1, wet: 1, band: 0.6, cycle: 0.2, steps: 6, palette: 0, stops: 4, colorA: [0.03, 0.02, 0.02, 1], colorB: [0.35, 0.08, 0.04, 1], colorC: [0.9, 0.45, 0.12, 1], colorD: [1, 0.85, 0.55, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Cold drift', values: { threshold: 0.1, fade: 20, ground: 0, wet: 0.85, band: 2, cycle: -0.08, steps: 0, palette: 0, stops: 4, colorA: [0.02, 0.03, 0.05, 1], colorB: [0.06, 0.18, 0.3, 1], colorC: [0.35, 0.65, 0.75, 1], colorD: [0.9, 0.95, 0.97, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Ink trace', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 0.4, cycle: 0.05, steps: 2, palette: 0, stops: 2, colorA: [0.03, 0.03, 0.035, 1], colorB: [0.92, 0.9, 0.85, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Own colors', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 0.8, cycle: 0.12, steps: 8, palette: 1, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Contours only', values: { threshold: 0.08, fade: 12, ground: 2, wet: 1, band: 0.5, cycle: 0.1, steps: 10, palette: 0, stops: 4, colorA: [0.02, 0.03, 0.02, 1], colorB: [0.12, 0.22, 0.1, 1], colorC: [0.55, 0.62, 0.3, 1], colorD: [0.9, 0.88, 0.7, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Long memory', values: { threshold: 0.12, fade: 45, ground: 0, wet: 1, band: 3, cycle: 0.03, steps: 6, palette: 0, stops: 4, colorA: [0.04, 0.02, 0.02, 1], colorB: [0.3, 0.1, 0.06, 1], colorC: [0.62, 0.32, 0.16, 1], colorD: [0.85, 0.7, 0.5, 1], colorE: [1, 1, 1, 1] } }
+  ],
+  'fx-store-zoom': [
+    { name: 'Store look', values: { zoom: 1, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
+    { name: 'Uneven zoom', values: { zoom: 2.6, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
+    { name: 'Live mosaic', values: { zoom: 5.5, stretch: 0, magnify: 0, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
+    { name: 'Tall pixels', values: { zoom: 2, stretch: 0.6, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 200, wide: 1.5, wet: 1 } },
+    { name: 'Wide pixels', values: { zoom: 2, stretch: -0.6, magnify: 0.5, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 180, wide: 1.5, wet: 1 } },
+    { name: 'Torus scroll', values: { zoom: 1.3, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0.05, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
+    { name: 'Overflow mirror', values: { zoom: 1.8, stretch: 0, magnify: 1, mirror: 1, panX: 0.35, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
+    { name: 'Zoomed-out tiles', values: { zoom: 0.7, stretch: 0, magnify: 1, mirror: 2, panX: 0, panY: 0.2, scrollX: 0, scrollY: 0.03, lines: 320, wide: 1.5, wet: 1 } }
+  ],
   // ── Compress (JPEG / DCT intra artifacts) ──
   'fx-compress': [
     { name: 'JPEG low', values: { block: 8, quality: 0.25, ring: 0.5, chroma: 0.7, grid: 0, vary: 0 } },

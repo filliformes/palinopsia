@@ -128,6 +128,12 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Reads the picture as a grid of cells and replaces each with a single color of its own (its center pixel, or its average), redrawn as a shape that swells with brightness. It is analysis and resynthesis rather than simple blurring, so the result feels constructed. Coarse settings turn any source into a tiled panel.',
   'fx-optical-rain':
     'Shatters the edges of the image into vertical streaks that drift downward, each fragment carrying a little of the color it came from. The picture appears to be dissolving into falling threads. One of the stereoscopic-texture effects, and it pairs well with the 3D stage in the Finalizer.',
+  'fx-shatter':
+    'Turns movement into texture. A still frame is grabbed again and again, and a fine pattern switches between it and the live picture : where nothing moves the two match and the picture looks untouched, wherever something moves the pattern shows. A motion detector that draws in checks, bars or dots, on a clock or on the beat.',
+  'fx-crawl':
+    'Colors the picture by how long ago each place last changed. Anything that moves leaves bands of color behind it, each band the places it passed at the same moment, and the palette turns slowly through them so the contours crawl. A map of time drawn by the motion itself, in a palette you choose or in the picture\'s own colors.',
+  'fx-store-zoom':
+    'Reads the picture the way a low-resolution frame store would : one zoom that enlarges and cuts into uneven blocks at once, wide or tall pixels, a pan that wraps around the frame, and a mirror that appears where the address runs off the end. Deliberately crude : the stepped blocks are the point.',
   'fx-phosphene':
     'The lingering ghost you see after looking at something bright, which is what the whole instrument is named after. A bright shape burns in and then hangs there in its opposite color once it has moved on. Slow settings leave a long, painterly memory of the image.',
 
