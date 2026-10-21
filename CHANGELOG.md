@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The Body page takes less room.** Its sections are named in the left margin, the way
+  the layer strip names IN / MIX / FX / OUT : TRACK (what the camera reads, sensitivity,
+  hold time, OSC out), the feature monitor's seven groups (Hands, Pose, Face, Silhouette,
+  Motion field, Movement qualities, Presence, each in its own color on a faint panel of
+  that color), NEW RULE (the rule builder) and RULES. No more title line per section, the
+  explanations ride on the margin words' tooltips, the last gesture recognized moves to
+  the page header, and the monitor holds as many columns as its width allows, at any UI
+  zoom. The margin word is one shared component (`MarginLabel.tsx`); the layer strip's
+  looks the same.
 - **The pickers are sorted into clearer families.** Effects : a new **Frame Store** group
   (Field Store, Shatter, Crawl, Store Zoom, which were split between Time and Distortion),
   **Analog** (NTSC, Tracking, Sync Loss, Decay, Scanlines, CRT Screen, Rutt) and **Codec**
