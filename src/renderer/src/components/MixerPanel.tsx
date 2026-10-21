@@ -306,6 +306,8 @@ function MixerColumn({
         <ModChip count={boundCount[0]} open={openMod?.layer === index && openMod.field === 'mix'} onToggle={() => setOpenMod(openMod?.layer === index && openMod.field === 'mix' ? null : { layer: index, field: 'mix' })} target={{ kind: 'layer', layer: index, field: 'mix' }} what="A/B mix" />
       </Section>
       <div className={`flex shrink-0 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`} title={hasB ? undefined : 'No Source B : pick one in the layer and these mix it with A'}>
+        {/* (data-ctl : the search, Ctrl/Cmd+K, finds and flashes it; no box) */}
+        <div className="contents" data-ctl={`mix:${index}:sourceBlend`}>
         <BlendSelect
           className="input w-full appearance-none !px-1 !py-0.5 text-center !text-[9px]"
           style={{ backgroundImage: 'none' }}
@@ -313,6 +315,7 @@ function MixerColumn({
           onChange={(m) => setSourceBlend(index, m)}
           title="How B meets A : the crossfader below is what this mode makes of it"
         />
+        </div>
         <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'mix' })} label={`L${index + 1} A·B mix`}>
         <div className="flex min-w-0 items-center gap-1">
           <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
@@ -407,6 +410,7 @@ function MixerColumn({
         {/* the mode, then what drives it on a line of its own (side by side,
             a column cut the words short); a band's number beside the word band */}
         <select
+          data-ctl={`mix:${index}:coupling`}
           className={`input w-full appearance-none !px-0.5 !py-0.5 text-center !text-[9px] ${coupled ? 'text-accent' : ''}`}
           style={{ backgroundImage: 'none' }}
           value={l.coupling.mode}
@@ -421,6 +425,7 @@ function MixerColumn({
         </select>
         <div className="flex min-w-0 gap-1">
           <select
+            data-ctl={`mix:${index}:feature`}
             className="input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
             style={{ backgroundImage: 'none' }}
             value={l.coupling.feature}
@@ -455,6 +460,7 @@ function MixerColumn({
           <span ref={meterRef} className="absolute inset-y-0 left-0 bg-accent" style={{ width: 0 }} />
         </span>
         <div className={`flex justify-around ${cplOff ? 'opacity-40' : ''}`}>
+          <div className="contents" data-ctl={`mix:${index}:amount`}>
           <MiniKnob
             label="amt"
             value={l.coupling.amount}
@@ -462,6 +468,8 @@ function MixerColumn({
             onChange={(v) => setCoupling(index, { amount: v })}
             title="How far the sound moves the mix"
           />
+          </div>
+          <div className="contents" data-ctl={`mix:${index}:tightness`}>
           <MiniKnob
             label="tight"
             value={l.coupling.tightness}
@@ -469,6 +477,7 @@ function MixerColumn({
             onChange={(v) => setCoupling(index, { tightness: v })}
             title="Loose : only the peaks, softly. Tight : every bit of it, sharply (the flash's length, the gate's edge, the drift's speed)"
           />
+          </div>
         </div>
       </div>
 

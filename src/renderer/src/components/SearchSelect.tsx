@@ -32,8 +32,9 @@ export interface SearchOption {
 
 /** Match `q` against one option. Lower is better; null = no match.
  *  0 prefix · 1 word-start · 2 substring · 2 keyword-exact · 2.5 keyword-word ·
- *  3 group hit · 3.5 keyword-substring · 4 subsequence. */
-function score(opt: SearchOption, q: string): number | null {
+ *  3 group hit · 3.5 keyword-substring · 4 subsequence. The search-everything
+ *  palette (Ctrl/Cmd+K) ranks with it too. */
+export function searchScore(opt: Pick<SearchOption, 'label' | 'group' | 'keywords'>, q: string): number | null {
   if (!q) return 0
   const label = opt.label.toLowerCase()
   const group = (opt.group ?? '').toLowerCase()
@@ -97,7 +98,7 @@ export function SearchSelect({
   const query = q.trim().toLowerCase()
   const groups = useMemo(() => {
     const scored = options
-      .map((o, i) => ({ o, i, s: score(o, query) }))
+      .map((o, i) => ({ o, i, s: searchScore(o, query) }))
       .filter((x): x is { o: SearchOption; i: number; s: number } => x.s !== null)
     const byGroup = new Map<string, { o: SearchOption; i: number; s: number }[]>()
     for (const x of scored) {

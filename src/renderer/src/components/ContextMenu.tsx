@@ -38,6 +38,14 @@ export function menuHostOf(doc: Document): HTMLElement | null {
   return h?.isConnected ? h : null
 }
 
+/** The window that has the keyboard now, among those with a host (a key the
+ *  Output page's own window hands on still knows it came from there); the
+ *  instrument's when none says so. */
+export function focusedHostDocument(): Document {
+  for (const [doc, h] of hosts) if (doc !== document && h.isConnected && doc.hasFocus()) return doc
+  return document
+}
+
 export interface MenuItem {
   label: string
   onClick?: () => void

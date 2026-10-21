@@ -569,7 +569,7 @@ export function Inspector(): JSX.Element {
         <div className="flex-1" />
         {/* Per-FX dry/wet opacity : centered, sized like a normal control. */}
         {fxOpacity && (
-          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet : ${fxOpacity.value.toFixed(2)}`}>
+          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet : ${fxOpacity.value.toFixed(2)}`} data-ctl={fxOpaKey ?? undefined}>
             <span className="font-mono text-[9px] uppercase text-muted">opacity</span>
             <input
               ref={fxOpaRef}
