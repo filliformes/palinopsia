@@ -229,6 +229,7 @@ export interface LayerCoupling {
   amount: number // 0..1 : depth
   tightness: number // 0..1 : vestigial (0) ↔ obvious (1)
   feature: AudioFeature // which audio feature drives the bond
+  band?: number // the band feature's band (0 : the lowest, up to AUDIO_BANDS - 1)
 }
 
 export interface LayerState {
@@ -725,7 +726,7 @@ export type ModTarget =
   // index that cycles through BLEND_MODES). Applied as a final per-frame override.
   // `vary` is a TRIGGER, not a value : the modulation path edge-detects it and
   // fires one variation as the modulator crosses its middle going up.
-  | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' | 'vary' }
+  | { kind: 'layer'; layer: number; field: 'opacity' | 'mix' | 'blend' | 'vary' | 'harmony' }
   // The Background's own controls : opacity, its clock's speed (0..4×) and the
   // contact shadow the layers cast on it ('depth'). Same final override.
   | { kind: 'bg'; field: 'opacity' | 'speed' | 'depth' }
@@ -1203,9 +1204,6 @@ export interface OutputFrame {
   /** The projector window enlarges the frame through a cubic instead of bilinear. */
   outSharp?: boolean
   time: number
-  // Per-layer coupled A/B mix (audio-driven) so the output window matches the
-  // control window; absent when no layer is coupled.
-  coupledMix?: number[] | null
   // Proximity's Context mood override (haze/blur/bloom/depth), so the output
   // window mirrors it; absent when Proximity is neutral.
   contextProx?: { haze: number; blur: number; bloom: number; depth: number } | null

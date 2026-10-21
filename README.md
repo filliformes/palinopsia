@@ -258,7 +258,7 @@ Each of the **4 layers** carries:
 | Element | What it does |
 |---|---|
 | **Source A / B** | Two source slots; the **A** / **B** buttons (and **BG** on the background) show that source's controls in the Inspector. Each holds a generator, an imported video (`🎞`), an imported sound file (`🔊`, its waveform), a capture (webcam `📷` / screen `🖥` / device `🎥` / an iPhone by USB `📱` / NDI® source `📶`), a HIVE network stream (`📡`), or nothing. |
-| **A/B mix** (`MIX`) | `sourceBlend` (how B combines with A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix` (0 = A only … 1 = full B) · `harmony` (⚖ consonant → dissonant B hue). Inert until B has a source. |
+| **A/B mix** (`MIX`) | `sourceBlend` (how B meets A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix`, whose meaning follows the mode and is named beside it : **A↔B** (normal : 0 = A only, 1 = B only), **blend** (the other per-pixel modes : 0 = A, 1 = the full blend), **depth** (weave), **key** (lumakey), **hunger** (consume). Dimmed until B has a source. A **≈** chip shows the layer is coupled to the sound (click : the Mixer). The A/B **hue** harmony and the **coupling** are set in the [Mixer](#the-mixer). |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
 | **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)). |
@@ -268,7 +268,6 @@ Each of the **4 layers** carries:
 | **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
 | **Feedback** (`FB` + `TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback). |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
-| **Coupling** (`CPL`) | Audio drives the A/B balance (hidden until Coupling is enabled in the Audio tab): modes off/lean/hocket/cut/gate/drift + audio feature + amount + tightness. |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.
 Right-click a layer for Init / Randomize / Copy / Paste / layer presets, and three
@@ -354,9 +353,36 @@ output shape uses it as the **outside fill**, the fill follows its opacity (over
 fill color) and goes through Vibe, Context and the Finalizer like the rest of the
 picture; only the film dust stays inside the shape.
 
+### The Mixer
+
+The **Mixer** (key `M`, or its tab) shows the four layers side by side, each column
+top to bottom in the order the picture flows :
+
+- **A·B**, how the two sources meet : the mode, an **A–B crossfader** (what it means
+  follows the mode, named under it with its value), and while the sound moves it, a
+  **white line** on the crossfader where the coupling puts the mix now.
+- **HUE**, the A/B harmony : B's colors set against A's. The middle leaves B as it is;
+  to the left B is pulled onto A's colors (**match**), to the right onto their opposite
+  (**clash**). The swatches show A's color and where B's lands (each source's color is
+  its average weighted by brightness, so a figure on black reads as itself). A grey B
+  takes the color as a tint.
+- **CPL**, the coupling : the sound moving the mix. Mode (lean · hocket · cut · gate ·
+  drift), what in the sound drives it (and which band, for **band**), a live meter of
+  what it hears, **amt** and **tight** knobs. **cut** flashes to B as the sound rises
+  past its threshold and fires again only once it has fallen back (a held note flashes
+  once instead of parking the layer on B); **gate**'s tightness hardens its edge. A
+  recalled scene keeps a drifting layer's momentum.
+- **LAYER**, how it lands on the stack : opacity and speed faders, the blend.
+
+A column without a Source B shows its A·B part dimmed. The **M** chips (mix, hue) open
+the modulator row under the four columns. The header holds the mix presets (they keep
+the A·B part too) and **≈ coupling**, the master switch : one click pauses every
+layer's coupling (every mix then sits at its slider), another lets it run again.
+
 The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
-`E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (tall
-opacity/speed faders + blend for all four), **Finishing** (the Vibe · Context ·
+`E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (the four
+layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
+blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
 Resolume, dataflou and Ableton Link panels), **performance** (the live load meter) and
 **assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
@@ -839,8 +865,9 @@ The **Connect** right-column tab (key `A`) holds the control panels
 (**Audio · MIDI · OSC · Resolume · dataflou · Ableton Link**), and the **performance** tab beside it the load meter:
 
 - **Audio** : enable the local analyser (input device picker), or receive
-  features over OSC from an audio brain (`/opsia/audio/*`). The **coupling**
-  master switch (pinned right) reveals each layer's CPL row. Live meters show
+  features over OSC from an audio brain (`/opsia/audio/*`). The **≈ coupling**
+  button (pinned right) is the coupling master switch, the same as the Mixer's : it
+  pauses every layer's A/B coupling at once (on at each launch). Live meters show
   level / flux / transient / centroid / **noisiness** (spectral flatness) / bands.
   The section's **dot** also lights while sound is going on in the app (Sonify on,
   something in the [Audio Layer](#the-audio-layer)), named beside it; clicking it
@@ -2459,7 +2486,9 @@ another protocol and is not shown.
 | `…/fx/{i}/{input}` | f · color · point2D | A Layer-FX unit input |
 | `…/coupling/mode` | i / f / s | `off·lean·hocket·cut·gate·drift` |
 | `…/coupling/amount` · `…/tightness` | f | Coupling depth / tightness |
-| `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch` |
+| `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch·noisiness` |
+| `…/coupling/band` | i / f | The band feature's band : `0`–`5` (int), or `0..1` across the six |
+| `…/harmony` | f | A/B hue : `0` B matched to A · `0.5` untouched · `1` B on A's complement |
 
 **Video transport** : `/opsia/layer{n}/video[/{A|B}]/…`. Without an explicit
 slot, the message lands on the layer's first video slot (A, then B). Ignored
@@ -2492,6 +2521,8 @@ unless the slot actually holds a video.
 | `bg/blend` | bool → **group** (≥ 0.5) else **blend in** |
 | `bg/randomize` | trigger : the Background's own dice |
 | `bg/source` · `bg/source/{input}` · `bg/fx/{i}/{input}` | Background source (a ground's id or name, or `none`; anything else is ignored) / its inputs / FX inputs |
+
+**Coupling master switch** : `/opsia/coupling` (≥ 0.5 : every layer's A/B coupling on; below : paused).
 
 **Feel macros & temperament** : each a single `0..1` float:
 `/opsia/density`, `/gesture`, `/coalesce`, `/proximity` (field macros; 0.5 = centre)

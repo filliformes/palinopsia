@@ -80,6 +80,7 @@ function applyDest(target: ModTarget, shaped: number): void {
     const x = Math.max(0, Math.min(1, shaped))
     if (target.field === 'opacity') st.setOpacity(target.layer, x)
     else if (target.field === 'mix') st.setSourceMix(target.layer, x)
+    else if (target.field === 'harmony') st.setHarmony(target.layer, x * 2 - 1)
     else st.setBlend(target.layer, BLEND_MODES[Math.min(BLEND_MODES.length - 1, Math.floor(x * BLEND_MODES.length))])
     return
   }

@@ -26,8 +26,8 @@ export function AudioPanel(): JSX.Element {
   const deviceId = useStore((s) => s.audioDeviceId)
   const deviceLabel = useStore((s) => s.audioDeviceLabel)
   const setDeviceId = useStore((s) => s.setAudioDeviceId)
-  const showCoupling = useStore((s) => s.showCoupling)
-  const setShowCoupling = useStore((s) => s.setShowCoupling)
+  const couplingOn = useStore((s) => s.couplingOn)
+  const setCouplingOn = useStore((s) => s.setCouplingOn)
   // Output levels : the input monitor (passthrough) and the Sonify engine, each
   // independently on/off + level, so both can sound at once from this tab.
   const monitor = useStore((s) => s.audioMonitor)
@@ -111,16 +111,17 @@ export function AudioPanel(): JSX.Element {
               ))}
             </div>
 
-            {/* Coupling toggle rides line 1, pinned right. */}
+            {/* The coupling master switch rides line 1, pinned right : the
+                same switch as the Mixer's (the coupling itself is set there). */}
             <div className="flex-1" />
             <button
-              onClick={() => setShowCoupling(!showCoupling)}
-              title="Show the A/B coupling row on each layer (audio binds the two sources)"
+              onClick={() => setCouplingOn(!couplingOn)}
+              title={`A/B coupling ${couplingOn ? 'on' : 'paused'} : the sound pushing each layer's A/B mix (set per layer in the Mixer, M). Click to ${couplingOn ? 'pause it on every layer at once' : 'let it run again'}.`}
               className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] ${
-                showCoupling ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
+                couplingOn ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted'
               }`}
             >
-              coupling
+              ≈ coupling
             </button>
           </>
         )}

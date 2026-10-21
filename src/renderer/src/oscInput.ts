@@ -11,6 +11,7 @@
 //
 // Address map:
 //   /opsia/layer{1..4}/opacity|speed|mix|trail        f 0..1
+//   /opsia/layer{n}/harmony                           f 0..1 (0 B matched to A's hue · 0.5 untouched · 1 B on A's complement)
 //   /opsia/layer{n}/blend|sourceblend                 i index | f 0..1
 //   /opsia/layer{n}/mute|solo|feedback                >= 0.5
 //   /opsia/layer{n}/vary                               trigger (that layer's Vary, at its own amount)
@@ -27,7 +28,9 @@
 //   /opsia/layer{n}/video[/{A|B}]/grainsync            i index | f 0..1 | s free|1/16|1/8|1/4|1/2
 //   /opsia/layer{n}/coupling/mode                     i index | f 0..1 | s name
 //   /opsia/layer{n}/coupling/amount|tightness         f 0..1
-//   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name
+//   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name (level flux transient centroid band pitch noisiness)
+//   /opsia/layer{n}/coupling/band                     i 0..5 | f 0..1 (the band feature's band, 0 = the lowest)
+//   /opsia/coupling                                    >= 0.5 (the master switch : every layer's coupling)
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
 //   /opsia/master/vibe|context|finalizer/{input}       f 0..1 → range (color/point2D: N args)
 //   /opsia/bg/opacity|depth (= shadow)                 f 0..1
@@ -214,7 +217,8 @@ function blendFrom(args: Args): BlendMode | null {
 }
 
 const COUPLING_MODES: readonly CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
-const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch']
+// noisiness last : the indices before it keep their meaning
+const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch', 'noisiness']
 
 // Video transport enums + the transport's log speed range (mirrors the UI
 // slider in VideoTransport.tsx : 1/64× .. 128×; it was left at 1/28 when the
@@ -392,6 +396,10 @@ function route(address: string, args: Args): void {
           if (feat) st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, feature: feat } })
         } else if (which === 'amount' || which === 'tightness') {
           st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, [which]: clamp01(n) } })
+        } else if (which === 'band') {
+          // an int is the band itself; a 0..1 float spreads over the six
+          const band = Number.isInteger(n) && n >= 1 ? Math.min(5, n) : Math.round(clamp01(n) * 5)
+          st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, band } })
         }
         return
       }
@@ -399,6 +407,7 @@ function route(address: string, args: Args): void {
       switch (ctl) {
         case 'opacity': st.setOpacity(li, clamp01(n)); return
         case 'mix': st.setSourceMix(li, clamp01(n)); return
+        case 'harmony': st.setHarmony(li, clamp01(n) * 2 - 1); return
         case 'trail': st.setFeedbackAmount(li, clamp01(n)); return
         case 'speed': st.setLayerSpeed(li, clamp01(n) * 20); return
         case 'blend': { const b = blendFrom(args); if (b) st.setBlend(li, b); return }
@@ -477,6 +486,7 @@ function route(address: string, args: Args): void {
 
     // Global field macros (0.5 = deadzone) and Proximity : each a single 0..1.
     case 'density': st.setDensity(clamp01(n)); return
+    case 'coupling': st.setCouplingOn(n >= 0.5); return
     case 'gesture': st.setGestureTexture(clamp01(n)); return
     case 'coalesce': st.setCoalesce(clamp01(n)); return
     case 'proximity': st.setProximity(clamp01(n)); return
@@ -1160,6 +1170,7 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/opacity`, 0, 1, l?.opacity ?? 1, 'Layer opacity')
     add(`/opsia/layer${n}/speed`, 0, 1, (l?.speed ?? 1) / 20, 'Layer speed (0..1 → 0..20×)')
     add(`/opsia/layer${n}/mix`, 0, 1, l?.sourceMix ?? 0.5, 'A/B source mix')
+    add(`/opsia/layer${n}/harmony`, 0, 1, ((l?.harmony ?? 0) + 1) / 2, 'A/B harmony : 0 B matched to A, 0.5 untouched, 1 B on A\'s complement')
     add(`/opsia/layer${n}/trail`, 0, 1, l?.feedbackAmount ?? 0, 'Feedback trail amount')
     const bi = Math.max(0, BLEND_MODES.indexOf(l?.blend ?? 'normal'))
     add(`/opsia/layer${n}/blend`, 0, 1, bi / (BLEND_MODES.length - 1), 'Layer blend mode (index)')
@@ -1175,6 +1186,7 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
     const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
     add(`/opsia/layer${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
+    add(`/opsia/layer${n}/coupling/band`, 0, 1, (l?.coupling?.band ?? 0) / 5, 'A/B coupling : the band feature\'s band (0 lowest … 1 highest)')
     // Video transport : advertised (slot-explicit) only while the slot actually
     // holds a video. `position` is a one-shot seek — advertised for discovery
     // but never echoed outbound (the playhead flies at frame rate).
@@ -1419,6 +1431,7 @@ function enumerateLeaves(): Leaf[] {
   }
   // Global field macros + Proximity (0.5 = deadzone).
   add('/opsia/density', 0, 1, st.density ?? 0.5, 'Density macro (sparse ⇄ dense)')
+  add('/opsia/coupling', 0, 1, st.couplingOn ? 1 : 0, 'A/B coupling master switch (>= 0.5 : on)')
   add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
   add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
   add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')

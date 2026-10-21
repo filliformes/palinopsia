@@ -6,9 +6,9 @@
 
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
-import type { AudioFeature, BlendMode, CouplingMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
+import type { BlendMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { BLEND_MODES, DEFAULT_LAYER_VARY } from '@shared/types'
-import { AUDIO_FEATURES } from '../engine/audioIn'
+import { couplingWords, mixTitle, mixWord } from './abMix'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
@@ -41,9 +41,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setSourceMix = useStore((s) => s.setSourceMix)
-  const setHarmony = useStore((s) => s.setHarmony)
-  const showCoupling = useStore((s) => s.showCoupling)
-  const setCoupling = useStore((s) => s.setCoupling)
+  const couplingOn = useStore((s) => s.couplingOn)
+  const setRightView = useStore((s) => s.setRightView)
   const setSourceBlend = useStore((s) => s.setSourceBlend)
   const setSourceShader = useStore((s) => s.setSourceShader)
   const setSourceVideo = useStore((s) => s.setSourceVideo)
@@ -88,6 +87,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const varyBound = boundFor('vary').length > 0
   const mixBound = boundFor('mix').length > 0
   const blendBound = boundFor('blend').length > 0
+  const hasB = !!layer.sourceB && layer.sourceB.kind !== 'none'
+  const coupled = couplingOn && hasB && layer.coupling.mode !== 'off'
   const opacityRef = useRef<HTMLInputElement | null>(null)
   const mixRef = useRef<HTMLInputElement | null>(null)
   const blendRef = useRef<HTMLSelectElement | null>(null)
@@ -289,14 +290,17 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
           />
 
-          {/* MIX: combinator mode + depth : ALWAYS visible (fixed layout);
-              inert until B has a source. */}
+          {/* MIX : how B meets A, and how much : what the slider means follows
+              the mode (its word beside it). ALWAYS visible (fixed layout),
+              dimmed while B is empty. The A/B harmony and the audio coupling
+              live in the Mixer (M) : the ≈ chip says this layer is coupled. */}
+          <div className={hasB ? 'min-w-0' : 'min-w-0 opacity-40'}>
           <Row label="MIX">
             <select
               className="input select-compact w-20 shrink-0 text-[10px]"
               value={layer.sourceBlend}
               onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-              title="How B combines with A : the slider is the depth"
+              title="How B meets A : the slider beside it is what this mode makes of it"
             >
               {BLEND_MODES.map((m) => (
                 <option key={m} value={m}>
@@ -316,88 +320,28 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 onChange={(e) => setSourceMix(index, Number(e.target.value))}
                 onDoubleClick={() => setSourceMix(index, 0.5)}
                 className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
-                title="Mix depth : 0 = A only, 1 = full blend result : double-click resets to 0.5"
+                title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one below and this mixes it with A'}
               />
             </span>
+            <span
+              className={`w-[52px] shrink-0 truncate text-right font-mono text-[9px] tabular-nums ${mixBound ? 'text-accent2' : 'text-muted'}`}
+              title={mixTitle(layer.sourceBlend)}
+            >
+              {mixWord(layer.sourceBlend)} {layer.sourceMix.toFixed(2)}
+            </span>
+            {coupled && (
+              <button
+                onClick={() => setRightView('mixer')}
+                className="shrink-0 rounded bg-accent/20 px-1 font-mono text-[10px] leading-4 text-accent ring-1 ring-accent/60 hover:bg-accent/30"
+                title={`Coupled to the sound (${couplingWords(layer.coupling)}) : it pushes this mix. Set it in the Mixer (click, or M)`}
+              >
+                ≈
+              </button>
+            )}
             {modChip('mix', 'A-B mix')}
-            <span className="shrink-0 font-mono text-[9px] text-muted" title="A/B harmony">⚖</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={layer.harmony}
-              onChange={(e) => setHarmony(index, Number(e.target.value))}
-              onDoubleClick={() => setHarmony(index, 0)}
-              className="min-w-0 flex-1 accent-accent2"
-              title={`Harmony ${layer.harmony.toFixed(2)} : 0 consonant (B matched) ↔ 1 dissonant (B hue clashes with A) : double-click resets to 0`}
-            />
           </Row>
+          </div>
           {modAssign('mix')}
-
-          {/* CPL: audio couples the A/B balance. Hidden unless the user turns on
-              coupling (Audio panel) : a visuals-only user never sees it. */}
-          {showCoupling && (
-          <Row label="CPL">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              {/* Line 1 : mode + feature pickers, each wide enough to read. */}
-              <div className="flex min-w-0 items-center gap-1.5">
-                <select
-                  className="input select-compact min-w-0 flex-1 text-[10px]"
-                  value={layer.coupling.mode}
-                  onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
-                  title="A/B coupling by audio : lean · hocket (pump) · cut (transient flash) · gate (B while loud) · drift (slow momentum)"
-                >
-                  <option value="off">off</option>
-                  <option value="lean">lean</option>
-                  <option value="hocket">hocket</option>
-                  <option value="cut">cut</option>
-                  <option value="gate">gate</option>
-                  <option value="drift">drift</option>
-                </select>
-                <select
-                  className="input select-compact min-w-0 flex-1 text-[10px]"
-                  value={layer.coupling.feature}
-                  onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
-                  title="Audio feature driving the bond (transient/flux read best)"
-                >
-                  {AUDIO_FEATURES.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {/* Line 2 : amount + tightness sliders, labelled. */}
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="shrink-0 font-mono text-[9px] uppercase text-muted">amt</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={layer.coupling.amount}
-                  onChange={(e) => setCoupling(index, { amount: Number(e.target.value) })}
-                  onDoubleClick={() => setCoupling(index, { amount: 0.5 })}
-                  className="min-w-0 flex-1 accent-accent"
-                  title={`Coupling amount ${layer.coupling.amount.toFixed(2)} : double-click resets to 0.5`}
-                />
-                <span className="shrink-0 font-mono text-[9px] uppercase text-muted">tight</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={layer.coupling.tightness}
-                  onChange={(e) => setCoupling(index, { tightness: Number(e.target.value) })}
-                  onDoubleClick={() => setCoupling(index, { tightness: 0.7 })}
-                  className="min-w-0 flex-1 accent-accent"
-                  title={`Tightness ${layer.coupling.tightness.toFixed(2)} : vestigial (peaks only) ↔ obvious (linear) : double-click resets to 0.7`}
-                />
-              </div>
-            </div>
-          </Row>
-          )}
 
           {/* SOURCE B */}
           <SourceRow

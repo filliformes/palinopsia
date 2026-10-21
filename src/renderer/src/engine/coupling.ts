@@ -1,7 +1,7 @@
 // Coupling engine (Slab 1 spine + Slab 2 mode catalogue). Binds a layer's two
 // voices (source A + B) with an audio feature, writing the effective sourceMix
-// onto the compositor each frame (post-modulation) and returning the coupled
-// mixes so the output window can mirror them.
+// onto the compositor each frame (post-modulation), and publishing it
+// (liveCoupledMix) so the Mixer can show where the sound pushes each mix.
 //
 // Modes = the synchresis catalogue as A/B-balance behaviours:
 //   lean   : audio leans the balance toward B (continuous, additive)
@@ -13,6 +13,9 @@
 // `tightness` is the universal response-sharpness: for cut it's the release
 // tail, for gate the edge hardness, for drift the follow speed, and for
 // lean/hocket the vestigial↔obvious exponent.
+//
+// The Mixer's master switch (store couplingOn) pauses every layer's coupling at
+// once : each mix then sits where its slider is.
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
@@ -27,18 +30,28 @@ const smoothstep = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t)
 }
 
-// Per-layer runtime state (cut's decaying flash, drift's integrator). Fixed to
-// the four layers; index-keyed, lazily created.
-const state: Array<{ held: number }> = []
+// Per-layer runtime state (cut's decaying flash and whether the feature is
+// still above its threshold, drift's integrator, the mode it last ran in).
+// Fixed to the four layers; index-keyed, lazily created.
+const state: Array<{ held: number; up: boolean; mode: string }> = []
+
+/** Each layer's mix as the coupling leaves it this frame, or null where no
+ *  coupling runs (off, no B, the audio input off, the master switch off). The
+ *  Mixer reads it to draw where the sound pushes the crossfader. */
+export const liveCoupledMix: Array<number | null> = [null, null, null, null]
 // Wall-clock of the previous applyCoupling(), so the cut release + drift follow
 // run at a fixed rate regardless of frame rate.
 let lastNow = 0
 
 /** Clear the per-layer coupling state : call when the composition is replaced
- *  (scene recall / New / session load) so a stale cut/drift value can't seed
- *  the next scene's coupling. */
-export function resetCouplingState(): void {
-  state.length = 0
+ *  (scene recall / New / session load) so a stale cut value can't seed the
+ *  next scene's coupling. `keepDrift` (a scene recall, which eases) keeps a
+ *  drifting layer's momentum : zeroing it snapped that mix back at once while
+ *  everything else was still easing. */
+export function resetCouplingState(keepDrift = false): void {
+  if (keepDrift) {
+    for (const s of state) if (s && s.mode !== 'drift') { s.held = 0; s.up = false }
+  } else state.length = 0
   lastNow = 0
 }
 
@@ -50,10 +63,16 @@ export function resetCouplingState(): void {
 export function applyCoupling(
   comp: { layers: Array<{ sourceMix: number }> },
   c: CompositionState,
-  now: number
+  now: number,
+  enabled = true
 ): number[] | null {
   // Inert until audio ingest is on : otherwise a silent bus reads as "all A".
-  if (audioBus.mode === 'off') return null
+  // And paused by the master switch.
+  if (audioBus.mode === 'off' || !enabled) {
+    liveCoupledMix.fill(null)
+    lastNow = 0
+    return null
+  }
   // Frame-rate normalizer: 1 at 60fps, larger when frames are longer.
   const fk = lastNow ? Math.min(6, Math.max(0.1, ((now - lastNow) / 1000) * 60)) : 1
   lastNow = now
@@ -62,13 +81,16 @@ export function applyCoupling(
     const layer = comp.layers[i]
     const base = layer ? layer.sourceMix : (l.sourceMix ?? 0.5)
     const cp = l.coupling
+    liveCoupledMix[i] = null
     if (!layer || !cp || cp.mode === 'off') return base
     // Needs a real second voice : the crossfade is inert without B.
     if (!l.sourceB || l.sourceB.kind === 'none') return base
-    if (!state[i]) state[i] = { held: 0 }
+    if (!state[i]) state[i] = { held: 0, up: false, mode: cp.mode }
     const s = state[i]
+    s.mode = cp.mode
 
-    const raw = clamp01(audioBus.feature(cp.feature))
+    // the band feature listens to the band the layer picked (0 : the lowest)
+    const raw = clamp01(audioBus.feature(cp.feature, Math.max(0, Math.round(cp.band ?? 0))))
     const tight = clamp01(cp.tightness)
     const amt = clamp01(cp.amount)
     const shaped = Math.pow(raw, 1 + (1 - tight) * 3)
@@ -83,16 +105,25 @@ export function applyCoupling(
         eff = base * (1 - amt) + shaped * amt
         break
       case 'cut':
-        // Flash to B on a transient, then release. Tight = snappy short flash;
-        // loose = a longer tail (release factor 0.60 … 0.98 per 60fps frame).
-        if (raw > 0.4) s.held = 1
-        else s.held *= Math.pow(0.6 + tight * 0.38, fk)
+        // Flash to B as the feature RISES past the threshold, then release.
+        // It fires again only once the feature has fallen back under 0.3, so a
+        // held level or a sustained pitch flashes once instead of parking the
+        // layer on B. Tight = snappy short flash; loose = a longer tail
+        // (release factor 0.60 … 0.98 per 60fps frame).
+        if (raw > 0.4 && !s.up) {
+          s.held = 1
+          s.up = true
+        } else {
+          if (raw < 0.3) s.up = false
+          s.held *= Math.pow(0.6 + tight * 0.38, fk)
+        }
         eff = toB(s.held)
         break
       case 'gate': {
-        // B while loud, A while quiet; tightness hardens the edge.
-        const lo = 0.5 - tight * 0.22
-        eff = toB(smoothstep(lo, lo + 0.16, raw))
+        // B while loud, A while quiet; tightness hardens the edge (a soft
+        // swell at 0, a switch at 1), round the same threshold.
+        const w = 0.03 + (1 - tight) * 0.3
+        eff = toB(smoothstep(0.426 - w / 2, 0.426 + w / 2, raw))
         break
       }
       case 'drift': {
@@ -105,6 +136,7 @@ export function applyCoupling(
     }
     eff = clamp01(eff)
     layer.sourceMix = eff
+    liveCoupledMix[i] = eff
     any = true
     return eff
   })

@@ -492,7 +492,7 @@ function setLayer(args: Record<string, unknown>): McpResult {
   const sb = blend('source_blend')
   const sp = n('speed', 0, 4)
   const tr = n('trail', 0, 1)
-  const h = n('harmony', 0, 1)
+  const h = n('harmony', -1, 1)
   if (o !== undefined) { s.setOpacity(layer, o); done.push('opacity') }
   if (b) { s.setBlend(layer, b); done.push('blend') }
   if (mx !== undefined) { s.setSourceMix(layer, mx); done.push('mix') }

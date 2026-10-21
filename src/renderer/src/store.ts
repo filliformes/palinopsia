@@ -922,7 +922,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       feedbackAmount: l.feedbackAmount ?? 0.6,
       sourceMix: l.sourceMix ?? 0.5,
       sourceBlend: l.sourceBlend ?? 'normal',
-      harmony: l.harmony ?? 0,
+      // -1 match … 0 untouched … 1 clash (sessions before 1.3 hold 0..1 : the same side)
+      harmony: Number.isFinite(l.harmony) ? Math.max(-1, Math.min(1, l.harmony)) : 0,
       speed: l.speed ?? 1,
       sourceAFx: l.sourceAFx ?? [],
       sourceBFx: l.sourceBFx ?? [],
@@ -1117,7 +1118,7 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
       l.sourceB = makeSlot(i, playable(theme.sources))
       l.sourceMix = rr(0.3, 0.7)
       l.sourceBlend = pickOf(theme.mixBlends ?? (['normal', 'screen', 'difference', 'multiply'] as BlendMode[]))
-      l.harmony = rr(0, 0.5)
+      l.harmony = rr(-0.4, 0.5) // matched … clashing (abHarmony.ts)
     }
     l.sourceAFx = R() < 0.4 ? buildRack(theme.layerFx, 1, i) : []
     l.fx = buildRack(theme.layerFx, 2, i)
@@ -1388,7 +1389,17 @@ interface StoreState {
   mixerPresets: Array<{
     id: string
     name: string
-    layers: Array<{ opacity: number; speed: number; blend: BlendMode }>
+    // the A/B part (mix, its mode, harmony, coupling) since 1.3 : older mixes
+    // leave it as it is
+    layers: Array<{
+      opacity: number
+      speed: number
+      blend: BlendMode
+      sourceMix?: number
+      sourceBlend?: BlendMode
+      harmony?: number
+      coupling?: LayerCoupling
+    }>
   }>
   saveMixerPreset: (name: string) => void
   applyMixerPreset: (presetId: string) => void
@@ -1653,10 +1664,11 @@ interface StoreState {
   setAudioDenoise: (on: boolean) => void
   audioDenoiseNotches: Array<{ f: number; q: number }>
   setAudioDenoiseNotches: (notches: Array<{ f: number; q: number }>) => void
-  // Show the per-layer A/B coupling (CPL) row. Off by default : a visuals-only
-  // user never sees the audio-relations control. Persisted.
-  showCoupling: boolean
-  setShowCoupling: (on: boolean) => void
+  // The Mixer's master switch : every layer's A/B coupling at once (the audio
+  // tab's "coupling" button is the same switch). On at launch : a show that
+  // paused it doesn't silently lose its coupling the next day. Transient.
+  couplingOn: boolean
+  setCouplingOn: (on: boolean) => void
   // Proximity (Field macro) : 0 far/vista · 0.5 neutral · 1 close/personal.
   // Pushes the Context mood; optional audio (brightness) drive. Persisted.
   proximity: number
@@ -2523,7 +2535,11 @@ export const useStore = create<StoreState>((set, get) => ({
       const layers = s.composition.layers.map((l) => ({
         opacity: l.opacity,
         speed: l.speed,
-        blend: l.blend
+        blend: l.blend,
+        sourceMix: l.sourceMix,
+        sourceBlend: l.sourceBlend,
+        harmony: l.harmony,
+        coupling: { ...l.coupling }
       }))
       const mixerPresets = [
         ...s.mixerPresets,
@@ -2541,7 +2557,17 @@ export const useStore = create<StoreState>((set, get) => ({
           ...s.composition,
           layers: s.composition.layers.map((l, i) => {
             const m = p.layers[i]
-            return m ? { ...l, opacity: m.opacity, speed: m.speed, blend: m.blend } : l
+            if (!m) return l
+            return {
+              ...l,
+              opacity: m.opacity,
+              speed: m.speed,
+              blend: m.blend,
+              ...(typeof m.sourceMix === 'number' ? { sourceMix: m.sourceMix } : {}),
+              ...(m.sourceBlend ? { sourceBlend: m.sourceBlend } : {}),
+              ...(typeof m.harmony === 'number' ? { harmony: Math.max(-1, Math.min(1, m.harmony)) } : {}),
+              ...(m.coupling ? { coupling: { ...l.coupling, ...m.coupling } } : {})
+            }
           })
         }
       }
@@ -3058,7 +3084,7 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => ({
           ...l,
-          harmony: Math.max(0, Math.min(1, v))
+          harmony: Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0))
         }))
       }
     })),
@@ -3755,11 +3781,8 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.audioDenoiseNotches', JSON.stringify(notches))
     set({ audioDenoiseNotches: notches })
   },
-  showCoupling: localStorage.getItem('opsia.showCoupling') === '1',
-  setShowCoupling: (on) => {
-    localStorage.setItem('opsia.showCoupling', on ? '1' : '0')
-    set({ showCoupling: on })
-  },
+  couplingOn: true,
+  setCouplingOn: (on) => set({ couplingOn: on }),
   proximity: (() => {
     const p = localStorage.getItem('opsia.proximity')
     return p !== null && Number.isFinite(Number(p)) ? Number(p) : 0.5
@@ -4884,7 +4907,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // Normalize defensively (idempotent) : a scene may predate a schema field.
       const composition = normalizeComposition(scene.composition)
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
-      resetCouplingState() // stale cut/drift state mustn't seed the recalled scene
+      resetCouplingState(true) // a stale cut mustn't seed the recalled scene (a drift keeps its momentum : the recall eases)
       // Restore the scene's World for the selector label (composition already
       // carries its baked effect); add it to the bank if this install lacks it.
       const worlds = ensureWorld(s.worlds, scene.world)
@@ -5003,7 +5026,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
-      resetCouplingState()
+      resetCouplingState(true)
       // Subtle per-recall variation → long sets never loop verbatim. Normalized
       // like recallScene (idempotent) so an old-shape scene can't skip migration.
       const composition = normalizeComposition(

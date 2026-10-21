@@ -542,6 +542,7 @@ class MidiManager {
       // Per-layer A↔B crossfade (source mix) + layer opacity.
       for (let i = 0; i < st.composition.layers.length; i++) {
         if (matches(map[`layer:${i}:mix`], binding)) { st.setSourceMix(i, t); ccHandled = true }
+        if (matches(map[`layer:${i}:harmony`], binding)) { st.setHarmony(i, t * 2 - 1); ccHandled = true }
         if (matches(map[`layer:${i}:opacity`], binding)) { st.setOpacity(i, t); ccHandled = true }
       }
       if (matches(map['bg:opacity'], binding)) { st.setBackgroundOpacity(t); ccHandled = true }

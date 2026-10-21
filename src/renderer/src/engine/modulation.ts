@@ -1310,7 +1310,7 @@ export interface ModComp {
   // Compositor-level overrides (not ISF inputs) : per-FX dry/wet opacity, and a
   // layer's own opacity / A-B mix / blend-mode index. Applied post-syncFromState.
   setFxOpacity: (scope: import('@shared/types').FxScope, instId: string, value: number) => void
-  setLayerParam: (layer: number, field: 'opacity' | 'mix' | 'blend', value: number) => void
+  setLayerParam: (layer: number, field: 'opacity' | 'mix' | 'blend' | 'harmony', value: number) => void
 }
 
 // Shared 0..1 → blend-index descriptor : the enum's ordered indices, so both the
@@ -1375,10 +1375,13 @@ export function writeModTarget(
       varyEdge(t.layer, x)
       return
     }
+    // (harmony runs -1 match … 0 untouched … 1 clash : the knob's middle leaves B alone)
     const value =
       t.field === 'blend'
         ? Math.min(BLEND_INDICES.length - 1, Math.floor(x * BLEND_INDICES.length))
-        : x
+        : t.field === 'harmony'
+          ? x * 2 - 1
+          : x
     liveModValues.set(liveKey(t), value)
     comp.setLayerParam(t.layer, t.field, value)
     return
@@ -1597,6 +1600,9 @@ export function applyModulation(
         final = inputValueForMode(
           { type: 'long', values: BLEND_INDICES, def: baseIdx }, baseIdx, v, a.depth, a.mode
         )
+      } else if (f === 'harmony') {
+        const base = layer.harmony ?? 0
+        final = inputValueForMode({ type: 'float', min: -1, max: 1, def: base }, base, v, a.depth, a.mode)
       } else {
         const base = f === 'opacity' ? layer.opacity : layer.sourceMix
         final = inputValueForMode({ type: 'float', min: 0, max: 1, def: base }, base, v, a.depth, a.mode)

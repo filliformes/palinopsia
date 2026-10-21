@@ -1482,7 +1482,7 @@ export default function App(): JSX.Element {
         }
         // 2b. Coupling: audio binds each layer's A/B balance (post-sync so it
         //     overrides the base mix).
-        applyCoupling(comp!, c, now)
+        applyCoupling(comp!, c, now, st.couplingOn)
         // 2c. Proximity (Field macro): push the Context mood into a depth zone.
         //     From here on the passes share the per-frame write bus (frameVals) so
         //     co-engaged macros stack on the same param instead of clobbering.

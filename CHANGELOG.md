@@ -7,6 +7,39 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The Mixer takes the A/B harmony and the coupling** (`MixerPanel.tsx` rewritten, Vincent
+  picked it from mockups) : each column top to bottom A·B (mode, an A–B crossfader with
+  the mode's word and value and a white line where the coupling puts the mix, painted
+  from `coupling.ts liveCoupledMix` by one rAF loop), HUE (a −1..1 slider, swatches of
+  A's color and where B lands), CPL (mode, feature, a band picker for band, a live meter
+  of the feature, amt / tight knobs), LAYER (opacity + speed faders side by side, blend;
+  readouts rounded : the opacity box showed `0.60955231832…`). M chips open `AssignRow`
+  under the columns (a column is too narrow for it). The header's **≈ coupling** is a
+  new master switch (store `couplingOn`, transient, on at launch; `applyCoupling(...,
+  enabled)`; the audio tab's coupling button is the same switch now, it used to only
+  show the CPL rows; OSC `/opsia/coupling`). Mixer presets also keep each layer's mix,
+  mode, harmony and coupling (older presets leave them). The layer strips lose the ⚖
+  slider and the CPL row (`showCoupling` gone); their MIX row names what the slider
+  means in each mode (`abMix.ts` : A↔B, blend, depth, key, hunger), dims without a B and
+  shows a ≈ chip while coupled (click : the Mixer).
+- **The A/B harmony is relative to A** (`engine/abHarmony.ts`) : it rotated B's hue by a
+  fixed angle whatever A was (so "consonant" did nothing, and a red A with a cyan B
+  became consonant at 1). Now −1 pulls B's mean hue onto A's, 1 onto A's complement, 0
+  leaves B untouched (sessions keep their look; 1.2 values are 0..1, the clash side).
+  The sources' colors come from a 2 x 1 pass (`MEANS_FS` : an 8 x 8 grid weighted by
+  brightness, a plain mean of a figure on black was black) run only when a layer's
+  harmony is set or the Mixer's swatches want it, read back for the swatches through
+  the async capture. A grey B takes the target as a tint, a grey A greys B on the match
+  side. Weave now follows the harmony too. Harmony is a layer modulation target (`A/B
+  hue`, the knob's middle = untouched), OSC `/opsia/layer{n}/harmony` (0.5 = untouched),
+  MIDI Learn, the agent's `set_layer` (−1..1).
+- **Coupling fixes** (`coupling.ts`) : **cut** fires as the feature rises past 0.4 and
+  re-arms under 0.3 (a held level or pitch parked the layer on B); **gate**'s tightness
+  hardens the edge (it slid the threshold); the **band** feature listens to the band the
+  layer picks (`LayerCoupling.band`, OSC `/opsia/layer{n}/coupling/band`; it was always
+  the lowest); a scene recall keeps a drifting layer's momentum (`resetCouplingState(true)`
+  : the mix snapped back while the rest eased); OSC's feature list gains `noisiness`
+  (appended, the indices before keep their meaning). The dead `coupledMix` field is gone.
 - **Oil Cloud source** (`shaders/isf/OilCloud.fs`, an ISF generator in two passes) : one
   billowing volume, after the volumetric cloud Vincent showed, ray-traced and painted.
   The field is a core plus turbulence (`|2n-1|` : round crests, sharp creases), four

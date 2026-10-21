@@ -115,7 +115,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'set_layer',
     title: 'Set a layer',
     description:
-      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1, harmony 0-1. The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
+      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1, harmony -1 to 1 (the colors of B set against those of A : -1 matched to the hue of A, 0 untouched, 1 on its complement). The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
     inputSchema: {
       type: 'object',
       properties: {

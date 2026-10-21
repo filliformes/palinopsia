@@ -1067,7 +1067,7 @@ export function jitterLayer(l: LayerState, amount: number): LayerState {
     fx: jitterFxArray(l.fx, amount),
     opacity: clampN(l.opacity + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
     sourceMix: clampN(l.sourceMix + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
-    harmony: clampN(l.harmony + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
+    harmony: clampN(l.harmony + (rnd() * 2 - 1) * amount * 0.3, -1, 1),
     feedbackAmount: clampN(l.feedbackAmount + (rnd() * 2 - 1) * amount * 0.3, 0, 1),
     speed: clampN(l.speed * (1 + (rnd() * 2 - 1) * amount * 0.4), 0, 20)
   }
