@@ -30,6 +30,7 @@ import { WARP_FS, WARP_VS, computeWarpVerts } from './warpQuad';
 import type { CollageSoundSet } from '../audio/collageVoice';
 import { Renderer as ISFRenderer } from 'interactive-shader-format';
 import { handle, installTextureBridge } from './isfTextureBridge';
+import { setTempoBpm } from './tempoSignal';
 import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './convNodes';
 import { dropKeptStores } from './fieldStore';
@@ -2923,6 +2924,7 @@ export class Compositor {
 
   syncFromState(c: CompositionState, sourceById: (id: string) => string | null) {
     this.bpm = c.bpm || 120;
+    setTempoBpm(this.bpm); // the beat-synced ISF phases (Shatter's grab) read it
     this.shared.budget.n = this.sceneHold ? LOADS_PER_FRAME_HOLD : LOADS_PER_FRAME; // cap new shader compiles this frame
     this.shared.budget.until = performance.now() + (this.sceneHold ? LOAD_MS_PER_FRAME_HOLD : LOAD_MS_PER_FRAME); // ...and cap the time they take
     this.shared.budget.deferred = 0;

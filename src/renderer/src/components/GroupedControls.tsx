@@ -176,6 +176,24 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('surface', 'bend', 'wave', 'waves', 'waveRate', 'axis'),
     g('depth', 'fog', 'shade', 'soften')
   ],
+  // the frame-store tricks : when it grabs · what the pattern is · how it moves;
+  // what stamps and how long it shows · how the palette turns · its colors; how
+  // the store is zoomed · where it reads · what the store is
+  'fx-shatter': [
+    g('clock', 'rate', 'sync', 'grab'),
+    g('pattern', 'pattern', 'scale', 'density'),
+    g('motion', 'flip', 'slide', 'wet')
+  ],
+  'fx-crawl': [
+    g('history', 'threshold', 'fade', 'clear', 'ground', 'wet'),
+    g('crawl', 'band', 'cycle', 'steps', 'palette', 'stops'),
+    g('colors', 'colorA', 'colorB', 'colorC', 'colorD', 'colorE')
+  ],
+  'fx-store-zoom': [
+    g('zoom', 'zoom', 'stretch', 'magnify', 'mirror'),
+    g('place', 'panX', 'panY', 'scrollX', 'scrollY'),
+    g('store', 'lines', 'wide', 'wet')
+  ],
   'fx-transform': [
     g('frame', 'zoom', 'posX', 'posY', 'rotate', 'wrap'),
     g('mask', 'shape', 'cropUp', 'cropDown', 'cropLeft', 'cropRight', 'cutout')
@@ -361,6 +379,25 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('bend') && zero('wave')) put(d, ['axis'], 'Bend and wave are at 0 : the surface is flat.')
     return d
   },
+  'fx-shatter': ({ is, isnt }) => {
+    const d: Why = {}
+    if (isnt('sync', 0)) put(d, ['rate'], 'Sync grabs on the tempo.')
+    if (is('pattern', 7)) put(d, ['scale', 'flip', 'slide'], 'The key follows the picture\'s own tones.')
+    return d
+  },
+  'fx-crawl': ({ is }) => {
+    const d: Why = {}
+    if (is('palette', 1)) {
+      put(d, ['stops', 'colorA', 'colorB', 'colorC', 'colorD', 'colorE'], 'Picture takes its colors from the picture.')
+      return d
+    }
+    if (is('stops', 2)) put(d, ['colorC'], 'Only the first stops are used.')
+    if (is('stops', 2, 3)) put(d, ['colorD'], 'Only the first stops are used.')
+    if (is('stops', 2, 3, 4)) put(d, ['colorE'], 'Only the first stops are used.')
+    return d
+  },
+  'fx-store-zoom': ({ at, zero }) =>
+    one(at('zoom', 1) && zero('stretch'), 'magnify', 'Zoom is 1 and stretch is 0 : nothing is enlarged.'),
   'fx-transform': ({ zero, is, isnt }) => {
     const d: Why = {}
     if (isnt('shape', 0)) put(d, ['wrap'], 'A shape cuts the picture : nothing wraps.')

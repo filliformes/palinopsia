@@ -1291,6 +1291,48 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-datamosh'], nativeChance: 0.7,
     blends: ['screen', 'difference'], layers: [2, 3], gestureTexture: 0.6, coalesce: 0.35, density: 0.55
   }),
+  // Frame-store tricks : each closes the bottom layer's rack (stackFx) over
+  // sources that MOVE (Shatter and Crawl show nothing on a still picture).
+  mk({
+    id: 'shatter', name: 'Shatter', family: 'Glitch / Datamosh',
+    blurb: 'Only what moves breaks into pattern : a still grabbed again and again, switched with the live picture by a fine checker.',
+    world: 'parametric',
+    palette: [K, [0.14, 0.16, 0.2, 1], [0.82, 0.84, 0.8, 1]],
+    sources: ['murmuration', 'particle-drift', 'shapes', 'organic', 'swell'],
+    layerFx: ['fx-grade', 'fx-posterize', 'fx-chroma-shift'],
+    stackFx: [['fx-shatter'], ['fx-shatter']],
+    pickInputs: {
+      'fx-shatter': { pattern: [0, 0, 1, 2, 4, 5, 7], rate: [0.8, 1.5, 2.5], density: [0.5], scale: [2, 3, 4, 6], flip: [0, 0, 2], wet: [1] }
+    },
+    blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0.15, gestureTexture: 0.6, coalesce: 0.35
+  }),
+  mk({
+    id: 'trail-crawl', name: 'Trail Crawl', family: 'Feedback / Afterimage',
+    blurb: 'Motion paints its own history : every place colored by when something last passed, the bands crawling slowly along the path.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.2, 0.28, 1], [0.78, 0.5, 0.22, 1], [0.94, 0.9, 0.8, 1]],
+    sources: ['murmuration', 'particle-drift', 'filaments', 'shapes', 'organic'],
+    layerFx: ['fx-grade', 'fx-grain'],
+    stackFx: [['fx-crawl']],
+    pickInputs: {
+      'fx-crawl': { palette: [0, 0, 1], band: [0.5, 1, 1.5], cycle: [0.06, 0.1, -0.08], steps: [6, 8, 12], fade: [6, 10, 15], ground: [0], wet: [1] }
+    },
+    blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.1, density: 0.4, drift: 0.2
+  }),
+  mk({
+    id: 'store-zoom', name: 'Store Zoom', family: 'Retro Screen',
+    blurb: 'A low-resolution frame store read through its counters : uneven zoom blocks, wide pixels, a pan that wraps around.',
+    world: 'parametric',
+    palette: [INK, [0.2, 0.22, 0.3, 1], [0.85, 0.55, 0.3, 1], [0.95, 0.92, 0.85, 1]],
+    sources: ['op-art', 'ten-print', 'shapes', 'slabs', 'grid-drift', 'lowercase'],
+    layerFx: ['fx-posterize', 'fx-palette', 'fx-scanlines'],
+    stackFx: [['fx-store-zoom']],
+    pickInputs: {
+      'fx-store-zoom': { zoom: [1, 1.6, 2.4, 3.3], magnify: [0, 1, 1], lines: [128, 192, 256], wide: [1.5], stretch: [0, 0, 0.4, -0.4], wet: [1] }
+    },
+    blends: ['screen', 'add', 'lightercolor'], layers: [2, 3], useB: 0.2, coalesce: 0.3, gestureTexture: 0.4,
+    motion: { skip: '^(wide|lines)$' }
+  }),
 
   // ── Space : points in space (Lattice) and line fields laid on planes
   // (Lowercase through Perspective). White on near-black, one cool shade.

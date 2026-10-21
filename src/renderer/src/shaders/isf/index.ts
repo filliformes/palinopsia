@@ -99,6 +99,9 @@ import forceLines from './fx/ForceLines.fs?raw'
 import aperture from './fx/Aperture.fs?raw'
 import distort from './fx/Distort.fs?raw'
 import perspective from './fx/Perspective.fs?raw'
+import shatter from './fx/Shatter.fs?raw'
+import crawl from './fx/Crawl.fs?raw'
+import storeZoom from './fx/StoreZoom.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -1898,6 +1901,21 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-phosphene', name: 'Phosphene', category: 'FX', source: phosphene,
     curated: { sensitivity: [0.3, 0.8], persistence: [0.4, 0.85], strength: [0.35, 0.8], complement: [0.6, 1], threshold: [0.4, 0.7] }
+  },
+  // ── Frame-store tricks : a stencil over a re-grabbed still, colors by write
+  // age, the store's address counters. Their staging switches (sync, flip, the
+  // ground, the mirror, the scroll) stay by hand : RANDOMIZE_SKIP in randomize.ts.
+  {
+    id: 'fx-shatter', name: 'Shatter', category: 'FX', source: shatter,
+    curated: { rate: [0.6, 3], pattern: [0, 7], scale: [1, 8], density: [0.35, 0.65], slide: [-1, 1], wet: [0.75, 1] }
+  },
+  {
+    id: 'fx-crawl', name: 'Crawl', category: 'FX', source: crawl,
+    curated: { threshold: [0.05, 0.18], fade: [3, 15], wet: [0.6, 1], band: [0.3, 2], cycle: [-0.15, 0.15], steps: [4, 12], stops: [3, 5] }
+  },
+  {
+    id: 'fx-store-zoom', name: 'Store Zoom', category: 'FX', source: storeZoom,
+    curated: { zoom: [1, 3.5], stretch: [-0.4, 0.4], magnify: [0, 1], panX: [-0.3, 0.3], panY: [-0.3, 0.3], lines: [128, 400], wide: [1, 1.7], wet: [0.8, 1] }
   },
   {
     id: 'fx-compress', name: 'Compress', category: 'FX', source: compress,
