@@ -712,6 +712,22 @@ verified before fixing), then the fixes, checked in a test copy where a machine 
   itself, or the copy made once by ffmpeg), asked before playing for those formats, and
   forced for a file the player refuses anyway (ALAC in an m4a).
 
+
+### Docs
+
+- **Everything caught up with v1.3.0** : the README (sources 46 = 45 generators + the
+  Audio source, 53 effects, 26 native nodes, 114 Generate themes in 17 families, 116 master
+  chains, 11 Sonify voices; Contents reaches the Mixer, the four-step strip, shaping,
+  World amount, the Output window, session media and Persistent; modulation targets,
+  MIDI, OSC, Agent and the architecture map), the OSC reference (the `layer{n}` form,
+  harmony, `/opsia/coupling`, coupling band and noisiness feature, World amount, scene
+  recall, the Assemblage voice, 19 blend modes by name, real ranges; `/opsia/audio/noisiness`
+  removed : never handled), the release notes (older-session notes, install, license, for
+  developers), the cheat-sheet (Source Editor, World editor and mouse groups) and a hover
+  hint on every control (81 added : 1169 inputs in 128 shaders). New pictures : Oil Cloud,
+  Orbit and Oil Sky in the gallery, the compositor with the new strip, the Mixer, the
+  Source Editor. The bibliography gains the papers the organic sources cite.
+
 ## v1.2.10 — 2026-10-15
 
 ### Added

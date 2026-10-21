@@ -274,13 +274,14 @@
       A handful of address shapes cover everything else.</p>
     <dl class="conv">
       <div><dt>Continuous</dt><dd>One float <code>0..1</code>, scaled into the declared range of the target.</dd></div>
-      <div><dt>Enum</dt><dd>An int index, a float <code>0..1</code> across the members, or the mode's <b>name</b> string.</dd></div>
+      <div><dt>Enum</dt><dd>An <b>int</b> index (from <code>0</code>), a <b>float</b> <code>0..1</code> across the members, or the member's <b>name</b> string. The OSC type tag decides : a float <code>2.0</code> is the top of the range, not index 2.</dd></div>
       <div><dt>Boolean</dt><dd>True at <code>≥ 0.5</code> (mute · solo · feedback · isolate).</dd></div>
       <div><dt>Trigger</dt><dd>Fires on the <b>rising edge</b> — send <code>1</code>, then <code>0</code> to re-arm.</dd></div>
       <div><dt>Color</dt><dd>3–4 raw args <code>r g b [a]</code>, or a single value read as grayscale.</dd></div>
       <div><dt>Point2D</dt><dd>Two normalized args, each scaled to its own axis range.</dd></div>
-      <div><dt>Indices</dt><dd>Layers, Meta, Scenes, bands and FX slots all count from <code>1</code>.</dd></div>
-      <div><dt>Tempo</dt><dd><code>/opsia/bpm</code> is the one raw value — sent in BPM, clamped <code>20..800</code>.</dd></div>
+      <div><dt>Indices</dt><dd>Layers, Meta knobs, scenes, audio bands, Worlds and FX slots count from <code>1</code>, like the UI. Enum indices count from <code>0</code>.</dd></div>
+      <div><dt>Tempo</dt><dd><code>/opsia/bpm</code> is sent in BPM, clamped <code>20..800</code>. The few other raw values (seconds, gains, a pan, a count) say so in their row.</dd></div>
+      <div><dt>Outside /opsia</dt><dd>Only <code>/opsia/…</code> plays Opsia. While the Resolume mapper learns, Resolume's own <code>/composition/…</code> messages become its columns; anything else is ignored.</dd></div>
     </dl>
   </section>
 
@@ -291,36 +292,38 @@
       <h2>Layers</h2>
       <span class="sec-note">n = 1 … 4</span>
     </div>
+    <p class="blurb">A layer is addressed <code>/opsia/layer1/…</code> to <code>/opsia/layer4/…</code>, the form
+      OSCQuery advertises and the feedback sends back. The older <code>/opsia/layer/1/…</code> is still read.</p>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/opacity</td><td class="arg">f 0..1</td><td class="desc">Layer <b>opacity</b>.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/speed</td><td class="arg">f 0..1</td><td class="desc">Layer time multiplier — <code>0..1</code> maps to <b>0 – 20×</b>.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/mix</td><td class="arg">f 0..1</td><td class="desc">A/B source <b>crossfade</b> (0 = A, 1 = B).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/trail</td><td class="arg">f 0..1</td><td class="desc">Feedback <b>trail</b> persistence.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/blend</td><td class="arg">i · f 0..1</td><td class="desc">Layer <b>blend mode</b> — index or 0..1 across the 15 modes.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/sourceblend</td><td class="arg">i · f 0..1</td><td class="desc">How <b>B combines with A</b> before the crossfade.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/mute</td><td class="arg">≥ 0.5</td><td class="desc">Silence the layer.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/solo</td><td class="arg">≥ 0.5</td><td class="desc">Solo the layer.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/feedback</td><td class="arg">≥ 0.5</td><td class="desc">Layer samples its own previous frame.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/vary</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Vary</b> this layer : a variant at its own amount, like its Vary button.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/play · loop · grain</td><td class="arg">≥ 0.5</td><td class="desc">A video slot's <b>transport</b> : play, loop, granular playback. Without <code>{A|B}</code> : the layer's first video slot. An <b>Import audio</b> slot answers to the same addresses (no direction, no grain).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/volume</td><td class="arg">f 0..1</td><td class="desc">The film's own <b>sound</b> (0 = silent, the default), or an audio slot's volume. Heard on Sonify's output device.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/direction</td><td class="arg">i · f · s</td><td class="desc">Forward · reverse · pendulum (index, 0..1 across, or the name).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/ignoreglobal</td><td class="arg">≥ 0.5</td><td class="desc">The clip plays at its own speed (× its layer's), whatever the global speed.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/speed</td><td class="arg">f 0..1</td><td class="desc">Playback <b>speed</b>, log across 1/64× to 128×.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/position</td><td class="arg">f 0..1</td><td class="desc">A one-shot <b>seek</b> within the trim (never echoed back : the playhead moves every frame).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/in · out</td><td class="arg">f 0..1</td><td class="desc">The <b>trim</b> points.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/grainsize · grainspray · grainrev · grainjit</td><td class="arg">f 0..1</td><td class="desc">The granular player's grain size, spray, reverse odds and jitter.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/layer/</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/grainsync</td><td class="arg">i · f · s</td><td class="desc">Grains on free time or the tempo : <code>free · 1/16 · 1/8 · 1/4 · 1/2</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/opacity</td><td class="arg">f 0..1</td><td class="desc">Layer <b>opacity</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/speed</td><td class="arg">f 0..1</td><td class="desc">Layer time multiplier : <code>0..1</code> maps to <b>0 to 20×</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/mix</td><td class="arg">f 0..1</td><td class="desc">A/B source <b>crossfade</b> (0 = A, 1 = B).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/trail</td><td class="arg">f 0..1</td><td class="desc">Feedback <b>trail</b> persistence.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/blend</td><td class="arg">i · f 0..1 · s</td><td class="desc">Layer <b>blend mode</b> : an index, 0..1 across the 19 modes, or the name : <code>normal · add · subtract · multiply · screen · overlay · softlight · hardlight · darken · lighten · difference · exclusion · dodge · burn · wrap · weave · lumakey · consume · lightercolor</code> (index 0 to 18).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/sourceblend</td><td class="arg">i · f 0..1 · s</td><td class="desc">How <b>B combines with A</b> before the crossfade : the same 19 modes, by index, 0..1 or name.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/mute</td><td class="arg">≥ 0.5</td><td class="desc">Silence the layer.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/solo</td><td class="arg">≥ 0.5</td><td class="desc">Solo the layer.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/feedback</td><td class="arg">≥ 0.5</td><td class="desc">Layer samples its own previous frame.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/vary</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Vary</b> this layer : a variant at its own amount, like its Vary button.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/play · loop · grain</td><td class="arg">≥ 0.5</td><td class="desc">A video slot's <b>transport</b> : play, loop, granular playback. Without <code>{A|B}</code> : the layer's first video slot. An <b>Import audio</b> slot answers to the same addresses (no direction, no grain).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/volume</td><td class="arg">f 0..1</td><td class="desc">The film's own <b>sound</b> (0 = silent, the default), or an audio slot's volume. Heard on Sonify's output device.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/direction</td><td class="arg">i · f · s</td><td class="desc">Forward · reverse · pendulum (index, 0..1 across, or the name).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/ignoreglobal</td><td class="arg">≥ 0.5</td><td class="desc">The clip plays at its own speed (× its layer's), whatever the global speed.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/speed</td><td class="arg">f 0..1</td><td class="desc">Playback <b>speed</b>, log across 1/64× to 128× (a sound file plays 1/16× to 16×).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/position</td><td class="arg">f 0..1</td><td class="desc">A one-shot <b>seek</b> within the trim (never echoed back : the playhead moves every frame).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/in · out</td><td class="arg">f 0..1</td><td class="desc">The <b>trim</b> points.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/grainsize · grainspray · grainrev · grainjit</td><td class="arg">f 0..1</td><td class="desc">The granular player's grain size, spray, reverse odds and jitter.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/layer</span><span class="v">{n}</span>/video/<span class="v">{A|B}</span>/grainsync</td><td class="arg">i · f · s</td><td class="desc">Grains on free time or the tempo : <code>free · 1/16 · 1/8 · 1/4 · 1/2</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>volume</td><td class="arg">f 0..2</td><td class="desc">The <b>Audio Layer</b>'s volume, a gain (1 = as it comes).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>mix</td><td class="arg">f 0..1</td><td class="desc">A to B : 0.5 plays both whole, toward an end the other one fades out.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>mute</td><td class="arg">≥ 0.5</td><td class="desc">Mute the Audio Layer.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span>play</td><td class="arg">≥ 0.5</td><td class="desc">Both files from their in points <b>together</b> (≥ 0.5), or both paused.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/volume · pan · mute</td><td class="arg">f</td><td class="desc">A slot's volume (a gain, 0..2), <b>pan</b> (-1 left .. 1 right), mute (≥ 0.5). A file or a live input.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/play · loop · ignoreglobal · keeppitch</td><td class="arg">≥ 0.5</td><td class="desc">A file slot's <b>transport</b>; keep the pitch when its speed changes.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/speed · position · in · out</td><td class="arg">f 0..1</td><td class="desc">A file slot's speed (log, like a video's), a one-shot seek, the trim points.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/audiolayer/</span><span class="v">{A|B}</span>/speed · position · in · out</td><td class="arg">f 0..1</td><td class="desc">A file slot's speed (log, like a video's; a sound plays 1/16× to 16×), a one-shot seek, the trim points.</td></tr>
         </tbody>
       </table>
     </div>
@@ -340,10 +343,10 @@
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator — <code>shaderId</code>, display <b>name</b>, or <code>none</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator : a <code>shaderId</code> (a shader of your own from the Source Editor goes by its <code>user-…</code> id), a built-in's display <b>name</b>, or <code>none</code>. The one already there keeps its settings; an unknown name empties the slot, like <code>none</code>.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A source shader <b>input</b>, scaled to its range.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-source</b> FX unit <code>i</code>.</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-layer</b> FX unit <code>i</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-layer</b> FX unit <code>i</code>.</td></tr>
         </tbody>
       </table>
     </div>
@@ -353,18 +356,22 @@
   <section id="coupling">
     <div class="sec-head">
       <span class="sec-num">03</span>
-      <h2>A/B Coupling</h2>
-      <span class="sec-note">per layer · Slab 1</span>
+      <h2>A/B Harmony &amp; Coupling</h2>
+      <span class="sec-note">per layer · the Mixer</span>
     </div>
-    <p class="blurb">The audio bond between a layer's two voices — how B answers A.</p>
+    <p class="blurb">How a layer's B answers its A : in color (the harmony) and to the sound (the coupling,
+      driven by the audio tab's input). Both sit in the Mixer's columns.</p>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/mode</td><td class="arg">i · f · s</td><td class="desc">Bond character — <code>off · lean · hocket · cut · gate · drift</code>.</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/amount</td><td class="arg">f 0..1</td><td class="desc">Coupling <b>depth</b>.</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/tightness</td><td class="arg">f 0..1</td><td class="desc">Vestigial (0) ↔ obvious (1).</td></tr>
-          <tr><td class="addr"><span class="lit">…/layer/</span><span class="v">{n}</span>/coupling/feature</td><td class="arg">i · f · s</td><td class="desc">Driving audio feature — <code>level · flux · transient · centroid · band · pitch</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/harmony</td><td class="arg">f 0..1</td><td class="desc">The A/B <b>harmony</b>, B's colors relative to A's (the Mixer's HUE, -1..1 there) : <code>0</code> pulls B onto A's colors, <code>0.5</code> leaves B as it is, <code>1</code> puts B on A's complement.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>coupling</td><td class="arg">≥ 0.5</td><td class="desc">The <b>master switch</b> for every layer's coupling (the Mixer header's ≈ coupling). On at launch, not saved.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/mode</td><td class="arg">i · f · s</td><td class="desc">Bond character : <code>off · lean · hocket · cut · gate · drift</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/amount</td><td class="arg">f 0..1</td><td class="desc">Coupling <b>depth</b>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/tightness</td><td class="arg">f 0..1</td><td class="desc">Vestigial (0) ↔ obvious (1).</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/feature</td><td class="arg">i · f · s</td><td class="desc">The audio <b>feature</b> that drives it : <code>level · flux · transient · centroid · band · pitch · noisiness</code> (index 0 to 6).</td></tr>
+          <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/coupling/band</td><td class="arg">i 0..5 · f 0..1</td><td class="desc">Which of the six <b>bands</b> the <code>band</code> feature listens to : a whole number, <code>0</code> the lowest to <code>5</code> the highest, or a fraction 0..1 across the six. A whole number counts as the band whatever its type tag, so a float <code>1.0</code> is band 1 (the second) : send <code>0.99</code> or <code>5</code> for the highest.</td></tr>
         </tbody>
       </table>
     </div>
@@ -424,8 +431,9 @@
       <h2>Field macros &amp; Proximity</h2>
       <span class="sec-note">0.5 = deadzone</span>
     </div>
-    <p class="blurb">Four single-float macros sweep the whole field at once. Each rests at <code>0.5</code> —
-      pushing either way pulls the composition along one expressive axis.</p>
+    <p class="blurb">Five single-float macros sweep the whole field at once. Each rests at <code>0.5</code> :
+      pushing either way pulls the composition along one expressive axis. The temperament dials rest at
+      <code>0</code> (off).</p>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
@@ -453,6 +461,7 @@
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td class="addr"><span class="lit">/opsia/</span>world</td><td class="arg">s · i</td><td class="desc">Select the active <b>World</b> — id / name string, or a 1-based index into the bank.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>world/amount</td><td class="arg">f 0..1</td><td class="desc">The <b>World amount</b> : how much of the active World's own change is on (<code>1</code> all of it, the default; <code>0</code> the mood it found). Your edits, modulators and macros keep working under it. Remembered on this computer.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>seq/run</td><td class="arg">≥ 0.5</td><td class="desc">Run (≥ 0.5) or stop the macro-form <b>sequencer</b>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>seq/skip</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Advance to the next scene now (respects transition + variation).</td></tr>
         </tbody>
@@ -472,7 +481,7 @@
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td class="addr"><span class="lit">/opsia/meta/</span><span class="v">{k}</span></td><td class="arg">f 0..1</td><td class="desc">Drive <b>Meta knob</b> <code>k</code> — a smoothed macro that fans out to whatever you've mapped to it.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/</span>bpm</td><td class="arg">f 20..800</td><td class="desc">Master <b>tempo</b> — the one raw value, in BPM.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bpm</td><td class="arg">f 20..800</td><td class="desc">Master <b>tempo</b>, raw, in BPM. With <b>Ableton Link</b> on, a tempo sent here counts as your own edit : it goes to every linked app (Link has no address of its own).</td></tr>
         </tbody>
       </table>
     </div>
@@ -486,8 +495,9 @@
       <span class="sec-note">inbound only · Pandore → Opsia</span>
     </div>
     <p class="blurb">The audio brain pushes analysis features straight to the bus, where <b>audio modulators</b>
-      read them per frame. These bypass the parameter store — they're sensor inputs, not controls, and are
-      never echoed back on the feedback stream.</p>
+      and the A/B coupling read them per frame. They bypass the parameter store : sensor inputs, not controls,
+      never echoed back on the feedback stream. They count while the audio tab's source is <b>OSC</b>, or
+      <b>Both</b> (OSC wins while it is fresher than half a second, else the local input plays).</p>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
@@ -497,7 +507,6 @@
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>transient</td><td class="arg">f 0..1</td><td class="desc"><b>Onset</b> / attack energy.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>centroid</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>brightness</b>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>pitch</td><td class="arg">f 0..1</td><td class="desc">Estimated <b>pitch</b>.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/audio/</span>noisiness</td><td class="arg">f 0..1</td><td class="desc">Spectral <b>flatness</b> — 0 tonal / pitched, 1 noise-like (hiss, breath).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/audio/</span>band/<span class="v">{1-6}</span></td><td class="arg">f 0..1</td><td class="desc">Energy in one of six frequency <b>bands</b>.</td></tr>
         </tbody>
       </table>
@@ -511,17 +520,21 @@
       <h2>Scenes &amp; Randomize</h2>
       <span class="sec-note">rising-edge triggers</span>
     </div>
+    <p class="blurb">A control or a layer made <b>Persistent</b> (right-click → Persistent) keeps playing through
+      a scene recall, a vary, or <code>/opsia/randomize</code> and its Transport scopes, fired from here as from
+      the page. Pins have no address of their own; a message sent straight to a persistent control still moves it.</p>
     <div class="tbl-scroll">
       <table>
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td class="addr"><span class="lit">/opsia/scene/</span><span class="v">{n}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Recall <b>scene</b> <code>n</code> (1-based) — full-instrument state.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>scene <span class="v">n</span></td><td class="arg">i · f</td><td class="desc">Recall the scene whose number (1-based, rounded) is the argument. Not edge-tracked : every message recalls, so send it once (the dataflou mesh's scene destination plays this one).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll <b>everything</b> within curated ranges, at the Transport's intensity.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>randomize/<span class="v">{scope}</span></td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Re-roll one scope, at the Transport's intensity : <code>sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>panic</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Panic flush</b> — drop every self-feeding buffer (feedback · trails · frame rings · accumulators) at once. Same as key <code>0</code> / the ⚡ Flush button; advertised over OSCQuery.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>vary</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc"><b>Vary</b> : a variant of the whole scene at the Transport's spread, like its Vary button.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/</span>randomize/masterparams · meta · inspector · sonify · resolume · background</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">The other randomizes, as MIDI Learn fires them : master FX parameters in place, Meta knob values, the selected Inspector unit, the Sonify patch, the Resolume pins, the Background's dice.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/</span>output/x · y · scale · rotate · spin · feather</td><td class="arg">f 0..1</td><td class="desc">The <b>output transform</b> : the whole finished frame moved as one picture (0.5 = none for x, y, scale, rotate and spin; scale runs 0 to 2).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>randomize/masterparams · meta · inspector · sonify · resolume · background</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">The other randomizes, as MIDI Learn fires them : master FX parameters in place, the Sonify patch, the selected Inspector unit, the Resolume pins, the Background's dice, and <b>meta</b>, new Meta knob <b>values</b> with their destinations kept (not the Transport's Meta Knobs scope, which also re-rolls the destinations; that one has no address).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>output/x · y · scale · rotate · spin · feather</td><td class="arg">f 0..1</td><td class="desc">The <b>output transform</b> : the whole finished frame moved as one picture, 0..1 over each range : x and y -1..1 (frame widths and heights), scale 0..2, rotate -180..180°, spin -360..360° a second, feather 0..0.2. <code>0.5</code> = none for x, y, scale, rotate and spin. Skipped while the dome is on (the dome has its own turn, spin and offset).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>output/flipx · flipy</td><td class="arg">≥ 0.5</td><td class="desc">Flip the output frame.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>output/edge</td><td class="arg">i · f · s</td><td class="desc">What shows past the frame : <code>black · repeat · mirror</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>output/reset</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">Back to the frame as it is.</td></tr>
@@ -529,7 +542,7 @@
           <tr><td class="addr"><span class="lit">/opsia/</span>space/turn · glide</td><td class="arg">f 0..1</td><td class="desc">Turn the sound scene (0.5 = none) · how softly a following voice moves (0..2 s).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>space/mirror · headphones</td><td class="arg">≥ 0.5</td><td class="desc">Swap left and right · hear the room on headphones (binaural).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>space/pieces</td><td class="arg">i · f</td><td class="desc">The Collage pieces as sources of their own : an integer count, or 0..1 of 30.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/</span>space/<span class="v">{voice}</span>/az · el · width · span · spin</td><td class="arg">f 0..1</td><td class="desc">Where a Sonify voice sits, 0..1 over each range (az 0.5 = straight ahead). Voices : <code>spectra orbit flow events raster sstv filter chord collage signal</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>space/<span class="v">{voice}</span>/az · el · width · span · spin</td><td class="arg">f 0..1</td><td class="desc">Where a Sonify voice sits, 0..1 over each range : az -180..180° (0.5 = straight ahead; an offset while the voice follows), el -15..90°, width 0..180°, span 0..1, spin -360..360° a second. Voices : <code>spectra orbit flow events raster sstv filter chord collage signal assemblage</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>space/<span class="v">{voice}</span>/follow</td><td class="arg">≥ 0.5</td><td class="desc">The voice follows the picture, else it stays at its fixed place.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>surface <span class="v">x y</span></td><td class="arg">f f</td><td class="desc"><b>Metasurface</b> cursor — two <code>0..1</code> floats on the scene plane; the output becomes a live blend of the nearest scenes. Sending it turns the surface ON (Pandore's Trill Square plays it).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>surface/active</td><td class="arg">bool</td><td class="desc">Enable / disable the Metasurface (<code>&ge; 0.5</code>).</td></tr>
@@ -551,8 +564,9 @@
       <h2>Sonify</h2>
       <span class="sec-note">image → sound · v = voice</span>
     </div>
-    <p class="blurb">The image-to-sound engine speaks its own sub-namespace. The ten voices are
-      <code>spectra · orbit · flow · events · raster · sstv · filter · signal · chord · collage</code>; each takes
+    <p class="blurb">The image-to-sound engine speaks its own sub-namespace. The eleven voices are
+      <code>spectra · orbit · flow · events · raster · sstv · filter · signal · chord · collage · assemblage</code>
+      (<code>sstv</code> is the Transmission voice); each takes
       the same shape of address, so a controller can play any voice's probes, pitch and timbre. The
       patch also travels with sessions and scenes. <b>Index</b> addresses (the root octave, a reading
       path, the orbit shape, the chord's voice count, a mode, an octave, a tap, a sync mode, the voicing)
@@ -565,7 +579,7 @@
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>on</td><td class="arg">bool</td><td class="desc">Master <b>on/off</b> for the sound engine.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>master</td><td class="arg">f 0..1</td><td class="desc">Output <b>gain</b>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>root · rootoct · scale</td><td class="arg">i · s</td><td class="desc">Global <b>quantizer</b> — key root, root octave, and scale : a name (<code>harmonic minor</code>, <code>dimwh</code>, <code>Diminished W-H</code>…) or an index : 0 chromatic · 1 major · 2 minor · 3 minor pentatonic · 4 whole tone · 5 dorian · 6 phrygian · 7 lydian · 8 harmonic minor · 9 ionian · 10 mixolydian · 11 aeolian · 12 locrian · 13 major pentatonic · 14 major blues · 15 minor blues · 16 diminished W-H · 17 diminished H-W.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>keyseq/on · next</td><td class="arg">bool · <span class="tag trig">trigger</span></td><td class="desc">Run the <b>key sequencer</b> (≥ 0.5) or stop it; <code>next</code> changes the key now.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>keyseq/on · next</td><td class="arg">bool · <span class="tag trig">trigger</span></td><td class="desc">Run the <b>key sequencer</b> (≥ 0.5) or stop it; <code>next</code> changes the key now (each message at 0.5 or more, not edge-tracked).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>keyseq/mode</td><td class="arg">s · i</td><td class="desc">How the next key is chosen : <code>list · circle · affinity · pivot · picture</code>.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>keyseq/glide · chance</td><td class="arg">f 0..1</td><td class="desc">The <b>glide</b> to a new key (0 to 4 s) and the <b>chance</b> a change falls when the clock allows one.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>keyseq/every · vary</td><td class="arg">f s · f 0..1</td><td class="desc">Free time : <b>every</b> how often a change may fall (0.25 to 300 s); <b>vary</b> draws each wait around it, between Every ÷ 4<sup>vary</sup> and Every × 4<sup>vary</sup> (0 = always Every).</td></tr>
@@ -576,14 +590,15 @@
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>eq/preset</td><td class="arg">s · i</td><td class="desc">Recall a saved <b>output EQ</b> : its name, or its number in the menu (0 or <code>flat</code> : flat). The bypass switch and the glue stay.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>filter/linein · linefrom</td><td class="arg">bool · s | i</td><td class="desc">The <b>Filter</b> voice plays a line-in (≥ 0.5) instead of its noise; <code>linefrom</code> says which : <code>input</code> (an audio input) or <code>layer</code> (the Audio Layer, its slots mixed before its own volume and mute).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>tap/a · tap/b</td><td class="arg">i 0..4</td><td class="desc">What each image <b>tap</b> reads : 0 the master output, 1-4 a layer.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/tap</td><td class="arg">i 0..1</td><td class="desc">Which tap a voice <b>listens</b> to (A or B). Every voice but collage.</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/looct · hioct</td><td class="arg">i</td><td class="desc">A voice's <b>octave range</b> (spectra, flow, events, signal, chord, collage, filter); the low end always stays below the high end.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/tap</td><td class="arg">i 0..1</td><td class="desc">Which tap a voice <b>listens</b> to (A or B). Every voice but collage and assemblage (they hear films, not the picture).</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span><span class="v">{v}</span>/looct · hioct</td><td class="arg">i</td><td class="desc">A voice's <b>octave range</b> (spectra, flow, events, signal, chord, collage, assemblage, filter) : an integer octave, or a float 0..1 across the voice's span (collage and assemblage reach octave 9); the low end always stays below the high end.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>spectra/sync · orbit/shape · filter/loop</td><td class="arg">bool · i 0..4 · f</td><td class="desc">Spectra's sweep locked to the tempo (one sweep a bar; off, the rate you had set comes back); the Orbit's <b>shape</b> (circle, 1:2, 2:3, 3:4, 1:3); the Filter's noise <b>loop</b> (0 free noise, up a frozen stretch replayed : a flutter, then a buzz).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>collage/on · gain · pan · resonance · ring · harmonics · width · input · hp · lp · comp · ringin</td><td class="arg">bool · f 0..1</td><td class="desc">The <b>Collage</b> voice : the films of a Collage source heard all at once, each piece panned by its place and rung at a note of the key. <b>comp</b> is one compressor on all the films (0 = off), so they hold one level.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>collage/hpslope · lpslope</td><td class="arg">i 12 | 24 · f</td><td class="desc">The films' filters' slope : 12 or 24 dB per octave (an int as it is; a float, 0.5 and up = 24).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>glue/on · amount · voice</td><td class="arg">bool · f 0..1 · s | i 0..4</td><td class="desc">The <b>glue</b> : one compressor on everything that leaves (Sonify and the Audio Layer), after the output EQ (both cards are in the audio tab). <b>amount</b> takes the threshold to -12 dB and the ratio to 4:1; <b>voice</b> clean · warm · punch · bite · slow.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>collage/bank · decay · cutoff · peak · slope · tone · tilt · waves · wavesrate · noise · noiserate · detune</td><td class="arg">f 0..1</td><td class="desc">Its <b>Ring bank</b> (48 tuned resonant bands) : bank is the wet (0 the plain voice); tone and tilt are bipolar (0.5 = centre).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>collage/send · choke · wavessync · noisesync · voicing</td><td class="arg">bool · i</td><td class="desc">The bank added on top (send) or crossfaded (mix); <b>choke</b> or sustain; sync modes 0 free · 1 straight · 2 triplet · 3 dotted; voicing 0 Clean · 1 SEM · 2 MS-20 · 3 Steiner · 4 K35.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/sonify/</span>assemblage/<span class="v">{collage control}</span> · accent · tape</td><td class="arg">bool · f 0..1 · i</td><td class="desc">The <b>Assemblage</b> voice : an Assemblage edit's own sound, cut with the picture, each clip placed by its unit on the Assemble map. It takes every <code>collage/…</code> control above (its ring bank and octave range too), plus <b>accent</b> (a strike of the resonators at every cut) and <b>tape</b> (≥ 0.5 : the speed changes the pitch; below, the pitch is kept).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>chord/waves · wavesrate · wavessync</td><td class="arg">f · i 0..3</td><td class="desc">The Chord's <b>waves</b> : a travelling level across its notes.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>signal/wave · heads · path · steps</td><td class="arg">i · f 0..1</td><td class="desc">The <b>Signal</b> voice : read heads that play the picture as data. <b>wave</b> the grain (0 pip · 1 damped · 2 noise · 3 click · 4 fm · 5 square · 6 tri · 7 pink · 8 ping), <b>heads</b> 1 to 4, <b>path</b> 0 horizontal · 1 vertical · 2 radial · 3 spiral, <b>steps</b> per sweep 0..7 (8 · 12 · 16 · 24 · 32 · 48 · 64 · 96). An integer is the index; a float is 0..1 across the choices.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/sonify/</span>signal/decay · tone · fm · rate · spread · thresh · density · snap</td><td class="arg">f 0..1</td><td class="desc">Its grain length (0.2 ms to 500 ms), the noise grains' tone, the fm depth, the step <b>rate</b> (per second, or per beat when synced), the heads' polymeter <b>spread</b>, how bright a cell must be to fire, marks per head per step, and pitch from free frequency (0) to the scale (1).</td></tr>
@@ -650,20 +665,27 @@
     <div class="sync">
       <div class="card">
         <h3>OSCQuery · HTTP</h3>
-        <p>The whole parameter tree, self-describing (type · range · value · description). Point a client
-          at the HTTP port to auto-discover every address above.</p>
-        <p class="flow">http://&lt;host&gt;:<span class="a">port+1</span>/  ·  ?HOST_INFO</p>
+        <p>The fixed controls, self-describing (type · range · value · description) : index addresses typed
+          <code>i</code>, the picture's features read-only. Shader inputs on sources and FX racks are not listed
+          (address them by name); the three finishing units' and the Background ground's float inputs are.</p>
+        <p>On this computer only (it listens on <code>127.0.0.1</code>; on <code>port-1</code> when the OSC port is 65535).
+          The tree is read when OSC in starts (at launch, or when IN is switched on or its port changes), so the rows
+          that follow what is loaded (a slot's film or sound, the Audio Layer's slots, the ground's inputs, the body
+          features) are the ones there then : switch IN off and on to read it again.</p>
+        <p class="flow">http://127.0.0.1:<span class="a">port+1</span>/  ·  ?HOST_INFO</p>
       </div>
       <div class="card">
         <h3>OSCQuery · WebSocket</h3>
-        <p>A live value-stream on the same port for web / no-UDP clients. Subscribe per path, receive
-          value frames as controls move.</p>
+        <p>A live value-stream on the same port for web / no-UDP clients, every 100 ms while one is attached.
+          With no <code>LISTEN</code> a client gets every path; <code>LISTEN</code> narrows it to the paths named,
+          <code>IGNORE</code> drops one. Triggers, seeks and the audio sensors are never streamed.</p>
         <p class="flow">→ {COMMAND:<span class="a">"LISTEN"</span>, DATA:"/opsia/…"}<br>← {FULL_PATH, VALUE:[v]}</p>
       </div>
       <div class="card">
         <h3>Outbound feedback</h3>
-        <p>A throttled diff-and-send loop pushes only <b>changed</b> controls back to a configured
-          host:port — same <code>/opsia/…</code> addresses, same <code>0..1</code>. Pandore's UI tracks Opsia's.</p>
+        <p>A throttled diff-and-send loop (every 100 ms) pushes only <b>changed</b> controls back to a configured
+          host:port : the same <code>/opsia/…</code> addresses and values as OSCQuery advertises, indices as ints.
+          It follows what is loaded live. Triggers, seeks and the audio sensors are never echoed. Pandore's UI tracks Opsia's.</p>
         <p class="flow"><span class="a">Opsia</span> → UDP → host:port</p>
       </div>
       <div class="card">
@@ -675,6 +697,9 @@
     </div>
     <p class="blurb">The <b>OSC monitor</b> (the OSC section's <b>monitor</b> button) shows every message in and out,
       live, with its address, values and destination.</p>
+    <p class="blurb">The same addresses are played by two other routes : the <b>dataflou</b> mesh (each of its
+      destinations is an <code>/opsia/…</code> address, played once per change) and the <b>Agent (MCP)</b>'s
+      <code>osc</code> tool (<code>/opsia/…</code> only; a trigger it sends fires every time).</p>
   </section>
 
   <footer>

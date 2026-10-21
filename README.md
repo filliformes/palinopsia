@@ -24,9 +24,10 @@ work: **never cheap psychedelia, never a 3D game engine.**
 ![The Palinopsia compositor](docs/images/interface-compositor.jpg)
 
 *The instrument: live preview and scene bank at the top left, the Inspector for
-whatever is selected below it, the pinned master finalizers under that, and the
-layer stack down the right column : here two layers of Shapes cut up by Slice
-Shuffle and **Autocutter**, differenced together.*
+whatever is selected below it (here Oil Cloud, its controls in three columns : shape,
+view, paint), the Master FX strip with its pinned finalizers under that, and the layer
+stack down the right column, each layer in its four steps (IN, MIX, FX, OUT) : here an
+**Oil Cloud** over a floor of points (**Lattice**) on Layer 1.*
 
 ### What it looks like
 
@@ -39,10 +40,12 @@ racks, palette, World and macro biases : in one click.
 | ![Op-Art](docs/images/shot-opart.jpg)<br>**Op-Art** : a grid warped and folded until it breathes | ![Datamosh](docs/images/shot-datamosh.jpg)<br>**Datamosh** : a slit-scan torn into RGB compression noise | ![Mycelial](docs/images/shot-mycelial.jpg)<br>**Mycelial** : reaction-diffusion filaments, grown then eroded |
 | ![Cathode Ray](docs/images/shot-crt.jpg)<br>**Cathode Ray** : phosphor scanlines, one colour on black | ![Analog moiré](docs/images/shot-moire.jpg)<br>**Analog moiré** : a wobbulated interference field | ![Cut-Up](docs/images/visual-cut-up.jpg)<br>**Cut-Up** : a wall of films, each in its own torn piece |
 | ![Gravity Well](docs/images/shot-gravity-well.jpg)<br>**Gravity Well** : a floor of points sinking into a funnel, ringing with ripples | ![Line Wall](docs/images/shot-line-wall.jpg)<br>**Line Wall** : machine-cut bars laid on a wall that runs off to the side | ![Crossing](docs/images/shot-crossing.jpg)<br>**Crossing** : full-height bars, each leaning its own way |
+| ![Oil Cloud](docs/images/shot-oil-cloud.jpg)<br>**Oil Cloud** : one billowing cloud, ray-traced and painted in oil, warm toward the light, cool in its folds | ![Orbit](docs/images/shot-orbit.jpg)<br>**Orbit** : a figure of points circled in space, here a ring rolling through itself | ![Oil Sky](docs/images/shot-oil-sky.jpg)<br>**Oil Sky** : a cloudscape painted in thick oil, the light low behind it |
 
-*(The first two rows are from v1.0.0, the last from v1.2.6 : Lattice, Perspective and
-Lowercase's slant, each straight from its Space theme. The older shots stay in
-`docs/images/`.)*
+*(The first two rows are from v1.0.0, the third from v1.2.6 (Lattice, Perspective and
+Lowercase's slant, each straight from its Space theme), the last from v1.3.0 : the
+**Oil Cloud** and **Cloud Study** generators and Lattice's new forms, each straight from
+its Generate theme. The older shots stay in `docs/images/`.)*
 
 ---
 
@@ -53,19 +56,22 @@ Lowercase's slant, each straight from its Space theme. The older shots stay in
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
 **The instrument**
-- [The layer stack](#the-layer-stack) : sources · A/B mix · racks · blends · masks · coupling · [the Audio Layer](#the-audio-layer) : sound files and live inputs into Sonify's mix
-- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation
+- [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files and live inputs into Sonify's mix
+- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
-- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix)
+- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 18 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
-- [Worlds / diegesis](#worlds--diegesis-key-w) · [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Output & mapping](#output--mapping-key-o) : **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
+- [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
+- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b)
+- [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) · [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · Generate (114 themes) · [Persistent](#persistent--controls-and-layers-that-stay) controls and layers · Set in every scene
+- [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-45-generators) (45 generators) · [Effects](#effects) (53 FX) ·
+- [Sources](#sources-46) (46 : 45 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (53 FX) ·
   [Native nodes](#native-nodes) (26) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (19)
 - [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
@@ -188,7 +194,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 110 themed recipes that build a coherent
+   **Generate** in the toolbar : 114 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet.
@@ -215,6 +221,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Alt+E` | **Source Editor** : write a shader of your own, or a copy of a built-in one |
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
+| `V` | **Big preview** : fold the panels under the preview away, and back (the preview's **⤢ big**) |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
@@ -238,7 +245,9 @@ In **Sonify** (also in the cheat-sheet) :
 **MIDI:** the **MIDI Learn** toolbar button (top bar), or the `L` key from
 anywhere : maps any controller; see [MIDI](#midi).
 **Everywhere:** double-click a slider/knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
-video **in / out** trim handles.
+video **in / out** trim handles. Right-click a control or a layer for
+[**Persistent**](#persistent--controls-and-layers-that-stay) (scenes, Randomize and
+Generate leave it as it plays) and **Set in every scene**.
 **Feedback:** a brief **toast**, docked in the empty middle of the
 [bottom toolbar](#the-transport-bar-bottom), confirms actions with no natural home on
 screen : a recording saved (with its filename), a panic flush, or a live-capture
@@ -290,7 +299,8 @@ only the modulation aimed at the effects that went is dropped.
 A layer's **opacity, A/B mix and blend mode** are themselves [modulation](#modulation-brain-8-modulators--matrix)
 targets : a small **M** chip beside each opens the same M1–8 binding row as any
 Inspector control. Bound sliders turn the modulated colour and move with the
-signal; the blend dropdown cycles its modes. Per-FX **dry/wet opacity** is
+signal; the blend dropdown cycles its modes. So is the A/B **hue** harmony, from its M
+chip in the [Mixer](#the-mixer) (the knob's middle leaves B untouched). Per-FX **dry/wet opacity** is
 modulatable too : select a loaded effect and its opacity slider grows the same
 **M** pill. (These are compositor-level, so they apply as a final per-frame
 override with the base value preserved, and they travel with sessions.)
@@ -394,12 +404,21 @@ the modulator row under the four columns. The header holds the mix presets (they
 the A·B part too) and **≈ coupling**, the master switch : one click pauses every
 layer's coupling (every mix then sits at its slider), another lets it run again.
 
+![The Mixer](docs/images/interface-mixer.jpg)
+
+*The Mixer : four columns, each from the top its two sources, A·B (the mode and the
+crossfader, named with its value), HUE (A's swatch, the match ↔ clash slider, where B
+lands), CPL (the coupling's mode and feature, its meter, amt and tight), then LAYER
+(active or inactive, the opacity and speed faders, the blend). Layers 3 and 4 have no
+Source B, so their A·B, HUE and CPL parts are dimmed; a pinned control wears its gold
+bar.*
+
 The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
 `E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (the four
 layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
 blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
-Resolume, dataflou and Ableton Link panels), **performance** (the live load meter) and
+Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter) and
 **assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
@@ -558,7 +577,8 @@ camera through *Continuity Camera*, listed with the others.
 
 Left → right:
 
-- **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time) ·
+- **BPM** (20–800) : the label is a **tap-tempo button** (tap it in time), and a
+  **LINK n** badge beside it says the tempo is shared with [Ableton Link](#ableton-link) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
   default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
   Generate all morph over this, live) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
@@ -568,7 +588,9 @@ Left → right:
   learned pad). Messages (a refused effect drop, a saved recording) appear in the
   toolbar's empty middle, always in the same place, over nothing; a long instruction
   grows upward from there.
-- **Output** (opens the Output / mapping page; lights while the external output is on) · **Body** (opens the embodied-control
+- **Output** (opens the Output / mapping page; lights while the external output is on;
+  right-click : open or close an Output window, or the
+  [Output page in a window](#output--mapping-key-o) of its own) · **Body** (opens the embodied-control
   page; lights while the camera is live; also key `B`) · **Seq** (opens the
   sequencer; lights when running) · **Sonify** (opens Sonify; lights while the sound
   engine runs).
@@ -580,10 +602,12 @@ Left → right:
 The **top bar** stays on one line in a window narrower than the screen : as it
 narrows it tucks the SESSION / GENERATE labels away, then tightens the session name,
 the menus and the zoom readout, never dropping a button (only the 1024 px minimum
-window still wraps). It carries the session controls (name · Session · Generate · New /
-Open / Save / Save As · render-depth + theme selectors), the **MIDI Learn**
+window still wraps). It carries the session controls, one group (the name, the
+session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Session
+media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
 button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
-file), undo / redo, UI zoom, and, at the far right, **⚡ Flush**, the panic
+file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
+zoom, the render-depth and theme selectors, and, at the far right, **⚡ Flush**, the panic
 button (also key `0`) that drops every self-feeding buffer at once: per-layer
 trails, the Feedback / Réponse / Chronoscan frame rings, the Sediment / Scanner
 accumulators, the consume blend's competition field, and the persistent buffers of
@@ -689,9 +713,10 @@ One type follows the **live performer** instead of the picture:
   flatness) : bind a sound's noise to a layer's tint saturation and the *sound
   colours the picture* (the other direction of the same crossmodal table).
 
-The **`audio`** follower listens **FROM** the audio input (the audio tab), or from a
-**layer's clip** : the soundtrack of an imported film or an imported sound file, **read
-at its playhead**. The sound is analysed once (the same analysis the live input runs,
+The **`audio`** follower listens **FROM** the audio input (the audio tab), from the
+[Audio Layer](#the-audio-layer) (`AU A`, `AU B`, or `AU all` : its whole sound, live
+inputs included), or from a **layer's clip** : the soundtrack of an imported film or an
+imported sound file, **read at its playhead**. The sound is analysed once (the same analysis the live input runs,
 60 times a second, cached on disk) and read wherever the playhead is, so it follows the
 clip at any speed, reversed, scrubbed or in grains, while the film itself plays silent;
 a stopped clip reads silence, and flux takes the most of what the playhead crossed (a
@@ -717,13 +742,15 @@ parameter's **M** button in the Inspector or Meta tile. In the Modulation strip,
 parameter sits at its own value, the depth and binding are kept) and click again to
 turn it back on. Modulation reaches
 **float, enum, and bool** inputs, plus the **video** targets (playhead / speed /
-loop / grain), the compositor-level **layer** controls (opacity / A-B mix /
-blend-mode, from the M chips on the layer strip, and the layer's **Vary**, a trigger
-that fires as the modulator crosses its middle going up), per-**FX dry/wet opacity**,
-the **Background**'s opacity, speed and contact shadow, every **Fulldome** mapping
-slider (rotate, spin, feather, the panorama's and the screen's own; see
-[Fulldome](#fulldome)), the **Sonify** parameters and the **Meta knobs** themselves. It
-is written straight to the compositor at frame rate, never through React re-renders.
+loop / grain / the film's volume), the compositor-level **layer** controls (opacity / A-B mix /
+blend-mode, from the M chips on the layer strip, the A/B **hue** harmony from the
+[Mixer](#the-mixer) (−1 match … 1 clash, the middle leaves B untouched), and the layer's
+**Vary**, a trigger that fires as the modulator crosses its middle going up),
+per-**FX dry/wet opacity**, the **Background**'s opacity, speed and contact shadow, every
+**Fulldome** mapping slider (rotate, spin, feather, the panorama's and the screen's own; see
+[Fulldome](#fulldome)), every [output transform](#output-transform) slider, the
+[World amount](#worlds--diegesis-key-w), the **Sonify** parameters and the **Meta knobs**
+themselves. It is written straight to the compositor at frame rate, never through React re-renders.
 
 The matrix holds **32** bindings (bounded, so a patch stays readable; the Meta
 knobs are outside it); how many are in use shows under the Modulation strip's name. Randomize, Generate and a World's audio route use at most 12
@@ -877,7 +904,7 @@ the composite live.
 ## Audio in
 
 The **Connect** right-column tab (key `A`) holds the control panels
-(**Audio · MIDI · OSC · Resolume · dataflou · Ableton Link**), and the **performance** tab beside it the load meter:
+(**Audio · MIDI · OSC · Resolume · dataflou · Ableton Link · Agent (MCP)**), and the **performance** tab beside it the load meter:
 
 - **Audio** : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **≈ coupling**
@@ -911,6 +938,11 @@ The **Connect** right-column tab (key `A`) holds the control panels
     input's noise (mains-hum series + strong tones), models a set of notches, and
     applies a high-pass + multi-notch filter to clean the signal before it is
     monitored or analysed.
+  - **Output EQ & glue** (under USB denoise) : the room EQ and the compressor on
+    everything that leaves, Sonify and the Audio Layer (see
+    [Sonify](#sonify--image-to-sound-key-s)). Above them, the **Output levels** :
+    Sonify, the Audio Layer (to 200 %) and the input monitor, each with its on/off and
+    its level.
 - **MIDI** : controller input picker + the learned-bindings ledger, plus the
   **MIDI output** controls (see [MIDI](#midi)).
 - **OSC** : inbound listener (port, on/off, this machine's IPs), outbound
@@ -964,13 +996,17 @@ Learnable targets:
   (the per-knob **CC** button still works as a direct shortcut).
 - **Transport** : BPM (CC → 40–240), SPD, MORPH, PROX (each mirrors its
   slider's curve).
-- **Continuous (CC)** : each of the **4 layer opacities** and their **A/B mix**,
-  the **background opacity**, the **8 Feel dials**, the **Metasurface XY**, and
-  the **Sonify master** (each mirrors its own curve).
+- **Continuous (CC)** : each of the **4 layer opacities**, their **A/B mix** and
+  their A/B **hue** harmony (in the Mixer), the **Background**'s opacity, speed and
+  shadow, the **8 Feel dials**, the **Metasurface XY**, and the **Sonify master**
+  (each mirrors its own curve).
 - **Fires** (pad/note or button-CC, press edge only) : **Vary**, **Randomize**
   (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Record**
-  start/stop, **Sonify** on/off, and the **Sequence** + **Sonify-sequence**
-  transports.
+  start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
+  **Sonify-sequence** and **key-sequence** transports, the **Master FX chain** on/off,
+  session **New / Load / Open**, and the dice (each layer's, the Background's, the
+  master parameters', the Meta knobs', the selected Inspector unit's, the Resolume
+  pins).
 - **Scene chips** : a pad recalls that scene *slot* (like the `1`–`9` keys); a
   pad can also step **scene next / prev**.
 
@@ -1606,7 +1642,9 @@ always bound them. The sound patch **travels with sessions and scenes** : recall
 switches the sonification with it (the on-switch and output device stay
 machine-local). And the whole page speaks **OSC** under `/opsia/sonify/…`
 (on/master/root/**rootoct**/scale + per-voice on·gain·pan·probes·pitches·params,
-the **Signal** voice `/signal/{on,gain,pan,wave,decay,tone,fm,heads,rate,sync,steps,spread,thresh,density,path,snap}`, the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width,input,hp,lp,hpslope,lpslope,comp,ringin}` and its Ring bank `/collage/{bank,send,decay,choke,cutoff,peak,slope,tone,tilt,waves,wavesrate,wavessync,noise,noiserate,noisesync,detune,voicing}`, the Chord's `/chord/{waves,wavesrate,wavessync,noise,air}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
+the **Signal** voice `/signal/{on,gain,pan,wave,decay,tone,fm,heads,rate,sync,steps,spread,thresh,density,path,snap}`, the **Chord** bank, the **Collage** voice `/collage/{on,gain,resonance,ring,harmonics,width,input,hp,lp,hpslope,lpslope,comp,ringin}` and its Ring bank `/collage/{bank,send,decay,choke,cutoff,peak,slope,tone,tilt,waves,wavesrate,wavessync,noise,noiserate,noisesync,detune,voicing}`, the **Assemblage** voice under
+`/assemblage/…` (the Collage's controls, plus `accent` and `tape`), the Filter's line
+source `/filter/linefrom` (`input`, or `layer` : the Audio Layer), the Chord's `/chord/{waves,wavesrate,wavessync,noise,air}`, and the **FX** tail `/fx/{send,delaytime,feedback,size,decay,
 damp,reverbmode,freeze,…}`, plus the taps `/tap/{a,b}` (0 master, 1-4 a layer), each
 voice's `/tap` and `/looct` `/hioct`, `/spectra/sync`, `/orbit/shape`, `/filter/loop`, the
 output **glue** `/glue/{on,amount,voice}` and the key sequencer `/keyseq/{on,next,mode,glide,chance,range,hold,every,vary,keys}`;
@@ -1917,10 +1955,48 @@ session holds the picture still until the new one has compiled, then dissolves).
 double-click in the bank; recall crossfades over the **MORPH** time. Scenes
 carry their sequencer tags and are saved inside the session.
 
-**Persistent** : **right-click a control** (any parameter in the Inspector or the
+**Session Loader** (toolbar) : a dropdown of every saved session + a **Load**
+button, so you can jump between saved sessions without the file dialog.
+**Right-click Load** to link a folder of sessions : every session in it (and its
+subfolders) joins the dropdown under the folder's name, in name order (number them
+01, 02… and they list in show order). The folder is linked, not copied : a session
+saved there later appears too. The same menu lists the linked folders : click one to
+jump to its first session, × to unlink it (the files are never touched).
+
+**Generate** (toolbar) : a dropdown of **114 visual themes** in 17 families
+(Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
+Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
+Cinematic/Atmospheric (Oil Sky : a cloudscape in thick oil, from Cloud Study), Retro
+Screen, Minimal/Structural, Datamosh & Compression (Codec Rot : a real video codec
+starved of keyframes, through Codec Mosh),
+**Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
+**Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
+overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
+out and piled at different heights in **Paste-Up** : it plays
+the session's Collage folder, or the last one picked on this computer, and with none yet
+stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
+node per theme, on the layer that reads the others), **Space** (points in space and line
+fields laid on planes : Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor
+with Lattice, Warp Tunnel and Orbit with its tunnel, globe, torus and galaxy, Line Wall
+and Data Floor with Lowercase through Perspective, Crossing with its slanted bars, and
+Oil Cloud, one painted cloud turning in the dark), and, at the end, **Feel Studies**,
+one theme per Feel macro with everything else held still) + a **Generate** button. Each
+theme is a *recipe* : a tight source/FX pool drawn from the whole instrument (nodes that
+read another layer are handed one that is in the scene), a Vibe palette, a matching World
+(coupling + audio routing), Feel biases, and a way of **moving** : it binds a few
+modulators across its layers in its family's manner (slow breathing for Organic, Living
+Surfaces and Cinematic, drawn cadences for film, stepped and on the beat for Glitch and
+Data, sine and saw sweeps for Analog), so every active layer has at least one moving
+parameter while the master and the World's audio route are left alone. Generate builds
+a whole new, coherent, on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it
+again re-rolls a fresh variation within the same theme.
+
+### Persistent : controls and layers that stay
+
+**Right-click a control** (any parameter in the Inspector or the
 Finishing stages, a layer's opacity, A·B mix, blend or speed, the Mixer's faders,
-crossfader, hue and blend, the Background's opacity, speed and shadow, a Meta knob)
-→ **Persistent**, and no scene, Randomize, Variation, the sequencer, the scene pad,
+crossfader, hue and blend, the Background's opacity, speed and shadow, a Meta knob; not
+yet Sonify's controls or a modulator's card) → **Persistent**, and no scene, Randomize, Variation, the sequencer, the scene pad,
 Generate, a World or a Mixer, layer, background or master preset changes it any more :
 it stays as it plays while everything around it moves (and never moves in a morph).
 Its modulation stays with it. **Right-click a layer** (or its column header in the
@@ -1937,39 +2013,6 @@ wherever that source plays the same shader; the Vibe, Context and Finalizer are 
 the same three. The same menu has **Set in every scene** (**Set this layer in every
 scene** for a layer) : what plays now is written once into every scene that has it
 (the toast says how many, and which lacked it); Ctrl+Z undoes it.
-
-**Session Loader** (toolbar) : a dropdown of every saved session + a **Load**
-button, so you can jump between saved sessions without the file dialog.
-**Right-click Load** to link a folder of sessions : every session in it (and its
-subfolders) joins the dropdown under the folder's name, in name order (number them
-01, 02… and they list in show order). The folder is linked, not copied : a session
-saved there later appears too. The same menu lists the linked folders : click one to
-jump to its first session, × to unlink it (the files are never touched).
-
-**Generate** (toolbar) : a dropdown of **110 visual themes** in 17 families
-(Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
-Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage,
-Cinematic/Atmospheric, Retro Screen, Minimal/Structural, Datamosh & Compression,
-**Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
-**Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
-overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
-out and piled at different heights in **Paste-Up** : it plays
-the session's Collage folder, or the last one picked on this computer, and with none yet
-stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
-node per theme, on the layer that reads the others), **Space** (points in space and line
-fields laid on planes : Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor
-with Lattice, Line Wall and Data Floor with Lowercase through Perspective, Crossing with
-its slanted bars), and, at the end, **Feel Studies**,
-one theme per Feel macro with everything else held still) + a **Generate** button. Each
-theme is a *recipe* : a tight source/FX pool drawn from the whole instrument (nodes that
-read another layer are handed one that is in the scene), a Vibe palette, a matching World
-(coupling + audio routing), Feel biases, and a way of **moving** : it binds a few
-modulators across its layers in its family's manner (slow breathing for Organic, Living
-Surfaces and Cinematic, drawn cadences for film, stepped and on the beat for Glitch and
-Data, sine and saw sweeps for Analog), so every active layer has at least one moving
-parameter while the master and the World's audio route are left alone. Generate builds
-a whole new, coherent, on-theme session in place (unsaved; Ctrl+S keeps it). Pressing it
-again re-rolls a fresh variation within the same theme.
 
 ## Metasurface : the continuous scene-space
 
@@ -2058,15 +2101,18 @@ don't flood your history.
 
 ---
 
-## Sources (45 generators)
+## Sources (46)
 
-45 sources produce an image from nothing (all but two : Collage plays a folder of films,
-Silhouette reads the Body camera). Any generator can fill **Source A or B**
+46 sources : 45 generators that produce an image from nothing (all but two : Collage
+plays a folder of films, Silhouette reads the Body camera), and **Audio**, the waveform of
+a sound file you import (it needs a file, so no dice or theme deals it; see
+[Audio sources](#audio-sources)). Any generator can fill **Source A or B**
 of any layer (and all but a few can be the Background source). Each ships curated
-Randomize sub-ranges and its own preset bank.
+Randomize sub-ranges and its own preset bank. Your own generators from the
+[Source Editor](#source-editor--your-own-shaders-alte) list first, under **my shaders**.
 
 <details>
-<summary><b>The full generator catalogue</b> (click to expand)</summary>
+<summary><b>The full source catalogue (46)</b> (click to expand)</summary>
 
 | Source | Description |
 |---|---|
@@ -2115,6 +2161,7 @@ Randomize sub-ranges and its own preset bank.
 | **Collage** *(native)* | A wall of films cut up by the Autocutter partition : a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
 | **Grown** *(native)* | A texture that grows itself : a tiny neural network trained on a real scan (lava, mossy rock, bark) runs in every cell of a grid. From nothing the texture of the photo emerges, stays alive and heals where you damage it. |
 | **Silhouette** *(native)* | The body in front of the Body camera, cut out of the room : **cutout** (the camera where you are, nothing elsewhere), **matte** (white on black, to key another layer or feed a Matte node), **shadow** (a flat colored silhouette) or **hole** (the room with you taken out). `trail` leaves fading echoes of the body. Listed with the live inputs; needs the Body camera with Silhouette on and never turns the camera on by itself (see [Body](#body--embodied-control-key-b)). |
+| **Audio** *(native)* | A sound file played in the layer like a film (**Import audio…**, the video transport), the layer drawing its **waveform** : **view** whole, loop or scrolling past the playhead, **style** filled, outline or bars, the played part lit. Seven presets and the three **Sound** master chains (see [Audio sources](#audio-sources)). |
 
 </details>
 
@@ -2131,9 +2178,11 @@ Two gestures mined from the EYESY lineage run through the field generators:
   still. Mirrors to the output window.
 
 > Beyond generators, a source slot can also hold an **imported video** (see
-> [Video sources](#video-sources)), a **live capture** (webcam / screen / device),
-> or a **HIVE** HEVC-over-TCP network stream : each treatable through the slot's
-> own Source-FX rack.
+> [Video sources](#video-sources)), an **imported sound file** (see
+> [Audio sources](#audio-sources)), a **live capture** (webcam / screen / device / an
+> iPhone by USB), an [NDI](#ndi) source, an **Assemblage** (see
+> [Assemble](#assemble--the-automatic-editor-key-e)), or a **HIVE** HEVC-over-TCP
+> network stream : each treatable through the slot's own Source-FX rack.
 
 ---
 
@@ -2144,7 +2193,9 @@ Two gestures mined from the EYESY lineage run through the field generators:
 There are **five effect racks**: **Source-A FX** and **Source-B FX** (one under each
 source slot), **Layer FX**, **Master FX**, and **Background FX**.
 
-- **Any standard ISF effect below can be placed in any of the five racks** : placement is not restricted by effect. The picker (grouped by sub-category) is the
+- **Any standard ISF effect below can be placed in any of the five racks** : placement is not restricted by effect, and your own effects from the
+  [Source Editor](#source-editor--your-own-shaders-alte) (**my shaders**, first in the
+  picker) go anywhere too. The picker (grouped by sub-category) is the
   same everywhere. Each unit has enable, dry/wet **opacity** (double-click → 1),
   drag-reorder, presets, a dice `⚄`, and a **reset `↺`** (the whole effect back to
   its defaults).
@@ -2169,7 +2220,7 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   finishing units at its end; the chain's effects run underneath across the whole width,
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **114** designed chains and sets the Vibe to match (the
+  whole master chain with one of **116** designed chains and sets the Vibe to match (the
   finalizers stay). The newer ones sit in five groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Node recipes** (a node that reads another layer is wired, when the preset is
@@ -2299,7 +2350,7 @@ none is picked, so all five run in any rack.
 | **Mosaïque** | **Spatial concatenative synthesis** ([Assemble](#assemble--the-automatic-editor-key-e)'s sibling on the other axis; after CIS + Image-Melding). The frame is cut into patches, and each is replaced by the **corpus tile** (from the sidechain layer) whose colour + structure match best : tiles flip/rotate and **re-tint** to fit, matches **hold** across frames so it doesn't boil. Cell **shape** goes grid → **brick** → **voronoi** (organic polygons of varying size) → **warp** (a noise-bent grid), with an **irregular** amount and a **drift** that slowly evolves the shapes; **melt** softens the seams. |
 | **Réponse** | Temporal convolution : the layer's last 16 frames summed through a shaped attack/decay envelope (reversible): a convolution-reverb for image. |
 | **Feedback** | A full video-feedback engine (LZX-Memory-Palace-class) : the last frame re-sampled through a drifting off-centre transform + self-displacement, held at the edge of chaos by AGC + a noise floor. **Couple** runs a second buffer under a diverged transform and cross-mixes it (emergent behaviour no single loop shows); a delay-tap ring with **RGB delay** (channels sheared in time) and an echo **route** (back into the loop, or feedforward onto the output only); blend modes. A **keyer** gates what re-enters : on **luma** (key black / white) or **chroma** (key desaturated / colourful), so only the keyed region trails; a **placement** switch puts the spatial process on the recirculating buffer (*feedback* : a wandering tunnel) or on the incoming live image (*painting* : the source smeared into a still accumulator that holds its shape); and a per-repeat **hue cycle** and **sat drift** bleach the trails toward grey or intensify them toward neon as they age. |
-| **Codec Mosh** | The real datamosh, through an actual H.264 encoder and decoder (the graphics card's own, the processor's when it has none free) with the stream broken on purpose. At a cut in the layer (**mosh on cuts**), on **mosh ▸** or on the **mosh rate** clock, the new picture's keyframe is **withheld** : the new motion drags the old picture around and only the blocks the encoder repaints let the new one through, until a clean keyframe returns (**refresh** : never … a quarter second, or **clean ▸**). **Bloom** repeats each motion frame (the smear compounds), **drop** loses some (errors pile up), **motion from sidechain** paints another layer's movement onto this one (it re-seats this layer's picture first, and on mosh ▸). **Blocks** is the encoded size (fine 960 · medium 640 · coarse 416 · huge 256 px long edge : the 16-pixel macroblocks grow on screen as it shrinks) and **quality** the per-frame quantizer (starved … clean, no restart). Runs a few frames behind its input; each one holds an encoder, so keep a handful at most. 10 presets, the **Codec Rot** and **Keyframe Hunger** master chains, the **Codec Rot** Generate theme. |
+| **Codec Mosh** | The real datamosh, through an actual H.264 encoder and decoder (the graphics card's own, the processor's when it has none free) with the stream broken on purpose. At a cut in the layer (**mosh on cuts**), on **mosh ▸** or on the **mosh rate** clock, the new picture's keyframe is **withheld** : the new motion drags the old picture around and only the blocks the encoder repaints let the new one through, until a clean keyframe returns (**refresh** : never … a quarter second, or **clean ▸**). **Bloom** repeats each motion frame (the smear compounds), **drop** loses some (errors pile up), **motion from sidechain** paints another layer's movement onto this one (it re-seats this layer's picture first, and on mosh ▸). **Blocks** is the encoded size (fine 960 · medium 640 · coarse 416 · huge 256 px long edge : the 16-pixel macroblocks grow on screen as it shrinks) and **quality** the per-frame quantizer (starved … clean, no restart). Runs a few frames behind its input; each one holds an encoder, so keep a handful at most (Randomize never deals it). 10 presets, the **Codec Rot** and **Keyframe Hunger** master chains, the **Codec Rot** Generate theme. |
 | **Datamosh** | The codec-mosh look, real-time and codec-free: optical flow quantised to macroblocks advects a feedback buffer (the P-frame smear). Refresh (the I-frame) down + a scene cut = the bloom; **sticky/melt/fluid** modes; **actants** : sparse autonomous frozen patches that drift along the flow; **manifest** reveals a new source only where there's motion; auto-bloom on detected cuts; motion-transfer from a sidechain; **flow-shaping** : a **mosh gate** restricts the smear to moving or to still regions, **edge-repel** pushes the flow off the image's own contours, and **re-sharpen** claws back the mush. |
 | **Scanner** | A flatbed-scanner slit-scan : a head sweeps the frame, capturing each line at a different instant; anything moving mid-sweep smears and tears across the scanlines. |
 | **Autocutter** | A cut-up collage : the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an **auto cut** rate. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** tears the cuts like a torn-magazine collage (one piece over the other, the white core of the paper showing only along the upper piece's ragged edge, loose fibers, a soft shadow; the frame's own edges stay clean cuts), and **mask** peels pieces away into transparent holes : at full mask a single piece survives, and each new cut elects a different one. **Shape** switches between the rectangles and an irregular **Voronoi mosaic** (denser, more organic : every dial behaves the same in both). Set an **auto rate** and a **crossfade** to dissolve one cut layout into the next instead of snapping. Ships 9 presets from *Clean cut-up* to *Last piece*. |
@@ -2329,7 +2380,7 @@ none is picked, so all five run in any rack.
 |---|---|
 | **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
 | **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe / Arc or a modulator add blur, haze, trails or depth on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce`), and its **neutral** button puts those macros back to 0.5. |
-| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-53-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), a **gate hair**, the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand (the **gate hair** only by hand : no World or Generate theme puts it in), so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
+| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-53-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), a **gate hair**, the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand (the **gate hair** only by hand : no built-in World or Generate theme puts it in), so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
 
 In the **Finishing** view (key `F`) each stage is split into labeled sections : Vibe
 Palette (palette · color chord · tone · split-tone), Context (softness · distance ·
@@ -2392,6 +2443,14 @@ in the middle, your shaders and every built-in one on the left, a live preview o
 right. They are ISF, the format every generator and effect in Palinopsia is written in :
 a JSON header between `/*` and `*/` declares the controls, the GLSL below draws the
 picture (an image input named `inputImage` makes it an effect).
+
+![The Source Editor](docs/images/interface-source-editor.jpg)
+
+*The Source Editor : your shaders and every built-in one to copy on the left, the code
+in the middle (here the feedback template, a trail that keeps the last frame), and on
+the right the live preview, "compiled in 9 ms" and the controls its header declares,
+playing it there. Save, **use** (on the selected slot) and **new from…** sit along the
+top.*
 
 - **Start from something.** `new from…` gives a generator, an effect, or a feedback
   template (a persistent buffer that keeps the last frame); any built-in generator or
@@ -2528,7 +2587,7 @@ another protocol and is not shown.
 
 **Video transport** : `/opsia/layer{n}/video[/{A|B}]/…`. Without an explicit
 slot, the message lands on the layer's first video slot (A, then B). Ignored
-unless the slot actually holds a video.
+unless the slot actually holds a video or a sound file (Import audio).
 
 | Address | Type | Meaning |
 |---|---|---|
@@ -2540,6 +2599,8 @@ unless the slot actually holds a video.
 | `…/video/grainsize` | f | Grain length (0..1 → 0.05..1 s) |
 | `…/video/grainspray` · `…/grainrev` · `…/grainjit` | f | Scatter · reverse probability · speed jitter |
 | `…/video/grainsync` | i / f / s | `free·1/16·1/8·1/4·1/2` (BPM grain clock) |
+| `…/video/volume` | f | The film's own sound (0 = silent, the default); on a sound file, its volume |
+| `…/video/ignoreglobal` | bool | Its own speed × its layer's, whatever the global speed (≥ 0.5) |
 
 **Master** : `/opsia/master/…`
 
@@ -2591,7 +2652,7 @@ unless the slot actually holds a video.
 | `/opsia/space/turn · glide` | f 0..1 | Turn the sound scene (0.5 = none) · how softly a following voice moves (0..2 s) |
 | `/opsia/space/mirror · headphones` | bool | Swap left and right · hear the room on headphones (≥ 0.5) |
 | `/opsia/space/pieces` | i / f | Collage pieces as sources of their own (an integer count, or 0..1 of 30) |
-| `/opsia/space/{voice}/az · el · width · span · spin` | f 0..1 | Where a Sonify voice sits (`spectra` `orbit` `flow` `events` `raster` `sstv` `filter` `chord` `collage` `signal`), 0..1 over each range (az 0.5 = straight ahead) |
+| `/opsia/space/{voice}/az · el · width · span · spin` | f 0..1 | Where a Sonify voice sits (`spectra` `orbit` `flow` `events` `raster` `sstv` `filter` `chord` `collage` `signal` `assemblage`), 0..1 over each range (az 0.5 = straight ahead) |
 | `/opsia/space/{voice}/follow` | bool | It follows the picture (≥ 0.5), else it stays at its fixed place |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
@@ -2625,7 +2686,8 @@ ones to a peer (e.g. Pandore's UI mirrors yours). Same `/opsia/…` addresses
 outbound value is a single float `f`** (enums/bools normalized). Streamed: every
 layer control, meta knobs, BPM (raw), the three master finalizers' float inputs,
 background controls + source inputs, all macros/temperament, world (1-based
-index), and `seq/run` : plus, while a slot holds a video, its transport
+index) and its amount, the coupling switch, the output transform, the Sonify patch and
+Space, the Audio Layer, and `seq/run` : plus, while a slot holds a video, its transport
 (`video/{A|B}/play·direction·loop·speed·in·out·grain·grain*`). **Not** streamed:
 `/opsia/audio/*`, `/opsia/seq/skip`, and `video/…/position` (the playhead flies
 at frame rate; it's advertised for discovery but never echoed).
@@ -2723,7 +2785,7 @@ Link app on the same network (Live, DJ software, phone apps), with no setup. The
 - **ENABLED / DISABLED** joins or leaves the Link session (disabled by default,
   remembered on this machine, never in a session). Beside it : how many other apps
   are linked, the session's tempo and where the bar is (a dot per beat, the first one
-  the top of the bar).
+  the top of the bar). A build without the Link module says **MISSING** there, and why.
 - **bar** : the beats per bar every app aligns its phase to (Live calls it the
   quantum; 4 unless the music is in 3 or 6…).
 - **latency** : the picture reaches the screen this late (a projector, a capture
@@ -2781,7 +2843,7 @@ A client that only runs local (stdio) servers can reach it through a bridge such
 | `get_state` | the four layers (sources, controls, mix, blend, opacity, speed, effects), the background, the master, the BPM, the World, the scenes |
 | `snapshot` | an image of the output, as the audience sees it |
 | `list_shaders` · `describe_shader` | the sources and effects, each control's range and default, a shader's ISF code |
-| `set_source` · `set_controls` · `set_layer` | a generator on a slot or the background, any unit's controls, a layer's own settings |
+| `set_source` · `set_controls` · `set_layer` | a generator on a slot or the background, any unit's controls, a layer's own settings (opacity, blend, A/B mix and mode, mute, solo, speed, feedback and trail, the A/B hue harmony from −1 to 1) or the background's |
 | `add_effect` · `edit_effect` | effects on any rack : add (with a position and values), on/off, mix, move, remove |
 | `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work |
 | `scenes` | list, recall, save, rename, delete |
@@ -2815,11 +2877,11 @@ the UI (`src/renderer/src/mcp/tools.ts`, listed in `src/shared/mcpTools.ts`).
 
 | Layer | Choice |
 |---|---|
-| Shell | Electron + electron-vite + TypeScript + React 18 + Tailwind + Zustand |
+| Shell | Electron + electron-vite + TypeScript + React 18 + Tailwind + Zustand; CodeMirror 6 for the Source Editor |
 | Engine | WebGL2 + [`interactive-shader-format`](https://github.com/msfeldstein/interactive-shader-format-js) runtime; WebGPU compute is post-MVP |
-| Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer |
-| Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE; ffmpeg for recording delivery |
-| Audio | Web Audio (local analyser + the Sonify AudioWorklet engine) + OSC audio bus |
+| Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer; the Ableton Link SDK in an N-API addon (main); a dataflou mesh node (main); an MCP server for the Agent (Streamable HTTP, 127.0.0.1 only) |
+| Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE and (H.264) for Codec Mosh; ffmpeg for recording delivery and the clips' sound analysis |
+| Audio | Web Audio (local analyser + the Sonify AudioWorklet engine, which also plays the Audio Layer) + OSC audio bus |
 | Output | Fullscreen HDMI · Spout (DX11) / Syphon (Metal) · NDI (built in) · HIVE (HEVC/TCP + mDNS) · DXV3 real-time recording : every consumer reads the clean picture through its own GPU conversion + asynchronous readback ring (`engine/frameCapture.ts`), none stalls the render loop |
 
 ## Architecture
@@ -2829,7 +2891,11 @@ src/
   main/       Electron main : OSC in/out, OSCQuery, output window, HIVE in/out,
               video ingest (ffmpeg → all-intra cache), Assemble corpus analysis
               + edit export, the NDI runtime (find / install), Installation mode
-              (start with the computer, self-healing, the log file)
+              (start with the computer, self-healing, the log file), the clips'
+              sound analysis (audioAnalysis.ts), session media checks, relink and
+              collect (mediaRefs.ts), your shaders folder (userShaders.ts), Ableton
+              Link (link.ts), the dataflou node (dataflou/) and the Agent's MCP
+              server (mcp.ts)
   preload/    contextBridge API surface (window.api), plus the Spout / Syphon / NDI
               senders, the NDI receiver and the DXV3 file writer (in the window's
               own process : a 4K frame costs 30–90 ms to move to another one)
@@ -2840,19 +2906,26 @@ src/
               native generators (nativeGenerators.ts : Lattice, Reaction, Fluid,
               Slime Mold, Mycelium, Veins, Grown, each its own GL engine, handed
               the audio texture and its sidechain layer through an optional
-              feed()), native nodes (convNodes), strobe limiter, output shaper,
+              feed()), native nodes (convNodes; Codec Mosh in codecMosh.ts), the
+              A/B harmony (abHarmony.ts), modulation shaping (modShape.ts), the
+              World amount (worldAmount.ts), the clip player and the clip-sound
+              reader (clipPlayer.ts, clipAudio.ts), strobe limiter, output shaper,
               the output transform (outXform.ts), PBR, the fulldome stage
               (dome.ts), the capture rings that feed
               every output (frameCapture.ts) and the small readback rings that
               turn the picture back into control data : vision, Sonify taps,
               depth, light zones, the mark scanline (gridReadback.ts)
-    shaders/  ISF .fs files + registry (curated ranges) + presets
+    shaders/  ISF .fs files + registry (curated ranges) + presets, your own
+              shaders (userShaders.ts) and the compile + lint check the Source
+              Editor and the Agent share (shaderCheck.ts)
     audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice,
-              and Space (space.ts : the voices placed on speakers or sent as
-              objects; the panning in shared/spatial.ts)
+              the Audio Layer (audioLayer.ts), and Space (space.ts : the voices
+              placed on speakers or sent as objects; the panning in shared/spatial.ts)
     assemble/ the corpus matcher : descriptor costs, live matching, PCA map
+    mcp/      the Agent's tools, run through the same store actions as the UI
   shared/     types shared across processes (incl. the descriptor definitions,
               so corpus and live image are measured with one ruler)
+native/link/  N-API Ableton Link addon (the Link SDK and asio, compiled in)
 native/spout/ N-API DX11 Spout sender addon (vendored Spout2 SDK)
 native/syphon/ macOS Syphon (Metal) server addon, built from the Syphon source in CI
 native/avcapture/ macOS USB input addon (AVFoundation) : an iPhone by USB and the other

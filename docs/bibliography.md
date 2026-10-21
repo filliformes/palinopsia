@@ -86,6 +86,18 @@ Bridson, R., Hourihan, J., & Nordenstam, M. (2007). Curl-noise for procedural fl
 
 ↳ The divergence-free velocity field that advects the Organic generator (fire, water, nature) and the curl-noise base field of the Sillage node.
 
+Fedkiw, R., Stam, J., & Jensen, H. W. (2001). Visual simulation of smoke. In *Proceedings of the 28th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '01)* (pp. 15–22). ACM. https://doi.org/10.1145/383259.383260
+
+↳ The vorticity confinement that keeps the Fluid generator's eddies spinning (`engine/FluidSource.ts`).
+
+Harris, M. J. (2004). Fast fluid dynamics simulation on the GPU. In R. Fernando (Ed.), *GPU gems: Programming techniques, tips, and tricks for real-time graphics* (pp. 637–665). Addison-Wesley. https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu
+
+↳ The GPU layout of the Fluid generator's solver (advection, Jacobi pressure, projection as fragment passes).
+
+Stam, J. (1999). Stable fluids. In *Proceedings of the 26th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '99)* (pp. 121–128). ACM Press/Addison-Wesley. https://doi.org/10.1145/311535.311548
+
+↳ The Fluid generator (`engine/FluidSource.ts`): ink, smoke and fire solved live with semi-Lagrangian advection and a pressure projection.
+
 Tessendorf, J. (2001). *Simulating ocean water* [Course notes]. ACM SIGGRAPH. https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2002.pdf
 
 ↳ The deep-water dispersion law (ω = √(gk)) that sets the speed of every wave train in Swell and in the Organic water.
@@ -110,9 +122,17 @@ Turing, A. M. (1952). The chemical basis of morphogenesis. *Philosophical Transa
 
 ## 5. Natural materials and growth
 
+Boswell, G. P., Jacobs, H., Davidson, F. A., Gadd, G. M., & Ritz, K. (2003). Growth and function of fungal mycelia in heterogeneous environments. *Bulletin of Mathematical Biology, 65*(3), 447–477. https://doi.org/10.1016/S0092-8240(03)00003-X
+
+↳ The Mycelium generator (`engine/MyceliumSource.ts`): tips that eat the ground they cross, so the colony stalls where the soil is spent.
+
 Cetegen, B. M., & Ahmed, T. A. (1993). Experiments on the periodic instability of buoyant plumes and pool fires. *Combustion and Flame, 93*(1–2), 157–184. https://doi.org/10.1016/0010-2180(93)90090-P
 
 ↳ The puffing of the Organic fire: flame height pulses at a few hertz, slower for bigger flames.
+
+Edelstein, L. (1982). The propagation of fungal colonies: A model for tissue growth. *Journal of Theoretical Biology, 98*(4), 679–701. https://doi.org/10.1016/0022-5193(82)90146-1
+
+↳ The hyphal-tip model of the Mycelium generator: tips that run, branch and fuse into a network.
 
 Goehring, L., Conroy, R., Akhter, A., Clegg, W. J., & Routh, A. F. (2010). Evolution of mud-crack patterns during repeated drying cycles. *Soft Matter, 6*(15), 3562–3567. https://doi.org/10.1039/b922206e
 
@@ -122,6 +142,10 @@ Helland, T. (2012, September 18). *How to convert temperature (K) to RGB: Algori
 
 ↳ `og_blackbody`, the blackbody colour of the Organic fire.
 
+Jones, J. (2010). Characteristics of pattern formation and evolution in approximations of *Physarum* transport networks. *Artificial Life, 16*(2), 127–153. https://doi.org/10.1162/artl.2010.16.2.16202
+
+↳ The Slime Mold generator (`engine/PhysarumSource.ts`): agents that sense the trail ahead-left, ahead and ahead-right, turn, step and deposit.
+
 Kardar, M., Parisi, G., & Zhang, Y.-C. (1986). Dynamic scaling of growing interfaces. *Physical Review Letters, 56*(9), 889–892. https://doi.org/10.1103/PhysRevLett.56.889
 
 ↳ The roughness of Colony's growth fronts (lichen, mould, rust, burning paper).
@@ -129,6 +153,14 @@ Kardar, M., Parisi, G., & Zhang, Y.-C. (1986). Dynamic scaling of growing interf
 Maunuksela, J., Myllys, M., Kähkönen, O.-P., Timonen, J., Provatas, N., Alava, M. J., & Ala-Nissila, T. (1997). Kinetic roughening in slow combustion of paper. *Physical Review Letters, 79*(8), 1515–1518. https://doi.org/10.1103/PhysRevLett.79.1515
 
 ↳ The measured front statistics that make Colony's burning paper advance like the real thing.
+
+Runions, A., Fuhrer, M., Lane, B., Federl, P., Rolland-Lagan, A.-G., & Prusinkiewicz, P. (2005). Modeling and visualization of leaf venation patterns. *ACM Transactions on Graphics, 24*(3), 702–711. https://doi.org/10.1145/1073204.1073251
+
+↳ The Veins generator's leaves (`engine/VeinsSource.ts`): space colonization from a growing margin, open and closed venation, vein widths after the pipe model.
+
+Runions, A., Lane, B., & Prusinkiewicz, P. (2007). Modeling trees with a space colonization algorithm. In *Eurographics Workshop on Natural Phenomena* (pp. 63–70). The Eurographics Association. https://doi.org/10.2312/NPH/NPH07/063-070
+
+↳ The Veins generator's roots, grown from their collars through the soil by the same algorithm.
 
 ## 6. Film, video and display artifacts
 
@@ -396,9 +428,21 @@ Bjorklund, E. (2003). *The theory of rep-rate pattern generation in the SNS timi
 
 ↳ The even pulse distribution of the Euclid modulator (`engine/modulation.ts`).
 
+Camurri, A., Mazzarino, B., & Volpe, G. (2004). Analysis of expressive gesture: The EyesWeb expressive gesture processing library. In A. Camurri & G. Volpe (Eds.), *Gesture-based communication in human-computer interaction* (Lecture Notes in Computer Science, Vol. 2915, pp. 460–467). Springer. https://doi.org/10.1007/978-3-540-24598-8_42
+
+↳ The movement qualities of the Body page (`engine/effort.ts`): energy, expansion, fluidity and their siblings as computable gesture descriptors.
+
+Casiez, G., Roussel, N., & Vogel, D. (2012). 1 € filter: A simple speed-based low-pass filter for noisy input in interactive systems. In *Proceedings of the SIGCHI Conference on Human Factors in Computing Systems (CHI '12)* (pp. 2527–2530). ACM. https://doi.org/10.1145/2207676.2208639
+
+↳ The speed-dependent smoothing of every pose landmark before the movement qualities take their derivatives (`engine/effort.ts`).
+
 Castro, D. (2025). The Shadow Harvester: Sonifying the body through light. In D. Cavdir & F. Berthaut (Eds.), *Proceedings of the International Conference on New Interfaces for Musical Expression* (pp. 312–318). https://doi.org/10.5281/zenodo.15698869
 
 ↳ The silhouette zone features and cover gestures of the Body page.
+
+Larboulette, C., & Gibet, S. (2015). A review of computable expressive descriptors of human motion. In *Proceedings of the 2nd International Workshop on Movement and Computing (MOCO '15)* (pp. 21–28). ACM. https://doi.org/10.1145/2790994.2790998
+
+↳ The movement qualities' formulas (`engine/effort.ts`): kinetic energy, suddenness as aggregated acceleration, directness as net displacement over path length, the contraction index behind expansion.
 
 May, R. M. (1976). Simple mathematical models with very complicated dynamics. *Nature, 261*(5560), 459–467. https://doi.org/10.1038/261459a0
 
@@ -540,6 +584,14 @@ Fong, C. (2015). *Analytical methods for squaring the disc* (arXiv:1509.06344). 
 
 ## 16. Standards, protocols and open-source software
 
+Ableton. (n.d.). *Link* (Version 4.1.1) [Computer software, GPL-2.0-or-later]. GitHub. https://github.com/Ableton/link
+
+↳ Ableton Link, compiled into the app (`native/link`, `src/main/link.ts`): the tempo and the bar shared with every Link app on the network.
+
+*CodeMirror* (Version 6) [Computer software, MIT License]. (n.d.). https://codemirror.net
+
+↳ The code editor of the Source Editor (`components/SourceEditor.tsx`).
+
 Feldstein, M. (n.d.). *interactive-shader-format-js* [Computer software, ISC License]. GitHub. https://github.com/msfeldstein/interactive-shader-format-js
 
 ↳ The ISF runtime (npm `interactive-shader-format`) that renders every ISF generator and FX.
@@ -552,6 +604,10 @@ International Telecommunication Union. (1992). *Information technology: Digital 
 
 ↳ The 8×8 block, per-block quantisation and chroma-subsampling model of the Compress FX.
 
+International Telecommunication Union. (2003). *Advanced video coding for generic audiovisual services* (ITU-T Recommendation H.264). https://www.itu.int/rec/T-REC-H.264
+
+↳ The codec the Codec Mosh node breaks on purpose (baseline profile): keyframes withheld, motion frames repeated or dropped (`engine/codecMosh.ts`).
+
 International Telecommunication Union. (2011). *Studio encoding parameters of digital television for standard 4:3 and wide screen 16:9 aspect ratios* (ITU-R Recommendation BT.601-7). https://www.itu.int/rec/R-REC-BT.601
 
 ↳ The luma weights (0.299, 0.587, 0.114) used by the native nodes.
@@ -562,11 +618,19 @@ International Telecommunication Union. (2015). *Parameter values for the HDTV st
 
 *ISF: Interactive Shader Format specification* (Version 2.0). (n.d.). GitHub. https://github.com/mrRay/ISF_Spec
 
-↳ The shader format of the whole engine (JSON header plus GLSL, inputs, passes, persistent buffers).
+↳ The shader format of the whole engine (JSON header plus GLSL, inputs, passes, persistent buffers), and of the shaders you write in the Source Editor.
+
+*Model Context Protocol specification* (Version 2025-11-25). (2025). https://modelcontextprotocol.io/specification/2025-11-25
+
+↳ The Agent (MCP) server (`src/main/mcp.ts`): Streamable HTTP in its plain JSON form, versions 2025-11-25 back to 2024-11-05.
 
 *OSCQuery proposal* [Draft protocol specification]. (n.d.). GitHub. https://github.com/Vidvox/OSCQueryProposal
 
 ↳ The OSCQuery server that advertises the address space to any client.
+
+World Wide Web Consortium. (n.d.). *WebCodecs* [W3C Working Draft]. https://www.w3.org/TR/webcodecs/
+
+↳ The H.264 encoder (the graphics card's when it can) and decoder the Codec Mosh node runs the layer through, and the HEVC decode of HIVE streams.
 
 Wright, M., & Freed, A. (1997). Open SoundControl: A new protocol for communicating with sound synthesizers. In *Proceedings of the 1997 International Computer Music Conference* (pp. 101–104). International Computer Music Association. https://opensoundcontrol.stanford.edu/files/1997-ICMC-OSC.pdf
 
@@ -582,4 +646,5 @@ Entries above whose details could not all be confirmed against a primary source:
 - Yeo and Berger (2006): the page range in the ICMC 2006 proceedings is not confirmed.
 - Verplank, Mathews and Shaw (2000): pages 368–371 come from secondary citations; no stable URL for the paper was found.
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
+- Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).

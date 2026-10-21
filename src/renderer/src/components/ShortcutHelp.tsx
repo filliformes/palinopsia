@@ -7,12 +7,13 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
   {
     title: 'Full-page views',
     rows: [
-      ['O', 'Output / mapping'],
+      ['O', 'Output / mapping (in its own window : brings it up)'],
       ['W', 'World editor'],
       ['Q', 'Sequence (macro-form)'],
       ['S', 'Sonify (image → sound)'],
       ['B', 'Body (embodied control)'],
-      ['K', 'Resolume OSC mapper']
+      ['K', 'Resolume OSC mapper'],
+      ['Alt+E', 'Source Editor : write a shader, or a copy of any one, as your own (again : close it)']
     ]
   },
   {
@@ -21,9 +22,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['M', 'Mixer ↔ Layers'],
       ['F', 'Finishing'],
       ['G', 'Feel (global macros)'],
-      ['E', 'Assemble tab'],
-      ['Alt+E', 'Source Editor : write a shader, or a copy of any one, as your own'],
-      ['A', 'Connect tab : audio · MIDI · OSC · Resolume · dataflou · Ableton Link'],
+      ['E', 'Assemble tab (again : back to the layers)'],
+      ['A', 'Connect tab : audio · MIDI · OSC · Resolume · dataflou · Ableton Link · Agent (again : back to the layers)'],
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
@@ -45,27 +45,59 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['R', 'Randomize (Transport’s current mode)'],
       ['H', 'Freeze / hold the output'],
       ['L', 'MIDI Learn on/off'],
-      ['Esc', 'Close top overlay · exit MIDI Learn'],
-      ['Esc on the output', 'Close a fullscreen output over the controls, else back to them (an installation : hold 1.5 s)']
-    ]
-  },
-  {
-    title: 'In Sonify',
-    rows: [
-      ['⇧ drag a slider', 'Finer : a tenth of the speed'],
-      ['Click a value', "Type it (the Collage's levels and filters, the Ring cutoff, the Prism crossover : 4250, 4.2k, -6)"],
-      ['Drag an EQ point', 'Frequency across, gain up and down · wheel over it : Q · double-click : band on / off · Delete : band off · Esc : close'],
-      ['Drag a Space number', 'Up / down to change it · drag a voice on the Room map to place it']
+      ['Esc', 'Close this sheet, then the top page (the Source Editor first) · exit MIDI Learn'],
+      ['Esc on the output', 'Close a fullscreen output over the controls, else back to them (an installation : hold Esc or O 1.5 s)'],
+      ['Ctrl ⇧O', 'Leave an installation, from any window']
     ]
   },
   {
     title: 'Session & zoom',
     rows: [
-      ['Ctrl S', 'Save session (the shader, in the Source Editor)'],
+      ['?', 'This sheet (again : close it)'],
+      ['Ctrl S', 'Save session'],
       ['Ctrl F', 'Fulldome output on / off'],
       ['Ctrl Z', 'Undo  ·  Ctrl ⇧Z / Ctrl Y redo'],
       ['Ctrl + / −', 'Zoom UI  ·  Ctrl 0 resets'],
       ['Ctrl wheel', 'Zoom UI']
+    ]
+  },
+  {
+    title: 'In the Source Editor',
+    rows: [
+      ['Ctrl S', 'Save the shader (one that plays changes live)'],
+      ['Esc', 'Close it (outside the code)'],
+      ['Ctrl F', 'Find and replace in the code'],
+      ['Ctrl Z', 'Undo in the code  ·  Ctrl ⇧Z redo'],
+      ['Ctrl /', 'Comment the line on / off'],
+      ['Tab', 'Indent  ·  ⇧Tab unindent'],
+      ['Alt ↑ / ↓', 'Move the line']
+    ]
+  },
+  {
+    title: 'In the World editor',
+    rows: [
+      ['↑ ↓ ← →', 'Step through the Worlds'],
+      ['Enter', 'Apply the selected World (double-click one too)']
+    ]
+  },
+  {
+    title: 'Mouse',
+    rows: [
+      ['Double-click', 'A slider, fader or knob : back to its default'],
+      ['Right-click a control', 'Persistent · Set in every scene (a layer : right-click the layer)'],
+      ['Right-click an M', 'Clear all the modulation on that control'],
+      ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],
+      ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
+      ['Right-click Output', 'Output in a window · the Output page in a window']
+    ]
+  },
+  {
+    title: 'In Sonify & the audio tab',
+    rows: [
+      ['⇧ drag a slider', 'Finer : a tenth of the speed'],
+      ['Click a value', "Type it (the Collage's levels and filters, the Ring cutoff, the Prism crossover : 4250, 4.2k, -6)"],
+      ['Drag a Space number', 'Up / down to change it (⇧ : finer) · drag a voice on the Room map to place it'],
+      ['Drag an EQ point', 'The output EQ (audio tab) : frequency across, gain up and down · wheel over it : Q · double-click : band on / off, or a new bell · Delete : band off · Esc : close']
     ]
   }
 ]
@@ -108,7 +140,7 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }): JSX.Element 
           ))}
         </div>
         <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted">
-          Bare letters are ignored while a text field is focused. Most of these are also MIDI-learnable : press{' '}
+          Bare letters are ignored while a text field is focused, and under the Source Editor (its keys are its own). In the Output page's own window they still play the instrument. Most of these are also MIDI-learnable : press{' '}
           <kbd className="rounded border border-border bg-panel2 px-1 font-mono text-[10px]">L</kbd>.
         </p>
       </div>
