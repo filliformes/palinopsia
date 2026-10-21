@@ -255,8 +255,10 @@ down : the Background strip first, then Layer 1 to Layer 4, then the
 
 Each layer's strip reads top to bottom in the order the picture goes through it,
 in four numbered stages : **1 Sources** (A and B side by side, each with its
-picker and its own effects), two lines running down from them into **2 Mix**
-(where A and B meet), **3 Layer FX** (the effects on the mixed picture), and
+picker and "+ fx" on one line, its effects under them, led by a **power** button
+that turns that source's whole chain off, or all back on), two lines running down
+from them into **2 Mix** (where A and B meet : the slider, the mix in **percent**
+in a box you can type in, the mode), **3 Layer FX** (the effects on the mixed picture), and
 **4 Out** (how the layer lands on the layers below : three tabs, **blend**,
 **mask** and **feedback**, each showing where it stands; one opens its controls
 at a time). **Speed** and **Vary**, which act on the whole layer, stay in view under

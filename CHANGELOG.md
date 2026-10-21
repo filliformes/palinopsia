@@ -16,6 +16,10 @@ that CI builds into cross-platform releases.
   its state, one drawer open : the shape mask's place on an X/Y pad, the feedback on/off
   beside its trail). FB left the header (it is the feedback tab). Speed and Vary under a
   line, always visible; their readouts rounded. `Stage` / `StageArrow` / `XYPad` helpers.
+  Then (Vincent) : a card's picker and "+ fx" share one line (the picker's menu keeps its
+  own width); a source's effects are led by a **power** button (`ChainSwitch`, store
+  `toggleRackChain(scope)` : all off when every unit is on, else all on; half lit when
+  some are off); the mix has an editable percent box beside its slider (one decimal).
 - **The Mixer takes the A/B harmony and the coupling** (`MixerPanel.tsx` rewritten, Vincent
   picked it from mockups) : each column top to bottom A·B (mode, an A–B crossfader with
   the mode's word and value and a white line where the coupling puts the mix, painted

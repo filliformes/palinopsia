@@ -328,7 +328,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             hint={
               hasB ? (
                 <span className={mixBound ? 'text-accent2' : 'text-muted'} title={mixTitle(layer.sourceBlend)}>
-                  how A and B meet · <span className="tabular-nums">{mixWord(layer.sourceBlend)} {layer.sourceMix.toFixed(2)}</span>
+                  how A and B meet · {mixWord(layer.sourceBlend)}
                 </span>
               ) : (
                 'no B : pick one above'
@@ -353,6 +353,18 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 />
               </span>
               <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
+              {/* the mix in percent, typed or read */}
+              <span className="flex shrink-0 items-center gap-0.5" title={mixTitle(layer.sourceBlend)}>
+                <BoundedNumberInput
+                  value={Math.round(layer.sourceMix * 1000) / 10}
+                  min={0}
+                  max={100}
+                  maxFrac={1}
+                  onChange={(v) => setSourceMix(index, v / 100)}
+                  className={`input w-[2.9rem] !px-1 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
+                />
+                <span className="font-mono text-[9px] text-muted">%</span>
+              </span>
               {/* as wide as its longest mode (no fixed width : a select sizes
                   to its widest option), so "lightercolor" is never cut */}
               <select
@@ -687,6 +699,42 @@ function MaskControls({ index, mask }: { index: number; mask: LayerMask }): JSX.
 
 type OutTab = 'blend' | 'mask' | 'feedback'
 
+// A power glyph (the chain's on/off).
+function PowerIcon({ size = 10 }: { size?: number }): JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" aria-hidden="true">
+      <path d="M3.4 3.2a4.2 4.2 0 1 0 5.2 0" />
+      <path d="M6 1.2v4.3" />
+    </svg>
+  )
+}
+
+// One source's whole effect chain on or off : lit while every unit is on, half
+// lit while some are off; a click turns them all off, or all back on.
+function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['scope']; fx: Parameters<typeof FxChips>[0]['fx'] }): JSX.Element {
+  const toggleRackChain = useStore((s) => s.toggleRackChain)
+  const on = fx.filter((f) => f.enabled).length
+  const all = on === fx.length
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation()
+        toggleRackChain(scope)
+      }}
+      className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded transition-colors ${
+        all
+          ? 'bg-accent/20 text-accent ring-1 ring-accent/60'
+          : on > 0
+            ? 'bg-accent/10 text-accent/70 ring-1 ring-accent/30'
+            : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={all ? 'This chain is on : click to turn all its effects off' : on > 0 ? `${on} of ${fx.length} effects on : click to turn them all on` : 'This chain is off : click to turn all its effects on'}
+    >
+      <PowerIcon />
+    </button>
+  )
+}
+
 // One stage of the layer : a numbered box (the order the picture goes through
 // the layer), its title and what it does, then its controls.
 function Stage({ n, title, hint, dim = false, children }: { n: number; title: string; hint: ReactNode; dim?: boolean; children: ReactNode }): JSX.Element {
@@ -912,7 +960,8 @@ function SourceRow({
         }}
         title={`Source ${label} : drop a film, a sound file or a folder here`}
       >
-        {/* (a card : the label and picker on one line, its effects under them) */}
+        {/* (a card : the label, the picker and "+ fx" on one line, the
+            effects under them, led by the chain's on/off) */}
         <div className={card ? 'flex min-w-0 items-center gap-1' : 'contents'}>
         {/* A real button (it selects this source : its controls go to the
             Inspector); the click bubbles to the row's onSelect. */}
@@ -1009,13 +1058,19 @@ function SourceRow({
             else if (v !== '__video__' && v !== '__assemble__' && v !== '__audio__') onPick(v || null)
           }}
         />
+        {card && (
+          <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <FxAddSelect scope={scope} className="w-[3.4rem] shrink-0" />
+          </span>
+        )}
         </div>
-        {/* +fx always present : the layout never shifts when sources load.
-            In a card it leads the source's effects, which wrap after it. */}
+        {/* +fx always present : the layout never shifts when sources load. */}
         {card ? (
-          <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
-            <FxChips scope={scope} fx={fx} leading={<FxAddSelect scope={scope} className="w-[4.5rem] shrink-0" />} />
-          </div>
+          fx.length > 0 && (
+            <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+              <FxChips scope={scope} fx={fx} leading={<ChainSwitch scope={scope} fx={fx} />} />
+            </div>
+          )
         ) : (
           <span onClick={(e) => e.stopPropagation()}>
             <FxAddSelect scope={scope} className="w-[8.5rem] shrink-0" />

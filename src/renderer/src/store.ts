@@ -1418,6 +1418,9 @@ interface StoreState {
   toggleFx: (scope: FxScope, instId: string) => void
   // On/Off for the whole master chain : all non-locked master FX at once.
   toggleMasterChain: () => void
+  /** On/Off for one rack's whole chain (a source's effects) : all off if every
+   *  unit is on, else all on. Locked units are left alone. */
+  toggleRackChain: (scope: FxScope) => void
   setFxOpacity: (scope: FxScope, instId: string, v: number) => void
   moveFx: (scope: FxScope, instId: string, dir: -1 | 1) => void
   // Drag-and-drop reorder: place instId before beforeId (null = end of chain).
@@ -3216,6 +3219,14 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: updateFxArray(s.composition, scope, (fx) =>
         fx.map((f) => (f.id === instId ? { ...f, enabled: !f.enabled } : f))
       )
+    })),
+  toggleRackChain: (scope) =>
+    set((s) => ({
+      composition: updateFxArray(s.composition, scope, (fx) => {
+        const regular = fx.filter((f) => !f.locked)
+        const target = !(regular.length > 0 && regular.every((f) => f.enabled))
+        return fx.map((f) => (f.locked ? f : { ...f, enabled: target }))
+      })
     })),
   toggleMasterChain: () =>
     set((s) => {
