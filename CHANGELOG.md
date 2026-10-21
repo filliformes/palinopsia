@@ -16,7 +16,9 @@ that CI builds into cross-platform releases.
   trail stays in its row while feedback is off, dimmed; Speed and Vary share a line.
   Measured at the default column width, old strip → rail : A only 301 → 202 px, a
   typical layer 351 → 254, luma mask + feedback 471 → 322, shape mask + feedback + 5
-  effects 537 → 368 (the boxed stages had been 421 / 447 / 507 / 527).
+  effects 537 → 368 (the boxed stages had been 421 / 447 / 507 / 527). Then : the % box
+  as wide as "100", the speed and vary boxes as wide as "16.15" (measured : no clipping),
+  the layer's "+ fx" the size of the sources', a thin line between A and B.
 - **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
   three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
   Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,

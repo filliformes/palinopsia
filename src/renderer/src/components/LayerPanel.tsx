@@ -300,6 +300,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
                   onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
                 />
+                {/* a thin line between A and B */}
+                <span className="w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
                 <SourceRow
                   card
                   label="B"
@@ -352,7 +354,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       max={100}
                       maxFrac={1}
                       onChange={(v) => setSourceMix(index, v / 100)}
-                      className={`input w-[2.9rem] !px-1 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
+                      className={`input w-[1.75rem] !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
                     />
                     <span className="font-mono text-[9px] text-muted">%</span>
                   </span>
@@ -394,7 +396,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   fx={layer.fx}
                   leading={
                     <>
-                      <FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />
+                      <FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[3.4rem] shrink-0" />
                       {/* the whole chain off, or all back on (as on each source) */}
                       {layer.fx.length > 0 && <ChainSwitch scope={{ kind: 'layer', layer: index }} fx={layer.fx} />}
                     </>
@@ -508,13 +510,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="Layer time : scales every source and FX clock on this layer (1 = realtime) : double-click resets"
             />
-            <div className="w-10 shrink-0">
+            <div className="w-[2.2rem] shrink-0">
               <BoundedNumberInput
                 value={Math.round(layer.speed * 100) / 100}
                 min={0}
                 max={20}
                 onChange={(v) => setLayerSpeed(index, v)}
-                className="input w-full !px-1 !py-0.5 text-right !text-[10px]"
+                className="input w-full !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
               />
             </div>
             {/* VARY : the global Vary, aimed at this layer alone; a modulation
@@ -539,13 +541,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="How far one Vary moves this layer : double-click resets"
             />
-            <div className="w-10 shrink-0">
+            <div className="w-[2.2rem] shrink-0">
               <BoundedNumberInput
                 value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
                 min={0}
                 max={1}
                 onChange={(v) => setLayerVary(index, v)}
-                className="input w-full !px-1 !py-0.5 text-right !text-[10px]"
+                className="input w-full !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
               />
             </div>
           </div>
