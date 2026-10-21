@@ -7,6 +7,162 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Grain on the dome is film grain again** (`shaders/isf/lib/finalGrain.glsl`,
+  `engine/dome.ts`, `domeSignal.ts`, `isfTextureBridge.ts`) : the Finalizer's film and
+  digital grain moved into one shared include (pasted at `// @grain`, the same maths, so
+  flat output is unchanged). While the Fulldome output is on (any mapping) the Finalizer
+  skips it and the dome stage draws it after the mapping, in the master's own pixels
+  (its size counts pixels of a 4096 master : the default 1.5 is 1 to 2 master pixels),
+  only where the picture is, following the Finalizer's opacity and dry/wet. It came out
+  2-4x blown up and oblong. CRT and VHS noise stay in the frame : their rows are the
+  picture's own scan lines, so they bend and turn with it, like their parasites. Dither
+  (a master-rack effect) is unchanged.
+- **The dome reads the picture through mipmaps** (`engine/dome.ts`) : each frame the
+  flat frame is copied into an 8-bit mipmapped texture (anisotropic filtering where the
+  card has it), and every dome read uses that pixel's own footprint, so where the
+  mapping squeezes the frame (the full dome's four corner pinches, the panorama's
+  zenith, many turns) fine patterns average out instead of shimmering into moiré;
+  magnified areas are as sharp as before. About 22 MB of video memory at a 2048²
+  composition.
+- **Rotations turn the dome, not the frame** (full dome, fill; `shaders/isf/lib/dome.glsl`,
+  pasted at a `// @dome` line by one loop in `shaders/isf/index.ts`, and used by the
+  Feedback node in `convNodes.ts`) : Transform's rotate turns around the zenith (its
+  zoom and position stay flat); Feedback Zoom's twist and zoom and the Feedback node's
+  rotate and zoom work on the disc around their wandering centre, so no frame corner
+  swings into view and echoes nest as circles (edge black : rings within rings). Wrap,
+  screen, cover and contain behave as before.
+- **Things fall down the dome's walls** (full dome, fill, automatic, no new control; the
+  same include) : down points out to the rim all around, up to the zenith, sideways
+  around the dome, and at the front everything reads as it does flat. Ash falls outward
+  on spokes thinning toward the zenith, Optical Rain on spokes that halve in number
+  toward it, Erosion washes outward; Streak (angle 0 : a spin blur round the dome),
+  Light Trails and Murmuration's wind turn with each point's place; Sync Loss rolls
+  outward and its tears twist rings; Tracking's band is a ring creeping up the walls
+  (its flat "up" kept). Flat output is unchanged.
+- **Flash safety is tighter on the dome** (`store.ts setDome`, `OutputPage.tsx`) : left
+  at mild (0.35, its default) when the dome turns on, it goes to strong (0.7), and mild
+  comes back when the dome goes off (`strobeSafeDomeBack`, never saved); a level set by
+  hand (any other, or one picked while the dome is on) stays. One line in the section's
+  help says so. Verified in a test copy : every touched shader compiles with no console
+  errors, the dome at 4096² holds 60 fps with grain on, Flash safety goes 0.35 → 0.7 →
+  0.35 with the dome and a hand-set 0.5 is kept.
+
+- **Search everything (Ctrl+K / Cmd+K)** (`searchIndex.ts`,
+  `components/SearchEverything.tsx`) : a palette over the app finds sources, effects
+  (yours too), presets (each shader's, yours, layer / Mixer / Background), master chains,
+  Generate themes, every parameter of what is loaded (every input of every loaded source
+  and effect, each effect's dry/wet, the layer and Mixer controls, the Background's
+  three, the 16 Meta knobs), the full pages and right-column tabs, and commands
+  (Randomize, Vary, randomize the selected unit, Panic flush, Freeze, Record, MIDI Learn,
+  Fulldome, New / Open session, Undo / Redo), read from the registries and the
+  composition each time it opens (new effects appear by themselves). Results come under
+  headings by kind, each row with a hint of what the pick does or where it lands; a row
+  that can't apply is greyed and says why. Matching is SearchSelect's own score (now
+  exported, `searchScore`), so the `keywords.ts` tags work, several words narrow
+  (`mosh l2`), and whole kinds rank (`reverb` lists the reverb effects before presets
+  named so). Keys : ↑ ↓, PgUp / PgDn, Tab / ⇧Tab (the next kind), Enter, Esc; Ctrl+K
+  again or a click outside closes; letters typed in the field never fire shortcuts, and
+  bare K stays the Resolume mapper. Where a pick lands follows the selection : a source
+  in the selected slot (the Background, if the source can be a ground; an effect
+  selected : its own slot, a layer-rack effect's : that layer's first empty slot, else A;
+  nothing : the first empty layer, else L1 A); an effect in the selected source's,
+  effect's or Background's rack (nothing : the Master FX; where `canHostFx` refuses,
+  the layer's own rack, else the row greys); a shader's preset onto the selected unit if
+  it plays that shader, else onto one in the composition (the selection's layer first),
+  else the shader loads with it; a layer preset onto the selected layer, else L1; Mixer
+  and Background presets and master chains as from their menus, a Generate theme
+  through the Generate button's own path (`generateFromTheme`, pulled out of
+  `TopBarMenus.tsx` : it asks to save first). A parameter selects its unit in the
+  Inspector (or opens the layer strip, the Mixer or the Meta bar), unfolds the big
+  preview and closes full pages, then scrolls to the control (`data-ctl` on `PinZone`)
+  and pulses it twice. Every pick is one undo step; with the field empty, recent picks
+  come first. It opens in whichever window has the keyboard, the Output page's own window
+  included (`focusedHostDocument`). The cheat-sheet lists Ctrl+K and the keys inside the
+  search. Measured outside the app : 2,113 results on a two-layer scene, about 2 ms of
+  ranking a keystroke. Verified in a test copy : it opens, finds, picks into the
+  selected source's FX, one Ctrl+Z undoes the pick, Esc closes without acting.
+
+- **Shatter** (`shaders/isf/fx/Shatter.fs`, Time) : motion shown as texture. A still is
+  grabbed again and again (**grab rate** 0 to 8 Hz; **sync** free, 1 bar, 1/2, 1/4 or
+  1/8 of the tempo; **grab ▸**, a held button or a modulator grabbing once on its rising
+  edge) and a 1-bit **pattern** switches each pixel between it and the live picture :
+  checker, lines, columns, diagonals, bricks, dither, cells, or key (the picture's own
+  darks show the still, so a bright moving subject leaves its last grab behind). Still
+  areas look untouched, anything that moves breaks into the pattern. **scale** is in
+  1080p pixels; **density** is the exact share of pixels showing the still, and **flip**
+  (0 to 6 Hz) and **slide** keep it, so a fine pattern never shifts the average
+  brightness Flash safety measures (measured : exactly half of the changed pixels at
+  0.5, after a flip, a slide and with every pattern; key ignores flip). ISF shaders
+  could not read the tempo : `engine/tempoSignal.ts`, hooked in
+  `Compositor.syncFromState`, the integrands in `phases.ts`; like Decimate it follows
+  the tempo on the layer's clock, not the shared beat grid (1/4 at 120 BPM : 4 grabs in
+  2 s; capped at 8 a second).
+- **Crawl** (`shaders/isf/fx/Crawl.fs`, Time) : colours each place by how long ago it
+  last changed. A pixel that changes past the **threshold** is stamped with the time and
+  the stamps' age is read through a palette, so motion leaves bands of colour behind it,
+  each band the places it passed at the same moment, and **cycle** (±0.5 turns a second)
+  makes them crawl. **band** (seconds of history in one turn), **steps** (hard bands, 0 :
+  smooth), **palette** a ramp of 2 to 5 **color stops** (slate to amber to bone by
+  default, no rainbow) or **picture** (each place's own colour from near-black to pale),
+  **fade** up to 60 s back to live, **clear ▸**, **ground** live / black / clear.
+  Pixels still changing show the live picture; inserting it stamps nothing; at cycle 0
+  a stamp keeps its colour. The dice roll its colours as one ramp.
+- **Store Zoom** (`shaders/isf/fx/StoreZoom.fs`, Distortion) : the picture read through
+  the address counters of a low-resolution frame store, with no state. One **zoom** (0.5
+  to 12; below 1 it shrinks and repeats) enlarges and cuts into uneven blocks at once
+  (zoom 1.6 : runs of 2, 2, 1, 2, 1, 2, 2); **magnify** 0 keeps the picture in place and
+  only mosaics it; **stretch** makes tall or wide blocks; **pan** and **scroll** on both
+  axes wrap around the frame; **mirror** (left / right or top / bottom, one axis) folds
+  where the address runs off the end, so it moves with pan and zoom (at pan 0 and zoom
+  above 1 it is off-frame until you pan : its hint says so); **lines** (256) and **pixel
+  width** (1.5) are the store's own. It matched a JS model of the counters pixel for
+  pixel.
+- For the three : eight presets each, a **Store** group of six master chains (Store ·
+  Shatter, Catch-up, Trail Crawl, Crawl Mosaic, Uneven Zoom, Mirror Scroll; they keep
+  the scene's palette mix), three Generate themes each putting its effect on the bottom
+  layer over moving sources (**Shatter** in Glitch / Datamosh, **Trail Crawl** in
+  Feedback / Afterimage, **Store Zoom** in Retro Screen), dice ranges (the staging
+  switches sync, flip, ground, mirror and scroll in `RANDOMIZE_SKIP`), hints, keywords,
+  blurbs, Inspector column groups and grey-outs. Nothing special on the dome : Shatter
+  and Crawl work per pixel with patterns scaled to the frame height, Store Zoom zooms
+  about the frame centre. Run on the ISF runtime outside the app with test cards;
+  verified in a test copy : the three compile with no console errors.
+
+- **Field Store, a key-gated store that never fades** (`engine/fieldStore.ts`, a native
+  node behind a header-only ISF) : one low-resolution store (**store size** 64, 128, 256
+  or 512 square, 8 bits a channel, blocky; stretched over the frame : wide cells on
+  16:9, square on the dome; empty cells transparent) holds a copy of the picture,
+  written only where a 1-bit **key** per cell lets the live picture through
+  (brightness, edges, motion against the previous frame, sidechain through a new **key
+  from** picker (none : this layer), transparency, or none; **key level**, **invert
+  key**), each channel floored to 2 to 8 bits as it is written (**depth**). Nothing in
+  it ever fades. **mode** : trail (the keyed parts; the live figure in front of its
+  stamps), color trail (one flat ink per grab, stepping in hue : **ink hue**, **ink
+  step**), ghost (the stamps at half over the live picture), catch-up (the whole frame;
+  the keyed live figure running ahead of it), mosaic (the store over the picture),
+  reveal (the store alone), protect (all but the key written : the keyed parts vanish
+  into what was there before), acquire (each cell written once, first come); **show**
+  overrides the display (over, under, instead, double, inside). The **capture** clock :
+  every frame, every N frames, bursts (N on, 2N off), every bar, 1/4, 1/8, 1/16, or hold,
+  with **grab ▸** and **clear ▸**; it runs on the layer's own time (speed scales it,
+  freeze stops it). **slide X / Y** : a speed on the store's address (a dead zone around
+  zero, a steep curve), wrapping around the edges; at full speed it strobes like wagon
+  wheels. **survive scene changes** (`keep`) : a replaced Field Store parks its store for
+  two minutes, and the next one with keep on takes it within its first 30 s (at once if
+  it has written nothing yet, else the old store crumbles in under its own stamps);
+  Panic flush empties the parking (`Compositor.panic`). Flash safety : clear crumbles
+  the store away cell by cell over 0.4 s, a display or key change crossfades over
+  0.25 s, a carried-over store crumbles in over 0.4 s, a size change resamples at most
+  every 0.25 s. Ten presets (Hard trail, Beat stamps, Color stamps, Strobe ghost,
+  Catch-up, Live mosaic, Motion reveal, Vanish, First arrivals, Drifting lattice), three
+  master chains under Time & memory (**Hard Memory**, **Sixteen Levels**, **Strobe
+  Ghost**), two Generate themes in Feedback / Afterimage (**Field Store**, **Revealed**),
+  hints for all 17 inputs, keywords, a blurb, Inspector columns (mode / key / clock /
+  store; ink hue and step grey out outside color trail, key level and invert with key
+  none, N unless the clock counts frames), the Orbit voice in auto-Sonify. Any rack
+  (`fxScopes.ts`); Randomize never deals it (reveal and protect can blank or hide a
+  layer). Verified in a test copy : it compiles with no console errors.
+
 - **NDI® audio in : an Audio Layer slot plays an NDI source's sound** (`preload/ndi.ts`,
   `audio/ndiAudio.worklet.js`, `audio/ndiAudioIn.ts`). A third slot kind beside a sound
   file and a live input (`AudioLayerSlot` kind `'ndi'` : `ndiName`, `chL` / `chR`) : a
@@ -160,7 +316,8 @@ that CI builds into cross-platform releases.
   Measured : red under green, 0 / 0.25 / 0.5 / 0.75 / 1 give red, red + half green,
   yellow, half red + green, green.
 
-- **Persistent controls and layers, and Set in every scene** (Vincent : a code change had
+- **Persistent controls, layers, effects, sources and modulators, and Set in every
+  scene** (Vincent : a code change had
   him re-enter parameters across a set's scenes). Right-click a control → **Persistent** :
   scenes (recall, the sequencer, the scene pad), Randomize, Variation, the layer dice,
   Generate, a World and the Mixer / layer / background / master presets leave it as it
@@ -184,8 +341,43 @@ that CI builds into cross-platform releases.
   Background's opacity / speed / shadow and the Meta knobs; a 2 px gold bar
   (`[data-pinned]`, `--c-pin`), a gold border on a pinned layer, **◆ n persistent** in
   the scene bank with the list (`describePin`). `modTargetKey` moved to `modKey.ts` (the
-  store re-exports it). Not yet : a whole effect unit or source slot, modulator cards,
-  Sonify's controls.
+  store re-exports it). Then (steps 2 and 3) : a **whole effect** (`fxunit:<rack>:<id>`,
+  the rack spelled as control keys spell it), a **whole source slot** (`src:<i>:<A|B>` :
+  a control key always has a fourth part, its input) and a **modulator card**
+  (`mod:<n>`), through the same gate. An effect lands whole in its own rack at the place
+  it has now (kept before the finishing units), whether the arriving rack had it or not
+  (a scene holding it elsewhere has it moved there), with its matrix rows and Meta
+  destinations (the arriving rows on it give way); a finishing unit is replaced in place
+  and takes the live id (so it survives Generate), a pinned Context or Finalizer keeps
+  its World keys; a rack that can't hold it (the Background off, a source rack on an
+  empty slot) holds nothing; the dice keep it and deal around it; dragging it to another
+  rack by hand moves its pins, the control pins on it too (`movePins`). A slot keeps its
+  source (kind, shader or film, inputs, framing, transport) and its rack, with all their
+  rows and Meta destinations; a pinned empty B stays empty; a hand swap keeps the pin
+  (it is the slot that is pinned) and the new source is what it holds; **Randomize
+  effects for source A / B** on it refuses with a toast, the layer dice and presets deal
+  around it. A modulator card keeps its configuration only : bindings follow their own
+  rules, so a pinned control's carried binding now runs its own pinned card; pinning a
+  World's modulator makes it yours (`togglePin`). Order : slots, effects, controls,
+  layers, Meta knobs last; a whole pin wins over the control pins inside it. UI :
+  **Persistent effect** / **Set this effect in every scene** on effect chips and the FX
+  Inspector header (a gold border on the chip); a source card's right-click opens the
+  layer menu with **Persistent source** / **Set this source in every scene** on top
+  (header "Layer n · source A"), the source Inspector header too (a 1 px gold outline);
+  modulator cards gain a right-click menu, **Persistent modulator** / **Set this
+  modulator in every scene** (a gold border and a gold M name). The ◆ list names them
+  ("L1 FX · Shatter, the whole effect", "L1 A · sea.mov, the whole source", "M3 (lfo),
+  the modulator"). Undo covers the toggles, sessions save them, no layout moves (border
+  colors and box shadows only). 58 scenario checks pass (and step 1's 15); a scene-pad
+  frame costs 0.05 µs with no pins, about 35 µs with three to eight. Verified in a test
+  copy : a pinned source-FX unit, layer-FX unit, master unit, source slot and live
+  modulator all kept through two Generates and the dice (all, sources, master, layer
+  FX, source FX) while the rest re-rolled; New clears them. Known edges : a pinned
+  modulator that is off and drives nothing still counts as free for a World's audio
+  routing (the World's binding then rides the pinned card); a scene saved before a
+  pinned effect was dragged to another rack carries two units with the same id; Generate
+  doesn't remove a freshly dealt copy of a pinned effect beside it (the dice do). Not
+  yet : Sonify's controls.
 
 - **The gate hair is removed** (Vincent : "I don't want any gate hair"; it first went
   hand-only, the Peint and Pressé Worlds and the Nitrate and Projection Booth themes no
@@ -1055,6 +1247,13 @@ verified before fixing), then the fixes, checked in a test copy where a machine 
 
 
 ### Docs
+
+- **The 10-21 batch** : the README (56 effects with Shatter, Crawl and Store Zoom, 27
+  native nodes with Field Store, 119 Generate themes, 125 master chains in six groups
+  with Store, 20 blend modes in Contents; Search everything (`Ctrl+K`) with the global
+  Ctrl keys moved out of the Sonify table; Persistent for whole effects, sources and
+  modulators; the dome's rotations, gravity, mipmaps and grain; Flash safety on the
+  dome; the architecture map), the release notes and the cheat-sheet's Persistent row.
 
 - **Everything caught up with v1.3.0** : the README (sources 46 = 45 generators + the
   Audio source, 53 effects, 26 native nodes, 114 Generate themes in 17 families, 116 master
