@@ -16,9 +16,14 @@
 //
 // The Mixer's master switch (store couplingOn) pauses every layer's coupling at
 // once : each mix then sits where its slider is.
+//
+// Each layer hears its feature level-matched (couplingMatch.ts) : mapped from its
+// own recent range onto 0..1 before the mode reads it, unless the layer's auto
+// is off (LayerCoupling.auto false : the raw feature, eased across the switch).
 
 import type { CompositionState } from '@shared/types'
 import { audioBus } from './audioIn'
+import { autoMix, gateStep, matchFeature, newGate, newMatch, resetMatch, type CouplingMatch } from './couplingMatch'
 
 // NaN-safe : a partial/malformed coupling block could feed NaN through here,
 // and `v < 0 ? … : v` would pass NaN straight to layer.sourceMix, blanking the
@@ -39,6 +44,18 @@ const state: Array<{ held: number; up: boolean; open: boolean; mode: string }> =
  *  coupling runs (off, no B, the audio input off, the master switch off). The
  *  Mixer reads it to draw where the sound pushes the crossfader. */
 export const liveCoupledMix: Array<number | null> = [null, null, null, null]
+/** What each layer's coupling hears this frame (its feature as the mode reads
+ *  it : matched, or raw with auto off), or null where no coupling runs : the
+ *  CPL meter. */
+export const liveCouplingFeature: Array<number | null> = [null, null, null, null]
+
+// Level-matching : one matcher per layer, the silence gate shared (the level is
+// the input's). Kept through a scene recall, New or a session load (the sound
+// has not changed); a layer's starts over when its feature or band changes,
+// every one when the input does.
+const match: CouplingMatch[] = []
+let gate = newGate()
+let inputKey = ''
 // Wall-clock of the previous applyCoupling(), so the cut release + drift follow
 // run at a fixed rate regardless of frame rate.
 let lastNow = 0
@@ -70,18 +87,29 @@ export function applyCoupling(
   // And paused by the master switch.
   if (audioBus.mode === 'off' || !enabled) {
     liveCoupledMix.fill(null)
+    liveCouplingFeature.fill(null)
     lastNow = 0
     return null
   }
   // Frame-rate normalizer: 1 at 60fps, larger when frames are longer.
   const fk = lastNow ? Math.min(6, Math.max(0.1, ((now - lastNow) / 1000) * 60)) : 1
   lastNow = now
+  const dt = fk / 60
+  // another input (its mode, its device, the Audio Layer) : every range starts over
+  const ik = `${audioBus.mode}|${audioBus.requested}|${audioBus.localActive}`
+  if (ik !== inputKey) {
+    inputKey = ik
+    gate = newGate()
+    for (const m of match) if (m) resetMatch(m, m.key)
+  }
+  gateStep(gate, audioBus.feature('level'), dt)
   let any = false
   const out = c.layers.map((l, i) => {
     const layer = comp.layers[i]
     const base = layer ? layer.sourceMix : (l.sourceMix ?? 0.5)
     const cp = l.coupling
     liveCoupledMix[i] = null
+    liveCouplingFeature[i] = null
     if (!layer || !cp || cp.mode === 'off') return base
     // Needs a real second voice : the crossfade is inert without B.
     if (!l.sourceB || l.sourceB.kind === 'none') return base
@@ -89,11 +117,19 @@ export function applyCoupling(
     const s = state[i]
     s.mode = cp.mode
 
-    // the band feature listens to the band the layer picked (0 : the lowest)
-    const raw = clamp01(audioBus.feature(cp.feature, Math.max(0, Math.round(cp.band ?? 0))))
+    // the band feature listens to the band the layer picked (0 : the lowest),
+    // level-matched unless the layer's auto is off
+    const band = Math.max(0, Math.round(cp.band ?? 0))
+    const raw = clamp01(audioBus.feature(cp.feature, band))
+    const key = cp.feature === 'band' ? `band${band}` : cp.feature
+    const auto = cp.auto !== false
+    const mt = match[i] ?? (match[i] = newMatch(key, auto))
+    if (mt.key !== key) resetMatch(mt, key)
+    const f = autoMix(mt, auto, raw, matchFeature(mt, cp.feature, raw, audioBus.feature('flux'), gate, dt), dt)
+    liveCouplingFeature[i] = f
     const tight = clamp01(cp.tightness)
     const amt = clamp01(cp.amount)
-    const shaped = Math.pow(raw, 1 + (1 - tight) * 3)
+    const shaped = Math.pow(f, 1 + (1 - tight) * 3)
     const toB = (g: number): number => base + g * amt * (1 - base) // lean base→B by g
 
     let eff = base
@@ -110,11 +146,11 @@ export function applyCoupling(
         // held level or a sustained pitch flashes once instead of parking the
         // layer on B. Tight = snappy short flash; loose = a longer tail
         // (release factor 0.60 … 0.98 per 60fps frame).
-        if (raw > 0.4 && !s.up) {
+        if (f > 0.4 && !s.up) {
           s.held = 1
           s.up = true
         } else {
-          if (raw < 0.3) s.up = false
+          if (f < 0.3) s.up = false
           s.held *= Math.pow(0.6 + tight * 0.38, fk)
         }
         eff = toB(s.held)
@@ -128,16 +164,16 @@ export function applyCoupling(
         // rate. It flips past the band's far end, so the mix never jumps.
         const w = 0.03 + (1 - tight) * 0.3
         const hy = 0.03 * tight * tight
-        if (!s.open && raw >= 0.426 + hy + w / 2) s.open = true
-        else if (s.open && raw <= 0.426 - hy - w / 2) s.open = false
+        if (!s.open && f >= 0.426 + hy + w / 2) s.open = true
+        else if (s.open && f <= 0.426 - hy - w / 2) s.open = false
         const edge = 0.426 + (s.open ? -hy : hy)
-        eff = toB(smoothstep(edge - w / 2, edge + w / 2, raw))
+        eff = toB(smoothstep(edge - w / 2, edge + w / 2, f))
         break
       }
       case 'drift': {
         // Slow one-pole follow : momentum, not morphology (congruent movement).
         const a = 1 - Math.pow(1 - (0.01 + tight * 0.06), fk)
-        s.held += (raw - s.held) * a
+        s.held += (f - s.held) * a
         eff = toB(s.held)
         break
       }

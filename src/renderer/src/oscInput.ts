@@ -30,6 +30,7 @@
 //   /opsia/layer{n}/coupling/amount|tightness         f 0..1
 //   /opsia/layer{n}/coupling/feature                  i index | s name (level flux transient centroid band pitch noisiness) | f 0..1 (over the first six)
 //   /opsia/layer{n}/coupling/band                     i 0..5 | f 0..1 (the band feature's band, 0 = the lowest)
+//   /opsia/layer{n}/coupling/auto                     >= 0.5 (level-matching on; below : the raw feature)
 //   /opsia/coupling                                    >= 0.5 (the master switch : every layer's coupling)
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
 //   /opsia/master/vibe|context|finalizer/{input}       f 0..1 → range (color/point2D: N args)
@@ -415,6 +416,9 @@ function route(address: string, args: Args): void {
           // an int is the band itself; a 0..1 float spreads over the six
           const band = Number.isInteger(n) && n >= 1 ? Math.min(5, n) : Math.round(clamp01(n) * 5)
           st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, band } })
+        } else if (which === 'auto') {
+          // level-matching : on is the field's absence (the default)
+          st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, auto: n >= 0.5 ? undefined : false } })
         }
         return
       }
@@ -1206,6 +1210,7 @@ function enumerateLeaves(): Leaf[] {
     const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
     addI(`/opsia/layer${n}/coupling/feature`, 0, COUPLING_FEATURES.length - 1, cf, 'A/B coupling audio feature : 0 level · 1 flux · 2 transient · 3 centroid · 4 band · 5 pitch · 6 noisiness')
     addI(`/opsia/layer${n}/coupling/band`, 0, 5, l?.coupling?.band ?? 0, 'A/B coupling : the band feature\'s band (0 lowest … 5 highest)')
+    add(`/opsia/layer${n}/coupling/auto`, 0, 1, l?.coupling?.auto === false ? 0 : 1, 'A/B coupling level-matching : the feature heard against its recent range (>= 0.5 : on, below : the raw feature)')
     // Video transport : advertised (slot-explicit) only while the slot actually
     // holds a video. `position` is a one-shot seek — advertised for discovery
     // but never echoed outbound (the playhead flies at frame rate).
