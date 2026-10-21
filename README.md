@@ -930,9 +930,10 @@ inspector column.
 
 ![The macro-form sequencer](docs/images/interface-sequencer.jpg)
 
-*Tagged scenes across the top, the live monitor at the bottom, and the transport
-column on the right: dwell clock, transition style, selection strategy, the
-Repose–Disturbance–Repose climate arc, and the punctuation toggles.*
+*Tagged scenes across the top with the tag editor for the selected one, the live
+monitor at the bottom, and the column on the right: dwell clock, transition style,
+selection strategy, the Breathe and Repose–Disturbance–Repose climate-arc overlays,
+and the slow long-forms below them.*
 
 ## Worlds / diegesis (key `W`)
 
@@ -2619,7 +2620,7 @@ picture (an image input named `inputImage` makes it an effect).
 
 *The Source Editor : your shaders and every built-in one to copy on the left, the code
 in the middle (here the feedback template, a trail that keeps the last frame), and on
-the right the live preview, "compiled in 9 ms" and the controls its header declares,
+the right the live preview, its compile time and the controls its header declares,
 playing it there. Save, **use** (on the selected slot) and **new from…** sit along the
 top.*
 
