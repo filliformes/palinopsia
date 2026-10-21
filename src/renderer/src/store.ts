@@ -2660,7 +2660,8 @@ export const useStore = create<StoreState>((set, get) => ({
         sourceMix: l.sourceMix,
         sourceBlend: l.sourceBlend,
         harmony: l.harmony,
-        coupling: { ...l.coupling }
+        // auto written out : a preset carries level-matching on as well as off
+        coupling: { ...l.coupling, auto: l.coupling.auto !== false }
       }))
       const mixerPresets = [
         ...s.mixerPresets,
@@ -2687,7 +2688,8 @@ export const useStore = create<StoreState>((set, get) => ({
               ...(typeof m.sourceMix === 'number' ? { sourceMix: m.sourceMix } : {}),
               ...(m.sourceBlend ? { sourceBlend: m.sourceBlend } : {}),
               ...(typeof m.harmony === 'number' ? { harmony: Math.max(-1, Math.min(1, m.harmony)) } : {}),
-              ...(m.coupling ? { coupling: { ...l.coupling, ...m.coupling } } : {})
+              // (auto : on is the field's absence; a mix saved before it keeps the layer's)
+              ...(m.coupling ? { coupling: { ...l.coupling, ...m.coupling, auto: (m.coupling.auto ?? l.coupling.auto) === false ? false : undefined } } : {})
             }
           })
         })

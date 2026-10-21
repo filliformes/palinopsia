@@ -234,6 +234,9 @@ export interface LayerCoupling {
   tightness: number // 0..1 : vestigial (0) ↔ obvious (1)
   feature: AudioFeature // which audio feature drives the bond
   band?: number // the band feature's band (0 : the lowest, up to AUDIO_BANDS - 1)
+  // Level-matching : the feature heard against its own recent range (a quiet
+  // track moves the mix as far as a loud one). Absent : on; false : the raw feature.
+  auto?: boolean
 }
 
 export interface LayerState {

@@ -11,7 +11,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { AudioFeature, CouplingMode, LayerState, ModTarget, SourceSlot } from '@shared/types'
 import { modTargetKey, useStore } from '../store'
 import { AUDIO_FEATURES, AUDIO_BANDS, audioBus } from '../engine/audioIn'
-import { liveCoupledMix } from '../engine/coupling'
+import { liveCoupledMix, liveCouplingFeature } from '../engine/coupling'
 import { liveModValues } from '../engine/modulation'
 import { abSwatches, harmonizeRgb, wantAbSwatches } from '../engine/abHarmony'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -50,7 +50,8 @@ export function MixerPanel(): JSX.Element {
 
   // One loop paints what moves on its own : where the coupling puts each mix
   // (the white line on the crossfader, the word under it) and the sound
-  // driving it (the CPL meter). Straight to the DOM, never through React.
+  // driving it (the CPL meter : the feature as the coupling reads it, matched
+  // unless its auto is off). Straight to the DOM, never through React.
   const ghostRefs = useRef<Array<HTMLSpanElement | null>>([])
   const wordRefs = useRef<Array<HTMLSpanElement | null>>([])
   const meterRefs = useRef<Array<HTMLSpanElement | null>>([])
@@ -76,7 +77,7 @@ export function MixerPanel(): JSX.Element {
         if (meter) {
           const hasB = !!l.sourceB && l.sourceB.kind !== 'none'
           const listening = hasB && st.couplingOn && audioBus.mode !== 'off' && l.coupling.mode !== 'off'
-          const f = listening ? audioBus.feature(l.coupling.feature, l.coupling.band ?? 0) : 0
+          const f = listening ? (liveCouplingFeature[i] ?? 0) : 0
           meter.style.width = `${Math.max(0, Math.min(1, f)) * 100}%`
         }
       })
@@ -254,6 +255,7 @@ function MixerColumn({
 
   const coupled = couplingOn && hasB && l.coupling.mode !== 'off'
   const cplOff = l.coupling.mode === 'off'
+  const auto = l.coupling.auto !== false
   // the whole layer persistent : its column wears the pin's color (right-click
   // its header to pin or unpin, as on the layer itself)
   const whole = usePin(layerPin(index), `L${index + 1}, the whole layer`)
@@ -384,8 +386,23 @@ function MixerColumn({
         </div>
       </div>
 
-      {/* ── CPL : the sound moving the mix. */}
-      <Section label={audioOff ? 'CPL · no audio in' : 'CPL'} />
+      {/* ── CPL : the sound moving the mix. auto (level-matching) rides its
+          header, as the M chips do theirs : no line added. */}
+      <Section label={audioOff ? 'CPL · no audio in' : 'CPL'}>
+        <button
+          onClick={() => setCoupling(index, { auto: auto ? false : undefined })}
+          className={`shrink-0 rounded px-1 font-mono text-[9px] normal-case tracking-normal transition-colors ${
+            auto ? 'bg-accent/20 text-accent ring-1 ring-accent/60' : 'bg-panel3/60 text-muted hover:text-text'
+          } ${cplOff || !hasB ? 'opacity-40' : ''}`}
+          title={
+            auto
+              ? 'Level-matched : the feature is heard against its own recent range, so a quiet track moves the mix as far as a loud one and a loud one swings instead of sitting at the top (silence stays still). Click for the raw feature'
+              : 'Raw : the feature as the analysis reads it (flux often reads a few hundredths : the mix barely moves). Click to match it to its recent range'
+          }
+        >
+          auto
+        </button>
+      </Section>
       <div className={`flex shrink-0 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`} title={audioOff ? 'The audio input is off (audio tab) : the coupling waits for it' : undefined}>
         {/* the mode, then what drives it on a line of its own (side by side,
             a column cut the words short); a band's number beside the word band */}
@@ -434,7 +451,7 @@ function MixerColumn({
           )}
         </div>
         {/* the sound it listens to, live */}
-        <span className="relative block h-1.5 overflow-hidden rounded-sm bg-panel3/70" title={cplOff ? 'Coupling off' : `What it hears : ${couplingWords(l.coupling)}`}>
+        <span className="relative block h-1.5 overflow-hidden rounded-sm bg-panel3/70" title={cplOff ? 'Coupling off' : `What it hears${auto ? ', matched to its recent range' : ' (raw)'} : ${couplingWords(l.coupling)}`}>
           <span ref={meterRef} className="absolute inset-y-0 left-0 bg-accent" style={{ width: 0 }} />
         </span>
         <div className={`flex justify-around ${cplOff ? 'opacity-40' : ''}`}>
