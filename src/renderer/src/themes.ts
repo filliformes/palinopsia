@@ -664,13 +664,20 @@ export const THEMES: Theme[] = [
     world: 'monomedia',
     context: { trails: 0, haze: 0 },
     palette: [INK, [0.14, 0.12, 0.1, 1], [0.7, 0.66, 0.58, 1], [0.93, 0.9, 0.84, 1]],
-    // sources that keep moving : the motion key writes nothing over a still one
-    sources: ['murmuration', 'particle-drift', 'shapes', 'ash', 'filaments'],
+    // sources that keep moving : the motion key writes nothing over a still one.
+    // The bottom layer is always Particle Drift (it wrote a clear picture in every
+    // test; a lone Filaments could stay faint), and the key level stays under one
+    // 4-bit step (the key reads a one-level change as 0.2) : at 0.25-0.32 a single
+    // Ash or Shapes layer wrote nothing, 3 generations in 8 were black (10-21).
+    // A and B never multiply : two sparse sources on black multiply to black.
+    sources: ['murmuration', 'particle-drift', 'shapes', 'filaments'],
+    stack: [['particle-drift']],
+    mixBlends: ['screen', 'lighten', 'difference'],
     layerFx: ['fx-grade'],
     stackFx: [['node-fieldstore'], ['node-fieldstore']],
     pickInputs: {
       'node-fieldstore': {
-        mode: [5, 5, 7], show: [0], key: [2], threshold: [0.18, 0.25, 0.32], invert: [0],
+        mode: [5, 5, 7], show: [0], key: [2], threshold: [0.12, 0.15, 0.18], invert: [0],
         clock: [0, 0, 1], every: [2, 3], size: [2, 2, 3], bits: [4, 5],
         slideX: [0], slideY: [0, 0, 0.12], keep: [0], mix: [1]
       }

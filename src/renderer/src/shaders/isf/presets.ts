@@ -98,7 +98,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Tiled scramble', values: { mode: 0, amount: 1.0, scale: 3.0, offsetX: 0, offsetY: 0, extend: 1, swap: 0, mix: 1.0 } },
     { name: 'Mirror fold', values: { mode: 0, amount: 1.0, scale: 2.2, offsetX: 0.1, offsetY: -0.1, extend: 2, swap: 0, mix: 1.0 } },
     { name: 'Swapped roles', values: { mode: 0, amount: 0.8, scale: 1.0, offsetX: 0, offsetY: 0, extend: 2, swap: 1, mix: 1.0 } },
-    { name: 'Ghost remap', values: { mode: 0, amount: 0.7, scale: 1.2, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 0.45 } }
+    { name: 'Ghost remap', values: { mode: 0, amount: 0.7, scale: 1.2, offsetX: 0, offsetY: 0, extend: 2, swap: 0, mix: 0.45 } },
+    { name: 'Tight patch', values: { mode: 0, amount: 1.0, scale: 0.4, offsetX: 0.15, offsetY: 0.1, extend: 0, swap: 0, mix: 1.0 } },
+    { name: 'Swap slip', values: { mode: 1, amount: 0.5, scale: 0.9, offsetX: 0.2, offsetY: -0.12, extend: 1, swap: 1, mix: 0.85 } }
   ],
   'node-lumablur': [
     { name: 'Bright blooms soft', values: { control: 0, blackWidth: 0, whiteWidth: 24, gamma: 1.0, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
@@ -108,7 +110,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Near focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.8, invert: 0, quality: 1, mix: 1.0 } },
     { name: 'Far focus', values: { control: 1, blackWidth: 0, whiteWidth: 36, gamma: 1.0, focus: 0.2, invert: 0, quality: 1, mix: 1.0 } },
     { name: 'Tilt shift', values: { control: 1, blackWidth: 0, whiteWidth: 20, gamma: 2.0, focus: 0.5, invert: 0, quality: 1, mix: 1.0 } },
-    { name: 'Fast soft', values: { control: 0, blackWidth: 2, whiteWidth: 14, gamma: 1.0, focus: 0.5, invert: 0, quality: 0, mix: 1.0 } }
+    { name: 'Fast soft', values: { control: 0, blackWidth: 2, whiteWidth: 14, gamma: 1.0, focus: 0.5, invert: 0, quality: 0, mix: 1.0 } },
+    { name: 'Dream lens', values: { control: 1, blackWidth: 4, whiteWidth: 64, gamma: 0.8, focus: 0.4, invert: 0, quality: 2, mix: 1.0 } },
+    { name: 'Stepped ghosts', values: { control: 0, blackWidth: 12, whiteWidth: 72, gamma: 1.4, focus: 0.5, invert: 1, quality: 0, mix: 0.8 } }
   ],
   'node-gooey': [
     { name: 'Metaballs', values: { blur: 0.35, threshold: 0.4, softness: 0.05, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
@@ -118,7 +122,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Tight blobs', values: { blur: 0.2, threshold: 0.5, softness: 0.02, fill: 0, key: 0, outside: 0, invert: 0, mix: 1.0 } },
     { name: 'Dark goo', values: { blur: 0.4, threshold: 0.55, softness: 0.06, fill: 0, key: 0, outside: 0.1, invert: 1, mix: 1.0 } },
     { name: 'Soft lava', values: { blur: 0.55, threshold: 0.4, softness: 0.2, fill: 1, key: 1, outside: 0.15, invert: 0, mix: 0.9 } },
-    { name: 'Ghost blobs', values: { blur: 0.4, threshold: 0.4, softness: 0.08, fill: 0, key: 0, outside: 0.5, invert: 0, mix: 0.6 } }
+    { name: 'Ghost blobs', values: { blur: 0.4, threshold: 0.4, softness: 0.08, fill: 0, key: 0, outside: 0.5, invert: 0, mix: 0.6 } },
+    { name: 'Big merge', values: { blur: 0.85, threshold: 0.25, softness: 0.04, fill: 0, key: 1, outside: 0.1, invert: 0, mix: 1.0 } },
+    { name: 'Mercury', values: { blur: 0.45, threshold: 0.3, softness: 0.015, fill: 2, key: 1, outside: 0.35, invert: 0, mix: 0.85 } }
   ],
   'node-matte': [
     { name: 'Luma key', values: { channel: 0, low: 0.0, high: 1.0, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
@@ -128,7 +134,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Red channel', values: { channel: 1, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
     { name: 'Alpha matte', values: { channel: 4, low: 0.0, high: 1.0, invert: 0, swap: 0, empty: 0, mix: 1.0 } },
     { name: 'Swapped', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 1, empty: 0, mix: 1.0 } },
-    { name: 'Half blend', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 0.5 } }
+    { name: 'Half blend', values: { channel: 0, low: 0.2, high: 0.8, invert: 0, swap: 0, empty: 0, mix: 0.5 } },
+    { name: 'Cut-out', values: { channel: 0, low: 0.12, high: 0.35, invert: 0, swap: 0, empty: 1, mix: 1.0 } },
+    { name: 'Blue cut', values: { channel: 3, low: 0.7, high: 0.3, invert: 0, swap: 0, empty: 1, mix: 1.0 } }
   ],
   'node-lookup': [
     { name: 'Palette line', values: { index: 0, axis: 0, position: 0.5, band: 0.2, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
@@ -138,7 +146,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Hue remap', values: { index: 2, axis: 0, position: 0.5, band: 0.4, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 1.0 } },
     { name: 'Folded twice', values: { index: 0, axis: 0, position: 0.5, band: 0.3, offset: 0, cycles: 2, gamma: 1, mirror: 1, mix: 1.0 } },
     { name: 'Calm gradient', values: { index: 0, axis: 0, position: 0.5, band: 1.0, offset: 0, cycles: 1, gamma: 1.2, mirror: 0, mix: 0.85 } },
-    { name: 'Tinted', values: { index: 0, axis: 0, position: 0.5, band: 0.5, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 0.4 } }
+    { name: 'Tinted', values: { index: 0, axis: 0, position: 0.5, band: 0.5, offset: 0, cycles: 1, gamma: 1, mirror: 0, mix: 0.4 } },
+    { name: 'Triple wrap', values: { index: 0, axis: 2, position: 0.4, band: 0.2, offset: 0.35, cycles: 3, gamma: 0.8, mirror: 0, mix: 1.0 } },
+    { name: 'Channel folds', values: { index: 1, axis: 0, position: 0.35, band: 0.25, offset: 0.15, cycles: 1.5, gamma: 0.8, mirror: 1, mix: 0.65 } }
   ],
   'node-toile': [
     { name: 'Oil paint', values: { radius: 0.5, sharp: 0.5, paint: 1.0, strokes: 0, line: 0.3, threshold: 0.5, mix: 1.0 } },
@@ -376,7 +386,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Vertical slit', values: { shape: 1, size: 0.25, soft: 0.1, flicker: 0.2, rate: 6, couple: 0.5, amount: 1.0 } },
     { name: 'Horizontal band', values: { shape: 2, size: 0.3, soft: 0.14, flicker: 0.2, rate: 6, couple: 0.5, amount: 1.0 } },
     { name: 'Hard flicker', values: { shape: 0, size: 0.55, soft: 0.05, flicker: 0.8, rate: 14, couple: 0.7, amount: 1.0 } },
-    { name: 'Soft window', values: { shape: 3, size: 0.85, soft: 0.35, flicker: 0, rate: 8, couple: 0.2, amount: 0.8 } }
+    { name: 'Soft window', values: { shape: 3, size: 0.85, soft: 0.35, flicker: 0, rate: 8, couple: 0.2, amount: 0.8 } },
+    { name: 'Letterbox', values: { shape: 2, size: 0.55, soft: 0.02, flicker: 0, rate: 8, couple: 0.1, amount: 1.0 } },
+    { name: 'Pinhole', values: { shape: 0, size: 0.26, soft: 0.25, flicker: 0.1, rate: 4, couple: 1.0, amount: 1.0 } }
   ],
   // ── Metamorph (birth-from-within silhouettes) ──
   metamorph: [
@@ -388,7 +400,8 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Wanderer', values: { rate: 0.15, size: 0.28, wobble: 0.45, complexity: 0.5, drift: 0.9, inner: 0.3 } },
     { name: 'Still cell', values: { rate: 0.03, size: 0.32, wobble: 0.3, complexity: 0.4, drift: 0.1, inner: 0.4 } },
     { name: 'Boiling mass', values: { rate: 0.2, size: 0.4, wobble: 1.0, complexity: 0.6, drift: 0.4, inner: 0.35 } },
-    { name: 'Births on trigger', values: { rate: 0, size: 0.3, wobble: 0.5, complexity: 0.55, drift: 0.5, inner: 0.3 } }
+    { name: 'Births on trigger', values: { rate: 0, size: 0.3, wobble: 0.5, complexity: 0.55, drift: 0.5, inner: 0.3 } },
+    { name: 'Seedlings', values: { rate: 0.4, size: 0.12, wobble: 0.55, complexity: 0.35, drift: 0.75, inner: 0.15 } }
   ],
   // ── Motif (spatial counterpoint / transpose echoes) ──
   'fx-motif': [
@@ -426,7 +439,24 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Ghost outline', values: { view: 0, window: 4, style: 1, amp: 1.6, dim: 0.3, playhead: 0, color: [0.85, 0.9, 1, 1], ground: [0, 0, 0, 1] } },
     { name: 'Loop window', values: { view: 1, window: 4, style: 0, amp: 1.2, dim: 0.65, playhead: 1, color: [0.4, 0.75, 1, 1], ground: [0.02, 0.03, 0.06, 1] } },
     { name: 'Tape (no ground)', values: { view: 2, window: 10, style: 0, amp: 2.2, dim: 0.5, playhead: 0, color: [1, 0.85, 0.6, 1], ground: [0, 0, 0, 0] } },
-    { name: 'Paper', values: { view: 0, window: 4, style: 0, amp: 1.1, dim: 0.75, playhead: 1, color: [0.12, 0.12, 0.14, 1], ground: [0.93, 0.91, 0.86, 1] } }
+    { name: 'Paper', values: { view: 0, window: 4, style: 0, amp: 1.1, dim: 0.75, playhead: 1, color: [0.12, 0.12, 0.14, 1], ground: [0.93, 0.91, 0.86, 1] } },
+    { name: 'Red line', values: { view: 2, window: 1.5, style: 1, amp: 1.8, dim: 0.4, playhead: 1, color: [0.95, 0.3, 0.25, 1], ground: [0.02, 0.01, 0.01, 1] } },
+    { name: 'Barcode', values: { view: 0, window: 4, style: 2, amp: 0.8, dim: 0.8, playhead: 1, color: [0.85, 0.85, 0.8, 1], ground: [0.05, 0.05, 0.06, 1] } },
+    { name: 'Overlay loop', values: { view: 1, window: 4, style: 2, amp: 1.3, dim: 0.35, playhead: 1, color: [0.62, 0.52, 0.85, 1], ground: [0, 0, 0, 0] } }
+  ],
+  // ── Silhouette (the body from the Body camera). Its own look only : it never
+  // turns the camera on. Matte draws the body opaque, so its trail does nothing.
+  'gen-silhouette': [
+    { name: 'Cutout', values: { mode: 0, threshold: 0.5, softness: 0.08, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Feathered', values: { mode: 0, threshold: 0.42, softness: 0.22, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Echoes', values: { mode: 0, threshold: 0.5, softness: 0.1, trail: 0.6, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Key matte', values: { mode: 1, threshold: 0.5, softness: 0.04, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Framed matte', values: { mode: 1, threshold: 0.45, softness: 0.15, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 1 } },
+    { name: 'Paper figure', values: { mode: 2, threshold: 0.55, softness: 0.03, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Ember trail', values: { mode: 2, threshold: 0.5, softness: 0.12, trail: 0.8, color: [1, 0.5, 0.2, 1], fit: 0 } },
+    { name: 'Glass shadow', values: { mode: 2, threshold: 0.5, softness: 0.18, trail: 0.35, color: [0.45, 0.7, 0.95, 0.55], fit: 0 } },
+    { name: 'Absence', values: { mode: 3, threshold: 0.45, softness: 0.1, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
+    { name: 'Slow vanish', values: { mode: 3, threshold: 0.5, softness: 0.15, trail: 0.7, color: [0.95, 0.92, 0.85, 1], fit: 0 } }
   ],
   // ── Collage (a wall of films cut up) ──
   'gen-collage': [
@@ -955,7 +985,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Crush blacks', values: { alpha: 1, parasites: 0, black: 0.1, white: 1, gamma: 0.9, rGain: 1, gGain: 1, bGain: 1, sharpen: 0, character: 1, grain: 0.06, grainSize: 1.5, chroma: 0 } },
     { name: 'Faded lift', values: { alpha: 1, parasites: 0, black: 0.04, white: 0.92, gamma: 1.15, rGain: 1.02, gGain: 1, bGain: 0.98, sharpen: 0, character: 1, grain: 0.12, grainSize: 1.8, chroma: 0.1 } },
     { name: 'Heavy grain', values: { alpha: 1, parasites: 0, black: 0, white: 1, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.15, character: 1, grain: 0.4, grainSize: 2, chroma: 0.25 } },
-    { name: 'Broadcast', values: { alpha: 1, parasites: 0, black: 0.02, white: 0.98, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.45, character: 0, grain: 0.1, grainSize: 1, chroma: 0.2 } }
+    { name: 'Broadcast', values: { alpha: 1, parasites: 0, black: 0.02, white: 0.98, gamma: 1, rGain: 1, gGain: 1, bGain: 1, sharpen: 0.45, character: 0, grain: 0.1, grainSize: 1, chroma: 0.2 } },
+    { name: 'CRT glass', values: { alpha: 1, parasites: 0.25, black: 0.03, white: 0.97, gamma: 1, rGain: 1, gGain: 1.02, bGain: 1.04, sharpen: 0.25, character: 2, grain: 0.12, grainSize: 1.2, chroma: 0.15 } },
+    { name: 'VHS dub', values: { alpha: 1, parasites: 0.4, black: 0.06, white: 0.9, gamma: 1.1, rGain: 1.04, gGain: 0.97, bGain: 1, sharpen: 0, character: 3, grain: 0.22, grainSize: 2.2, chroma: 0.35 } }
   ],
   'fx-granular': [
     { name: 'Fine grain', values: { grain: 0.7, density: 0.9, scatter: 0.1, rotate: 0.1, smear: 0.2, rate: 0.6, stagger: 0, sizeVar: 0, edges: 0, audio: 0 } },
@@ -1015,7 +1047,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Brickwork', values: { rate: 1.2, sync: 0, pattern: 4, scale: 8, density: 0.5, flip: 0, slide: 0, wet: 1 } },
     { name: 'Crumbling cells', values: { rate: 0.5, sync: 0, pattern: 6, scale: 6, density: 0.6, flip: 1, slide: 0, wet: 1 } },
     { name: 'Catch-up', values: { rate: 2, sync: 0, pattern: 7, scale: 3, density: 0.45, flip: 0, slide: 0, wet: 1 } },
-    { name: 'Grab on the beat', values: { rate: 1.5, sync: 3, pattern: 2, scale: 6, density: 0.5, flip: 0, slide: -1, wet: 1 } }
+    { name: 'Grab on the beat', values: { rate: 1.5, sync: 3, pattern: 2, scale: 6, density: 0.5, flip: 0, slide: -1, wet: 1 } },
+    { name: 'Slanted rain', values: { rate: 2.5, sync: 0, pattern: 3, scale: 5, density: 0.4, flip: 0, slide: -3, wet: 1 } },
+    { name: 'Bar checks', values: { rate: 1.5, sync: 1, pattern: 0, scale: 20, density: 0.6, flip: 0, slide: 0, wet: 0.9 } }
   ],
   'fx-crawl': [
     { name: 'Isochrones', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 1, cycle: 0.1, steps: 8, palette: 0, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
@@ -1025,7 +1059,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Ink trace', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 0.4, cycle: 0.05, steps: 2, palette: 0, stops: 2, colorA: [0.03, 0.03, 0.035, 1], colorB: [0.92, 0.9, 0.85, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
     { name: 'Own colors', values: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 0.8, cycle: 0.12, steps: 8, palette: 1, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
     { name: 'Contours only', values: { threshold: 0.08, fade: 12, ground: 2, wet: 1, band: 0.5, cycle: 0.1, steps: 10, palette: 0, stops: 4, colorA: [0.02, 0.03, 0.02, 1], colorB: [0.12, 0.22, 0.1, 1], colorC: [0.55, 0.62, 0.3, 1], colorD: [0.9, 0.88, 0.7, 1], colorE: [1, 1, 1, 1] } },
-    { name: 'Long memory', values: { threshold: 0.12, fade: 45, ground: 0, wet: 1, band: 3, cycle: 0.03, steps: 6, palette: 0, stops: 4, colorA: [0.04, 0.02, 0.02, 1], colorB: [0.3, 0.1, 0.06, 1], colorC: [0.62, 0.32, 0.16, 1], colorD: [0.85, 0.7, 0.5, 1], colorE: [1, 1, 1, 1] } }
+    { name: 'Long memory', values: { threshold: 0.12, fade: 45, ground: 0, wet: 1, band: 3, cycle: 0.03, steps: 6, palette: 0, stops: 4, colorA: [0.04, 0.02, 0.02, 1], colorB: [0.3, 0.1, 0.06, 1], colorC: [0.62, 0.32, 0.16, 1], colorD: [0.85, 0.7, 0.5, 1], colorE: [1, 1, 1, 1] } },
+    { name: 'Survey map', values: { threshold: 0.06, fade: 20, ground: 1, wet: 1, band: 1.5, cycle: 0.06, steps: 16, palette: 0, stops: 5, colorA: [0.05, 0.09, 0.12, 1], colorB: [0.1, 0.3, 0.32, 1], colorC: [0.45, 0.55, 0.3, 1], colorD: [0.78, 0.68, 0.42, 1], colorE: [0.96, 0.94, 0.88, 1] } },
+    { name: 'Backwash', values: { threshold: 0.15, fade: 4, ground: 0, wet: 0.7, band: 0.15, cycle: -0.3, steps: 3, palette: 0, stops: 3, colorA: [0.05, 0.02, 0.06, 1], colorB: [0.42, 0.14, 0.3, 1], colorC: [0.24, 0.5, 0.48, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } }
   ],
   'fx-store-zoom': [
     { name: 'Store look', values: { zoom: 1, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
@@ -1035,7 +1071,9 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Wide pixels', values: { zoom: 2, stretch: -0.6, magnify: 0.5, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 180, wide: 1.5, wet: 1 } },
     { name: 'Torus scroll', values: { zoom: 1.3, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0.05, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
     { name: 'Overflow mirror', values: { zoom: 1.8, stretch: 0, magnify: 1, mirror: 1, panX: 0.35, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
-    { name: 'Zoomed-out tiles', values: { zoom: 0.7, stretch: 0, magnify: 1, mirror: 2, panX: 0, panY: 0.2, scrollX: 0, scrollY: 0.03, lines: 320, wide: 1.5, wet: 1 } }
+    { name: 'Zoomed-out tiles', values: { zoom: 0.7, stretch: 0, magnify: 1, mirror: 2, panX: 0, panY: 0.2, scrollX: 0, scrollY: 0.03, lines: 320, wide: 1.5, wet: 1 } },
+    { name: 'Sixty-four lines', values: { zoom: 1.2, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 64, wide: 1, wet: 1 } },
+    { name: 'Folding scroll', values: { zoom: 2, stretch: -0.3, magnify: 1, mirror: 2, panX: 0.1, panY: 0, scrollX: -0.04, scrollY: 0.025, lines: 360, wide: 2, wet: 0.9 } }
   ],
   // ── Compress (JPEG / DCT intra artifacts) ──
   'fx-compress': [
@@ -1156,29 +1194,40 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Dense pool', values: { rate: 0.2, scale: 3, warp: 0.7, pool: 0.9, density: 0.8, grain: 0.3, pigment: [0.2, 0.28, 0.36, 1] } }
   ],
   'gen-veins': [
-    { name: 'Green leaf', values: { kind: 1, density: 0.5, thickness: 1, rate: 1, cycle: 1, veinColor: [0.86, 0.9, 0.62, 1], blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, ground: [0.012, 0.014, 0.012, 1], relief: 0.5 } },
-    { name: 'Ginkgo (open)', values: { kind: 0, density: 0.45, thickness: 1.1, rate: 1, cycle: 1, veinColor: [0.95, 0.85, 0.45, 1], blade: [0.35, 0.28, 0.06, 1], bladeAmt: 0.75, ground: [0.015, 0.012, 0.008, 1], relief: 0.45 } },
-    { name: 'Skeleton leaf', values: { kind: 1, density: 0.75, thickness: 0.8, rate: 1.2, cycle: 1, veinColor: [0.9, 0.86, 0.78, 1], blade: [0.05, 0.05, 0.05, 1], bladeAmt: 0, ground: [0.01, 0.01, 0.01, 1], relief: 0.6 } },
-    { name: 'Autumn', values: { kind: 1, density: 0.55, thickness: 1.2, rate: 0.8, cycle: 1, veinColor: [0.98, 0.78, 0.35, 1], blade: [0.5, 0.15, 0.04, 1], bladeAmt: 0.8, ground: [0.012, 0.008, 0.006, 1], relief: 0.5 } },
-    { name: 'Roots', values: { kind: 2, density: 0.5, thickness: 1.2, rate: 1, cycle: 1, veinColor: [0.82, 0.74, 0.6, 1], ground: [0.045, 0.03, 0.022, 1], relief: 0.55 } },
-    { name: 'Fine roots', values: { kind: 2, density: 0.8, thickness: 0.7, rate: 1.4, cycle: 1, veinColor: [0.9, 0.86, 0.8, 1], ground: [0.02, 0.015, 0.012, 1], relief: 0.5 } }
+    { name: 'Green leaf', values: { kind: 1, density: 0.5, thickness: 1, rate: 1, cycle: 1, veinColor: [0.86, 0.9, 0.62, 1], blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, ground: [0.012, 0.014, 0.012, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Ginkgo (open)', values: { kind: 0, density: 0.45, thickness: 1.1, rate: 1, cycle: 1, veinColor: [0.95, 0.85, 0.45, 1], blade: [0.35, 0.28, 0.06, 1], bladeAmt: 0.75, ground: [0.015, 0.012, 0.008, 1], relief: 0.45, lightAngle: 2.36 } },
+    { name: 'Skeleton leaf', values: { kind: 1, density: 0.75, thickness: 0.8, rate: 1.2, cycle: 1, veinColor: [0.9, 0.86, 0.78, 1], blade: [0.05, 0.05, 0.05, 1], bladeAmt: 0, ground: [0.01, 0.01, 0.01, 1], relief: 0.6, lightAngle: 2.36 } },
+    { name: 'Autumn', values: { kind: 1, density: 0.55, thickness: 1.2, rate: 0.8, cycle: 1, veinColor: [0.98, 0.78, 0.35, 1], blade: [0.5, 0.15, 0.04, 1], bladeAmt: 0.8, ground: [0.012, 0.008, 0.006, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Roots', values: { kind: 2, density: 0.5, thickness: 1.2, rate: 1, cycle: 1, veinColor: [0.82, 0.74, 0.6, 1], ground: [0.045, 0.03, 0.022, 1], relief: 0.55, blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, lightAngle: 2.36 } },
+    { name: 'Fine roots', values: { kind: 2, density: 0.8, thickness: 0.7, rate: 1.4, cycle: 1, veinColor: [0.9, 0.86, 0.8, 1], ground: [0.02, 0.015, 0.012, 1], relief: 0.5, blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, lightAngle: 2.36 } },
+    { name: 'Gold leaf', values: { kind: 1, density: 0.6, thickness: 0.9, rate: 0.9, cycle: 1, veinColor: [1, 0.86, 0.45, 1], blade: [0.08, 0.06, 0.03, 1], bladeAmt: 0.85, ground: [0.006, 0.005, 0.004, 1], relief: 0.75, lightAngle: 0.8 } },
+    { name: 'Ink roots', values: { kind: 2, density: 0.35, thickness: 2.2, rate: 0.6, cycle: 1, veinColor: [0.06, 0.06, 0.07, 1], blade: [0.12, 0.26, 0.1, 1], bladeAmt: 0.7, ground: [0.88, 0.86, 0.8, 1], relief: 0.2, lightAngle: 2.36 } },
+    { name: 'Fern', values: { kind: 0, density: 0.85, thickness: 0.6, rate: 2, cycle: 1, veinColor: [0.7, 0.95, 0.55, 1], blade: [0.03, 0.12, 0.05, 1], bladeAmt: 0.5, ground: [0.008, 0.012, 0.01, 1], relief: 0.35, lightAngle: 3.9 } },
+    { name: 'Frost leaf', values: { kind: 1, density: 0.65, thickness: 1.4, rate: 0.8, cycle: 0, veinColor: [0.82, 0.92, 1, 1], blade: [0.1, 0.16, 0.24, 1], bladeAmt: 0.6, ground: [0.01, 0.012, 0.018, 1], relief: 0.8, lightAngle: 5.5 } }
   ],
   'gen-physarum': [
-    { name: 'Transport network', values: { agents: 0.5, sensor: 9, sensorAngle: 22.5, turn: 45, speed: 1, wobble: 0.15, deposit: 0.5, decay: 0.5, diffuse: 0.5, scale: 0.4, shape: 0, tint: [0.95, 0.82, 0.32, 1], contrast: 0.5, glow: 0.5, relief: 0.4 } },
-    { name: 'Contracting disc', values: { agents: 0.8, sensor: 12, sensorAngle: 35, turn: 25, speed: 1, wobble: 0.1, deposit: 0.6, decay: 0.4, diffuse: 0.4, scale: 0.35, shape: 1, tint: [0.98, 0.88, 0.4, 1], contrast: 0.55, glow: 0.6, relief: 0.45 } },
-    { name: 'Long cords', values: { agents: 0.45, sensor: 22, sensorAngle: 15, turn: 15, speed: 1.4, wobble: 0.05, deposit: 0.6, decay: 0.35, diffuse: 0.3, scale: 0.3, shape: 0, tint: [0.92, 0.9, 0.82, 1], contrast: 0.6, glow: 0.4, relief: 0.5 } },
-    { name: 'Foam cells', values: { agents: 0.6, sensor: 5, sensorAngle: 60, turn: 45, speed: 0.8, wobble: 0.3, deposit: 0.5, decay: 0.6, diffuse: 0.6, scale: 0.5, shape: 0, tint: [0.7, 0.85, 0.95, 1], contrast: 0.5, glow: 0.3, relief: 0.4 } },
-    { name: 'Ring migration', values: { agents: 0.55, sensor: 10, sensorAngle: 25, turn: 35, speed: 1.2, wobble: 0.2, deposit: 0.5, decay: 0.45, diffuse: 0.45, scale: 0.4, shape: 2, tint: [0.95, 0.6, 0.3, 1], contrast: 0.5, glow: 0.7, relief: 0.35 } },
-    { name: 'Neural lace', values: { agents: 0.3, sensor: 16, sensorAngle: 22, turn: 22, speed: 1, wobble: 0.12, deposit: 0.8, decay: 0.55, diffuse: 0.35, scale: 0.6, shape: 0, tint: [0.85, 0.75, 0.95, 1], contrast: 0.7, glow: 0.8, relief: 0.3 } }
+    { name: 'Transport network', values: { agents: 0.5, sensor: 9, sensorAngle: 22.5, turn: 45, speed: 1, wobble: 0.15, deposit: 0.5, decay: 0.5, diffuse: 0.5, scale: 0.4, shape: 0, tint: [0.95, 0.82, 0.32, 1], contrast: 0.5, glow: 0.5, relief: 0.4, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Contracting disc', values: { agents: 0.8, sensor: 12, sensorAngle: 35, turn: 25, speed: 1, wobble: 0.1, deposit: 0.6, decay: 0.4, diffuse: 0.4, scale: 0.35, shape: 1, tint: [0.98, 0.88, 0.4, 1], contrast: 0.55, glow: 0.6, relief: 0.45, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Long cords', values: { agents: 0.45, sensor: 22, sensorAngle: 15, turn: 15, speed: 1.4, wobble: 0.05, deposit: 0.6, decay: 0.35, diffuse: 0.3, scale: 0.3, shape: 0, tint: [0.92, 0.9, 0.82, 1], contrast: 0.6, glow: 0.4, relief: 0.5, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Foam cells', values: { agents: 0.6, sensor: 5, sensorAngle: 60, turn: 45, speed: 0.8, wobble: 0.3, deposit: 0.5, decay: 0.6, diffuse: 0.6, scale: 0.5, shape: 0, tint: [0.7, 0.85, 0.95, 1], contrast: 0.5, glow: 0.3, relief: 0.4, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Ring migration', values: { agents: 0.55, sensor: 10, sensorAngle: 25, turn: 35, speed: 1.2, wobble: 0.2, deposit: 0.5, decay: 0.45, diffuse: 0.45, scale: 0.4, shape: 2, tint: [0.95, 0.6, 0.3, 1], contrast: 0.5, glow: 0.7, relief: 0.35, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Neural lace', values: { agents: 0.3, sensor: 16, sensorAngle: 22, turn: 22, speed: 1, wobble: 0.12, deposit: 0.8, decay: 0.55, diffuse: 0.35, scale: 0.6, shape: 0, tint: [0.85, 0.75, 0.95, 1], contrast: 0.7, glow: 0.8, relief: 0.3, rate: 1, zoom: 1, ground: [0.012, 0.012, 0.01, 1], lightAngle: 2.36 } },
+    { name: 'Microscope', values: { agents: 0.6, sensor: 8, sensorAngle: 28, turn: 40, speed: 0.9, wobble: 0.1, deposit: 0.7, decay: 0.45, diffuse: 0.55, rate: 1, scale: 0.45, zoom: 2.5, shape: 0, tint: [0.98, 0.92, 0.55, 1], ground: [0.02, 0.018, 0.012, 1], contrast: 0.6, glow: 0.6, relief: 0.7, lightAngle: 2.36 } },
+    { name: 'Blueprint', values: { agents: 0.5, sensor: 14, sensorAngle: 20, turn: 30, speed: 1.1, wobble: 0.08, deposit: 0.6, decay: 0.4, diffuse: 0.35, rate: 1, scale: 0.35, zoom: 1, shape: 0, tint: [0.1, 0.18, 0.38, 1], ground: [0.86, 0.84, 0.78, 1], contrast: 0.65, glow: 0, relief: 0.15, lightAngle: 2.36 } },
+    { name: 'Slow bloom', values: { agents: 0.9, sensor: 30, sensorAngle: 45, turn: 30, speed: 0.4, wobble: 0.2, deposit: 0.3, decay: 0.15, diffuse: 0.25, rate: 0.4, scale: 0.6, zoom: 1, shape: 1, tint: [0.75, 0.95, 0.7, 1], ground: [0.01, 0.014, 0.012, 1], contrast: 0.45, glow: 0.5, relief: 0.4, lightAngle: 4.2 } },
+    { name: 'Fizz', values: { agents: 0.7, sensor: 3, sensorAngle: 80, turn: 80, speed: 2.2, wobble: 0.8, deposit: 0.4, decay: 0.8, diffuse: 0.7, rate: 1.2, scale: 0.3, zoom: 1, shape: 0, tint: [0.95, 0.55, 0.75, 1], ground: [0.014, 0.01, 0.014, 1], contrast: 0.55, glow: 0.4, relief: 0.3, lightAngle: 1.2 } }
   ],
   'gen-fluid': [
-    { name: 'Ink in water', values: { kind: 0, flow: 0.6, sources: 2, size: 1, wander: 0.5, swirl: 0.5, buoyancy: 0.1, viscosity: 0.2, fade: 0.25, rate: 1, detail: 0.5, colorA: [0.86, 0.9, 0.95, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.015, 0.018, 0.024, 1], relief: 0.35 } },
-    { name: 'Indigo bloom', values: { kind: 0, flow: 0.45, sources: 1, size: 1.4, wander: 0.3, swirl: 0.8, buoyancy: -0.3, viscosity: 0.1, fade: 0.1, rate: 0.8, detail: 0.6, colorA: [0.25, 0.35, 0.85, 1], colorB: [0.12, 0.18, 0.6, 1], ground: [0.01, 0.012, 0.02, 1], relief: 0.4 } },
-    { name: 'Marbling', values: { kind: 0, flow: 0.9, sources: 4, size: 0.8, wander: 0.8, swirl: 1.1, buoyancy: 0, viscosity: 0, fade: 0.05, rate: 1, detail: 0.65, colorA: [0.9, 0.86, 0.75, 1], colorB: [0.55, 0.1, 0.12, 1], ground: [0.02, 0.02, 0.025, 1], relief: 0.5 } },
-    { name: 'Smoke column', values: { kind: 1, flow: 0.7, sources: 1, size: 1.2, wander: 0.3, swirl: 0.6, buoyancy: 0.5, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.75, 0.75, 0.78, 1], ground: [0.012, 0.012, 0.015, 1], relief: 0.45 } },
-    { name: 'Incense', values: { kind: 1, flow: 0.35, sources: 3, size: 0.5, wander: 0.6, swirl: 0.9, buoyancy: 0.35, viscosity: 0.05, fade: 0.2, rate: 0.8, detail: 0.6, colorA: [0.8, 0.82, 0.88, 1], ground: [0.01, 0.01, 0.014, 1], relief: 0.3 } },
-    { name: 'Campfire', values: { kind: 2, flow: 0.9, sources: 3, size: 1, wander: 0.4, swirl: 0.7, buoyancy: 0.6, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.5, 0.48, 0.46, 1], ground: [0.008, 0.006, 0.006, 1], glow: 1.1 } },
-    { name: 'Candle', values: { kind: 2, flow: 0.5, sources: 1, size: 0.6, wander: 0.15, swirl: 0.35, buoyancy: 0.5, viscosity: 0.3, fade: 0.45, rate: 1, detail: 0.6, colorA: [0.4, 0.38, 0.36, 1], ground: [0.006, 0.005, 0.005, 1], glow: 1.2 } }
+    { name: 'Ink in water', values: { kind: 0, flow: 0.6, sources: 2, size: 1, wander: 0.5, swirl: 0.5, buoyancy: 0.1, viscosity: 0.2, fade: 0.25, rate: 1, detail: 0.5, colorA: [0.86, 0.9, 0.95, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.015, 0.018, 0.024, 1], relief: 0.35, glow: 1, lightAngle: 2.36 } },
+    { name: 'Indigo bloom', values: { kind: 0, flow: 0.45, sources: 1, size: 1.4, wander: 0.3, swirl: 0.8, buoyancy: -0.3, viscosity: 0.1, fade: 0.1, rate: 0.8, detail: 0.6, colorA: [0.25, 0.35, 0.85, 1], colorB: [0.12, 0.18, 0.6, 1], ground: [0.01, 0.012, 0.02, 1], relief: 0.4, glow: 1, lightAngle: 2.36 } },
+    { name: 'Marbling', values: { kind: 0, flow: 0.9, sources: 4, size: 0.8, wander: 0.8, swirl: 1.1, buoyancy: 0, viscosity: 0, fade: 0.05, rate: 1, detail: 0.65, colorA: [0.9, 0.86, 0.75, 1], colorB: [0.55, 0.1, 0.12, 1], ground: [0.02, 0.02, 0.025, 1], relief: 0.5, glow: 1, lightAngle: 2.36 } },
+    { name: 'Smoke column', values: { kind: 1, flow: 0.7, sources: 1, size: 1.2, wander: 0.3, swirl: 0.6, buoyancy: 0.5, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.75, 0.75, 0.78, 1], ground: [0.012, 0.012, 0.015, 1], relief: 0.45, colorB: [0.95, 0.45, 0.18, 1], glow: 1, lightAngle: 2.36 } },
+    { name: 'Incense', values: { kind: 1, flow: 0.35, sources: 3, size: 0.5, wander: 0.6, swirl: 0.9, buoyancy: 0.35, viscosity: 0.05, fade: 0.2, rate: 0.8, detail: 0.6, colorA: [0.8, 0.82, 0.88, 1], ground: [0.01, 0.01, 0.014, 1], relief: 0.3, colorB: [0.95, 0.45, 0.18, 1], glow: 1, lightAngle: 2.36 } },
+    { name: 'Campfire', values: { kind: 2, flow: 0.9, sources: 3, size: 1, wander: 0.4, swirl: 0.7, buoyancy: 0.6, viscosity: 0.15, fade: 0.3, rate: 1, detail: 0.5, colorA: [0.5, 0.48, 0.46, 1], ground: [0.008, 0.006, 0.006, 1], glow: 1.1, colorB: [0.95, 0.45, 0.18, 1], relief: 0.35, lightAngle: 2.36 } },
+    { name: 'Candle', values: { kind: 2, flow: 0.5, sources: 1, size: 0.6, wander: 0.15, swirl: 0.35, buoyancy: 0.5, viscosity: 0.3, fade: 0.45, rate: 1, detail: 0.6, colorA: [0.4, 0.38, 0.36, 1], ground: [0.006, 0.005, 0.005, 1], glow: 1.2, colorB: [0.95, 0.45, 0.18, 1], relief: 0.35, lightAngle: 2.36 } },
+    { name: 'Milk swirl', values: { kind: 0, flow: 0.5, sources: 2, size: 1.2, wander: 0.35, swirl: 0.7, buoyancy: -0.5, viscosity: 0.3, fade: 0.15, rate: 0.9, detail: 0.55, colorA: [0.92, 0.88, 0.8, 1], colorB: [0.55, 0.38, 0.22, 1], ground: [0.08, 0.05, 0.03, 1], glow: 1, relief: 0.4, lightAngle: 2.36 } },
+    { name: 'Fog bank', values: { kind: 1, flow: 0.3, sources: 6, size: 2.2, wander: 0.9, swirl: 0.3, buoyancy: 0.15, viscosity: 0.5, fade: 0.08, rate: 0.6, detail: 0.35, colorA: [0.62, 0.68, 0.72, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.02, 0.024, 0.03, 1], glow: 1, relief: 0.25, lightAngle: 2.36 } },
+    { name: 'Embers', values: { kind: 2, flow: 0.7, sources: 5, size: 0.55, wander: 0.8, swirl: 1, buoyancy: 0.5, viscosity: 0, fade: 0.35, rate: 0.9, detail: 0.7, colorA: [0.2, 0.18, 0.17, 1], colorB: [0.95, 0.45, 0.18, 1], ground: [0.005, 0.004, 0.004, 1], glow: 1.5, relief: 0.3, lightAngle: 2.36 } }
   ],
   'gen-nca': [
     { name: 'Lava field', values: { texture: 0, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
@@ -1186,7 +1235,11 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Moss and stone', values: { texture: 1, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
     { name: 'Lichen crust', values: { texture: 1, cells: 360, speed: 150, drift: 0, colour: 0.7, bright: 1 } },
     { name: 'Bark', values: { texture: 2, cells: 216, speed: 90, drift: 0, colour: 1, bright: 1 } },
-    { name: 'Gray bark', values: { texture: 2, cells: 300, speed: 120, drift: 0, colour: 0.15, bright: 1.05 } }
+    { name: 'Gray bark', values: { texture: 2, cells: 300, speed: 120, drift: 0, colour: 0.15, bright: 1.05 } },
+    { name: 'Slow magma', values: { texture: 0, cells: 260, speed: 20, drift: 0, colour: 0.9, bright: 0.85 } },
+    { name: 'Drifting moss', values: { texture: 1, cells: 170, speed: 100, drift: 0.4, colour: 0.95, bright: 1 } },
+    { name: 'Charred bark', values: { texture: 2, cells: 90, speed: 60, drift: 0, colour: 0.3, bright: 0.65 } },
+    { name: 'Fever lava', values: { texture: 0, cells: 380, speed: 300, drift: -0.25, colour: 1, bright: 1.25 } }
   ],
   scan: [
     { name: 'Granite face', values: { material: 11, scale: 1.4, drift: 0.03, weather: 0.35, colour: 1 } },
@@ -1245,7 +1298,8 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Broad bands', values: { count: 2, ratio: 2, rate: 0.25, freq: 1.5, thickness: 0.28, lines: 3, skew: 0.2, angle: 0.5, audio: 0, tint: [0.7, 0.72, 0.68, 1] } },
     { name: 'Nervous', values: { count: 6, ratio: 2.7, rate: 1.4, freq: 8, thickness: 0.06, lines: 12, skew: 0.55, angle: 3, audio: 0, tint: [0.8, 0.55, 0.3, 1] } },
     { name: 'Tidal', values: { count: 4, ratio: 1.8, rate: 0.18, freq: 2.5, thickness: 0.15, lines: 5, skew: 0.45, angle: 1.5, audio: 0, tint: [0.5, 0.68, 0.7, 1] } },
-    { name: 'Band rhythm', values: { count: 5, ratio: 1.5, rate: 0.35, freq: 3.5, thickness: 0.1, lines: 7, skew: 0.4, angle: 0.9, audio: 0.7, tint: [0.82, 0.84, 0.8, 1] } }
+    { name: 'Band rhythm', values: { count: 5, ratio: 1.5, rate: 0.35, freq: 3.5, thickness: 0.1, lines: 7, skew: 0.4, angle: 0.9, audio: 0.7, tint: [0.82, 0.84, 0.8, 1] } },
+    { name: 'Engraving', values: { count: 8, ratio: 1.25, rate: 0.2, freq: 11, thickness: 0.04, lines: 14, skew: 0.15, angle: 4.4, audio: 0, tint: [0.9, 0.86, 0.74, 1] } }
   ],
   'drift-field': [
     { name: 'Slow tide', values: { rate: 0.07, scale: 1.6, warp: 0.3, steps: 4, contrast: 1.05, split: 0.08, angle: 0 } },
@@ -1297,7 +1351,8 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Palette knife', values: { coverage: 0.6, scale: 1.1, detail: 0.5, drift: 0.12, evolve: 0.15, horizon: 0.6, sun: 0.3, sunHeight: 0.3, glow: 0.5, shadow: 0.7, brush: 0.9, mixing: 0.05, impasto: 0.9, canvas: 0.1, audio: 0, sky: [0.26, 0.34, 0.5, 1], light: [1, 0.84, 0.6, 1], shade: [0.36, 0.3, 0.44, 1] } },
     { name: 'Glaze', values: { coverage: 0.5, scale: 0.9, detail: 0.4, drift: 0.06, evolve: 0.1, horizon: 0.55, sun: 0.2, sunHeight: 0.4, glow: 0.6, shadow: 0.55, brush: 0.25, mixing: 0.9, impasto: 0.2, canvas: 0.45, audio: 0, sky: [0.3, 0.4, 0.56, 1], light: [1, 0.9, 0.75, 1], shade: [0.42, 0.4, 0.52, 1] } },
     { name: 'Pastel dawn', values: { coverage: 0.45, scale: 1.3, detail: 0.55, drift: 0.1, evolve: 0.12, horizon: 0.8, sun: 0.35, sunHeight: 0.08, glow: 0.5, shadow: 0.45, brush: 0.5, mixing: 0.6, impasto: 0.45, canvas: 0.3, audio: 0, sky: [0.42, 0.46, 0.62, 1], light: [0.95, 0.75, 0.68, 1], shade: [0.55, 0.48, 0.6, 1] } },
-    { name: 'Breathing sky', values: { coverage: 0.5, scale: 1, detail: 0.55, drift: 0.12, evolve: 0.2, horizon: 0.65, sun: 0.25, sunHeight: 0.3, glow: 0.55, shadow: 0.65, brush: 0.55, mixing: 0.45, impasto: 0.55, canvas: 0.25, audio: 0.7, sky: [0.3, 0.42, 0.62, 1], light: [1, 0.88, 0.7, 1], shade: [0.42, 0.38, 0.5, 1] } }
+    { name: 'Breathing sky', values: { coverage: 0.5, scale: 1, detail: 0.55, drift: 0.12, evolve: 0.2, horizon: 0.65, sun: 0.25, sunHeight: 0.3, glow: 0.55, shadow: 0.65, brush: 0.55, mixing: 0.45, impasto: 0.55, canvas: 0.25, audio: 0.7, sky: [0.3, 0.42, 0.62, 1], light: [1, 0.88, 0.7, 1], shade: [0.42, 0.38, 0.5, 1] } },
+    { name: 'High noon', values: { coverage: 0.42, scale: 1.4, detail: 0.6, drift: 0.18, evolve: 0.18, horizon: 0.45, sun: 0, sunHeight: 0.85, glow: 0.3, shadow: 0.55, brush: 0.5, mixing: 0.4, impasto: 0.6, canvas: 0.2, audio: 0, sky: [0.2, 0.42, 0.78, 1], light: [1, 0.98, 0.94, 1], shade: [0.5, 0.56, 0.68, 1] } }
   ],
   contour: [
     { name: 'Survey map', values: { rate: 0.06, scale: 2.2, levels: 12, width: 0.1, warp: 0.4, fill: 0.1, major: 5, audioSwell: 0 } },
