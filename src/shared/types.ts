@@ -1482,7 +1482,9 @@ export interface ExposedApi {
   captureOpenScreenSettings: () => Promise<boolean>
   // Output window (2nd display / projector) : mirror via WebRTC loopback.
   outputDisplays: () => Promise<DisplayInfo[]>
-  outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean>
+  // A string : refused, and why (-1 never takes a fullscreen or span output off
+  // its projector).
+  outputOpen: (displayId: number, windowed?: boolean) => Promise<boolean | string>
   // Multi-projector span : one borderless output window across several displays'
   // union bounds (each projector a separate, adjacent monitor).
   outputOpenSpan: (displayIds: number[]) => Promise<boolean>

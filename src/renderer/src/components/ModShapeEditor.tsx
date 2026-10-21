@@ -30,6 +30,8 @@ function ShapeMeter({ id, mod, threshold }: { id: string; mod: number; threshold
   const rawRef = useRef<HTMLDivElement | null>(null)
   const outRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
+    // the clock of the window it is in (the Output page can have its own)
+    const view = rawRef.current?.ownerDocument.defaultView ?? window
     let raf = 0
     const paint = (): void => {
       const live = shapedLive.get(id)
@@ -37,10 +39,10 @@ function ShapeMeter({ id, mod, threshold }: { id: string; mod: number; threshold
       const out = live ? live.out : raw
       if (rawRef.current) rawRef.current.style.width = `${Math.round(raw * 100)}%`
       if (outRef.current) outRef.current.style.width = `${Math.round(out * 100)}%`
-      raf = requestAnimationFrame(paint)
+      raf = view.requestAnimationFrame(paint)
     }
-    raf = requestAnimationFrame(paint)
-    return () => cancelAnimationFrame(raf)
+    raf = view.requestAnimationFrame(paint)
+    return () => view.cancelAnimationFrame(raf)
   }, [id, mod])
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5" title="Top : the modulator as it comes (the tick : the threshold). Bottom : what the shaping gives, before depth and mode.">

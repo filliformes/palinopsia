@@ -1680,6 +1680,7 @@ function ResourceHud(): JSX.Element {
     hz: null
   })
   const [fps, setFps] = useState(0)
+  const hudRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -1700,6 +1701,9 @@ function ResourceHud(): JSX.Element {
   }, [])
 
   useEffect(() => {
+    // On the clock of the window it is in (the Output page can have its own,
+    // which keeps running while the instrument is minimized).
+    const view = hudRef.current?.ownerDocument.defaultView ?? window
     let raf = 0
     let last = 0
     const tick = (t: number): void => {
@@ -1707,10 +1711,10 @@ function ResourceHud(): JSX.Element {
         setFps(currentFps())
         last = t
       }
-      raf = requestAnimationFrame(tick)
+      raf = view.requestAnimationFrame(tick)
     }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    raf = view.requestAnimationFrame(tick)
+    return () => view.cancelAnimationFrame(raf)
   }, [])
 
   const pct = (v: number | null): string => (v == null ? '-' : `${Math.round(v)}%`)
@@ -1731,7 +1735,7 @@ function ResourceHud(): JSX.Element {
         : String(Math.round(fps))
       : '-'
   return (
-    <div className="flex shrink-0 items-center justify-center gap-6 border-t border-border bg-panel/60 py-2 font-mono">
+    <div ref={hudRef} className="flex shrink-0 items-center justify-center gap-6 border-t border-border bg-panel/60 py-2 font-mono">
       {cell(
         'FPS',
         fpsValue,

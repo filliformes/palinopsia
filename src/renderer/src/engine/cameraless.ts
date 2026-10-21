@@ -22,7 +22,7 @@
 // grab() (the filmGrab event) re-draws now, or re-freezes the gate on the live frame.
 // The draw clock runs on real time (the projector's rate), not on the master Speed :
 // a slowed or paused picture still weaves and steps like film in a running gate.
-// Dust, hair and scratches are NOT here : they live in filmDamage.ts (their own film
+// Dust and scratches are NOT here : they live in filmDamage.ts (their own film
 // clock, and they work with Film Hold off); weave() hands them this stage's boil.
 
 import type { FilmWeave } from './filmDamage'

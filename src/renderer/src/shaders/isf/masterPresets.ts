@@ -655,7 +655,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grade', inputs: { contrast: 1.08, saturation: 1.1, lift: 0.02 } },
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.06, size: 1.4, chroma: 0 } }
     ],
-    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.46, 0.56, 1], highTint: [0.58, 0.52, 0.42, 1] }
+    vibe: { contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.46, 0.56, 1], highTint: [0.58, 0.52, 0.42, 1] }
   },
   {
     // The painter's two temperatures over any picture : warm lights, cool
@@ -665,7 +665,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grade', inputs: { contrast: 1.12, saturation: 1.18, lift: 0.0 } },
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.3, chroma: 0 } }
     ],
-    vibe: { mixSrc: 1, contrast: 1.06, saturation: 1.1, gamma: 1, autoLevel: 0.1, splitTone: 0.5, shadowTint: [0.3, 0.42, 0.7, 1], highTint: [0.75, 0.55, 0.3, 1] }
+    vibe: { contrast: 1.06, saturation: 1.1, gamma: 1, autoLevel: 0.1, splitTone: 0.5, shadowTint: [0.3, 0.42, 0.7, 1], highTint: [0.75, 0.55, 0.3, 1] }
   },
   {
     name: 'Codec Rot',
@@ -674,7 +674,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'node-codecmosh', inputs: { cuts: 0.75, pulse: 0, refresh: 0.2, bloom: 0.45, drop: 0.05, quality: 0.35, size: 2, motionFrom: 0, mix: 1 } },
       { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0.02 } }
     ],
-    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.15, shadowTint: [0.44, 0.48, 0.55, 1], highTint: [0.56, 0.52, 0.45, 1] }
+    vibe: { contrast: 1.05, saturation: 1.05, gamma: 1, autoLevel: 0.15, splitTone: 0.15, shadowTint: [0.44, 0.48, 0.55, 1], highTint: [0.56, 0.52, 0.45, 1] }
   },
   {
     name: 'Keyframe Hunger',
@@ -684,7 +684,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-compress', inputs: { block: 16, quality: 0.3, ring: 0.4, chroma: 0.5, grid: 0.1 } },
       { shaderId: 'fx-grade', inputs: { contrast: 1.15, saturation: 0.9, lift: 0.04 } }
     ],
-    vibe: { mixSrc: 1, contrast: 1.1, saturation: 0.9, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.5, 0.47, 0.44, 1], highTint: [0.5, 0.52, 0.56, 1] }
+    vibe: { contrast: 1.1, saturation: 0.9, gamma: 1, autoLevel: 0.2, splitTone: 0.2, shadowTint: [0.5, 0.47, 0.44, 1], highTint: [0.5, 0.52, 0.56, 1] }
   },
   {
     name: 'Liquid Mosh',

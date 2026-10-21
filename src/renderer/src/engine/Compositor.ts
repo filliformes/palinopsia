@@ -1739,12 +1739,11 @@ export class Compositor {
   private cfSplice = 0;
   private cfGrab = 0; // filmGrab event (momentary 0/1) : re-draw / re-freeze on its rising edge
   private cfGrabPrev = 0;
-  // Film damage (dust, fibres, gate hair, scratches) : its own stage right after
+  // Film damage (dust, fibres, scratches) : its own stage right after
   // Cameraless, on whenever any of it is up (Film Hold or not). fd* ← film* inputs.
   private filmDamage: FilmDamage | null = null;
   private fdDust = 0;
   private fdScratch = 0;
-  private fdHair = 0;
   private fdGauge = 1; // 0 35 mm · 1 16 mm · 2 Super 8
   private fdDirt = 0; // 0 print · 1 mixed · 2 negative
   private fdBurst = 0; // filmBurst event (momentary 0/1) : a dirt burst on its rising edge
@@ -3037,7 +3036,6 @@ export class Compositor {
     this.cfGrab = numf(fi.filmGrab, 0);
     this.fdDust = numf(fi.filmDust, 0);
     this.fdScratch = numf(fi.filmScratch, 0);
-    this.fdHair = numf(fi.filmHair, 0);
     this.fdGauge = Math.round(numf(fi.filmGauge, 1));
     this.fdDirt = Math.round(numf(fi.filmDirt, 0));
     this.fdBurst = numf(fi.filmBurst, 0);
@@ -3094,7 +3092,6 @@ export class Compositor {
           case 'filmGrab': this.cfGrab = value; break;
           case 'filmDust': this.fdDust = value; break;
           case 'filmScratch': this.fdScratch = value; break;
-          case 'filmHair': this.fdHair = value; break;
           case 'filmGauge': this.fdGauge = Math.round(value); break;
           case 'filmDirt': this.fdDirt = Math.round(value); break;
           case 'filmBurst': this.fdBurst = value; break;
@@ -3575,7 +3572,7 @@ export class Compositor {
     if (!filmRan) this.cameraless?.reset();
     this.cfRan = filmRan;
 
-    // Film damage : dust, fibres, gate hair, scratches on a 24 fps film clock
+    // Film damage : dust, fibres, scratches on a 24 fps film clock
     // (engine/filmDamage.ts). Dirt rides the boil above; skipped entirely when off,
     // except while a triggered dirt burst plays out.
     const burstEdge = this.fdBurst >= 0.5 && this.fdBurstPrev < 0.5;
@@ -3584,11 +3581,11 @@ export class Compositor {
       if (!this.filmDamage) this.filmDamage = new FilmDamage(gl);
       this.filmDamage.burstNow();
     }
-    if (this.fdDust > 0.001 || this.fdScratch > 0.001 || this.fdHair > 0.001 || this.filmDamage?.bursting()) {
+    if (this.fdDust > 0.001 || this.fdScratch > 0.001 || this.filmDamage?.bursting()) {
       if (!this.filmDamage) this.filmDamage = new FilmDamage(gl);
       composite = this.filmDamage.apply(
         composite, rawDt,
-        { dust: this.fdDust, scratch: this.fdScratch, hair: this.fdHair, gauge: this.fdGauge, dirt: this.fdDirt },
+        { dust: this.fdDust, scratch: this.fdScratch, gauge: this.fdGauge, dirt: this.fdDirt },
         weave, this.w, this.h
       );
     }

@@ -130,7 +130,7 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.04, bloom: 0.06, depth: 0.12, haze: 0.02 },
     finalizer: {
       filmHold: 1, filmRate: 10, filmJitter: 0.2, filmBoil: 0.15, filmFlutter: 0.12,
-      filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.2, filmScratch: 0.3, filmHair: 0,
+      filmBlank: 0.35, filmBlankMode: 0, filmDust: 0.2, filmScratch: 0.3,
       filmGauge: 0, filmDirt: 0, filmGranule: 0, filmSplice: 0.05
     },
     autoMod: { feature: 'transient', target: 'bloom', depth: 0.4 }
@@ -144,7 +144,7 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.2, bloom: 0.18, depth: 0.28, haze: 0.1 },
     finalizer: {
       filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
-      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15, filmHair: 0,
+      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15,
       filmGauge: 1, filmDirt: 1, filmGranule: 0.6, filmSplice: 0.03
     },
     autoMod: null // "silent by conviction" : audio decoupled
@@ -158,7 +158,7 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.12, bloom: 0.1, depth: 0.35, haze: 0.08 },
     finalizer: {
       filmHold: 1, filmRate: 8, filmJitter: 0.35, filmBoil: 0.4, filmFlutter: 0.25,
-      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6, filmHair: 0,
+      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6,
       filmGauge: 1, filmDirt: 0, filmGranule: 0.35, filmSplice: 0.08
     },
     autoMod: { feature: 'level', target: 'haze', depth: 0.3 }
@@ -211,17 +211,16 @@ export const WORLD_FILM_KEYS: Array<{ k: string; label: string; min: number; max
   { k: 'filmBlank', label: 'blanks', min: 0, max: 1 },
   { k: 'filmDust', label: 'dust', min: 0, max: 1 },
   { k: 'filmScratch', label: 'scratch', min: 0, max: 1 },
-  { k: 'filmHair', label: 'gate hair', min: 0, max: 1 },
   { k: 'filmGranule', label: 'granulation', min: 0, max: 1 },
   { k: 'filmSplice', label: 'splice', min: 0, max: 1 }
 ]
 // The film menus a World carries too (the built-ins do), outside the editor's rows.
 const WORLD_FILM_MENUS = ['filmBlankMode', 'filmGauge', 'filmDirt']
 // What a World without film puts back : the hold and the damage off.
-const FILM_OFF: Record<string, number> = { filmHold: 0, filmDust: 0, filmScratch: 0, filmHair: 0 }
+const FILM_OFF: Record<string, number> = { filmHold: 0, filmDust: 0, filmScratch: 0 }
 // A film is on in a composition when any of these marks it (the rest have
 // non-zero defaults and say nothing by themselves).
-const FILM_MARKS = ['filmHold', 'filmBlank', 'filmDust', 'filmScratch', 'filmHair', 'filmGranule', 'filmSplice']
+const FILM_MARKS = ['filmHold', 'filmBlank', 'filmDust', 'filmScratch', 'filmGranule', 'filmSplice']
 
 export const WORLD_COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 
@@ -597,11 +596,9 @@ export function worldEffects(world: World, c: CompositionState): string[] {
   }
   const film = world.finalizer
   if (film && Object.keys(film).length) {
-    const hair = num(film.filmHair, 0)
     const gran = num(film.filmGranule, 0)
     out.push(
       `film : hold ${['off', 'on', 'freeze'][Math.round(num(film.filmHold, 0))] ?? 'off'} · dust ${num(film.filmDust, 0).toFixed(2)} · scratch ${num(film.filmScratch, 0).toFixed(2)}` +
-        (hair > 0 ? ` · hair ${hair.toFixed(2)}` : '') +
         (gran > 0 ? ` · granulation ${gran.toFixed(2)}` : '')
     )
   } else out.push('film off')
@@ -629,7 +626,7 @@ export function worldFromComposition(c: CompositionState): Pick<World, 'coupling
   const ctxInst = c.master.find((f) => f.shaderId === 'fx-context')
   const context: Record<string, number> = {}
   for (const { k } of WORLD_CONTEXT_KEYS) context[k] = round(num(ctxInst?.inputs[k], CONTEXT_DEFAULTS[k] ?? 0))
-  // The film, when anything marks it (a hair-only or a granulated film counts),
+  // The film, when anything marks it (a granulated film counts),
   // read whole : a key the session lacks is what the stage plays without it.
   const finInst = c.master.find((f) => f.shaderId === 'fx-finalizer')
   let finalizer: Record<string, number> | undefined

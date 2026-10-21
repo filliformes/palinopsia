@@ -476,13 +476,13 @@ export function makeFinalizer(): FxInstance {
 
 // The Cameraless / direct-film input names on the Finalizer. Removing these keys
 // drops the finalizer back to a clean grade (they fall to their neutral ISF
-// defaults : hold off, no dust / scratch / hair). Used by New to open a
+// defaults : hold off, no dust / scratch). Used by New to open a
 // blank slate even when the active World is a direct-film mode : Griffé / Peint
 // / Pressé inject filmHold + dust via applyWorldToComposition, which is what
 // used to make a New session open with drawn-film "rectangles" over the picture.
 const FINALIZER_FILM_KEYS = [
   'filmHold', 'filmRate', 'filmJitter', 'filmBoil', 'filmFlutter',
-  'filmBlank', 'filmBlankMode', 'filmDust', 'filmScratch', 'filmHair', 'filmGauge', 'filmDirt',
+  'filmBlank', 'filmBlankMode', 'filmDust', 'filmScratch', 'filmGauge', 'filmDirt',
   'filmGranule', 'filmSplice'
 ] as const
 
@@ -934,12 +934,34 @@ function dropRemovedInputs(c: CompositionState): CompositionState {
   })
 }
 
+// The gate hair is gone (the Finalizer's filmHair) : an older session's value
+// goes, and with it its modulation rows, its Meta destinations and what a World
+// left of it to fade (no dead rows).
+function withoutGateHair(c: CompositionState): CompositionState {
+  const fin = new Set((c.master ?? []).filter((f) => f.shaderId === 'fx-finalizer').map((f) => f.id))
+  const hit = (t: ModTarget | undefined): boolean => !!t && t.kind === 'fx' && t.input === 'filmHair' && fin.has(t.instId)
+  const drop = <T>(r: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!r || typeof r !== 'object' || !('filmHair' in r)) return r
+    const { filmHair: _gone, ...rest } = r
+    return rest
+  }
+  return {
+    ...c,
+    master: c.master?.map((f) => (fin.has(f.id) && f.inputs && 'filmHair' in f.inputs ? { ...f, inputs: drop(f.inputs)! } : f)),
+    modMatrix: c.modMatrix?.filter((a) => !hit(a.target)),
+    metaKnobs: c.metaKnobs?.map((k) => (k?.destinations?.some(hit) ? { ...k, destinations: k.destinations.filter((t) => !hit(t)) } : k)),
+    worldBase: drop(c.worldBase),
+    worldShift: drop(c.worldShift)
+  }
+}
+
 // Migrate a composition loaded from disk (or a recalled scene) up to the current
 // schema : backfill new layer/background/master/modulator/metaKnob fields so an
 // older session — or a scene inside one — can never hand the engine an undefined
 // slab or a locked-tail that's missing the Vibe → Context → Finalizer stages.
 // Idempotent : safe to run on an already-current composition.
 export function normalizeComposition(c: CompositionState): CompositionState {
+  c = withoutGateHair(c)
   return dropRemovedInputs({
     ...c,
     // a hand-edited session with no BPM (or null) : the default, not a NaN tempo
@@ -5405,7 +5427,8 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: adoptLegacyWorldMod(normalizeComposition(sc.composition)) })),
       activeSceneId: null,
       // what the session holds persistent (none in an older file)
-      pins: Array.isArray(s.pins) ? [...new Set(s.pins.filter((k): k is string => typeof k === 'string'))] : [],
+      // (a pin on the gone gate hair holds nothing : dropped)
+      pins: Array.isArray(s.pins) ? [...new Set(s.pins.filter((k): k is string => typeof k === 'string' && !/^fx:master:[^:]+:filmHair$/.test(k)))] : [],
       variationBaseline: null,
       // The old selection can dangle onto an FX unit the loaded session lacks, and
       // the old palette name no longer describes it : reset both (as newSession does).

@@ -1,8 +1,8 @@
-// Film damage : dust, fibres, a hair in the gate and scratches, modelled on what
+// Film damage : dust, fibres and scratches, modelled on what
 // real prints do (research : Ivanova et al., Eurographics 2023, 12k hand-labelled
 // flaws on 4K scans; a film stock maker's handling notes; Joyeux et al. on scratch
 // motion; the commercial film-damage plug-ins as the professional baseline). Runs after the
-// Cameraless stage, whenever dust / scratch / hair is up, Film Hold or not.
+// Cameraless stage, whenever dust / scratch is up, Film Hold or not.
 //
 // What makes it read as film rather than as noise :
 //   - a FILM CLOCK (24 fps, Super 8 18), separate from the draw clock : dust lives
@@ -21,14 +21,12 @@
 //     frame + (1 - y) gives in one stroke the slight slant, the continuity from
 //     frame to frame, the partial first/last frame and the slow sinusoidal
 //     wander of a roller scratch; gaps, width and strength vary along them;
-//   - dirt and scratches sit on the film, so they ride the Cameraless boil;
-//     the gate hair sits in the projector, so it doesn't.
+//   - dirt and scratches sit on the film, so they ride the Cameraless boil.
 // The grid below only decides WHERE a particle spawns, never its shape.
 
 export interface FilmDamageParams {
   dust: number // 0..1 : specks per film frame on a curve (0.15 ~1, 0.5 ~17, 1 ~80)
   scratch: number // 0..1 : how often a scratch starts (0.5 ~1.4 live at once, 1 ~5)
-  hair: number // 0..1 : share of the time a hair sits in the gate
   gauge: number // 0 35 mm · 1 16 mm · 2 Super 8
   dirt: number // 0 print (dark) · 1 mixed · 2 negative (white sparkle)
 }
@@ -77,7 +75,6 @@ uniform float uCount;       // expected specks this film frame
 uniform uint uSaltF, uSaltC, uSaltMap; // per-film-frame salts
 uniform int uFibN;
 uniform vec4 uFib[${MAX_FIBRES * 2}];   // A.xy B.xy · C.xy width opacity(<0 = white)
-uniform vec4 uHair[3];      // A.xy B.xy · C.xy E.xy · width opacity on -
 uniform int uScrN;
 uniform vec4 uScr[${MAX_SCRATCH * 3}];  // x0 amp freq phase · width type s0 s1 · drift depth seed strength
 
@@ -247,23 +244,6 @@ void main(){
       else { vec3 drop = clamp(vec3(dp - 2.0, dp - 1.0, dp), 0.0, 1.0); col = mix(col, col * (1.0 - 0.92 * drop), cov * amt); }
     }
   }
-  // The gate hair : in the projector, so in screen space (the picture weaves under it).
-  if (uHair[2].z > 0.5) {
-    vec2 sp = (vUV - 0.5) * vec2(asp, 1.0);
-    vec2 A = uHair[0].xy, B = uHair[0].zw, C = uHair[1].xy, E = uHair[1].zw;
-    vec2 D = 2.0 * C - B;
-    float wd = uHair[2].x;
-    vec2 lo = min(min(min(A, B), min(C, D)), E) - vec2(wd + 3.0 * px), hi = max(max(max(A, B), max(C, D)), E) + vec2(wd + 3.0 * px);
-    if (sp.x > lo.x && sp.y > lo.y && sp.x < hi.x && sp.y < hi.y) {
-      float d = min(sdBez(sp, A, B, C), sdBez(sp, C, D, E));
-      float L = length(E - C) + length(C - A);
-      float tp = smoothstep(0.0, 0.3 * L, length(sp - E));
-      float ww = wd * mix(0.25, 1.0, tp);
-      float soft = max(px, 0.0005 * uGauge);
-      float cov = clamp((0.5 * ww + 0.5 * soft - d) / soft, 0.0, 1.0) * min(1.0, ww / soft);
-      col = mix(col, col * vec3(0.06, 0.05, 0.045), cov * uHair[2].y);
-    }
-  }
   frag = vec4(col, src.a);
 }`
 
@@ -307,20 +287,6 @@ interface Scratch {
   str: number
 }
 
-interface Hair {
-  A: [number, number] // anchored just outside a frame edge
-  B: [number, number]
-  C: [number, number]
-  E: [number, number] // the free end
-  t: [number, number] // across the hair (sway direction)
-  L: number
-  w: number
-  life: number // seconds
-  age: number
-  sway: number // Hz
-  ph: number
-}
-
 export class FilmDamage {
   private prog: WebGLProgram
   private quad: WebGLBuffer
@@ -345,11 +311,6 @@ export class FilmDamage {
   private scr: Scratch[] = []
   private lastScratch = 0
   private readonly scrBuf = new Float32Array(MAX_SCRATCH * 12)
-  // Gate hair.
-  private hair: Hair | null = null
-  private hairGap = 0
-  private lastHair = 0
-  private readonly hairBuf = new Float32Array(12)
 
   constructor(private gl: WebGL2RenderingContext) {
     const compile = (type: number, src: string): WebGLShader => {
@@ -460,81 +421,6 @@ export class FilmDamage {
     for (let i = 0; i < n; i++) this.spawnScratch(p, this.frame + R(), R() * 100)
   }
 
-  // ── Gate hair ──────────────────────────────────────────────────────────
-  private newHair(): void {
-    const k = GAUGES[this.gaugeIdx].k
-    const asp = this.asp
-    const hw = asp / 2
-    const u = 0.1 + 0.8 * R()
-    const e = R()
-    // Which edge it hangs from (rarely the top), anchored just outside it.
-    let A: [number, number] = [-hw + u * asp, 0.51]
-    let n: [number, number] = [0, -1]
-    if (e < 0.3) {
-      A = [-hw - 0.01, -0.5 + u]
-      n = [1, 0]
-    } else if (e < 0.6) {
-      A = [hw + 0.01, -0.5 + u]
-      n = [-1, 0]
-    } else if (e < 0.9) {
-      A = [-hw + u * asp, -0.51]
-      n = [0, 1]
-    }
-    const t: [number, number] = [-n[1], n[0]]
-    const L = Math.min(0.28, (0.04 + 0.12 * R()) * Math.sqrt(k))
-    const j = (): number => R() - 0.5
-    const C: [number, number] = [A[0] + n[0] * L * 0.55 + t[0] * L * j() * 0.5, A[1] + n[1] * L * 0.55 + t[1] * L * j() * 0.5]
-    const E: [number, number] = [A[0] + n[0] * L + t[0] * L * j() * 0.9, A[1] + n[1] * L + t[1] * L * j() * 0.9]
-    const B: [number, number] = [(A[0] + C[0]) / 2 + t[0] * L * j() * 0.6, (A[1] + C[1]) / 2 + t[1] * L * j() * 0.6]
-    this.hair = {
-      A, B, C, E, t, L,
-      w: (0.0018 + 0.0017 * R()) * Math.pow(k, 0.8),
-      life: clamp(-Math.log(1 - R()) * 10, 3, 60),
-      age: 0,
-      sway: 0.5 + 1.5 * R(),
-      ph: R() * 6.28
-    }
-  }
-
-  private stepHair(p: FilmDamageParams, dt: number): void {
-    const amt = clamp(p.hair, 0, 1)
-    if (amt <= 0.001) {
-      this.hair = null
-      this.hairBuf[10] = 0
-      this.lastHair = 0
-      return
-    }
-    // Turning it up from 0 : a hair shortly, so the control answers.
-    if (this.lastHair <= 0.001) this.hairGap = Math.min(this.hairGap, 0.3)
-    this.lastHair = amt
-    if (this.hair) {
-      this.hair.age += dt
-      if (this.hair.age > this.hair.life) {
-        this.hair = null
-        // Present ~10 s, absent long enough that it's there `amt` of the time.
-        this.hairGap = Math.max(0.5, -Math.log(1 - R()) * 10 * (1 - amt) / amt)
-      }
-    } else {
-      this.hairGap -= dt
-      if (this.hairGap <= 0) this.newHair()
-    }
-    const h = this.hair
-    if (!h) {
-      this.hairBuf[10] = 0
-      return
-    }
-    // Trembles with each pull-down, sways in the gate's air.
-    const k = GAUGES[this.gaugeIdx].k
-    const jt = (): number => gauss() * 0.0008 * k
-    const sw = Math.sin(6.2832 * h.sway * this.filmT + h.ph)
-    this.hairBuf.set([
-      h.A[0], h.A[1], h.B[0] + jt(), h.B[1] + jt(),
-      h.C[0] + jt() + h.t[0] * sw * 0.025 * h.L, h.C[1] + jt() + h.t[1] * sw * 0.025 * h.L,
-      h.E[0] + jt() + h.t[0] * sw * 0.06 * h.L, h.E[1] + jt() + h.t[1] * sw * 0.06 * h.L,
-      h.w, 0.85, 1, 0
-    ])
-  }
-
   /** The filmBurst event : a dirty stretch of film reaches the gate on the next
    *  film frame. Plays even with dust at 0 (a clean print hits a dirty patch). */
   burstNow(): void {
@@ -600,7 +486,6 @@ export class FilmDamage {
       if (this.gaugeIdx >= 0) this.filmT = this.frame / fps
       this.gaugeIdx = gi
       this.prefillScratches(p)
-      if (this.hair) this.newHair()
     }
     if (p.scratch <= 0.001) this.scr = []
     else if (this.lastScratch <= 0.001) this.prefillScratches(p)
@@ -608,15 +493,12 @@ export class FilmDamage {
     this.filmT += dt
     const f = Math.floor(this.filmT * fps)
     let n = 0
-    let stepped = false
     while (this.frame < f && n < 4) {
       this.frame++
       this.stepFrame(p)
       n++
-      stepped = true
     }
     this.frame = Math.max(this.frame, f)
-    if (stepped) this.stepHair(p, n / fps) // the hair trembles with each pull-down
 
     const gl = this.gl
     gl.useProgram(this.prog)
@@ -637,7 +519,6 @@ export class FilmDamage {
     gl.uniform1ui(this.u('uSaltMap'), hash32(fr ^ 0x9e3779b9))
     gl.uniform1i(this.u('uFibN'), this.fibN)
     gl.uniform4fv(this.u('uFib'), this.fib)
-    gl.uniform4fv(this.u('uHair'), this.hairBuf)
     // Scratch positions along the strip go relative to this frame (small floats).
     for (let i = 0; i < MAX_SCRATCH; i++) {
       const o = i * 12

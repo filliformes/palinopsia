@@ -10,6 +10,7 @@ import { useEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { OUTPUT_PAGE_FRAME } from '@shared/types'
 import { useStore } from '../store'
+import { watchUserInput } from '../sessionGuard'
 import { OutputPage } from './OutputPage'
 import { Toaster, showToast } from './Toast'
 
@@ -63,12 +64,20 @@ function copyRootAttributes(to: Document): void {
   }
 }
 
+// Keys the pages open on the instrument take for themselves (Esc closes the page
+// on top, the arrows step the World bank, Enter applies a World, Delete turns an
+// EQ band off) and no shortcut uses : here they are this window's own (its
+// buttons, its scroll), never a page's on the other screen.
+const OWN_KEYS = new Set(['Escape', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Delete', 'Backspace'])
+
 /** Typing in the window's own fields stays there; every other key goes to the
- *  instrument, as if pressed over it. */
+ *  instrument, as if pressed over it, but the page keys above. */
 function forwardKeys(w: Window): () => void {
   const fwd = (e: KeyboardEvent): void => {
     const el = e.target as HTMLElement | null
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
+    // (Esc still leaves MIDI Learn : its overlay covers this window too)
+    if (OWN_KEYS.has(e.key) && !(e.key === 'Escape' && useStore.getState().midiLearnMode)) return
     const copy = new KeyboardEvent(e.type, {
       key: e.key,
       code: e.code,
@@ -135,6 +144,9 @@ export function OutputPageWindow({ canvasRef }: { canvasRef: RefObject<HTMLCanva
     const rootObs = new MutationObserver(() => copyRootAttributes(doc))
     rootObs.observe(document.documentElement, { attributes: true })
     const unKeys = forwardKeys(w)
+    // an edit here is your hands on the controls too (a session just opened
+    // must not absorb it as the engine settling)
+    const unInput = watchUserInput(w)
 
     // Closed from its own title bar : the page closes (next time it opens in
     // the app). Not when this closes it : the listener is gone by then.
@@ -151,6 +163,7 @@ export function OutputPageWindow({ canvasRef }: { canvasRef: RefObject<HTMLCanva
       rootObs.disconnect()
       if (queued) cancelAnimationFrame(queued)
       unKeys()
+      unInput()
       w!.removeEventListener('beforeunload', onGone)
       window.clearInterval(keep)
       setHost(null)
