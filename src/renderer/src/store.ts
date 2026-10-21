@@ -1868,7 +1868,8 @@ interface StoreState {
   // an undo or New never opens a microphone by itself (like the camera). Picking
   // an input opens it, so does its open button, and an installation's boot.
   audioLayerArmed: AudioLayerArmed
-  /** Open a live slot's input (no slot : every live slot, an installation's boot). */
+  /** Open a live slot's input or NDI source (no slot : every such slot, an
+   *  installation's boot). */
   armAudioLayer: (slot?: 'A' | 'B') => void
   /** A file into a slot. `keep` keeps the slot's transport, volume and pan (the
    *  clip row stepping through a folder); else a fresh slot (its volume kept). */
@@ -1877,6 +1878,9 @@ interface StoreState {
    *  performer's pick. Its channels stay on the same device (another one : 1+2);
    *  the same input picked again opens it anew. */
   setAudioLayerLive: (slot: 'A' | 'B', deviceId: string, deviceLabel: string) => void
+  /** An NDI® source's sound into a slot, opened (the performer's pick); the same
+   *  source picked again opens it anew. */
+  setAudioLayerNdi: (slot: 'A' | 'B', name: string) => void
   patchAudioLayerSlot: (slot: 'A' | 'B', patch: Partial<AudioLayerSlot>) => void
   clearAudioLayerSlot: (slot: 'A' | 'B') => void
   patchAudioLayer: (patch: Partial<Pick<AudioLayerState, 'mix' | 'volume' | 'mute'>>) => void
@@ -4547,7 +4551,10 @@ export const useStore = create<StoreState>((set, get) => ({
   armAudioLayer: (slot) =>
     set((s) => {
       const armed = { ...s.audioLayerArmed }
-      for (const sl of slot ? [slot] : (['A', 'B'] as const)) if (s.audioLayer[sl]?.kind === 'live') armed[sl] = true
+      for (const sl of slot ? [slot] : (['A', 'B'] as const)) {
+        const k = s.audioLayer[sl]?.kind
+        if (k === 'live' || k === 'ndi') armed[sl] = true
+      }
       return { audioLayerArmed: armed }
     }),
   setAudioLayerFile: (slot, mediaId, mediaName, mediaPath, keep) =>
@@ -4585,6 +4592,27 @@ export const useStore = create<StoreState>((set, get) => ({
         selection: { type: 'audio', slot },
         // (a file's transport modulation, on a live input : dead rows)
         composition: prev?.kind === 'file' ? dropAuSlotTargets(s.composition, slot, true) : s.composition
+      }
+    })
+    if (again) audioLayer.reopen(slot)
+  },
+  setAudioLayerNdi: (slot, name) => {
+    const was = get()
+    const old = was.audioLayer[slot]
+    const same = old?.kind === 'ndi' && old.ndiName === name
+    // the same source picked again (lost, or it would not open) : opened anew
+    const again = same && was.audioLayerArmed[slot]
+    set((s) => {
+      const prev = s.audioLayer[slot]
+      const next: AudioLayerSlot = prev?.kind === 'ndi' && prev.ndiName === name
+        ? prev
+        : { kind: 'ndi', ndiName: name, chL: 0, chR: 1, volume: prev && prev.kind !== 'file' ? prev.volume : 1, pan: prev?.pan ?? 0 }
+      return {
+        audioLayer: { ...s.audioLayer, [slot]: next },
+        // a file slot's transport modulation goes with the file (volume / pan stay)
+        composition: prev?.kind === 'file' ? dropAuSlotTargets(s.composition, slot, true) : s.composition,
+        audioLayerArmed: { ...s.audioLayerArmed, [slot]: true },
+        selection: { type: 'audio', slot }
       }
     })
     if (again) audioLayer.reopen(slot)

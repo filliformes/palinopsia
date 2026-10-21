@@ -324,10 +324,10 @@ export type AudioFeature = 'level' | 'flux' | 'transient' | 'centroid' | 'band' 
 export interface ClipAudioSrc { layer: number; slot: 'A' | 'B' | 'all' }
 
 /** One of the Audio Layer's two slots (the layers tab, under L4) : a sound file,
- *  played like an Import Audio slot (the same transport fields), or a live audio
- *  input. */
+ *  played like an Import Audio slot (the same transport fields), a live audio
+ *  input, or an NDI® source's sound. */
 export interface AudioLayerSlot {
-  kind: 'file' | 'live'
+  kind: 'file' | 'live' | 'ndi'
   // a file : what plays (opsia-media://…), its name, the file on disk
   mediaId?: string
   mediaName?: string
@@ -345,6 +345,9 @@ export interface AudioLayerSlot {
   deviceLabel?: string
   chL?: number
   chR?: number
+  // an NDI source : its name on the network ("MACHINE (Source)"); its channels
+  // are chL / chR as a live input's
+  ndiName?: string
   volume: number // 0..2 (1 = as it comes)
   pan: number // -1..1
   mute?: boolean
@@ -1537,6 +1540,11 @@ export interface ExposedApi {
   /** Start (or share) receiving one NDI source; frames flow to the page. */
   ndiInOpen: (name: string) => Promise<boolean>
   ndiInClose: (name: string) => void
+  /** NDI audio in : start (or take back) slot `id`'s receiver for one source's
+   *  sound at `rate`; its port arrives as the window message
+   *  { t: 'opsia:ndiaudioport', token }. False : no runtime, or refused. */
+  ndiAudioOpen: (id: string, name: string, rate: number, token: string) => Promise<boolean>
+  ndiAudioClose: (id: string, token: string) => void
   /** USB input (macOS) : the cameras AVFoundation sees, an iPhone by USB included
    *  (ok false off a Mac or without the module, with why). */
   avfList: () => Promise<{ ok: boolean; devices: import('./avf').AvfDevice[]; message: string }>

@@ -118,12 +118,13 @@ function differs(a: Snapshot, b: Snapshot): boolean {
 }
 
 /** The live inputs open after an undo : an undo never opens one by itself. A
- *  restored live slot stays open only when it is open now, on the same device;
- *  any other comes back closed (its open button). */
+ *  restored live slot stays open only when it is open now, on the same device
+ *  (an NDI slot : the same source); any other comes back closed (its open button). */
 function keptOpen(restored: Snapshot['audioLayer']): FullState['audioLayerArmed'] {
   const cur = useStore.getState()
   const open = (sl: 'A' | 'B'): boolean => {
     const r = restored[sl], c = cur.audioLayer[sl]
+    if (r?.kind === 'ndi') return c?.kind === 'ndi' && cur.audioLayerArmed[sl] && r.ndiName === c.ndiName
     return r?.kind === 'live' && c?.kind === 'live' && cur.audioLayerArmed[sl] && (r.deviceId ?? '') === (c.deviceId ?? '')
   }
   return { A: open('A'), B: open('B') }

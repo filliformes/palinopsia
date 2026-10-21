@@ -1,10 +1,11 @@
 // The Audio Layer strip (the layers tab, under L4) : the layer's volume, meter
-// and mute on its header, then slot A, the A/B mix and slot B, each a sound file
-// or a live input. And the Inspector's page for a selected slot : a file's
-// transport (the Import Audio one), a live input's device and channels, and the
-// slot's volume and pan.
+// and mute on its header, then slot A, the A/B mix and slot B, each a sound file,
+// a live input or an NDI® source. And the Inspector's page for a selected slot :
+// a file's transport (the Import Audio one), a live input's device (an NDI
+// source) and channels, and the slot's volume and pan.
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AudioLayerSlot, ModTarget, SourceSlot } from '@shared/types'
 import type { AuModTarget } from '@shared/auMod'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
@@ -17,6 +18,7 @@ import { modTargetKey, useStore } from '../store'
 import { AUDIO_LAYER, audioLayer, type AudioSlotName, type SlotInfo } from '../audio/audioLayer'
 import { droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
 import { showToast } from './Toast'
+import { NdiPicker } from './NdiPicker'
 
 const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
 const M_FLOOR = -60
@@ -69,13 +71,13 @@ function SlotState({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): JSX
   const armed = useStore((st) => st.audioLayerArmed[slot])
   const arm = useStore((st) => st.armAudioLayer)
   const info = useSlotInfo(slot)
-  if (s.kind === 'live' && !armed) {
+  if (s.kind !== 'file' && !armed) {
     return (
       <button
         type="button"
         onClick={() => arm(slot)}
         className="w-10 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-accent ring-1 ring-accent/50 transition-colors hover:bg-accent/15"
-        title={`Open this live input (${slotName(s)}) : a session (or an undo) never opens one by itself`}
+        title={`Open this ${s.kind === 'ndi' ? 'NDI® source' : 'live input'} (${slotName(s)}) : a session (or an undo) never opens one by itself`}
       >
         open
       </button>
@@ -87,7 +89,7 @@ function SlotState({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): JSX
       type="button"
       onClick={() => audioLayer.reopen(slot)}
       className="w-10 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-danger ring-1 ring-danger/40 transition-colors hover:bg-danger/15"
-      title={`${s.kind === 'file' ? 'It cannot play' : info.lost ? 'It was lost (it opens again when the device comes back)' : 'It could not open'} : ${info.error}. Click : try again`}
+      title={`${s.kind === 'file' ? 'It cannot play' : info.lost ? (s.kind === 'ndi' ? 'It is not on the network (it plays again as soon as it is back)' : 'It was lost (it opens again when the device comes back)') : 'It could not open'} : ${info.error}. Click : try again`}
     >
       {info.lost ? 'lost' : 'failed'}
     </button>
@@ -164,6 +166,7 @@ function Chip({ label, active, onClick, title }: { label: string; active: boolea
 function slotName(s: AudioLayerSlot | null): string | null {
   if (!s) return null
   if (s.kind === 'file') return s.mediaName ?? 'sound file'
+  if (s.kind === 'ndi') return s.ndiName ?? 'NDI source'
   return s.deviceLabel ?? (s.deviceId ? 'live input' : 'default input')
 }
 
@@ -174,7 +177,7 @@ export function AudioLayerPanel(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed.audioLayer)
   const toggleSection = useStore((s) => s.toggleSection)
   // a live input not open yet (a session never opens one by itself)
-  const closed = useStore((s) => (['A', 'B'] as const).some((sl) => s.audioLayer[sl]?.kind === 'live' && !s.audioLayerArmed[sl]))
+  const closed = useStore((s) => (['A', 'B'] as const).some((sl) => !!s.audioLayer[sl] && s.audioLayer[sl]?.kind !== 'file' && !s.audioLayerArmed[sl]))
   const a = slotName(al.A), b = slotName(al.B)
   // which control's binding row is open (its M chip), under its own row
   const [openMod, setOpenMod] = useState<'volume' | 'mix' | null>(null)
@@ -263,10 +266,12 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
   const setSelection = useStore((st) => st.setSelection)
   const setFile = useStore((st) => st.setAudioLayerFile)
   const setLive = useStore((st) => st.setAudioLayerLive)
+  const setNdi = useStore((st) => st.setAudioLayerNdi)
   const clear = useStore((st) => st.clearAudioLayerSlot)
   const patchSlot = useStore((st) => st.patchAudioLayerSlot)
   const inputs = useAudioInputs()
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [ndiPick, setNdiPick] = useState(false)
   const pick = (file: File): void => {
     let path = ''
     try { path = window.api.getMediaPath(file) } catch { /* unavailable */ }
@@ -283,7 +288,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     else showToast(`${name} : an Audio Layer slot takes a sound file (or a film, for its soundtrack)`, 'warn', 5000)
   }
   const liveVal = (id: string): string => `__live__:${id}`
-  const value = !s ? '' : s.kind === 'file' ? '__file__' : liveVal(s.deviceId ?? '')
+  const value = !s ? '' : s.kind === 'file' ? '__file__' : s.kind === 'ndi' ? '__ndi__' : liveVal(s.deviceId ?? '')
   const known = !s || s.kind !== 'live' || !s.deviceId || inputs.some((d) => d.id === s.deviceId)
   const options: SearchOption[] = [
     { value: '', label: 'none' },
@@ -291,7 +296,9 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     { value: '__file_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'file', title: 'A sound file (WAV, AIFF, MP3, FLAC, Ogg, AAC…) played like a film : its transport and waveform in the Inspector' },
     { value: liveVal(''), label: 'default input', prefix: '🎙 ', group: 'live input', title: "The system's default audio input, live" },
     ...inputs.map((d): SearchOption => ({ value: liveVal(d.id), label: d.name, prefix: '🎙 ', group: 'live input', title: `${d.name}, live : its channels in the Inspector` })),
-    ...(!known && s?.kind === 'live' ? [{ value: liveVal(s.deviceId ?? ''), label: `${s.deviceLabel ?? 'input'} (not found)`, prefix: '🎙 ', group: 'live input' }] : [])
+    ...(!known && s?.kind === 'live' ? [{ value: liveVal(s.deviceId ?? ''), label: `${s.deviceLabel ?? 'input'} (not found)`, prefix: '🎙 ', group: 'live input' }] : []),
+    ...(s?.kind === 'ndi' ? [{ value: '__ndi__', label: s.ndiName ?? 'NDI source', prefix: '📶 ', group: 'NDI®' }] : []),
+    { value: '__ndi_pick__', label: 'NDI® source…', prefix: '📶 ', group: 'NDI®', title: "Another computer's or app's sound over the network (an NDI audio plug-in in a DAW, NDI Tools, OBS…) : the same sources the NDI video input lists" }
   ]
   return (
     <div
@@ -341,6 +348,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
         onChange={(v) => {
           if (v === '') clear(slot)
           else if (v === '__file_pick__') fileRef.current?.click()
+          else if (v === '__ndi_pick__') setNdiPick(true)
           else if (v.startsWith('__live__:')) {
             const id = v.slice('__live__:'.length)
             setLive(slot, id, id ? (inputs.find((d) => d.id === id)?.label ?? '') : '')
@@ -352,6 +360,13 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
         <span onClick={(e) => e.stopPropagation()}>
           <Chip label="⊘" active={!!s.mute} onClick={() => patchSlot(slot, { mute: !s.mute })} title={`Mute slot ${slot}`} />
         </span>
+      )}
+      {/* (on the page's body : not under this row's title; its clicks kept from the row) */}
+      {ndiPick && createPortal(
+        <span onClick={(e) => e.stopPropagation()}>
+          <NdiPicker onPick={(name) => { setNdiPick(false); setNdi(slot, name) }} onCancel={() => setNdiPick(false)} />
+        </span>,
+        document.body
       )}
     </div>
   )
@@ -380,11 +395,11 @@ export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Elem
     <div className="rounded-md border border-border bg-panel">
       <div className="flex items-start gap-2 px-3 py-2">
         <span className="min-w-0 truncate text-[12px] font-semibold">
-          {s.kind === 'file' ? '🔊' : '🎙'} {slotName(s)}
+          {s.kind === 'file' ? '🔊' : s.kind === 'ndi' ? '📶' : '🎙'} {slotName(s)}
         </span>
         <span className="whitespace-nowrap pt-0.5 font-mono text-[9px] uppercase tracking-wide text-muted">audio layer · {slot}</span>
         <p className="ml-auto max-w-[50%] text-right text-[10px] leading-tight text-muted">
-          {s.kind === 'file' ? 'A sound file' : 'A live input'}, into Sonify&apos;s mix (Sonify on or off) : the output EQ, the limiter, the recordings and Space have it.
+          {s.kind === 'file' ? 'A sound file' : s.kind === 'ndi' ? 'An NDI® source' : 'A live input'}, into Sonify&apos;s mix (Sonify on or off) : the output EQ, the limiter, the recordings and Space have it.
         </p>
       </div>
       {s.kind === 'file' ? (
@@ -474,7 +489,9 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
   const arm = useStore((st) => st.armAudioLayer)
   const inputs = useAudioInputs()
   const info = useSlotInfo(slot)
-  const n = Math.max(2, info.channels)
+  const ndi = s.kind === 'ndi'
+  // (an NDI source : the first 16 of its channels)
+  const n = Math.max(2, ndi ? Math.min(16, info.channels) : info.channels)
   const chL = s.chL ?? 0, chR = s.chR ?? 1
   const chOpts: Array<{ v: string; label: string }> = []
   for (let i = 0; i + 1 < n; i += 2) chOpts.push({ v: `${i}:${i + 1}`, label: `${i + 1}+${i + 2} stereo` })
@@ -487,7 +504,8 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
   return (
     <div className="flex flex-col gap-2 border-t border-border px-2 py-2">
       <div className="flex items-center gap-2">
-        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">input</span>
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">{ndi ? 'ndi' : 'input'}</span>
+        {ndi ? <NdiSourceButton slot={slot} name={s.ndiName ?? ''} /> : (
         <select
           className="input select-compact min-w-0 flex-1 text-[10px]"
           value={s.deviceId ?? ''}
@@ -503,6 +521,7 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
           ))}
           {!known && <option value={s.deviceId}>{`${s.deviceLabel ?? 'input'} (not found)`}</option>}
         </select>
+        )}
         <select
           className="input select-compact w-28 shrink-0 text-[10px]"
           value={chVal}
@@ -521,7 +540,7 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
             type="button"
             onClick={() => arm(slot)}
             className="w-12 shrink-0 rounded bg-panel2 py-0.5 text-center font-mono text-[9px] text-accent ring-1 ring-accent/50 transition-colors hover:bg-accent/15"
-            title="Open this live input : a session never opens one by itself"
+            title={`Open this ${ndi ? 'NDI® source' : 'live input'} : a session never opens one by itself`}
           >
             open
           </button>
@@ -530,7 +549,7 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
             type="button"
             onClick={() => audioLayer.reopen(slot)}
             className="w-12 shrink-0 text-right font-mono text-[9px] text-danger hover:underline"
-            title={`${info.lost ? 'It was lost (it opens again when the device comes back)' : 'It could not open'} : ${info.error}. Click : try again`}
+            title={`${info.lost ? (ndi ? 'It is not on the network (it plays again as soon as it is back)' : 'It was lost (it opens again when the device comes back)') : 'It could not open'} : ${info.error}. Click : try again`}
           >
             {info.lost ? 'lost' : "can't open"}
           </button>
@@ -539,15 +558,18 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
             className="w-12 shrink-0 text-right font-mono text-[9px] text-muted"
             title="The channels the device delivers (most drivers give one or two; an interface often shows its inputs as several devices, one per pair)"
           >
-            {info.channels ? `${info.channels} ch` : 'opening…'}
+            {info.channels ? `${info.channels} ch` : ndi ? 'connecting…' : 'opening…'}
           </span>
         )}
       </div>
       {!armed && (
         <p className="text-[10px] leading-tight text-muted">
-          Not open : a session (or an undo) never opens a live input by itself. Open it here or in its row; picking an input opens it too.
+          {ndi
+            ? 'Not open : a session (or an undo) never opens an NDI source by itself. Open it here or in its row; picking a source opens it too.'
+            : 'Not open : a session (or an undo) never opens a live input by itself. Open it here or in its row; picking an input opens it too.'}
         </p>
       )}
+      {ndi && armed && <NdiAudioReadout slot={slot} />}
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">level</span>
         <Meter which={slot} className="min-w-[40px] flex-1" number />
@@ -640,6 +662,55 @@ function AuAssign({ target }: { target: ModTarget }): JSX.Element {
   return (
     <div className="pb-0.5">
       <AssignRow target={target} bound={bound} />
+    </div>
+  )
+}
+
+/** An NDI slot's source : its name; click, another one (the NDI source list). */
+function NdiSourceButton({ slot, name }: { slot: AudioSlotName; name: string }): JSX.Element {
+  const setNdi = useStore((st) => st.setAudioLayerNdi)
+  const [pick, setPick] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setPick(true)}
+        className="input select-compact min-w-0 flex-1 truncate text-left text-[10px]"
+        title={`${name} : its sound over the network. Click : another NDI® source`}
+      >
+        📶 {name || 'NDI source'}
+      </button>
+      {pick && createPortal(
+        <NdiPicker onPick={(n) => { setPick(false); setNdi(slot, n) }} onCancel={() => setPick(false)} />,
+        document.body
+      )}
+    </>
+  )
+}
+
+/** What an NDI slot is receiving, live : connected or not, the jitter buffer
+ *  (what it holds, its target) and the times it ran dry. */
+function NdiAudioReadout({ slot }: { slot: AudioSlotName }): JSX.Element {
+  const [st, setSt] = useState(() => audioLayer.ndiStats(slot))
+  useEffect(() => {
+    const tick = (): void => setSt(audioLayer.ndiStats(slot))
+    tick()
+    const t = setInterval(tick, 500)
+    return () => clearInterval(t)
+  }, [slot])
+  const text = !st
+    ? 'opening…'
+    : !st.connected
+      ? 'not connected : NDI looks for it on the network'
+      : !st.channels
+        ? 'connected : no sound from it yet'
+        : `${st.channels} ch · buffer ${st.fillMs} / ${st.targetMs} ms${st.underruns ? ` · ran dry ${st.underruns}×` : ''}`
+  return (
+    <div
+      className="font-mono text-[10px] text-muted"
+      title="Received from the network : the source's channels, and the buffer that keeps its sound steady (what it holds now / what it aims at). It ran dry when this window was held up longer than the buffer; it then aims a little higher (up to 120 ms), and comes back down once all is steady."
+    >
+      📶 {text}
     </div>
   )
 }
