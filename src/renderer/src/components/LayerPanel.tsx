@@ -6,9 +6,10 @@
 
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
-import type { BlendMode, LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
-import { BLEND_MODES, DEFAULT_LAYER_VARY } from '@shared/types'
-import { couplingWords, mixTitle, mixWord } from './abMix'
+import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
+import { DEFAULT_LAYER_VARY } from '@shared/types'
+import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
+import { BlendSelect } from './BlendSelect'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
@@ -97,7 +98,6 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const coupled = couplingOn && hasB && layer.coupling.mode !== 'off'
   const opacityRef = useRef<HTMLInputElement | null>(null)
   const mixRef = useRef<HTMLInputElement | null>(null)
-  const blendRef = useRef<HTMLSelectElement | null>(null)
   // a modulated slider : a drag moves the base by as much as the thumb moves
   const opacitySlide = useModSlide(opacityBound, layer.opacity, 0, 1, (v) => setOpacity(index, v))
   const mixSlide = useModSlide(mixBound, layer.sourceMix, 0, 1, (v) => setSourceMix(index, v))
@@ -112,15 +112,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
       offs.push(registerLiveOverlay({ el: opacityRef.current, key: modTargetKey(layerTarget('opacity')), format: (x) => String(x) }))
     if (mixBound && mixRef.current)
       offs.push(registerLiveOverlay({ el: mixRef.current, key: modTargetKey(layerTarget('mix')), format: (x) => String(x) }))
-    // (the select lives in the blend drawer : registered each time it opens)
-    if (blendBound && blendRef.current)
-      offs.push(registerLiveOverlay({ el: blendRef.current, key: modTargetKey(layerTarget('blend')), format: blendOf }))
+    // (the blend menu in the drawer shows its live mode itself : BlendSelect)
     const tab = blendTabRef.current
     if (blendBound && tab) {
       const show = (m: string): void => {
         if (tab.textContent !== m) tab.textContent = m
       }
-      offs.push(registerLiveOverlay({ key: modTargetKey(layerTarget('blend')), apply: (x) => show(blendOf(x)), idle: () => show(blendBase.current) }))
+      offs.push(registerLiveOverlay({ key: modTargetKey(layerTarget('blend')), apply: (x) => show(blendLabel(blendAt(x))), idle: () => show(blendLabel(blendBase.current)) }))
     }
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,20 +393,16 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                     <span className="font-mono text-[9px] text-muted">%</span>
                   </span>
                   </PinZone>
-                  {/* as wide as its longest mode (no fixed width : a select sizes
-                      to its widest option), so "lightercolor" is never cut */}
-                  <select
+                  {/* as wide as its longest mode, the same in every mode (no
+                      fixed width : an invisible stack of every name sizes it),
+                      so "lighter color" is never cut */}
+                  <BlendSelect
+                    fit
                     className="input select-compact shrink-0 text-[10px]"
                     value={layer.sourceBlend}
-                    onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+                    onChange={(m) => setSourceBlend(index, m)}
                     title="How B meets A : the slider beside it is what this mode makes of it"
-                  >
-                    {BLEND_MODES.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   {coupled && (
                     <button
                       onClick={() => setRightView('mixer')}
@@ -453,7 +447,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               <div className="flex min-w-0 overflow-hidden rounded border border-border">
                 {(
                   [
-                    ['blend', layer.blend, blendBound],
+                    ['blend', blendLabel(layer.blend), blendBound],
                     ['mask', layer.mask.mode > 0 ? `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.invert ? ' inv' : ''}` : 'no mask', false],
                     ['feedback', layer.feedback ? `fb ${layer.feedbackAmount.toFixed(2)}` : 'fb off', false]
                   ] as Array<[OutTab, string, boolean]>
@@ -494,18 +488,12 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                     <>
                       <Row label="BLEND">
                         <PinZone pin={modTargetKey(layerTarget('blend'))} label={`L${index + 1} blend`}>
-                        <select
-                          ref={blendRef}
+                        <BlendSelect
                           className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
                           value={layer.blend}
-                          onChange={(e) => setBlend(index, e.target.value as BlendMode)}
-                        >
-                          {BLEND_MODES.map((m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(m) => setBlend(index, m)}
+                          liveKey={blendBound ? modTargetKey(layerTarget('blend')) : undefined}
+                        />
                         </PinZone>
                         {modChip('blend', 'blend mode')}
                       </Row>
@@ -672,9 +660,6 @@ function ToggleChip({
     </button>
   )
 }
-
-// A modulated blend's live value : an index that cycles through the modes.
-const blendOf = (x: number): string => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
 
 // Per-layer spatial mask : mode + invert, then the mode's own params. Multiplies
 // the layer's contribution to the stack (beyond blend + opacity).

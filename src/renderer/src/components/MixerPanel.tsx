@@ -8,8 +8,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { AudioFeature, BlendMode, CouplingMode, LayerState, ModTarget, SourceSlot } from '@shared/types'
-import { BLEND_MODES } from '@shared/types'
+import type { AudioFeature, CouplingMode, LayerState, ModTarget, SourceSlot } from '@shared/types'
 import { modTargetKey, useStore } from '../store'
 import { AUDIO_FEATURES, AUDIO_BANDS, audioBus } from '../engine/audioIn'
 import { liveCoupledMix } from '../engine/coupling'
@@ -22,6 +21,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { PromptModal } from './PromptModal'
 import { registerLiveOverlay } from './liveOverlay'
 import { couplingWords, mixTitle, mixWord } from './abMix'
+import { BlendSelect } from './BlendSelect'
 import { useModSlide } from './useModSlide'
 import { PinZone, usePin } from './Pin'
 import { layerPin, layerSpeedPin } from '../persist'
@@ -225,24 +225,17 @@ function MixerColumn({
   const [mixBound, hueBound, opaBound, blendBound] = [boundCount[0] > 0, boundCount[1] > 0, boundCount[2] > 0, boundCount[3] > 0]
 
   // Bound sliders follow their live value (the app-wide behaviour), the blend
-  // menu its live mode; a drag on a modulated slider moves its base by as much
-  // as the thumb moves.
+  // menu its live mode (BlendSelect paints it); a drag on a modulated slider
+  // moves its base by as much as the thumb moves.
   const mixRef = useRef<HTMLInputElement | null>(null)
   const hueRef = useRef<HTMLInputElement | null>(null)
-  const blendRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const offs: Array<() => void> = []
     if (mixBound && mixRef.current) offs.push(registerLiveOverlay({ el: mixRef.current, key: keyOf('mix'), format: (x) => String(x) }))
     if (hueBound && hueRef.current) offs.push(registerLiveOverlay({ el: hueRef.current, key: keyOf('harmony'), format: (x) => String(x) }))
-    if (blendBound && blendRef.current)
-      offs.push(registerLiveOverlay({
-        el: blendRef.current,
-        key: keyOf('blend'),
-        format: (x) => BLEND_MODES[Math.max(0, Math.min(BLEND_MODES.length - 1, Math.round(x)))] ?? BLEND_MODES[0]
-      }))
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mixBound, hueBound, blendBound, index])
+  }, [mixBound, hueBound, index])
   const mixSlide = useModSlide(mixBound, l.sourceMix, 0, 1, (v) => setSourceMix(index, v))
   const hueSlide = useModSlide(hueBound, l.harmony, -1, 1, (v) => setHarmony(index, Math.abs(v) < 0.04 ? 0 : v))
 
@@ -311,19 +304,13 @@ function MixerColumn({
         <ModChip count={boundCount[0]} open={openMod?.layer === index && openMod.field === 'mix'} onToggle={() => setOpenMod(openMod?.layer === index && openMod.field === 'mix' ? null : { layer: index, field: 'mix' })} target={{ kind: 'layer', layer: index, field: 'mix' }} what="A/B mix" />
       </Section>
       <div className={`flex shrink-0 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`} title={hasB ? undefined : 'No Source B : pick one in the layer and these mix it with A'}>
-        <select
+        <BlendSelect
           className="input w-full appearance-none !px-1 !py-0.5 text-center !text-[9px]"
           style={{ backgroundImage: 'none' }}
           value={l.sourceBlend}
-          onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+          onChange={(m) => setSourceBlend(index, m)}
           title="How B meets A : the crossfader below is what this mode makes of it"
-        >
-          {BLEND_MODES.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+        />
         <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'mix' })} label={`L${index + 1} A·B mix`}>
         <div className="flex min-w-0 items-center gap-1">
           <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
@@ -482,20 +469,14 @@ function MixerColumn({
         </PinZone>
       </div>
       <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'blend' })} label={`L${index + 1} blend`}>
-      <select
-        ref={blendRef}
+      <BlendSelect
         className={`input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
         style={{ backgroundImage: 'none' }}
         value={l.blend}
-        onChange={(e) => setBlend(index, e.target.value as BlendMode)}
+        onChange={(m) => setBlend(index, m)}
+        liveKey={blendBound ? keyOf('blend') : undefined}
         title={blendBound ? 'How this layer lands on the layers below : modulated, it shows the mode playing now' : 'How this layer lands on the layers below'}
-      >
-        {BLEND_MODES.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
+      />
       </PinZone>
     </div>
   )

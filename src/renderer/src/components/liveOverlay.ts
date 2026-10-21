@@ -14,14 +14,15 @@ type LiveSub =
   | { el: HTMLInputElement | HTMLSelectElement; key: string; format: (v: number) => string }
   // Anything else (a toggle button showing its live ON / OFF, a readout) : paint
   // it yourself. `idle` runs on the frames nothing modulates it (put the stored
-  // value back once the modulation stops).
-  | { key: string; apply: (v: number) => void; idle?: () => void }
+  // value back once the modulation stops). `view` : the window it paints in, when
+  // not the instrument's (the Output page's own).
+  | { key: string; apply: (v: number) => void; idle?: () => void; view?: Window }
 
 type Loop = { subs: Set<LiveSub>; raf: number }
 const loops = new Map<Window, Loop>()
 
-/** The window a subscriber paints in (one without an element : the instrument's). */
-const viewOf = (s: LiveSub): Window => ('el' in s ? s.el.ownerDocument.defaultView : null) ?? window
+/** The window a subscriber paints in (one without an element or a view : the instrument's). */
+const viewOf = (s: LiveSub): Window => ('el' in s ? s.el.ownerDocument.defaultView : s.view) ?? window
 
 function tick(view: Window, loop: Loop): void {
   for (const s of loop.subs) {

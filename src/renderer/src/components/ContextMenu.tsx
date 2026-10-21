@@ -32,6 +32,12 @@ export function MenuHost(): JSX.Element {
   return <div ref={ref} className="contents" />
 }
 
+/** This window's menu host, if it has one (the blend menus open there too). */
+export function menuHostOf(doc: Document): HTMLElement | null {
+  const h = hosts.get(doc)
+  return h?.isConnected ? h : null
+}
+
 export interface MenuItem {
   label: string
   onClick?: () => void
