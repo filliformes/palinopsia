@@ -13,7 +13,7 @@ import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { modTargetKey, useStore } from '../store'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
-import { SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
+import { SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { AssignRow } from './AutoControls'
@@ -225,7 +225,7 @@ export function BackgroundPanel(): JSX.Element {
               value={shaderId ?? ''}
               options={[
                 { value: '', label: 'none' },
-                ...inPickerOrder(BG_SOURCES_ALPHA).map((g): SearchOption => ({ value: g.id, label: g.name, group: sourceSection(g), keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
+                ...inPickerOrder(BG_SOURCES_ALPHA).map((g): SearchOption => ({ value: g.id, label: g.name, prefix: sourceIcon(g.id), group: sourceSection(g), keywords: keywordsFor(g.id), title: generatorBlurb(g.id) }))
               ]}
               onChange={(v) => setBackgroundSource(v || null)}
               title="The Background's source : a curated set of grounds (type to search)"

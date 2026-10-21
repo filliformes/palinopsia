@@ -2,7 +2,7 @@
   "DESCRIPTION": "Crawl : colors each place by how long ago it last changed. A pixel that changes by more than the THRESHOLD is stamped with the time, and the stamps are read through a slowly turning palette : motion leaves bands of color behind it (every place it passed at the same moment shares one) and CYCLE makes them crawl along its path. BAND is how many seconds of history one turn of the palette spans, STEPS cuts it into hard bands, FADE hands a stamp back to the picture after that many seconds. The palette is a ramp of 2 to 5 stops, or PICTURE : each place's own color run from near-black to pale. A pixel still changing shows the live picture. GROUND : the live picture, black, or clear (only the contours, over the layers below). CLEAR ▸ forgets the history.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Time", "Color"],
+  "CATEGORIES": ["FX", "Frame Store", "Time", "Color"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "threshold", "TYPE": "float", "MIN": 0.01, "MAX": 0.5,  "DEFAULT": 0.08, "LABEL": "threshold" },

@@ -2,7 +2,7 @@
   "DESCRIPTION": "Slit Buffer : time-smear of the input: a write head sweeps across the frame, freezing the live image into the persistent buffer as it passes, so the picture behind the head holds older moments. A real slit-scan of whatever feeds the layer (the slit-scan register). Direction sets the sweep (normal / inverted / pendulum ping-pong); VERTICAL sweeps top to bottom and ANGLE tilts the slit; Jitter breaks the seam into a ragged edge; Jumps teleports the whole playhead to random spots before/after its swept position. GRAB writes the whole live frame at once. Until the head first passes, the picture shows the live image.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch", "Scan"],
+  "CATEGORIES": ["FX", "Time", "Glitch", "Scan"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "rate",      "TYPE": "float", "MIN": 0.02, "MAX": 3.0, "DEFAULT": 0.3 },

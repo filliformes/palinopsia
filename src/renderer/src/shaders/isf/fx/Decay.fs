@@ -2,7 +2,7 @@
   "DESCRIPTION": "Decay : analog generation loss. The picture wears like a tape dub or a worn print: VHS chroma bleed, block/quantization crush, horizontal line jitter, a BOUNDED feedback ghost (capped so it can never run away into feedback fractals), tape noise and flickering dropout lines. HEAD SWITCH adds the torn band at the bottom of the frame where a VCR's heads hand over. It only ever DEGRADES the incoming image : it never invents its own pattern. No psychedelia.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Analog", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "amount",  "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.5,  "LABEL": "amount" },

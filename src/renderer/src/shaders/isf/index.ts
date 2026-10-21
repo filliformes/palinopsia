@@ -312,7 +312,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*{
       "DESCRIPTION": "Datamosh : the codec 'moshing' look, real-time and codec-free. The layer's own motion (optical flow, quantized to macroblocks) advects a feedback buffer every frame, so the picture keeps SLIDING along movement : the P-frame smear. Turn REFRESH (the I-frame) down and a new scene's motion drags the PREVIOUS scene's texture around : figures melt into and emerge from the image (the bloom). RESIDUAL re-injects live texture (the mosh↔mush line); RESEED snaps whole blocks back so it never fully mushes. STICKY slides each block as a crisp tile (real datamosh tearing); MELT is a softer smear. ACTANTS are sparse sticky patches that a trigger drops into the picture, drifting along the flow as autonomous frozen blocks, then fading away. MANIFEST reveals the live frame only where there's motion, so a new source completes itself out of the retained frame instead of cutting. MOSH GATE holds only the moving parts (+) or only the still ones (−); EDGE REPEL steers the smear along content edges; RE-SHARP crisps the softened result back up. With a sidechain layer + 'motion transfer' on, that layer's MOVEMENT moshes THIS layer's texture. The smear lingers the same time at any frame rate, macroblocks keep their size at every render resolution, and a transparent layer moshes its transparency too.",
-      "CATEGORIES": ["FX", "Glitch", "Feedback"],
+      "CATEGORIES": ["FX", "Codec", "Glitch", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["melt", "sticky", "fluid"], "DEFAULT": 1, "LABEL": "mode" },
         { "NAME": "motion", "TYPE": "float", "MIN": 0.0, "MAX": 4.0, "DEFAULT": 1.0, "LABEL": "motion" },
@@ -370,7 +370,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*{
       "DESCRIPTION": "Scanner : a flatbed-scanner slit-scan. A scan head sweeps the frame; the line it crosses is CAPTURED from the live signal at that instant and held until the head passes again. Because each line is grabbed at a different moment, anything MOVING during the sweep smears and tears across the scanlines : the classic 'moved the photo mid-scan' glitch, live. LOOP scans continuously; ONE-SHOT does a single pass on a trigger then holds the frozen document. DRAG shears the capture (the paper sliding under the head), WOBBLE adds a hand-wave (a different one every pass), JITTER/TEAR rip lines, CHANNEL SPLIT misregisters the CCD's RGB, AUDIO offsets each captured line by the sound's waveform (the scan records it like an oscilloscope). TRIGGER (scan ▸) starts a fresh pass on its rising edge : fire it from the button, over OSC, or by binding a modulator (a square LFO / sample&hold / audio edge) with M for rhythmic live re-scans. Works on any rack.",
-      "CATEGORIES": ["FX", "Scan", "Glitch"],
+      "CATEGORIES": ["FX", "Time", "Scan", "Glitch"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["loop", "one-shot"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "axis", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["down", "up", "right", "left"], "DEFAULT": 0, "LABEL": "direction" },
@@ -767,7 +767,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*{
       "DESCRIPTION": "Pulfrich : monocular 3D from a temporal eye-delay. One eye reads a slightly DELAYED image (a dark filter slows its neural response) so lateral motion becomes stereo depth. The delay is read per-pixel from a frame ring, keyed by the shared DEPTH map (or the luminance), so near / bright planes lag more; ZERO PLANE sets the key that gets no delay, so planes beyond it lag in one eye and planes before it in the other (in front of and behind the screen). The disparity is TEMPORAL, not spatial : a still picture shows no color fringes (only DESAT tints it); depth blooms only on lateral motion. ANAGLYPH gives a red/cyan pair for glasses (DESAT curbs retinal rivalry, DISPARITY widens the split); FREE is a glasses-free parallax slide, gated by motion. A matte companion to the Anaglyph stage. Layer / source / master; the key falls back to luminance when Depth is off.",
-      "CATEGORIES": ["FX", "Depth", "Time"],
+      "CATEGORIES": ["FX", "Optical", "Depth", "Time"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["anaglyph", "free"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "source", "TYPE": "long", "VALUES": [0, 1], "LABELS": ["luminance", "depth map"], "DEFAULT": 1, "LABEL": "key" },
@@ -830,7 +830,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*{
       "DESCRIPTION": "Field Store : a key-gated store that never fades. One low-resolution store (64 to 512 square, stretched over the frame : wide pixels on a 16:9 picture) holds a copy of the picture. Live video is written into it ONLY where a 1-bit KEY lets it through (brightness, edges, motion, a sidechain layer's brightness, the layer's transparency, or none), on a capture CLOCK (every frame, every N frames, bursts, on the beat, or only on grab ▸), and nothing in it ever decays : a moving figure leaves HARD stamps of itself, not a soft trail. MODE picks what is written and what is shown. TRAIL : the keyed parts stamped, the live figure in front of its copies. COLOR TRAIL : the stamps in one flat ink that steps with every grab. GHOST : the stamps at half over the live picture. CATCH-UP : the whole frame grabbed, the keyed figure running ahead of it. MOSAIC : the store over the picture (live at store resolution, frozen where the key fails). REVEAL : the store alone, so what passes the key paints the picture in out of nothing. PROTECT : the keyed parts are never written and show what was there before (a figure vanishes). ACQUIRE : each cell written once, by the first thing through. SHOW overrides the display. DEPTH floors each channel to 2^bits levels. SLIDE moves the store's address (a velocity, wrapping around the edges), so stamps drift off in lattices. CLEAR ▸ crumbles the store away. SURVIVE SCENE CHANGES hands the store to the next scene's Field Store.",
-      "CATEGORIES": ["FX", "Time", "Feedback"],
+      "CATEGORIES": ["FX", "Frame Store", "Time", "Feedback"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["trail", "color trail", "ghost", "catch-up", "mosaic", "reveal", "protect", "acquire"], "DEFAULT": 0, "LABEL": "mode" },
         { "NAME": "show", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5], "LABELS": ["by mode", "over", "under", "instead", "double", "inside"], "DEFAULT": 0, "LABEL": "show" },
@@ -876,7 +876,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*{
       "DESCRIPTION": "Codec Mosh : the real datamosh. The picture goes through an actual H.264 video encoder and decoder (the graphics card's own), and the stream between them is broken on purpose. At a cut (or mosh ▸) the new picture's keyframe is withheld : the new motion drags the OLD picture around, and only the blocks the encoder repaints let the new one through, until a clean keyframe comes back (refresh, clean ▸). BLOOM repeats each motion frame so the smear compounds; DROP loses some, so the next ones land on the wrong picture. MOTION FROM SIDECHAIN paints another layer's movement onto this one. BLOCKS is the size it is encoded at (the smaller, the bigger the blocks on screen), QUALITY starves or feeds it. It runs a few frames behind its input, and each Codec Mosh uses one of the graphics card's encoders.",
-      "CATEGORIES": ["FX", "Glitch"],
+      "CATEGORIES": ["FX", "Codec", "Glitch"],
       "INPUTS": [
         { "NAME": "mosh", "TYPE": "event", "DEFAULT": false, "LABEL": "mosh ▸" },
         { "NAME": "clean", "TYPE": "event", "DEFAULT": false, "LABEL": "clean ▸" },
@@ -2082,15 +2082,46 @@ export function isLiveSource(sh: IsfShader): boolean {
   return !!m && /"Live"/.test(m[1])
 }
 
-/** A generator's section in the source pickers. */
-export function sourceSection(sh: IsfShader): 'live' | 'organic' | 'analog' | 'generators' {
-  return isLiveSource(sh) ? 'live' : isOrganicSource(sh) ? 'organic' : isAnalogSource(sh) ? 'analog' : 'generators'
+/** Generators tagged "Painterly" : painted matter (Oil Cloud, Cloud Study). */
+export function isPaintedSource(sh: IsfShader): boolean {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  return !!m && /"Painterly"/.test(m[1])
 }
 
-/** Generators in picker order : living matter, then analog video, then every
- *  other generator, alphabetical within each section. */
+/** Generators tagged "Geometry" (and not analog video) : lines, grids, dots,
+ *  patterns and shapes. */
+export function isGeometrySource(sh: IsfShader): boolean {
+  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
+  return !!m && /"Geometry"/.test(m[1])
+}
+
+export type SourceSection = 'live' | 'organic' | 'painted' | 'analog' | 'geometry' | 'generators'
+
+/** A generator's section in the source pickers. */
+export function sourceSection(sh: IsfShader): SourceSection {
+  return isLiveSource(sh)
+    ? 'live'
+    : isOrganicSource(sh)
+      ? 'organic'
+      : isPaintedSource(sh)
+        ? 'painted'
+        : isAnalogSource(sh)
+          ? 'analog'
+          : isGeometrySource(sh)
+            ? 'geometry'
+            : 'generators'
+}
+
+/** The icon a source shows in the pickers, beside the camera and capture
+ *  entries it lists with (only the Live ones have one). */
+export function sourceIcon(id: string): string | undefined {
+  return id === 'gen-silhouette' ? '👤 ' : undefined
+}
+
+/** Generators in picker order : living matter, painted matter, analog video,
+ *  geometry, then every other generator, alphabetical within each section. */
 export function inPickerOrder(list: IsfShader[]): IsfShader[] {
-  const rank = { live: -1, organic: 0, analog: 1, generators: 2 }
+  const rank: Record<SourceSection, number> = { live: -1, organic: 0, painted: 1, analog: 2, geometry: 3, generators: 4 }
   return [...list].sort(
     (a, b) => rank[sourceSection(a)] - rank[sourceSection(b)] || a.name.localeCompare(b.name)
   )
@@ -2101,7 +2132,8 @@ export function inPickerOrder(list: IsfShader[]): IsfShader[] {
 function fxGroup(sh: IsfShader): string {
   const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
   if (!m) return 'Other'
-  const cats = m[1].split(',').map((x) => x.replace(/["'\s]/g, ''))
+  // (quotes and outer spaces off : a group may be two words, "Frame Store")
+  const cats = m[1].split(',').map((x) => x.replace(/["']/g, '').trim())
   return cats.find((c) => c && c !== 'FX') ?? 'Other'
 }
 

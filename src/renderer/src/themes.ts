@@ -176,7 +176,10 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
     skip: '^(count|cells|repeat|side|audio)$'
   },
   // Each study isolates one Feel macro : nothing else may move.
-  'Feel Studies': { ...MOTION_DEFAULT, mods: [0, 0] }
+  'Feel Studies': { ...MOTION_DEFAULT, mods: [0, 0] },
+  // The frame-store looks (Field Store, Shatter, Crawl, Store Zoom) : grabs on a
+  // clock, so stepped motion leaning on the beat (each theme here pins its own).
+  'Frame Store': { ...STEPPED, rate: [0.15, 1.5], bpm: 0.6 }
 }
 
 /** The motion recipe a theme generates with : its family's, bent by the theme. */
@@ -641,7 +644,8 @@ export const THEMES: Theme[] = [
   // never fading; no layer feedback and no Context trails (they would soften the
   // stamps back into the usual trail).
   mk({
-    id: 'field-store', name: 'Field Store', family: 'Feedback / Afterimage',
+    id: 'field-store', name: 'Field Store', family: 'Frame Store',
+    motion: FAMILY_MOTION['Feedback / Afterimage'], // moves as it did in Feedback / Afterimage
     blurb: 'Hard stamps that never fade : moving forms leave crisp copies of themselves in a coarse store, kept until wiped.',
     world: 'parametric',
     context: { trails: 0, haze: 0 },
@@ -659,7 +663,8 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.15, feedback: 0, drift: 0.2, density: 0.45
   }),
   mk({
-    id: 'revealed', name: 'Revealed', family: 'Feedback / Afterimage',
+    id: 'revealed', name: 'Revealed', family: 'Frame Store',
+    motion: FAMILY_MOTION['Feedback / Afterimage'], // moves as it did in Feedback / Afterimage
     blurb: 'Only what moves is written : the picture assembles out of the dark where motion passed, and stays.',
     world: 'monomedia',
     context: { trails: 0, haze: 0 },
@@ -1294,7 +1299,8 @@ export const THEMES: Theme[] = [
   // Frame-store tricks : each closes the bottom layer's rack (stackFx) over
   // sources that MOVE (Shatter and Crawl show nothing on a still picture).
   mk({
-    id: 'shatter', name: 'Shatter', family: 'Glitch / Datamosh',
+    id: 'shatter', name: 'Shatter', family: 'Frame Store',
+    motion: FAMILY_MOTION['Glitch / Datamosh'], // moves as it did in Glitch / Datamosh
     blurb: 'Only what moves breaks into pattern : a still grabbed again and again, switched with the live picture by a fine checker.',
     world: 'parametric',
     palette: [K, [0.14, 0.16, 0.2, 1], [0.82, 0.84, 0.8, 1]],
@@ -1307,7 +1313,8 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0.15, gestureTexture: 0.6, coalesce: 0.35
   }),
   mk({
-    id: 'trail-crawl', name: 'Trail Crawl', family: 'Feedback / Afterimage',
+    id: 'trail-crawl', name: 'Trail Crawl', family: 'Frame Store',
+    motion: FAMILY_MOTION['Feedback / Afterimage'], // moves as it did in Feedback / Afterimage
     blurb: 'Motion paints its own history : every place colored by when something last passed, the bands crawling slowly along the path.',
     world: 'sublimated',
     palette: [K, [0.12, 0.2, 0.28, 1], [0.78, 0.5, 0.22, 1], [0.94, 0.9, 0.8, 1]],
@@ -1320,7 +1327,7 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], layers: [1, 2], feedback: 0.1, density: 0.4, drift: 0.2
   }),
   mk({
-    id: 'store-zoom', name: 'Store Zoom', family: 'Retro Screen',
+    id: 'store-zoom', name: 'Store Zoom', family: 'Frame Store',
     blurb: 'A low-resolution frame store read through its counters : uneven zoom blocks, wide pixels, a pan that wraps around.',
     world: 'parametric',
     palette: [INK, [0.2, 0.22, 0.3, 1], [0.85, 0.55, 0.3, 1], [0.95, 0.92, 0.85, 1]],
@@ -1331,7 +1338,7 @@ export const THEMES: Theme[] = [
       'fx-store-zoom': { zoom: [1, 1.6, 2.4, 3.3], magnify: [0, 1, 1], lines: [128, 192, 256], wide: [1.5], stretch: [0, 0, 0.4, -0.4], wet: [1] }
     },
     blends: ['screen', 'add', 'lightercolor'], layers: [2, 3], useB: 0.2, coalesce: 0.3, gestureTexture: 0.4,
-    motion: { skip: '^(wide|lines)$' }
+    motion: { ...FAMILY_MOTION['Retro Screen'], skip: '^(wide|lines)$' } // moves as it did in Retro Screen
   }),
 
   // ── Space : points in space (Lattice) and line fields laid on planes

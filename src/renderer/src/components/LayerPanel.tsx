@@ -10,7 +10,7 @@ import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types
 import { DEFAULT_LAYER_VARY } from '@shared/types'
 import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
 import { BlendSelect } from './BlendSelect'
-import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceSection } from '../shaders/isf'
+import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { makeDefaultMask, modTargetKey, useStore } from '../store'
@@ -1092,6 +1092,7 @@ function SourceRow({
               (g): SearchOption => ({
                 value: g.id,
                 label: g.name,
+                prefix: sourceIcon(g.id),
                 group: sourceSection(g),
                 keywords: keywordsFor(g.id),
                 title: generatorBlurb(g.id)

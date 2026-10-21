@@ -2,7 +2,7 @@
   "DESCRIPTION": "Mosh Blocks : macroblock corruption on a stepped clock: a minority of blocks grab displaced content (smearing the frame edge where they reach past it), some with channel-swapped color. `freak` blocks break the family : content grabbed from anywhere in the frame, zoomed, mirrored or inverted, held on a slower clock. `audio` raises the odds per block column from its own band of the live spectrum. The datamosh / JPEG-corruption register: cuts and holds, not flow.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Codec", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "blocks", "TYPE": "float", "MIN": 4.0, "MAX": 96.0, "DEFAULT": 24.0 },

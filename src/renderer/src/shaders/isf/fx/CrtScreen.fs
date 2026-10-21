@@ -2,7 +2,7 @@
   "DESCRIPTION": "CRT Screen : a whole-tube finish (a CRT glass surface): barrel curvature, edge-increasing chromatic aberration, scanline grille, corner vignette, and a rounded bezel that blacks out beyond the glass (the bezel follows the layer's own alpha, so a transparent layer stays transparent). GRILLE LINES counts the grille per frame height; RASTER MOIRÉ keeps the curved moiré bands the glass beats against a fine grille, at any output resolution. The 'projected on a tube' master stage : pairs with Grain/Scanlines under it.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Stylize", "Master"],
+  "CATEGORIES": ["FX", "Analog", "Stylize", "Master"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "curve",      "TYPE": "float", "MIN": 0.0, "MAX": 0.6, "DEFAULT": 0.15, "LABEL": "glass curve" },

@@ -2,7 +2,7 @@
   "DESCRIPTION": "Grain : physically-modeled noise per medium. FILM: clumped photochemical grain (value-noise, NOT white), 24fps reseed, amplitude peaking in the MIDTONES; optional color-stock chroma grain. DIGITAL: honest sensor noise : signal-dependent SHOT noise (highlights), a constant READ-noise floor (shadows), faint static fixed-pattern (PRNU) and blotchy low-frequency chroma noise. CRT: row-correlated snow with color speckle; PARASITES add a rolling hum bar, faint RF herringbone and impulse specks. VHS: luma smear + chroma phase error (CHROMA GRAIN strengthens it); PARASITES add line jitter, the head-switch tear at the bottom, single-scanline dropouts with a recovery tail (in bursts) and, high up, a drifting tracking band. Parasites apply to CRT/VHS only. SIZE is in 1080p pixels, relative to the frame height : the grain keeps its share of the frame at 4K or on the dome.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Texture"],
+  "CATEGORIES": ["FX", "Film", "Texture"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "character", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["digital", "film", "crt", "vhs"], "DEFAULT": 1 },

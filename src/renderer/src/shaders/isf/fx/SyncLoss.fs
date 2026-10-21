@@ -2,7 +2,7 @@
   "DESCRIPTION": "Sync Loss : vertical hold rolling away plus horizontal tear bands on a stepped clock: the picture rolls down the screen, catches (snaps into lock for a moment), slips again and tears. The broken-monitor register.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Analog", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "roll",   "TYPE": "float", "MIN": 0.0, "MAX": 2.0, "DEFAULT": 0.25 },

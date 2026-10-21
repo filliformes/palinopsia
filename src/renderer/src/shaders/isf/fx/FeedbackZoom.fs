@@ -2,7 +2,7 @@
   "DESCRIPTION": "Feedback Zoom : the deepest palinopsia move: the image feeds back into itself through a zoom and twist, echoes marching inward or outward. Persistent-buffer recursion with a mix()-based decay, so trails converge instead of blooming. The tunnel turns about CENTER, and DRIFT lets that point wander slowly so the vortex is never nailed to the middle of the frame (0 = locked on CENTER). EDGE sets what fills in where the zoomed frame leaves the picture : the live image, black (a nested frame), or the clamped border smear. CLEAR wipes the echoes. Zoom, twist and decay follow the layer clock, so the tunnel runs the same at any frame rate and holds still when the layer is frozen.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch", "Feedback"],
+  "CATEGORIES": ["FX", "Feedback", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "zoom",   "TYPE": "float", "MIN": 0.85, "MAX": 1.15, "DEFAULT": 1.03 },

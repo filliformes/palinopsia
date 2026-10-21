@@ -2,7 +2,7 @@
   "DESCRIPTION": "Store Zoom : the picture read through the address counters of a low-resolution frame store. One ZOOM both enlarges and mosaics : each store pixel is held for a run of screen pixels, and because the zoom is a whole-number step added up pixel by pixel, the runs come out uneven (2, 3, 2, 3...) : the stepped look of a hardware zoom. MAGNIFY 1 enlarges the picture (a frozen store); 0 keeps it in place and only cuts it into those uneven blocks (live video written through a zoomed store). STRETCH makes the blocks tall (up) or wide (down). PAN and SCROLL move the read address, wrapping around the frame; MIRROR reflects the picture where the address runs off the end of the store, on one axis, so its axis moves with pan and zoom. LINES is the store's resolution, PIXEL WIDTH its pixel shape. Keeps the layer's transparency.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Distortion", "Glitch"],
+  "CATEGORIES": ["FX", "Frame Store", "Distortion", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "zoom",    "TYPE": "float", "MIN": 0.5,  "MAX": 12.0,   "DEFAULT": 1.6,   "LABEL": "zoom" },

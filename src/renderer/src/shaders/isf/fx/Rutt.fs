@@ -2,7 +2,7 @@
   "DESCRIPTION": "Rutt : the classic Rutt/Etra-style scan processor. The input is redrawn as horizontal scan lines each displaced vertically by the image's own luminance, so bright areas push the lines into relief (a wireframe topography of the picture). RELIEF picks the push : DOWN hangs the bright areas below their line like a relief seen from underneath, UP lifts them as the classic scan processor did. Brightness follows the local slope. Matte line-work on a near-black ground that keeps the layer's transparency.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Scan", "Stylize"],
+  "CATEGORIES": ["FX", "Analog", "Scan", "Stylize"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "lines", "TYPE": "float", "MIN": 20.0, "MAX": 200.0, "DEFAULT": 80.0 },

@@ -7,6 +7,20 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The pickers are sorted into clearer families.** Effects : a new **Frame Store** group
+  (Field Store, Shatter, Crawl, Store Zoom, which were split between Time and Distortion),
+  **Analog** (NTSC, Tracking, Sync Loss, Decay, Scanlines, CRT Screen, Rutt) and **Codec**
+  (Codec Mosh, Datamosh, Mosh Blocks, Compress, Databend, Byte Corrupt, Ringing) take
+  fourteen effects out of Glitch (29 → 15); Feedback Zoom joins Feedback; Phosphene,
+  Pulfrich and Optical Rain share **Optical**; Aperture and Grain make **Film**; Scanner
+  and Slit Buffer go to Time, Pixelmask to Stylize. No group holds a single effect any
+  more. Sources : two new sections, **Painted** (Oil Cloud, Cloud Study) and **Geometry**
+  (ten line, grid, dot and shape generators), between Organic, Analog and the rest; the
+  Silhouette source gets its 👤 like the other live entries. Generate : the five store
+  themes (Field Store, Revealed, Shatter, Trail Crawl, Store Zoom) are one **Frame Store**
+  family (18 families), each moving exactly as before; master chains : all nine store
+  chains in one **Frame Store** group. The FX group reader now keeps two-word groups.
+
 - **Grain on the dome is film grain again** (`shaders/isf/lib/finalGrain.glsl`,
   `engine/dome.ts`, `domeSignal.ts`, `isfTextureBridge.ts`) : the Finalizer's film and
   digital grain moved into one shared include (pasted at `// @grain`, the same maths, so
@@ -117,11 +131,11 @@ that CI builds into cross-platform releases.
   above 1 it is off-frame until you pan : its hint says so); **lines** (256) and **pixel
   width** (1.5) are the store's own. It matched a JS model of the counters pixel for
   pixel.
-- For the three : eight presets each, a **Store** group of six master chains (Store ·
+- For the three : eight presets each, a **Frame Store** group of six master chains (Store ·
   Shatter, Catch-up, Trail Crawl, Crawl Mosaic, Uneven Zoom, Mirror Scroll; they keep
   the scene's palette mix), three Generate themes each putting its effect on the bottom
-  layer over moving sources (**Shatter** in Glitch / Datamosh, **Trail Crawl** in
-  Feedback / Afterimage, **Store Zoom** in Retro Screen), dice ranges (the staging
+  layer over moving sources (**Shatter**, **Trail Crawl**, **Store Zoom**, in the Frame
+  Store family), dice ranges (the staging
   switches sync, flip, ground, mirror and scroll in `RANDOMIZE_SKIP`), hints, keywords,
   blurbs, Inspector column groups and grey-outs. Nothing special on the dome : Shatter
   and Crawl work per pixel with patterns scaled to the frame height, Store Zoom zooms
@@ -155,8 +169,8 @@ that CI builds into cross-platform releases.
   0.25 s, a carried-over store crumbles in over 0.4 s, a size change resamples at most
   every 0.25 s. Ten presets (Hard trail, Beat stamps, Color stamps, Strobe ghost,
   Catch-up, Live mosaic, Motion reveal, Vanish, First arrivals, Drifting lattice), three
-  master chains under Time & memory (**Hard Memory**, **Sixteen Levels**, **Strobe
-  Ghost**), two Generate themes in Feedback / Afterimage (**Field Store**, **Revealed**),
+  master chains in the Frame Store group (**Hard Memory**, **Sixteen Levels**, **Strobe
+  Ghost**), two Generate themes in the Frame Store family (**Field Store**, **Revealed**),
   hints for all 17 inputs, keywords, a blurb, Inspector columns (mode / key / clock /
   store; ink hue and step grey out outside color trail, key level and invert with key
   none, N unless the clock counts frames), the Orbit voice in auto-Sonify. Any rack
