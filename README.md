@@ -1917,6 +1917,27 @@ session holds the picture still until the new one has compiled, then dissolves).
 double-click in the bank; recall crossfades over the **MORPH** time. Scenes
 carry their sequencer tags and are saved inside the session.
 
+**Persistent** : **right-click a control** (any parameter in the Inspector or the
+Finishing stages, a layer's opacity, A·B mix, blend or speed, the Mixer's faders,
+crossfader, hue and blend, the Background's opacity, speed and shadow, a Meta knob)
+→ **Persistent**, and no scene, Randomize, Variation, the sequencer, the scene pad,
+Generate, a World or a Mixer, layer, background or master preset changes it any more :
+it stays as it plays while everything around it moves (and never moves in a morph).
+Its modulation stays with it. **Right-click a layer** (or its column header in the
+Mixer) → **Persistent layer** holds the whole layer : its sources, effects, mix, mask,
+feedback and modulation; its dice, Init, presets and Paste then say so and do nothing.
+Your own hand still moves a persistent control (a drag, a typed number, MIDI or OSC
+sent to it). A pinned control wears a thin gold bar at its left, a pinned layer a gold
+border; **◆ n persistent** in the scene bank lists them (× unpins one, a pin on an
+effect or a source that is not in the picture now is dimmed : it holds again when that
+comes back). Pins belong to the session, not to a scene : they are saved with it, New
+clears them, Generate keeps them. A control on an effect holds wherever that same
+effect is (an effect a Generate or a dice put in is a new one), a source's control
+wherever that source plays the same shader; the Vibe, Context and Finalizer are always
+the same three. The same menu has **Set in every scene** (**Set this layer in every
+scene** for a layer) : what plays now is written once into every scene that has it
+(the toast says how many, and which lacked it); Ctrl+Z undoes it.
+
 **Session Loader** (toolbar) : a dropdown of every saved session + a **Load**
 button, so you can jump between saved sessions without the file dialog.
 **Right-click Load** to link a folder of sessions : every session in it (and its

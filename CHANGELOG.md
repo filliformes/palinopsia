@@ -7,6 +7,33 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **Persistent controls and layers, and Set in every scene** (Vincent : a code change had
+  him re-enter parameters across a set's scenes). Right-click a control → **Persistent** :
+  scenes (recall, the sequencer, the scene pad), Randomize, Variation, the layer dice,
+  Generate, a World and the Mixer / layer / background / master presets leave it as it
+  plays. `persist.ts` : pins are keys (a control's `modTargetKey`, `lay:<i>:speed`,
+  `layer:<i>`), held in the store (`pins`), saved with the session (`Session.pins`), in undo,
+  cleared by New, kept by Generate, never in a scene. One gate, `keepPersistent(incoming,
+  live, pins)`, runs at every bulk write BEFORE the morph starts (a pinned value is the
+  same at both ends : measured, a pinned opacity stays flat through a 2 s recall while
+  the next layer fades); the scene pad grafts per frame (App.tsx). A source's control
+  holds where the arriving slot plays the same shader, an effect's where the same unit id
+  is; the finishing units take the live one's id when something on them is pinned
+  (`adoptLockedIds` : Generate builds them anew). A pinned control keeps its matrix rows
+  and Meta destinations, a pinned layer all of its own (over the 32-row cap, arriving
+  rows give way); a pinned Meta knob comes whole. Randomize modulation skips pinned
+  targets; the dice, Init, presets and Paste on a pinned layer refuse with a toast (a
+  modulator firing its Vary is ignored quietly). **Set in every scene** writes the live
+  value (or layer) into every scene through the same graft, one undo step, with a count
+  of the scenes that lacked it. UI (`Pin.tsx`) : `PinZone` (a `display: contents` wrapper,
+  so no layout moves) on every auto-generated control, the layer strip's opacity / mix /
+  blend / speed, the Mixer's faders, crossfader, hue, blend and column header, the
+  Background's opacity / speed / shadow and the Meta knobs; a 2 px gold bar
+  (`[data-pinned]`, `--c-pin`), a gold border on a pinned layer, **◆ n persistent** in
+  the scene bank with the list (`describePin`). `modTargetKey` moved to `modKey.ts` (the
+  store re-exports it). Not yet : a whole effect unit or source slot, modulator cards,
+  Sonify's controls.
+
 - **The gate hair comes only by hand** (Vincent : the hair stuck on an edge of the frame was
   annoying). The Peint and Pressé Worlds and the Nitrate and Projection Booth Generate
   themes no longer set `filmHair` (0.25, 0.5, 0.3, 0.4 before); Randomize never touched it.

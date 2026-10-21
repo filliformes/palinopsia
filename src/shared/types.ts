@@ -1123,6 +1123,9 @@ export interface Session {
   // session" is on, and applied on load only where that option is on : the
   // warp is otherwise the computer's (its projector), not the piece's.
   warp?: { enabled: boolean; corners: number[]; feather?: number }
+  // Persistence : the pinned controls and layers (renderer persist.ts keys),
+  // which scenes, Randomize, Generate and the World leave alone. Absent : none.
+  pins?: string[]
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown

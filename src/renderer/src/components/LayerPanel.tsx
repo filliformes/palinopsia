@@ -31,6 +31,8 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
 import { Blink } from './Blink'
+import { PinZone, usePinItems } from './Pin'
+import { layerPin, layerSpeedPin } from '../persist'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
   const layer = useStore((s) => s.composition.layers[index])
@@ -160,8 +162,14 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
     e.preventDefault()
     setMenu({ x: e.clientX, y: e.clientY })
   }
+  // the whole layer persistent : no scene, Randomize, Generate or World changes it
+  const wholeKey = layerPin(index)
+  const wholePinned = useStore((s) => s.pins.includes(wholeKey))
+  const wholeItems = usePinItems(wholeKey, `L${index + 1}, the whole layer`, { pin: 'Persistent layer', every: 'Set this layer in every scene' })
 
   const menuItems: MenuItem[] = [
+    ...wholeItems,
+    { divider: true, label: '' },
     { label: 'Init layer', onClick: () => initLayer(index) },
     { label: 'Randomize layer', onClick: () => randomizeLayer(index) },
     // An empty source has nothing to process : its rack is not offered
@@ -190,6 +198,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
       className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel p-2 transition-colors ${
         flashing ? 'animate-pulse border-accent ring-1 ring-accent' : 'border-border'
       }`}
+      style={wholePinned && !flashing ? { borderColor: 'rgb(var(--c-pin) / 0.75)' } : undefined}
       onContextMenu={onContextMenu}
     >
       {/* Header: chevron · LAYER n · opacity · S/M/FB */}
@@ -204,8 +213,15 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           >
             ▶
           </span>
-          <span className="font-mono text-[11px] text-muted">L{index + 1}</span>
+          <span
+            className="font-mono text-[11px]"
+            style={{ color: wholePinned ? 'rgb(var(--c-pin))' : 'rgb(var(--c-muted))' }}
+            title={wholePinned ? 'Persistent : no scene, Randomize or Generate changes this layer (right-click the layer to unpin)' : undefined}
+          >
+            L{index + 1}
+          </span>
         </button>
+        <PinZone pin={modTargetKey(layerTarget('opacity'))} label={`L${index + 1} opacity`}>
         <span className="relative flex min-w-0 flex-1">
           <MidiLearnOverlay id={`layer:${index}:opacity`} />
           <input
@@ -221,6 +237,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             title={`Opacity ${layer.opacity.toFixed(2)} : double-click resets to 1`}
           />
         </span>
+        </PinZone>
         {modChip('opacity', 'layer opacity')}
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
@@ -332,6 +349,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               <StepLabel n={2} title={hasB ? `Mix : how A and B meet (${mixWord(layer.sourceBlend)})` : 'Mix : no Source B yet, pick one above'} />
               <div className={`flex min-w-0 flex-1 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`}>
                 <div className="flex min-h-[26px] min-w-0 items-center gap-1.5">
+                  <PinZone pin={modTargetKey(layerTarget('mix'))} label={`L${index + 1} A·B mix`}>
                   <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
                   <span className="relative flex min-w-0 flex-1">
                     <MidiLearnOverlay id={`layer:${index}:mix`} />
@@ -361,6 +379,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                     />
                     <span className="font-mono text-[9px] text-muted">%</span>
                   </span>
+                  </PinZone>
                   {/* as wide as its longest mode (no fixed width : a select sizes
                       to its widest option), so "lightercolor" is never cut */}
                   <select
@@ -445,6 +464,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   {outTab === 'blend' && (
                     <>
                       <Row label="BLEND">
+                        <PinZone pin={modTargetKey(layerTarget('blend'))} label={`L${index + 1} blend`}>
                         <select
                           ref={blendRef}
                           className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
@@ -457,6 +477,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                             </option>
                           ))}
                         </select>
+                        </PinZone>
                         {modChip('blend', 'blend mode')}
                       </Row>
                       {modAssign('blend')}
@@ -503,6 +524,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           {/* Speed and Vary act on the whole layer : one line, under a rule */}
           <div className="border-t border-border/80" />
           <div className="flex min-w-0 items-center gap-1.5">
+            <PinZone pin={layerSpeedPin(index)} label={`L${index + 1} speed`}>
             <span className="shrink-0 font-mono text-[9px] uppercase text-muted">speed</span>
             <input
               type="range"
@@ -524,6 +546,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 className="input w-full !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
               />
             </div>
+            </PinZone>
             {/* VARY : the global Vary, aimed at this layer alone; a modulation
                 target like the other layer fields, so a modulator can fire it. */}
             <button

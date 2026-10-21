@@ -49,6 +49,8 @@ interface Snapshot {
   // The Audio Layer (its files and inputs, levels, mix) : New and Open replace
   // it too. Which live inputs are open is not in it (see apply).
   audioLayer: FullState['audioLayer']
+  // What is persistent : New clears it, Open replaces it.
+  pins: string[]
 }
 
 function snap(): Snapshot {
@@ -72,7 +74,8 @@ function snap(): Snapshot {
     drift: s.drift,
     flow: s.flow,
     superFlicker: s.superFlicker,
-    audioLayer: s.audioLayer
+    audioLayer: s.audioLayer,
+    pins: s.pins
   }
 }
 
@@ -97,7 +100,8 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.drift !== b.drift ||
     a.flow !== b.flow ||
     a.superFlicker !== b.superFlicker ||
-    a.audioLayer !== b.audioLayer
+    a.audioLayer !== b.audioLayer ||
+    a.pins !== b.pins
   )
 }
 
@@ -140,7 +144,8 @@ function apply(s: Snapshot): void {
     flow: s.flow,
     superFlicker: s.superFlicker,
     audioLayer: s.audioLayer,
-    audioLayerArmed: armed
+    audioLayerArmed: armed,
+    pins: s.pins
   })
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)

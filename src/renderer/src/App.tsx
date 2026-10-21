@@ -88,6 +88,7 @@ import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from
 import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, morphDebug } from './morph'
 
 import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
+import { keepPersistent } from './persist'
 import { liveLight } from './lightPath'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
@@ -1390,7 +1391,8 @@ export default function App(): JSX.Element {
           mv.x = sx
           mv.y = sy
           mv.t = now
-          c = surfaceComposition(st.scenes, sx, sy, cur)!
+          // (the scene pad blends scenes : what is persistent stays as it plays)
+          c = keepPersistent(surfaceComposition(st.scenes, sx, sy, cur)!, st.composition, st.pins)
         } else {
           surfaceNearest.current = -1
           surfaceMove.current.t = 0

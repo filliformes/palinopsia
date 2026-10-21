@@ -8,6 +8,7 @@ import { useRef, useState, type DragEvent, type MouseEvent } from 'react'
 import { useStore } from '../store'
 import { ContextMenu } from './ContextMenu'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { describePin } from '../persist'
 
 // Step to the scene one slot before/after the active one (wrapping). A pad
 // bound to scene:prev / scene:next fires this same path; with no active scene
@@ -60,6 +61,7 @@ export function SceneBank(): JSX.Element {
       >
         ⚄ Random
       </button>
+      <PinsChip />
 
       {/* Step chips : recall the previous / next scene (wrapping). Also learn
           hosts so a pad can page through the bank one slot at a time. */}
@@ -179,5 +181,47 @@ export function SceneBank(): JSX.Element {
         />
       )}
     </div>
+  )
+}
+
+// What is persistent (persist.ts) : how many, and the list (each one in words,
+// dimmed when it is not in the picture now, × unpins it). Only while there is
+// something pinned : a right-click on a control or a layer pins it.
+function PinsChip(): JSX.Element | null {
+  const pins = useStore((s) => s.pins)
+  const composition = useStore((s) => s.composition)
+  const unpin = useStore((s) => s.unpin)
+  const clearPins = useStore((s) => s.clearPins)
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  if (!pins.length) return null
+  const items = pins.map((k) => {
+    const d = describePin(k, composition)
+    return {
+      label: d.here ? d.label : `${d.label} (not in the picture now)`,
+      disabled: !d.here,
+      onDelete: () => unpin(k),
+      deleteTitle: 'Unpin'
+    }
+  })
+  return (
+    <>
+      <button
+        onClick={(e: MouseEvent) => setAt({ x: e.clientX, y: e.clientY })}
+        className="rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-panel3/60"
+        style={{ borderColor: 'rgb(var(--c-pin) / 0.6)', color: 'rgb(var(--c-pin))' }}
+        title="Persistent : what no scene, Randomize, Variation, Generate or World changes. Click for the list (right-click a control or a layer to pin or unpin it)"
+      >
+        ◆ {pins.length} persistent
+      </button>
+      {at && (
+        <ContextMenu
+          x={at.x}
+          y={at.y}
+          header="Persistent : scenes and dice leave these alone"
+          items={[...items, { divider: true, label: '' }, { label: 'Unpin everything', danger: true, onClick: clearPins }]}
+          onClose={() => setAt(null)}
+        />
+      )}
+    </>
   )
 }

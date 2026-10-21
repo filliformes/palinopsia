@@ -21,6 +21,7 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { ModShapeEditor, ShapeToggle } from './ModShapeEditor'
+import { PinZone } from './Pin'
 
 /** The modulation matrix is full : say so (a click that does nothing reads as
  *  broken), and how to make room. */
@@ -81,6 +82,7 @@ export function ModButton({
       onClick={() => onAssign?.(target, label)}
       onContextMenu={(e) => {
         e.preventDefault()
+        e.stopPropagation() // (the control's own menu, Persistent, is under it)
         clearAll()
       }}
       className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
@@ -334,6 +336,30 @@ function Control({
   dense?: boolean
   labelExtra?: JSX.Element
   rgbOnly?: boolean
+}): JSX.Element | null {
+  const el = controlFor({ inp, value, onChange, modTargetFor, dense, labelExtra, rgbOnly })
+  // Every control with a target can be pinned (a color or a pad too : the key is
+  // the input's, whether or not the matrix can modulate it).
+  const t = modTargetFor?.(inp.name)
+  return el && t ? <PinZone pin={modTargetKey(t)} label={inp.label}>{el}</PinZone> : el
+}
+
+function controlFor({
+  inp,
+  value,
+  onChange,
+  modTargetFor,
+  dense,
+  labelExtra,
+  rgbOnly
+}: {
+  inp: IsfInputDesc
+  value: Value | undefined
+  onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
+  dense: boolean
+  labelExtra?: JSX.Element
+  rgbOnly: boolean
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':

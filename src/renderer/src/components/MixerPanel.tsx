@@ -22,6 +22,8 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { PromptModal } from './PromptModal'
 import { registerLiveOverlay } from './liveOverlay'
 import { couplingWords, mixTitle, mixWord } from './abMix'
+import { PinZone, usePin } from './Pin'
+import { layerPin, layerSpeedPin } from '../persist'
 
 const COUPLING_MODES: CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 const COUPLING_TITLE =
@@ -249,12 +251,25 @@ function MixerColumn({
 
   const coupled = couplingOn && hasB && l.coupling.mode !== 'off'
   const cplOff = l.coupling.mode === 'off'
+  // the whole layer persistent : its column wears the pin's color (right-click
+  // its header to pin or unpin, as on the layer itself)
+  const whole = usePin(layerPin(index), `L${index + 1}, the whole layer`)
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded border border-border bg-panel2/50 p-1.5">
+    <div
+      className="flex min-h-0 min-w-0 flex-col gap-1.5 rounded border border-border bg-panel2/50 p-1.5"
+      style={whole.pinned ? { borderColor: 'rgb(var(--c-pin) / 0.75)' } : undefined}
+    >
       {/* Layer id + solo/mute : one click without leaving the Mixer. */}
-      <div className="flex shrink-0 items-center gap-1">
-        <span className="font-mono text-[10px] text-muted">L{index + 1}</span>
+      <div className="flex shrink-0 items-center gap-1" onContextMenu={whole.onContextMenu}>
+        {whole.menu}
+        <span
+          className="font-mono text-[10px]"
+          style={{ color: whole.pinned ? 'rgb(var(--c-pin))' : 'rgb(var(--c-muted))' }}
+          title={whole.pinned ? 'Persistent : no scene, Randomize or Generate changes this layer (right-click to unpin)' : 'Right-click : make the whole layer persistent'}
+        >
+          L{index + 1}
+        </span>
         <div className="flex-1" />
         <button
           onClick={() => toggleSolo(index)}
@@ -299,6 +314,7 @@ function MixerColumn({
             </option>
           ))}
         </select>
+        <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'mix' })} label={`L${index + 1} A·B mix`}>
         <div className="flex min-w-0 items-center gap-1">
           <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
           <span className="relative flex min-w-0 flex-1">
@@ -325,6 +341,7 @@ function MixerColumn({
           </span>
           <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
         </div>
+        </PinZone>
         <span
           ref={wordRef}
           className={`block text-center font-mono text-[9px] tabular-nums ${mixBound ? 'text-accent2' : coupled ? 'text-accent' : 'text-muted'}`}
@@ -339,6 +356,7 @@ function MixerColumn({
         <ModChip count={boundCount[1]} open={openMod?.layer === index && openMod.field === 'harmony'} onToggle={() => setOpenMod(openMod?.layer === index && openMod.field === 'harmony' ? null : { layer: index, field: 'harmony' })} target={{ kind: 'layer', layer: index, field: 'harmony' }} what="A/B hue" />
       </Section>
       <div className={`flex shrink-0 flex-col gap-0.5 ${hasB ? '' : 'opacity-40'}`}>
+        <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'harmony' })} label={`L${index + 1} A·B hue`}>
         <div className="flex min-w-0 items-center gap-1">
           <span className="h-3 w-3 shrink-0 rounded-sm ring-1 ring-border" style={{ background: swA }} title="A's color (its average)" />
           <span className="relative flex min-w-0 flex-1">
@@ -359,6 +377,7 @@ function MixerColumn({
           </span>
           <span className="h-3 w-3 shrink-0 rounded-sm ring-1 ring-border" style={{ background: swB }} title="Where B's color lands" />
         </div>
+        </PinZone>
         <div className="flex justify-between font-mono text-[9px] leading-none text-muted/80">
           <span>match</span>
           <span>clash</span>
@@ -439,9 +458,14 @@ function MixerColumn({
         <ActiveTag a={a} b={b} mute={l.mute} solo={l.solo} anySolo={anySolo} opacity={l.opacity} />
       </Section>
       <div className="flex min-h-0 w-full flex-1 gap-1">
-        <VFader label="OPA" value={l.opacity} min={0} max={1} step={0.01} onChange={(v) => setOpacity(index, v)} midiId={`layer:${index}:opacity`} />
-        <VFader label="SPD" value={l.speed} min={0} max={20} step={0.05} onChange={(v) => setLayerSpeed(index, v)} />
+        <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'opacity' })} label={`L${index + 1} opacity`}>
+          <VFader label="OPA" value={l.opacity} min={0} max={1} step={0.01} onChange={(v) => setOpacity(index, v)} midiId={`layer:${index}:opacity`} />
+        </PinZone>
+        <PinZone pin={layerSpeedPin(index)} label={`L${index + 1} speed`}>
+          <VFader label="SPD" value={l.speed} min={0} max={20} step={0.05} onChange={(v) => setLayerSpeed(index, v)} />
+        </PinZone>
       </div>
+      <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'blend' })} label={`L${index + 1} blend`}>
       <select
         className="input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px]"
         style={{ backgroundImage: 'none' }}
@@ -455,6 +479,7 @@ function MixerColumn({
           </option>
         ))}
       </select>
+      </PinZone>
     </div>
   )
 }

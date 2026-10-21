@@ -28,6 +28,7 @@ import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { useFlash } from './useFlash'
 import { warnModMatrixFull } from './AutoControls'
+import { PinZone } from './Pin'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -316,6 +317,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   const learning = midiLearn === index
 
   return (
+    <PinZone pin={targetKey} label={`Meta ${index + 1} (${knob.name})`}>
     <div
       className={`flex min-w-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
         knob.destinations.length > 0 || isModulated
@@ -457,6 +459,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
 
       {assignOpen && <KnobModAssign index={index} bound={bound} />}
     </div>
+    </PinZone>
   )
 }
 

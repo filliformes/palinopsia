@@ -25,6 +25,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
+import { PinZone } from './Pin'
 
 const BG_SOURCES_ALPHA = [...BG_SOURCES].sort((a, b) => a.name.localeCompare(b.name))
 
@@ -165,6 +166,7 @@ export function BackgroundPanel(): JSX.Element {
           <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
           <span className="font-mono text-[11px] text-muted">BG</span>
         </button>
+        <PinZone pin={modTargetKey(bgTarget('opacity'))} label="Background opacity">
         <span className="relative flex min-w-0 flex-1">
           <MidiLearnOverlay id="bg:opacity" />
           <input
@@ -176,6 +178,7 @@ export function BackgroundPanel(): JSX.Element {
             title={`Background opacity ${opacity.toFixed(2)} : 0 = off · double-click resets to 1`}
           />
         </span>
+        </PinZone>
         {modChip('opacity')}
         <span className="relative inline-flex shrink-0">
           <MidiLearnOverlay id="rand:bg" />
@@ -263,6 +266,7 @@ export function BackgroundPanel(): JSX.Element {
 
           {/* SPEED : its own clock (source, rack and films), 0..4× */}
           <Row label="SPEED" hint="The Background's own clock : its source, its effects and a Collage's films play at this speed (grounds move slowly : 0.25× by default)">
+            <PinZone pin={modTargetKey(bgTarget('speed'))} label="Background speed">
             <span className="relative flex min-w-0 flex-1">
               <MidiLearnOverlay id="bg:speed" />
               <input
@@ -277,12 +281,14 @@ export function BackgroundPanel(): JSX.Element {
             <div className="w-11 shrink-0">
               <BoundedNumberInput value={Math.round(speed * 100) / 100} min={0} max={BG_SPEED_MAX} onChange={setBackgroundSpeed} className="input w-full px-1 py-0.5 text-right text-[11px]" />
             </div>
+            </PinZone>
             {modChip('speed')}
           </Row>
           {modAssign('speed')}
 
           {/* SHADOW : the layers cast a soft shadow onto the ground */}
           <Row label="SHADOW" hint="The layers cast a soft shadow onto the Background (their bright parts, offset down-right) : it lifts them off the ground. 0 = flat">
+            <PinZone pin={modTargetKey(bgTarget('depth'))} label="Background shadow">
             <span className="relative flex min-w-0 flex-1">
               <MidiLearnOverlay id="bg:depth" />
               <input
@@ -297,6 +303,7 @@ export function BackgroundPanel(): JSX.Element {
             <div className="w-11 shrink-0">
               <BoundedNumberInput value={Math.round(depth * 100) / 100} min={0} max={1} onChange={setBackgroundDepth} className="input w-full px-1 py-0.5 text-right text-[11px]" />
             </div>
+            </PinZone>
             {modChip('depth')}
           </Row>
           {modAssign('depth')}

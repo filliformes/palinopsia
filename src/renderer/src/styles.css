@@ -76,7 +76,7 @@
 @font-face { font-family: 'Zilla Slab'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/ZillaSlab.ttf') format('truetype'); }
 
 
-/* The layer strip's four steps (sources, mix, layer FX, out) : each one's badge
+/* The layer strip's four steps (sources, mix, layer FX, out) : each one's word
    and the faint panel under it (LayerPanel.tsx STEP_TINT). The same in every
    theme : at a tenth of their strength they sit on dark and light panels alike. */
 :root {
@@ -84,6 +84,14 @@
   --c-step2: 255 140 26;
   --c-step3: 165 140 255;
   --c-step4: 76 201 167;
+  /* Persistence (persist.ts) : what a pinned control or layer wears */
+  --c-pin: 250 204 21;
+}
+
+/* A pinned control : a thin bar just left of it (Pin.tsx PinZone wraps it
+   with no box of its own, so the layout never moves). */
+[data-pinned] > *:first-child {
+  box-shadow: -4px 0 0 -2px rgb(var(--c-pin));
 }
 
 /* ======== Theme palettes ======== */

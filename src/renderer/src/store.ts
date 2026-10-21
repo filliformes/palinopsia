@@ -45,6 +45,8 @@ import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpac
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
+import { modTargetKey } from './modKey'
+import { graftPins, isPinnedTarget, keepPersistent, layerPin } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
@@ -1232,22 +1234,9 @@ export type Selection =
   | { type: 'audio'; slot: 'A' | 'B' } // an Audio Layer slot (the layers tab, under L4)
   | null
 
-/** Stable identity for a mod target : used to find existing assignments. */
-export function modTargetKey(t: ModTarget): string {
-  if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
-  if (t.kind === 'bgSource') return `bgsrc:${t.input}`
-  if (t.kind === 'meta') return `meta:${t.knob}`
-  if (t.kind === 'sonify') return `soni:${t.param}`
-  if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
-  if (t.kind === 'bg') return `bg:${t.field}`
-  if (t.kind === 'dome') return `dome:${t.field}`
-  if (t.kind === 'outx') return `outx:${t.field}`
-  if (t.kind === 'world') return 'world:amount'
-  const s = t.scope
-  const scopeKey =
-    s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
-  return `fx:${scopeKey}:${t.instId}:${t.input}`
-}
+// modTargetKey (a mod target's stable identity) lives in modKey.ts, so the
+// modules the store imports (persist.ts) can use it too; the store re-exports it.
+export { modTargetKey }
 
 // ── Store ─────────────────────────────────────────────────────────────
 interface StoreState {
@@ -1894,6 +1883,15 @@ interface StoreState {
   scenes: SceneEntry[]
   activeSceneId: string | null
   saveScene: () => void
+  /** Persistence : what scenes, Randomize, Variation, Generate, a World and the
+   *  mix presets leave alone (persist.ts keys : a control's mod-target key,
+   *  'lay:<i>:speed', 'layer:<i>'). Saved with the session, never in a scene. */
+  pins: string[]
+  togglePin: (key: string) => void
+  unpin: (key: string) => void
+  clearPins: () => void
+  /** Write what plays now for this pin into every scene (one undo step). */
+  setInEveryScene: (key: string, label: string) => void
   // Overwrite an existing scene with the current live state.
   updateSceneFromLive: (id: string) => void
   duplicateScene: (id: string) => void
@@ -2120,6 +2118,19 @@ function dropLayerTargets(c: CompositionState, layer: number): CompositionState 
         (t.scope.kind === 'layer' || t.scope.kind === 'sourceA' || t.scope.kind === 'sourceB') &&
         t.scope.layer === layer)
   )
+}
+
+// Persistence (persist.ts) : an arriving composition with the pins held from
+// the one playing now. Every bulk write goes through it.
+const keep = (s: { composition: CompositionState; pins: string[] }, c: CompositionState): CompositionState =>
+  keepPersistent(c, s.composition, s.pins)
+
+// A whole-layer change by a menu (init, dice, a preset, paste) on a pinned
+// layer : nothing, and it says why.
+function layerHeld(s: { pins: string[] }, layer: number, quiet = false): boolean {
+  if (!s.pins.includes(layerPin(layer))) return false
+  if (!quiet) showToast(`L${layer + 1} is persistent : unpin it first (right-click the layer)`, 'warn', 4200)
+  return true
 }
 
 /** The slot a swap is about to overwrite. */
@@ -2361,6 +2372,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   initLayer: (layer) =>
     set((s) => {
+      if (layerHeld(s, layer)) return {}
       // Fresh factory layer : keeps its identity (id), but its source + FX are
       // replaced, so its mod/Meta patching goes with it (dropLayerTargets).
       const composition = {
@@ -2370,21 +2382,22 @@ export const useStore = create<StoreState>((set, get) => ({
           id: l.id
         }))
       }
-      return { composition: dropLayerTargets(composition, layer) }
+      return { composition: keep(s, dropLayerTargets(composition, layer)) }
     }),
   randomizeLayer: (layer) =>
     set((s) => {
+      if (layerHeld(s, layer)) return {}
       const composition = {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
       }
-      return { composition: dropLayerTargets(composition, layer), variationBaseline: null }
+      return { composition: keep(s, dropLayerTargets(composition, layer)), variationBaseline: null }
     }),
 
   varyLayer: (layer) =>
     set((s) => {
       const cur = s.composition.layers[layer]
-      if (!cur) return {}
+      if (!cur || layerHeld(s, layer, true)) return {} // (a modulator may fire it : quietly)
       // Anchored like the global Vary : every fire is a fresh variant at the
       // amount's distance from the layer as it was BEFORE the first fire, so a
       // modulator firing it all night circles your settings. Jittering the last
@@ -2400,7 +2413,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // No target pruning : a jitter moves values, it never removes a unit, so
       // every modulation row still points at something that exists.
       return {
-        composition: { ...s.composition, layers: updateLayer(s.composition.layers, layer, () => next) },
+        composition: keep(s, { ...s.composition, layers: updateLayer(s.composition.layers, layer, () => next) }),
         varyPulse: bumpPulse(s.varyPulse, layer)
       }
     }),
@@ -2418,7 +2431,7 @@ export const useStore = create<StoreState>((set, get) => ({
   randomizeLayerFx: (layer, which) =>
     set((s) => {
       const cur = s.composition.layers[layer]
-      if (!cur) return {}
+      if (!cur || layerHeld(s, layer)) return {}
       // a rack on an empty source would process nothing (OSC, a stale menu)
       const src = which === 'A' ? cur.sourceA : which === 'B' ? cur.sourceB : null
       if (which !== 'layer' && (!src || src.kind === 'none')) return {}
@@ -2441,7 +2454,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // the next global Vary anchors on them rather than dealing the old rack
       // back from its baseline.
       return {
-        composition: dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId)),
+        composition: keep(s, dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId))),
         variationBaseline: null
       }
     }),
@@ -2467,7 +2480,7 @@ export const useStore = create<StoreState>((set, get) => ({
   applyLayerPreset: (layer, presetId) =>
     set((s) => {
       const p = s.layerPresets.find((x) => x.id === presetId)
-      if (!p) return s
+      if (!p || layerHeld(s, layer)) return s
       const composition = {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => ({
@@ -2482,7 +2495,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       // The layer's instrument is replaced : drop its now-orphaned patching
       // (source rows would seize the preset's inputs, fx rows dangle on old ids).
-      return { composition: dropLayerTargets(composition, layer) }
+      return { composition: keep(s, dropLayerTargets(composition, layer)) }
     }),
   deleteLayerPreset: (presetId) =>
     set((s) => {
@@ -2502,7 +2515,7 @@ export const useStore = create<StoreState>((set, get) => ({
   pasteLayer: (layer) =>
     set((s) => {
       const src = s.copiedLayer
-      if (!src) return s
+      if (!src || layerHeld(s, layer)) return s
       const composition = {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => ({
@@ -2516,7 +2529,7 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
       // Pasting replaces this layer's instrument : drop its orphaned patching.
-      return { composition: dropLayerTargets(composition, layer) }
+      return { composition: keep(s, dropLayerTargets(composition, layer)) }
     }),
 
   rightView: 'layers',
@@ -2556,7 +2569,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const p = s.mixerPresets.find((x) => x.id === presetId)
       if (!p) return s
       return {
-        composition: {
+        composition: keep(s, {
           ...s.composition,
           layers: s.composition.layers.map((l, i) => {
             const m = p.layers[i]
@@ -2572,7 +2585,7 @@ export const useStore = create<StoreState>((set, get) => ({
               ...(m.coupling ? { coupling: { ...l.coupling, ...m.coupling } } : {})
             }
           })
-        }
+        })
       }
     }),
   deleteMixerPreset: (presetId) =>
@@ -2879,7 +2892,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // the old ones (bg-fx rows dangled on dead ids and ate the 12-row cap; a
       // source row seized the new source's input of the same name).
       const c = dropBgTargets({ ...s.composition, background }, prev?.source ?? null)
-      return { composition: dropTargets(c, (t) => t.kind === 'fx' && t.scope.kind === 'background') }
+      return { composition: keep(s, dropTargets(c, (t) => t.kind === 'fx' && t.scope.kind === 'background')) }
     }),
   initBackground: () =>
     set((s) => {
@@ -2905,9 +2918,9 @@ export const useStore = create<StoreState>((set, get) => ({
       // scoped to it — bg-fx rows would dangle on old ids, a bgSource row would
       // seize the preset's inputs.
       return {
-        composition: dropTargets(
-          composition,
-          (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background')
+        composition: keep(
+          s,
+          dropTargets(composition, (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background'))
         ),
         selection: { type: 'background' }
       }
@@ -3043,7 +3056,7 @@ export const useStore = create<StoreState>((set, get) => ({
         (t) => t.kind === 'fx' && t.scope.kind === 'master' && !liveIds.has(t.instId)
       )
       // A chain preset sets its own vibe : no longer a named palette.
-      return { composition, vibePresetName: vibe ? null : s.vibePresetName }
+      return { composition: keep(s, composition), vibePresetName: vibe ? null : s.vibePresetName }
     }),
   setSourceInput: (layer, slot, name, value) =>
     set((s) => ({
@@ -3350,7 +3363,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   randomize: (scope, intensity = 1) =>
     set((s) => {
-      const composition = randomizeComposition(s.composition, scope, intensity)
+      const composition = keep(s, randomizeComposition(s.composition, scope, intensity))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now()) // morph to the new draw
       // A structural randomize is a fresh starting point : drop the Variation
       // baseline so the next Variation press anchors on this new scene.
@@ -3366,7 +3379,7 @@ export const useStore = create<StoreState>((set, get) => ({
   applyVariation: (amount) =>
     set((s) => {
       const base = s.variationBaseline ?? s.composition
-      const composition = varyComposition(base, amount)
+      const composition = keep(s, varyComposition(base, amount))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
       return { composition, variationBaseline: base, varyPulse: bumpPulse(s.varyPulse, 4) }
     }),
@@ -3389,14 +3402,14 @@ export const useStore = create<StoreState>((set, get) => ({
         }
         return { ...k, destinations, value }
       })
-      return { composition: { ...s.composition, metaKnobs } }
+      return { composition: keep(s, { ...s.composition, metaKnobs }) }
     }),
   vibePresetName: null,
   setVibePresetName: (n) => set({ vibePresetName: n }),
 
   randomizeMasterParams: () =>
     set((s) => ({
-      composition: {
+      composition: keep(s, {
         ...s.composition,
         // Keep the chain and the pinned Vibe; re-roll every other unit's
         // inputs within curated ranges.
@@ -3405,7 +3418,7 @@ export const useStore = create<StoreState>((set, get) => ({
             ? { ...f, inputs: randomizeInputs(f.shaderId, f.inputs) }
             : f
         )
-      }
+      })
     })),
 
   midiLearn: null,
@@ -3552,7 +3565,10 @@ export const useStore = create<StoreState>((set, get) => ({
     })
     return result
   },
-  randomizeModulation: (candidates, addNew) => {
+  randomizeModulation: (candidatesIn, addNew) => {
+    // a persistent control keeps its modulation as it is
+    const pins = get().pins
+    const candidates = candidatesIn.filter((t) => !isPinnedTarget(t, pins))
     if (!candidates.length) return true
     let ok = true
     set((st) => {
@@ -3848,7 +3864,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // switch : morphed, every layer would hand over through a crossfade), so
     // only the mood and the film ease.
     const prev = s.worlds.find((x) => x.id === s.world)
-    const composition = applyWorldToComposition(s.composition, w, prev)
+    const composition = keep(s, applyWorldToComposition(s.composition, w, prev))
     beginSceneMorph(s.composition, composition, s.morphMs, performance.now(), { couplingFromTarget: true })
     set({ world: w.id, composition })
     // A routing that could not go in says so, wherever the World was picked
@@ -4916,7 +4932,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // (the engine reconciles; feedback buffers survive the recall). The
       // engine morphs to it over morphMs, live (App loop reads morph.ts).
       // Normalize defensively (idempotent) : a scene may predate a schema field.
-      const composition = normalizeComposition(scene.composition)
+      const composition = keep(s, normalizeComposition(scene.composition))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
       resetCouplingState(true) // a stale cut mustn't seed the recalled scene (a drift keeps its momentum : the recall eases)
       // Restore the scene's World for the selector label (composition already
@@ -4943,6 +4959,38 @@ export const useStore = create<StoreState>((set, get) => ({
       scenes: s.scenes.filter((x) => x.id !== id),
       activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
     })),
+  pins: [],
+  togglePin: (key) => set((s) => ({ pins: s.pins.includes(key) ? s.pins.filter((k) => k !== key) : [...s.pins, key] })),
+  unpin: (key) => set((s) => ({ pins: s.pins.filter((k) => k !== key) })),
+  clearPins: () => set({ pins: [] }),
+  setInEveryScene: (key, label) => {
+    const s = get()
+    if (!s.scenes.length) {
+      showToast('No scenes yet : save one first', 'warn', 3500)
+      return
+    }
+    // the pin's own graft, one scene at a time : the same rule as a recall
+    let changed = 0, already = 0, lack = 0
+    const scenes = s.scenes.map((sc) => {
+      const { comp, applied } = graftPins(sc.composition, s.composition, [key])
+      if (!applied.has(key)) { lack++; return sc }
+      if (comp === sc.composition) { already++; return sc }
+      changed++
+      return { ...sc, composition: comp }
+    })
+    if (changed) set({ scenes })
+    const n = s.scenes.length
+    const many = (k: number): string => `${k} scene${k === 1 ? '' : 's'}`
+    showToast(
+      changed
+        ? `${label} : set in ${changed} of ${many(n)}${already ? `, ${already} already had it` : ''}${lack ? `, ${lack} without it (another source or effect there)` : ''}. Ctrl+Z undoes.`
+        : lack === n
+          ? `${label} : no scene has it (another source or effect there)`
+          : `${label} : every scene already has it`,
+      changed ? 'ok' : 'warn',
+      5200
+    )
+  },
   surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
   setSurfaceActive: (active) =>
     set((s) => {
@@ -5040,8 +5088,9 @@ export const useStore = create<StoreState>((set, get) => ({
       resetCouplingState(true)
       // Subtle per-recall variation → long sets never loop verbatim. Normalized
       // like recallScene (idempotent) so an old-shape scene can't skip migration.
-      const composition = normalizeComposition(
-        variation > 0 ? varyComposition(scene.composition, variation) : scene.composition
+      const composition = keep(
+        s,
+        normalizeComposition(variation > 0 ? varyComposition(scene.composition, variation) : scene.composition)
       )
       beginSceneMorph(s.composition, composition, Math.max(0, crossfadeMs), performance.now())
       const worlds = ensureWorld(s.worlds, scene.world)
@@ -5090,6 +5139,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return {
         name: 'Untitled',
         composition: built,
+        pins: [], // New is a clean slate : nothing persistent
         selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
         activeSceneId: null,
@@ -5146,6 +5196,7 @@ export const useStore = create<StoreState>((set, get) => ({
       if (world) comp = dropWorldKeys(withTheme(applyWorldToComposition(comp, world)), [...Object.keys(ctxOver), ...Object.keys(finOver)])
       // Morph into it over the Morph time (layer by layer, live : morph.ts relay);
       // at 0, a clean cut once the new one has compiled.
+      comp = keep(s, comp) // what you pinned rides through a Generate too
       if (s.morphMs > 20) beginRelayMorph(s.composition, comp, s.morphMs, performance.now())
       else {
         cancelMorph()
@@ -5258,6 +5309,8 @@ export const useStore = create<StoreState>((set, get) => ({
       // composition (missing Background slab / finalizer tail) live.
       scenes: (s.scenes ?? []).map((sc) => ({ ...sc, composition: adoptLegacyWorldMod(normalizeComposition(sc.composition)) })),
       activeSceneId: null,
+      // what the session holds persistent (none in an older file)
+      pins: Array.isArray(s.pins) ? [...new Set(s.pins.filter((k): k is string => typeof k === 'string'))] : [],
       variationBaseline: null,
       // The old selection can dangle onto an FX unit the loaded session lacks, and
       // the old palette name no longer describes it : reset both (as newSession does).
@@ -5356,6 +5409,7 @@ export const useStore = create<StoreState>((set, get) => ({
       name: s.name,
       composition: s.composition,
       scenes: s.scenes,
+      ...(s.pins.length ? { pins: s.pins } : {}),
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
       sonify: { ...s.sonify, on: false, sinkId: '' },
