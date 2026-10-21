@@ -296,8 +296,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               live in the Mixer (M) : the ≈ chip says this layer is coupled. */}
           <div className={hasB ? 'min-w-0' : 'min-w-0 opacity-40'}>
           <Row label="MIX">
+            {/* as wide as its longest mode (no fixed width : a select sizes to
+                its widest option), so "lightercolor" is never cut */}
             <select
-              className="input select-compact w-20 shrink-0 text-[10px]"
+              className="input select-compact shrink-0 text-[10px]"
               value={layer.sourceBlend}
               onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
               title="How B meets A : the slider beside it is what this mode makes of it"

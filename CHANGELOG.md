@@ -21,7 +21,8 @@ that CI builds into cross-platform releases.
   mode, harmony and coupling (older presets leave them). The layer strips lose the ⚖
   slider and the CPL row (`showCoupling` gone); their MIX row names what the slider
   means in each mode (`abMix.ts` : A↔B, blend, depth, key, hunger), dims without a B and
-  shows a ≈ chip while coupled (click : the Mixer).
+  shows a ≈ chip while coupled (click : the Mixer). Its mode menu is as wide as its
+  longest mode (no fixed width : "lightercolor" was cut), the same width in every mode.
 - **The A/B harmony is relative to A** (`engine/abHarmony.ts`) : it rotated B's hue by a
   fixed angle whatever A was (so "consonant" did nothing, and a red A with a cyan B
   became consonant at 1). Now −1 pulls B's mean hue onto A's, 1 onto A's complement, 0
