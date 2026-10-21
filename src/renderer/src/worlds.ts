@@ -144,7 +144,7 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.2, bloom: 0.18, depth: 0.28, haze: 0.1 },
     finalizer: {
       filmHold: 1, filmRate: 6, filmJitter: 0.4, filmBoil: 0.6, filmFlutter: 0.4,
-      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15, filmHair: 0.25,
+      filmBlank: 0.05, filmBlankMode: 2, filmDust: 0.3, filmScratch: 0.15, filmHair: 0,
       filmGauge: 1, filmDirt: 1, filmGranule: 0.6, filmSplice: 0.03
     },
     autoMod: null // "silent by conviction" : audio decoupled
@@ -158,7 +158,7 @@ export const BUILTIN_WORLDS: World[] = [
     context: { trails: 0.12, bloom: 0.1, depth: 0.35, haze: 0.08 },
     finalizer: {
       filmHold: 1, filmRate: 8, filmJitter: 0.35, filmBoil: 0.4, filmFlutter: 0.25,
-      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6, filmHair: 0.5,
+      filmBlank: 0.08, filmBlankMode: 0, filmDust: 0.55, filmScratch: 0.6, filmHair: 0,
       filmGauge: 1, filmDirt: 0, filmGranule: 0.35, filmSplice: 0.08
     },
     autoMod: { feature: 'level', target: 'haze', depth: 0.3 }

@@ -1133,11 +1133,11 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-corrode'], nativeChance: 0.6,
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.45 },
-    finalizer: { grain: 0.18, filmDust: 0.45, filmScratch: 0.45, filmHair: 0.3, filmGauge: 0, filmDirt: 1 }
+    finalizer: { grain: 0.18, filmDust: 0.45, filmScratch: 0.45, filmGauge: 0, filmDirt: 1 }
   }),
   mk({
     id: 'projection-booth', name: 'Projection Booth', family: 'Film Wall',
-    blurb: 'Your films through a projector gate : the iris breathes, dust and a hair ride the frame.',
+    blurb: 'Your films through a projector gate : the iris breathes, dust and scratches ride the frame.',
     world: 'monomedia',
     palette: [K, [0.22, 0.18, 0.12, 1], [0.92, 0.86, 0.72, 1]],
     sources: ['gen-collage'], needsClips: true,
@@ -1145,7 +1145,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-aperture', 'fx-grain'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.75 },
-    finalizer: { filmDust: 0.3, filmScratch: 0.25, filmHair: 0.4, filmGauge: 1 }
+    finalizer: { filmDust: 0.3, filmScratch: 0.25, filmGauge: 1 }
   }),
 
   // ── Node Workshop : one recipe node per theme, placed where it reads the

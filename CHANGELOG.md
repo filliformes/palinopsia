@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The gate hair comes only by hand** (Vincent : the hair stuck on an edge of the frame was
+  annoying). The Peint and Pressé Worlds and the Nitrate and Projection Booth Generate
+  themes no longer set `filmHair` (0.25, 0.5, 0.3, 0.4 before); Randomize never touched it.
+  The Finalizer's **gate hair** slider stays, at 0 by default; dust, scratches and the rest
+  of the film damage are unchanged. A scene or session that already has the hair keeps it
+  until the slider goes to 0.
+
 - **The layer strip, compact : the Rail** (`LayerPanel.tsx`, layout C of two compact mockups,
   Vincent : feedback must not change the height, Speed and Vary on one line). The stage
   boxes, their title lines, the arrows and the merge lines are gone (they cost ~130 px);
