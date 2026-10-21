@@ -112,3 +112,13 @@ export function registerOpenSession(fn: (() => void) | null): void {
 export function fireOpenSession(): void {
   openSessionFn?.()
 }
+
+// The big preview (V) folds the panels under it away : App registers how to
+// bring them back, so a search pick (Ctrl/Cmd+K) can reach a control there.
+let showPanelsFn: (() => void) | null = null
+export function registerShowPanels(fn: (() => void) | null): void {
+  showPanelsFn = fn
+}
+export function fireShowPanels(): void {
+  showPanelsFn?.()
+}

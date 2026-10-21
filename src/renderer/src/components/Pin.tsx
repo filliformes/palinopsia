@@ -50,11 +50,12 @@ export function usePin(key: string | null, label: string, words?: { pin: string;
 }
 
 /** Wraps one control (no box of its own : the layout never moves) : the
- *  right-click menu, and the bar while it is pinned. */
+ *  right-click menu, and the bar while it is pinned. `data-ctl` (its key) is
+ *  how the search (Ctrl/Cmd+K) finds the control to flash it. */
 export function PinZone({ pin, label, children }: { pin: string | null; label: string; children: ReactNode }): JSX.Element {
   const { pinned, onContextMenu, menu } = usePin(pin, label)
   return (
-    <div className="contents" onContextMenu={onContextMenu} data-pinned={pinned ? '' : undefined}>
+    <div className="contents" onContextMenu={onContextMenu} data-pinned={pinned ? '' : undefined} data-ctl={pin ?? undefined}>
       {children}
       {menu}
     </div>

@@ -196,9 +196,29 @@ export function SessionLoader(): JSX.Element {
   )
 }
 
+/** Generate a session from a theme, as the Generate button does : unsaved
+ *  changes are asked about first, and a theme that plays your films says when
+ *  painted sources stand in. The search (Ctrl/Cmd+K) generates through it too.
+ *  False when you stayed. */
+export async function generateFromTheme(id: string): Promise<boolean> {
+  const current = THEMES.find((t) => t.id === id)
+  // Generate replaces the session : unsaved changes are asked about first.
+  if (!(await leaveSession(`generating “${current?.name ?? 'a theme'}”`))) return false
+  const standIn = !!current?.needsClips && !collageClipsFor(useStore.getState().composition)
+  useStore.getState().generateTheme(id)
+  markClean()
+  if (standIn)
+    showToast(
+      `${current?.name ?? 'Film Wall'} plays your films : pick a folder in a Collage source (a layer's source → Collage). Painted sources stand in until then.`,
+      'warn',
+      9000
+    )
+  else showToast(`Generated · ${current?.name ?? 'theme'}`)
+  return true
+}
+
 export function GenerateMenu(): JSX.Element {
   const [sel, setSel] = useState(THEMES[0].id)
-  const generateTheme = useStore((s) => s.generateTheme)
   const current = THEMES.find((t) => t.id === sel)
 
   return (
@@ -221,20 +241,7 @@ export function GenerateMenu(): JSX.Element {
       />
       <button
         className="btn text-[12px] text-accent2"
-        onClick={async () => {
-          // Generate replaces the session : unsaved changes are asked about first.
-          if (!(await leaveSession(`generating “${current?.name ?? 'a theme'}”`))) return
-          const standIn = !!current?.needsClips && !collageClipsFor(useStore.getState().composition)
-          generateTheme(sel)
-          markClean()
-          if (standIn)
-            showToast(
-              `${current?.name ?? 'Film Wall'} plays your films : pick a folder in a Collage source (a layer's source → Collage). Painted sources stand in until then.`,
-              'warn',
-              9000
-            )
-          else showToast(`Generated · ${current?.name ?? 'theme'}`)
-        }}
+        onClick={() => void generateFromTheme(sel)}
         title={current ? `Generate a “${current.name}” session : ${current.blurb}` : 'Generate'}
       >
         Generate

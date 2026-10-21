@@ -56,6 +56,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     title: 'Session & zoom',
     rows: [
       ['?', 'This sheet (again : close it)'],
+      ['Ctrl K', 'Search everything : sources, effects, parameters, presets, themes, pages, commands (again : close it)'],
       ['Ctrl S', 'Save session'],
       ['Ctrl F', 'Fulldome output on / off'],
       ['Ctrl Z', 'Undo  ·  Ctrl ⇧Z / Ctrl Y redo'],
@@ -73,6 +74,15 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Ctrl /', 'Comment the line on / off'],
       ['Tab', 'Indent  ·  ⇧Tab unindent'],
       ['Alt ↑ / ↓', 'Move the line']
+    ]
+  },
+  {
+    title: 'In the search (Ctrl K)',
+    rows: [
+      ['↑ ↓', 'Choose  ·  PgUp / PgDn by eight'],
+      ['Tab', 'The next kind (sources, effects, parameters…)  ·  ⇧Tab the one before'],
+      ['Enter', 'Pick it : a source goes in the selected slot, an effect in the selected rack, a parameter is shown and flashed'],
+      ['Esc', 'Close it  ·  with the field empty, your recent picks come first']
     ]
   },
   {

@@ -26,9 +26,10 @@ import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
 import { sonifyEngine } from './audio/sonify'
 import { spaceEngine } from './audio/space'
-import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession } from './commands'
+import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession, registerShowPanels } from './commands'
 import { Toaster, showToast } from './components/Toast'
 import { ShortcutHelp } from './components/ShortcutHelp'
+import { SearchEverything, toggleSearch } from './components/SearchEverything'
 import { onCaptureError } from './engine/CaptureSource'
 import { personStatus } from './engine/personMask'
 import { syncLiveMatchers } from './assemble/liveMatch'
@@ -304,6 +305,11 @@ export default function App(): JSX.Element {
     try { const n = Number(localStorage.getItem('opsia.previewH')); return Number.isFinite(n) && n >= 80 ? n : null } catch { return null }
   })
   const [bigPreview, setBigPreview] = useState(false)
+  // a search pick (Ctrl/Cmd+K) reaching a control under the preview unfolds them
+  useEffect(() => {
+    registerShowPanels(() => setBigPreview(false))
+    return () => registerShowPanels(null)
+  }, [])
   const previewRef = useRef<HTMLDivElement | null>(null)
   const previewColRef = useRef<HTMLElement | null>(null)
   const compositorRef = useRef<Compositor | null>(null)
@@ -880,6 +886,13 @@ export default function App(): JSX.Element {
       // The Source Editor covers the app : its keys are its own (Esc closes it,
       // Ctrl/Cmd+S saves the shader), nothing under it fires.
       if (useStore.getState().sourceEditorOpen && e.key !== 'Escape') return
+      // Ctrl/Cmd+K : search everything (a palette; again : close it). Even from
+      // a field, like Ctrl+S. Bare K stays the Resolume mapper.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        toggleSearch()
+        return
+      }
       // ? : the keyboard cheat-sheet (Shift+/ on most layouts). Toggles.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key === '?') {
         e.preventDefault()
@@ -2439,6 +2452,7 @@ export default function App(): JSX.Element {
       )}
       {leaveAsk && <SaveChangesModal title={leaveAsk.title} detail={leaveAsk.detail} onChoose={leaveAsk.done} />}
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+      <SearchEverything />
       <Toaster />
       {/* every right-click menu opens here, over everything */}
       <MenuHost />
