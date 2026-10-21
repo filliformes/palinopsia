@@ -34,6 +34,9 @@ const SIZES = [960, 640, 416, 256]
 const CODEC = 'avc1.42001f' // baseline (no B-frames : every frame is decodable at once), level 3.1
 /** No frame for this long (the unit or its layer off) : the codec closes (checkIdle). */
 const IDLE_MS = 2000
+/** Frames encoded after a clean keyframe with the decoder still waiting for one :
+ *  the encoder dropped it (a realtime one may), so another is asked for. */
+const CLEAN_WATCH = 12
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
@@ -108,6 +111,7 @@ export class CodecMoshNode implements ConvNode {
   private decTs = 0
   // the state of the mosh
   private wantClean = true // the next encode is a clean keyframe for the decoder
+  private sinceClean = 0 // frames encoded since the last clean keyframe (CLEAN_WATCH)
   private wantSideKey = false // motion mode : the next encode is the sidechain's keyframe, withheld
   private wantMosh = false // the next encode is a keyframe, withheld
   private holding = false // a withheld keyframe is in force : unasked keyframes are withheld too
@@ -318,6 +322,7 @@ export class CodecMoshNode implements ConvNode {
     this.failCount++
     const wait = Math.min(60_000, 5000 * 2 ** (this.failCount - 1))
     this.failUntil = performance.now() + wait
+    this.decW = 0 // the input passes through until a new decoder's first frame
     console.warn(`[codecMosh] ${why} : trying again in ${Math.round(wait / 1000)} s`)
   }
 
@@ -470,10 +475,14 @@ export class CodecMoshNode implements ConvNode {
       if (!side && cutSense > 0 && this.isCut(host, cutSense)) this.wantMosh = true
       // ▸ mosh with a motion source : re-seat this layer's picture under the motion
       if (motion && this.wantMosh) { this.wantClean = true; this.wantMosh = false }
+      // the clean keyframe never reached the decoder (it skips every delta until
+      // one does, and nothing else would ask again : the picture sat still)
+      if (!this.wantClean && this.dec && !this.decodedKey && ++this.sinceClean > CLEAN_WATCH) this.wantClean = true
       if (this.wantClean) {
         // a clean keyframe of THIS layer for the decoder
         this.encode(host, this.encW, this.encH, true, 'clean', quality)
         this.wantClean = false
+        this.sinceClean = 0
         this.wantMosh = false
         this.holding = !!motion
         this.wantSideKey = !!motion
@@ -581,6 +590,9 @@ export class CodecMoshNode implements ConvNode {
     this.cfgKey = ''
     this.latest?.close()
     this.latest = null
+    // the last decoded picture is from before the pause (minutes old, another
+    // scene perhaps) : the input passes through until the new decoder's first frame
+    this.decW = 0
     this.idle = true
     if (this.idleTimer) clearInterval(this.idleTimer)
     this.idleTimer = null

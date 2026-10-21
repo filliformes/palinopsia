@@ -23,7 +23,7 @@
     { "NAME": "audioTex", "TYPE": "image" }
   ],
   "PASSES": [
-    { "TARGET": "cloud", "WIDTH": "floor($WIDTH * (0.5 + min($DOME_FILL * 1000, 1) * (max(0.5, min(1, 2100 / $HEIGHT)) - 0.5)))", "HEIGHT": "floor($HEIGHT * (0.5 + min($DOME_FILL * 1000, 1) * (max(0.5, min(1, 2100 / $WIDTH)) - 0.5)))" },
+    { "TARGET": "cloud", "WIDTH": "floor(max((w = $WIDTH) * 0.5, min(w * min($DOME_FILL * 1000, 1), 2100)))", "HEIGHT": "floor(max((h = $HEIGHT) * 0.5, min(h * min($DOME_FILL * 1000, 1), 2100)))" },
     {}
   ]
 }*/
@@ -35,18 +35,21 @@ uniform float PH_rotation; // wrap 6.2831853
 uniform float PH_evolve; // wrap 256
 // Under full-dome fill the view is kept square (the dome stretches the frame's
 // width and height over one circle), else 0 (engine/domeSignal.ts). There the
-// cloud is traced at full size up to about 2100 pixels a side (the PASSES
-// above; each size may name $WIDTH and $HEIGHT once, the runtime replaces only
-// the first) : the dome enlarges a 1080p frame's height about twice, and a
-// half-size trace went soft. Flat, half size : the strokes are drawn full size.
+// cloud is traced at full size up to 2100 pixels a side, never under half size
+// (the PASSES above) : the dome enlarges a 1080p frame's height about twice, and
+// a half-size trace went soft. Flat, half size : the strokes are drawn full size.
+// Each size caps its OWN side : the runtime replaces only the first $WIDTH /
+// $HEIGHT of an expression, so the side is named once and kept in a variable
+// (w = $WIDTH) for its second use (capped by the other side, a wide frame was
+// traced nearly full width and cut to about half height).
 uniform float DOME_FILL;
 
 const float PI = 3.14159265;
 const float R0 = 0.6; // the core's radius
 
-// Hash without Sine (THIRD_PARTY_NOTICES), on cells wrapped at 256.
+// Hash without Sine (THIRD_PARTY_NOTICES), on cells already wrapped at 256 (vnoise3).
 float hash13(vec3 p3) {
-  p3 = fract(mod(p3, 256.0) * 0.1031);
+  p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);
 }
@@ -60,14 +63,17 @@ vec2 hash22(vec2 p) {
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.xx + p3.yz) * p3.zy);
 }
+// The cell wrapped once and its far corner wrapped on from it (exact on whole
+// numbers) : the same values as wrapping each of the 8 corners, for 2 wraps.
 float vnoise3(vec3 p) {
-  vec3 i = floor(p);
+  vec3 i = mod(floor(p), 256.0);
+  vec3 j = mod(i + 1.0, 256.0);
   vec3 f = fract(p);
   vec3 u = f * f * (3.0 - 2.0 * f);
-  float a = hash13(i), b = hash13(i + vec3(1.0, 0.0, 0.0));
-  float c = hash13(i + vec3(0.0, 1.0, 0.0)), d = hash13(i + vec3(1.0, 1.0, 0.0));
-  float e = hash13(i + vec3(0.0, 0.0, 1.0)), g = hash13(i + vec3(1.0, 0.0, 1.0));
-  float h = hash13(i + vec3(0.0, 1.0, 1.0)), k = hash13(i + vec3(1.0, 1.0, 1.0));
+  float a = hash13(i), b = hash13(vec3(j.x, i.y, i.z));
+  float c = hash13(vec3(i.x, j.y, i.z)), d = hash13(vec3(j.x, j.y, i.z));
+  float e = hash13(vec3(i.x, i.y, j.z)), g = hash13(vec3(j.x, i.y, j.z));
+  float h = hash13(vec3(i.x, j.y, j.z)), k = hash13(j);
   return mix(mix(mix(a, b, u.x), mix(c, d, u.x), u.y), mix(mix(e, g, u.x), mix(h, k, u.x), u.y), u.z);
 }
 float vnoise2(vec2 p) {
@@ -97,8 +103,11 @@ const mat3 M3 = mat3(0.00, 0.80, 0.60, -0.80, 0.36, -0.48, -0.60, -0.48, 0.64);
 // so the puffs bulge and the creases between them cut deep. SWIRL twists the
 // space first, like stirred paint; DENSITY 2 weighs the small puffs. Clearly
 // outside after the first two octaves, it answers with the most the rest could
-// add (still outside) : the march strides on without the fine ones.
-float field(vec3 p, int octaves) {
+// add (still outside) : the march strides on without the fine ones. And once
+// the march only gathers how much cloud it meets (solidK > 0 : the light's
+// point found), deep inside it answers with the least the rest could add when
+// that is already solid (f * K >= 1) : the same density, without the fine ones.
+float field(vec3 p, int octaves, float solidK) {
   // the cloud's own frame : the spin, then a slight tilt
   p = vec3(gCa * p.x + gSa * p.z, p.y, -gSa * p.x + gCa * p.z);
   p = vec3(p.x, p.y * 0.95 - p.z * 0.31, p.y * 0.31 + p.z * 0.95);
@@ -107,8 +116,10 @@ float field(vec3 p, int octaves) {
   vec3 q = p * 1.9 + vec3(31.0, 17.0, 5.0);
   // the stir : a push whose direction turns smoothly through the cloud (one
   // look into the noise sets its heading), so the puffs curl every way
-  float hd = vnoise3(q * 0.45 + vec3(0.0, 0.0, ev)) * 12.566;
-  q += vec3(cos(hd), sin(hd) * 0.8, sin(hd * 1.7 + 1.0)) * swirl * 0.7;
+  if (swirl > 0.0) {
+    float hd = vnoise3(q * 0.45 + vec3(0.0, 0.0, ev)) * 12.566;
+    q += vec3(cos(hd), sin(hd) * 0.8, sin(hd * 1.7 + 1.0)) * swirl * 0.7;
+  }
   float wAll = 0.55 + 0.275 + (0.1375 + 0.06875) * 1.1;
   float s = 0.0, a = 0.55;
   for (int o = 0; o < 4; o++) {
@@ -116,6 +127,8 @@ float field(vec3 p, int octaves) {
     if (o == 2) {
       float most = (R0 - r) + gReach * ((s + (0.1375 + 0.06875) * density2 * 2.2) / wAll - 0.2);
       if (most < -0.05) return most;
+      float least = (R0 - r) + gReach * (s / wAll - 0.2);
+      if (solidK > 0.0 && least * solidK >= 1.0) return least;
     }
     vec3 dir = o == 0 ? vec3(1.0, 0.0, 0.0) : o == 1 ? vec3(0.0, -1.0, 0.0) : o == 2 ? vec3(0.0, 0.0, 1.0) : vec3(-1.0, 1.0, 0.0);
     float t = abs(2.0 * vnoise3(q + dir * ev) - 1.0);
@@ -170,7 +183,7 @@ vec4 cloudPass(vec2 uv) {
   for (int i = 0; i < 72; i++) {
     if (t > t1 || T < 0.03) break;
     vec3 pos = ro + rd * t;
-    float f = field(pos, 4);
+    float f = field(pos, 4, found ? K : 0.0);
     if (f > 0.0) {
       if (!found && f > best) {
         best = f;
@@ -194,20 +207,20 @@ vec4 cloudPass(vec2 uv) {
   if (alpha < 0.003) return vec4(0.0);
   // lit or turned away : the field's slope toward the light (one look)
   float e = 0.07;
-  float fl = field(skin + L * e, 4);
+  float fl = field(skin + L * e, 4, 0.0);
   float x = clamp(0.46 + (skinF - fl) / e * 0.26, 0.0, 1.0);
   // its own shade : more cloud between here and the light
-  float fs = field(skin + L * 0.32, 2);
+  float fs = field(skin + L * 0.32, 2, 0.0);
   x *= mix(1.0, 0.42, smoothstep(0.0, 0.12, fs));
   // the folds sit deep in the shade : more cloud straight out from here (a
   // crease between two puffs), and nearer the core
   float occ = smoothstep(R0 * 0.4, Rb * 0.85, length(skin));
-  float crease = smoothstep(-0.02, 0.16, field(skin + normalize(skin) * 0.22, 2));
+  float crease = smoothstep(-0.02, 0.16, field(skin + normalize(skin) * 0.22, 2, 0.0));
   float ao = (1.0 - crease) * 0.75 + occ * 0.25;
   vec3 c = ramp(x) * mix(0.2, 1.08, ao);
   // the back light : open toward it (little cloud that way), the shade turns
   // cyan and pale on its edges
-  float back = 1.0 - smoothstep(0.0, 0.1, field(skin + Lb * 0.3, 2));
+  float back = 1.0 - smoothstep(0.0, 0.1, field(skin + Lb * 0.3, 2, 0.0));
   c += mix(cool.rgb, vec3(1.0), 0.55) * back * (1.0 - x) * 0.55 * ao;
   return vec4(c * alpha, alpha); // premultiplied
 }

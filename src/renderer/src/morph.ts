@@ -66,6 +66,7 @@ export function beginSceneMorph(
   }
   relay = null
   envelopes = null
+  soundEnvelopes = null
   pendingSwaps = []
   modEngine.forkGhosts()
   state = { from: structuredClone(src), startMs: now, ms }
@@ -78,6 +79,7 @@ export function cancelMorph(): void {
   state = null
   relay = null
   envelopes = null
+  soundEnvelopes = null
   pendingSwaps = []
 }
 
@@ -155,8 +157,18 @@ function lerpMods(a: ModAssignment[], b: ModAssignment[], k: number, aMods: Modu
       out.push({ ...m, muted: false, depth: lerpN(o.depth, to, k) })
     } else out.push({ ...m, muted: false, depth: lerpN(0, to, k) })
   }
+  // An outgoing binding combined with other modulators (shape.with) fades out
+  // combined with the OLD ones : the ghosts (the slots 0..7 are the target's).
+  // Its integrator and gate carry on under the ghost id (modShape forkShapeGhosts).
+  const ghostShape = (s: ModAssignment['shape']): ModAssignment['shape'] =>
+    s?.with?.length ? { ...s, with: s.with.map((w) => w + GHOST) } : s
   for (const o of old.values()) {
-    out.push(sameMod(o.mod) ? { ...o, depth: lerpN(o.depth, 0, k) } : { ...o, id: `${o.id}~ghost`, mod: o.mod + GHOST, depth: lerpN(o.depth, 0, k) })
+    const shape = ghostShape(o.shape)
+    out.push(
+      sameMod(o.mod)
+        ? { ...o, shape, depth: lerpN(o.depth, 0, k) }
+        : { ...o, shape, id: `${o.id}~ghost`, mod: o.mod + GHOST, depth: lerpN(o.depth, 0, k) }
+    )
   }
   return out
 }
@@ -290,6 +302,7 @@ interface RelaySlot {
   readyAt: number | null // when the engine first had it loaded (ms)
   swapped: boolean // borrow : the engine slots were swapped (the hand-over is done)
   leftAt: number | null // the old content left its engine slot (borrow : swapped; out : faded) (ms)
+  keepSound: boolean // through / in : the same sound on both sides, playing on in its own slot (sharesSound)
 }
 
 let relay: {
@@ -302,6 +315,9 @@ let relay: {
 let syncCount = 0
 let lastRendered: CompositionState | null = null // what the engine was fed (opacities as SHOWN)
 let envelopes: number[] | null = null
+// The same per slot for its SOUND (an Audio slot, a film with its volume up) :
+// the picture's envelope, except where the sound plays on through (keepSound).
+let soundEnvelopes: number[] | null = null
 let pendingSwaps: Array<[number, number]> = []
 
 const RELAY_WINDOW = 0.55 // each slot's share of the morph
@@ -332,6 +348,16 @@ function switches(id: string | null | undefined, inputs: Record<string, number |
 const slotSwitchKey = (s: SourceSlot | null | undefined): string => `${slotKey(s)}{${s && s.kind !== 'none' ? switches(s.shaderId, s.inputs) : ''}}`
 const fxSwitchKey = (fx: FxInstance[] | undefined): string => (fx ?? []).map((f) => `${f.shaderId}{${switches(f.shaderId, f.inputs)}}`).join(',')
 const layerEmpty = (l: LayerState | undefined): boolean => !l || (slotKey(l.sourceA) === 'none' && slotKey(l.sourceB) === 'none')
+// A slot with a sound of its own : an Audio slot, or a film with its volume up.
+const sounding = (s: SourceSlot | null | undefined): boolean =>
+  !!s && (s.kind === 'audio' || (s.kind === 'video' && (s.videoVolume ?? 0) > 0.001))
+// The same sound in the same place on both sides : the engine slot keeps playing
+// it if the layer hands over IN PLACE (through). Borrowed, a free slot started a
+// second copy from its in point : both heard over the crossfade, then the music
+// restarted at the hand-over.
+const sharesSound = (a: LayerState, b: LayerState): boolean =>
+  ((sounding(a.sourceA) || sounding(b.sourceA)) && slotKey(a.sourceA) === slotKey(b.sourceA)) ||
+  ((sounding(a.sourceB) || sounding(b.sourceB)) && slotKey(a.sourceB) === slotKey(b.sourceB))
 const layerDark = (l: LayerState | undefined): boolean => layerEmpty(l) || !!l!.mute || l!.opacity <= 0.001
 // What a layer IS : its sources and racks (and their switches, above), and the
 // switches no ease can cross (blend modes, mute / solo / feedback, the mask's
@@ -387,10 +413,18 @@ export function beginRelayMorph(from: CompositionState, target: CompositionState
     const end = start + RELAY_WINDOW
     let kind: RelayKind
     let host = i
+    let keepSound = false
     if (sameLayer(a, b)) kind = 'same'
-    else if (layerDark(a)) kind = 'in'
-    else if (layerEmpty(b)) kind = 'out'
-    else {
+    else if (layerDark(a)) {
+      kind = 'in'
+      // unseen (opacity 0) but heard : the same sound plays on, not faded in again
+      keepSound = !a.mute && sharesSound(a, b)
+    } else if (layerEmpty(b)) kind = 'out'
+    else if (sharesSound(a, b)) {
+      // its sound plays on, one copy, unbroken : the picture hands over in place
+      kind = 'through'
+      keepSound = true
+    } else {
       // The free slot with the fewest visible layers between it and this one
       // (so the stacking barely changes at the hand-over), then the nearest.
       let best = -1
@@ -416,7 +450,7 @@ export function beginRelayMorph(from: CompositionState, target: CompositionState
         host = best
       } else kind = 'through'
     }
-    slots[i] = { kind, start, mid: start + RELAY_WINDOW / 2, end, host, switchSync: null, readyAt: null, swapped: false, leftAt: null }
+    slots[i] = { kind, start, mid: start + RELAY_WINDOW / 2, end, host, switchSync: null, readyAt: null, swapped: false, leftAt: null, keepSound }
   }
   const sb = src.background
   const tb = target.background
@@ -467,6 +501,13 @@ export function consumeLayerSwaps(): Array<[number, number]> {
  *  render loop multiplies them in after every modulator and macro. */
 export function relayEnvelopes(): number[] | null {
   return envelopes
+}
+
+/** The same for each engine slot's sound (null when no relay) : the render loop
+ *  scales the layer's sound by them, so an outgoing sound fades with its picture
+ *  instead of playing on at full and being cut dead at the hand-over. */
+export function relaySoundEnvelopes(): number[] | null {
+  return soundEnvelopes
 }
 
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x))
@@ -607,9 +648,13 @@ function relayedComposition(now: number, target: CompositionState): CompositionS
   if (allDone) {
     relay = null
     envelopes = null
+    soundEnvelopes = null
     return target
   }
   envelopes = env
+  // the sound fades with its picture (out, in, a borrow's two sides), except a
+  // sound that plays on through the hand-over in its own slot
+  soundEnvelopes = env.map((e, i) => (r.slots[i]?.keepSound ? 1 : e))
   return {
     ...target,
     worldShift: lerpShift(a.worldShift, target.worldShift, k),

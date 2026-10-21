@@ -155,6 +155,7 @@ export class AudioSource {
   private disposed = false
   private inputs: Record<string, number | number[]> = {}
   private muted = false
+  private gain = 1 // this frame's scale on the volume (a relay morph's hand-over : setGain)
 
   constructor(private gl: WebGL2RenderingContext, private w: number, private h: number) {
     this.vao = gl.createVertexArray()!
@@ -202,6 +203,9 @@ export class AudioSource {
   setMuted(m: boolean): void {
     this.muted = m
   }
+  setGain(g: number): void {
+    this.gain = Math.max(0, Math.min(1, g))
+  }
 
   duration(): number {
     return this.player.duration()
@@ -216,7 +220,7 @@ export class AudioSource {
 
   /** The transport, once a frame : `mul` is the layer's speed × the global one. */
   tick(_rawDt: number, mul: number): void {
-    this.player.setVolume(num(this.inputs.volume, 0.8), this.muted)
+    this.player.setVolume(num(this.inputs.volume, 0.8) * this.gain, this.muted)
     this.player.setKeepPitch(num(this.inputs.keepPitch, 0) > 0.5)
     this.player.tick(mul)
   }

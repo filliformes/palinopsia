@@ -31,9 +31,9 @@ const smoothstep = (a: number, b: number, x: number): number => {
 }
 
 // Per-layer runtime state (cut's decaying flash and whether the feature is
-// still above its threshold, drift's integrator, the mode it last ran in).
-// Fixed to the four layers; index-keyed, lazily created.
-const state: Array<{ held: number; up: boolean; mode: string }> = []
+// still above its threshold, gate's side of its edge, drift's integrator, the
+// mode it last ran in). Fixed to the four layers; index-keyed, lazily created.
+const state: Array<{ held: number; up: boolean; open: boolean; mode: string }> = []
 
 /** Each layer's mix as the coupling leaves it this frame, or null where no
  *  coupling runs (off, no B, the audio input off, the master switch off). The
@@ -50,7 +50,7 @@ let lastNow = 0
  *  everything else was still easing. */
 export function resetCouplingState(keepDrift = false): void {
   if (keepDrift) {
-    for (const s of state) if (s && s.mode !== 'drift') { s.held = 0; s.up = false }
+    for (const s of state) if (s && s.mode !== 'drift') { s.held = 0; s.up = false; s.open = false }
   } else state.length = 0
   lastNow = 0
 }
@@ -85,7 +85,7 @@ export function applyCoupling(
     if (!layer || !cp || cp.mode === 'off') return base
     // Needs a real second voice : the crossfade is inert without B.
     if (!l.sourceB || l.sourceB.kind === 'none') return base
-    if (!state[i]) state[i] = { held: 0, up: false, mode: cp.mode }
+    if (!state[i]) state[i] = { held: 0, up: false, open: false, mode: cp.mode }
     const s = state[i]
     s.mode = cp.mode
 
@@ -121,9 +121,17 @@ export function applyCoupling(
         break
       case 'gate': {
         // B while loud, A while quiet; tightness hardens the edge (a soft
-        // swell at 0, a switch at 1), round the same threshold.
+        // swell at 0, a switch at 1), round the same threshold. The harder the
+        // edge, the more it holds the side it is on (a Schmitt edge : the band
+        // moves down once crossed upward, up once crossed back) : a feature
+        // hovering on the line no longer flips the whole layer A / B at frame
+        // rate. It flips past the band's far end, so the mix never jumps.
         const w = 0.03 + (1 - tight) * 0.3
-        eff = toB(smoothstep(0.426 - w / 2, 0.426 + w / 2, raw))
+        const hy = 0.03 * tight * tight
+        if (!s.open && raw >= 0.426 + hy + w / 2) s.open = true
+        else if (s.open && raw <= 0.426 - hy - w / 2) s.open = false
+        const edge = 0.426 + (s.open ? -hy : hy)
+        eff = toB(smoothstep(edge - w / 2, edge + w / 2, raw))
         break
       }
       case 'drift': {

@@ -12,7 +12,7 @@
 // touch the React store, so nothing re-renders at 60 Hz.
 
 import { setWorldAmountMod, worldAmountBase } from './worldAmount'
-import { pruneShapes, shapeValue } from './modShape'
+import { forkShapeGhosts, pruneShapes, shapeValue } from './modShape'
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
@@ -380,7 +380,8 @@ export class ModEngine {
   }
 
   /** A morph begins : each ghost slot takes over its modulator's exact state
-   *  (phase, held values), so the old motion carries on unbroken in the ghost. */
+   *  (phase, held values), so the old motion carries on unbroken in the ghost;
+   *  and each binding's shaping state likewise (its integrator, its gate). */
   forkGhosts(): void {
     const now = this.lastNow || performance.now()
     while (this.slots.length < SLOTS) this.slots.push(makeSlot(now))
@@ -388,6 +389,7 @@ export class ModEngine {
       this.slots[i + 8] = structuredClone(this.slots[i])
       this.values[i + 8] = this.values[i]
     }
+    forkShapeGhosts()
   }
 
   /** Advance every enabled modulator to `now` and return post-curve values.

@@ -194,7 +194,7 @@ uniform sampler2D uState; // Consume/Reagent competition field (mode 17; unused 
 uniform int mode;
 uniform float x;          // what the mode makes of it : the crossfade, the blend's depth, weave's depth, the key, the hunger
 uniform float harm;       // A/B harmony : -1 B matched to A's hue · 0 untouched · 1 B on A's complement (abHarmony.ts)
-uniform sampler2D uMeans; // the sources' colors (MEANS_FS) : texel 0 A, texel 1 B
+uniform sampler2D uMeans; // the sources' colors (MEANS_FS) : texel 0 A, texel 1 B, texel 2 the way B turns
 ${BLEND_GLSL}
 ${HARMONY_GLSL}
 void main(){
@@ -202,7 +202,8 @@ void main(){
   vec4 B = texture(b, uv);
   vec3 mA = texelFetch(uMeans, ivec2(0, 0), 0).rgb;
   vec3 mB = texelFetch(uMeans, ivec2(1, 0), 0).rgb;
-  B.rgb = harmonize(B.rgb, mA, mB, harm);
+  float side = texelFetch(uMeans, ivec2(2, 0), 0).r * 2.0 - 1.0; // the way B turns, kept near the antipode
+  B.rgb = harmonize(B.rgb, mA, mB, harm, side);
   if(mode==15){
     // WEAVE (a luminance-displacement weave): each source's luminance displaces the
     // OTHER's sampling, then they interleave : a woven two-source warp.
@@ -212,7 +213,7 @@ void main(){
     float lb = dot(B.rgb, lw);
     float d = 0.06 * x;
     vec3 aw = texture(a, uv + vec2(0.0, (lb-0.5)*2.0*d)).rgb;
-    vec3 bw = harmonize(texture(b, uv + vec2((la-0.5)*2.0*d, 0.0)).rgb, mA, mB, harm);
+    vec3 bw = harmonize(texture(b, uv + vec2((la-0.5)*2.0*d, 0.0)).rgb, mA, mB, harm, side);
     o = vec4(mix(aw, bw, 0.5), max(A.a, B.a));
     return;
   }
@@ -1030,6 +1031,11 @@ export class ISFLayer {
   reagent: PingPong | null = null;
   // The same field between this layer and the stack below (blend mode 'consume').
   stackReagent: PingPong | null = null;
+  // A/B harmony's measure of the two sources (abHarmony.ts MEANS_FS, 3 x 1),
+  // eased from one measure to the next (lazy : only while harmony or the
+  // Mixer's swatch needs it), and when it was last taken (ms, -1 never).
+  means: PingPong | null = null;
+  meansAt = -1;
   // Spatial mask on this layer's stack contribution (null = none).
   mask: LayerMask | null = null;
 
@@ -1355,7 +1361,12 @@ export class ISFLayer {
   // A clip that ignores the global speed plays at the layer's speed alone.
   private ownSpeedA = false;
   private ownSpeedB = false;
+  /** This frame's scale on the layer's sound (the relay's hand-over envelope,
+   *  Compositor.scaleLayerSound), taken by the next tickVideos. */
+  soundGain = 1;
   tickVideos(layerIndex: number, rawDt: number, mulAll: number, bpm = 120, audible = true): void {
+    const gain = this.soundGain;
+    this.soundGain = 1;
     for (const slot of ['A', 'B'] as const) {
       const mul = (slot === 'A' ? this.ownSpeedA : this.ownSpeedB) ? this.speed : mulAll;
       const v = slot === 'A' ? this.videoA : this.videoB;
@@ -1363,11 +1374,13 @@ export class ISFLayer {
       const key = videoKey(layerIndex, slot);
       if (v) {
         v.setAudible(audible);
+        v.setGain(gain);
         v.tick(rawDt, mul, bpm);
         videoPlayheads.set(key, { time: v.time(), duration: v.duration() });
       } else if (au) {
         // a muted layer (or another one soloed) plays on, silent
         au.setMuted(!audible);
+        au.setGain(gain);
         au.tick(rawDt, mul);
         videoPlayheads.set(key, { time: au.time(), duration: au.duration() });
       } else {
@@ -1647,6 +1660,8 @@ export class ISFLayer {
     disposeTarget(gl, this.scratchB);
     this.reagent?.dispose(gl);
     this.stackReagent?.dispose(gl);
+    this.means?.dispose(gl);
+    this.means = null;
   }
 }
 
@@ -1818,10 +1833,14 @@ export class Compositor {
   private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
   private uMBHue!: WebGLUniformLocation; private uMState!: WebGLUniformLocation;
   private uMMeans!: WebGLUniformLocation;
-  // The A/B sources' colors (abHarmony.ts MEANS_FS) : a 2 x 1 target, written
-  // just before a layer's mix when its harmony or the Mixer's swatches need it.
+  // The A/B sources' colors (abHarmony.ts MEANS_FS) : each layer's own 3 x 1
+  // ping-pong (ISFLayer.means), written just before its mix when its harmony or
+  // the Mixer's swatches need it. meansTarget is never written : the blank the
+  // mix samples where a layer has no measure (harmony off : never read then).
   private meansProg!: WebGLProgram;
   private uMeA!: WebGLUniformLocation; private uMeB!: WebGLUniformLocation;
+  private uMePrev!: WebGLUniformLocation; private uMeRate!: WebGLUniformLocation;
+  private uMeHarm!: WebGLUniformLocation;
   private meansTarget!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Consume/Reagent competition-field update program.
   private reagentProg!: WebGLProgram;
@@ -1909,7 +1928,10 @@ export class Compositor {
     this.meansProg = compile(gl, QUAD_VS, MEANS_FS);
     this.uMeA = gl.getUniformLocation(this.meansProg, 'a')!;
     this.uMeB = gl.getUniformLocation(this.meansProg, 'b')!;
-    this.meansTarget = makeTarget(gl, 2, 1);
+    this.uMePrev = gl.getUniformLocation(this.meansProg, 'prev')!;
+    this.uMeRate = gl.getUniformLocation(this.meansProg, 'rate')!;
+    this.uMeHarm = gl.getUniformLocation(this.meansProg, 'harm')!;
+    this.meansTarget = makeTarget(gl, 3, 1);
 
     this.reagentProg = compile(gl, QUAD_VS, REAGENT_FS);
     this.uRA = gl.getUniformLocation(this.reagentProg, 'a')!;
@@ -2061,6 +2083,13 @@ export class Compositor {
   scaleLayerOpacity(i: number, k: number): void {
     const L = this.layers[i];
     if (L) L.opacity *= Math.max(0, Math.min(1, k));
+  }
+
+  /** Scale a layer's sound this frame (its Audio slot, its film's volume) : the
+   *  relay's sound envelope, so an outgoing sound fades with its picture. */
+  scaleLayerSound(i: number, k: number): void {
+    const L = this.layers[i];
+    if (L) L.soundGain = Math.max(0, Math.min(1, k));
   }
 
   /** Sonify's Collage voice : every Collage wall in the composition (layers A/B
@@ -3216,17 +3245,32 @@ export class Compositor {
     this.abSwatchAt[li] = now;
     return true;
   }
-  /** The two sources' colors into the 2 x 1 means target (abHarmony.ts). */
-  private measureSources(a: WebGLTexture, b: WebGLTexture): void {
+  /** The two sources' colors into the layer's own means (abHarmony.ts), eased
+   *  from its last measure; returns the measure just made. */
+  private measureSources(L: ISFLayer, a: WebGLTexture, b: WebGLTexture, timeMs: number): WebGLTexture {
     const gl = this.gl;
+    if (!L.means) {
+      L.means = new PingPong(gl, 3, 1);
+      L.meansAt = -1;
+    }
+    // About 0.12 s to settle (frame rate free); a first look or a stale one
+    // (harmony was off, the Mixer closed : over 0.4 s) takes the new one whole.
+    const since = L.meansAt < 0 ? -1 : timeMs - L.meansAt;
+    const rate = since <= 0 || since > 400 ? 1 : 1 - Math.exp(-since / 120);
+    L.meansAt = timeMs;
     gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.meansTarget.fbo);
-    gl.viewport(0, 0, 2, 1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, L.means.write());
+    gl.viewport(0, 0, 3, 1);
     gl.useProgram(this.meansProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uMeA, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uMeB, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, L.means.read()); gl.uniform1i(this.uMePrev, 2);
+    gl.uniform1f(this.uMeRate, rate);
+    gl.uniform1f(this.uMeHarm, Math.max(-1, Math.min(1, L.harmony)));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
+    L.means.swap();
+    return L.means.read();
   }
   private abSwatchKick(name: string, tex: WebGLTexture): void {
     const gl = this.gl;
@@ -3236,7 +3280,7 @@ export class Compositor {
         cap = new FrameCapture(gl, 2);
         this.abSwatchCaps.set(name, cap);
       }
-      cap.kick(tex, 2, 1, 'rgba-up', 2, this.vao);
+      cap.kick(tex, 3, 1, 'rgba-up', 3, this.vao);
     } catch (e) {
       console.error((e as Error).message);
     }
@@ -3256,10 +3300,10 @@ export class Compositor {
     for (let li = 0; li < 4; li++) {
       const cap = this.abSwatchCaps.get(`ab${li}`);
       const f = cap?.harvestLatest();
-      if (f && f.w >= 2) {
+      if (f && f.w >= 3) {
         const px = new Uint8Array(f.buf);
         const at = (x: number): [number, number, number] => [px[x * 4] / 255, px[x * 4 + 1] / 255, px[x * 4 + 2] / 255];
-        abSwatches[li] = { a: at(0), b: at(1) };
+        abSwatches[li] = { a: at(0), b: at(1), side: Math.round(at(2)[0] * 2 - 1) };
       }
       if (f) cap!.recycle(f.buf);
       if (!this.layers[li]?.hasB()) abSwatches[li] = null;
@@ -3290,7 +3334,7 @@ export class Compositor {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a); gl.uniform1i(this.uMA, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, b); gl.uniform1i(this.uMB, 1);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, stateTex); gl.uniform1i(this.uMState, 2);
-    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.meansTarget.tex); gl.uniform1i(this.uMMeans, 3);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, layer?.means ? layer.means.read() : this.meansTarget.tex); gl.uniform1i(this.uMMeans, 3);
     gl.uniform1i(this.uMMode, this.modeIndex[mode] ?? 0);
     gl.uniform1f(this.uMX, x);
     gl.uniform1f(this.uMBHue, Math.max(-1, Math.min(1, harmony))); // abHarmony.ts
@@ -3395,8 +3439,10 @@ export class Compositor {
           L.renderSource('B', nodeCtx.sidechainTex);
           const sigB = L.collageShapes('B', L.rackB.apply(L.scratchB.tex, this.chain, layerCtx), this.chain, (fbo, tex) => this.copyInto(fbo, tex)); // native nodes on source B
           const swatch = this.abSwatchDue(li, timeMs);
-          if (Math.abs(L.harmony) >= 0.001 || swatch) this.measureSources(sig, sigB);
-          if (swatch) this.abSwatchKick(`ab${li}`, this.meansTarget.tex);
+          if (Math.abs(L.harmony) >= 0.001 || swatch) {
+            const means = this.measureSources(L, sig, sigB, timeMs);
+            if (swatch) this.abSwatchKick(`ab${li}`, means);
+          }
           sig = this.mixSources(sig, sigB, L.sourceMix, L.sourceBlend, L.harmony, L);
         }
         gl.bindVertexArray(null);

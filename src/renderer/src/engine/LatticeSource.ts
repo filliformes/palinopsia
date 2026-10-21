@@ -35,6 +35,7 @@ uniform float uR0;            // tunnel : its radius; sphere, torus, galaxy : th
 uniform float uDist, uExt;    // sphere, torus, galaxy : the camera's distance from the centre, their extent
 uniform vec3 uCamW, uCamWP;   // and the camera there (world units), now and STREAK seconds ago
 uniform float uRot, uRotP;    // their own turn (FLY), now and STREAK seconds ago
+uniform float uStream, uStreamP; // the galaxy's stream along its arms (0..1), now and STREAK seconds ago
 uniform vec3 uFace;           // the unit direction from their centre toward the camera
 uniform float uReach01;       // REACH as set (0..1) : the new forms scale it their own way
 uniform int uSquare;          // full-dome FILL : the view kept square, so round stays round on the dome
@@ -179,8 +180,10 @@ vec3 rotY(vec3 v, float a) { float c = cos(a), sn = sin(a); return vec3(c * v.x 
 // core. The spiral turns as one (FLY) while every point streams out along its
 // arm and comes back in at the core, faded at both ends (fade) : the arms stay
 // arms however long it turns (a disc that sheared would wind them into rings).
-vec3 galaxyPt(vec3 h3, vec3 h2, float rot, out float r, out float fade) {
-  float q0 = fract(h3.y + rot * 0.04);
+// The stream is its own phase (wrapped at 1) : read off the turn, it jumped
+// along the arms each time the turn wrapped.
+vec3 galaxyPt(vec3 h3, vec3 h2, float rot, float along, out float r, out float fade) {
+  float q0 = fract(h3.y + along);
   fade = smoothstep(0.0, 0.08, q0) * (1.0 - smoothstep(0.82, 1.0, q0));
   float q = 1.4 * (0.03 + 0.97 * pow(q0, 1.6));
   r = uR0 * q * (1.0 + (h2.z - 0.5) * 0.12);
@@ -215,7 +218,9 @@ void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) 
     float R = uR0;
     vec3 B = rad * R + vec3(0.0, 0.0, z);
     float L = 4.0 + uReach01 * 40.0; // the reach, along the tunnel
-    float disp = -uWellAmt * 0.7 * R * exp(-pow((z + L) / (L * 0.5), 2.0)); // a throat ahead
+    // a throat ahead (squared by hand : pow() of the negative base beyond it is undefined)
+    float zw = (z + L) / (L * 0.5);
+    float disp = -uWellAmt * 0.7 * R * exp(-zw * zw);
     disp += uRipple * 0.25 * R * sin(z * 6.2831853 * uRings / L + uRipplePh); // rings running along
     disp += uSwell * 0.3 * R * vnoise(vec2(cos(th) * 2.0 + idz / 8.0, sin(th) * 2.0) + vec2(uSwellPh, uSwellPh * 0.6));
     // the spectrum round the wall : bass at the floor, treble overhead
@@ -273,7 +278,7 @@ void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) 
     // GALAXY : a spiral disc; the well is its bulge, the ripple a density wave.
     vec3 h3 = hash33(vec3(fk, 17.0, 5.0) + 41.0);
     float rr, fd;
-    vec3 g = galaxyPt(h3, h2, uRot, rr, fd);
+    vec3 g = galaxyPt(h3, h2, uRot, uStream, rr, fd);
     float R = uR0;
     float RR = R * (0.15 + uReach01 * 1.2); // the reach, a radius
     vec3 gp = vec3(0.0);
@@ -298,7 +303,7 @@ void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) 
     y += uSide * 0.3 * R * sideAt(g - uCamW);
     P = g + vec3(0.0, y, 0.0) - uCamW;
     float rp, fp;
-    Pp = (bulge ? gp : galaxyPt(h3, h2, uRotP, rp, fp)) + vec3(0.0, y, 0.0) - uCamWP;
+    Pp = (bulge ? gp : galaxyPt(h3, h2, uRotP, uStreamP, rp, fp)) + vec3(0.0, y, 0.0) - uCamWP;
   }
   // FOG : the far side dims, toward the back of the shape
   float depth = -dot(P, uBack);
@@ -409,7 +414,10 @@ export class LatticeSource implements NativeGenerator {
   private yaw = 0
   private ripplePh = Math.random() * Math.PI * 2
   private rot = 0 // the sphere's, torus's, galaxy's own turn (FLY), radians
-  private swellPh = Math.random() * 512
+  private stream = 0 // the galaxy's points streaming along their arms, 0..1
+  // The swell's phase wraps at 5120 : a whole number of noise periods (512) for
+  // every rate it is read at (x 0.6 : 3072, x 0.7 : 3584), so no wrap re-deals it.
+  private swellPh = Math.random() * 5120
   private cellS = 0
   private audioTex: WebGLTexture | null = null
   private sideTex: WebGLTexture | null = null
@@ -504,11 +512,14 @@ export class LatticeSource implements NativeGenerator {
     const height = Math.max(0.3, num(I, 'height', 10))
     // The shapes' own turn : FLY spins the globe, rolls the torus, wheels the galaxy.
     const turnRate = num(I, 'fly', 0.15) * 1.2 // radians per second at full
-    if (shape) this.rot = (this.rot + turnRate * dt) % (Math.PI * 200)
+    if (shape) {
+      this.rot = (this.rot + turnRate * dt) % (Math.PI * 200)
+      this.stream = (this.stream + turnRate * 0.04 * dt) % 1
+    }
 
     const pace = num(I, 'pace', 0.3)
     this.ripplePh = (this.ripplePh + pace * 2 * Math.PI * dt) % (Math.PI * 2)
-    this.swellPh = (this.swellPh + pace * 0.6 * dt) % 512
+    this.swellPh = (this.swellPh + pace * 0.6 * dt) % 5120
 
     const lens = Math.max(0, Math.min(1, num(I, 'lens', 0.6)))
     const f = 0.6 * Math.pow(10, 1 - lens)
@@ -566,6 +577,7 @@ export class LatticeSource implements NativeGenerator {
       .f1('uR0', form === 2 ? height : r0).f1('uDist', dist).f1('uExt', ext)
       .f3('uCamW', ...camW).f3('uCamWP', ...camWP)
       .f1('uRot', this.rot).f1('uRotP', this.rot - turnRate * streakSec)
+      .f1('uStream', this.stream).f1('uStreamP', this.stream - turnRate * 0.04 * streakSec)
       .f3('uFace', -B.f[0], -B.f[1], -B.f[2])
       .f3('uCam', this.cam[0], form === 0 ? height : this.cam[1], this.cam[2])
       .f3('uRight', ...B.r).f3('uUp', ...B.u).f3('uBack', ...B.b)

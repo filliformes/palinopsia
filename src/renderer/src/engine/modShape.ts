@@ -73,13 +73,26 @@ interface Integrator {
   gate: boolean // threshold gate : on (with a little hysteresis)
 }
 const state = new Map<string, Integrator>()
+// A morph's outgoing binding on a ghost modulator (morph.ts lerpMods) is the
+// same binding under `${id}~ghost` : it carries on from where the binding got to.
+const GHOST_ID = '~ghost'
 const stateOf = (id: string): Integrator => {
   let s = state.get(id)
   if (!s) {
-    s = { pos: 0.5, shown: 0.5, held: false, gate: false }
+    const base = id.endsWith(GHOST_ID) ? state.get(id.slice(0, -GHOST_ID.length)) : undefined
+    s = base ? { ...base } : { pos: 0.5, shown: 0.5, held: false, gate: false }
     state.set(id, s)
   }
   return s
+}
+
+/** A morph begins (ModEngine.forkGhosts) : each binding's ghost takes a COPY of
+ *  its integrator and gate as they are now (a copy : the incoming binding may
+ *  keep the id and carry on from the same place), so a FLOW or STEP that walked
+ *  a rotation round does not drop back to its base as the old scene fades. */
+export function forkShapeGhosts(): void {
+  for (const k of [...state.keys()]) if (k.endsWith(GHOST_ID)) state.delete(k)
+  for (const [k, s] of [...state.entries()]) state.set(k + GHOST_ID, { ...s })
 }
 
 /** Back to the middle (the parameter at its base) : the editor's reset. */
@@ -118,8 +131,9 @@ export function shapeValue(a: ModAssignment, values: number[], dt: number): numb
   if (t > 0) {
     if (s.thresholdMode === 'gate') {
       const g = stateOf(a.id)
-      // a little hysteresis : a value hovering on the line never chatters
-      if (g.gate) g.gate = v >= t - 0.04
+      // a little hysteresis : a value hovering on the line never chatters (never
+      // more than half the line : under 0.04 a gate once open stayed open)
+      if (g.gate) g.gate = v >= t - Math.min(0.04, t * 0.5)
       else g.gate = v >= t
       v = g.gate ? 1 : 0
     } else {
