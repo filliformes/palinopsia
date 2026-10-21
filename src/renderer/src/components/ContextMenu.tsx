@@ -69,10 +69,14 @@ export function ContextMenu({
   // keeps it in place).
   const markRef = useRef<HTMLSpanElement | null>(null)
   const [host, setHost] = useState<HTMLElement | 'inline' | null>(null)
+  // ...and that window is the one it listens to and fits in (the Output page
+  // window is a second document : its clicks, keys and size are its own).
+  const [win, setWin] = useState<Window>(window)
   useLayoutEffect(() => {
     const doc = markRef.current?.ownerDocument
     const h = doc ? hosts.get(doc) : undefined
     setHost(h?.isConnected ? h : 'inline')
+    if (doc?.defaultView && doc.defaultView !== win) setWin(doc.defaultView)
   }, [])
   // The cursor (x, y) is in viewport pixels; the menu sits in the zoomed chrome
   // (see uiZoom.ts) : measured before paint, so it opens right at the cursor.
@@ -97,18 +101,18 @@ export function ContextMenu({
       e.stopPropagation()
       onClose()
     }
-    window.addEventListener('mousedown', down)
-    window.addEventListener('keydown', key, true)
+    win.addEventListener('mousedown', down)
+    win.addEventListener('keydown', key, true)
     return () => {
-      window.removeEventListener('mousedown', down)
-      window.removeEventListener('keydown', key, true)
+      win.removeEventListener('mousedown', down)
+      win.removeEventListener('keydown', key, true)
     }
-  }, [onClose])
+  }, [onClose, win])
 
   // Keep the whole menu inside the viewport : estimate its height, clamp the top
   // so it never runs off the bottom, and cap + scroll when the list is very long
   // (a layer/background with many saved presets used to spill off-screen).
-  const vw = window.innerWidth / z, vh = window.innerHeight / z // the viewport in the menu's own pixels
+  const vw = win.innerWidth / z, vh = win.innerHeight / z // the viewport in the menu's own pixels
   const estH = Math.min(items.length * 28 + 40, vh - 16)
   const top = Math.max(8, Math.min(y / z, vh - 8 - estH))
   const style: React.CSSProperties = {
