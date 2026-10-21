@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Palinopsia — a visual instrument you play</title>
-<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a modulation brain, image-to-sound placed around a speaker dome, an automatic video editor, embodied webcam control, fulldome output and a seat on the dataflou mesh. Free and open source for Windows, macOS and Linux.">
+<meta name="description" content="Palinopsia (Opsia): an OSC-controlled ISF/WebGL visual instrument. A four-layer compositor you perform, with a layer of sound, a modulation brain, image-to-sound placed around a speaker dome, Ableton Link, an editor for your own shaders, an automatic video editor, embodied webcam control, fulldome output, a seat for an AI agent and a seat on the dataflou mesh. Free and open source for Windows, macOS and Linux.">
 <meta property="og:title" content="Palinopsia — a visual instrument you play">
-<meta property="og:description" content="A four-layer WebGL compositor you perform, not a tool you wire. Played by hand, by an internal modulation brain, over OSC/MIDI, or with your body.">
+<meta property="og:description" content="A four-layer WebGL compositor you perform, not a tool you wire. Played by hand, by an internal modulation brain, over OSC/MIDI, or with your body, in time with Ableton Link.">
 <meta property="og:image" content="https://filliformes.github.io/palinopsia/images/interface-compositor.jpg">
 <meta name="theme-color" content="#141414">
 <style>
@@ -138,7 +138,7 @@
   <div class="wrap">
     <span class="brand">Palinopsia<span class="dot">.</span></span>
     <a class="link" href="#download">Download</a>
-    <a class="link" href="#new-129">What's new</a>
+    <a class="link" href="#new-130">What's new</a>
     <a class="link" href="#quickstart">Quickstart</a>
     <a class="link" href="#highlights">Highlights</a>
     <a class="link" href="#faq">FAQ</a>
@@ -151,16 +151,16 @@
   <header class="hero">
     <p class="kicker">Palinopsia · Opsia · a visual instrument</p>
     <h1>A visual instrument you play<span class="dot">.</span></h1>
-    <p class="lede">Palinopsia is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, over OSC and MIDI, from the other instruments of a dataflou mesh, or with your own body.</p>
+    <p class="lede">Palinopsia is a WebGL2 compositor you perform, not a tool you wire. It stacks layers of generated and treated video, plus a layer of sound, masters the whole picture through a fixed set of stages, and lets you steer every parameter live: by hand, by an internal modulation brain, over OSC and MIDI, from the other instruments of a dataflou mesh, from an AI agent on the same computer, or with your own body. With Ableton Link, it keeps time with your music.</p>
     <p class="sub">Free and open source, for Windows, macOS and Linux. The name is the persistence of a visual image after the stimulus is gone.</p>
 
     <div class="specs">
       <div class="s"><span class="n"><em>4</em></span><span class="l">layers</span></div>
-      <div class="s"><span class="n"><em>43</em></span><span class="l">sources</span></div>
-      <div class="s"><span class="n"><em>53</em></span><span class="l">effects</span></div>
-      <div class="s"><span class="n"><em>10</em></span><span class="l">sonify voices</span></div>
-      <div class="s"><span class="n"><em>109</em></span><span class="l">one-click recipes</span></div>
-      <div class="s"><span class="n mono">OSC·MIDI·body·mesh</span><span class="l">played by</span></div>
+      <div class="s"><span class="n"><em>46</em></span><span class="l">sources</span></div>
+      <div class="s"><span class="n"><em>56</em></span><span class="l">effects</span></div>
+      <div class="s"><span class="n"><em>11</em></span><span class="l">sonify voices</span></div>
+      <div class="s"><span class="n"><em>119</em></span><span class="l">one-click recipes</span></div>
+      <div class="s"><span class="n mono">OSC·MIDI·Link·body·mesh</span><span class="l">played by</span></div>
     </div>
 
     <div class="ctarow">
@@ -171,8 +171,8 @@
   </header>
 
   <figure>
-    <img src="images/interface-compositor.jpg" alt="The Palinopsia interface: live preview and scene bank top-left, the Inspector below, the pinned finalizers under that, and the layer stack down the right column.">
-    <figcaption>The instrument at rest. Live preview and scene bank top-left, the Inspector for whatever is selected below it, the pinned master stages under that, and the layer stack down the right column.</figcaption>
+    <img src="images/interface-compositor.jpg" alt="The Palinopsia interface: live preview and scene bank top-left, the Inspector below, the Master FX strip with the three finishing stages under that, and the layers down the right column, each read top to bottom in four steps (IN, MIX, FX, OUT), the Audio Layer under them.">
+    <figcaption>The instrument at rest. Live preview and scene bank top-left, the Inspector for whatever is selected below it, the master effects and the three finishing stages under that, and the layers down the right column, each in the order the picture goes through it : IN, MIX, FX, OUT. The Audio Layer sits under Layer 4.</figcaption>
   </figure>
 
   <section id="download">
@@ -214,7 +214,51 @@
       <figure><img src="images/shot-gravity-well.jpg" alt="Gravity Well"><figcaption><b>Gravity Well.</b> A floor of points sinking into a funnel, ringing with ripples.</figcaption></figure>
       <figure><img src="images/shot-line-wall.jpg" alt="Line Wall"><figcaption><b>Line Wall.</b> Machine-cut bars laid on a wall that runs off to the side.</figcaption></figure>
       <figure><img src="images/shot-crossing.jpg" alt="Crossing"><figcaption><b>Crossing.</b> Full-height bars, each leaning its own way.</figcaption></figure>
+      <figure><img src="images/shot-oil-cloud.jpg" alt="Oil Cloud"><figcaption><b>Oil Cloud.</b> One billowing cloud painted in oil, gold toward the light, blue in its folds.</figcaption></figure>
+      <figure><img src="images/shot-orbit.jpg" alt="Orbit"><figcaption><b>Orbit.</b> A figure of dots the camera circles : a ring rolling through itself, a globe, a galaxy.</figcaption></figure>
+      <figure><img src="images/shot-oil-sky.jpg" alt="Oil Sky"><figcaption><b>Oil Sky.</b> A sky of billowing cloud over the horizon, painted in thick oil.</figcaption></figure>
     </div>
+  </section>
+
+  <section id="new-130">
+    <h2>New in 1.3.0</h2>
+    <p class="section-lede">The audio update. Sound gets a layer of its own under the four layers of picture, the tempo is shared with Live and every Ableton Link app, and the instrument opens up : write your own shaders, or let an AI agent on your computer play along.</p>
+    <ul class="new">
+      <li><b>The Audio Layer</b> : a strip for sound under Layer 4. Two slots, A and B, each a sound file, a live input (a microphone, your interface's inputs, one channel or a stereo pair) or the sound of an <b>NDI® source</b> on the network (a DAW's NDI plug-in on another computer, OBS), each with its own volume, pan and mute, a mix between them and meters. It plays through Sonify's output, Sonify on or off, so the output EQ, the recordings and Space have it, and everything that listens to sound can listen to it. Its volumes, pans and a file's speed, in, out and playhead take modulators like any control : a modulated playhead scrubs.</li>
+      <li><b>Ableton Link</b> : enable it in the Connect tab <kbd>A</kbd> and Palinopsia shares the tempo and the bar with Live, DJ software and every Link app on your network. Modulators synced to the BPM and the Sonify sequencers land on the music's downbeat, and a latency setting keeps the picture on the beat through a slow projector. Turn on <b>start / stop sync</b> and pressing play in Live starts Palinopsia on the bar (the MIDI clock, the scene sequencer, the Sonify sequencers); its <b>PLAYING / STOPPED</b> button plays or stops every linked app.</li>
+      <li><b>Write your own shaders</b> <kbd>Alt+E</kbd> : the Source Editor starts from a template, a copy of any built-in source or effect, or an ISF file. It compiles as you type into a live preview, the last version that worked keeps playing, and a mistake is marked on its line. Saved, it joins the source and effect menus; sessions carry the shaders they play.</li>
+      <li><b>Let an AI agent play along</b> : turn on <b>Agent (MCP)</b> in the Connect tab and an agent on your computer can read what plays, look at the output, set sources, controls, effects and scenes, and write shaders, seeing each one run before handing it to you. Every change it makes is one undo, it cannot touch the Flash safety, and only your own computer can connect. Off until you turn it on.</li>
+      <li><b>Codec Mosh</b>, the real datamosh : a new effect sends the picture through an actual video encoder and decoder and withholds the keyframes between them. At a cut, the new motion drags the old picture around until a clean frame returns. Two master chains (Codec Rot, Keyframe Hunger) and a Generate theme.</li>
+      <li><b>Field Store</b>, a store that never fades : a new node keeps a coarse copy of the picture, written only where a key lets it through (the bright parts, the edges, what moves, another layer). A moving figure leaves hard stamps of itself instead of a soft trail, a picture can be painted in by what moves (<b>reveal</b>), or a figure vanish into what was there before (<b>protect</b>). Ten presets, three master chains and two Generate themes, Field Store and Revealed.</li>
+      <li><b>Shatter</b>, <b>Crawl</b> and <b>Store Zoom</b>, three new effects. Shatter switches a regularly grabbed still with the live picture through a pattern, so motion shows as texture; Crawl colours each place by how long ago it changed, so motion leaves bands of colour that crawl; Store Zoom is a hardware frame store's zoom, uneven blocks, wide pixels, a wrapping scroll and a moving mirror. A new Frame Store group of master chains and three Generate themes in a Frame Store family. The effect and source pickers are sorted into clearer families too (Frame Store, Analog, Codec, Optical, Film; Painted and Geometry sources).</li>
+      <li><b>Shape a modulation</b> : each binding's <b>⌇</b> opens three tools between the modulator and the parameter. <b>Combine</b> it with one or two other modulators, set a <b>threshold</b> so only real hits move the picture, or <b>integrate</b> it : the kick turns a rotation or a hue one notch per beat, and the picture stays where the music left it.</li>
+      <li><b>The Mixer, the home of A and B</b> <kbd>M</kbd> : each layer's column shows how its sources meet, with a crossfader from A to B and a white line where the sound pushes it, the <b>hue</b> harmony with swatches of the colors (B takes A's colors, or their opposite), and the <b>coupling</b> to the sound with a live meter. The coupling matches the sound's level (<b>auto</b>), so a quiet track moves the mix as far as a loud one and silence leaves it still. One <b>≈ coupling</b> switch pauses every layer's coupling at once, and each column says whether its layer is active (and why not).</li>
+      <li><b>A clearer, smaller layer strip</b> : each layer reads top to bottom in the order the picture goes through it, its steps named in the margin (<b>IN</b>, <b>MIX</b>, <b>FX</b>, <b>OUT</b>), each on a soft panel of its own color. Blend, mask and feedback are tabs, Speed and Vary share a line, a power button turns a whole chain of effects off and on, and a typical layer is about a third shorter.</li>
+      <li><b>Search everything</b> <kbd>Ctrl+K</kbd> : type and a palette finds any effect, source, preset, master chain, Generate theme, page or command, and every parameter of what is loaded. Enter puts a source in the selected slot or an effect in the selected rack, or shows the parameter and flashes it. Every pick is one undo.</li>
+      <li><b>Persistent</b> : right-click any control, a whole layer, an effect, a source or a modulator card, and choose Persistent. No scene, Randomize, Variation, Generate, World or preset changes it while everything around it moves; an effect keeps its place in its rack, a source slot its film and effects, a modulator its settings. A thin gold bar or border marks it. The same menu has <b>Set in every scene</b> : what plays now goes into every scene at once.</li>
+      <li><b>Oil Cloud</b> and <b>Cloud Study</b>, two new sources : one billowing cloud floating in the dark, and a whole sky of them under a low sun, ray-traced then painted in thick oil, the strokes following their forms. Crisp on the dome, with presets, master chains and the Oil Cloud and Oil Sky themes.</li>
+      <li><b>Lattice has four more forms</b> : a <b>tunnel</b> of dots to fly down forever, and a <b>sphere</b>, a <b>torus</b> and a spiral <b>galaxy</b> the camera circles. On the full dome they keep their proportions, round and in the middle. Two new themes, Warp Tunnel and Orbit.</li>
+      <li><b>Effects that follow the dome</b> : on the full dome, rotations turn around the zenith and feedback echoes nest in circles, rain, ash, streaks and trails fall down the walls, the film grain stays fine and round, fine patterns no longer shimmer where the dome squeezes the picture, and the Flash safety tightens while the dome is on.</li>
+      <li><b>Missing media, found again</b> : when a session's films or sounds are gone, a banner names them and <b>Relink…</b> finds them by name in a folder you pick. <b>Collect into the session's folder</b> copies every file a session uses beside it, so it travels between computers in one piece.</li>
+      <li><b>A better World page</b> <kbd>W</kbd> : it says what a World will change, morphs into it, lets you pick the layers it couples, reads a World from what is on screen, and previews on your own layers and your live sound. A <b>World amount</b> dial, playable by modulators, Meta knobs and OSC, fades its mood in and out live.</li>
+      <li><b>Sound drives the picture from a film</b> : an audio modulator can listen to a layer's clip at its playhead, a film's soundtrack or a sound file, reversed, scrubbed or in grains, even while the film plays silent. And <b>Import audio</b>, a new source that plays a sound file like a film and shows its waveform.</li>
+      <li><b>Sonify hears your edits</b> : an eleventh voice, <b>Assemblage</b>, plays an Assemblage's own sound cut with the picture, each clip's place on the map giving its note and pan. The Filter voice can play the Audio Layer, and the output EQ keeps presets, one for each room, its glue included.</li>
+      <li><b>Everyday comforts</b> : drag films, sounds, folders and sessions in from your desktop, recent sessions under Open ▾, a preview you can size or make big (<kbd>V</kbd>), the Output page in a window of its own from the Output button's right-click menu, a <b>50 add</b> blend mode, and the Feel macros (Density and the others) saved with each session. The audio/midi/osc tab is now called Connect.</li>
+      <li><b>Free software under the GPL</b> (version 3 or later), so that Ableton Link can be built in. Versions up to 1.2.10 stay MIT.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">release notes</a>.</p>
+  </section>
+
+  <section id="new-1210">
+    <h2>New in 1.2.10</h2>
+    <p class="section-lede">The key moves on its own time. A small release for the key sequencer and Sonify's controls.</p>
+    <ul class="new">
+      <li><b>A key that is no metronome</b> : in free time, the key sequencer's <b>every</b> takes a modulator or a Meta knob, and <b>vary</b> draws each wait at random around it (at full, anywhere from a quarter to four times as long).</li>
+      <li><b>Picture on your own keys</b> : Picture can choose from a list of up to 8 keys you write, the picture's color and light picking the nearest one. Its wheel shows them as dots.</li>
+      <li><b>Sonify's modulation works like the rest of the app</b> : its M chips open the Inspector's own binding row right under the parameter, a right-click on one clears that parameter's modulation, and a modulated slider's number moves with the modulation.</li>
+      <li><b>The sequencers fold</b> to their headers, and keep playing.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.10.md">release notes</a>.</p>
   </section>
 
   <section id="new-129">
@@ -322,24 +366,24 @@
   <section id="quickstart">
     <h2>Your first five minutes</h2>
     <ol class="steps">
-      <li>You land on a fresh, random one-layer scene. Press <kbd>R</kbd> a few times. Each press re-rolls the whole instrument (sources, effects, blends, modulators) from curated ranges and crossfades over the morph time. This is the fastest way to feel the range of the thing.</li>
+      <li>You land on a fresh, random one-layer scene. Press <kbd>R</kbd> a few times. Each press re-rolls the whole instrument (sources, effects, blends, modulators) from curated ranges and crossfades over the morph time. This is the fastest way to feel the range of the thing. Anything you made <b>Persistent</b> (right-click a control, an effect or a source) stays where it is.</li>
       <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
-      <li>Click a layer's <b>source</b> (the A chip) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
+      <li>In a layer's <b>IN</b> step, click its <b>A</b> button (or pick another source from the menu beside it) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
       <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the <b>Morph</b> time, live: set it long and one scene slowly becomes the next.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page, pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 109 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 119 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
     </ol>
-    <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it.</div>
+    <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it. Looking for something? <kbd>Ctrl</kbd>+<kbd>K</kbd> finds any effect, source, preset or control as you type.</div>
   </section>
 
   <section id="highlights">
     <h2>Beyond the picture</h2>
-    <p class="section-lede">Palinopsia is one instrument with several rooms. Each is a full-page mode reached by a single key.</p>
+    <p class="section-lede">Palinopsia is one instrument with several rooms, each reached by a single key.</p>
     <div class="feat">
       <div class="card">
         <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
         <div class="body">
           <h3>Sonify<span class="k">S</span></h3>
-          <p>The image itself synthesizes audio in real time, inside the app, no external software. Ten voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, and a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4) with a shared reverb/delay tail, an output EQ, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time. And every voice can take its place in the room : around a speaker dome, or as objects for SpatGRIS.</p>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Eleven voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4, and an Assemblage's own sound, cut with the picture) with a shared reverb/delay tail, an output EQ with presets, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time. And every voice can take its place in the room : around a speaker dome, or as objects for SpatGRIS.</p>
         </div>
       </div>
       <div class="card">
@@ -353,14 +397,28 @@
         <img src="images/interface-modulation.jpg" alt="The modulation brain: eight modulators over the sixteen meta knobs and two XY pads.">
         <div class="body">
           <h3>Modulation brain<span class="k">D</span></h3>
-          <p>Eight modulators (LFOs, envelopes, chaos, Euclidean and Turing patterns, audio and vision followers, a body follower) and sixteen meta knobs write on top of your values every frame. Dial a value by hand, then let a shape move it. Everything answers to MIDI Learn and OSC too.</p>
+          <p>Eight modulators (LFOs, envelopes, chaos, Euclidean and Turing patterns, audio and vision followers, a body follower) and sixteen meta knobs write on top of your values every frame. Dial a value by hand, then let a shape move it. Shape a binding with <b>⌇</b> : combine it with other modulators, keep only the real hits with a threshold, or integrate it so each beat pushes the value a notch and leaves it there. An audio modulator can even listen to a film's own soundtrack, where its playhead is. Everything answers to MIDI Learn and OSC too.</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/interface-mixer.jpg" alt="The Mixer: a column per layer, with its A and B crossfader, the hue harmony and its swatches, the coupling to the sound with its meter, and the layer's faders.">
+        <div class="body">
+          <h3>Mixer<span class="k">M</span></h3>
+          <p>The home of A and B. Each layer's column shows how its two sources meet : the mode and a crossfader from A to B, a white line where the sound pushes it, the <b>hue</b> harmony (B takes A's colors, or their opposite) with swatches, and the <b>coupling</b> to the sound with a live meter, above opacity, speed and blend. Each column says whether its layer is active, and why not; one <b>≈ coupling</b> switch pauses every layer's coupling at once.</p>
         </div>
       </div>
       <div class="card">
         <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
         <div class="body">
           <h3>Output &amp; mapping<span class="k">O</span></h3>
-          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter.</p>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter. The page opens inside the app; right-click the Output button to open the output, or the whole page, in a window beside the controls.</p>
+        </div>
+      </div>
+      <div class="card">
+        <img src="images/interface-source-editor.jpg" alt="The Source Editor: your shaders and every built-in in a list on the left, the ISF code in the middle, a live preview with the shader's controls on the right.">
+        <div class="body">
+          <h3>Source Editor<span class="k">Alt+E</span></h3>
+          <p>Write your own generators and effects in ISF. Start from a template, from a copy of any built-in shader, or from an ISF file found anywhere. It compiles as you type into a live preview, the shader's controls right there to try it; the last version that worked keeps playing, and a mistake is marked on its line. Save it and it joins the source and effect menus under <b>my shaders</b>, like any built-in; save again while it plays and it changes live. Sessions carry the shaders they play, so they open the same on another computer.</p>
         </div>
       </div>
       <div class="card text">
@@ -372,11 +430,23 @@
       <div class="card text">
         <div class="body">
           <h3>dataflou mesh<span class="k">A</span></h3>
-          <p>Turn on the <b>dataflou</b> section of the audio/midi/osc tab and Palinopsia becomes a node of the mesh its sibling instruments speak. Nodes on the network find each other on their own, show what they publish and what they take, and wire any source to any destination, both ways. Palinopsia shares what it senses (sound, picture, body, modulators) and takes Meta knobs, layers, the feel macros, scenes and tempo.</p>
+          <p>Turn on the <b>dataflou</b> section of the Connect tab and Palinopsia becomes a node of the mesh its sibling instruments speak. Nodes on the network find each other on their own, show what they publish and what they take, and wire any source to any destination, both ways. Palinopsia shares what it senses (sound, picture, body, modulators) and takes Meta knobs, layers, the feel macros, scenes and tempo.</p>
+        </div>
+      </div>
+      <div class="card text">
+        <div class="body">
+          <h3>Ableton Link<span class="k">A</span></h3>
+          <p>Enable <b>Ableton Link</b> in the Connect tab and Palinopsia joins Live, DJ software and every Link app on your network : one tempo that anyone can change and everyone follows, and one bar. Modulators synced to the BPM and Sonify's sequencers land on the same downbeat as the music, a <b>LINK</b> badge beside the BPM counts the apps linked, and a latency setting keeps the picture on the beat through a slow projector. With <b>start / stop sync</b>, Live's play starts Palinopsia's MIDI clock and sequencers on the bar, and Palinopsia's play starts everyone.</p>
+        </div>
+      </div>
+      <div class="card text">
+        <div class="body">
+          <h3>Agent (MCP)<span class="k">A</span></h3>
+          <p>Turn on <b>Agent (MCP)</b> in the Connect tab and an AI agent on the same computer can read what is playing, look at the output, set sources, controls, effects and scenes, drive anything that has an OSC address, and write new shaders, seeing each one run before handing it to you. Every change it makes is one <kbd>Ctrl</kbd>+<kbd>Z</kbd>, your Inspector stays where you left it, it cannot touch the Flash safety, and only your own computer can connect. Off until you turn it on.</p>
         </div>
       </div>
     </div>
-    <p><b>Body</b> <kbd>B</kbd> reads the room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature, any movement quality or the motion field into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
+    <p>Under Layer 4, the <b>Audio Layer</b> plays sound : two slots of sound files, live inputs or NDI® sources, each with its own volume, pan and mute and a mix between them, through Sonify's output, Sonify on or off. <b>World</b> <kbd>W</kbd> sets the mood of the whole instrument (its atmosphere, its film character, how the layers couple to the sound), says what it will change before you apply it, and fades in and out with its World amount. <b>Body</b> <kbd>B</kbd> reads the room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature, any movement quality or the motion field into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
   </section>
 
   <section>
@@ -384,10 +454,10 @@
     <p class="section-lede">A few ideas that make everything else click into place.</p>
     <div class="model">
       <ul>
-        <li>The picture is a <b>stack</b>, built bottom to top: a Background, then Layer 1 to Layer 4. The Layers column reads in that order, top down. The layers either blend onto the Background (Layer 1 in its own blend mode) or sit over it as a <b>group</b>, letting it through their dark parts.</li>
-        <li>Each layer holds <b>two sources</b> (A and B), a mix between them, its own effect racks, a <b>blend</b> mode onto the layers below, a spatial <b>mask</b>, and its own opacity and speed. A source is a generator, an imported video, a live capture, or a network stream.</li>
+        <li>The picture is a <b>stack</b>, built bottom to top: a Background, then Layer 1 to Layer 4. The Layers column reads in that order, top down, and ends with the <b>Audio Layer</b>, for sound. The layers either blend onto the Background (Layer 1 in its own blend mode) or sit over it as a <b>group</b>, letting it through their dark parts.</li>
+        <li>Each layer reads top to bottom in four steps, the way the picture goes through it : <b>IN</b>, its <b>two sources</b> (A and B), each with its own effects; <b>MIX</b>, how they meet; <b>FX</b>, the layer's own effects; and <b>OUT</b>, its <b>blend</b> mode onto the layers below, a spatial <b>mask</b> and its feedback. It has its own opacity and speed too. A source is a generator, one of your own shaders, an imported video or sound, a live capture, or a network stream.</li>
         <li>Three stages <b>master the whole picture</b>, always last and always on: <b>Vibe Palette</b> (colour), <b>Context</b> (depth and atmosphere), and the <b>Finalizer</b> (final grade, grain, and output shape).</li>
-        <li>Anything you can reach, you can <b>automate</b>. The modulation brain and the meta knobs write on top of your values every frame, and the same targets answer to MIDI and OSC. You dial in a value by hand, then let a shape move it.</li>
+        <li>Anything you can reach, you can <b>automate</b>. The modulation brain and the meta knobs write on top of your values every frame, and the same targets answer to MIDI and OSC. You dial in a value by hand, then let a shape move it. And what you make <b>Persistent</b> stays put: scenes, Randomize and Generate move everything around it.</li>
       </ul>
     </div>
     <p>That is the instrument. The long list of sources, effects and nodes is vocabulary you learn over time. The shape of the thing does not change.</p>
@@ -401,6 +471,10 @@
         <p class="a">Press <kbd>S</kbd> for Sonify. The image itself synthesizes audio in real time, inside the app, no external software. The probes you see drawn on the picture are the instrument.</p>
       </div>
       <div class="row">
+        <p class="q">Play a sound file or a live input under the layers?</p>
+        <p class="a">In the layers tab, under Layer 4, sits the <b>Audio Layer</b> (<span class="mono">AU</span>). Each of its two slots, A and B, takes a sound file (drop one on it from your desktop), a live input (a microphone, or your interface's inputs, one channel or a stereo pair) or the sound of an <b>NDI® source</b> on the network. Each has its own volume, pan and mute, with a mix between them; the <b>▶</b> between A and B starts both files together. It plays through Sonify's output, Sonify on or off, so the output EQ, the recordings and Space have it. Pick <b>Audio Layer</b> as the Connect tab's input and everything that reacts to sound reacts to what it plays. A session never turns a microphone on by itself: a saved live input comes back with an <b>open</b> button.</p>
+      </div>
+      <div class="row">
         <p class="q">Make a collage of my films?</p>
         <p class="a">Pick <b>Collage</b> as a layer source and open a folder in the Inspector: every piece plays its own film. Bind a modulator to <code>cuts</code> and the wall grows and shrinks a piece at a time; turn on <b>FX before shapes</b> to run the source's effects on the films while the seams and torn paper stay crisp; and turn on Sonify's <b>Collage</b> voice to hear them, tuned to your key.</p>
       </div>
@@ -409,12 +483,28 @@
         <p class="a">Drag its chip onto the other rack (hold <kbd>Ctrl</kbd> to copy instead), or right-click it for <b>Copy to Master FX</b> / <b>Copy to Layer N FX</b>. Its modulation follows a move. A rack that can't host an effect says why.</p>
       </div>
       <div class="row">
+        <p class="q">Write my own shader?</p>
+        <p class="a">Press <kbd>Alt</kbd>+<kbd>E</kbd> (or <b>{ }</b> in the bottom bar) for the <b>Source Editor</b>. Start from a template (a generator, an effect, a feedback), from a copy of any built-in shader, or from an ISF file. It compiles as you type into a live preview with the shader's controls beside it; a mistake is marked on its line while the last version that worked keeps playing. Save with <kbd>Ctrl</kbd>+<kbd>S</kbd> and it joins the source and effect menus under <b>my shaders</b>, kept in a Shaders folder; save again while it plays and it changes live. A session carries the shaders it plays, so it opens the same on another computer.</p>
+      </div>
+      <div class="row">
         <p class="q">Change scenes or sessions during a show without a jump?</p>
         <p class="a">Set the <b>Morph</b> time in the transport. Scene recalls, Randomize, the sequencer, loading a session, <b>New</b> and <b>Generate</b> all move into the next composition over that time, live: the same sources ease their every value, anything else crossfades layer by layer, and a new layer only fades in once it is ready. At Morph 0 a session holds the picture still while it compiles, then dissolves.</p>
       </div>
       <div class="row">
+        <p class="q">Find an effect, a preset or a control fast?</p>
+        <p class="a">Press <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>K</kbd> on a Mac) and type. One palette searches the effects, sources, presets, master chains, Generate themes, pages and commands, and every parameter of what is loaded; several words narrow it (<span class="mono">mosh l2</span>). <kbd>Enter</kbd> puts a source in the selected slot, an effect in the selected rack, a preset onto the unit playing its shader, or shows a parameter in the Inspector and flashes it. Each pick is one undo, <kbd>Esc</kbd> closes it, and your recent picks come first.</p>
+      </div>
+      <div class="row">
+        <p class="q">Keep a control the same in every scene?</p>
+        <p class="a">Right-click it and choose <b>Persistent</b>. From then on no scene, Randomize, Variation, Generate, World or preset changes it, while everything around it moves, and its modulation stays with it. A thin gold bar marks it, and the scene bank lists everything persistent. Right-click a whole layer to make all of it persistent (a gold border marks it), an effect's chip to keep that effect at its place, a source card to keep its slot's source and effects, or a modulator card to keep its settings. To write what plays now into every scene instead, choose <b>Set in every scene</b> from the same menu; one undo brings the scenes back.</p>
+      </div>
+      <div class="row">
         <p class="q">Use a MIDI controller?</p>
         <p class="a">Press <kbd>L</kbd> to arm MIDI Learn from anywhere, click a control (it pulses), then move a knob or hit a pad. It stays armed, so you can map the next control right away.</p>
+      </div>
+      <div class="row">
+        <p class="q">Sync it with Ableton Live?</p>
+        <p class="a">Press <kbd>A</kbd> for the Connect tab and enable <b>Ableton Link</b>. Palinopsia joins every Link app on your network, Live and DJ software among them: the tempo is shared (anyone changes it, everyone follows), and so is the bar, so modulators synced to the BPM and the Sonify sequencers land on the same downbeat as the music. A <b>LINK</b> badge beside the BPM counts the apps linked. If a slow projector puts the picture behind the beat, raise the latency setting. To start and stop together, turn on <b>start / stop sync</b> here and Start Stop Sync in Live's Link/Tempo/MIDI preferences: Live's play then starts Palinopsia's MIDI clock and sequencers on the bar.</p>
       </div>
       <div class="row">
         <p class="q">Play it with my body?</p>
@@ -425,20 +515,28 @@
         <p class="a">Every parameter is an OSC endpoint (advertised over OSCQuery), so a companion brain like <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a> or hardware like Pandore can play the whole instrument. The picture also streams back out over OSC, so the image can answer the sound. The <b>OSC monitor</b> shows every message both ways, live.</p>
       </div>
       <div class="row">
+        <p class="q">Let an AI agent drive it?</p>
+        <p class="a">Turn on <b>Agent (MCP)</b> in the Connect tab (<kbd>A</kbd>) and give your agent the address it shows (<span class="mono">http://127.0.0.1:9311/mcp</span> by default). An agent on the same computer can then read what is playing, look at the output, set sources, controls, effects and scenes, drive anything that has an OSC address, and write shaders, seeing each one run before handing it to you. Every change it makes is one <kbd>Ctrl</kbd>+<kbd>Z</kbd>, it cannot touch the Flash safety, and only your own computer can connect. It stays off until you turn it on, and the top bar's <b>AGENT</b> light shows when it is.</p>
+      </div>
+      <div class="row">
         <p class="q">Wire it to my other instruments on the network?</p>
-        <p class="a">Turn on the <b>dataflou</b> section in the audio/midi/osc tab (pick a name and a universe). Every dataflou node on the network appears there with its parameters: wire one of theirs to Palinopsia, or Palinopsia's sound, picture or body features to one of theirs, and watch every connection on the mesh. Wires come back on their own when a node reappears.</p>
+        <p class="a">Turn on the <b>dataflou</b> section in the Connect tab (pick a name and a universe). Every dataflou node on the network appears there with its parameters: wire one of theirs to Palinopsia, or Palinopsia's sound, picture or body features to one of theirs, and watch every connection on the mesh. Wires come back on their own when a node reappears.</p>
       </div>
       <div class="row">
         <p class="q">Drive Resolume with it?</p>
-        <p class="a">Press <kbd>K</kbd> for the Resolume mapper, open your composition (<span class="mono">.avc</span>), and pin Palinopsia's signals to Resolume's controls. Turn on OSC input in Resolume's preferences; the Resolume section of the audio/midi/osc tab says when it is sending.</p>
+        <p class="a">Press <kbd>K</kbd> for the Resolume mapper, open your composition (<span class="mono">.avc</span>), and pin Palinopsia's signals to Resolume's controls. Turn on OSC input in Resolume's preferences; the Resolume section of the Connect tab says when it is sending.</p>
       </div>
       <div class="row">
         <p class="q">Project in a dome?</p>
-        <p class="a">On the Output page, turn on <b>Fulldome</b>: Palinopsia renders a square domemaster (front at the bottom), fits a flat picture as full dome, panorama or screen, and shows it in a 3D dome simulator. Everything downstream (projector, NDI, Spout, Syphon, recording) gets the dome.</p>
+        <p class="a">On the Output page, turn on <b>Fulldome</b>: Palinopsia renders a square domemaster (front at the bottom), fits a flat picture as full dome, panorama or screen, and shows it in a 3D dome simulator. Everything downstream (projector, NDI, Spout, Syphon, recording) gets the dome. Under full-dome fill, rotations turn around the zenith and falling things fall down the walls, and the Flash safety tightens while the dome is on.</p>
       </div>
       <div class="row">
         <p class="q">Go fullscreen or record a take?</p>
-        <p class="a">Press <kbd>O</kbd> for the Output page: pick a display, set the resolution, and record (DXV3 records in real time, even the 4096² dome master). The take keeps rolling if you leave the page, so you can tweak parameters mid-recording, and it carries the Sonify sound when it plays.</p>
+        <p class="a">Press <kbd>O</kbd> for the Output page: pick a display, set the resolution, and record (DXV3 records in real time, even the 4096² dome master). The take keeps rolling if you leave the page, so you can tweak parameters mid-recording, and it carries the Sonify sound when it plays. The page opens inside the app; to keep it beside the instrument or on another screen, right-click the Output button and choose <b>Output page in a window</b> (its <b>⇲</b> puts it back). The same menu opens the output itself in a window beside the controls.</p>
+      </div>
+      <div class="row">
+        <p class="q">Open a session on another computer?</p>
+        <p class="a">When a session opens and some of its films or sounds are gone, a banner names them: <b>Relink…</b> finds them by name in a folder you pick. Before you travel, <b>Open ▾ → Session media…</b> lists every file the session uses, and <b>Collect into the session's folder</b> copies them all beside it, so the session moves in one piece; save to keep. Your own shaders travel inside the session.</p>
       </div>
       <div class="row">
         <p class="q">Undo a mistake, or calm a runaway feedback?</p>
@@ -451,7 +549,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (43 sources, 53 effects, 25 native nodes, the modulation matrix, the sequencers, the Sonify voices and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.9.md">1.2.9 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (46 sources, 56 effects, 27 native nodes, 119 Generate recipes, the modulation matrix, the sequencers, the 11 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">1.3.0 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <footer>
