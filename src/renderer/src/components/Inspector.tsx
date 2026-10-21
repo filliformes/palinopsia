@@ -76,6 +76,7 @@ const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; l
     { label: 'matte', hint: 'bright = this layer, dark = input 2', none: 'self' }
   ],
   'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }],
+  'node-fieldstore': [{ label: 'key from', hint: 'its brightness decides where the store is written (with key : sidechain)', none: 'self' }],
   'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }]
 }
 

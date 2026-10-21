@@ -135,6 +135,13 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('damage', 'bloom', 'drop', 'motionFrom'),
     g('codec', 'quality', 'size', 'mix')
   ],
+  // Field Store : what it does · where it writes · when · the store itself
+  'node-fieldstore': [
+    g('mode', 'mode', 'show', 'hue', 'drift', 'mix'),
+    g('key', 'key', 'threshold', 'invert'),
+    g('clock', 'clock', 'every', 'grab', 'clear'),
+    g('store', 'size', 'bits', 'slideX', 'slideY', 'keep')
+  ],
   'node-datamosh': [
     g('mosh', 'mode', 'decay', 'refresh', 'residual', 'reseed', 'manifest', 'moshGate'),
     g('motion', 'motion', 'thresh', 'swirl', 'edgeRepel', 'flowInvert', 'sidechainFlow', 'flowRes'),
@@ -327,6 +334,13 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   'node-scanner': ({ zero }) => one(zero('jitter'), 'tear', 'Line jitter is at 0 : nothing rips.'),
+  'node-fieldstore': ({ is, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 1)) put(d, ['hue', 'drift'], 'Only color trail stamps in an ink.')
+    if (is('key', 5)) put(d, ['threshold', 'invert'], 'No key : everything is written.')
+    if (isnt('clock', 1, 2)) put(d, ['every'], 'Only every N frames and bursts count frames.')
+    return d
+  },
   'node-chronoscan': ({ isnt }) => {
     const d: Why = {}
     if (isnt('source', 2)) put(d, ['angle', 'sweep', 'sweepMode'], 'Only the slit-scan control sweeps.')

@@ -171,6 +171,26 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     trig: 'SAMPLE ▸ : grab a fresh frame now (rising edge). In HOLD mode this is the only way to refresh; in CLOCK mode it forces an extra sample and restarts the clock. Bind a modulator (square/S&H/audio) to sample on the beat.',
     mix: 'Dry/wet against the live image.'
   },
+  // ── Field Store (a key-gated store that never fades) ──
+  'node-fieldstore': {
+    mode: 'What is written and what you see. TRAIL : the keyed parts are stamped, the live figure stays in front of its copies. COLOR TRAIL : the same, in one flat ink. GHOST : the stamps at half over the picture. CATCH-UP : the whole frame is grabbed and the keyed figure runs ahead of it. MOSAIC : the store over the picture (live at store resolution, frozen where the key fails). REVEAL : the store alone, so only what passed the key appears, out of the dark. PROTECT : the keyed parts are never written and show what was there before (a figure vanishes). ACQUIRE : each cell is written once, by the first thing through, and kept.',
+    show: 'How the store sits against the live picture. BY MODE : the mode’s own. OVER : the store wherever it holds something. UNDER : the keyed live in front, the store behind. INSTEAD : the store alone (empty cells are transparent). DOUBLE : the store at half over the live. INSIDE : the store only where the key passes. A change fades in over a quarter second.',
+    key: 'Where the store may be written (one bit per cell, hard edged). BRIGHTNESS : the bright parts. EDGES : the contours. MOTION : what changed since the last frame. SIDECHAIN : another layer’s bright parts (pick it in key from; none = this layer). TRANSPARENCY : wherever this layer is opaque. NONE : everywhere.',
+    threshold: 'Where the key cuts : low lets more through, high only the strongest (the brightest, the sharpest edges, the fastest motion).',
+    invert: 'Swap the key : write where it does NOT pass (the dark parts, the still parts).',
+    clock: 'When the store is written. EVERY FRAME : continuously (a solid hard smear). EVERY N FRAMES : discrete copies, N frames apart. BURSTS : N frames written, then twice as long held. EVERY BAR / 1/4 / 1/8 / 1/16 : on the tempo. HOLD : only when you press grab ▸. A frozen or stopped layer writes nothing.',
+    every: 'The N of every N frames (and the length of a burst), counted at 60 frames a second of this layer’s clock : low = copies close together, high = far apart.',
+    grab: 'GRAB ▸ : write the store now, by the key (rising edge). It also restarts the clock from here. Bind a modulator (an audio onset, a square LFO) with M to grab on the beat.',
+    clear: 'CLEAR ▸ : empty the store. It crumbles away cell by cell in under half a second, never in one flash.',
+    size: 'The store’s resolution, a square stretched over the frame (wide cells on a 16:9 picture). 64 = huge blocks, 512 = fine. Changing it keeps what is stored.',
+    bits: 'Levels per color channel in what is written : 4 bits = 16 levels (4,096 colors), floored, so gradients break into hard, sometimes colored bands. 8 bits = near clean. Only new stamps change; what is stored keeps its depth.',
+    slideX: 'Moves the store sideways : a speed, not a position. Around 0 it holds still; further out it runs faster and faster, wrapping around the edges, so stamps drift off in lattices (at full speed the copies strobe like wagon wheels). Live stamps still land where the figure is.',
+    slideY: 'Moves the store up or down : a speed, not a position (see slide X).',
+    hue: 'Color trail : the ink of the first stamp.',
+    drift: 'Color trail : how far the ink’s hue steps with each grab (0 = every stamp the same ink; small = a slow walk through neighboring colors).',
+    keep: 'Survive scene changes : when a scene change (or Generate, or undo) replaces this effect, the next scene’s Field Store with this on takes over its store, picture and slide. PANIC empties it. The store lives in the graphics card, never in a session file.',
+    mix: 'Dry/wet against the live picture.'
+  },
   'node-corrode': {
     bury: 'The time to full corrosion, on a log scale : 0 = about an hour, 0.5 ≈ 8 minutes, 1 = a minute. The mask ONLY ever grows : it eats the picture over that time and never recovers until you EXHUME. On the Master rack it weathers the whole set.',
     spread: 'How far the corroded zones creep outward into clean areas over the BURY time (the migrating front) : 0 = the blotches only appear, 1 = the fronts travel a quarter of the frame.',

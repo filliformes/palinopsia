@@ -184,6 +184,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Eats the picture away slowly and never repairs it. Blotches seed, then creep outward, so over minutes (from one to about sixty, your choice) the image is consumed, stained dark or dissolved into transparency. It only resets when you deliberately exhume it, which makes it a device for long pieces rather than a moment.',
   'node-decimate':
     'Grabs a fresh frame only now and then and holds it in between, so the picture steps through time instead of flowing. It is the time-lapse or stop-motion feel that a smooth sixty frames a second erases. It can snap hard between grabs or tween continuously across them.',
+  'node-fieldstore':
+    'Keeps a coarse copy of the picture that never fades, and writes into it only where a key lets it through : the bright parts, the edges, what moves, or another layer. Whatever is written stays as a hard stamp until you clear it, so a moving figure leaves crisp copies of itself instead of a soft trail. Its modes run from trails and ghosts to a live mosaic, a picture assembled from motion alone, or a figure that vanishes into what was there before. The store can slide and wrap around the edges, and carry over into the next scene.',
 
   // ── The pinned finalizers ────────────────────────────────────────────
   'fx-context':

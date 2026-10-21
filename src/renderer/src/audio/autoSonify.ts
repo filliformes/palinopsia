@@ -36,6 +36,7 @@ const AFFINITY: Array<[RegExp, Voice, number]> = [
   // feedback / temporal → Orbit
   [/^(node-feedback|congeal|node-chronoscan|node-sediment)$/, 'orbit', 3],
   [/^(fx-feedback-zoom|fx-wide-time|fx-light-trails|node-eternalism|node-afterimage|fx-phosphene)$/, 'orbit', 2],
+  [/^(node-fieldstore)$/, 'orbit', 2], // the store that remembers : temporal, like the trails above
   // line-work / lattices → Spectra
   [/^(ten-print|grid-drift|slabs|contour|filaments|interference|ramps|op-art|direct-marks)$/, 'spectra', 3],
   [/^(fx-rutt|fx-scanlines|differential|rgb-osc|shapes|fx-wavefold|fx-pixelmask)$/, 'spectra', 2],

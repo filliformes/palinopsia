@@ -817,6 +817,53 @@ export const NATIVE_NODES: IsfShader[] = [
     }*/`,
     curated: { rate: [1, 12], sync: [0, 0], smooth: [0, 0.6], mix: [0.7, 1] }
   },
+  // ── Field Store : a key-gated store that never fades (engine/fieldStore.ts) ──
+  {
+    id: 'node-fieldstore',
+    name: 'Field Store',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Field Store : a key-gated store that never fades. One low-resolution store (64 to 512 square, stretched over the frame : wide pixels on a 16:9 picture) holds a copy of the picture. Live video is written into it ONLY where a 1-bit KEY lets it through (brightness, edges, motion, a sidechain layer's brightness, the layer's transparency, or none), on a capture CLOCK (every frame, every N frames, bursts, on the beat, or only on grab ▸), and nothing in it ever decays : a moving figure leaves HARD stamps of itself, not a soft trail. MODE picks what is written and what is shown. TRAIL : the keyed parts stamped, the live figure in front of its copies. COLOR TRAIL : the stamps in one flat ink that steps with every grab. GHOST : the stamps at half over the live picture. CATCH-UP : the whole frame grabbed, the keyed figure running ahead of it. MOSAIC : the store over the picture (live at store resolution, frozen where the key fails). REVEAL : the store alone, so what passes the key paints the picture in out of nothing. PROTECT : the keyed parts are never written and show what was there before (a figure vanishes). ACQUIRE : each cell written once, by the first thing through. SHOW overrides the display. DEPTH floors each channel to 2^bits levels. SLIDE moves the store's address (a velocity, wrapping around the edges), so stamps drift off in lattices. CLEAR ▸ crumbles the store away. SURVIVE SCENE CHANGES hands the store to the next scene's Field Store.",
+      "CATEGORIES": ["FX", "Time", "Feedback"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["trail", "color trail", "ghost", "catch-up", "mosaic", "reveal", "protect", "acquire"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "show", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5], "LABELS": ["by mode", "over", "under", "instead", "double", "inside"], "DEFAULT": 0, "LABEL": "show" },
+        { "NAME": "key", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5], "LABELS": ["brightness", "edges", "motion", "sidechain", "transparency", "none (all)"], "DEFAULT": 0, "LABEL": "key" },
+        { "NAME": "threshold", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "key level" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "invert key", "COMPACT": true },
+        { "NAME": "clock", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5, 6, 7], "LABELS": ["every frame", "every N frames", "bursts", "every bar", "1/4", "1/8", "1/16", "hold (grab ▸)"], "DEFAULT": 1, "LABEL": "capture" },
+        { "NAME": "every", "TYPE": "float", "MIN": 1.0, "MAX": 30.0, "DEFAULT": 5.0, "INTEGER": true, "LABEL": "N frames" },
+        { "NAME": "grab", "TYPE": "event", "DEFAULT": false, "LABEL": "grab ▸" },
+        { "NAME": "clear", "TYPE": "event", "DEFAULT": false, "LABEL": "clear ▸" },
+        { "NAME": "size", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["64 (huge blocks)", "128", "256", "512 (fine)"], "DEFAULT": 2, "LABEL": "store size" },
+        { "NAME": "bits", "TYPE": "long", "VALUES": [2, 3, 4, 5, 6, 8], "LABELS": ["2 bits", "3 bits", "4 bits", "5 bits", "6 bits", "8 bits"], "DEFAULT": 4, "LABEL": "depth" },
+        { "NAME": "slideX", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "slide X" },
+        { "NAME": "slideY", "TYPE": "float", "MIN": -1.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "slide Y" },
+        { "NAME": "hue", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.08, "LABEL": "ink hue" },
+        { "NAME": "drift", "TYPE": "float", "MIN": -0.5, "MAX": 0.5, "DEFAULT": 0.05, "LABEL": "ink step" },
+        { "NAME": "keep", "TYPE": "bool", "DEFAULT": false, "LABEL": "survive scene changes", "COMPACT": true },
+        { "NAME": "mix", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    curated: {
+      mode: [0, 7],
+      show: [0, 0], // the mode's own display : a dice never splits the pair
+      key: [0, 2], // brightness, edges, motion (sidechain and none need a hand)
+      threshold: [0.3, 0.7],
+      invert: [0, 0],
+      clock: [0, 6], // never dice into hold : it would stop writing
+      every: [2, 10],
+      size: [1, 3],
+      bits: [3, 6],
+      slideX: [-0.3, 0.3],
+      slideY: [-0.3, 0.3],
+      hue: [0, 1],
+      drift: [-0.15, 0.15],
+      keep: [0, 0],
+      mix: [0.8, 1]
+    }
+  },
   {
     id: 'node-codecmosh',
     name: 'Codec Mosh',

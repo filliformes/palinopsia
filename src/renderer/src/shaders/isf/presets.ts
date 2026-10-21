@@ -339,6 +339,21 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Freeze (trig)', values: { mode: 1, rate: 6, sync: 0, smooth: 0.0, mix: 1.0 } },
     { name: 'Held tween (trig)', values: { mode: 1, rate: 6, sync: 0, smooth: 0.8, mix: 1.0 } }
   ],
+  // ── Field Store (a key-gated store that never fades) ──
+  // Every preset sets every input (presets are partial merges). keep stays off :
+  // carrying a store into the next scene is the scene's call, not a preset's.
+  'node-fieldstore': [
+    { name: 'Hard trail', values: { mode: 0, show: 0, key: 0, threshold: 0.5, invert: 0, clock: 1, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Beat stamps', values: { mode: 0, show: 0, key: 0, threshold: 0.45, invert: 0, clock: 4, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Color stamps', values: { mode: 1, show: 0, key: 0, threshold: 0.45, invert: 0, clock: 1, every: 6, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.035, keep: 0, mix: 1 } },
+    { name: 'Strobe ghost', values: { mode: 2, show: 0, key: 0, threshold: 0.35, invert: 0, clock: 1, every: 8, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Catch-up', values: { mode: 3, show: 0, key: 0, threshold: 0.5, invert: 0, clock: 1, every: 12, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Live mosaic', values: { mode: 4, show: 0, key: 5, threshold: 0.5, invert: 0, clock: 0, every: 5, size: 1, bits: 3, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Motion reveal', values: { mode: 5, show: 0, key: 2, threshold: 0.3, invert: 0, clock: 0, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Vanish', values: { mode: 6, show: 0, key: 2, threshold: 0.3, invert: 0, clock: 0, every: 5, size: 2, bits: 5, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'First arrivals', values: { mode: 7, show: 0, key: 2, threshold: 0.35, invert: 0, clock: 0, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+    { name: 'Drifting lattice', values: { mode: 0, show: 0, key: 0, threshold: 0.5, invert: 0, clock: 1, every: 4, size: 2, bits: 4, slideX: 0.32, slideY: 0.18, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } }
+  ],
   // ── Force Lines (incrustation along the image's gradients) ──
   'fx-force-lines': [
     { name: 'Engraved', values: { lines: 8, shift: 0.015, edge: 0.7, gate: 0.6, amount: 1.0, slide: 2, rate: 0, vary: 0, audio: 0 } },

@@ -770,6 +770,32 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { contrast: 1.05, saturation: 0.85, gamma: 1, autoLevel: 0.15, splitTone: 0.25, shadowTint: [0.46, 0.47, 0.5, 1], highTint: [0.57, 0.52, 0.44, 1] }
   },
+  // Field Store on the whole picture : hard stamps that never fade, the whole
+  // frame through a coarse 16-level store, strobed see-through echoes.
+  {
+    name: 'Hard Memory', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-fieldstore', inputs: { mode: 0, show: 0, key: 0, threshold: 0.6, invert: 0, clock: 1, every: 4, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.08, saturation: 0.95, lift: 0.01 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Sixteen Levels', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-fieldstore', inputs: { mode: 4, show: 0, key: 5, threshold: 0.5, invert: 0, clock: 0, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1.05, lift: 0.0 } }
+    ],
+    vibe: { contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0.1 }
+  },
+  {
+    name: 'Strobe Ghost', group: 'Time & memory',
+    fx: [
+      { shaderId: 'node-fieldstore', inputs: { mode: 2, show: 0, key: 0, threshold: 0.35, invert: 0, clock: 1, every: 8, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.9, lift: 0.02 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.9, gamma: 1, autoLevel: 0.15, splitTone: 0.15, shadowTint: [0.45, 0.48, 0.55, 1], highTint: [0.56, 0.52, 0.46, 1] }
+  },
   {
     name: 'Slow Loop', group: 'Time & memory',
     fx: [
