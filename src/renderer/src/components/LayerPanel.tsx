@@ -69,7 +69,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   // Which OUT drawer is open (blend, mask, feedback) : one at a time.
-  const [outTab, setOutTab] = useState<OutTab>('blend')
+  const [outTab, setOutTab] = useState<OutTab | null>(null)
   const [savePrompt, setSavePrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [flashing, flash] = useFlash()
@@ -270,176 +270,175 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
       {!collapsed && (
         <>
           {/* The layer reads top to bottom in the order the picture goes
-              through it : (1) the two sources, side by side, (2) where they
-              meet, (3) the effects on the mixed picture, (4) how it lands on
-              the layers below. Speed and Vary, which act on all of it, sit
-              under a line at the end. */}
-          <Stage n={1} title="SOURCES" hint="what it shows">
-            <div className="flex min-w-0 items-stretch gap-1.5">
-              <SourceRow
-                card
-                label="A"
-                shaderId={layer.sourceA.shaderId}
-                sourceKind={layer.sourceA.kind}
-                mediaId={layer.sourceA.mediaId}
-                mediaName={layer.sourceA.mediaName}
-                selected={isSelected('A')}
-                scope={{ kind: 'sourceA', layer: index }}
-                fx={layer.sourceAFx}
-                onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
-                onPick={(id) => setSourceShader(index, 'A', id)}
-                onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
-                onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
-                onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
-              />
-              <SourceRow
-                card
-                label="B"
-                shaderId={layer.sourceB?.shaderId ?? null}
-                sourceKind={layer.sourceB?.kind ?? 'none'}
-                mediaId={layer.sourceB?.mediaId}
-                mediaName={layer.sourceB?.mediaName}
-                selected={isSelected('B')}
-                scope={{ kind: 'sourceB', layer: index }}
-                fx={layer.sourceBFx}
-                onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
-                onPick={(id) => setSourceShader(index, 'B', id)}
-                onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
-                onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
-                onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
-              />
+              through it, its four steps numbered on a rail down the left :
+              (1) the two sources, side by side, (2) where they meet, (3) the
+              effects on the mixed picture, (4) how it lands on the layers below
+              (tabs, a drawer opened on demand). Speed and Vary, which act on all
+              of it, share the last line, under a rule. No boxes, no titles :
+              as compact as the old strip. */}
+          <div className="relative flex min-w-0 flex-col gap-1.5">
+            {/* the rail, badge 1 to badge 4 */}
+            <span className="pointer-events-none absolute bottom-[10px] left-[7px] top-[12px] w-px bg-accent/35" aria-hidden="true" />
+
+            {/* 1 · SOURCES */}
+            <div className="flex min-w-0 items-start gap-1.5">
+              <RailBadge n={1} title="Sources : what the layer shows (A and B, each with its own effects)" />
+              <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                <SourceRow
+                  card
+                  label="A"
+                  shaderId={layer.sourceA.shaderId}
+                  sourceKind={layer.sourceA.kind}
+                  mediaId={layer.sourceA.mediaId}
+                  mediaName={layer.sourceA.mediaName}
+                  selected={isSelected('A')}
+                  scope={{ kind: 'sourceA', layer: index }}
+                  fx={layer.sourceAFx}
+                  onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
+                  onPick={(id) => setSourceShader(index, 'A', id)}
+                  onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
+                  onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
+                  onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
+                />
+                <SourceRow
+                  card
+                  label="B"
+                  shaderId={layer.sourceB?.shaderId ?? null}
+                  sourceKind={layer.sourceB?.kind ?? 'none'}
+                  mediaId={layer.sourceB?.mediaId}
+                  mediaName={layer.sourceB?.mediaName}
+                  selected={isSelected('B')}
+                  scope={{ kind: 'sourceB', layer: index }}
+                  fx={layer.sourceBFx}
+                  onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
+                  onPick={(id) => setSourceShader(index, 'B', id)}
+                  onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
+                  onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
+                  onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
+                />
+              </div>
             </div>
-          </Stage>
 
-          {/* A and B run down into the mix (B's line asleep without a B) */}
-          <svg className="-my-1 block h-3 w-full shrink-0" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M25 0 C25 7 50 5 50 12" fill="none" stroke="rgb(var(--c-muted))" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            <path d="M75 0 C75 7 50 5 50 12" fill="none" stroke={hasB ? 'rgb(var(--c-accent))' : 'rgb(var(--c-panel3))'} strokeWidth="1" vectorEffect="non-scaling-stroke" />
-          </svg>
+            {/* 2 · MIX : how B meets A, and how much (what the slider means
+                follows the mode : its tooltip says). Dimmed while B is empty.
+                The A/B harmony and the coupling live in the Mixer (M) : the ≈
+                chip says this layer is coupled. */}
+            <div className="flex min-w-0 items-start gap-1.5">
+              <RailBadge n={2} title={hasB ? `Mix : how A and B meet (${mixWord(layer.sourceBlend)})` : 'Mix : no Source B yet, pick one above'} />
+              <div className={`flex min-w-0 flex-1 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`}>
+                <div className="flex min-h-[26px] min-w-0 items-center gap-1.5">
+                  <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
+                  <span className="relative flex min-w-0 flex-1">
+                    <MidiLearnOverlay id={`layer:${index}:mix`} />
+                    <input
+                      ref={mixRef}
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={layer.sourceMix}
+                      onChange={(e) => setSourceMix(index, Number(e.target.value))}
+                      onDoubleClick={() => setSourceMix(index, 0.5)}
+                      className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
+                      title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one above and this mixes it with A'}
+                    />
+                  </span>
+                  <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
+                  {/* the mix in percent, typed or read */}
+                  <span className="flex shrink-0 items-center gap-0.5" title={mixTitle(layer.sourceBlend)}>
+                    <BoundedNumberInput
+                      value={Math.round(layer.sourceMix * 1000) / 10}
+                      min={0}
+                      max={100}
+                      maxFrac={1}
+                      onChange={(v) => setSourceMix(index, v / 100)}
+                      className={`input w-[2.9rem] !px-1 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
+                    />
+                    <span className="font-mono text-[9px] text-muted">%</span>
+                  </span>
+                  {/* as wide as its longest mode (no fixed width : a select sizes
+                      to its widest option), so "lightercolor" is never cut */}
+                  <select
+                    className="input select-compact shrink-0 text-[10px]"
+                    value={layer.sourceBlend}
+                    onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+                    title="How B meets A : the slider beside it is what this mode makes of it"
+                  >
+                    {BLEND_MODES.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  {coupled && (
+                    <button
+                      onClick={() => setRightView('mixer')}
+                      className="shrink-0 rounded bg-accent/20 px-1 font-mono text-[10px] leading-4 text-accent ring-1 ring-accent/60 hover:bg-accent/30"
+                      title={`Coupled to the sound (${couplingWords(layer.coupling)}) : it pushes this mix. Set it in the Mixer (click, or M)`}
+                    >
+                      ≈
+                    </button>
+                  )}
+                  {modChip('mix', 'A-B mix')}
+                </div>
+                {modAssign('mix')}
+              </div>
+            </div>
 
-          {/* MIX : how B meets A, and how much : what the slider means follows
-              the mode (its word beside it). Dimmed while B is empty. The A/B
-              harmony and the audio coupling live in the Mixer (M) : the ≈
-              chip says this layer is coupled. */}
-          <Stage
-            n={2}
-            title="MIX"
-            dim={!hasB}
-            hint={
-              hasB ? (
-                <span className={mixBound ? 'text-accent2' : 'text-muted'} title={mixTitle(layer.sourceBlend)}>
-                  how A and B meet · {mixWord(layer.sourceBlend)}
-                </span>
-              ) : (
-                'no B : pick one above'
-              )
-            }
-          >
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
-              <span className="relative flex min-w-0 flex-1">
-                <MidiLearnOverlay id={`layer:${index}:mix`} />
-                <input
-                  ref={mixRef}
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={layer.sourceMix}
-                  onChange={(e) => setSourceMix(index, Number(e.target.value))}
-                  onDoubleClick={() => setSourceMix(index, 0.5)}
-                  className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
-                  title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one above and this mixes it with A'}
+            {/* 3 · LAYER FX : the effects on the mixed picture */}
+            <div className="flex min-w-0 items-start gap-1.5">
+              <RailBadge n={3} title="Layer FX : the effects on the mixed picture" />
+              <div className="flex min-h-[26px] min-w-0 flex-1 items-center">
+                <FxChips
+                  scope={{ kind: 'layer', layer: index }}
+                  fx={layer.fx}
+                  leading={
+                    <>
+                      <FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />
+                      {/* the whole chain off, or all back on (as on each source) */}
+                      {layer.fx.length > 0 && <ChainSwitch scope={{ kind: 'layer', layer: index }} fx={layer.fx} />}
+                    </>
+                  }
                 />
-              </span>
-              <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
-              {/* the mix in percent, typed or read */}
-              <span className="flex shrink-0 items-center gap-0.5" title={mixTitle(layer.sourceBlend)}>
-                <BoundedNumberInput
-                  value={Math.round(layer.sourceMix * 1000) / 10}
-                  min={0}
-                  max={100}
-                  maxFrac={1}
-                  onChange={(v) => setSourceMix(index, v / 100)}
-                  className={`input w-[2.9rem] !px-1 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
-                />
-                <span className="font-mono text-[9px] text-muted">%</span>
-              </span>
-              {/* as wide as its longest mode (no fixed width : a select sizes
-                  to its widest option), so "lightercolor" is never cut */}
-              <select
-                className="input select-compact shrink-0 text-[10px]"
-                value={layer.sourceBlend}
-                onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-                title="How B meets A : the slider beside it is what this mode makes of it"
-              >
-                {BLEND_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
+              </div>
+            </div>
+
+            {/* 4 · OUT : how it lands on the layers below. Each tab says where
+                it stands; a click opens its drawer, another closes it. */}
+            <div className="flex min-w-0 items-start gap-1.5">
+              <RailBadge n={4} title="Out : how the layer lands on the layers below" small />
+              <div className="flex min-w-0 flex-1 overflow-hidden rounded border border-border">
+                {(
+                  [
+                    ['blend', `blend ${layer.blend}`, blendBound],
+                    ['mask', `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.mode > 0 && layer.mask.invert ? ' inv' : ''}`, false],
+                    ['feedback', layer.feedback ? `feedback ${layer.feedbackAmount.toFixed(2)}` : 'feedback off', false]
+                  ] as Array<[OutTab, string, boolean]>
+                ).map(([k, text, mod]) => (
+                  <button
+                    key={k}
+                    onClick={() => setOutTab(outTab === k ? null : k)}
+                    className={`min-w-0 flex-1 truncate border-r border-border px-1 py-0.5 font-mono text-[10px] last:border-r-0 transition-colors ${
+                      outTab === k
+                        ? 'bg-accent/20 text-accent'
+                        : mod
+                          ? 'text-accent2 hover:bg-panel3/60'
+                          : (k === 'mask' && layer.mask.mode > 0) || (k === 'feedback' && layer.feedback)
+                            ? 'text-text hover:bg-panel3/60'
+                            : 'text-muted hover:bg-panel3/60 hover:text-text'
+                    }`}
+                    title={`${k === 'blend' ? 'How this layer lands on the layers below' : k === 'mask' ? 'Where this layer shows : its own brightness, a fade, or a window' : 'Trails : the layer samples its own previous frame'} (click to ${outTab === k ? 'close' : 'open'})`}
+                  >
+                    {text}
+                  </button>
                 ))}
-              </select>
-              {coupled && (
-                <button
-                  onClick={() => setRightView('mixer')}
-                  className="shrink-0 rounded bg-accent/20 px-1 font-mono text-[10px] leading-4 text-accent ring-1 ring-accent/60 hover:bg-accent/30"
-                  title={`Coupled to the sound (${couplingWords(layer.coupling)}) : it pushes this mix. Set it in the Mixer (click, or M)`}
-                >
-                  ≈
-                </button>
-              )}
-              {modChip('mix', 'A-B mix')}
+              </div>
             </div>
-            {modAssign('mix')}
-          </Stage>
-          <StageArrow />
+          </div>
 
-          {/* LAYER FX : the effects on the mixed picture */}
-          <Stage n={3} title="LAYER FX" hint="on the mixed picture">
-            <FxChips
-              scope={{ kind: 'layer', layer: index }}
-              fx={layer.fx}
-              leading={
-                <>
-                  <FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />
-                  {/* the whole chain off, or all back on (as on each source) */}
-                  {layer.fx.length > 0 && <ChainSwitch scope={{ kind: 'layer', layer: index }} fx={layer.fx} />}
-                </>
-              }
-            />
-          </Stage>
-          <StageArrow />
-
-          {/* OUT : how it lands on the layers below. One drawer open at a
-              time; each tab says where it stands. */}
-          <Stage n={4} title="OUT" hint="into the layers below">
-            <div className="flex min-w-0 overflow-hidden rounded border border-border">
-              {(
-                [
-                  ['blend', `blend ${layer.blend}`, blendBound],
-                  ['mask', `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.mode > 0 && layer.mask.invert ? ' inv' : ''}`, false],
-                  ['feedback', layer.feedback ? `feedback ${layer.feedbackAmount.toFixed(2)}` : 'feedback off', false]
-                ] as Array<[OutTab, string, boolean]>
-              ).map(([k, text, mod]) => (
-                <button
-                  key={k}
-                  onClick={() => setOutTab(k)}
-                  className={`min-w-0 flex-1 truncate border-r border-border px-1 py-0.5 font-mono text-[10px] last:border-r-0 transition-colors ${
-                    outTab === k
-                      ? 'bg-accent/20 text-accent'
-                      : mod
-                        ? 'text-accent2 hover:bg-panel3/60'
-                        : (k === 'mask' && layer.mask.mode > 0) || (k === 'feedback' && layer.feedback)
-                          ? 'text-text hover:bg-panel3/60'
-                          : 'text-muted hover:bg-panel3/60 hover:text-text'
-                  }`}
-                  title={k === 'blend' ? 'How this layer lands on the layers below' : k === 'mask' ? 'Where this layer shows : its own brightness, a fade, or a window' : 'Trails : the layer samples its own previous frame'}
-                >
-                  {text}
-                </button>
-              ))}
-            </div>
-            <div className="flex min-w-0 flex-col gap-1 border-l-2 border-accent/30 pl-1.5">
+          {/* the open drawer, under the tabs (off the rail : the rail joins the steps) */}
+          {outTab && (
+            <div className="ml-[21px] flex min-w-0 flex-col gap-1 border-l-2 border-accent/30 pl-1.5">
               {outTab === 'blend' && (
                 <>
                   <Row label="BLEND">
@@ -462,6 +461,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               )}
               {outTab === 'mask' && <MaskControls index={index} mask={layer.mask} />}
               {outTab === 'feedback' && (
+                // on or off, the same row : the trail stays put, asleep while off
                 <Row label="TRAIL">
                   <ToggleChip
                     label={layer.feedback ? 'on' : 'off'}
@@ -469,41 +469,34 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                     onClick={() => toggleFeedback(index)}
                     title="Feedback : this layer samples its own previous frame (trails)"
                   />
-                  {layer.feedback ? (
-                    <>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={layer.feedbackAmount}
-                        onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
-                        className="min-w-0 flex-1 accent-accent"
-                        title="Feedback persistence : decay trails (capped below infinite bloom)"
-                      />
-                      <div className="w-11 shrink-0">
-                        <BoundedNumberInput
-                          value={Math.round(layer.feedbackAmount * 100) / 100}
-                          min={0}
-                          max={1}
-                          onChange={(v) => setFeedbackAmount(index, v)}
-                          className="input w-full px-1 py-0.5 text-right text-[11px]"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <span className="min-w-0 truncate font-mono text-[9px] text-muted">turn on for trails</span>
-                  )}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={layer.feedbackAmount}
+                    onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
+                    className={`min-w-0 flex-1 accent-accent ${layer.feedback ? '' : 'opacity-40'}`}
+                    title={layer.feedback ? 'Feedback persistence : decay trails (capped below infinite bloom)' : 'Feedback is off : the trail it will have when on'}
+                  />
+                  <div className={`w-11 shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
+                    <BoundedNumberInput
+                      value={Math.round(layer.feedbackAmount * 100) / 100}
+                      min={0}
+                      max={1}
+                      onChange={(v) => setFeedbackAmount(index, v)}
+                      className="input w-full px-1 py-0.5 text-right text-[11px]"
+                    />
+                  </div>
                 </Row>
               )}
             </div>
-          </Stage>
+          )}
 
-          {/* Speed and Vary act on the whole layer : always in view, under a line */}
-          <div className="mt-0.5 border-t border-border/80" />
-
-          {/* SPEED : the layer's global clock multiplier */}
-          <Row label="SPEED">
+          {/* Speed and Vary act on the whole layer : one line, under a rule */}
+          <div className="border-t border-border/80" />
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 font-mono text-[9px] uppercase text-muted">speed</span>
             <input
               type="range"
               min={0}
@@ -515,22 +508,17 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="Layer time : scales every source and FX clock on this layer (1 = realtime) : double-click resets"
             />
-            <div className="w-11 shrink-0">
+            <div className="w-10 shrink-0">
               <BoundedNumberInput
                 value={Math.round(layer.speed * 100) / 100}
                 min={0}
                 max={20}
                 onChange={(v) => setLayerSpeed(index, v)}
-                className="input w-full px-1 py-0.5 text-right text-[11px]"
+                className="input w-full !px-1 !py-0.5 text-right !text-[10px]"
               />
             </div>
-          </Row>
-
-          {/* VARY : the global Vary, aimed at this layer alone. The button IS the
-              label, shaped like every other command button in the app, and it is
-              a modulation target like the other layer fields, so a modulator can
-              fire the variation instead of a hand. */}
-          <div className="flex min-w-0 items-center gap-1.5">
+            {/* VARY : the global Vary, aimed at this layer alone; a modulation
+                target like the other layer fields, so a modulator can fire it. */}
             <button
               onClick={() => varyLayer(index)}
               className={`relative ${TBTN} ${varyBound ? TBTN_MOD : TBTN_IDLE}`}
@@ -551,13 +539,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               className="min-w-0 flex-1 accent-accent"
               title="How far one Vary moves this layer : double-click resets"
             />
-            <div className="w-11 shrink-0">
+            <div className="w-10 shrink-0">
               <BoundedNumberInput
                 value={layer.varyAmount ?? DEFAULT_LAYER_VARY}
                 min={0}
                 max={1}
                 onChange={(v) => setLayerVary(index, v)}
-                className="input w-full px-1 py-0.5 text-right text-[11px]"
+                className="input w-full !px-1 !py-0.5 text-right !text-[10px]"
               />
             </div>
           </div>
@@ -741,25 +729,17 @@ function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['
   )
 }
 
-// One stage of the layer : a numbered box (the order the picture goes through
-// the layer), its title and what it does, then its controls.
-function Stage({ n, title, hint, dim = false, children }: { n: number; title: string; hint: ReactNode; dim?: boolean; children: ReactNode }): JSX.Element {
+// A step's number on the layer's rail (the order the picture goes through the
+// layer), centered on its row's first line; the title says what the step does.
+function RailBadge({ n, title, small = false }: { n: number; title: string; small?: boolean }): JSX.Element {
   return (
-    <div className={`flex min-w-0 flex-col gap-1 rounded border border-border/70 bg-panel2/30 p-1.5 ${dim ? 'opacity-50' : ''}`}>
-      <div className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] uppercase tracking-wide text-muted">
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-accent font-sans text-[9px] font-medium normal-case tracking-normal text-panel">
-          {n}
-        </span>
-        <span className="shrink-0">{title}</span>
-        <span className="min-w-0 flex-1 truncate text-right normal-case tracking-normal text-muted/60">{hint}</span>
-      </div>
-      {children}
-    </div>
+    <span
+      className={`relative z-10 flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full bg-accent font-sans text-[9px] font-medium text-panel ${small ? 'mt-[3px]' : 'mt-[5px]'}`}
+      title={title}
+    >
+      {n}
+    </span>
   )
-}
-// The picture passing from one stage to the next.
-function StageArrow(): JSX.Element {
-  return <div className="-my-1 text-center font-mono text-[9px] leading-none text-muted/60" aria-hidden="true">↓</div>
 }
 
 // A small X/Y pad (0..1 each, y up), for a mask window's place. Pointer
@@ -945,7 +925,7 @@ function SourceRow({
       <div
         className={
           card
-            ? `flex min-w-0 flex-1 basis-0 flex-col gap-1 rounded border p-1 transition-shadow ${selected ? 'border-accent/60' : 'border-border/70'} bg-panel/60 ${dropOver ? 'ring-2 ring-accent' : ''}`
+            ? `flex min-w-0 flex-1 basis-0 flex-col gap-1 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`
             : `flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`
         }
         onClick={onSelect}

@@ -7,6 +7,16 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The layer strip, compact : the Rail** (`LayerPanel.tsx`, layout C of two compact mockups,
+  Vincent : feedback must not change the height, Speed and Vary on one line). The stage
+  boxes, their title lines, the arrows and the merge lines are gone (they cost ~130 px);
+  the four steps are numbered badges on a thin rail down the left (`RailBadge`, the
+  step's purpose in its tooltip); the source halves lose their box (the A/B buttons say
+  which is selected); the Out tabs open and close a drawer (none open by default); the
+  trail stays in its row while feedback is off, dimmed; Speed and Vary share a line.
+  Measured at the default column width, old strip → rail : A only 301 → 202 px, a
+  typical layer 351 → 254, luma mask + feedback 471 → 322, shape mask + feedback + 5
+  effects 537 → 368 (the boxed stages had been 421 / 447 / 507 / 527).
 - **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
   three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
   Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,

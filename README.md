@@ -254,15 +254,16 @@ down : the Background strip first, then Layer 1 to Layer 4, then the
 [Audio Layer](#the-audio-layer) (the sound).
 
 Each layer's strip reads top to bottom in the order the picture goes through it,
-in four numbered stages : **1 Sources** (A and B side by side, each with its
+in four steps numbered on a thin rail down its left edge : **1 Sources** (A and B side by side, each with its
 picker and "+ fx" on one line, its effects under them, led by a **power** button
 that turns that source's whole chain off, or all back on), two lines running down
 from them into **2 Mix** (where A and B meet : the slider, the mix in **percent**
 in a box you can type in, the mode), **3 Layer FX** (with the same **power** button) (the effects on the mixed picture), and
 **4 Out** (how the layer lands on the layers below : three tabs, **blend**,
-**mask** and **feedback**, each showing where it stands; one opens its controls
-at a time). **Speed** and **Vary**, which act on the whole layer, stay in view under
-a line at the end. Each of the **4 layers** carries:
+**mask** and **feedback**, each showing where it stands; a click opens its drawer,
+another closes it; feedback on or off keeps the layer's height). **Speed** and
+**Vary**, which act on the whole layer, share the last line, under a rule. A
+typical layer takes about a third less height than before. Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
