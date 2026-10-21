@@ -18,6 +18,8 @@
 // on from where they are instead of reshuffling every column.
 uniform float PH_rain;
 
+// @dome
+
 float h11(float x) { x = fract(x * 0.1031); x *= x + 33.33; x *= x + x; return fract(x); }
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
@@ -44,14 +46,27 @@ void main() {
 
   // Per-column phase + speed → a vertical drift that pulls the sample upward, so
   // the content appears to fall (rain). Columns individuate the fragmentation.
+  // On the full dome (lib/dome.glsl) the rain falls OUTWARD, from the zenith down
+  // the walls all round : the columns are spokes (as many as fit round the
+  // horizon, so they keep their flat width there; halving ring by ring in toward
+  // the zenith, so they never crowd into pixel noise) and each drop pulls its
+  // fragment from nearer the zenith.
+  bool dome = DOME_FILL > 0.0;
   float col = floor(uv.x * columns);
+  if (dome) {
+    vec2 pol = domePolar(uv);
+    float rh = domeHorizon();
+    float lv = min(0.0, floor(log2(max(pol.y / rh, 0.001))));
+    float spokes = max(8.0, floor(3.14159265 * rh * columns * exp2(lv) + 0.5));
+    col = mod(floor(pol.x * spokes), spokes) - 613.0 * lv;
+  }
   float spd = 0.3 + h11(col) * 1.4;
   // Each column snaps back when its drop has fallen (a new drop starts), and
   // the top of the frame rains in from the bottom : both kept, they read as
   // rain, not as a flaw.
   float off = fract(PH_rain * spd + h11(col + 7.0));
   float len = mix(0.02, 0.5, streak);
-  vec2 ruv = vec2(uv.x, fract(uv.y + off * len));
+  vec2 ruv = dome ? fract(uv + domeDir(uv, vec2(0.0, off * len))) : vec2(uv.x, fract(uv.y + off * len));
 
   // Where it rains: gated by edges (fragmentation "beyond form") × amount, with
   // a per-column flicker so streaks break rather than smear uniformly.

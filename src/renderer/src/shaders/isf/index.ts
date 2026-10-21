@@ -42,6 +42,8 @@ import scan from './Scan.fs?raw'
 import organicLib from './lib/organic.glsl?raw'
 import organicRelief from './lib/organicRelief.glsl?raw'
 import analogParasites from './lib/analogParasites.glsl?raw'
+import domeLib from './lib/dome.glsl?raw'
+import finalGrain from './lib/finalGrain.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
@@ -2036,6 +2038,15 @@ export const ALL_SHADERS: IsfShader[] = [
   CONTEXT_SHADER,
   FINALIZER_SHADER
 ]
+
+// Shared GLSL at a shader's include line, whatever its list : "// @dome"
+// (lib/dome.glsl : turns and falls on the dome's disc under full-dome fill) and
+// "// @grain" (lib/finalGrain.glsl : the Finalizer's grain, which the dome stage
+// also draws after the mapping). The header is untouched.
+for (const s of ALL_SHADERS) {
+  if (s.source.includes('// @dome')) s.source = s.source.replace('// @dome', domeLib)
+  if (s.source.includes('// @grain')) s.source = s.source.replace('// @grain', finalGrain)
+}
 
 export const SHADER_BY_ID: Record<string, IsfShader> = Object.fromEntries(
   ALL_SHADERS.map((s) => [s.id, s])

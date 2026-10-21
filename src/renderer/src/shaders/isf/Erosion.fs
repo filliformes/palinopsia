@@ -35,8 +35,46 @@ float vnoise(vec2 p) {
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// @dome
+
+// Value noise repeating every P cells in x (P whole) : the field laid round the
+// dome meets itself again at the back.
+float vnoiseP(vec2 p, float P) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float x0 = mod(i.x, P);
+  float x1 = mod(i.x + 1.0, P);
+  float a = hash(vec2(x0, i.y));
+  float b = hash(vec2(x1, i.y));
+  float c = hash(vec2(x0, i.y + 1.0));
+  float d = hash(vec2(x1, i.y + 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// On the full dome (lib/dome.glsl) the sediment washes OUTWARD, from the zenith
+// down the walls all round : the channels are spokes (as many as fit round the
+// horizon, so they keep their flat width there), gathering in to the summit, and
+// the flow runs to the rim. The same field as flat, laid round the dome.
+vec2 erosionDome(vec2 uv) {
+  float t = PH_rate * 0.3;
+  vec2 pol = domePolar(uv);
+  float down = 0.5 * pol.y; // out from the zenith, in frame heights (the disc's diameter is one)
+  float P = max(1.0, floor(3.14159265 * domeHorizon() * scale * streaks + 0.5));
+  float P2 = max(1.0, floor(P * 2.3 + 0.5));
+  float P3 = max(1.0, floor(P * 0.3 + 0.5));
+  vec2 p = vec2(pol.x * P, down * scale - t);
+  float wanderX = (vnoise(vec2(down * 2.0 - t * 0.5, 7.3)) - 0.5) * 1.5;
+  float n1 = vnoiseP(p + vec2(wanderX, 0.0), P);
+  float n2 = vnoiseP(vec2(pol.x * P2 + wanderX * 2.0, p.y * 2.3 + 11.0), P2);
+  float ridge = 1.0 - abs(2.0 * (n1 * 0.7 + n2 * 0.3) - 1.0);
+  float channel = pow(ridge, 2.0 + carve * 6.0);
+  float banks = vnoiseP(vec2(pol.x * P3, down * scale * 0.6 - t * 0.4), P3) * sediment;
+  return vec2(channel, banks);
+}
+
 // The field : x = channels (0..1), y = sediment banks (0..1).
 vec2 erosionField(vec2 uv) {
+  if (DOME_FILL > 0.0) return erosionDome(uv);
   float t = PH_rate * 0.3;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
 

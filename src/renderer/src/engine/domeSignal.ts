@@ -20,3 +20,18 @@ export const domeFill = (): number => fill
 export function setDomeFill(v: number): void {
   fill = Number.isFinite(v) && v > 0 ? v : 0
 }
+
+// The Finalizer's film and digital grain, while the dome is on (any mapping) :
+// the dome stage draws it after the mapping, in master pixels (engine/dome.ts,
+// lib/finalGrain.glsl), and a Finalizer declaring
+//
+//   uniform float DOME_GRAIN;
+//
+// gets 1 and leaves it out (else 0 : it draws it over the flat frame, as ever).
+let grain = 0
+
+export const domeGrain = (): number => grain
+
+export function setDomeGrain(on: boolean): void {
+  grain = on ? 1 : 0
+}

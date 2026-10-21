@@ -3,8 +3,14 @@
 // that pixel looks at on the dome, then decide which point of the flat picture
 // belongs there (wrap / screen / fisheye). Output is RGBA8 so an 8K master is
 // 256 MB, not 512.
+//
+// The frame is read through a MIPMAPPED copy with each pixel's own footprint
+// (textureGrad), so where the mapping squeezes the picture it averages instead
+// of shimmering. The Finalizer's film / digital grain is drawn here, after the
+// mapping, in master pixels (lib/finalGrain.glsl).
 
 import type { DomeConfig } from '@shared/dome'
+import finalGrain from '../shaders/isf/lib/finalGrain.glsl?raw'
 
 const VS = `#version 300 es
 in vec2 p; out vec2 uv;
@@ -31,7 +37,14 @@ uniform float uHalfW, uHalfH, uSurround;
 uniform float uScale;
 uniform vec2 uOffset;
 uniform int uFit;           // full dome : 0 fill · 1 cover · 2 contain
+uniform float uGrain;       // the Finalizer's film / digital grain : amount × its opacity, 0 = none
+uniform int uGrainChar;     // 0 digital · 1 film
+uniform float uGrainCell;   // its cell, in master pixels
+uniform float uGrainChroma;
+uniform float uGrainAlpha;  // the Finalizer's opacity (the grain weighs by the graded luma)
+uniform float uTime;
 const float PI = 3.14159265359;
+${finalGrain}
 
 // Elliptical grid mapping (Fong), disc → square : the inverse of
 // (x, y) → (x·sqrt(1 − y²/2), y·sqrt(1 − x²/2)). It spreads the WHOLE square over
@@ -54,13 +67,16 @@ vec2 discShift(vec2 z, vec2 a){
   return vec2(n.x * d.x + n.y * d.y, n.y * d.x - n.x * d.y) / max(dot(d, d), 1e-6);
 }
 
-vec3 wrapAt(float az, float el){
+// The panorama at a direction : its colour (rgb) and how much of the picture is
+// there (a, the fades). gx / gy : the picture's footprint per master pixel (see
+// FOOTPRINTS in main).
+vec4 wrapAt(float az, float el, vec2 gx, vec2 gy){
   float u = az / (2.0 * PI) * uTurns + 0.5;          // the front lands on the picture's centre
   float k = floor(u);
   float fu = u - k;
   if (uMirror == 1 && mod(k, 2.0) > 0.5) fu = 1.0 - fu; // alternate copies mirror : no seams
   float v = (el - uBottom) / max(uTop - uBottom, 1e-4);
-  if (v < 0.0) return vec3(0.0);
+  if (v < 0.0) return vec4(0.0);
   // FEATHER softens the band's own edges : the bottom always, the top when the
   // zenith is black (fade and stretch have their own way above the top). Never
   // under ~1.5 master pixels : at 0 the edge is crisp, not stair-stepped (v moves
@@ -68,62 +84,43 @@ vec3 wrapAt(float az, float el){
   float fw = max(uFeather * 1.5, 1.5 * uPix / max(uTop - uBottom, 1e-3));
   float fade = smoothstep(0.0, fw, v);
   if (v > 1.0) {
-    if (uCap == 2) return vec3(0.0);
+    if (uCap == 2) return vec4(0.0);
     if (uCap == 0) fade *= 1.0 - smoothstep(0.0, 1.0, (el - uTop) / max(0.5 * PI - uTop, 1e-3));
     v = 1.0;
+    gx.y = 0.0; // the top row, held : it does not move up or down
+    gy.y = 0.0;
   } else if (uCap == 2) {
     fade *= 1.0 - smoothstep(1.0 - fw, 1.0, v);
   }
   vec2 s = vec2(fu, v);
-  return texture(src, s).rgb * fade;
+  return vec4(textureGrad(src, s, gx, gy).rgb * fade, fade);
 }
 
 void main(){
   vec2 q = uv * 2.0 - 1.0;
   if (uFlip == 1) q.x = -q.x;
   float r = length(q);
-  if (r > 1.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
   float theta = r * uHalfAp;                      // angle from the zenith (equidistant)
   float az = atan(q.x, -q.y);                     // 0 = front (bottom), + = the audience's right
   float el = 0.5 * PI - theta;
-  vec3 col = vec3(0.0);
-  if (uMode == 0) {
-    // The BACK SEAM : unless the turns land the picture back on itself (whole
-    // turns, even ones with mirror seams), the frame's two edges meet behind
-    // the audience in a hard cut. It stays at the physical back (az = ±180°)
-    // whatever the rotate and spin : the picture turns, the cut does not.
-    // Within 12° of it, each side blends toward the other's continuation, so
-    // they meet halfway. Where the seam was already clean both samples are the
-    // same picture and nothing changes.
-    col = wrapAt(az - uRot, el);
-    float toSeam = PI - abs(az);
-    float sw = radians(12.0);
-    if (toSeam < sw) col = mix(col, wrapAt((az > 0.0 ? az - 2.0 * PI : az + 2.0 * PI) - uRot, el), 0.5 * (1.0 - toSeam / sw));
-  } else if (uMode == 1) {
+
+  // Each mapping's picture coordinate, worked out in every pixel (the inside /
+  // outside tests come later) so its footprint can be taken below.
+  float sd = 0.0;
+  vec2 sc = vec2(0.0);
+  vec2 sS = vec2(0.0);                            // screen
+  if (uMode == 1) {
     vec3 D = vec3(sin(theta) * sin(az), cos(theta), -sin(theta) * cos(az));
-    vec3 back = uSurround > 0.001 ? wrapAt(az - uRot, el) * uSurround : vec3(0.0);
-    float d = dot(D, uC);
-    col = back;
-    if (d > 1e-4) {
-      vec3 t = D / d;
-      float sx = dot(t, uR) / uHalfW;
-      float sy = dot(t, uU) / uHalfH;
-      float m = max(abs(sx), abs(sy));
-      if (m < 1.0) {
-        vec2 s = vec2(sx, sy) * 0.5 + 0.5;
-        vec3 scr = texture(src, s).rgb;
-        // FEATHER softens the screen's border (0.2 melts the outer third into the
-        // surround). At 0 it is crisp, anti-aliased over ~1.5 master pixels : a
-        // tangent-plane coordinate moves (1 + x²) per radian, x = halfW at the
-        // edge. (It used to keep a fixed 1.5 % softness, 8 px on a 2K master.)
-        float sw = max(uFeather * 1.5, 1.5 * uPix * (1.0 + uHalfW * uHalfW) / max(uHalfW, 1e-3));
-        col = mix(back, scr, 1.0 - smoothstep(1.0 - sw, 1.0, m));
-      }
-    }
-  } else {
-    float c = cos(uRot), s = sin(uRot);
-    vec2 qq = mat2(c, s, -s, c) * q / uScale - uOffset;
-    vec2 p;
+    sd = dot(D, uC);
+    vec3 t = D / max(sd, 1e-4);
+    sc = vec2(dot(t, uR) / uHalfW, dot(t, uU) / uHalfH);
+    sS = sc * 0.5 + 0.5;
+  }
+  float c = cos(uRot), s = sin(uRot);
+  vec2 qq = mat2(c, s, -s, c) * q / uScale - uOffset;
+  vec2 pF = vec2(0.0);                            // full dome
+  bool inDisc = true;
+  if (uMode == 2) {
     if (uFit == 0) {
       vec2 z = mat2(c, s, -s, c) * q / uScale;
       // The two offset sliders (a square, -1..1 each) onto a disc of radius 0.9
@@ -132,13 +129,71 @@ void main(){
       // shared/spatial.ts's pictureToDirection mirrors this.
       vec2 oc = clamp(uOffset, -1.0, 1.0);
       vec2 a = 0.9 * vec2(oc.x * sqrt(1.0 - 0.5 * oc.y * oc.y), oc.y * sqrt(1.0 - 0.5 * oc.x * oc.x));
-      p = length(z) <= 1.0 ? discToSquare(discShift(z, a)) * 0.5 + 0.5 : vec2(-1.0);
+      pF = discToSquare(discShift(z, a)) * 0.5 + 0.5;
+      inDisc = length(z) <= 1.0;
     } else if (uFit == 1) {
-      p = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;       // the height spans the circle
+      pF = vec2(qq.x / uAspect, qq.y) * 0.5 + 0.5;      // the height spans the circle
     } else {
       float k = sqrt(1.0 + uAspect * uAspect);           // the corners touch the rim
-      p = vec2(qq.x * k / uAspect, qq.y * k) * 0.5 + 0.5;
+      pF = vec2(qq.x * k / uAspect, qq.y * k) * 0.5 + 0.5;
     }
+  }
+  // FOOTPRINTS, while every pixel still runs the same code (hardware
+  // derivatives are only defined there) : how far the picture's coordinate moves
+  // from one master pixel to the next. Every read goes through textureGrad with
+  // it over a mipmapped copy of the frame, so where the mapping SQUEEZES the
+  // picture (the fill's four corner pinches, the panorama's zenith, many turns,
+  // a small scale) the mipmaps average it instead of shimmering into moiré; where
+  // it magnifies (most of the dome) it reads the full-size frame as before.
+  vec2 dAz = vec2(dFdx(az), dFdy(az));
+  dAz -= 2.0 * PI * floor(dAz / (2.0 * PI) + 0.5); // atan jumps a whole turn at the back
+  vec2 dEl = vec2(dFdx(el), dFdy(el));
+  float uK = uTurns / (2.0 * PI);
+  float vK = 1.0 / max(uTop - uBottom, 1e-4);
+  vec2 wgx = vec2(dAz.x * uK, dEl.x * vK);
+  vec2 wgy = vec2(dAz.y * uK, dEl.y * vK);
+  vec2 sgx = dFdx(sS);
+  vec2 sgy = dFdy(sS);
+  vec2 pgx = dFdx(pF);
+  vec2 pgy = dFdy(pF);
+
+  if (r > 1.0) { o = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  vec3 col = vec3(0.0);
+  float cov = 0.0;                                // how much of the picture is here (the grain rides it)
+  if (uMode == 0) {
+    // The BACK SEAM : unless the turns land the picture back on itself (whole
+    // turns, even ones with mirror seams), the frame's two edges meet behind
+    // the audience in a hard cut. It stays at the physical back (az = ±180°)
+    // whatever the rotate and spin : the picture turns, the cut does not.
+    // Within 12° of it, each side blends toward the other's continuation, so
+    // they meet halfway. Where the seam was already clean both samples are the
+    // same picture and nothing changes.
+    vec4 w = wrapAt(az - uRot, el, wgx, wgy);
+    float toSeam = PI - abs(az);
+    float sw = radians(12.0);
+    if (toSeam < sw) w = mix(w, wrapAt((az > 0.0 ? az - 2.0 * PI : az + 2.0 * PI) - uRot, el, wgx, wgy), 0.5 * (1.0 - toSeam / sw));
+    col = w.rgb;
+    cov = w.a;
+  } else if (uMode == 1) {
+    vec4 back = uSurround > 0.001 ? wrapAt(az - uRot, el, wgx, wgy) * uSurround : vec4(0.0);
+    col = back.rgb;
+    cov = back.a;
+    if (sd > 1e-4) {
+      float m = max(abs(sc.x), abs(sc.y));
+      if (m < 1.0) {
+        vec3 scr = textureGrad(src, sS, sgx, sgy).rgb;
+        // FEATHER softens the screen's border (0.2 melts the outer third into the
+        // surround). At 0 it is crisp, anti-aliased over ~1.5 master pixels : a
+        // tangent-plane coordinate moves (1 + x²) per radian, x = halfW at the
+        // edge. (It used to keep a fixed 1.5 % softness, 8 px on a 2K master.)
+        float sw = max(uFeather * 1.5, 1.5 * uPix * (1.0 + uHalfW * uHalfW) / max(uHalfW, 1e-3));
+        float k = 1.0 - smoothstep(1.0 - sw, 1.0, m);
+        col = mix(back.rgb, scr, k);
+        cov = mix(back.a, 1.0, k);
+      }
+    }
+  } else {
+    vec2 p = inDisc ? pF : vec2(-1.0);
     if (p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0) {
       // FEATHER softens a cropped or contained frame's own edges inside the
       // circle (fill reaches the rim, which the rim feather below handles).
@@ -147,8 +202,21 @@ void main(){
       float fitK = uFit == 1 ? max(1.0 / uAspect, 1.0) : sqrt(1.0 + uAspect * uAspect) * max(1.0 / uAspect, 1.0);
       float pxF = uPix / uHalfAp / max(uScale, 0.05) * fitK * 0.5;
       float fe = uFit == 0 ? 1.0 : smoothstep(0.0, max(uFeather * 1.5, 1.5 * pxF), min(min(p.x, 1.0 - p.x), min(p.y, 1.0 - p.y)));
-      col = texture(src, p).rgb * fe;
+      col = textureGrad(src, p, pgx, pgy).rgb * fe;
+      cov = fe;
     }
+  }
+  // GRAIN after the mapping (lib/finalGrain.glsl) : the Finalizer's film or
+  // digital grain in MASTER pixels, so it reads as grain on the dome, one size
+  // everywhere, never blown up or pulled oblong by the stretch. It rides the
+  // picture (none on the black round a screen or under a panorama), weighed by
+  // the graded luma as in the Finalizer.
+  if (uGrain > 0.001 && cov > 0.001) {
+    float l = clamp(dot(col, vec3(0.299, 0.587, 0.114)) / max(uGrainAlpha * cov, 1e-3), 0.0, 1.0);
+    vec3 add = uGrainChar == 1
+      ? finalFilmGrain(gl_FragCoord.xy, uGrainCell, l, uTime, uGrainChroma, uGrain)
+      : finalDigitalGrain(gl_FragCoord.xy, uGrainCell, l, uTime, uGrainChroma, uGrain);
+    col = clamp(col + add * cov, 0.0, 1.0);
   }
   if (uGrid == 1) {
     // Alignment grid : every 10° of elevation, every 30° of azimuth; the horizon
@@ -168,7 +236,24 @@ void main(){
   o = vec4(col * edge, 1.0);
 }`
 
-function compile(gl: WebGL2RenderingContext): WebGLProgram {
+// The flat frame into the top level of the mipmapped copy, texel for texel.
+const COPY_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D src;
+void main(){ o = vec4(texelFetch(src, ivec2(gl_FragCoord.xy), 0).rgb, 1.0); }`
+
+/** The Finalizer's film / digital grain, drawn by the dome stage after the
+ *  mapping (lib/finalGrain.glsl). CRT and VHS (2, 3) stay in the Finalizer. */
+export interface DomeGrain {
+  amount: number // grain amount × the unit's dry / wet
+  character: number // 0 digital · 1 film · 2 crt · 3 vhs
+  size: number // the Finalizer's grain size (1..6)
+  chroma: number
+  alpha: number // the Finalizer's opacity
+}
+
+function compile(gl: WebGL2RenderingContext, fs: string): WebGLProgram {
   const mk = (t: number, s: string): WebGLShader => {
     const sh = gl.createShader(t)!
     gl.shaderSource(sh, s)
@@ -178,7 +263,7 @@ function compile(gl: WebGL2RenderingContext): WebGLProgram {
   }
   const p = gl.createProgram()!
   gl.attachShader(p, mk(gl.VERTEX_SHADER, VS))
-  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, FS))
+  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fs))
   gl.bindAttribLocation(p, 0, 'p')
   gl.linkProgram(p)
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('[dome] ' + (gl.getProgramInfoLog(p) || 'link'))
@@ -203,10 +288,18 @@ export class DomeStage {
   private prog: WebGLProgram
   private u = new Map<string, WebGLUniformLocation | null>()
   private target: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null
+  // The flat frame, copied each frame into an RGBA8 texture with its whole mip
+  // chain (+1/3 of the frame : 22 MB at a 2048² composition) : the master reads
+  // it at each pixel's own footprint.
+  private mip: { fbo: WebGLFramebuffer; tex: WebGLTexture; w: number; h: number } | null = null
+  private copyProg: WebGLProgram
+  private copySrc: WebGLUniformLocation | null
   size = 0
 
   constructor(private gl: WebGL2RenderingContext) {
-    this.prog = compile(gl)
+    this.prog = compile(gl, FS)
+    this.copyProg = compile(gl, COPY_FS)
+    this.copySrc = gl.getUniformLocation(this.copyProg, 'src')
   }
 
   private loc(n: string): WebGLUniformLocation | null {
@@ -232,17 +325,50 @@ export class DomeStage {
     this.size = n
   }
 
-  /** Render the master from `src` (the flat composite, `aspect` = w/h). The
-   *  caller's fullscreen-triangle VAO must be bound. Returns the master texture. */
-  render(src: WebGLTexture, aspect: number, cfg: DomeConfig, timeSec: number): WebGLTexture {
+  private ensureMip(w: number, h: number): void {
+    if (this.mip && this.mip.w === w && this.mip.h === h) return
     const gl = this.gl
+    if (this.mip) { gl.deleteFramebuffer(this.mip.fbo); gl.deleteTexture(this.mip.tex) }
+    const tex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texStorage2D(gl.TEXTURE_2D, Math.floor(Math.log2(Math.max(w, h))) + 1, gl.RGBA8, w, h)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    // Anisotropic where the card has it : the corner pinches squeeze the frame
+    // one way much more than the other, and plain trilinear would blur both.
+    const an = gl.getExtension('EXT_texture_filter_anisotropic')
+    if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, Number(gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)) || 1))
+    const fbo = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
+    this.mip = { fbo, tex, w, h }
+  }
+
+  /** Render the master from `src` (the flat composite, w × h), with the
+   *  Finalizer's film / digital grain drawn over it in master pixels. The
+   *  caller's fullscreen-triangle VAO must be bound. Returns the master texture. */
+  render(src: WebGLTexture, w: number, h: number, cfg: DomeConfig, timeSec: number, grain?: DomeGrain | null): WebGLTexture {
+    const gl = this.gl
+    const aspect = w / Math.max(1, h)
+    // The frame into the mipmapped copy, then its levels averaged down.
+    this.ensureMip(w, h)
+    const m = this.mip!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, m.fbo)
+    gl.viewport(0, 0, w, h)
+    gl.useProgram(this.copyProg)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, src)
+    gl.uniform1i(this.copySrc, 0)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
     this.ensure(cfg.res)
     const t = this.target!
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo)
+    gl.bindTexture(gl.TEXTURE_2D, m.tex)
+    gl.generateMipmap(gl.TEXTURE_2D)
     gl.viewport(0, 0, this.size, this.size)
     gl.useProgram(this.prog)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, src)
     gl.uniform1i(this.loc('src'), 0)
     const dt = this.lastT < 0 ? 0 : Math.max(0, Math.min(0.25, timeSec - this.lastT))
     this.lastT = timeSec
@@ -287,6 +413,19 @@ export class DomeStage {
     gl.uniform1f(this.loc('uScale'), cfg.scale)
     gl.uniform2f(this.loc('uOffset'), cfg.offsetX, cfg.offsetY)
     gl.uniform1i(this.loc('uFit'), cfg.fit === 'cover' ? 1 : cfg.fit === 'contain' ? 2 : 0)
+    // Grain in master pixels : its size counts pixels of a 4096 master (the
+    // Satosphère's), so the default 1.5 is one to two master pixels, the same
+    // grain on the dome at 2048 or 4096 (the flat frame counts 1080p pixels).
+    const g = grain && (grain.character === 0 || grain.character === 1) ? grain : null
+    const ga = g ? Math.max(0, g.amount) * Math.max(0, Math.min(1, g.alpha)) : 0
+    gl.uniform1f(this.loc('uGrain'), ga)
+    if (g && ga > 0.001) {
+      gl.uniform1i(this.loc('uGrainChar'), g.character === 1 ? 1 : 0)
+      gl.uniform1f(this.loc('uGrainCell'), Math.max(0.5, (Math.max(1, g.size) * this.size) / 4096))
+      gl.uniform1f(this.loc('uGrainChroma'), Math.max(0, Math.min(1, g.chroma)))
+      gl.uniform1f(this.loc('uGrainAlpha'), Math.max(0, Math.min(1, g.alpha)))
+      gl.uniform1f(this.loc('uTime'), timeSec % 86400)
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     return t.tex
   }
@@ -294,6 +433,8 @@ export class DomeStage {
   dispose(): void {
     const gl = this.gl
     if (this.target) { gl.deleteFramebuffer(this.target.fbo); gl.deleteTexture(this.target.tex); this.target = null }
+    if (this.mip) { gl.deleteFramebuffer(this.mip.fbo); gl.deleteTexture(this.mip.tex); this.mip = null }
     gl.deleteProgram(this.prog)
+    gl.deleteProgram(this.copyProg)
   }
 }
