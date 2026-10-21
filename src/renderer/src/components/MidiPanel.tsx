@@ -172,7 +172,7 @@ export function MidiPanel(): JSX.Element {
               onClick={() => setClockOut(!clockOut)}
               disabled={!outputName}
               className={`${pillCls(clockOut)} disabled:opacity-40`}
-              title="Send MIDI clock (24 PPQN) + Start/Stop at the app BPM, so the device follows Opsia's tempo. The device must be set to external / MIDI-clock sync."
+              title="Send MIDI clock (24 PPQN) + Start/Stop at the app BPM, so the device follows Opsia's tempo. With Ableton Link enabled, the clock follows Link's beat and Start waits for the next Link bar. The device must be set to external / MIDI-clock sync."
             >
               clock {clockOut && clockRunning ? '●' : ''}
             </button>
@@ -180,7 +180,7 @@ export function MidiPanel(): JSX.Element {
               onClick={() => midi.resyncClock()}
               disabled={!clockRunning}
               className="shrink-0 rounded border border-border bg-panel2/60 px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-accent disabled:opacity-40"
-              title="Re-align the follower's downbeat to now (Stop + Start)"
+              title="Re-align the follower's downbeat to now (Stop + Start); with Ableton Link enabled, to the next Link bar"
             >
               resync
             </button>

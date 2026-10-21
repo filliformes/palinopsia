@@ -37,7 +37,7 @@ import { tickSequencer } from './engine/sequencer'
 import { tickSonifySeq } from './audio/soniSeq'
 import { tickKeySeq } from './audio/soniKeySeq'
 import { soniBeats, soniClockTick } from './audio/soniClock'
-import { linkBeats, linkQuantum, linkSettings, setLinkSettings, tickLink } from './link'
+import { linkBeats, linkQuantum, linkSettings, linkShared, setLinkSettings, tickLink } from './link'
 import { applyWorldAmount } from './engine/worldAmount'
 import { Collapsible } from './components/Collapsible'
 import { FxAddSelect, FxChips } from './components/FxRackPanel'
@@ -1398,6 +1398,9 @@ export default function App(): JSX.Element {
           surfaceMove.current.t = 0
           c = morphedComposition(now, st.composition)
         }
+        // With other apps on Ableton Link the tempo is the session's, whatever
+        // the scene pad blends or a morph eases through
+        if (linkShared()) c = { ...c, bpm: st.composition.bpm }
         // 1. Store → engine reconciliation (base values). One write path for
         //    everything: UI edits, session loads, OSC : the engine follows.
         //    Shader hot-swaps preserve feedback buffers (brief §1).

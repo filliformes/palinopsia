@@ -1,7 +1,8 @@
 // A controlled number input that:
 //  - accepts floats (or just ints when integer=true)
 //  - allows the field to be EMPTY during editing (instead of snapping to 0)
-//  - clamps to [min, max] and reverts to the previous value on blur if invalid
+//  - clamps to [min, max] and reverts to the value from before the edit on blur
+//    if invalid, and on Escape (which commits nothing)
 //  - hides spinner arrows (handled globally in styles.css)
 //  - in rich themes (Nature), gets a "console readout"
 //    look : accent-tinted mono on a dark embedded card : until focused,
@@ -16,10 +17,12 @@ import { registerLiveOverlay } from './liveOverlay'
 
 interface Props {
   value: number
-  onChange: (v: number) => void
-  // The edit settled (blur / Enter) on this number. onChange follows every
-  // keystroke that parses, so typing "130" passes through 1 and 13 : a
-  // consumer that must only hear the final number (Ableton Link) listens here.
+  // Follows every keystroke that parses (a live edit : the picture moves as you
+  // type), so typing "130" passes through 1 and 13. Left out, the typed number
+  // stays in the box until it settles, and only onCommit hears it.
+  onChange?: (v: number) => void
+  // The edit settled (blur / Enter) on this number. A consumer that must only
+  // hear the final number (the BPM, which Ableton Link shares) listens here.
   onCommit?: (v: number) => void
   min?: number
   max?: number
@@ -72,6 +75,9 @@ export function BoundedNumberInput({
   // an old value after a fast type-then-blur sequence).
   const strRef = useRef(str)
   strRef.current = str
+  // The value from before this edit's first live write (null : nothing written
+  // yet) : what Escape, or an edit left on nothing parsable, goes back to.
+  const before = useRef<number | null>(null)
   // DOM ref for focus/blur handling.
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -115,18 +121,27 @@ export function BoundedNumberInput({
 
   const re = integer ? /^-?\d*$/ : /^-?\d*\.?\d*([eE][-+]?\d*)?$/
 
+  // Back to the value from before the edit, the live writes undone.
+  function revert(): void {
+    const was = before.current ?? value
+    if (before.current !== null && before.current !== value) onChange?.(before.current)
+    before.current = null
+    setStr(formatValue(was, integer, maxFrac))
+  }
+
   function commit(raw: string): void {
     if (raw === '' || raw === '-' || raw === '.' || raw === '-.') {
-      setStr(formatValue(value, integer, maxFrac))
+      revert()
       return
     }
     const n = integer ? parseInt(raw, 10) : parseFloat(raw)
     if (!Number.isFinite(n)) {
-      setStr(formatValue(value, integer, maxFrac))
+      revert()
       return
     }
+    before.current = null
     const clamped = Math.max(min, Math.min(max, n))
-    if (clamped !== value) onChange(clamped)
+    if (clamped !== value) onChange?.(clamped)
     onCommit?.(clamped)
     setStr(formatValue(clamped, integer, maxFrac))
   }
@@ -164,6 +179,7 @@ export function BoundedNumberInput({
         // without typing, the on-blur commit sees dirty=false and
         // skips the commit, leaving the parent value untouched.
         dirty.current = false
+        before.current = null
       }}
       onChange={(e) => {
         const v = e.target.value
@@ -178,11 +194,14 @@ export function BoundedNumberInput({
         // Live commit only for a fully-parsable value. Empty / sign-
         // only / dot-only intermediaries leave the parent value
         // untouched until blur.
-        if (v === '' || v === '-' || v === '.' || v === '-.') return
+        if (!onChange || v === '' || v === '-' || v === '.' || v === '-.') return
         const n = integer ? parseInt(v, 10) : parseFloat(v)
         if (!Number.isFinite(n)) return
         const clamped = Math.max(min, Math.min(max, n))
-        if (clamped !== value) onChange(clamped)
+        if (clamped !== value) {
+          if (before.current === null) before.current = value
+          onChange(clamped)
+        }
       }}
       onBlur={() => {
         focused.current = false
@@ -201,12 +220,17 @@ export function BoundedNumberInput({
       onKeyDown={(e) => {
         // Enter commits-and-blurs so the user gets the same "value
         // settles" feedback as clicking elsewhere. Escape reverts to
-        // the last-good external value without committing.
+        // the value from before the edit without committing.
         if (e.key === 'Enter') {
           ;(e.currentTarget as HTMLInputElement).blur()
         } else if (e.key === 'Escape') {
-          setStr(formatValue(value, integer, maxFrac))
+          // Clean before the blur : it runs onBlur right here, before React
+          // re-renders, and a dirty box committed the half-typed text there
+          // ("1" then Escape set 20 BPM on every linked app).
+          dirty.current = false
           ;(e.currentTarget as HTMLInputElement).blur()
+          // after the blur : its own reset reads the value of the last render
+          revert()
         }
       }}
     />

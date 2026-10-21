@@ -16,9 +16,9 @@
 import { useSyncExternalStore } from 'react'
 import { useStore } from './store'
 import type { LinkState } from '@shared/types'
-import { isTempoTyping, onTempoEdited } from './tempoEvents'
+import { onTempoEdited } from './tempoEvents'
 import { setTempoShared } from './sessionGuard'
-import { runSilently } from './undo'
+import { writeLinkTempo } from './undo'
 
 export interface LinkSettings {
   enabled: boolean
@@ -56,8 +56,15 @@ let state: LinkState = { available: true, enabled: false, peers: 0, tempo: 120, 
 let atLocal = 0
 let snap = { settings, state }
 const listeners = new Set<() => void>()
+// What the Link section and the badge show of a read : a read that changes none
+// of it re-renders nobody (the reads come 30 times a second for the whole show;
+// the beat is read through linkBeats, never through the snapshot).
+const shown = (s: LinkState): string =>
+  `${s.available}|${s.enabled}|${s.peers}|${s.quantum}|${Math.round(s.tempo * 100)}|${s.error ?? ''}`
+let shownKey = ''
 const emit = (): void => {
   snap = { settings, state }
+  shownKey = shown(state)
   for (const fn of listeners) fn()
 }
 
@@ -154,7 +161,8 @@ let holdUntil = 0
  *  confirms it within a read or two). */
 function propose(bpm: number): void {
   const a = api()
-  if (!a || !active()) return
+  if (!a || !active() || !Number.isFinite(bpm)) return
+  bpm = Math.max(20, Math.min(999, bpm)) // Link's own range (main clamps the same)
   const now = performance.now()
   state = { ...state, beat: beatAt(now), tempo: bpm }
   atLocal = now
@@ -162,20 +170,30 @@ function propose(bpm: number): void {
   a.linkSetTempo(bpm)
 }
 
+// when the session's tempo was last written into the store
+let wroteAt = 0
+
 /** Once a frame from App's loop, before the clocks read the BPM. */
 export function tickLink(now: number): void {
-  // a BPM being typed is Palinopsia's alone until it is settled
-  if (!active() || now < holdUntil || isTempoTyping()) return
+  if (!active() || now < holdUntil) return
   const bpm = useStore.getState().composition.bpm
+  // a session with no BPM (hand-edited) : nothing to share until one is set
+  if (!Number.isFinite(bpm)) return
   const tempo = Math.round(state.tempo * 100) / 100
   if (Math.abs(bpm - tempo) < 0.005) return
   if (state.peers > 0) {
     // the session's tempo wins over a session, a scene, Randomize, a morph. It
     // is nobody's edit here, so never an undo step : Ctrl+Z would stop on it,
-    // and the step it undid would only be written back the next frame.
-    runSilently(() => useStore.setState((s) => ({ composition: { ...s.composition, bpm: tempo } })))
-  } else {
-    // alone, Palinopsia leads : whatever set the BPM sets Link's
+    // and the step it undid would only be written back the next frame. During
+    // a linked app's tempo ramp, written ten times a second, not every frame
+    // (the beat comes from linkBeats, and each write re-renders the composition's
+    // readers); a single change is written at once.
+    if (now - wroteAt < 100) return
+    wroteAt = now
+    writeLinkTempo(tempo)
+  } else if (Math.abs(Math.max(20, Math.min(999, bpm)) - tempo) >= 0.005) {
+    // alone, Palinopsia leads : whatever set the BPM sets Link's (a BPM past
+    // Link's 20..999 goes at its edge, once, not again at every read)
     propose(bpm)
   }
 }
@@ -190,7 +208,7 @@ g.__opsiaLinkOff?.()
     // a read taken before our own tempo proposal reached Link would undo it
     if (performance.now() < holdUntil && Math.abs(s.tempo - state.tempo) > 0.005) return
     take(s)
-    emit()
+    if (shown(s) !== shownKey) emit()
   })
   const offTempo = onTempoEdited((bpm) => propose(bpm))
   // With Link on, the tempo is the network's, not the piece's : the Save

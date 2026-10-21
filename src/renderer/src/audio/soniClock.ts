@@ -31,6 +31,12 @@ let epoch = 0
  *  With Ableton Link on (`link` = its beat now, counted in bars of `q`), the
  *  clock IS Link's, so the bars fall where every linked app's do. */
 export function soniClockTick(now: number, bpm: number, link: number | null = null, q = 4): number {
+  // a beat or a tempo that is no number (a session with no BPM) : counted as
+  // none, else the offset and the count latched NaN and the sequencers stalled
+  // for good
+  if (!Number.isFinite(link)) link = null
+  if (!Number.isFinite(beats)) beats = 0
+  if (!Number.isFinite(bpm)) bpm = 120
   if (link != null) {
     const nq = Math.max(1, q)
     // Link comes on, or its bar changes size (Link counts its beats afresh for
