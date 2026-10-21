@@ -173,10 +173,10 @@ export class AudioSource {
   }
 
   /** `url` : what the element plays (opsia-media://…); `path` : the file on disk
-   *  (its analysis, its waveform). */
-  load(url: string, path: string): void {
+   *  (its analysis, its waveform); `at` : where it starts (seconds). */
+  load(url: string, path: string, at = 0): void {
     this.path = path
-    this.player.load(url, path)
+    this.player.load(url, path, at)
   }
 
   setPlayback(p: AudioPlayback): void {

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { audioBus, AUDIO_BANDS, LAYER_INPUT } from '../engine/audioIn'
+import { layerSounds } from '../audio/audioLayer'
 import { EqCard, GlueCard } from './SonifyEq'
 import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
@@ -41,7 +42,8 @@ export function AudioPanel(): JSX.Element {
   const patchAudioLayer = useStore((s) => s.patchAudioLayer)
   // Sound going on in the app (Sonify, the Audio Layer) : the dot lights for it
   // too, the input analysis on or off, so it is clear something sounds.
-  const layerSound = useStore((s) => !!(s.audioLayer.A || s.audioLayer.B) && !s.audioLayer.mute)
+  // (a live input not open yet sounds nothing)
+  const layerSound = useStore((s) => layerSounds(s.audioLayer, s.audioLayerArmed) && !s.audioLayer.mute)
   const playing = [sonify.on ? 'Sonify' : '', layerSound ? 'Audio Layer' : ''].filter(Boolean)
   const setSonify = useStore((s) => s.setSonify)
   const denoise = useStore((s) => s.audioDenoise)

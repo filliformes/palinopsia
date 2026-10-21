@@ -71,6 +71,11 @@ import { GridReadback } from './gridReadback';
 import { BLEND_MODES } from '@shared/types';
 export type { BlendMode };
 
+// Each layer's Import Audio file and where it was, as the last frame left it :
+// an engine rebuilt starts the same file there (the visual source jumped back to
+// its top while the Audio Layer resumed).
+const audioWasAt = new Map<string, { url: string; time: number }>();
+
 const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 uv;
 void main(){ uv = p*0.5+0.5; gl_Position = vec4(p,0.,1.); }`;
@@ -960,7 +965,7 @@ export class ISFLayer {
   }
 
   /** Load/swap/clear an AUDIO slot (cheap when the file is unchanged). */
-  setAudio(slot: 'A' | 'B', cfg: { url: string; path: string; inputs: Record<string, number | number[]> } | null): void {
+  setAudio(slot: 'A' | 'B', cfg: { url: string; path: string; inputs: Record<string, number | number[]> } | null, layerIndex = -1): void {
     const id = cfg ? cfg.url : null;
     const curId = slot === 'A' ? this.audioIdA : this.audioIdB;
     let cur = slot === 'A' ? this.audioA : this.audioB;
@@ -969,7 +974,10 @@ export class ISFLayer {
       cur = null;
       if (cfg) {
         cur = new AudioSource(this.shared.gl, this.w, this.h);
-        cur.load(cfg.url, cfg.path);
+        // the engine rebuilt (the render scale, the composition's size, a GPU
+        // reset) : the same file goes on where it was, not from its top
+        const was = audioWasAt.get(videoKey(layerIndex, slot));
+        cur.load(cfg.url, cfg.path, was && was.url === cfg.url ? was.time : 0);
       }
       if (slot === 'A') { this.audioA = cur; this.audioIdA = id; }
       else { this.audioB = cur; this.audioIdB = id; }
@@ -1370,9 +1378,11 @@ export class ISFLayer {
         au.setMuted(!audible);
         au.tick(rawDt, mul);
         videoPlayheads.set(key, { time: au.time(), duration: au.duration() });
+        audioWasAt.set(key, { url: (slot === 'A' ? this.audioIdA : this.audioIdB) ?? '', time: au.time() });
       } else {
         videoPlayheads.delete(key);
       }
+      if (!au) audioWasAt.delete(key);
     }
   }
 
@@ -2902,7 +2912,7 @@ export class Compositor {
       L.setNative('A', natA, natA ? l.sourceA.inputs : null);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs, folder: l.sourceA.collageFolder } : null);
-      L.setAudio('A', l.sourceA.kind === 'audio' && l.sourceA.mediaId ? { url: l.sourceA.mediaId, path: l.sourceA.mediaPath ?? '', inputs: l.sourceA.inputs } : null);
+      L.setAudio('A', l.sourceA.kind === 'audio' && l.sourceA.mediaId ? { url: l.sourceA.mediaId, path: l.sourceA.mediaPath ?? '', inputs: l.sourceA.inputs } : null, i);
       const nativeB = !!l.sourceB && l.sourceB.kind === 'generator' && NATIVE_SOURCE_IDS.has(l.sourceB.shaderId ?? '');
       const isTextB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-text';
       const isParamB = !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-parametric';
@@ -2925,7 +2935,7 @@ export class Compositor {
       L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
-      L.setAudio('B', l.sourceB?.kind === 'audio' && l.sourceB.mediaId ? { url: l.sourceB.mediaId, path: l.sourceB.mediaPath ?? '', inputs: l.sourceB.inputs } : null);
+      L.setAudio('B', l.sourceB?.kind === 'audio' && l.sourceB.mediaId ? { url: l.sourceB.mediaId, path: l.sourceB.mediaPath ?? '', inputs: l.sourceB.inputs } : null, i);
       L.setVideoPlayback('A', l.sourceA);
       L.setVideoPlayback('B', l.sourceB);
       L.setFraming('A', l.sourceA, i);

@@ -623,6 +623,12 @@ class SonifyEngine {
   private lineStream: MediaStream | null = null
   private lineWanted = false
   private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
+  // The line-in opens its input only once armed (runtime only, never saved) :
+  // by its button or an installation's boot. A session, a scene, a preset or an
+  // undo never opens the microphone by itself (the Audio Layer's rule).
+  private lineArmed = false
+  private lineForGood = false // an installation : no load lets it go
+  private lineListeners = new Set<() => void>()
   private lastTick = 0
   private chordSentN = -1 // the Chord note count the worklet has
   private collageOffAt = 0 // the Collage voice fading out before it is released (ms)
@@ -1532,10 +1538,43 @@ class SonifyEngine {
     // modulated pitch or probe snapping to its base for up to 50 ms on every
     // slider move, OSC message and sequencer step).
     if (cfg.on) this.postMod()
-    // the line-in : a microphone / interface, or the Audio Layer
-    const lineIn = !!cfg.on && cfg.filter.on && cfg.filter.lineIn
-    this.syncLineIn(lineIn && cfg.filter.lineFrom !== 'layer')
+    // the line-in : a microphone / interface (once armed), or the Audio Layer
+    this.syncLineIn(this.lineArmed && this.micWanted(cfg))
     this.syncLayerLine()
+  }
+
+  /** The Filter voice plays the microphone / interface (Sonify on). */
+  private micWanted(cfg: SoniConfig): boolean {
+    return !!cfg.on && cfg.filter.on && cfg.filter.lineIn && cfg.filter.lineFrom !== 'layer'
+  }
+
+  /** The line-in may open its input : its button (the performer's own act) or
+   *  an installation's boot (`forGood` : no load lets it go). It opens now if
+   *  the Filter voice plays it. */
+  armLineIn(forGood = false): void {
+    if (forGood) this.lineForGood = true
+    if (!this.lineArmed) {
+      this.lineArmed = true
+      for (const fn of this.lineListeners) fn()
+    }
+    if (this.node) this.syncLineIn(this.micWanted(this.cfg))
+  }
+
+  /** A whole sound is about to load (a session, a scene, a preset or a
+   *  sequencer step's, an undo) : an open line-in stays open through it, a
+   *  closed one stays closed (its button opens it again). */
+  loadingSound(): void {
+    if (!this.lineArmed || this.lineWanted || this.lineForGood) return
+    this.lineArmed = false
+    for (const fn of this.lineListeners) fn()
+  }
+
+  /** May the line-in open its input (the page lights its button by it)? */
+  lineInArmed(): boolean { return this.lineArmed }
+
+  onLineArm(fn: () => void): () => void {
+    this.lineListeners.add(fn)
+    return () => { this.lineListeners.delete(fn) }
   }
 
   /** Open/close the line-in tap for the Filter voice (mic/line via WebRTC). */
@@ -1651,8 +1690,24 @@ class SonifyEngine {
     this.bpm = bpm > 0 ? bpm : 120
     const node = this.node
     if (!node || !this.cfg.on) {
-      if (this.collage) { this.collage.dispose(); this.collage = null }
-      if (this.asm) { this.asm.dispose(); this.asm = null }
+      if (node) {
+        // Sonify off, the Audio Layer holding the engine : the films fade out as
+        // a voice switched off does, then go (released at once, they were cut
+        // while the worklet's voice gate was still closing : a click)
+        if (this.collage) {
+          if (!this.collageOffAt) { this.collage.silence(); this.collageOffAt = nowMs }
+          else if (nowMs - this.collageOffAt > 80) { this.collage.dispose(); this.collage = null; this.collageOffAt = 0 }
+        }
+        if (this.asm) {
+          if (!this.asmOffAt) { this.asm.silence(); this.asmOffAt = nowMs }
+          else if (nowMs - this.asmOffAt > 80) { this.asm.dispose(); this.asm = null; this.asmOffAt = 0 }
+        }
+      } else {
+        if (this.collage) { this.collage.dispose(); this.collage = null }
+        if (this.asm) { this.asm.dispose(); this.asm = null }
+        this.collageOffAt = 0
+        this.asmOffAt = 0
+      }
       this.assemblageSets = []
       return
     }

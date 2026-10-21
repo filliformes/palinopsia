@@ -13,6 +13,7 @@
 import { useSyncExternalStore } from 'react'
 import type { CompositionState, SceneEntry, SequenceState, World } from '@shared/types'
 import { saveUserWorlds, useStore } from './store'
+import { sonifyEngine } from './audio/sonify'
 import { cancelMorph } from './morph'
 import { showToast } from './components/Toast'
 import { tempoEdited } from './tempoEvents'
@@ -154,7 +155,8 @@ function apply(s: Snapshot): void {
   // A step that left the sound alone leaves it alone here too : the same object
   // stays, so the step's other side still compares equal on the sound.
   const curSoni = useStore.getState().sonify
-  if (s.sonify !== curSoni) useStore.getState().setSonify({ ...s.sonify, on: curSoni.on, sinkId: curSoni.sinkId })
+  // (an undo never opens the Filter's line-in : only an open one stays open)
+  if (s.sonify !== curSoni) { sonifyEngine.loadingSound(); useStore.getState().setSonify({ ...s.sonify, on: curSoni.on, sinkId: curSoni.sinkId }) }
   applying = false
 }
 

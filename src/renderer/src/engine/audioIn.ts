@@ -37,8 +37,10 @@ export type AudioMode = 'off' | 'osc' | 'local' | 'both'
 /** The input menu's Audio Layer entry : the local input is then the layer's own
  *  sound (its analyser, after its volume), no microphone opened. */
 export const LAYER_INPUT = 'opsia:audio-layer'
-/** The Audio Layer's analyser, as it stands (null : the layer is empty). */
-export type LayerAnalyser = () => { an: AnalyserNode; sampleRate: number } | null
+/** The Audio Layer's sound this frame, analysed once (`dt` : seconds since the
+ *  last frame) : its features and its analyser's buffers (null : the layer is
+ *  empty). */
+export type LayerAnalyser = (dt: number) => { an: AnalyserNode; sampleRate: number; feats: AudioFeatures; bufs: FrameBufs } | null
 
 export interface AudioFeatures {
   level: number // RMS loudness 0..1
@@ -71,7 +73,7 @@ const LOG_FMAX = Math.log2(1760)
 // after Chris Wilson's PitchDetect. Returns the fundamental in Hz, or -1 when
 // the frame is too quiet / unvoiced to trust. Lag search is bounded to the
 // musical range so the cost stays contained.
-function autoCorrelate(buf: Float32Array, sampleRate: number): number {
+function autoCorrelate(buf: Float32Array, sampleRate: number, corr: Float32Array): number {
   const SIZE = buf.length
   let rms = 0
   for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i]
@@ -99,7 +101,8 @@ function autoCorrelate(buf: Float32Array, sampleRate: number): number {
   // Bound the lag to the musical range (min period at FMAX, max at FMIN).
   const minLag = Math.max(2, Math.floor(sampleRate / 1760))
   const maxLag = Math.min(n - 1, Math.ceil(sampleRate / 55))
-  const c = new Float32Array(maxLag + 1)
+  // (one buffer per analyser, kept : lags outside minLag..maxLag read as 0)
+  const c = corr
   for (let lag = minLag; lag <= maxLag; lag++) {
     let s = 0
     for (let i = 0; i < n - lag; i++) s += b[i] * b[i + lag]
@@ -118,9 +121,9 @@ function autoCorrelate(buf: Float32Array, sampleRate: number): number {
   if (maxpos <= 0) return -1
   let T0 = maxpos
   // Parabolic interpolation around the peak for sub-sample accuracy.
-  const x1 = c[T0 - 1] ?? 0
+  const x1 = T0 - 1 >= minLag ? c[T0 - 1] : 0
   const x2 = c[T0]
-  const x3 = c[T0 + 1] ?? 0
+  const x3 = T0 + 1 <= maxLag ? c[T0 + 1] : 0
   const a = (x1 + x3 - 2 * x2) / 2
   const bb = (x3 - x1) / 2
   if (a) T0 = T0 - bb / (2 * a)
@@ -132,6 +135,7 @@ export interface FrameBufs {
   freq: Uint8Array<ArrayBuffer>
   time: Uint8Array<ArrayBuffer>
   timeF: Float32Array<ArrayBuffer> // float waveform (pitch)
+  corr: Float32Array<ArrayBuffer> // the pitch's correlation by lag (one per analyser, not one per frame)
   prev: Float32Array<ArrayBuffer>
   n: number
 }
@@ -140,6 +144,7 @@ export function frameBufs(an: AnalyserNode): FrameBufs {
     freq: new Uint8Array(an.frequencyBinCount),
     time: new Uint8Array(an.fftSize),
     timeF: new Float32Array(an.fftSize),
+    corr: new Float32Array(an.fftSize),
     prev: new Float32Array(an.frequencyBinCount),
     n: 0
   }
@@ -210,7 +215,7 @@ export function analyseFrame(an: AnalyserNode, fb: FrameBufs, L: AudioFeatures, 
   // slowly, and the ACF is the heaviest step). Held across unvoiced frames.
   if (++fb.n % 3 === 0) {
     an.getFloatTimeDomainData(fb.timeF)
-    const hz = autoCorrelate(fb.timeF, sampleRate)
+    const hz = autoCorrelate(fb.timeF, sampleRate, fb.corr)
     if (hz > 0) {
       // Log-map the fundamental over a musical span (A1 55 Hz → A6 1760 Hz).
       const t = (Math.log2(hz) - LOG_FMIN) / (LOG_FMAX - LOG_FMIN)
@@ -625,15 +630,18 @@ class AudioBus {
 
   private computeLocal(dt: number): void {
     if (this.layerIn) {
-      const L = this.layerSrc?.() ?? null
+      const L = this.layerSrc?.(dt) ?? null
       if (!L) {
-        if (this.layerAn) { this.layerAn = null; this.local = zero() }
+        if (this.layerAn) { this.layerAn = null; this.bufs = null; this.local = zero() }
         return
       }
-      // the layer rebuilt (a new audio context) : its new analyser
-      if (L.an !== this.layerAn || !this.bufs) { this.layerAn = L.an; this.bufs = frameBufs(L.an) }
+      // The layer's own analysis, run once this frame (a modulator FROM "AU all"
+      // reads the same : the same analyser was analysed twice a frame), its
+      // buffers for the spectrum and waveform readers.
+      this.layerAn = L.an
+      this.bufs = L.bufs
+      this.local = L.feats
       this.sampleRate = L.sampleRate
-      analyseFrame(L.an, this.bufs, this.local, dt, L.sampleRate)
       return
     }
     if (this.analyser && this.bufs) analyseFrame(this.analyser, this.bufs, this.local, dt, this.sampleRate)
