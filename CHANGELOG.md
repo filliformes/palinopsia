@@ -23,7 +23,11 @@ that CI builds into cross-platform releases.
   (`FxRackPanel.tsx`, every rack : they took ~30 px per chip, so two effects now share a
   line in a source's half), and FB is back in the layer header beside S and ⊘ (the
   feedback tab keeps its state and trail). Typical layer 257 → 232 px, luma mask +
-  feedback 351 → 326 (the old strip : 383 / 474).
+  feedback 351 → 326 (the old strip : 383 / 474). Then (Vincent, from three mockups) :
+  each step on a soft panel of its own color (styles.css `--c-step1..4`, blue, orange,
+  violet, teal, at a tenth : the same in every theme), the badges in those colors, the
+  rail gone; each panel takes 2 px of the gaps above and below, so the height is
+  unchanged (232 px); the Out drawer sits inside step 4's panel (326 → 323).
 - **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
   three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
   Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,

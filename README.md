@@ -254,7 +254,8 @@ down : the Background strip first, then Layer 1 to Layer 4, then the
 [Audio Layer](#the-audio-layer) (the sound).
 
 Each layer's strip reads top to bottom in the order the picture goes through it,
-in four steps numbered on a thin rail down its left edge : **1 Sources** (A and B side by side, each with its
+in four numbered steps, each on a faint panel of its own color (sources blue, mix
+orange, layer FX violet, out teal) : **1 Sources** (A and B side by side, each with its
 picker and "+ fx" on one line, its effects under them, led by a **power** button
 that turns that source's whole chain off, or all back on), two lines running down
 from them into **2 Mix** (where A and B meet : the slider, the mix in **percent**

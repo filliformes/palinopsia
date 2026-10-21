@@ -76,6 +76,16 @@
 @font-face { font-family: 'Zilla Slab'; font-weight: 400; font-style: normal; font-display: swap; src: url('./fonts/ZillaSlab.ttf') format('truetype'); }
 
 
+/* The layer strip's four steps (sources, mix, layer FX, out) : each one's badge
+   and the faint panel under it (LayerPanel.tsx STEP_TINT). The same in every
+   theme : at a tenth of their strength they sit on dark and light panels alike. */
+:root {
+  --c-step1: 90 169 230;
+  --c-step2: 255 140 26;
+  --c-step3: 165 140 255;
+  --c-step4: 76 201 167;
+}
+
 /* ======== Theme palettes ======== */
 /* Colors are held as space-separated RGB triples so Tailwind's rgb(.../<alpha>)
    machinery can add opacity variants. Themes also expose an optional

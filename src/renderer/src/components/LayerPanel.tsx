@@ -283,11 +283,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               of it, share the last line, under a rule. No boxes, no titles :
               as compact as the old strip. */}
           <div className="relative flex min-w-0 flex-col gap-1.5">
-            {/* the rail, badge 1 to badge 4 */}
-            <span className="pointer-events-none absolute bottom-[10px] left-[7px] top-[12px] w-px bg-accent/35" aria-hidden="true" />
-
             {/* 1 · SOURCES */}
-            <div className="flex min-w-0 items-start gap-1.5">
+            <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[1] }}>
               <RailBadge n={1} title="Sources : what the layer shows (A and B, each with its own effects)" />
               <div className="flex min-w-0 flex-1 items-start gap-1.5">
                 <SourceRow
@@ -331,7 +328,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 follows the mode : its tooltip says). Dimmed while B is empty.
                 The A/B harmony and the coupling live in the Mixer (M) : the ≈
                 chip says this layer is coupled. */}
-            <div className="flex min-w-0 items-start gap-1.5">
+            <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[2] }}>
               <RailBadge n={2} title={hasB ? `Mix : how A and B meet (${mixWord(layer.sourceBlend)})` : 'Mix : no Source B yet, pick one above'} />
               <div className={`flex min-w-0 flex-1 flex-col gap-1 ${hasB ? '' : 'opacity-40'}`}>
                 <div className="flex min-h-[26px] min-w-0 items-center gap-1.5">
@@ -394,7 +391,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             </div>
 
             {/* 3 · LAYER FX : the effects on the mixed picture */}
-            <div className="flex min-w-0 items-start gap-1.5">
+            <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[3] }}>
               <RailBadge n={3} title="Layer FX : the effects on the mixed picture" />
               <div className="flex min-h-[26px] min-w-0 flex-1 items-center">
                 <FxChips
@@ -413,9 +410,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
             {/* 4 · OUT : how it lands on the layers below. Each tab says where
                 it stands; a click opens its drawer, another closes it. */}
-            <div className="flex min-w-0 items-start gap-1.5">
+            <div className="-mx-1 -my-[2px] flex min-w-0 items-start gap-1.5 rounded-[5px] px-1 py-[2px]" style={{ background: STEP_TINT[4] }}>
               <RailBadge n={4} title="Out : how the layer lands on the layers below" small />
-              <div className="flex min-w-0 flex-1 overflow-hidden rounded border border-border">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 overflow-hidden rounded border border-border">
                 {(
                   [
                     ['blend', `blend ${layer.blend}`, blendBound],
@@ -441,65 +439,66 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   </button>
                 ))}
               </div>
+              {/* the open drawer, under the tabs, on the step's panel */}
+              {outTab && (
+                <div className="flex min-w-0 flex-col gap-1 border-l-2 pl-1.5" style={{ borderColor: STEP_EDGE[4] }}>
+                  {outTab === 'blend' && (
+                    <>
+                      <Row label="BLEND">
+                        <select
+                          ref={blendRef}
+                          className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
+                          value={layer.blend}
+                          onChange={(e) => setBlend(index, e.target.value as BlendMode)}
+                        >
+                          {BLEND_MODES.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        {modChip('blend', 'blend mode')}
+                      </Row>
+                      {modAssign('blend')}
+                    </>
+                  )}
+                  {outTab === 'mask' && <MaskControls index={index} mask={layer.mask} />}
+                  {outTab === 'feedback' && (
+                    // on or off, the same row : the trail stays put, asleep while off
+                    <Row label="TRAIL">
+                      <ToggleChip
+                        label={layer.feedback ? 'on' : 'off'}
+                        active={layer.feedback}
+                        onClick={() => toggleFeedback(index)}
+                        title="Feedback : this layer samples its own previous frame (trails)"
+                      />
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={layer.feedbackAmount}
+                        onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
+                        className={`min-w-0 flex-1 accent-accent ${layer.feedback ? '' : 'opacity-40'}`}
+                        title={layer.feedback ? 'Feedback persistence : decay trails (capped below infinite bloom)' : 'Feedback is off : the trail it will have when on'}
+                      />
+                      <div className={`w-11 shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
+                        <BoundedNumberInput
+                          value={Math.round(layer.feedbackAmount * 100) / 100}
+                          min={0}
+                          max={1}
+                          onChange={(v) => setFeedbackAmount(index, v)}
+                          className="input w-full px-1 py-0.5 text-right text-[11px]"
+                        />
+                      </div>
+                    </Row>
+                  )}
+                </div>
+              )}
+              </div>
             </div>
           </div>
 
-          {/* the open drawer, under the tabs (off the rail : the rail joins the steps) */}
-          {outTab && (
-            <div className="ml-[21px] flex min-w-0 flex-col gap-1 border-l-2 border-accent/30 pl-1.5">
-              {outTab === 'blend' && (
-                <>
-                  <Row label="BLEND">
-                    <select
-                      ref={blendRef}
-                      className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
-                      value={layer.blend}
-                      onChange={(e) => setBlend(index, e.target.value as BlendMode)}
-                    >
-                      {BLEND_MODES.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                    {modChip('blend', 'blend mode')}
-                  </Row>
-                  {modAssign('blend')}
-                </>
-              )}
-              {outTab === 'mask' && <MaskControls index={index} mask={layer.mask} />}
-              {outTab === 'feedback' && (
-                // on or off, the same row : the trail stays put, asleep while off
-                <Row label="TRAIL">
-                  <ToggleChip
-                    label={layer.feedback ? 'on' : 'off'}
-                    active={layer.feedback}
-                    onClick={() => toggleFeedback(index)}
-                    title="Feedback : this layer samples its own previous frame (trails)"
-                  />
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={layer.feedbackAmount}
-                    onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
-                    className={`min-w-0 flex-1 accent-accent ${layer.feedback ? '' : 'opacity-40'}`}
-                    title={layer.feedback ? 'Feedback persistence : decay trails (capped below infinite bloom)' : 'Feedback is off : the trail it will have when on'}
-                  />
-                  <div className={`w-11 shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
-                    <BoundedNumberInput
-                      value={Math.round(layer.feedbackAmount * 100) / 100}
-                      min={0}
-                      max={1}
-                      onChange={(v) => setFeedbackAmount(index, v)}
-                      className="input w-full px-1 py-0.5 text-right text-[11px]"
-                    />
-                  </div>
-                </Row>
-              )}
-            </div>
-          )}
 
           {/* Speed and Vary act on the whole layer : one line, under a rule */}
           <div className="border-t border-border/80" />
@@ -737,12 +736,22 @@ function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['
   )
 }
 
-// A step's number on the layer's rail (the order the picture goes through the
-// layer), centered on its row's first line; the title says what the step does.
+// A step's number (the order the picture goes through the layer), in the step's
+// color, centered on its row's first line; the title says what the step does.
+// Each step's color (styles.css --c-step1..4 : sources, mix, layer FX, out) :
+// its badge, its panel's tint, an edge where it needs one.
+const STEP_TINT: Record<number, string> = {
+  1: 'rgb(var(--c-step1) / 0.1)', 2: 'rgb(var(--c-step2) / 0.1)', 3: 'rgb(var(--c-step3) / 0.1)', 4: 'rgb(var(--c-step4) / 0.1)'
+}
+const STEP_EDGE: Record<number, string> = {
+  1: 'rgb(var(--c-step1) / 0.5)', 2: 'rgb(var(--c-step2) / 0.5)', 3: 'rgb(var(--c-step3) / 0.5)', 4: 'rgb(var(--c-step4) / 0.5)'
+}
+
 function RailBadge({ n, title, small = false }: { n: number; title: string; small?: boolean }): JSX.Element {
   return (
     <span
-      className={`relative z-10 flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full bg-accent font-sans text-[9px] font-medium text-panel ${small ? 'mt-[3px]' : 'mt-[5px]'}`}
+      className={`relative z-10 flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full font-sans text-[9px] font-medium ${small ? 'mt-[3px]' : 'mt-[5px]'}`}
+      style={{ background: `rgb(var(--c-step${n}))`, color: 'rgb(24 24 24)' }}
       title={title}
     >
       {n}
