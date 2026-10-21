@@ -29,6 +29,7 @@ import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MarginLabel } from './MarginLabel'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
@@ -800,13 +801,12 @@ const STEP_WORD: Record<number, string> = { 1: 'IN', 2: 'MIX', 3: 'FX', 4: 'OUT'
 
 function StepLabel({ n, title, small = false }: { n: number; title: string; small?: boolean }): JSX.Element {
   return (
-    <span
-      className={`w-[17px] shrink-0 cursor-default select-none font-mono text-[9px] leading-[13px] ${small ? 'mt-[4px]' : 'mt-[6px]'}`}
-      style={{ color: `rgb(var(--c-step${n}))` }}
+    <MarginLabel
+      word={STEP_WORD[n]}
+      color={`rgb(var(--c-step${n}))`}
       title={title}
-    >
-      {STEP_WORD[n]}
-    </span>
+      className={`w-[17px] ${small ? 'mt-[4px]' : 'mt-[6px]'}`}
+    />
   )
 }
 

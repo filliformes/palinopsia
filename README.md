@@ -1124,7 +1124,14 @@ frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows 
 render (on a machine where that thread cannot start, they run on the main thread as
 before). The models ship inside the app, so it works offline and in kiosk.
 
-**Capture bar** (one distributed line): **Hands** (21 landmarks per hand, up to two)
+**Layout.** Like the layer strip's IN / MIX / FX / OUT, every section is named in the
+left margin, in its color, on a faint panel of that color (hover the word for what the
+section does) : **TRACK** (the capture line), the camera preview beside the feature
+monitor's seven groups, then **NEW RULE** (the builder line) and **RULES** (the saved
+rules). The header holds the tracking state, the last gesture recognized and the camera
+picker.
+
+**TRACK** (one distributed line): **Hands** (21 landmarks per hand, up to two)
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
 reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
@@ -1132,21 +1139,21 @@ model; cheap) · **Mirror** (selfie view) · **Hi-res** (track on every display 
 instead of once per new camera frame : for a fast camera, at about twice the cost) ·
 **sensitivity**
 (how easily gestures fire, a global default that any single gesture can override) ·
-**hold time** (how long a held pose must last) · **OSC out**. The camera picker sits
-in the page header.
+**hold time** (how long a held pose must last) · **OSC out**.
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
 the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
 lean / sway / motion-energy / arm-span / stance / weight, the movement qualities (below),
 the face blendshapes and head pose, and (with Silhouette on) each of the nine **zone
-coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **Feature monitor** shows
-them live, grouped and colour-coded by body region (Hands · Pose · Movement qualities ·
-Face · Silhouette · Motion field · Presence); its **→**
+coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **feature monitor** shows
+them live, one row per body region, its name in the margin in the region's color (Hands ·
+Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
+the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
 open a filter, or the body's motion drive feedback, continuously.
 
-**Gestures → actions (the rule builder).** The **Create actions** panel authors rules:
+**Gestures → actions (the rule builder).** The **NEW RULE** line authors rules:
 **one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
 when both land close **together** (`+`) or **in order** (`→`); an **exclusive** combo
 swallows its component gestures' own singles (a chord that doesn't also play its
