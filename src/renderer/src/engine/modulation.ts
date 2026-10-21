@@ -12,6 +12,8 @@
 // touch the React store, so nothing re-renders at 60 Hz.
 
 import { setWorldAmountMod, worldAmountBase } from './worldAmount'
+import { auModBase, setAuMod } from './audioLayerMod'
+import { auBaseOf, auSpan, auValueOf } from '@shared/auMod'
 import { forkShapeGhosts, pruneShapes, shapeValue } from './modShape'
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
@@ -1117,6 +1119,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'dome') return `dome:${t.field}`
   if (t.kind === 'outx') return `outx:${t.field}`
   if (t.kind === 'world') return 'world:amount'
+  if (t.kind === 'au') return t.slot ? `au:${t.slot}:${t.field}` : `au:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1353,6 +1356,17 @@ export function writeModTarget(
     comp.setOutXformParam(t.field, value)
     return
   }
+  // An Audio Layer control : absolute over its span (a speed over its octaves),
+  // onto the audio engine (nothing there : an empty slot, a live input's transport).
+  if (t.kind === 'au') {
+    const st = auModBase()
+    if (!st || auBaseOf(st, t) === null) return
+    const r = auSpan(t.field)
+    const value = auValueOf(t.field, r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min))
+    liveModValues.set(liveKey(t), value)
+    setAuMod(t, value)
+    return
+  }
   // A dome slider : absolute over its span.
   if (t.kind === 'dome') {
     const r = DOME_MOD_RANGE[t.field]
@@ -1550,6 +1564,20 @@ export function applyModulation(
       if (final === null || typeof final !== 'number') continue
       liveModValues.set(liveKey(a.target), final)
       setWorldAmountMod(final)
+      continue
+    }
+    if (a.target.kind === 'au') {
+      // An Audio Layer control, in its own units (a speed : over its octaves),
+      // around or scaling where it sits; the engine glides there this frame.
+      const st = auModBase()
+      const base = st ? auBaseOf(st, a.target) : null
+      if (base === null) continue // an empty slot, a live input's transport : nothing to move
+      const r = auSpan(a.target.field)
+      const x = inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
+      if (x === null || typeof x !== 'number') continue
+      const final = auValueOf(a.target.field, x)
+      liveModValues.set(liveKey(a.target), final)
+      setAuMod(a.target, final)
       continue
     }
     if (a.target.kind === 'outx') {

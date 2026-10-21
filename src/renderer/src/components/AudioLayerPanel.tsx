@@ -5,11 +5,15 @@
 // slot's volume and pan.
 
 import { useEffect, useRef, useState } from 'react'
-import type { AudioLayerSlot, SourceSlot } from '@shared/types'
+import type { AudioLayerSlot, ModTarget, SourceSlot } from '@shared/types'
+import type { AuModTarget } from '@shared/auMod'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { VideoTransport } from './VideoTransport'
-import { useStore } from '../store'
+import { AssignRow, useBound } from './AutoControls'
+import { registerLiveOverlay } from './liveOverlay'
+import { useModSlide } from './useModSlide'
+import { modTargetKey, useStore } from '../store'
 import { AUDIO_LAYER, audioLayer, type AudioSlotName, type SlotInfo } from '../audio/audioLayer'
 import { droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
 import { showToast } from './Toast'
@@ -172,6 +176,11 @@ export function AudioLayerPanel(): JSX.Element {
   // a live input not open yet (a session never opens one by itself)
   const closed = useStore((s) => (['A', 'B'] as const).some((sl) => s.audioLayer[sl]?.kind === 'live' && !s.audioLayerArmed[sl]))
   const a = slotName(al.A), b = slotName(al.B)
+  // which control's binding row is open (its M chip), under its own row
+  const [openMod, setOpenMod] = useState<'volume' | 'mix' | null>(null)
+  const modChip = (f: 'volume' | 'mix', what: string): JSX.Element => (
+    <AuModChip target={f === 'mix' ? AU_MIX : AU_VOLUME} open={openMod === f} onToggle={() => setOpenMod(openMod === f ? null : f)} what={what} />
+  )
   return (
     <div className="flex min-w-0 flex-col gap-1.5 rounded-md border border-border bg-panel p-2">
       {/* Header : chevron · AU · volume · meter · mute */}
@@ -184,16 +193,18 @@ export function AudioLayerPanel(): JSX.Element {
           <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
           <span className="font-mono text-[11px] text-muted">AU</span>
         </button>
-        <input
-          type="range" min={0} max={2} step={0.01} value={al.volume}
-          onChange={(e) => patch({ volume: Number(e.target.value) })}
+        <AuSlider
+          target={AU_VOLUME} min={0} max={2} value={al.volume}
+          set={(v) => patch({ volume: v })}
           onDoubleClick={() => patch({ volume: 1 })}
-          className="min-w-0 flex-1 accent-accent"
+          className="min-w-0 flex-1"
           title={`The Audio Layer's volume ${Math.round(al.volume * 100)} % (double-click : 100 %). It plays into Sonify's mix (after Sonify's own volume) : the output EQ, the limiter, the recordings and Space have it, Sonify on or off.`}
         />
+        {modChip('volume', "the Audio Layer's volume")}
         <Meter which={null} className="w-12 shrink-0" />
         <Chip label="⊘" active={al.mute} onClick={() => patch({ mute: !al.mute })} title="Mute the Audio Layer" />
       </div>
+      {openMod === 'volume' && <AuAssign target={AU_VOLUME} />}
       {collapsed ? (
         <div className="flex min-w-0 items-center gap-1 px-1 font-mono text-[9px] text-muted" title="What the collapsed Audio Layer holds (expand to edit)">
           <span className="min-w-0 truncate">{a && b ? `${a} + ${b}` : (a ?? b ?? 'empty')}</span>
@@ -207,15 +218,17 @@ export function AudioLayerPanel(): JSX.Element {
             <PlayBoth />
             <span className="shrink-0 font-mono text-[9px] uppercase text-muted">mix</span>
             <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
-            <input
-              type="range" min={0} max={1} step={0.01} value={al.mix}
-              onChange={(e) => patch({ mix: Number(e.target.value) })}
+            <AuSlider
+              target={AU_MIX} min={0} max={1} value={al.mix}
+              set={(v) => patch({ mix: v })}
               onDoubleClick={() => patch({ mix: 0.5 })}
-              className="min-w-0 flex-1 accent-accent"
+              className="min-w-0 flex-1"
               title={`A and B : the middle plays both whole, toward an end the other one fades out (${al.mix.toFixed(2)}; double-click : the middle)`}
             />
             <span className="shrink-0 font-mono text-[9px] text-muted">B</span>
+            {modChip('mix', "the Audio Layer's A/B mix")}
           </div>
+          {openMod === 'mix' && <AuAssign target={AU_MIX} />}
           <SlotRow slot="B" />
         </>
       )}
@@ -399,6 +412,13 @@ export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Elem
               swap: (url, name, path) => setFile(slot, url, name, path, true),
               volume: s.volume,
               setVolume: (v) => patchSlot(slot, { volume: v }),
+              mod: {
+                position: { kind: 'au', slot, field: 'playhead' },
+                speed: { kind: 'au', slot, field: 'speed' },
+                loopIn: { kind: 'au', slot, field: 'trimIn' },
+                loopOut: { kind: 'au', slot, field: 'trimOut' },
+                vol: { kind: 'au', slot, field: 'volume' }
+              },
               extra: (
                 <button
                   onClick={() => patchSlot(slot, { keepPitch: !s.keepPitch })}
@@ -426,18 +446,24 @@ export function AudioLayerInspector({ slot }: { slot: AudioSlotName }): JSX.Elem
 function PanRow({ slot, pan }: { slot: AudioSlotName; pan: number }): JSX.Element {
   const patchSlot = useStore((st) => st.patchAudioLayerSlot)
   const txt = Math.abs(pan) < 0.005 ? 'C' : pan < 0 ? `L${Math.round(-pan * 100)}` : `R${Math.round(pan * 100)}`
+  const target: AuModTarget = { kind: 'au', slot, field: 'pan' }
+  const [open, setOpen] = useState(false)
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">pan</span>
-      <input
-        type="range" min={-1} max={1} step={0.01} value={pan}
-        onChange={(e) => patchSlot(slot, { pan: Number(e.target.value) })}
-        onDoubleClick={() => patchSlot(slot, { pan: 0 })}
-        className="min-w-0 flex-1 accent-accent"
-        title={`Pan ${txt} : left to right (double-click : centre)`}
-      />
-      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{txt}</span>
-    </div>
+    <>
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">pan</span>
+        <AuSlider
+          target={target} min={-1} max={1} value={pan}
+          set={(v) => patchSlot(slot, { pan: v })}
+          onDoubleClick={() => patchSlot(slot, { pan: 0 })}
+          className="min-w-0 flex-1"
+          title={`Pan ${txt} : left to right (double-click : center)`}
+        />
+        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{txt}</span>
+        <AuModChip target={target} open={open} onToggle={() => setOpen(!open)} what={`slot ${slot}'s pan`} />
+      </div>
+      {open && <AuAssign target={target} />}
+    </>
   )
 }
 
@@ -456,6 +482,8 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
   const chVal = `${chL}:${chR}`
   if (!chOpts.some((o) => o.v === chVal)) chOpts.unshift({ v: chVal, label: chR < 0 ? `${chL + 1} mono` : `${chL + 1}+${chR + 1}` })
   const known = !s.deviceId || inputs.some((d) => d.id === s.deviceId)
+  const volTarget: AuModTarget = { kind: 'au', slot, field: 'volume' }
+  const [volOpen, setVolOpen] = useState(false)
   return (
     <div className="flex flex-col gap-2 border-t border-border px-2 py-2">
       <div className="flex items-center gap-2">
@@ -524,16 +552,94 @@ function LiveControls({ slot, s }: { slot: AudioSlotName; s: AudioLayerSlot }): 
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">level</span>
         <Meter which={slot} className="min-w-[40px] flex-1" number />
         <span className="shrink-0 font-mono text-[9px] uppercase text-muted">vol</span>
-        <input
-          type="range" min={0} max={2} step={0.01} value={s.volume}
-          onChange={(e) => patchSlot(slot, { volume: Number(e.target.value) })}
+        <AuSlider
+          target={volTarget} min={0} max={2} value={s.volume}
+          set={(v) => patchSlot(slot, { volume: v })}
           onDoubleClick={() => patchSlot(slot, { volume: 1 })}
-          className="w-16 shrink-0 accent-accent"
+          className="w-16 shrink-0"
           title={`Volume ${Math.round(s.volume * 100)} % (double-click : 100 %, as it comes in)`}
         />
         <span className="w-8 shrink-0 text-right font-mono text-[9px] tabular-nums text-muted">{Math.round(s.volume * 100)}</span>
+        <AuModChip target={volTarget} open={volOpen} onToggle={() => setVolOpen(!volOpen)} what={`slot ${slot}'s volume`} />
       </div>
+      {volOpen && <AuAssign target={volTarget} />}
       <PanRow slot={slot} pan={s.pan} />
+    </div>
+  )
+}
+
+// ── Modulation : the layer's volume and A/B mix, a slot's volume and pan (its
+// transport's in the transport's own mod row) are mod targets (ModTarget kind
+// 'au'), applied each frame on the audio engine, the stored value the base.
+const AU_VOLUME: AuModTarget = { kind: 'au', field: 'volume' }
+const AU_MIX: AuModTarget = { kind: 'au', field: 'mix' }
+
+/** A slider a modulator can move : bound, it tints accent2, shows the live
+ *  value (the shared liveOverlay loop) and a drag moves the base by as much as
+ *  the thumb moves (useModSlide), as every modulated slider does. */
+function AuSlider({ target, value, min, max, set, onDoubleClick, className, title }: {
+  target: ModTarget; value: number; min: number; max: number; set: (v: number) => void
+  onDoubleClick: () => void; className: string; title: string
+}): JSX.Element {
+  const ref = useRef<HTMLInputElement | null>(null)
+  const key = modTargetKey(target)
+  const bound = useBound(key).length > 0
+  const slide = useModSlide(bound, value, min, max, set)
+  useEffect(() => (bound && ref.current ? registerLiveOverlay({ el: ref.current, key, format: (x) => String(x) }) : undefined), [bound, key])
+  return (
+    <input
+      ref={ref}
+      type="range" min={min} max={max} step={0.01} value={value}
+      {...slide}
+      onDoubleClick={onDoubleClick}
+      className={`${className} ${bound ? 'accent-accent2' : 'accent-accent'}`}
+      title={bound ? `${title.replace(/\.$/, '')}. Modulated : a drag moves the base by as much as you move it.` : title}
+    />
+  )
+}
+
+/** The M chip beside a control : the modulators bound to it (M1·3), accent
+ *  while bound, accent2 while its binding row is open. Right-click clears every
+ *  modulation on it (the modulators and the Meta knobs). */
+function AuModChip({ target, open, onToggle, what }: { target: ModTarget; open: boolean; onToggle: () => void; what: string }): JSX.Element {
+  const key = modTargetKey(target)
+  const bound = useBound(key)
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const st = useStore.getState()
+        for (const b of bound) st.removeAssignment(b.id)
+        st.composition.metaKnobs.forEach((k, i) => {
+          if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, target)
+        })
+      }}
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+        bound.length
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : open
+            ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+            : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={`Modulate ${what} : a modulator or a Meta knob moves it. Right-click clears its modulation.`}
+    >
+      M{bound.length ? bound.map((b) => b.mod + 1).join('·') : ''}
+    </button>
+  )
+}
+
+/** The binding row an M chip opens, under its control's row. */
+function AuAssign({ target }: { target: ModTarget }): JSX.Element {
+  const bound = useBound(modTargetKey(target))
+  return (
+    <div className="pb-0.5">
+      <AssignRow target={target} bound={bound} />
     </div>
   )
 }

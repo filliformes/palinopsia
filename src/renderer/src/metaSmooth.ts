@@ -25,6 +25,9 @@ import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { parseSpaceModParam, placePatch } from '@shared/spatial'
 import { posToEvery } from './audio/soniKeyModel'
 import { isPinnedTarget } from './persist'
+import { auSpan, auTargetAlive, auValueOf } from '@shared/auMod'
+import { AUDIO_LAYER } from './audio/audioLayer'
+import { videoKey, videoSeekRequests } from './engine/videoState'
 
 const knobDisplay: number[] = []
 const tweens: Array<{ from: number; to: number; startedAt: number; ms: number; dice: boolean } | null> = []
@@ -89,6 +92,25 @@ function applyDest(target: ModTarget, shaped: number): void {
     else if (target.field === 'mix') st.setSourceMix(target.layer, x)
     else if (target.field === 'harmony') st.setHarmony(target.layer, x * 2 - 1)
     else st.setBlend(target.layer, BLEND_MODES[Math.min(BLEND_MODES.length - 1, Math.floor(x * BLEND_MODES.length))])
+    return
+  }
+  // An Audio Layer control : committed into its state (a playhead : moved there,
+  // once, as a click on its timeline would).
+  if (target.kind === 'au') {
+    const r = auSpan(target.field)
+    const v = auValueOf(target.field, r.min + Math.max(0, Math.min(1, shaped)) * (r.max - r.min))
+    if (!target.slot) {
+      st.patchAudioLayer(target.field === 'mix' ? { mix: v } : { volume: v })
+      return
+    }
+    const s = st.audioLayer[target.slot]
+    if (!s || !auTargetAlive(st.audioLayer, target)) return
+    const f = target.field
+    if (f === 'volume' || f === 'pan') st.patchAudioLayerSlot(target.slot, { [f]: v })
+    else if (f === 'playhead') videoSeekRequests.set(videoKey(AUDIO_LAYER, target.slot), v)
+    else if (f === 'speed') st.patchAudioLayerSlot(target.slot, { videoSpeed: v })
+    else if (f === 'trimIn') st.patchAudioLayerSlot(target.slot, { videoIn: Math.max(0, Math.min(v, (s.videoOut ?? 1) - 0.01)) })
+    else st.patchAudioLayerSlot(target.slot, { videoOut: Math.min(1, Math.max(v, (s.videoIn ?? 0) + 0.01)) })
     return
   }
   // An output-transform slider : committed into the session's transform.

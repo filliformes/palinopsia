@@ -22,6 +22,10 @@ export interface ClipPlayback {
 const RATE_MIN = 0.0625 // the slowest an <audio> plays (and below it, silence)
 const RATE_MAX = 16
 const NATIVE = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|webm)$/i
+// A scrubbed playhead (setScrubMod) : it jumps once the modulator has moved it
+// this far (seconds) from where it last went, and at most this often (ms).
+const SCRUB_STEP = 0.05
+const SCRUB_MS = 60
 
 export class ClipPlayer {
   readonly audio: HTMLAudioElement
@@ -33,6 +37,9 @@ export class ClipPlayer {
   private speedMod: number | null = null
   private loopInMod: number | null = null
   private loopOutMod: number | null = null
+  private scrubMod: number | null = null
+  private scrubLast = -1 // where the scrub last sent it (seconds; -1 : not scrubbing)
+  private scrubAt = 0 // when it last jumped (ms)
   private pos = 0 // the playhead, seconds (the element's, or where a seek is going)
   private held = false // cued for a synced start : kept paused until released
   // Loop off, at its out point : it stays there (an ended element told to play
@@ -122,6 +129,17 @@ export class ClipPlayer {
   setSpeedMod(v: number): void {
     this.speedMod = Math.max(0, v)
   }
+  /** The Audio Layer's modulated playhead (0..1 within the trim), given each
+   *  frame it is modulated. It follows the modulator's MOVES, not its value : a
+   *  jump once the modulator has moved on from where it last sent it (a cut, a
+   *  scratch), at most every SCRUB_MS and never over a seek still under way;
+   *  between two jumps the sound plays on from where it landed. So a held
+   *  modulator lets it play (never a stutter frozen on one spot), a sweep at
+   *  its own pace plays straight through, a slower or a backward one grains,
+   *  a fast one scratches. */
+  setScrubMod(v: number): void {
+    this.scrubMod = Math.max(0, Math.min(1, v))
+  }
   /** The loop's in / out under modulation (the video's names). */
   setMod(name: string, v: number): void {
     if (name === 'loopIn') this.loopInMod = Math.max(0, Math.min(1, v))
@@ -161,6 +179,9 @@ export class ClipPlayer {
     this.loopInMod = this.loopOutMod = null
     const spMod = this.speedMod ?? 1
     this.speedMod = null
+    const scN = this.scrubMod
+    this.scrubMod = null
+    if (scN === null) this.scrubLast = -1
     // (a seek asked for while the file loads waits for it)
     if (d <= 0 || a.readyState < 1) return
     const posN = this.posMod
@@ -183,7 +204,7 @@ export class ClipPlayer {
       const t = lo + posN * Math.max(0, hi - lo - 0.02)
       if (Math.abs(a.currentTime - t) > 0.08 || !this.pb.playing) seek(t)
       else this.pos = t
-    }
+    } else if (scN !== null) this.scrub(lo + scN * Math.max(0, hi - lo - 0.02), seek)
     const rate = Math.max(0, mul * this.pb.speed * spMod)
     if (!this.pb.playing || rate < RATE_MIN) {
       if (!a.paused) a.pause()
@@ -208,6 +229,22 @@ export class ClipPlayer {
       else { a.pause(); this.pos = hi; this.atEnd = true }
     } else if (ct < lo - 0.05) seek(lo)
     else if (posN === null) this.pos = ct
+  }
+
+  /** A scrubbed playhead's frame (setScrubMod) : `t` where the modulator puts
+   *  it now, in seconds. */
+  private scrub(t: number, seek: (t: number) => void): void {
+    const a = this.audio
+    // not moved on since its last jump : it plays on from there
+    if (this.scrubLast >= 0 && Math.abs(t - this.scrubLast) <= SCRUB_STEP) return
+    const now = performance.now()
+    if (now - this.scrubAt < SCRUB_MS || a.seeking) return // (it goes there on a later frame)
+    this.scrubLast = t
+    // playing there already (a sweep at its own pace) : no jump
+    if (this.pb.playing && Math.abs(a.currentTime - t) <= SCRUB_STEP) return
+    this.scrubAt = now
+    this.atEnd = false
+    seek(t)
   }
 
   /** Cued for a synced start : paused at its in point until `start()`. */
