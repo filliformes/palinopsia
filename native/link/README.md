@@ -6,9 +6,20 @@ whole app, in the Electron **main** process (`src/main/link.ts`); the page reads
 its state 30 times a second and carries the beat on between reads
 (`src/renderer/src/link.ts`).
 
-`link_addon.cpp` exposes `enable(on)`, `state(quantum)` →
-`{ enabled, peers, tempo, beat, phase }`, `setTempo(bpm)` and `close()`. It is
-polled, never calling back into JavaScript.
+`link_addon.cpp` exposes `enable(on)`, `startStopSync(on)`, `state(quantum)` →
+`{ enabled, peers, tempo, beat, phase, startStop, playing, playBeat }`,
+`setTempo(bpm)`, `setPlaying(on, quantum)` and `close()`. It is polled, never
+calling back into JavaScript.
+
+Start / stop sync is off by default, as in Live. `startStopSync(on)` turns it on
+or off (it returns whether it is on); while it is off, play and stop stay each
+app's own. `setPlaying(on, quantum)` proposes play or stop to every peer : a play
+maps beat 0 as Link asks, with other apps to the first bar from now (so everyone
+starts there in phase), alone to now. It returns the session's play state, and
+`false` while the sync is off. In `state`, `startStop` says whether the sync is
+on, `playing` whether the session plays, and `playBeat` the beat its play or stop
+was set at, on the same count as `beat` (a play starts on the first bar from
+there).
 
 `sdk/` vendors the header-only sources :
 

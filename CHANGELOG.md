@@ -7,6 +7,122 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **NDI® audio in : an Audio Layer slot plays an NDI source's sound** (`preload/ndi.ts`,
+  `audio/ndiAudio.worklet.js`, `audio/ndiAudioIn.ts`). A third slot kind beside a sound
+  file and a live input (`AudioLayerSlot` kind `'ndi'` : `ndiName`, `chL` / `chR`) : a
+  DAW's NDI audio plug-in on another computer, NDI Tools, OBS, any NDI source with sound,
+  picked from the video input's own source list (`NdiPicker`, **NDI® source…** in the
+  slot menu; `store.setAudioLayerNdi`). It joins the slot's volume / pan / meter chain,
+  so the layer's mix, Sonify's output, the recordings, Space and the audio tab's "Audio
+  Layer" input have it. The preload opens one audio-only receiver per slot on the video
+  input's NDI library and discovery, through NDI's frame sync (it resamples to the audio
+  context's rate and to the pull pace), pulled every ~5 ms (a timer plus each processor
+  report), sized by the time since the last pull and trimmed toward the processor's
+  buffer target by at most 300 ppm; planar float, every channel (up to 16), transferred
+  over a private `MessageChannel` straight to the slot's AudioWorklet (the page only
+  hands the port on; a token per open, so an old processor never closes a new one). The
+  worklet is the jitter buffer : a 50 ms target; an underrun fades out, refills, fades
+  in and raises the target by 20 ms (up to 120 ms), 20 s steady steps it back down; an
+  excess over the target + 25 ms is skipped under a crossfade, so the latency never
+  grows. It plays a stereo pair or one channel (a change crossfaded) and reports to the
+  Inspector (`2 ch · buffer 45 / 50 ms`, `ran dry N×`). Armed like a live input : a
+  session load or an undo never opens it (its **open** button; `armAudioLayer` at an
+  installation's boot does); **lost** while the source is off the network, playing again
+  when NDI finds it. A receiver lingers 2 s after a close (a rebuilt audio context takes
+  it back without reconnecting); the network-change reload and the page unload close and
+  reopen it like the video receivers; the new NDI functions are bound optionally (an
+  older runtime still loads). Sessions save the source's name. Measured outside the app
+  with a test sender : 48 kHz stereo ~45-49 ms from the sender's clock to the card's
+  output, no dropout over a minute, a card 300 ppm off held 43-56 ms after 90 s, 44.1 and
+  96 kHz resampled at the right pitch; in the app, connected in ~4 s, buffer 47-59 /
+  50 ms, no dropout over 12 s.
+
+- **Ableton Link start / stop sync** (`native/link`, `main/link.ts`, `renderer/src/link.ts`,
+  `playEvents.ts`). The addon gains `startStopSync(on)`, `setPlaying(on, quantum)` and
+  `state(q).startStop / playing / playBeat`; main configures it with the rest of Link
+  (`LinkConfig.startStop`) and answers a play at once (`link:play`, preload
+  `linkSetPlaying`), not at the next read. A play maps beat 0 as Link asks : with other
+  apps to the first bar from now, so everyone starts there in phase; alone, to now. UI
+  (Connect tab, Link section) : **start / stop sync** ENABLED / DISABLED (off by default,
+  as in Live; remembered on the computer with the Link settings, never in a session) and,
+  while it works, a **▶ PLAYING / ■ STOPPED** button that plays or stops every linked
+  app; the LINK badge fills while the session plays; the MIDI clock pill's dot is hollow
+  while its device waits for a play. Page side, one transport, Link's (`tickPlay`) : a
+  play starts, on its bar, the MIDI clock's Start (`midi.ts` reads `linkPlay()` : the
+  clock runs on while stopped, a play heard up to a quarter beat after its bar sends the
+  missed pulses with the Start, a later one waits for the next bar) and the sequencers
+  the last stop stopped (the Sonify step and key sequences, the scene sequencer). The
+  first play starts only the scene sequencer, and only when the session uses it
+  (`firstPlay`) : the Sonify sequencers follow Link's play once a Link stop has stopped
+  them. A stop sends MIDI Stop at once and stops them. Starting one here (the store
+  setters emit `playEdited`) or turning the MIDI clock on plays every linked app;
+  stopping the last one still going stops them, and the next play brings it back. What
+  Link's own play or stop changes is applied silently (`runSilently` : no undo step) and
+  never proposed back. Fixed along the way : a linked app re-counting its bars on play
+  stalled the Sonify sequencers; `soniClock.ts` now absorbs a whole-bar jump in Link's
+  count (any other jump re-counts like a new bar size) and its sequencers start on the
+  play's bar (`soniNextBar`); the MIDI clock renumbers its pulses on a jump. Measured
+  against a Node peer : the app followed the peer's play and stop within ~30 ms, the peer
+  saw the app's within 8 ms.
+
+- **Coupling level-matching** (`engine/couplingMatch.ts`) : raw flux on ordinary music
+  reads a few hundredths, so a lean on flux moved the mix by a percent or two, and a loud
+  master parked a level gate on B. Each coupled layer now hears its feature against its
+  own recent range before the mode, amount and tightness apply : a top follower (rising
+  over 0.3 s, falling over 3 s) and a floor follower (falling over 0.15 s, rising over
+  4 s), mapped `(v - floor) / max(peak - floor, minSpan)` with a minimum span per feature
+  (`MIN_SPAN`; the level's grows to a third of its top, about 3 dB); a feature that holds
+  still leans back to its raw value (only movement is spread). A silence gate on the
+  input's level, shared by the four layers (shut under 0.01, open over 0.03), keeps
+  silence and room noise still; nothing learns while it is shut, learning eases back in
+  over 0.25 s after a pause (the first frame out of silence lights the whole spectrum),
+  and it stays open for an OSC input that carries no level. The transient is matched
+  through the flux : it fires as the flux rises past the top of its recent range
+  (`TRANSIENT_ON`, re-armed under `TRANSIENT_REARM`; an input with no flux keeps the raw
+  transient), so it fires on the hits of whatever plays, not only on hits loud enough to
+  cross a fixed line (a World's cut on transient flashes more on busy tracks). A reset
+  (another feature, band or input) glides from the raw mapping to the matched one over 1
+  to 2 s (`MAP_EASE` : the gain rises slowly, falls at once); the matchers carry through
+  scene recalls, New and session loads. Simulated : a lean on flux (Synthetic) moved the
+  mix 1 to 2 % raw, now its full allowed swing on quiet and loud pop alike; a level gate
+  stuck at 100 % on loud material now sits at 57 %. Mixer : an `auto` chip on each
+  column's CPL header (no line added) turns it off for the raw feature, crossfading over
+  0.25 s (`AUTO_EASE`); the CPL meter shows what the coupling hears
+  (`liveCouplingFeature`). `LayerCoupling.auto` : absent is on, so older sessions and
+  Worlds get matching. Mixer presets write it out (a mix saved before keeps the layer's).
+  OSC `/opsia/layer{n}/coupling/auto` (≥ 0.5 on), advertised in OSCQuery and mirrored in
+  feedback.
+
+- **The Audio Layer's controls are modulation targets** (`shared/auMod.ts`,
+  `engine/audioLayerMod.ts`; a new `ModTarget` kind `'au'`) : the layer's volume (a gain
+  0..2) and A/B mix (0..1), each slot's volume (0..2) and pan (-1..1), and for a sound
+  file its playhead (0..1 inside the trim), speed (1/16x to 16x over its octaves, 1x in
+  the middle : `auSpeedToT` / `auSpeedFromT`) and trim in / out (0..1 of the file, the in
+  kept before the out by 1 % : `auTrim`). A live input or an NDI slot has volume and pan
+  only. Applied per frame as overrides on the audio engine, never through the store : the
+  modulation pass writes `audioLayerMod.ts` (`setAuMod`), `audioLayer.ts` takes it in its
+  tick (`takeAuMods`) and glides the gains and pans there over 15 ms (`setTargetAtTime`,
+  `RAMP` : no zipper, no click), back to the stored value the first frame nothing
+  modulates them; a store change keeps what a modulator holds (`holdMods`); mute still
+  wins; the New / Generate fade keeps the layer's volume to itself. Speed is a factor over
+  the stored speed (tape or kept pitch as set); the trim rides the clip player's loop
+  seams. The playhead is a scrub (`ClipPlayer.setScrubMod`) : it follows the modulator's
+  moves, not its value, jumping once the target is 50 ms (`SCRUB_STEP`) from where it last
+  went, at most every 60 ms (`SCRUB_MS`) and never over a seek under way, then playing on
+  from there : S&H cuts, a slow sweep grains, a fast one scratches, a held value plays.
+  UI : M chips beside the AU strip's volume and mix (their binding row opens under the
+  row), beside a slot's pan and a live input's or NDI source's volume in the Inspector,
+  and the file transport's own mod row (playhead, speed, in, out, vol); modulated sliders
+  tint, show the live value and move the base by the drag; the speed's number and the
+  timeline's in / out handles follow the live values. Labels `AU volume`, `AU mix`,
+  `AU A volume`, `AU A pan`, `AU A playhead`, `AU A speed`, `AU A in`, `AU A out`
+  (`auLabel`). Meta knobs drive them too (`metaSmooth.ts` commits into the Audio Layer's
+  state; a playhead knob seeks there once, as a click on the timeline). Clearing a slot
+  drops its bindings, a file turned live input or NDI source drops its transport's
+  (`dropAuSlotTargets`; volume and pan stay); dead rows give way when the matrix is full
+  (`auTargetAlive`); Randomize never picks them; no pins (the Audio Layer is outside the
+  composition). No new OSC.
+
 - **An Output EQ preset carries the Glue** (Vincent, from the shelf) : saving stores the
   glue (on / off, amount, voice) with the bands and gains (`eqPresets.ts`, `withGlue`);
   a recall brings it back and keeps the bypass switch; presets saved before keep the glue

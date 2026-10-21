@@ -56,7 +56,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
 **The instrument**
-- [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files and live inputs into Sonify's mix
+- [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files, live inputs and NDI® sources into Sonify's mix
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
@@ -80,7 +80,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
 - [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
 - [dataflou mesh](#dataflou-mesh) : Palinopsia as a node on the mesh, its sources and destinations
-- [Ableton Link](#ableton-link) : the tempo and the bar shared with every Link app on the network
+- [Ableton Link](#ableton-link) : the tempo, the bar and play / stop shared with every Link app on the network
 - [Agent (MCP)](#agent-mcp) : an AI agent on this computer reads and plays Palinopsia, looks at the output, writes shaders
 - [Stack & architecture](#stack) · [Aesthetic guardrails](#aesthetic-guardrails) · [Credits & license](#credits--license)
 
@@ -314,8 +314,9 @@ override with the base value preserved, and they travel with sessions.)
 Under Layer 4 sits the **Audio Layer** (`AU`) : the composition's sound, beside the
 picture's stack (its volume and mute are also in the audio tab's Output levels, under
 Sonify's). It has two slots, **A** and **B**, like a layer, each holding a
-**sound file** (Import audio…) or a **live audio input** (the default input or any
-device in the list : an interface, a microphone, a loopback device). Its header has the
+**sound file** (Import audio…), a **live audio input** (the default input or any
+device in the list : an interface, a microphone, a loopback device) or the sound of an
+**NDI® source** on the network. Its header has the
 layer's **volume** (0 to 200 %, 100 % in the middle), its **meter** and its **mute**;
 each slot's row has its own meter and mute; **MIX** goes from A to B (the middle plays
 both whole, toward an end the other one fades out, so a live input and a file blended
@@ -341,6 +342,16 @@ Select a slot (its **A** / **B** button) for its controls in the Inspector :
   never the laptop's microphone); picking it again reopens it. An input that fails to
   open while its device is there tries again by itself (after 5, 10, 20, 40 s, then every
   minute). Another channel pair switches in place, without reopening the device.
+- an **NDI® source** (**NDI® source…** in the slot menu, the same list as the
+  [NDI input](#ndi)'s : a DAW's NDI audio plug-in on another computer, NDI Tools, OBS…)
+  has its source (click it for another), its **channels** (a stereo pair, or one
+  channel of up to 16), its level and volume, and a **pan**. It takes a few seconds to
+  connect; the Inspector then reads what arrives, `2 ch · buffer 45 / 50 ms` : a steady
+  buffer of about 50 ms that grows a little after a dropout (`ran dry n×`, up to 120 ms)
+  and settles back after 20 s without one. Like a live input it never opens by itself
+  (its **open** button; picking a source opens it, an installation opens it at boot).
+  Off the network the slot says **lost**, and it plays again as soon as the source is
+  back. A session remembers the source by its name.
 - a **film** dropped on a slot plays its soundtrack; a file that cannot play says
   **failed** (click it to try again).
 
@@ -350,12 +361,25 @@ limiter, the recordings and [Space](#space--the-voices-in-the-room) all have it 
 sits with the effects return for now). Sonify off, its engine still runs for the layer,
 its voices silent. A modulator can listen **FROM** a file slot (`AU A`, `AU B`) like
 from a layer's clip, or from **`AU all`** : the layer's whole sound (both slots mixed, a
-live input too, after their volumes), analysed as it plays with the audio input's own
+live input or an NDI source too, after their volumes), analysed as it plays with the audio input's own
 maths. The layer is saved with the session (an older session opens with it
 empty) and answers to `/opsia/audiolayer/…` (see [OSC](#osc-implementation)). **New** and
 **Generate** fade it out over the MORPH time, as the picture glides (an undo during the
 fade brings it back). The Import
 audio source in a layer still plays its own file, as before.
+
+**Its controls are [modulation](#modulation-brain-8-modulators--matrix) targets** : the
+layer's **volume** and **MIX**, each slot's volume and **pan**, and a sound file's
+**playhead**, **speed** and **in / out**, from their **M** chips (the strip's volume and
+mix; in the Inspector a slot's pan, a live input's or NDI source's volume, and a file's
+transport row : playhead, speed, in, out, vol). A modulated slider turns the modulated
+color and shows the live value; a drag moves its base. Volumes glide (no clicks) and mute
+still wins. A speed moves by octaves (1/16× to 16×, 1× in the middle) and the in stays
+before the out. **The playhead scrubs** : it jumps where the modulator moves it, then
+plays on from there, so an S&H cuts, a slow sweep grains, a fast one scratches and a held
+value just plays. A live input or an NDI source has volume and pan only. Meta knobs reach
+them too (a playhead knob seeks once, like a click on the timeline). Clearing a slot
+clears its modulation, and Randomize leaves these targets alone.
 
 The **Background** has one source (from a curated set of grounds), its own full FX
 rack, opacity, its own clock (**SPEED**, 0 to 4×, 0.25× by default : its source, its
@@ -401,7 +425,15 @@ top to bottom in the order the picture flows :
   **band**), a live meter of what it hears, **amt** and **tight** knobs. **cut** flashes to B as the sound rises
   past its threshold and fires again only once it has fallen back (a held note flashes
   once instead of parking the layer on B); **gate**'s tightness hardens its edge. A
-  recalled scene keeps a drifting layer's momentum.
+  recalled scene keeps a drifting layer's momentum. **auto**, in the CPL header (lit,
+  the default), matches the sound's level : the coupling hears its feature against its
+  own last few seconds, so a quiet track moves the mix as far as a loud one, a loud one
+  swings instead of sitting at the top, and silence or room noise leaves it still. The
+  meter shows what the coupling hears, matched. **transient** then fires on the hits of
+  whatever plays, not only the loud ones (a cut on transient flashes more on a busy
+  track). Another feature, band or input settles in over a second or two; a recalled
+  scene, New or an opened session keep what it learned. Click **auto** off for the raw
+  feature (a quarter-second crossfade).
 - **LAYER**, how it lands on the stack : opacity and speed faders, the blend. Beside
   its title, **active** or **inactive** : whether the layer shows in the stack at all.
   Inactive when it has no source, is muted, sits at opacity 0, or another layer is
@@ -762,8 +794,11 @@ blend-mode, from the M chips on the layer strip, the A/B **hue** harmony from th
 per-**FX dry/wet opacity**, the **Background**'s opacity, speed and contact shadow, every
 **Fulldome** mapping slider (rotate, spin, feather, the panorama's and the screen's own; see
 [Fulldome](#fulldome)), every [output transform](#output-transform) slider, the
-[World amount](#worlds--diegesis-key-w), the **Sonify** parameters and the **Meta knobs**
-themselves. It is written straight to the compositor at frame rate, never through React re-renders.
+[World amount](#worlds--diegesis-key-w), the [Audio Layer](#the-audio-layer)'s controls
+(its volume and mix, each slot's volume and pan, a sound file's playhead, speed and
+in / out), the **Sonify** parameters and the **Meta knobs**
+themselves. It is written straight to the compositor (the Audio Layer's to its audio
+engine) at frame rate, never through React re-renders.
 
 The matrix holds **32** bindings (bounded, so a patch stays readable; the Meta
 knobs are outside it); how many are in use shows under the Modulation strip's name. Randomize, Generate and a World's audio route use at most 12
@@ -1034,7 +1069,12 @@ ledger with per-row clear.
 Opsia's tempo out over it: a 24-PPQN **clock** + **Start/Stop transport** (both
 toggleable), so an external instrument locks to Opsia's BPM. With
 [Ableton Link](#ableton-link) on, the clock follows Link's beat and Start (or a resync)
-waits for the next Link bar, so the device's bars line up with every linked app's. A **thru / merge**
+waits for the next Link bar, so the device's bars line up with every linked app's. With
+Link's **start / stop sync** on, Start and Stop follow Link's play : the clock keeps
+running while the session is stopped (the device keeps the tempo), Start goes out on the
+play's bar (a play heard a moment late sends the pulses it missed with it, so the bars
+still land) and Stop goes out at once with Link's stop. The clock pill's dot is hollow
+while the device waits for a play, and turning the clock on plays every linked app. A **thru / merge**
 pass forwards the learned input to that output (with a loop guard), so one USB
 cable both plays Opsia and drives the gear downstream. Built to sync an **Ableton
 Move** over USB-C: Opsia is the visual sibling, the Move keeps the beat.
@@ -1404,7 +1444,8 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
 
 ### NDI
 
-The network video link, **built in** both ways : no plugin, no OBS, no Spout-to-NDI bridge.
+The network video link, **built in** both ways, with sound in too : no plugin, no OBS, no
+Spout-to-NDI bridge.
 
 **NDI input** : a layer's source menu → **NDI Input…** lists every NDI source on the
 network (and on this computer) : a camera, a phone running an NDI camera app, OBS, NDI
@@ -1423,6 +1464,14 @@ sender it is (when both clocks agree : the same computer, or synced clocks). Mea
 the Aero (on its integrated graphics, so a floor) : a 1080p source arrives ~45 ms behind
 at the source's full rate; a 4096×4096 one ~110 ms behind with the app still at 53 fps. Sources that large are heavy for NDI's
 own codec (about 15 fps on a laptop CPU) : send 1080p or 2K when motion matters.
+
+**NDI audio in** : an [Audio Layer](#the-audio-layer) slot plays an NDI source's
+sound (**NDI® source…** in its slot menu, from the same list) : a DAW's NDI audio
+plug-in on another computer, NDI Tools, OBS. It plays in the layer's mix with its own
+volume, pan and meter, a stereo pair or one channel of up to 16, and reaches Sonify's
+output, the recordings, Space and the audio tab's **Audio Layer** input. It takes a few
+seconds to connect, then holds a steady buffer of about 50 ms (its readout is in the
+Inspector).
 
 **NDI output** is
 how a fulldome venue takes the picture (at the SAT, the artist's machine sends and the
@@ -2629,6 +2678,7 @@ another protocol and is not shown.
 | `…/coupling/amount` · `…/tightness` | f | Coupling depth / tightness |
 | `…/coupling/feature` | i / f / s | `level·flux·transient·centroid·band·pitch·noisiness` : an index `0`–`6` or a name reaches all seven, a `0..1` float spreads over the first six (as it always did); advertised and mirrored as an int |
 | `…/coupling/band` | i / f | The band feature's band : `0`–`5` (int), or `0..1` across the six; advertised and mirrored as an int |
+| `…/coupling/auto` | bool | Level-matching (the Mixer's **auto**) : ≥ 0.5 on (the default), below : the raw feature |
 | `…/harmony` | f | A/B hue : `0` B matched to A · `0.5` untouched · `1` B on A's complement |
 
 **Video transport** : `/opsia/layer{n}/video[/{A|B}]/…`. Without an explicit
@@ -2839,6 +2889,10 @@ Link app on the same network (Live, DJ software, phone apps), with no setup. The
 - **latency** : the picture reaches the screen this late (a projector, a capture
   card) : Palinopsia runs this far ahead so its beats land with the sound (-200 to
   +400 ms, double-click : 0).
+- **start / stop sync** : play and stop shared with the Link apps that share theirs
+  (**ENABLED / DISABLED**, off by default as in Live, remembered on this machine). In
+  Live, turn on Preferences → Link/Tempo/MIDI → **Start Stop Sync**. Enabling it while
+  Live already plays can take a few seconds before Palinopsia sees the play.
 
 While Link is enabled :
 
@@ -2860,10 +2914,26 @@ While Link is enabled :
   lands on the same downbeat.
 - Organic stays free (its wobble is the point), and so do modulators on Hz.
 
+With **start / stop sync** on, Palinopsia shares Link's play too :
+
+- **▶ PLAYING / ■ STOPPED**, beside the session's tempo, plays or stops the whole Link
+  session (every linked app). The **LINK** badge beside the BPM fills while it plays.
+- **A play starts the clocked things on its bar** : the [MIDI clock out](#midi) sends
+  Start (an Ableton Move it drives starts with Live), the scene sequencer runs if the
+  session uses it, and the Sonify step and key sequencers start again if a Link stop had
+  stopped them (on the very first play they wait for you : start them once). A stop
+  sends MIDI Stop at once and stops the sequencers.
+- **Starting one here plays everyone** : starting a sequencer, or the MIDI clock, while
+  the session is stopped plays every linked app; stopping the last thing still running
+  stops them all, and the next play brings it back.
+- What Link's play or stop changes is never an undo step, and never sent back to Link.
+
 Link runs in the main process (`native/link`, the Ableton Link SDK, GPL-2.0-or-later,
 compiled in; `src/main/link.ts`); the page reads it 30 times a second and carries the
 beat on between reads (`src/renderer/src/link.ts`). Tested against a second Link peer :
-the bars agreed within about a millisecond, and tempo changes went both ways.
+the bars agreed within about a millisecond, and tempo changes went both ways; so did play
+and stop (Palinopsia followed the peer's within ~30 ms, the peer saw Palinopsia's within
+8 ms).
 
 ---
 
