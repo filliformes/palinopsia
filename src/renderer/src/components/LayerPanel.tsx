@@ -68,6 +68,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const hasCopiedLayer = useStore((s) => s.copiedLayer !== null)
 
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  // Which OUT drawer is open (blend, mask, feedback) : one at a time.
+  const [outTab, setOutTab] = useState<OutTab>('blend')
   const [savePrompt, setSavePrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [flashing, flash] = useFlash()
@@ -223,12 +225,6 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
           <ToggleChip label="⊘" active={layer.mute} onClick={() => toggleMute(index)} title="Mute" />
-          <ToggleChip
-            label="FB"
-            active={layer.feedback}
-            onClick={() => toggleFeedback(index)}
-            title="Feedback : this layer samples its own previous frame (trails)"
-          />
           <span className="relative inline-flex">
             <MidiLearnOverlay id={`rand:layer:${index}`} />
             <button
@@ -273,150 +269,222 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
       {!collapsed && (
         <>
-          {/* SOURCE A: label · picker · +fx : its FX chips underneath */}
-          <SourceRow
-            label="A"
-            shaderId={layer.sourceA.shaderId}
-            sourceKind={layer.sourceA.kind}
-            mediaId={layer.sourceA.mediaId}
-            mediaName={layer.sourceA.mediaName}
-            selected={isSelected('A')}
-            scope={{ kind: 'sourceA', layer: index }}
-            fx={layer.sourceAFx}
-            onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
-            onPick={(id) => setSourceShader(index, 'A', id)}
-            onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
-            onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
-            onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
-          />
+          {/* The layer reads top to bottom in the order the picture goes
+              through it : (1) the two sources, side by side, (2) where they
+              meet, (3) the effects on the mixed picture, (4) how it lands on
+              the layers below. Speed and Vary, which act on all of it, sit
+              under a line at the end. */}
+          <Stage n={1} title="SOURCES" hint="what it shows">
+            <div className="flex min-w-0 items-stretch gap-1.5">
+              <SourceRow
+                card
+                label="A"
+                shaderId={layer.sourceA.shaderId}
+                sourceKind={layer.sourceA.kind}
+                mediaId={layer.sourceA.mediaId}
+                mediaName={layer.sourceA.mediaName}
+                selected={isSelected('A')}
+                scope={{ kind: 'sourceA', layer: index }}
+                fx={layer.sourceAFx}
+                onSelect={() => setSelection({ type: 'source', layer: index, slot: 'A' })}
+                onPick={(id) => setSourceShader(index, 'A', id)}
+                onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
+                onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
+                onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
+              />
+              <SourceRow
+                card
+                label="B"
+                shaderId={layer.sourceB?.shaderId ?? null}
+                sourceKind={layer.sourceB?.kind ?? 'none'}
+                mediaId={layer.sourceB?.mediaId}
+                mediaName={layer.sourceB?.mediaName}
+                selected={isSelected('B')}
+                scope={{ kind: 'sourceB', layer: index }}
+                fx={layer.sourceBFx}
+                onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
+                onPick={(id) => setSourceShader(index, 'B', id)}
+                onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
+                onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
+                onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
+              />
+            </div>
+          </Stage>
+
+          {/* A and B run down into the mix (B's line asleep without a B) */}
+          <svg className="-my-1 block h-3 w-full shrink-0" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M25 0 C25 7 50 5 50 12" fill="none" stroke="rgb(var(--c-muted))" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <path d="M75 0 C75 7 50 5 50 12" fill="none" stroke={hasB ? 'rgb(var(--c-accent))' : 'rgb(var(--c-panel3))'} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          </svg>
 
           {/* MIX : how B meets A, and how much : what the slider means follows
-              the mode (its word beside it). ALWAYS visible (fixed layout),
-              dimmed while B is empty. The A/B harmony and the audio coupling
-              live in the Mixer (M) : the ≈ chip says this layer is coupled. */}
-          <div className={hasB ? 'min-w-0' : 'min-w-0 opacity-40'}>
-          <Row label="MIX">
-            {/* as wide as its longest mode (no fixed width : a select sizes to
-                its widest option), so "lightercolor" is never cut */}
-            <select
-              className="input select-compact shrink-0 text-[10px]"
-              value={layer.sourceBlend}
-              onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
-              title="How B meets A : the slider beside it is what this mode makes of it"
-            >
-              {BLEND_MODES.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <span className="relative flex min-w-0 flex-1">
-              <MidiLearnOverlay id={`layer:${index}:mix`} />
-              <input
-                ref={mixRef}
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={layer.sourceMix}
-                onChange={(e) => setSourceMix(index, Number(e.target.value))}
-                onDoubleClick={() => setSourceMix(index, 0.5)}
-                className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
-                title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one below and this mixes it with A'}
-              />
-            </span>
-            <span
-              className={`w-[52px] shrink-0 truncate text-right font-mono text-[9px] tabular-nums ${mixBound ? 'text-accent2' : 'text-muted'}`}
-              title={mixTitle(layer.sourceBlend)}
-            >
-              {mixWord(layer.sourceBlend)} {layer.sourceMix.toFixed(2)}
-            </span>
-            {coupled && (
-              <button
-                onClick={() => setRightView('mixer')}
-                className="shrink-0 rounded bg-accent/20 px-1 font-mono text-[10px] leading-4 text-accent ring-1 ring-accent/60 hover:bg-accent/30"
-                title={`Coupled to the sound (${couplingWords(layer.coupling)}) : it pushes this mix. Set it in the Mixer (click, or M)`}
-              >
-                ≈
-              </button>
-            )}
-            {modChip('mix', 'A-B mix')}
-          </Row>
-          </div>
-          {modAssign('mix')}
-
-          {/* SOURCE B */}
-          <SourceRow
-            label="B"
-            shaderId={layer.sourceB?.shaderId ?? null}
-            sourceKind={layer.sourceB?.kind ?? 'none'}
-            mediaId={layer.sourceB?.mediaId}
-            mediaName={layer.sourceB?.mediaName}
-            selected={isSelected('B')}
-            scope={{ kind: 'sourceB', layer: index }}
-            fx={layer.sourceBFx}
-            onSelect={() => setSelection({ type: 'source', layer: index, slot: 'B' })}
-            onPick={(id) => setSourceShader(index, 'B', id)}
-            onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
-            onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
-            onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
-          />
-
-          {/* LAYER FX */}
-          <Row label="FX">
-            <FxAddSelect scope={{ kind: 'layer', layer: index }} className="min-w-0 flex-1" />
-          </Row>
-          <Indented>
-            <FxChips scope={{ kind: 'layer', layer: index }} fx={layer.fx} />
-          </Indented>
-
-          {/* BLEND against the stack below */}
-          <Row label="BLEND">
-            <select
-              ref={blendRef}
-              className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
-              value={layer.blend}
-              onChange={(e) => setBlend(index, e.target.value as BlendMode)}
-            >
-              {BLEND_MODES.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            {modChip('blend', 'blend mode')}
-          </Row>
-          {modAssign('blend')}
-
-          {/* MASK : a spatial mask on this layer's stack contribution. */}
-          <MaskControls index={index} mask={layer.mask} />
-
-          {/* TRAIL persistence : only while FB is on */}
-          {layer.feedback && (
-            <Row label="TRAIL">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={layer.feedbackAmount}
-                onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
-                className="min-w-0 flex-1 accent-accent"
-                title="Feedback persistence : decay trails (capped below infinite bloom)"
-              />
-              <div className="w-11 shrink-0">
-                <BoundedNumberInput
-                  value={layer.feedbackAmount}
+              the mode (its word beside it). Dimmed while B is empty. The A/B
+              harmony and the audio coupling live in the Mixer (M) : the ≈
+              chip says this layer is coupled. */}
+          <Stage
+            n={2}
+            title="MIX"
+            dim={!hasB}
+            hint={
+              hasB ? (
+                <span className={mixBound ? 'text-accent2' : 'text-muted'} title={mixTitle(layer.sourceBlend)}>
+                  how A and B meet · <span className="tabular-nums">{mixWord(layer.sourceBlend)} {layer.sourceMix.toFixed(2)}</span>
+                </span>
+              ) : (
+                'no B : pick one above'
+              )
+            }
+          >
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 font-mono text-[9px] text-text/80">A</span>
+              <span className="relative flex min-w-0 flex-1">
+                <MidiLearnOverlay id={`layer:${index}:mix`} />
+                <input
+                  ref={mixRef}
+                  type="range"
                   min={0}
                   max={1}
-                  onChange={(v) => setFeedbackAmount(index, v)}
-                  className="input w-full px-1 py-0.5 text-right text-[11px]"
+                  step={0.01}
+                  value={layer.sourceMix}
+                  onChange={(e) => setSourceMix(index, Number(e.target.value))}
+                  onDoubleClick={() => setSourceMix(index, 0.5)}
+                  className={`w-full min-w-0 ${mixBound ? 'accent-accent2' : 'accent-accent'}`}
+                  title={hasB ? mixTitle(layer.sourceBlend) : 'No Source B : pick one above and this mixes it with A'}
                 />
-              </div>
-            </Row>
-          )}
+              </span>
+              <span className="shrink-0 font-mono text-[9px] text-accent">B</span>
+              {/* as wide as its longest mode (no fixed width : a select sizes
+                  to its widest option), so "lightercolor" is never cut */}
+              <select
+                className="input select-compact shrink-0 text-[10px]"
+                value={layer.sourceBlend}
+                onChange={(e) => setSourceBlend(index, e.target.value as BlendMode)}
+                title="How B meets A : the slider beside it is what this mode makes of it"
+              >
+                {BLEND_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {coupled && (
+                <button
+                  onClick={() => setRightView('mixer')}
+                  className="shrink-0 rounded bg-accent/20 px-1 font-mono text-[10px] leading-4 text-accent ring-1 ring-accent/60 hover:bg-accent/30"
+                  title={`Coupled to the sound (${couplingWords(layer.coupling)}) : it pushes this mix. Set it in the Mixer (click, or M)`}
+                >
+                  ≈
+                </button>
+              )}
+              {modChip('mix', 'A-B mix')}
+            </div>
+            {modAssign('mix')}
+          </Stage>
+          <StageArrow />
 
-          {/* SPEED : the layer's global clock multiplier; always the last row */}
+          {/* LAYER FX : the effects on the mixed picture */}
+          <Stage n={3} title="LAYER FX" hint="on the mixed picture">
+            <FxChips
+              scope={{ kind: 'layer', layer: index }}
+              fx={layer.fx}
+              leading={<FxAddSelect scope={{ kind: 'layer', layer: index }} className="w-[5rem] shrink-0" />}
+            />
+          </Stage>
+          <StageArrow />
+
+          {/* OUT : how it lands on the layers below. One drawer open at a
+              time; each tab says where it stands. */}
+          <Stage n={4} title="OUT" hint="into the layers below">
+            <div className="flex min-w-0 overflow-hidden rounded border border-border">
+              {(
+                [
+                  ['blend', `blend ${layer.blend}`, blendBound],
+                  ['mask', `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.mode > 0 && layer.mask.invert ? ' inv' : ''}`, false],
+                  ['feedback', layer.feedback ? `feedback ${layer.feedbackAmount.toFixed(2)}` : 'feedback off', false]
+                ] as Array<[OutTab, string, boolean]>
+              ).map(([k, text, mod]) => (
+                <button
+                  key={k}
+                  onClick={() => setOutTab(k)}
+                  className={`min-w-0 flex-1 truncate border-r border-border px-1 py-0.5 font-mono text-[10px] last:border-r-0 transition-colors ${
+                    outTab === k
+                      ? 'bg-accent/20 text-accent'
+                      : mod
+                        ? 'text-accent2 hover:bg-panel3/60'
+                        : (k === 'mask' && layer.mask.mode > 0) || (k === 'feedback' && layer.feedback)
+                          ? 'text-text hover:bg-panel3/60'
+                          : 'text-muted hover:bg-panel3/60 hover:text-text'
+                  }`}
+                  title={k === 'blend' ? 'How this layer lands on the layers below' : k === 'mask' ? 'Where this layer shows : its own brightness, a fade, or a window' : 'Trails : the layer samples its own previous frame'}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <div className="flex min-w-0 flex-col gap-1 border-l-2 border-accent/30 pl-1.5">
+              {outTab === 'blend' && (
+                <>
+                  <Row label="BLEND">
+                    <select
+                      ref={blendRef}
+                      className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
+                      value={layer.blend}
+                      onChange={(e) => setBlend(index, e.target.value as BlendMode)}
+                    >
+                      {BLEND_MODES.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    {modChip('blend', 'blend mode')}
+                  </Row>
+                  {modAssign('blend')}
+                </>
+              )}
+              {outTab === 'mask' && <MaskControls index={index} mask={layer.mask} />}
+              {outTab === 'feedback' && (
+                <Row label="TRAIL">
+                  <ToggleChip
+                    label={layer.feedback ? 'on' : 'off'}
+                    active={layer.feedback}
+                    onClick={() => toggleFeedback(index)}
+                    title="Feedback : this layer samples its own previous frame (trails)"
+                  />
+                  {layer.feedback ? (
+                    <>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={layer.feedbackAmount}
+                        onChange={(e) => setFeedbackAmount(index, Number(e.target.value))}
+                        className="min-w-0 flex-1 accent-accent"
+                        title="Feedback persistence : decay trails (capped below infinite bloom)"
+                      />
+                      <div className="w-11 shrink-0">
+                        <BoundedNumberInput
+                          value={Math.round(layer.feedbackAmount * 100) / 100}
+                          min={0}
+                          max={1}
+                          onChange={(v) => setFeedbackAmount(index, v)}
+                          className="input w-full px-1 py-0.5 text-right text-[11px]"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="min-w-0 truncate font-mono text-[9px] text-muted">turn on for trails</span>
+                  )}
+                </Row>
+              )}
+            </div>
+          </Stage>
+
+          {/* Speed and Vary act on the whole layer : always in view, under a line */}
+          <div className="mt-0.5 border-t border-border/80" />
+
+          {/* SPEED : the layer's global clock multiplier */}
           <Row label="SPEED">
             <input
               type="range"
@@ -431,7 +499,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             />
             <div className="w-11 shrink-0">
               <BoundedNumberInput
-                value={layer.speed}
+                value={Math.round(layer.speed * 100) / 100}
                 min={0}
                 max={20}
                 onChange={(v) => setLayerSpeed(index, v)}
@@ -598,8 +666,85 @@ function MaskControls({ index, mask }: { index: number; mask: LayerMask }): JSX.
       </Row>
       {mask.mode === 1 && (<>{sl('LO', 'lumaLo')}{sl('HI', 'lumaHi')}{sl('SOFT', 'soft')}</>)}
       {mask.mode === 2 && (<>{sl('ANGLE', 'angle', 0, 6.283)}{sl('POS', 'pos')}{sl('SOFT', 'soft')}</>)}
-      {mask.mode === 3 && (<>{sl('X', 'cx')}{sl('Y', 'cy')}{sl('SIZE', 'size')}{sl('ASPECT', 'aspect', 0.2, 3)}{sl('ROUND', 'round')}{sl('SOFT', 'soft')}</>)}
+      {mask.mode === 3 && (
+        // the window's place on a pad at the right, its size and shape at the left
+        <div className="flex min-w-0 items-start gap-1.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {sl('SIZE', 'size')}{sl('ASPECT', 'aspect', 0.2, 3)}{sl('ROUND', 'round')}{sl('SOFT', 'soft')}
+          </div>
+          <XYPad
+            x={mask.cx}
+            y={mask.cy}
+            onChange={(cx, cy) => set({ cx, cy })}
+            onReset={() => set({ cx: def.cx, cy: def.cy })}
+            title={`The window's place : x ${mask.cx.toFixed(2)}, y ${mask.cy.toFixed(2)} (drag; double-click : the middle)`}
+          />
+        </div>
+      )}
     </>
+  )
+}
+
+type OutTab = 'blend' | 'mask' | 'feedback'
+
+// One stage of the layer : a numbered box (the order the picture goes through
+// the layer), its title and what it does, then its controls.
+function Stage({ n, title, hint, dim = false, children }: { n: number; title: string; hint: ReactNode; dim?: boolean; children: ReactNode }): JSX.Element {
+  return (
+    <div className={`flex min-w-0 flex-col gap-1 rounded border border-border/70 bg-panel2/30 p-1.5 ${dim ? 'opacity-50' : ''}`}>
+      <div className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] uppercase tracking-wide text-muted">
+        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-accent font-sans text-[9px] font-medium normal-case tracking-normal text-panel">
+          {n}
+        </span>
+        <span className="shrink-0">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-right normal-case tracking-normal text-muted/60">{hint}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+// The picture passing from one stage to the next.
+function StageArrow(): JSX.Element {
+  return <div className="-my-1 text-center font-mono text-[9px] leading-none text-muted/60" aria-hidden="true">↓</div>
+}
+
+// A small X/Y pad (0..1 each, y up), for a mask window's place. Pointer
+// mapped through the pad's own rectangle (the UI zoom is a CSS zoom).
+function XYPad({ x, y, onChange, onReset, title }: { x: number; y: number; onChange: (x: number, y: number) => void; onReset: () => void; title: string }): JSX.Element {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const drag = useRef<number | null>(null)
+  const at = (e: { clientX: number; clientY: number }): void => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const nx = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))
+    const ny = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height))
+    onChange(Math.round(nx * 100) / 100, Math.round(ny * 100) / 100)
+  }
+  return (
+    <div
+      ref={ref}
+      className="relative h-[62px] w-[62px] shrink-0 cursor-crosshair rounded border border-border"
+      style={{ touchAction: 'none', background: 'rgb(var(--c-input-bg))' }}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+        drag.current = e.pointerId
+        at(e)
+      }}
+      onPointerMove={(e) => { if (drag.current === e.pointerId) at(e) }}
+      onPointerUp={(e) => { if (drag.current === e.pointerId) drag.current = null }}
+      onPointerCancel={() => { drag.current = null }}
+      onDoubleClick={onReset}
+      title={title}
+    >
+      <span className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-border/60" />
+      <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-border/60" />
+      <span
+        className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-accent"
+        style={{ left: `${x * 100}%`, bottom: `${y * 100}%` }}
+      />
+    </div>
   )
 }
 
@@ -622,6 +767,7 @@ function Indented({ children }: { children: ReactNode }): JSX.Element {
 
 /** One source: [A] [picker] [+fx], with its FX chips underneath. */
 function SourceRow({
+  card = false,
   label,
   shaderId,
   sourceKind,
@@ -636,6 +782,8 @@ function SourceRow({
   onPickCapture,
   onPickHive
 }: {
+  /** A card (layout 2 : A and B side by side) : the picker over the effects. */
+  card?: boolean
   label: string
   shaderId: string | null
   sourceKind: SourceKind
@@ -741,7 +889,11 @@ function SourceRow({
   return (
     <>
       <div
-        className={`flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`}
+        className={
+          card
+            ? `flex min-w-0 flex-1 basis-0 flex-col gap-1 rounded border p-1 transition-shadow ${selected ? 'border-accent/60' : 'border-border/70'} bg-panel/60 ${dropOver ? 'ring-2 ring-accent' : ''}`
+            : `flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`
+        }
         onClick={onSelect}
         onDragOver={(e) => {
           if (!isFileDrag(e)) return
@@ -760,11 +912,13 @@ function SourceRow({
         }}
         title={`Source ${label} : drop a film, a sound file or a folder here`}
       >
+        {/* (a card : the label and picker on one line, its effects under them) */}
+        <div className={card ? 'flex min-w-0 items-center gap-1' : 'contents'}>
         {/* A real button (it selects this source : its controls go to the
             Inspector); the click bubbles to the row's onSelect. */}
         <button
           type="button"
-          className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : active ? TBTN_IDLE_ON : TBTN_IDLE}`}
+          className={`${TBTN} ${card ? 'w-[24px]' : 'w-[34px]'} shrink-0 px-0 text-center ${selected ? TBTN_LIT : active ? TBTN_IDLE_ON : TBTN_IDLE}`}
           title={`Source ${label} : show its controls in the Inspector`}
         >
           {label}
@@ -855,14 +1009,21 @@ function SourceRow({
             else if (v !== '__video__' && v !== '__assemble__' && v !== '__audio__') onPick(v || null)
           }}
         />
+        </div>
         {/* +fx always present : the layout never shifts when sources load.
-            w-auto so the box hugs its "+ fx" label instead of a fixed gutter. */}
-        <span onClick={(e) => e.stopPropagation()}>
-          <FxAddSelect scope={scope} className="w-[8.5rem] shrink-0" />
-        </span>
+            In a card it leads the source's effects, which wrap after it. */}
+        {card ? (
+          <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+            <FxChips scope={scope} fx={fx} leading={<FxAddSelect scope={scope} className="w-[4.5rem] shrink-0" />} />
+          </div>
+        ) : (
+          <span onClick={(e) => e.stopPropagation()}>
+            <FxAddSelect scope={scope} className="w-[8.5rem] shrink-0" />
+          </span>
+        )}
       </div>
       {/* Only the FX the user adds appear below the row */}
-      {fx.length > 0 && (
+      {!card && fx.length > 0 && (
         <div onClick={(e) => e.stopPropagation()}>
           <Indented>
             <FxChips scope={scope} fx={fx} />

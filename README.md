@@ -253,7 +253,14 @@ composite over one background "ground." The Layers column reads in that order, t
 down : the Background strip first, then Layer 1 to Layer 4, then the
 [Audio Layer](#the-audio-layer) (the sound).
 
-Each of the **4 layers** carries:
+Each layer's strip reads top to bottom in the order the picture goes through it,
+in four numbered stages : **1 Sources** (A and B side by side, each with its
+picker and its own effects), two lines running down from them into **2 Mix**
+(where A and B meet), **3 Layer FX** (the effects on the mixed picture), and
+**4 Out** (how the layer lands on the layers below : three tabs, **blend**,
+**mask** and **feedback**, each showing where it stands; one opens its controls
+at a time). **Speed** and **Vary**, which act on the whole layer, stay in view under
+a line at the end. Each of the **4 layers** carries:
 
 | Element | What it does |
 |---|---|
@@ -261,12 +268,12 @@ Each of the **4 layers** carries:
 | **A/B mix** (`MIX`) | `sourceBlend` (how B meets A, incl. the relation modes Weave / Lumakey / Consume) · `sourceMix`, whose meaning follows the mode and is named beside it : **A↔B** (normal : 0 = A only, 1 = B only), **blend** (the other per-pixel modes : 0 = A, 1 = the full blend), **depth** (weave), **key** (lumakey), **hunger** (consume). Dimmed until B has a source. A **≈** chip shows the layer is coupled to the sound (click : the Mixer). The A/B **hue** harmony and the **coupling** are set in the [Mixer](#the-mixer). |
 | **Source FX** | A separate effect rack under **each** source slot (`sourceAFx`, `sourceBFx`). |
 | **Layer FX** (`FX`) | The layer's own effect rack : the only rack that accepts the **sidechain** [native nodes](#native-nodes) (Transfert, Convolution, Mosaïque); the self-contained nodes run in any rack, and so do the TouchDesigner recipes (Remap, Luma Blur, Gooey, Matte, Lookup), whose other-layer inputs are optional. |
-| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)). |
-| **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : centre, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. |
+| **Blend** (`BLEND`) | How the layer composites onto the stack below ([19 blend modes](#blend-modes)) : the Out stage's **blend** tab. |
+| **Mask** | A per-layer spatial mask beyond blend modes: **luma** (keyed off the layer's own brightness, lo/hi + soft knee), **gradient** (a directional wipe at any angle/position), or **shape** (a soft rect/ellipse window : its place on an **X/Y pad**, size, aspect, roundness), each invertible. Multiplies into the layer's alpha before the blend. In the Out stage's **mask** tab. |
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
 | **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
-| **Feedback** (`FB` + `TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback). |
+| **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `feedback off` or its trail). |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.

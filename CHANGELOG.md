@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added (after the audit)
 
+- **The layer strip, rebuilt in four numbered stages** (`LayerPanel.tsx`, layout 2 of the
+  three Vincent saw as mockups, Speed and Vary kept out of the tabs at his request) : 1
+  Sources (A and B as side-by-side cards, `SourceRow card` : the picker over its effects,
+  "+ fx" leading them; drops and click-to-select on the whole card), an SVG of the two
+  running down into 2 Mix (A–B slider, the mode menu, ≈, M; the mode's word and value in
+  the stage title), 3 Layer FX, 4 Out (tabs blend · mask · feedback, each labelled with
+  its state, one drawer open : the shape mask's place on an X/Y pad, the feedback on/off
+  beside its trail). FB left the header (it is the feedback tab). Speed and Vary under a
+  line, always visible; their readouts rounded. `Stage` / `StageArrow` / `XYPad` helpers.
 - **The Mixer takes the A/B harmony and the coupling** (`MixerPanel.tsx` rewritten, Vincent
   picked it from mockups) : each column top to bottom A·B (mode, an A–B crossfader with
   the mode's word and value and a white line where the coupling puts the mix, painted
