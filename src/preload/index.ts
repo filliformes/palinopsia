@@ -104,6 +104,7 @@ const api: ExposedApi = {
   linkConfigure: (cfg) => ipcRenderer.invoke('link:configure', cfg),
   linkState: () => ipcRenderer.invoke('link:state'),
   linkSetTempo: (bpm) => ipcRenderer.send('link:tempo', bpm),
+  linkSetPlaying: (on) => ipcRenderer.send('link:play', on),
   onLinkState: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, s: Parameters<typeof cb>[0]): void => cb(s)
     ipcRenderer.on('link:state', h)

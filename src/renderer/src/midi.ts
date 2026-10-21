@@ -28,7 +28,7 @@ import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
 import { useStore } from './store'
 import { tempoEdited } from './tempoEvents'
-import { linkBeats, linkQuantum } from './link'
+import { linkBeats, linkPlay, linkQuantum } from './link'
 import type { SoniConfig } from './audio/sonify'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
@@ -310,6 +310,10 @@ export function describeBinding(b: MidiBinding): string {
 // Morph slider's power curve (Transport.tsx) : CC value → ms over 0..30s.
 const MORPH_POW = 2.5
 
+// With Ableton Link's start / stop sync, a play heard this many beats after
+// its bar still starts the follower there (caught up); later, on the next bar.
+const LATE = 0.25
+
 class MidiManager {
   private access: MIDIAccess | null = null
   private listeners = new Set<(devs: MidiDevice[]) => void>()
@@ -325,6 +329,13 @@ class MidiManager {
   // beat), and the pulse the Start waits for (the top of the next Link bar).
   private linkPulse: number | null = null
   private startPulse: number | null = null
+  // Link's beat line at the last schedule : a jump in its count shows against it
+  private linkPrev: { b: number; at: number; perMs: number } | null = null
+  // With start / stop sync : the Start waits for the bar Link's play starts on
+  // (read anew each time, the count can move); and the follower was started
+  // (Start sent, no Stop since).
+  private startOnPlay = false
+  private following = false
 
   async init(): Promise<boolean> {
     if (!('requestMIDIAccess' in navigator)) {
@@ -389,15 +400,24 @@ class MidiManager {
     if (!out) return
     const now = performance.now()
     const lb = linkBeats(now, false)
+    const play = linkPlay()
     this.startPulse = null
-    if (lb != null) {
+    this.startOnPlay = false
+    this.following = false
+    if (play) {
+      // start / stop sync : the clock runs, the Start waits for Link's play
+      // (playing : its bar if still to come, else the next one)
+      this.startOnPlay = play.playing
+    } else if (lb != null) {
       const q = linkQuantum()
       this.startPulse = Math.ceil(lb / q - 1e-6) * q * 24
     } else {
       try { out.send([0xfa]) } catch { /* port busy */ } // Start
+      this.following = true
     }
     this.nextPulse = now
     this.linkPulse = null
+    this.linkPrev = null
     const LOOKAHEAD = 120, TICK = 25
     const schedule = (): void => {
       const cur = performance.now()
@@ -409,6 +429,39 @@ class MidiManager {
         // line (its tempo is the slope).
         const perMs = ((linkBeats(cur + 1000, false) ?? b0) - b0) / 1000
         if (!(perMs > 0)) return
+        // Link's count jumped (a linked app put beat 0 on the bar its play
+        // starts on; alone, Palinopsia's own play put it on now) : the pulses
+        // keep their times, numbered anew
+        const lp = this.linkPrev
+        if (lp && cur - lp.at < 1000) {
+          const jump = b0 - (lp.b + (cur - lp.at) * lp.perMs)
+          if (Math.abs(jump) > 0.25) {
+            const d = Math.round(jump * 24)
+            if (this.linkPulse != null) this.linkPulse += d
+            if (this.startPulse != null) this.startPulse += d
+          }
+        }
+        this.linkPrev = { b: b0, at: cur, perMs }
+        const play = linkPlay()
+        if (play && !play.playing && (this.following || this.startPulse != null || this.startOnPlay)) {
+          // Link stopped : the follower stops now (the clock runs on, its tempo kept)
+          if (this.following) try { o.send([0xfc]) } catch { /* port gone */ } // Stop
+          this.following = false
+          this.startPulse = null
+          this.startOnPlay = false
+        } else if (play?.playing && !this.following && this.startPulse == null && !this.startOnPlay) {
+          this.startOnPlay = true // Link plays : Start on its bar
+        }
+        if (this.startOnPlay) {
+          if (play?.playing && play.at >= b0 - LATE) this.startPulse = Math.round(play.at * 24)
+          else {
+            // its bar long gone (start / stop sync turned on, the clock turned
+            // on while it plays) : the next bar
+            const q = linkQuantum()
+            this.startPulse = Math.ceil(b0 / q - 1e-6) * q * 24
+            this.startOnPlay = false
+          }
+        }
         const due = Math.floor(b0 * 24) + 1
         let k = this.linkPulse
         // the first pulse, a stall of more than half a second, or Link's beat
@@ -421,7 +474,12 @@ class MidiManager {
           const at = Math.max(cur, t)
           if (this.startPulse != null && k >= this.startPulse) {
             try { o.send([0xfa], at) } catch { /* port gone */ } // Start, on the top of the bar
+            // a play heard a moment after its bar : the pulses since it, at once,
+            // so the follower's bars still fall on Link's
+            for (let i = this.startPulse; i < k; i++) try { o.send([0xf8], at) } catch { /* port gone */ }
             this.startPulse = null
+            this.startOnPlay = false
+            this.following = true
           }
           try { o.send([0xf8], at) } catch { /* port gone */ }
           k++
@@ -432,10 +490,13 @@ class MidiManager {
         return
       }
       this.linkPulse = null
-      if (this.startPulse != null) {
+      this.linkPrev = null
+      if (this.startPulse != null || this.startOnPlay) {
         // Link turned off before its bar came : start now
         try { o.send([0xfa]) } catch { /* port gone */ }
         this.startPulse = null
+        this.startOnPlay = false
+        this.following = true
       }
       const bpm = useStore.getState().composition.bpm || 120
       const interval = 60000 / (bpm * 24)
@@ -453,6 +514,9 @@ class MidiManager {
   private stopClock(): void {
     if (this.clockTimer != null) { clearInterval(this.clockTimer); this.clockTimer = null }
     try { this.output()?.send([0xfc]) } catch { /* port gone */ } // Stop
+    this.startPulse = null
+    this.startOnPlay = false
+    this.following = false
   }
 
   /** Re-align the follower's downbeat to now (Stop then Start); with Ableton
@@ -466,6 +530,9 @@ class MidiManager {
   /** Stop the clock (sends Stop) without touching config : app teardown. */
   haltClock(): void { this.stopClock() }
   clockRunning(): boolean { return this.clockTimer != null }
+  /** The follower was sent Start (with start / stop sync, the clock runs on
+   *  while Link is stopped, the follower stopped). */
+  clockFollowing(): boolean { return this.clockTimer != null && this.following }
 
   /** (Re)wire message handlers to the selected input — or all of them when
    *  no name is chosen. Called on init, hot-plug, and dropdown change. */

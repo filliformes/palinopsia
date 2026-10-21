@@ -60,6 +60,7 @@ import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify
 import { audioLayer, defaultAudioLayer, NOT_ARMED, sanitizeAudioLayer, type AudioLayerArmed } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
+import { playEdited } from './playEvents'
 import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
@@ -3600,6 +3601,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setMidiClockOut: (on) => {
     localStorage.setItem('opsia.midiClockOut', on ? '1' : '0')
     set({ midiClockOut: on })
+    playEdited('clock', on)
   },
   midiThru: localStorage.getItem('opsia.midiThru') === '1',
   setMidiThru: (on) => {
@@ -4618,12 +4620,14 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   soniSeq: loadSoniSeq(),
-  setSoniSeqOn: (on) =>
+  setSoniSeqOn: (on) => {
     set((s) => {
       const soniSeq = { ...s.soniSeq, on, cur: on ? s.soniSeq.cur : 0 }
       persistSoniSeq(soniSeq)
       return { soniSeq }
-    }),
+    })
+    playEdited('soniSeq', on)
+  },
   setSoniSeqRate: (rate) =>
     set((s) => {
       const soniSeq = { ...s.soniSeq, rate }
@@ -4733,7 +4737,10 @@ export const useStore = create<StoreState>((set, get) => ({
       persistSoniKeySeq(soniKeySeq)
       return { soniKeySeq }
     }),
-  setSoniKeySeqOn: (on) => set((s) => ({ soniKeySeq: { ...s.soniKeySeq, on } })),
+  setSoniKeySeqOn: (on) => {
+    set((s) => ({ soniKeySeq: { ...s.soniKeySeq, on } }))
+    playEdited('keySeq', on)
+  },
   setSoniKeyStep: (i, patch, list = 'steps') =>
     set((s) => {
       const steps = s.soniKeySeq[list].map((st, j) => (j === i ? { ...st, ...patch } : st))
@@ -5234,8 +5241,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
   sequence: makeDefaultSequence(),
   setSequence: (patch) => set((s) => ({ sequence: { ...s.sequence, ...patch } })),
-  toggleSequenceRunning: () =>
-    set((s) => ({ sequence: { ...s.sequence, enabled: true, running: !s.sequence.running } })),
+  toggleSequenceRunning: () => {
+    set((s) => ({ sequence: { ...s.sequence, enabled: true, running: !s.sequence.running } }))
+    playEdited('scenes', get().sequence.running)
+  },
   sequenceTo: (id, variation, crossfadeMs) => {
     let sound = null as SoniConfig | null
     set((s) => {

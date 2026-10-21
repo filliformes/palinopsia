@@ -1394,6 +1394,8 @@ export interface ExposedApi {
   /** The state without configuring anything : at startup, is Link in this build? */
   linkState: () => Promise<LinkState>
   linkSetTempo: (bpm: number) => void
+  /** Start / stop sync : propose play or stop to every linked app. */
+  linkSetPlaying: (on: boolean) => void
   onLinkState: (cb: (s: LinkState) => void) => () => void
 
   // App lifecycle : save-before-quit handshake
@@ -1625,6 +1627,8 @@ export interface PerfStats {
 export interface LinkConfig {
   enabled: boolean
   quantum: number
+  /** start / stop sync : play and stop shared with the apps that share theirs */
+  startStop: boolean
 }
 
 /** The Link session as read in the main process, stamped with when (`at`, ms
@@ -1639,5 +1643,12 @@ export interface LinkState {
   phase: number
   /** the quantum `beat` was read for (a bar change re-maps the beat count) */
   quantum?: number
+  /** start / stop sync is on in the session's module */
+  startStop?: boolean
+  /** the session's transport (start / stop sync only) */
+  playing?: boolean
+  /** the beat the play or stop was set at, on `beat`'s count : a play starts
+   *  on the first bar from there */
+  playBeat?: number
   at: number
 }

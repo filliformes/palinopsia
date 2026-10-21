@@ -25,7 +25,7 @@ import { runSilently } from '../undo'
 import { visionBus } from '../engine/visionIn'
 import { registerKeyEveryBase, sonifyModValues } from '../engine/modulation'
 import { sameNotes, sonifyEngine, type SoniConfig } from './sonify'
-import { rateBeats, soniBar, soniClockEpoch, soniClockStart } from './soniClock'
+import { rateBeats, soniClockEpoch, soniClockStart, soniNextBar } from './soniClock'
 import { advanceDrift } from './soniSeq'
 import {
   BRIGHT, DIATONIC, affinity, diatonicRing, fifthsPos, isScale, keyId, mod12, rootAtFifths, sameKey, euclidHit,
@@ -423,10 +423,11 @@ function due(ks: SoniKeySeq, now: number, beats: number): boolean {
   const rb = rateBeats(ks.rate)
   if (rt.epoch !== soniClockEpoch()) {
     // The beat clock was counted afresh (Ableton Link came on or off, its bar
-    // changed size) : a start still waiting waits for the next of its bars, a
+    // changed size, a play alone put a new grid on now) : a start still waiting
+    // waits for the next of its bars (or the play's), a
     // running clock re-aligns on them (as for a new rate, just below).
     rt.epoch = soniClockEpoch()
-    if (rt.waiting) rt.startBeat = Math.ceil(beats / soniBar() - 1e-6) * soniBar()
+    if (rt.waiting) rt.startBeat = soniNextBar()
     else rt.periodBeats = 0
   }
   if (rt.waiting) {

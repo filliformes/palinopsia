@@ -11,6 +11,8 @@
 // - the bar is shared : the Sonify sequencers start on the next Link bar, and
 //   the modulators synced to the BPM slide onto the shared grid (./engine/
 //   modulation.ts), so a 1/1 LFO peaks where everyone's bar starts.
+// - with start / stop sync (off by default, as in Live), the play and stop are
+//   shared too : see "start / stop" below.
 // Per machine (like OSC) : localStorage, never in a session.
 
 import { useSyncExternalStore } from 'react'
@@ -18,7 +20,9 @@ import { useStore } from './store'
 import type { LinkState } from '@shared/types'
 import { onTempoEdited } from './tempoEvents'
 import { setTempoShared } from './sessionGuard'
-import { writeLinkTempo } from './undo'
+import { runSilently, writeLinkTempo } from './undo'
+import { onPlayEdited, type PlayThing } from './playEvents'
+import { soniClockPlayAt } from './audio/soniClock'
 
 export interface LinkSettings {
   enabled: boolean
@@ -27,10 +31,13 @@ export interface LinkSettings {
   /** the picture shows this late (a projector, a capture card) : Palinopsia
    *  runs this many ms ahead so it lands on the beat */
   latencyMs: number
+  /** start / stop sync : the session's play and stop are Palinopsia's, and
+   *  Palinopsia's are the session's */
+  startStop: boolean
 }
 
 const KEY = 'opsia.link'
-const DEFAULTS: LinkSettings = { enabled: false, quantum: 4, latencyMs: 0 }
+const DEFAULTS: LinkSettings = { enabled: false, quantum: 4, latencyMs: 0, startStop: false }
 
 function load(): LinkSettings {
   try {
@@ -39,7 +46,8 @@ function load(): LinkSettings {
       return {
         enabled: !!raw.enabled,
         quantum: Math.max(1, Math.min(16, Math.round(Number(raw.quantum) || 4))),
-        latencyMs: Math.max(-200, Math.min(400, Number(raw.latencyMs) || 0))
+        latencyMs: Math.max(-200, Math.min(400, Number(raw.latencyMs) || 0)),
+        startStop: !!raw.startStop
       }
     }
   } catch { /* defaults */ }
@@ -60,7 +68,7 @@ const listeners = new Set<() => void>()
 // of it re-renders nobody (the reads come 30 times a second for the whole show;
 // the beat is read through linkBeats, never through the snapshot).
 const shown = (s: LinkState): string =>
-  `${s.available}|${s.enabled}|${s.peers}|${s.quantum}|${Math.round(s.tempo * 100)}|${s.error ?? ''}`
+  `${s.available}|${s.enabled}|${s.peers}|${s.quantum}|${Math.round(s.tempo * 100)}|${s.error ?? ''}|${s.startStop}|${s.playing}`
 let shownKey = ''
 const emit = (): void => {
   snap = { settings, state }
@@ -94,7 +102,7 @@ async function configure(): Promise<void> {
   const a = api()
   if (!a) return
   try {
-    take(await a.linkConfigure({ enabled: settings.enabled, quantum: settings.quantum }))
+    take(await a.linkConfigure({ enabled: settings.enabled, quantum: settings.quantum, startStop: settings.startStop }))
   } catch (e) {
     state = { ...state, available: false, error: (e as Error).message, enabled: false }
   }
@@ -129,7 +137,8 @@ export function setLinkSettings(patch: Partial<LinkSettings>): void {
   // nothing to turn on when this build has no Link
   if (settings.enabled && !before.enabled && !state.available) settings = { ...settings, enabled: false }
   save()
-  if (before.enabled !== settings.enabled || before.quantum !== settings.quantum) void configure()
+  const reconfigure = before.enabled !== settings.enabled || before.quantum !== settings.quantum || before.startStop !== settings.startStop
+  if (reconfigure) void configure()
   else emit()
 }
 
@@ -173,8 +182,143 @@ function propose(bpm: number): void {
 // when the session's tempo was last written into the store
 let wroteAt = 0
 
+// ── start / stop ──────────────────────────────────────────────────────────
+// With start / stop sync on (here and in the other apps), the session's play
+// and stop are Palinopsia's : one transport for every linked app.
+// - A play (from any app) starts, on the bar it starts on : the MIDI clock's
+//   Start (./midi.ts reads linkPlay), and the sequencers the last stop stopped
+//   (the Sonify step and key sequences, the scene sequencer; before any stop,
+//   the scene sequencer when the session uses it). A stop stops them all, and
+//   sends the MIDI Stop.
+// - Here, starting one of them, or the MIDI clock, while the session is stopped
+//   plays it for every app; stopping the last one still going stops it (and the
+//   next play starts it again); stopping one while others go stops only it.
+//   What the session's own play or stop starts and stops is never proposed back.
+// - The play button of the Link section plays or stops the session itself.
+
+type Seq = Exclude<PlayThing, 'clock'>
+// Kept across a hot update : a fresh module would take a play under way for
+// a new one.
+type PlayState = {
+  /** the session's transport as last followed (null : start / stop sync off) */
+  seen: boolean | null
+  /** a play is under way and its bar is still to come */
+  pending: boolean
+  /** what the last stop stopped (null : no stop yet) */
+  resume: Seq[] | null
+  /** the sequencer stopped here whose stop stops the session : the next play
+   *  starts it again */
+  last: Seq | null
+}
+const ps: PlayState = ((globalThis as { __opsiaLinkPlay?: PlayState }).__opsiaLinkPlay ??= {
+  seen: null, pending: false, resume: null, last: null
+})
+// the session's own play or stop being applied : never proposed back
+let applying = false
+
+const syncing = (): boolean => active() && settings.startStop && !!state.startStop
+
+/** The session's transport while start / stop sync is on : playing or not,
+ *  and the bar its play starts on (on linkBeats' count : Live and Link put
+ *  beat 0 there, the count before it is negative). null when off. */
+export function linkPlay(): { playing: boolean; at: number } | null {
+  if (!syncing()) return null
+  const q = linkQuantum()
+  return { playing: !!state.playing, at: Math.ceil(((state.playBeat ?? 0) - 1e-3) / q) * q }
+}
+
+/** Propose play or stop to every linked app (start / stop sync on). */
+export function setLinkPlaying(on: boolean): void {
+  const a = api()
+  if (!a || typeof a.linkSetPlaying !== 'function' || !syncing()) return
+  a.linkSetPlaying(on)
+}
+
+/** What a play starts before any stop : the scene sequencer, when the session
+ *  uses it. */
+const firstPlay = (): Seq[] => (useStore.getState().sequence.enabled ? ['scenes'] : [])
+
+function runningSeqs(): Seq[] {
+  const st = useStore.getState()
+  const r: Seq[] = []
+  if (st.soniSeq.on) r.push('soniSeq')
+  if (st.soniKeySeq.on) r.push('keySeq')
+  if (st.sequence.enabled && st.sequence.running) r.push('scenes')
+  return r
+}
+
+/** Start or stop sequencers for the session's play or stop : silently (no
+ *  undo step : nobody's edit here) and never proposed back. */
+function setSeqs(on: boolean, which: Seq[]): void {
+  if (!which.length) return
+  applying = true
+  try {
+    runSilently(() => {
+      const st = useStore.getState()
+      if (which.includes('soniSeq') && st.soniSeq.on !== on) st.setSoniSeqOn(on)
+      if (which.includes('keySeq') && st.soniKeySeq.on !== on) st.setSoniKeySeqOn(on)
+      const sq = useStore.getState().sequence
+      // the scene sequencer needs scenes to go between (as its play button)
+      if (which.includes('scenes') && sq.running !== on && (!on || (sq.enabled && useStore.getState().scenes.length > 1))) {
+        useStore.getState().setSequence({ running: on })
+      }
+    })
+  } finally {
+    applying = false
+  }
+}
+
+/** Follow the session's play and stop (once a frame, from tickLink). */
+function tickPlay(now: number): void {
+  const p = linkPlay()
+  const playing = p ? p.playing : null
+  soniClockPlayAt(p?.playing ? p.at : null)
+  if (playing !== ps.seen) {
+    const before = ps.seen
+    ps.seen = playing
+    if (playing) {
+      // a play, or start / stop sync turned on while the session plays (its
+      // bar long gone : what follows joins at once, the sequencers on their
+      // next bar)
+      ps.pending = true
+      ps.last = null
+    } else if (playing === false && before) {
+      // a stop : what goes stops, and starts again with the next play (a stop
+      // before the play's bar came keeps what that play was to start)
+      const going = runningSeqs()
+      const was = ps.last ? [...going, ps.last] : going
+      ps.resume = [...new Set(ps.pending ? [...(ps.resume ?? firstPlay()), ...was] : was)]
+      ps.pending = false
+      ps.last = null
+      setSeqs(false, going)
+    } else ps.pending = false
+  }
+  if (!ps.pending || !p?.playing) return
+  // the bar is read anew each time : the count can move by whole bars meanwhile
+  const b = linkBeats(now, false)
+  if (b != null && b < p.at - 1e-3) return
+  ps.pending = false
+  setSeqs(true, ps.resume ?? firstPlay())
+}
+
+// Something started or stopped here on purpose (./playEvents.ts).
+function playEditedHere(what: PlayThing, on: boolean): void {
+  if (applying || !syncing()) return
+  if (on) {
+    if (!state.playing) setLinkPlaying(true)
+    return
+  }
+  // the last one still going : the session stops (and the next play starts it again)
+  const st = useStore.getState()
+  const clock = st.midiClockOut && !!st.midiOutputName
+  if (!state.playing || clock || runningSeqs().length) return
+  ps.last = what === 'clock' ? null : what
+  setLinkPlaying(false)
+}
+
 /** Once a frame from App's loop, before the clocks read the BPM. */
 export function tickLink(now: number): void {
+  tickPlay(now)
   if (!active() || now < holdUntil) return
   const bpm = useStore.getState().composition.bpm
   // a session with no BPM (hand-edited) : nothing to share until one is set
@@ -211,12 +355,14 @@ g.__opsiaLinkOff?.()
     if (shown(s) !== shownKey) emit()
   })
   const offTempo = onTempoEdited((bpm) => propose(bpm))
+  const offPlay = onPlayEdited(playEditedHere)
   // With Link on, the tempo is the network's, not the piece's : the Save
   // changes? question leaves it out (./sessionGuard.ts).
   setTempoShared(active)
   g.__opsiaLinkOff = () => {
     offState?.()
     offTempo()
+    offPlay()
   }
   if (settings.enabled) void configure()
   else void probe()

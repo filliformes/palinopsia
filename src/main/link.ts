@@ -3,6 +3,8 @@
 // runs here as the app's one Link instance. While it is on, the main window gets
 // the session's state 30 times a second, stamped with the time it was read; the
 // page carries the beat on between two reads (src/renderer/src/link.ts).
+// With start / stop sync (off by default, as in Live), the session's play and
+// stop come with each read, and the page's own play and stop go out from here.
 
 import { app, ipcMain, type BrowserWindow } from 'electron'
 import { join } from 'path'
@@ -10,14 +12,19 @@ import type { LinkConfig, LinkState } from '@shared/types'
 
 interface LinkAddon {
   enable(on: boolean): boolean
-  state(quantum: number): { enabled: boolean; peers?: number; tempo?: number; beat?: number; phase?: number }
+  startStopSync(on: boolean): boolean
+  state(quantum: number): {
+    enabled: boolean; peers?: number; tempo?: number; beat?: number; phase?: number
+    startStop?: boolean; playing?: boolean; playBeat?: number
+  }
   setTempo(bpm: number): void
+  setPlaying(on: boolean, quantum: number): boolean
   close(): void
 }
 
 let mod: LinkAddon | null = null
 let loadError = ''
-let cfg: LinkConfig = { enabled: false, quantum: 4 }
+let cfg: LinkConfig = { enabled: false, quantum: 4, startStop: false }
 let timer: ReturnType<typeof setInterval> | null = null
 let win: () => BrowserWindow | null = () => null
 // Link's instance (and its network threads) is only made once it is enabled :
@@ -74,6 +81,9 @@ function read(): LinkState {
     beat: s.beat ?? 0,
     phase: s.phase ?? 0,
     quantum: cfg.quantum,
+    startStop: !!s.startStop,
+    playing: !!s.startStop && !!s.playing,
+    playBeat: s.playBeat ?? 0,
     at
   }
 }
@@ -86,12 +96,15 @@ function push(): void {
 function configure(next: Partial<LinkConfig>): LinkState {
   cfg = {
     enabled: next.enabled ?? cfg.enabled,
-    quantum: Math.max(1, Math.min(16, Math.round(next.quantum ?? cfg.quantum)))
+    quantum: Math.max(1, Math.min(16, Math.round(next.quantum ?? cfg.quantum))),
+    startStop: next.startStop ?? cfg.startStop
   }
   const m = closed ? null : addon()
   if (m && (cfg.enabled || started)) {
     started = true
     m.enable(cfg.enabled)
+    // an older build of the module has no start / stop : it stays off
+    if (typeof m.startStopSync === 'function') m.startStopSync(cfg.enabled && cfg.startStop)
   }
   if (cfg.enabled && m && !timer) timer = setInterval(push, 33)
   if ((!cfg.enabled || !m) && timer) {
@@ -119,6 +132,13 @@ export function initLink(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('link:state', () => read())
   ipcMain.on('link:tempo', (_e, bpm: number) => {
     if (started && !closed && typeof bpm === 'number' && Number.isFinite(bpm)) mod?.setTempo(Math.max(20, Math.min(999, bpm)))
+  })
+  // Play or stop proposed by the page (start / stop sync) : the answer goes
+  // back at once, not at the next read, so a play alone starts without a wait.
+  ipcMain.on('link:play', (_e, on: boolean) => {
+    if (!started || closed || !cfg.enabled || !cfg.startStop || typeof mod?.setPlaying !== 'function') return
+    mod.setPlaying(on === true, cfg.quantum)
+    push()
   })
   app.on('will-quit', closeLink)
 }
