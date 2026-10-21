@@ -188,12 +188,34 @@ export function SceneBank(): JSX.Element {
 // dimmed when it is not in the picture now, × unpins it). Only while there is
 // something pinned : a right-click on a control or a layer pins it.
 function PinsChip(): JSX.Element | null {
+  const count = useStore((s) => s.pins.length)
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  if (!count) {
+    if (at) setAt(null) // (the last one unpinned from the list : it must not open again by itself)
+    return null
+  }
+  return (
+    <>
+      <button
+        onClick={(e: MouseEvent) => setAt({ x: e.clientX, y: e.clientY })}
+        className="rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-panel3/60"
+        style={{ borderColor: 'rgb(var(--c-pin) / 0.6)', color: 'rgb(var(--c-pin))' }}
+        title="Persistent : what no scene, Randomize, Variation, Generate or World changes. Click for the list (right-click a control or a layer to pin or unpin it)"
+      >
+        ◆ {count} persistent
+      </button>
+      {at && <PinsList x={at.x} y={at.y} onClose={() => setAt(null)} />}
+    </>
+  )
+}
+
+// The list itself : it follows the composition only while it is open (closed,
+// a slider drag no longer describes every pin on every frame).
+function PinsList({ x, y, onClose }: { x: number; y: number; onClose: () => void }): JSX.Element {
   const pins = useStore((s) => s.pins)
   const composition = useStore((s) => s.composition)
   const unpin = useStore((s) => s.unpin)
   const clearPins = useStore((s) => s.clearPins)
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
-  if (!pins.length) return null
   const items = pins.map((k) => {
     const d = describePin(k, composition)
     return {
@@ -204,24 +226,12 @@ function PinsChip(): JSX.Element | null {
     }
   })
   return (
-    <>
-      <button
-        onClick={(e: MouseEvent) => setAt({ x: e.clientX, y: e.clientY })}
-        className="rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-panel3/60"
-        style={{ borderColor: 'rgb(var(--c-pin) / 0.6)', color: 'rgb(var(--c-pin))' }}
-        title="Persistent : what no scene, Randomize, Variation, Generate or World changes. Click for the list (right-click a control or a layer to pin or unpin it)"
-      >
-        ◆ {pins.length} persistent
-      </button>
-      {at && (
-        <ContextMenu
-          x={at.x}
-          y={at.y}
-          header="Persistent : scenes and dice leave these alone"
-          items={[...items, { divider: true, label: '' }, { label: 'Unpin everything', danger: true, onClick: clearPins }]}
-          onClose={() => setAt(null)}
-        />
-      )}
-    </>
+    <ContextMenu
+      x={x}
+      y={y}
+      header="Persistent : scenes and dice leave these alone"
+      items={[...items, { divider: true, label: '' }, { label: 'Unpin everything', danger: true, onClick: clearPins }]}
+      onClose={onClose}
+    />
   )
 }

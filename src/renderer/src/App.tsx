@@ -180,7 +180,7 @@ function cycleContextPreset(): void {
 }
 import { initUndo, redo, runSilently, undo, useUndoState } from './undo'
 import { THEME_ORDER, useStore, type ThemeName } from './store'
-import { commitKnob, metaGlides, setKnobImmediate } from './metaSmooth'
+import { commitKnob, metaGlideComposition, metaGlides, setKnobImmediate } from './metaSmooth'
 import { clipAudio } from './engine/clipAudio'
 import { setMediaSink } from './engine/mediaSink'
 import { videoKey, videoPlayheads } from './engine/videoState'
@@ -1449,7 +1449,7 @@ export default function App(): JSX.Element {
         // 2a½. Meta-knob glides/drags : in-flight positions fan out to their
         //      destinations engine-side (zero store writes per frame; the
         //      final value commits to the store on settle).
-        if (metaGlides.size) applyMetaGlides(comp!, c, inputsForShader, metaGlides)
+        if (metaGlides.size) applyMetaGlides(comp!, metaGlideComposition(c), inputsForShader, metaGlides)
         // every driver of a layer's Vary has spoken : fire the crossings, once
         flushVaryEdges(now)
         // 2a⅝. Context's light tracing its drawn path (the Metasurface's draw

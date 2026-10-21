@@ -46,7 +46,7 @@ import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
 import { modTargetKey } from './modKey'
-import { graftPins, isPinnedTarget, keepPersistent, layerPin } from './persist'
+import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, sameDeep } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
@@ -895,13 +895,52 @@ function withAssembleFolder(sl: SourceSlot): SourceSlot {
   return folder ? { ...sl, mediaPath: folder } : sl
 }
 
+// Shader ids renamed since a file could hold them : the old id plays its heir
+// (Impasto became Cloud Study : what was saved in between holds 'impasto').
+const SHADER_ALIASES: Record<string, string> = { impasto: 'cloud-study' }
+const SHADER_ALIAS_MAP = new Map(Object.entries(SHADER_ALIASES))
+function aliasSlot<T extends SourceSlot | null | undefined>(sl: T): T {
+  const to = sl?.shaderId ? SHADER_ALIASES[sl.shaderId] : undefined
+  return to ? ({ ...sl, shaderId: to } as T) : sl
+}
+/** A stored preset bank with the renamed shader ids replaced (read once). */
+function aliasShaderIds<T>(v: T): T {
+  const j = JSON.stringify(v) ?? ''
+  return [...SHADER_ALIAS_MAP.keys()].some((id) => j.includes(`"${id}"`)) ? remapShaderIds(v, SHADER_ALIAS_MAP) : v
+}
+/** The per-shader preset bank (keyed by shader id) under the renamed ids. */
+function aliasPresetKeys<T>(bank: Record<string, T[]>): Record<string, T[]> {
+  if (!bank || typeof bank !== 'object') return bank
+  for (const [from, to] of SHADER_ALIAS_MAP) {
+    if (!Array.isArray(bank[from])) continue
+    bank[to] = [...(Array.isArray(bank[to]) ? bank[to] : []), ...bank[from]]
+    delete bank[from]
+  }
+  return bank
+}
+
+// Inputs a shader no longer has (Stutter's punch-in fire) : a binding on one is
+// a dead row that still counts toward the caps, and the unit being there keeps
+// it alive for the "drop dead rows" rescue. They go on load.
+const REMOVED_INPUTS: Record<string, readonly string[]> = { 'fx-stutter': ['trig'] }
+const REMOVED_NAMES = new Set(Object.values(REMOVED_INPUTS).flat())
+function dropRemovedInputs(c: CompositionState): CompositionState {
+  const maybe = (t: ModTarget): boolean => t.kind === 'fx' && REMOVED_NAMES.has(t.input)
+  if (!c.modMatrix.some((a) => maybe(a.target)) && !c.metaKnobs.some((k) => k.destinations.some(maybe))) return c
+  return dropTargets(c, (t) => {
+    if (t.kind !== 'fx' || !REMOVED_NAMES.has(t.input)) return false
+    const sid = fxArrayFor(c, t.scope).find((f) => f.id === t.instId)?.shaderId
+    return !!sid && !!REMOVED_INPUTS[sid]?.includes(t.input)
+  })
+}
+
 // Migrate a composition loaded from disk (or a recalled scene) up to the current
 // schema : backfill new layer/background/master/modulator/metaKnob fields so an
 // older session — or a scene inside one — can never hand the engine an undefined
 // slab or a locked-tail that's missing the Vibe → Context → Finalizer stages.
 // Idempotent : safe to run on an already-current composition.
 export function normalizeComposition(c: CompositionState): CompositionState {
-  return {
+  return dropRemovedInputs({
     ...c,
     // Older sessions have no Background slab : normalize to the blank (off) one;
     // an older slab gets the fields it lacks (a missing speed ran the clock at 0).
@@ -909,7 +948,7 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       ? {
           ...makeBlankBackground(),
           ...c.background,
-          source: c.background.source ?? emptySlot(),
+          source: aliasSlot(c.background.source) ?? emptySlot(),
           fx: Array.isArray(c.background.fx) ? c.background.fx : [],
           opacity: typeof c.background.opacity === 'number' ? c.background.opacity : 1,
           speed: typeof c.background.speed === 'number' ? c.background.speed : BG_DEFAULT_SPEED,
@@ -919,8 +958,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
     // Normalize layers from older session files : new fields get defaults.
     layers: c.layers.map((l) => ({
       ...l,
-      ...(l.sourceA ? { sourceA: withAssembleFolder(l.sourceA) } : {}),
-      ...(l.sourceB ? { sourceB: withAssembleFolder(l.sourceB) } : {}),
+      ...(l.sourceA ? { sourceA: withAssembleFolder(aliasSlot(l.sourceA)) } : {}),
+      ...(l.sourceB ? { sourceB: withAssembleFolder(aliasSlot(l.sourceB)) } : {}),
       feedbackAmount: l.feedbackAmount ?? 0.6,
       sourceMix: l.sourceMix ?? 0.5,
       sourceBlend: l.sourceBlend ?? 'normal',
@@ -986,7 +1025,7 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       const k = c.metaKnobs ?? []
       return makeDefaultMetaKnobs().map((d, i) => ({ ...d, ...(k[i] ?? {}) }))
     })()
-  }
+  })
 }
 
 // The Collage folder last picked on this computer : a Film Wall theme reuses it
@@ -2026,6 +2065,24 @@ function dropSlotTargets(
   )
 }
 
+/** A hand swap of a slot : its patching goes (dropSlotTargets), and so do its
+ *  pinned inputs (persist.ts holds a slot's input by name : kept, the pin would
+ *  hold the next source's input of the same name at every recall after). */
+function swapSlot(
+  s: { pins: string[] },
+  c: CompositionState,
+  layer: number,
+  slot: 'A' | 'B',
+  prev: SourceSlot | null,
+  alsoDropSourceFx = false
+): { composition: CompositionState; pins: string[] } {
+  const composition = dropSlotTargets(c, layer, slot, prev, alsoDropSourceFx)
+  if (!s.pins.length || sameSource(prev, slotOf(c, layer, slot))) return { composition, pins: s.pins }
+  const head = `src:${layer}:${slot}:`
+  const pins = s.pins.filter((k) => !k.startsWith(head))
+  return { composition, pins: pins.length === s.pins.length ? s.pins : pins }
+}
+
 /** The same, for the Background slab's source (addressed by input name alone). */
 function dropBgTargets(c: CompositionState, prev: SourceSlot | null): CompositionState {
   if (sameSource(prev, c.background?.source ?? null)) return c
@@ -2391,7 +2448,11 @@ export const useStore = create<StoreState>((set, get) => ({
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => randomizeSingleLayer(l))
       }
-      return { composition: keep(s, dropLayerTargets(composition, layer)), variationBaseline: null }
+      // (its pinned effects stay in their racks : keepPinnedUnits)
+      return {
+        composition: keep(s, keepPinnedUnits(dropLayerTargets(composition, layer), s.composition, s.pins)),
+        variationBaseline: null
+      }
     }),
 
   varyLayer: (layer) =>
@@ -2408,14 +2469,14 @@ export const useStore = create<StoreState>((set, get) => ({
       const next = jitterLayer(base, cur.varyAmount ?? DEFAULT_LAYER_VARY)
       // the amount is the layer's own setting, never part of the variant
       next.varyAmount = cur.varyAmount
-      layerVaryBase[layer] = base
-      layerVaryLast[layer] = next
       // No target pruning : a jitter moves values, it never removes a unit, so
       // every modulation row still points at something that exists.
-      return {
-        composition: keep(s, { ...s.composition, layers: updateLayer(s.composition.layers, layer, () => next) }),
-        varyPulse: bumpPulse(s.varyPulse, layer)
-      }
+      const composition = keep(s, { ...s.composition, layers: updateLayer(s.composition.layers, layer, () => next) })
+      layerVaryBase[layer] = base
+      // the layer as it lands (a pin on it holds a value : the next fire must
+      // still know this one as ours, or it anchors anew on every variant)
+      layerVaryLast[layer] = composition.layers[layer]
+      return { composition, varyPulse: bumpPulse(s.varyPulse, layer) }
     }),
   setLayerVary: (layer, amount) =>
     set((s) => ({
@@ -2436,18 +2497,24 @@ export const useStore = create<StoreState>((set, get) => ({
       const src = which === 'A' ? cur.sourceA : which === 'B' ? cur.sourceB : null
       if (which !== 'layer' && (!src || src.kind === 'none')) return {}
       const old = which === 'A' ? cur.sourceAFx : which === 'B' ? cur.sourceBFx : cur.fx
-      const gone = new Set((old ?? []).filter((f) => !f.locked).map((f) => f.id))
       const next = randomizeRack(which)
-      const composition = {
-        ...s.composition,
-        layers: updateLayer(s.composition.layers, layer, (l) =>
-          which === 'A'
-            ? { ...l, sourceAFx: next }
-            : which === 'B'
-              ? { ...l, sourceBFx: next }
-              : { ...l, fx: next }
-        )
-      }
+      // the pinned effects stay where they sit, the rest is dealt around them
+      const composition = keepPinnedUnits(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) =>
+            which === 'A'
+              ? { ...l, sourceAFx: next }
+              : which === 'B'
+                ? { ...l, sourceBFx: next }
+                : { ...l, fx: next }
+          )
+        },
+        s.composition,
+        s.pins
+      )
+      const dealt = new Set(fxArrayFor(composition, which === 'A' ? { kind: 'sourceA', layer } : which === 'B' ? { kind: 'sourceB', layer } : { kind: 'layer', layer }).map((f) => f.id))
+      const gone = new Set((old ?? []).filter((f) => !f.locked && !dealt.has(f.id)).map((f) => f.id))
       // Only the units that actually went : a rack dice must not clear the
       // modulation aimed at the layer's sources or at its other two racks.
       // New effects are a new starting point, as a structural randomize is :
@@ -2461,7 +2528,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   layerPresets: (() => {
     try {
-      return JSON.parse(localStorage.getItem('opsia.layerPresets') ?? '[]')
+      return aliasShaderIds(JSON.parse(localStorage.getItem('opsia.layerPresets') ?? '[]'))
     } catch {
       return []
     }
@@ -2615,7 +2682,8 @@ export const useStore = create<StoreState>((set, get) => ({
         return { selection: { type: 'source' as const, layer, slot } }
       }
       return {
-      composition: dropSlotTargets(
+      ...swapSlot(
+        s,
         {
           ...s.composition,
           layers: updateLayer(s.composition.layers, layer, (l) => {
@@ -2637,7 +2705,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   setSourceVideo: (layer, slot, mediaId, mediaName, mediaPath) =>
     set((s) => ({
-      composition: dropSlotTargets(
+      ...swapSlot(
+        s,
         {
           ...s.composition,
           layers: updateLayer(s.composition.layers, layer, (l) => {
@@ -2671,7 +2740,8 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setSourceAudio: (layer, slot, mediaId, mediaName, mediaPath) =>
     set((s) => ({
-      composition: dropSlotTargets(
+      ...swapSlot(
+        s,
         {
           ...s.composition,
           layers: updateLayer(s.composition.layers, layer, (l) => {
@@ -2721,7 +2791,8 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setSourceCapture: (layer, slot, spec, name) =>
     set((s) => ({
-      composition: dropSlotTargets(
+      ...swapSlot(
+        s,
         {
           ...s.composition,
           layers: updateLayer(s.composition.layers, layer, (l) => {
@@ -2745,7 +2816,8 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   setSourceHive: (layer, slot, host, port) =>
     set((s) => ({
-      composition: dropSlotTargets(
+      ...swapSlot(
+        s,
         {
           ...s.composition,
           layers: updateLayer(s.composition.layers, layer, (l) => {
@@ -2846,11 +2918,14 @@ export const useStore = create<StoreState>((set, get) => ({
       const source: SourceSlot = shaderId
         ? { kind: 'generator', shaderId, inputs: {} }
         : emptySlot()
+      // another source : its pinned inputs go with its patching (swapSlot)
+      const pins = sameSource(bg.source ?? null, source) ? s.pins : s.pins.filter((k) => !k.startsWith('bgsrc:'))
       return {
         composition: dropBgTargets(
           { ...s.composition, background: { ...bg, source } },
           bg.source ?? null
         ),
+        pins: pins.length === s.pins.length ? s.pins : pins,
         selection: shaderId ? { type: 'background' } : s.selection
       }
     }),
@@ -2892,15 +2967,19 @@ export const useStore = create<StoreState>((set, get) => ({
       // the old ones (bg-fx rows dangled on dead ids and ate the 12-row cap; a
       // source row seized the new source's input of the same name).
       const c = dropBgTargets({ ...s.composition, background }, prev?.source ?? null)
-      return { composition: keep(s, dropTargets(c, (t) => t.kind === 'fx' && t.scope.kind === 'background')) }
+      // (its pinned effects stay in the rack, with their rows : keepPinnedUnits)
+      return {
+        composition: keep(s, keepPinnedUnits(dropTargets(c, (t) => t.kind === 'fx' && t.scope.kind === 'background'), s.composition, s.pins))
+      }
     }),
   initBackground: () =>
     set((s) => {
       // Back to an empty ground : no source, no rack, the default opacity, clock,
       // shadow and mode, and no modulation left on the old source or rack.
+      // (a pinned opacity, clock or shadow stays : like Init on a layer)
       const c = { ...s.composition, background: makeBlankBackground() }
       return {
-        composition: dropTargets(c, (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background')),
+        composition: keep(s, dropTargets(c, (t) => t.kind === 'bgSource' || (t.kind === 'fx' && t.scope.kind === 'background'))),
         selection: s.selection?.type === 'background' ? null : s.selection
       }
     }),
@@ -2927,7 +3006,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   bgPresets: (() => {
     try {
-      return JSON.parse(localStorage.getItem('opsia.bgPresets') ?? '[]')
+      return aliasShaderIds(JSON.parse(localStorage.getItem('opsia.bgPresets') ?? '[]'))
     } catch {
       return []
     }
@@ -3363,7 +3442,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   randomize: (scope, intensity = 1) =>
     set((s) => {
-      const composition = keep(s, randomizeComposition(s.composition, scope, intensity))
+      // (the pinned effects stay in the racks it deals : keepPinnedUnits)
+      const composition = keep(s, keepPinnedUnits(randomizeComposition(s.composition, scope, intensity), s.composition, s.pins))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now()) // morph to the new draw
       // A structural randomize is a fresh starting point : drop the Variation
       // baseline so the next Variation press anchors on this new scene.
@@ -3892,7 +3972,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const worlds = s.worlds.map((w) => (w.id === id ? structuredClone(o) : w))
       saveUserWorlds(worlds)
       const fresh = worlds.find((w) => w.id === id)!
-      return s.world === id ? { worlds, composition: applyWorldToComposition(s.composition, fresh, edited) } : { worlds }
+      // (through the gate, like any World : what you pinned stays)
+      return s.world === id ? { worlds, composition: keep(s, applyWorldToComposition(s.composition, fresh, edited)) } : { worlds }
     }),
   saveWorldAsMine: (id) => {
     const s = get()
@@ -3953,7 +4034,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // (a new name or description changes nothing on screen).
       const sets = (['coupling', 'context', 'finalizer', 'autoMod', 'layers'] as const).some((k) => k in partial)
       return s.world === id && sets
-        ? { worlds, composition: applyWorldToComposition(s.composition, edited, before) }
+        ? { worlds, composition: keep(s, applyWorldToComposition(s.composition, edited, before)) } // (what you pinned stays)
         : { worlds }
     }),
   deleteWorld: (id) =>
@@ -3967,7 +4048,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // composition matches the selector (else it'd keep the deleted bias).
       localStorage.setItem('opsia.world', 'synthetic')
       const syn = worlds.find((x) => x.id === 'synthetic') ?? worlds[0]
-      return { worlds, world: 'synthetic', composition: applyWorldToComposition(s.composition, syn, w) }
+      return { worlds, world: 'synthetic', composition: keep(s, applyWorldToComposition(s.composition, syn, w)) }
     }),
   renameWorld: (id, name) => get().updateWorld(id, { name }),
   worldPageOpen: false,
@@ -4702,7 +4783,8 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       }
       return {
-        composition: dropSlotTargets(
+        ...swapSlot(
+          s,
           {
             ...s.composition,
             layers: s.composition.layers.map((l, i) =>
@@ -4843,7 +4925,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   userShaderPresets: (() => {
     try {
-      return JSON.parse(localStorage.getItem('opsia.userShaderPresets') ?? '{}')
+      return aliasPresetKeys(JSON.parse(localStorage.getItem('opsia.userShaderPresets') ?? '{}'))
     } catch {
       return {}
     }
@@ -4969,24 +5051,30 @@ export const useStore = create<StoreState>((set, get) => ({
       showToast('No scenes yet : save one first', 'warn', 3500)
       return
     }
-    // the pin's own graft, one scene at a time : the same rule as a recall
-    let changed = 0, already = 0, lack = 0
+    // the pin's own graft, one scene at a time : the same rule as a recall. A
+    // scene whose modulation is full would lose rows of its own for good to make
+    // room : it is left as it is, and the toast says so.
+    let changed = 0, already = 0, lack = 0, full = 0
     const scenes = s.scenes.map((sc) => {
-      const { comp, applied } = graftPins(sc.composition, s.composition, [key])
+      const { comp, applied, cut } = graftPins(sc.composition, s.composition, [key])
       if (!applied.has(key)) { lack++; return sc }
-      if (comp === sc.composition) { already++; return sc }
+      if (comp === sc.composition || sameDeep(comp, sc.composition)) { already++; return sc }
+      if (cut) { full++; return sc }
       changed++
       return { ...sc, composition: comp }
     })
     if (changed) set({ scenes })
     const n = s.scenes.length
     const many = (k: number): string => `${k} scene${k === 1 ? '' : 's'}`
+    const fullWords = `${many(full)} left as ${full === 1 ? 'it is' : 'they are'} (modulation full : free a row there first)`
     showToast(
       changed
-        ? `${label} : set in ${changed} of ${many(n)}${already ? `, ${already} already had it` : ''}${lack ? `, ${lack} without it (another source or effect there)` : ''}. Ctrl+Z undoes.`
-        : lack === n
-          ? `${label} : no scene has it (another source or effect there)`
-          : `${label} : every scene already has it`,
+        ? `${label} : set in ${changed} of ${many(n)}${already ? `, ${already} already had it` : ''}${lack ? `, ${lack} without it (another source or effect there)` : ''}${full ? `, ${fullWords}` : ''}. Ctrl+Z undoes.`
+        : full
+          ? `${label} : ${fullWords}${already ? `, ${already} already had it` : ''}`
+          : lack === n
+            ? `${label} : no scene has it (another source or effect there)`
+            : `${label} : every scene already has it`,
       changed ? 'ok' : 'warn',
       5200
     )
@@ -5081,7 +5169,8 @@ export const useStore = create<StoreState>((set, get) => ({
   setSequence: (patch) => set((s) => ({ sequence: { ...s.sequence, ...patch } })),
   toggleSequenceRunning: () =>
     set((s) => ({ sequence: { ...s.sequence, enabled: true, running: !s.sequence.running } })),
-  sequenceTo: (id, variation, crossfadeMs) =>
+  sequenceTo: (id, variation, crossfadeMs) => {
+    let sound = null as SoniConfig | null
     set((s) => {
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
@@ -5101,11 +5190,15 @@ export const useStore = create<StoreState>((set, get) => ({
       if (scene.sonify) {
         const cur = s.sonify
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
-        const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
-        queueMicrotask(() => useStore.getState().setSonify(next))
+        sound = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
       }
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
-    }),
+    })
+    // The sound lands inside this same call, after the composition : the
+    // sequencer runs it silently (runSilently), and a microtask landed after
+    // that had closed, so every step with a sound patch was an undo step.
+    if (sound) get().setSonify(sound)
+  },
   sequencePageOpen: false,
   setSequencePageOpen: (on) => set({ sequencePageOpen: on }),
 
@@ -5354,9 +5447,11 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ resolume: persistResolume(sanitizeResolume(s.resolume)) })
     }
     // A piece made for the dome brings its dome mapping back; older sessions
-    // keep whatever the machine had.
+    // keep whatever the machine had. On/off stays yours, so does the alignment
+    // grid : a setup aid of this room, never the piece's (a session saved while
+    // aligning would burn it into the show).
     if (s.dome && typeof s.dome === 'object')
-      set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled }) }) // on/off stays yours
+      set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled, grid: get().dome.grid }) })
     // The output transform is the piece's : its own, or none (an older file must
     // not open turned the way the last piece was left).
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
@@ -5431,7 +5526,7 @@ export const useStore = create<StoreState>((set, get) => ({
         closed: s.surface.closed
       },
       resolume: s.resolume,
-      dome: s.dome,
+      dome: { ...s.dome, grid: false }, // (the alignment grid is the room's, not the piece's)
       outXform: s.outXform,
       spaceVoices: s.space.voices,
       // your own shaders it plays (the composition, the scenes), with their source

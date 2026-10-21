@@ -7,6 +7,7 @@ import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/ty
 import { Blink } from './Blink'
 import { FX_OPACITY_INPUT } from '@shared/types'
 import { randomizeInputs } from '../randomize'
+import { pinnedInputs } from '../persist'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
@@ -507,7 +508,8 @@ export function Inspector(): JSX.Element {
   inspRandRef.current = () => {
     if (!shaderId) return
     const next = randomizeInputs(shaderId, values)
-    for (const [k, v] of Object.entries(next)) onChange(k, v)
+    const held = pinnedInputs(modTargetFor, useStore.getState().pins) // (a dice : the pinned ones stay)
+    for (const [k, v] of Object.entries(next)) if (!held(k)) onChange(k, v)
     if (isVibe) setVibePresetName(null)
     flash()
   }

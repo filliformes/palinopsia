@@ -4,12 +4,14 @@
 // its parameters stacked vertically. Default collapsed.
 
 import type { FxInstance, ModTarget } from '@shared/types'
+import { FX_OPACITY_INPUT } from '@shared/types'
 import { Blink } from './Blink'
 import { useEffect, useState } from 'react'
 import { frameVals } from '../engine/frameVals'
 import { liveModValues } from '../engine/modulation'
 import { useShallow } from 'zustand/react/shallow'
 import { randomizeInputs } from '../randomize'
+import { holdPinnedInputs, pinnedInputs } from '../persist'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { defaultInputs } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
@@ -273,9 +275,11 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
             // ones included) goes back, not only the ones the factory names.
             const factory =
               shaderId === 'fx-vibe' ? makeVibePalette() : shaderId === 'fx-context' ? makeContext() : shaderId === 'fx-finalizer' ? makeFinalizer() : null
-            setFxInputs({ kind: 'master' }, inst.id, { ...defaultInputs(shaderId), ...(factory?.inputs ?? {}) })
+            // (like Init on a layer : what you pinned stays as it plays)
+            const held = pinnedInputs(modTargetFor, useStore.getState().pins)
+            setFxInputs({ kind: 'master' }, inst.id, holdPinnedInputs({ ...defaultInputs(shaderId), ...(factory?.inputs ?? {}) }, inst.inputs, held))
             if (isVibe) {
-              setFxOpacity({ kind: 'master' }, inst.id, factory?.opacity ?? 1)
+              if (!held(FX_OPACITY_INPUT)) setFxOpacity({ kind: 'master' }, inst.id, factory?.opacity ?? 1)
               setVibePresetName(null)
             }
           }}
@@ -289,7 +293,8 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
         <button
           onClick={() => {
             const next = randomizeInputs(shaderId, values)
-            for (const [k, v] of Object.entries(next)) onChange(k, v)
+            const held = pinnedInputs(modTargetFor, useStore.getState().pins) // (a dice : the pinned ones stay)
+            for (const [k, v] of Object.entries(next)) if (!held(k)) onChange(k, v)
             if (isVibe) setVibePresetName(null)
             flash()
           }}

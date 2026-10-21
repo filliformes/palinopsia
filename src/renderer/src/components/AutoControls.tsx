@@ -150,7 +150,7 @@ export function AutoControls({
     arr.filter((i) => !(hasPosPair && i.name === 'posY') && !(hasLightOrder && i.name === 'lightOrder'))
   const renderControl = (inp: IsfInputDesc, dense = false): JSX.Element =>
     hasPosPair && inp.name === 'posX' ? (
-      <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} />
+      <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} modTargetFor={modTargetFor} />
     ) : (
       <Control
         key={inp.name}
@@ -195,7 +195,7 @@ export function AutoControls({
     const rest = inputs.filter((i) => i.type !== 'point2D' && !i.compact)
     const compactCell =
       compact.length > 0 ? (
-        <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} />
+        <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} modTargetFor={modTargetFor} />
       ) : null
     // Fixed-width controls (each its own 11rem) that WRAP by width, LEFT-justified so
     // the parameters stay compact and read left-to-right. They flow DOWN into rows as
@@ -260,11 +260,13 @@ export function AutoControls({
 function PosPairControl({
   inputs,
   values,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
   const dx = inputs.find((i) => i.name === 'posX')
   const dy = inputs.find((i) => i.name === 'posY')
@@ -311,13 +313,20 @@ function PosPairControl({
       </div>
     </div>
   )
+  // (each axis pins on its own : a right-click on its row)
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
       <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{dx?.label?.startsWith('shift') ? 'shift' : 'pos'}</span>
-      {axis('X', vx, minx, maxx, defx, 'posX')}
-      {axis('Y', vy, miny, maxy, defy, 'posY')}
+      <PinZone pin={pinOf(modTargetFor, 'posX')} label={dx?.label ?? 'posX'}>{axis('X', vx, minx, maxx, defx, 'posX')}</PinZone>
+      <PinZone pin={pinOf(modTargetFor, 'posY')} label={dy?.label ?? 'posY'}>{axis('Y', vy, miny, maxy, defy, 'posY')}</PinZone>
     </div>
   )
+}
+
+// A control's pin key (null : no target, no Persistent menu).
+function pinOf(modTargetFor: ((inputName: string) => ModTarget) | undefined, name: string): string | null {
+  const t = modTargetFor?.(name)
+  return t ? modTargetKey(t) : null
 }
 
 function Control({
@@ -749,53 +758,61 @@ export function AssignRow({
 function CompactCluster({
   inputs,
   values,
-  onChange
+  onChange,
+  modTargetFor
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
 }): JSX.Element {
+  const row = (inp: IsfInputDesc): JSX.Element => {
+    const def = typeof inp.def === 'number' ? inp.def : 0
+    const raw = values[inp.name]
+    const v = typeof raw === 'number' ? raw : def
+    if (inp.type === 'long') {
+      return (
+        <div className="flex items-center justify-between gap-2">
+          {labelEl(inp)}
+          <select
+            className="input select-compact w-12 shrink-0 !px-1 !py-0 text-[10px]"
+            value={v}
+            onChange={(e) => onChange(inp.name, Number(e.target.value))}
+            title={inp.label}
+          >
+            {(inp.values ?? []).map((val, i) => (
+              <option key={val} value={val}>
+                {inp.labels?.[i] ?? val}
+              </option>
+            ))}
+          </select>
+        </div>
+      )
+    }
+    const on = v >= 0.5
+    return (
+      <div className="flex items-center justify-between gap-2">
+        {labelEl(inp)}
+        <button
+          onClick={() => onChange(inp.name, on ? 0 : 1)}
+          className={`shrink-0 rounded px-1.5 py-0 font-mono text-[9px] leading-4 transition-colors ${
+            on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title={inp.label}
+        >
+          {on ? 'ON' : 'OFF'}
+        </button>
+      </div>
+    )
+  }
+  // (each row pins on its own : a right-click on it)
   return (
     <div className="flex w-44 min-w-0 flex-col gap-1">
-      {inputs.map((inp) => {
-        const def = typeof inp.def === 'number' ? inp.def : 0
-        const raw = values[inp.name]
-        const v = typeof raw === 'number' ? raw : def
-        if (inp.type === 'long') {
-          return (
-            <div key={inp.name} className="flex items-center justify-between gap-2">
-              {labelEl(inp)}
-              <select
-                className="input select-compact w-12 shrink-0 !px-1 !py-0 text-[10px]"
-                value={v}
-                onChange={(e) => onChange(inp.name, Number(e.target.value))}
-                title={inp.label}
-              >
-                {(inp.values ?? []).map((val, i) => (
-                  <option key={val} value={val}>
-                    {inp.labels?.[i] ?? val}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )
-        }
-        const on = v >= 0.5
-        return (
-          <div key={inp.name} className="flex items-center justify-between gap-2">
-            {labelEl(inp)}
-            <button
-              onClick={() => onChange(inp.name, on ? 0 : 1)}
-              className={`shrink-0 rounded px-1.5 py-0 font-mono text-[9px] leading-4 transition-colors ${
-                on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
-              }`}
-              title={inp.label}
-            >
-              {on ? 'ON' : 'OFF'}
-            </button>
-          </div>
-        )
-      })}
+      {inputs.map((inp) => (
+        <PinZone key={inp.name} pin={pinOf(modTargetFor, inp.name)} label={inp.label}>
+          {row(inp)}
+        </PinZone>
+      ))}
     </div>
   )
 }

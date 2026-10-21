@@ -131,8 +131,17 @@ function applyMap(files: Record<string, string>): void {
   const f = new Map(Object.entries(files).map(([k, v]) => [norm(k), v]))
   if (!f.size) return
   const cur = mediaState()
-  const next = rewrite(cur, (p) => f.get(norm(p)) ?? p)
-  useStore.setState({ composition: next.composition, scenes: next.scenes as never, audioLayer: next.audioLayer as never })
+  const map = (p: string): string => f.get(norm(p)) ?? p
+  const next = rewrite(cur, map)
+  // the Variation baseline too : the next Vary is built from it, and would deal
+  // the old paths back (missing again, or a collected session that no longer travels)
+  const base = useStore.getState().variationBaseline
+  useStore.setState({
+    composition: next.composition,
+    scenes: next.scenes as never,
+    audioLayer: next.audioLayer as never,
+    variationBaseline: base ? rewrite(base, map) : base
+  })
   markDirty()
 }
 

@@ -13,7 +13,7 @@
 // settle-time writes go through the store's normal actions, so they persist,
 // morph and stay OSC-visible like any base value.
 
-import type { ModTarget } from '@shared/types'
+import type { CompositionState, ModTarget } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { withSonifyParam } from './audio/sonify'
 import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
@@ -24,10 +24,17 @@ import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { parseSpaceModParam, placePatch } from '@shared/spatial'
 import { posToEvery } from './audio/soniKeyModel'
+import { isPinnedTarget } from './persist'
 
 const knobDisplay: number[] = []
-const tweens: Array<{ from: number; to: number; startedAt: number; ms: number } | null> = []
+const tweens: Array<{ from: number; to: number; startedAt: number; ms: number; dice: boolean } | null> = []
 let raf = 0
+
+// Knobs gliding because a dice moved them (the Meta ⚄, Randomize Meta) : a
+// dice is a randomize, so on their way and when they settle they leave the
+// pinned destinations where they are (persist.ts). A hand on the knob (a drag,
+// MIDI, OSC) still moves everything it goes to.
+const diceGlides = new Set<number>()
 
 // Knobs currently in-flight (gliding or dragged) : knob index → display 0..1.
 // The render loop overlays these onto the engine each frame (applyMetaGlides)
@@ -151,13 +158,32 @@ function applyDest(target: ModTarget, shaped: number): void {
 
 /** Commit a knob's final position to the store : knob.value + one fan-out of
  *  the final destination values. One store burst per gesture. */
-function settle(i: number, v01: number): void {
+function settle(i: number, v01: number, dice = false): void {
   metaGlides.delete(i)
-  const knob = useStore.getState().composition.metaKnobs[i]
+  diceGlides.delete(i)
+  const { composition, pins } = useStore.getState()
+  const knob = composition.metaKnobs[i]
   useStore.getState().setMetaValue(i, v01)
   if (!knob) return
   const shaped = shapeCurve(v01, knob.curve)
-  for (const t of knob.destinations) applyDest(t, shaped)
+  for (const t of knob.destinations) if (!dice || !isPinnedTarget(t, pins)) applyDest(t, shaped)
+}
+
+/** The composition the glide overlay fans out from (App's render loop) : a
+ *  knob a dice moves leaves its pinned destinations out. */
+export function metaGlideComposition(c: CompositionState): CompositionState {
+  if (!diceGlides.size) return c
+  const pins = useStore.getState().pins
+  if (!pins.length) return c
+  let changed = false
+  const metaKnobs = c.metaKnobs.map((k, i) => {
+    if (!diceGlides.has(i)) return k
+    const destinations = k.destinations.filter((t) => !isPinnedTarget(t, pins))
+    if (destinations.length === k.destinations.length) return k
+    changed = true
+    return { ...k, destinations }
+  })
+  return changed ? { ...c, metaKnobs } : c
 }
 
 function tick(): void {
@@ -171,7 +197,7 @@ function tick(): void {
     knobDisplay[i] = tw.from + (tw.to - tw.from) * k
     if (k >= 1) {
       tweens[i] = null
-      settle(i, knobDisplay[i])
+      settle(i, knobDisplay[i], tw.dice)
     } else {
       // In flight : the render loop fans this out engine-side.
       metaGlides.set(i, knobDisplay[i])
@@ -183,11 +209,14 @@ function tick(): void {
 }
 
 /** Move knob i toward v (0..1) over smoothMs, applying destinations en route.
- *  For MIDI CC (glide across 1/127 steps) and randomize : NOT mouse drag. */
-export function setKnobTarget(i: number, v: number, smoothMs: number): void {
+ *  For MIDI CC (glide across 1/127 steps) and randomize : NOT mouse drag.
+ *  `dice` : a dice moves it (the pinned destinations stay). */
+export function setKnobTarget(i: number, v: number, smoothMs: number, dice = false): void {
   const from = knobDisplayValue(i)
   const to = Math.max(0, Math.min(1, v))
-  tweens[i] = { from, to, startedAt: performance.now(), ms: Math.max(0, smoothMs) }
+  tweens[i] = { from, to, startedAt: performance.now(), ms: Math.max(0, smoothMs), dice }
+  if (dice) diceGlides.add(i)
+  else diceGlides.delete(i)
   if (!raf) raf = requestAnimationFrame(tick)
 }
 
@@ -199,6 +228,7 @@ export function setKnobTarget(i: number, v: number, smoothMs: number): void {
 export function setKnobImmediate(i: number, v: number): void {
   const val = v < 0 ? 0 : v > 1 ? 1 : v
   tweens[i] = null
+  diceGlides.delete(i) // (a hand took it over)
   knobDisplay[i] = val
   metaGlides.set(i, val)
   bump()
@@ -210,10 +240,12 @@ export function commitKnob(i: number): void {
 }
 
 /** Glide every knob to a new random POSITION, keeping its bindings : the ⚄
- *  next to the Meta title (shuffle the macro positions). */
+ *  next to the Meta title (shuffle the macro positions). A pinned knob stays. */
 export function shuffleMetaValues(): void {
-  const knobs = useStore.getState().composition.metaKnobs
-  knobs.forEach((k, i) => setKnobTarget(i, Math.random(), k.smoothMs))
+  const { composition, pins } = useStore.getState()
+  composition.metaKnobs.forEach((k, i) => {
+    if (!isPinnedTarget({ kind: 'meta', knob: i }, pins)) setKnobTarget(i, Math.random(), k.smoothMs, true)
+  })
 }
 
 /** Full 'Randomize Meta Knobs': re-roll each knob's destinations (up to 8)
@@ -222,6 +254,9 @@ export function shuffleMetaValues(): void {
  *  destinations along the way. */
 export function randomizeMetaKnobs(): void {
   useStore.getState().randomizeMetaBank()
-  const knobs = useStore.getState().composition.metaKnobs
-  knobs.forEach((k, i) => setKnobTarget(i, k.value, k.smoothMs))
+  // (a pinned knob came back whole from the bank's gate : it does not glide)
+  const { composition, pins } = useStore.getState()
+  composition.metaKnobs.forEach((k, i) => {
+    if (!isPinnedTarget({ kind: 'meta', knob: i }, pins)) setKnobTarget(i, k.value, k.smoothMs, true)
+  })
 }

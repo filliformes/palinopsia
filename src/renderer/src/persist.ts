@@ -20,7 +20,7 @@
 // destinations); a pinned layer keeps all of its own. The modulator cards
 // themselves still follow the scene.
 
-import type { CompositionState, FxInstance, FxScope, LayerState, MetaKnobState, ModTarget, SourceSlot } from '@shared/types'
+import type { CompositionState, FxInstance, FxScope, LayerState, MetaKnobState, ModAssignment, ModTarget, SourceSlot } from '@shared/types'
 import { FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_MAX_DESTS } from '@shared/types'
 import { modTargetKey } from './modKey'
 import { SHADER_BY_ID } from './shaders/isf'
@@ -132,6 +132,67 @@ function inputsWith<T>(to: Record<string, T>, from: Record<string, T>, input: st
 const sameSource = (a: SourceSlot | null | undefined, b: SourceSlot | null | undefined): boolean =>
   !!a && !!b && a.kind === b.kind && (a.shaderId ?? null) === (b.shaderId ?? null)
 
+// A pinned Meta knob's destination, still the same control in the arriving
+// composition : the same source in its slot, the same effect unit (a layer's
+// own controls, the Background's, Sonify, the dome... always there). Elsewhere
+// it would seize another source's input of the same name, or hold nothing.
+function destHolds(c: CompositionState, live: CompositionState, t: ModTarget): boolean {
+  switch (t.kind) {
+    case 'source': {
+      const prop = t.slot === 'A' ? 'sourceA' : 'sourceB'
+      return sameSource(c.layers[t.layer]?.[prop], live.layers[t.layer]?.[prop])
+    }
+    case 'bgSource':
+      return sameSource(c.background?.source, live.background?.source)
+    case 'fx': {
+      const to = chainOf(c, t.scope)?.find((f) => f.id === t.instId)
+      const from = chainOf(live, t.scope)?.find((f) => f.id === t.instId)
+      return !!to && (!from || to.shaderId === from.shaderId)
+    }
+    case 'layer':
+      return !!c.layers[t.layer]
+    case 'bg':
+      return !!c.background
+    default:
+      return true
+  }
+}
+
+const sameDests = (a: readonly ModTarget[], b: readonly ModTarget[]): boolean =>
+  a === b || (a.length === b.length && a.every((t, i) => modTargetKey(t) === modTargetKey(b[i])))
+
+const sameKnob = (a: MetaKnobState, b: MetaKnobState): boolean =>
+  a === b ||
+  (a.name === b.name && a.value === b.value && a.smoothMs === b.smoothMs && a.curve === b.curve &&
+    (a.midiCc?.channel ?? -1) === (b.midiCc?.channel ?? -1) && (a.midiCc?.number ?? -1) === (b.midiCc?.number ?? -1) &&
+    sameDests(a.destinations, b.destinations))
+
+// The same binding, whatever the object (a scene's copy, the live one).
+const sameRow = (a: ModAssignment, b: ModAssignment): boolean =>
+  a === b ||
+  (a.id === b.id && a.mod === b.mod && a.depth === b.depth && (a.mode ?? 'replace') === (b.mode ?? 'replace') &&
+    !!a.muted === !!b.muted && modTargetKey(a.target) === modTargetKey(b.target) &&
+    JSON.stringify(a.shape ?? null) === JSON.stringify(b.shape ?? null))
+
+// A pinned Context or film key is yours, not the World's : the World amount
+// fades on it what it faded there before (the arriving World's or scene's own
+// change would else pull the pinned value away below amount 1). A composition
+// from before the change was kept (worldBase alone) just lets the key go.
+function withWorldKey(c: CompositionState, live: CompositionState, k: string): CompositionState {
+  const legacy = !!c.worldBase && !c.worldShift
+  const pick = (to: Record<string, number> | undefined, from: Record<string, number> | undefined): Record<string, number> | undefined => {
+    const has = !legacy && !!from && k in from
+    if (has ? to?.[k] === from![k] : !to || !(k in to)) return to
+    const next = { ...(to ?? {}) }
+    if (has) next[k] = from![k]
+    else delete next[k]
+    return next
+  }
+  const worldBase = pick(c.worldBase, live.worldBase)
+  const worldShift = legacy ? c.worldShift : pick(c.worldShift, live.worldShift)
+  return worldBase === c.worldBase && worldShift === c.worldShift ? c : { ...c, worldBase, worldShift }
+}
+
 /** One pin onto the arriving composition. Returns it (unchanged when the pin
  *  already holds) and whether the pin applies there at all. */
 function graftOne(c: CompositionState, live: CompositionState, p: Pin): { c: CompositionState; applied: boolean } {
@@ -171,10 +232,14 @@ function graftOne(c: CompositionState, live: CompositionState, p: Pin): { c: Com
     }
     case 'meta': {
       // the whole knob : its value, its curve, its smoothing, where it goes
+      // (wherever that is still the same control : see destHolds)
       const from = live.metaKnobs[p.knob]
-      if (!from || !c.metaKnobs[p.knob]) return { c, applied: false }
-      if (c.metaKnobs[p.knob] === from) return { c, applied: true }
-      return { c: { ...c, metaKnobs: c.metaKnobs.map((k, i) => (i === p.knob ? from : k)) }, applied: true }
+      const to = c.metaKnobs[p.knob]
+      if (!from || !to) return { c, applied: false }
+      const destinations = from.destinations.filter((t) => destHolds(c, live, t))
+      const knob = destinations.length === from.destinations.length ? from : { ...from, destinations }
+      if (sameKnob(to, knob)) return { c, applied: true }
+      return { c: { ...c, metaKnobs: c.metaKnobs.map((k, i) => (i === p.knob ? knob : k)) }, applied: true }
     }
     case 'lay': {
       const to = c.layers[p.layer]
@@ -199,12 +264,16 @@ function graftOne(c: CompositionState, live: CompositionState, p: Pin): { c: Com
 
 // The finishing units (Vibe, Context, Finalizer : one of each, always there)
 // are the same unit whatever their id, but a Generate builds them anew. When
-// something on one is pinned, the arriving one takes the live one's id (its
-// modulation rows follow), so the pin holds now and at every recall after.
+// something on one is pinned (or a pinned Meta knob goes there), the arriving
+// one takes the live one's id (its modulation rows follow), so the pin holds
+// now and at every recall after.
 function adoptLockedIds(c: CompositionState, live: CompositionState, pins: readonly string[]): CompositionState {
   const ren = new Map<string, string>()
+  const knobs = pins.map(parsePin).flatMap((p) => (p?.k === 'meta' && live.metaKnobs[p.knob] ? [live.metaKnobs[p.knob]] : []))
+  const knobOn = (id: string): boolean =>
+    knobs.some((k) => k.destinations.some((t) => t.kind === 'fx' && t.scope.kind === 'master' && t.instId === id))
   for (const u of live.master) {
-    if (!u.locked || !pins.some((k) => k.startsWith(`fx:master:${u.id}:`))) continue
+    if (!u.locked || !(pins.some((k) => k.startsWith(`fx:master:${u.id}:`)) || knobOn(u.id))) continue
     const a = c.master.find((f) => f.locked && f.shaderId === u.shaderId)
     if (a && a.id !== u.id && !c.master.some((f) => f.id === u.id)) ren.set(a.id, u.id)
   }
@@ -219,12 +288,14 @@ function adoptLockedIds(c: CompositionState, live: CompositionState, pins: reado
   }
 }
 
-/** The pins onto an arriving composition, and which of them applied (a
- *  control on an effect the arriving composition lacks, or on a source it
- *  plays something else in, has nothing to hold). */
-export function graftPins(incoming: CompositionState, live: CompositionState, pins: readonly string[]): { comp: CompositionState; applied: Set<string> } {
+/** The pins onto an arriving composition, which of them applied (a control on
+ *  an effect the arriving composition lacks, or on a source it plays something
+ *  else in, has nothing to hold), and how many of the arriving composition's
+ *  own rows and Meta destinations had to give way to the pinned ones (a full
+ *  matrix). */
+export function graftPins(incoming: CompositionState, live: CompositionState, pins: readonly string[]): { comp: CompositionState; applied: Set<string>; cut: number } {
   const applied = new Set<string>()
-  if (!pins.length) return { comp: incoming, applied }
+  if (!pins.length) return { comp: incoming, applied, cut: 0 }
   let c = adoptLockedIds(incoming, live, pins)
   const layers = new Set<number>()
   const parsed: Array<[string, Pin]> = []
@@ -232,26 +303,39 @@ export function graftPins(incoming: CompositionState, live: CompositionState, pi
     const p = parsePin(key)
     if (p) parsed.push([key, p])
   }
-  // whole layers last : they hold the layer whatever its own pins did
-  for (const [key, p] of [...parsed.filter(([, x]) => x.k !== 'layer'), ...parsed.filter(([, x]) => x.k === 'layer')]) {
+  // whole layers after the controls : they hold the layer whatever its own pins
+  // did; the Meta knobs last, their destinations checked on what is then there
+  const rank = (p: Pin): number => (p.k === 'layer' ? 1 : p.k === 'meta' ? 2 : 0)
+  for (const [key, p] of [...parsed].sort((a, b) => rank(a[1]) - rank(b[1]))) {
     const r = graftOne(c, live, p)
     c = r.c
     if (r.applied) {
       applied.add(key)
       if (p.k === 'layer') layers.add(p.layer)
+      // a pinned Context / film key : what the World amount fades there too
+      if (p.k === 'fx' && p.scope.kind === 'master') {
+        const u = c.master.find((f) => f.id === p.instId)
+        if (u?.shaderId === 'fx-context' || u?.shaderId === 'fx-finalizer') c = withWorldKey(c, live, p.input)
+      }
     }
   }
-  if (!applied.size) return { comp: c, applied }
+  if (!applied.size) return { comp: c, applied, cut: 0 }
 
   // Their modulation : a pinned control keeps its own rows, a pinned layer all
   // of its own (the arriving ones on them go). A pinned Meta knob already came
-  // whole, its destinations with it.
+  // whole, its destinations with it. Nothing is rebuilt when the arriving rows
+  // there are already the same (a scene saved with them).
+  let cut = 0
   const held = (t: ModTarget): boolean => applied.has(modTargetKey(t)) || layers.has(layerOf(t))
   const kept = c.modMatrix.filter((a) => !held(a.target))
   const carried = live.modMatrix.filter((a) => held(a.target))
-  if (kept.length !== c.modMatrix.length || carried.length) {
+  const arrived = c.modMatrix.filter((a) => held(a.target))
+  const sameRows = arrived.length === carried.length && carried.every((a) => arrived.some((b) => sameRow(a, b)))
+  if (!sameRows) {
     // (over the cap, the arriving rows give way : the pinned ones are yours)
-    c = { ...c, modMatrix: [...kept.slice(0, Math.max(0, MAX_MOD_ASSIGNMENTS - carried.length)), ...carried] }
+    const room = Math.max(0, MAX_MOD_ASSIGNMENTS - carried.length)
+    cut += Math.max(0, kept.length - room)
+    c = { ...c, modMatrix: [...kept.slice(0, room), ...carried] }
   }
   const pinnedKnob = (i: number): boolean => applied.has(`meta:${i}`)
   let knobsChanged = false
@@ -259,12 +343,24 @@ export function graftPins(incoming: CompositionState, live: CompositionState, pi
     if (pinnedKnob(i)) return k
     const dest = k.destinations.filter((t) => !held(t))
     const add = (live.metaKnobs[i]?.destinations ?? []).filter(held)
-    if (dest.length === k.destinations.length && !add.length) return k
+    const here = k.destinations.filter(held)
+    if (here.length === add.length && add.every((t) => here.some((h) => modTargetKey(h) === modTargetKey(t)))) return k
     knobsChanged = true
-    return { ...k, destinations: [...dest.slice(0, Math.max(0, META_MAX_DESTS - add.length)), ...add] }
+    const room = Math.max(0, META_MAX_DESTS - add.length)
+    cut += Math.max(0, dest.length - room)
+    return { ...k, destinations: [...dest.slice(0, room), ...add] }
   })
   if (knobsChanged) c = { ...c, metaKnobs }
-  return { comp: c, applied }
+  return { comp: c, applied, cut }
+}
+
+/** The same value, deep (what a graft rebuilt can still be what a scene held). */
+export function sameDeep(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false
+  const ka = Object.keys(a as object).filter((k) => (a as Record<string, unknown>)[k] !== undefined)
+  const kb = Object.keys(b as object).filter((k) => (b as Record<string, unknown>)[k] !== undefined)
+  return ka.length === kb.length && ka.every((k) => sameDeep((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
 }
 
 /** The gate : an arriving composition with the pins held from the live one. */
@@ -277,7 +373,65 @@ export function isPinnedTarget(t: ModTarget, pins: readonly string[]): boolean {
   return pins.length > 0 && (pins.includes(modTargetKey(t)) || pins.includes(layerPin(layerOf(t))))
 }
 
+/** Which of one unit's inputs sit under a pin : its own dice and its reset
+ *  leave them (a dice is a randomize; a preset picked by hand still moves them). */
+export function pinnedInputs(target: ((input: string) => ModTarget) | undefined, pins: readonly string[]): (input: string) => boolean {
+  return (input) => !!target && isPinnedTarget(target(input), pins)
+}
+
+/** A unit's next inputs with the pinned ones as they are now (a reset). */
+export function holdPinnedInputs<T>(next: Record<string, T>, cur: Record<string, T>, held: (input: string) => boolean): Record<string, T> {
+  let out: Record<string, T> | null = null
+  for (const k of new Set([...Object.keys(next), ...Object.keys(cur)])) {
+    if (!held(k)) continue
+    out ??= { ...next }
+    if (Object.prototype.hasOwnProperty.call(cur, k)) out[k] = cur[k]
+    else delete out[k]
+  }
+  return out ?? next
+}
+
+// Can a rack hold an effect here (a source rack : only on a slot that plays).
+function hostsRack(c: CompositionState, s: FxScope): boolean {
+  if (s.kind === 'master') return true
+  if (s.kind === 'background') return !!c.background
+  const l = c.layers[s.layer]
+  if (!l || s.kind === 'layer') return !!l
+  const slot = s.kind === 'sourceA' ? l.sourceA : l.sourceB
+  return !!slot && slot.kind !== 'none'
+}
+
+/** A dice that deals racks anew keeps the pinned effects where they sat, with
+ *  their modulation, and deals the rest around them (a pinned control on a unit
+ *  the dice threw away would hold nothing). Before keepPersistent, which then
+ *  holds their values. */
+export function keepPinnedUnits(incoming: CompositionState, live: CompositionState, pins: readonly string[]): CompositionState {
+  let c = incoming
+  const back = new Set<string>()
+  for (const key of pins) {
+    const p = parsePin(key)
+    if (!p || p.k !== 'fx' || back.has(p.instId)) continue
+    const from = chainOf(live, p.scope)
+    const unit = from?.find((f) => f.id === p.instId)
+    const chain = chainOf(c, p.scope)
+    if (!from || !unit || unit.locked || !chain || chain.some((f) => f.id === unit.id) || !hostsRack(c, p.scope)) continue
+    // (the same effect freshly dealt beside it goes : a dealt rack never repeats one)
+    const rest = chain.filter((f) => f.locked || back.has(f.id) || f.shaderId !== unit.shaderId)
+    const lockedAt = rest.findIndex((f) => f.locked)
+    const at = Math.min(from.indexOf(unit), lockedAt >= 0 ? lockedAt : rest.length)
+    c = withChain(c, p.scope, [...rest.slice(0, at), unit, ...rest.slice(at)])
+    back.add(unit.id)
+  }
+  if (!back.size) return c
+  const has = new Set(c.modMatrix.map((a) => a.id))
+  const rows = live.modMatrix.filter((a) => a.target.kind === 'fx' && back.has(a.target.instId) && !has.has(a.id))
+  const room = Math.max(0, MAX_MOD_ASSIGNMENTS - c.modMatrix.length)
+  return rows.length && room ? { ...c, modMatrix: [...c.modMatrix, ...rows.slice(0, room)] } : c
+}
+
 const LAY_WORDS: Record<LayField, string> = { opacity: 'opacity', mix: 'A·B mix', blend: 'blend', harmony: 'A·B hue', speed: 'speed' }
+// (the Background's depth is its contact shadow on screen)
+const BG_WORDS: Record<'opacity' | 'speed' | 'depth', string> = { opacity: 'opacity', speed: 'speed', depth: 'shadow' }
 
 function inputLabel(shaderId: string | null | undefined, input: string): string {
   if (input === FX_OPACITY_INPUT) return 'dry/wet'
@@ -298,7 +452,7 @@ export function describePin(key: string, live: CompositionState): { label: strin
     case 'lay':
       return { label: `L${p.layer + 1} ${LAY_WORDS[p.field]}`, here: !!live.layers[p.layer] }
     case 'bg':
-      return { label: `Background ${p.field}`, here: !!live.background }
+      return { label: `Background ${BG_WORDS[p.field]}`, here: !!live.background }
     case 'meta':
       return { label: `Meta ${p.knob + 1}${live.metaKnobs[p.knob]?.name ? ` (${live.metaKnobs[p.knob].name})` : ''}`, here: !!live.metaKnobs[p.knob] }
     case 'src': {
@@ -308,7 +462,10 @@ export function describePin(key: string, live: CompositionState): { label: strin
     }
     case 'bgsrc': {
       const s = live.background?.source
-      return { label: `Background · ${shaderName(s?.shaderId)} · ${inputLabel(s?.shaderId, p.input)}`, here: !!s?.shaderId }
+      return {
+        label: `Background · ${shaderName(s?.shaderId)} · ${inputLabel(s?.shaderId, p.input)}`,
+        here: !!s?.shaderId && inputsForShader(s.shaderId).some((d) => d.name === p.input)
+      }
     }
     case 'fx': {
       const u = chainOf(live, p.scope)?.find((f) => f.id === p.instId)
