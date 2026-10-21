@@ -1526,9 +1526,10 @@ export function oscLeafValues(): Map<string, number> {
   return m
 }
 
-/** The advertised address list (path + description), for pickers. */
-export function oscLeafList(): Array<{ path: string; desc: string }> {
-  return enumerateLeaves().map((l) => ({ path: l.path, desc: l.desc }))
+/** The advertised address list (path + description), for pickers; `int` : an
+ *  index, read raw from an OSC int (the agent's osc tool sends one there only). */
+export function oscLeafList(): Array<{ path: string; desc: string; int?: boolean }> {
+  return enumerateLeaves().map((l) => ({ path: l.path, desc: l.desc, ...(l.int ? { int: true } : {}) }))
 }
 
 /** Enumerate the address space and hand it to the OSCQuery server. */

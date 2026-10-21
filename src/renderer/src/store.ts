@@ -5264,7 +5264,18 @@ export const useStore = create<StoreState>((set, get) => ({
         const id = userShaderId(u.name)
         const mine = get().userShaders.find((x) => x.id === id && !x.fromSession)
         if (mine && SHADER_BY_ID[id] && SHADER_BY_ID[id].source !== u.source) {
-          const info = registerUserShader(`${u.name} (session)`, u.source, true)
+          // never over one of yours already called "<name> (session)" (saved
+          // from an earlier load) : the next free "(session 2)", "(session 3)"…
+          let alt = `${u.name} (session)`
+          let same = ''
+          for (let n = 2; n < 100; n++) {
+            const aid = userShaderId(alt)
+            if (!get().userShaders.some((x) => x.id === aid && !x.fromSession)) break
+            if (SHADER_BY_ID[aid]?.source === u.source) { same = aid; break } // yours already is it
+            alt = `${u.name} (session ${n})`
+          }
+          if (same) { remap.set(sid, same); continue }
+          const info = registerUserShader(alt, u.source, true)
           get().upsertUserShader(info)
           remap.set(sid, info.id)
           continue

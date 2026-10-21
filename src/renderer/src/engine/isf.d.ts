@@ -19,6 +19,8 @@ declare module 'interactive-shader-format' {
     errorLine: unknown
     /** The GLSL the runtime built and compiled (set before compiling). */
     fragmentShader?: string
+    /** Its vertex stage, built beside it (a link error is read with both). */
+    vertexShader?: string
     /** The parser : its uniform declarations, for mapping error lines. */
     model?: { uniformDefs?: string }
   }

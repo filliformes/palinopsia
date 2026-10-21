@@ -7,7 +7,7 @@
 // declare them in the header. A built-in is never written over : saving a copy
 // asks for a name of yours.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ErrorInfo, type ReactNode } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, StateEffect, StateField, type Extension } from '@codemirror/state'
 import { Decoration, type DecorationSet, keymap } from '@codemirror/view'
@@ -19,9 +19,13 @@ import { Renderer as ISFRenderer } from 'interactive-shader-format'
 import { makeRedirectableGL } from '../engine/Compositor'
 import { handle } from '../engine/isfTextureBridge'
 import { FX_SHADERS, GENERATORS, SHADER_BY_ID } from '../shaders/isf'
-import { categoryOf, registerUserShader, unregisterUserShader, userShaderId, userShaderIdsIn } from '../shaders/userShaders'
+import {
+  SOURCE_EDITOR_KEY, categoryOf, fileNameOf, onUserShaderChange, registerUserShader, unregisterUserShader,
+  userShaderId, userShaderIdsIn, userShaderRevision, type UserShaderInfo
+} from '../shaders/userShaders'
+import { hintOf, longShape } from '../shaders/isf/inputs'
 import { outputCanvas } from '../engine/outputCanvas'
-import { compileIsf, lintIsf, type ShaderMark } from '../shaders/shaderCheck'
+import { compileIsf, compilesAlone, lintIsf, type ShaderMark } from '../shaders/shaderCheck'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 
@@ -111,6 +115,9 @@ interface Draft {
   userId: string | null // the shader of yours it edits (null : not saved yet)
   saved: string // the source as last saved ('' : never)
   from: string // what it started from (a template, a built-in), for the header
+  // the source the app held for `userId` when the editor last took it (opened,
+  // saved and loaded) : another source there since is a change made elsewhere
+  base?: string
 }
 const DRAFT_KEY = 'opsia.sourceDraft'
 function loadDraft(): Draft {
@@ -130,6 +137,8 @@ interface Ctl {
   def: unknown
   values?: number[]
   labels?: string[]
+  integer?: boolean // a float that steps by 1 (a long over a wide range)
+  hint?: string
 }
 function headerOf(source: string): { inputs: Ctl[]; ok: boolean } {
   const m = source.match(/\/\*\s*(\{[\s\S]*?\})\s*\*\//)
@@ -137,18 +146,24 @@ function headerOf(source: string): { inputs: Ctl[]; ok: boolean } {
   try {
     const j = JSON.parse(m[1]) as { INPUTS?: Array<Record<string, unknown>> }
     const inputs: Ctl[] = []
-    for (const i of j.INPUTS ?? []) {
-      const type = String(i.TYPE ?? '')
+    const fin = (x: unknown, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d)
+    for (const i of Array.isArray(j.INPUTS) ? j.INPUTS : []) {
+      if (!i || typeof i !== 'object') continue
+      let type = String(i.TYPE ?? '')
       if (type === 'image' || type === 'audio' || type === 'audioFFT') continue
-      inputs.push({
-        name: String(i.NAME ?? ''),
-        type,
-        min: typeof i.MIN === 'number' ? i.MIN : 0,
-        max: typeof i.MAX === 'number' ? i.MAX : 1,
-        def: i.DEFAULT,
-        values: Array.isArray(i.VALUES) ? (i.VALUES as number[]) : undefined,
-        labels: Array.isArray(i.LABELS) ? (i.LABELS as string[]) : undefined
-      })
+      let min = fin(i.MIN, 0)
+      let max = fin(i.MAX, 1)
+      let values: number[] | undefined
+      let labels: string[] | undefined
+      let integer = i.INTEGER === true
+      // a long as the Inspector shows it : a menu (its VALUES, or a small
+      // MIN..MAX), else an integer slider (a menu per integer froze the app)
+      if (type === 'long') {
+        const l = longShape(i)
+        if (l.menu) ({ values, labels } = l)
+        else { type = 'float'; min = l.min; max = l.max; integer = true }
+      }
+      inputs.push({ name: String(i.NAME ?? ''), type, min, max, def: i.DEFAULT, values, labels, integer, hint: hintOf(i) })
     }
     return { inputs, ok: true }
   } catch {
@@ -161,7 +176,7 @@ const defaultOf = (c: Ctl): unknown => {
   if (c.type === 'point2D') return [0.5, 0.5]
   if (c.type === 'bool' || c.type === 'event') return false
   if (c.type === 'long') return c.values?.[0] ?? 0
-  return c.min + (c.max - c.min) / 2
+  return c.integer ? Math.round(c.min + (c.max - c.min) / 2) : c.min + (c.max - c.min) / 2
 }
 
 type Mark = ShaderMark
@@ -224,7 +239,46 @@ const INPUTS_FOR_FX: Array<{ id: string; label: string }> = [
 const W = 480
 const H = 270
 
+/** The preview's GL : its own context, the last good program keeps playing. */
+interface PreviewGL {
+  gl: WebGL2RenderingContext
+  rgl: WebGL2RenderingContext
+  state: { redirect: WebGLFramebuffer | null }
+  cur: ISFRenderer | null
+  out: { fbo: WebGLFramebuffer; tex: WebGLTexture }
+  inp: { fbo: WebGLFramebuffer; tex: WebGLTexture }
+  inGen: ISFRenderer | null
+  inGenId: string
+  live: WebGLTexture
+}
+
+// A slip in the editor (a header it cannot show) closes it, not the whole app :
+// the compositor and the output keep running, and what you wrote is kept.
+interface BoundaryState { error: Error | null }
+class EditorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
+  state: BoundaryState = { error: null }
+  static getDerivedStateFromError(error: Error): BoundaryState {
+    return { error }
+  }
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('[SourceEditor]', error, info.componentStack)
+    showToast(`The Source Editor closed on an error : ${error.message}. What you wrote is kept.`, 'warn', 8000)
+    useStore.getState().setSourceEditorOpen(false)
+  }
+  render(): ReactNode {
+    return this.state.error ? null : this.props.children
+  }
+}
+
 export function SourceEditor(): JSX.Element {
+  return (
+    <EditorBoundary>
+      <SourceEditorBody />
+    </EditorBoundary>
+  )
+}
+
+function SourceEditorBody(): JSX.Element {
   const close = useStore((s) => s.setSourceEditorOpen)
   const userShaders = useStore((s) => s.userShaders)
   const upsert = useStore((s) => s.upsertUserShader)
@@ -245,16 +299,31 @@ export function SourceEditor(): JSX.Element {
   const valsRef = useRef(vals)
   valsRef.current = vals
   const [fxInput, setFxInput] = useState('filaments')
-  const [confirm, setConfirm] = useState<'' | 'delete' | 'overwrite'>('')
+  // asked before a save : delete it, replace another of yours (or the session's
+  // one) of that name, write over a version made elsewhere since you opened it
+  const [confirm, setConfirm] = useState<'' | 'delete' | 'overwrite' | 'session' | 'elsewhere'>('')
+  const forced = confirm === 'overwrite' || confirm === 'session' || confirm === 'elsewhere'
   const dirty = draft.source !== draft.saved
   // still one of yours (its file may have gone : removed by hand, another computer)
   const mine = !!draft.userId && userShaders.some((u) => u.id === draft.userId)
   const category = categoryOf(draft.source)
   const header = useMemo(() => headerOf(draft.source), [draft.source])
+  // Its source changed underneath the editor (the agent wrote it, a session
+  // brought its own) : say so, rather than save the old text over it.
+  useSyncExternalStore(onUserShaderChange, userShaderRevision)
+  const elsewhereOf = (d: Draft): string | null => {
+    const live = d.userId ? SHADER_BY_ID[d.userId]?.source : undefined
+    return live !== undefined && live !== d.saved && live !== (d.base ?? d.saved) ? live : null
+  }
+  const elsewhere = elsewhereOf(draft)
+  // a new shader opened (a copy, a template, a file, one of yours) : a save
+  // still on its way finishes for the one it was, not this one
+  const genRef = useRef(0)
 
   // ── CodeMirror ──
   const hostRef = useRef<HTMLDivElement | null>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const extsRef = useRef<Extension[]>([])
   useEffect(() => {
     if (!hostRef.current) return
     const exts: Extension[] = [
@@ -270,16 +339,21 @@ export function SourceEditor(): JSX.Element {
         setDraft({ ...d, source: u.state.doc.toString() })
       })
     ]
+    extsRef.current = exts
     const view = new EditorView({ state: EditorState.create({ doc: draftRef.current.source, extensions: exts }), parent: hostRef.current })
     viewRef.current = view
     if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __sourceEditor: { view } })
     return () => { view.destroy(); viewRef.current = null }
   }, [])
-  /** Replace the editor's whole text (opening another shader, a template). */
+  /** Replace the editor's whole text (opening another shader, a template) : a
+   *  fresh state, so Ctrl+Z never brings the last shader's text back under this
+   *  one's name (a Save then wrote it over this file). */
   const loadText = (source: string): void => {
+    genRef.current++
+    setConfirm('') // a question asked about the last one is not about this one
     const v = viewRef.current
     if (!v) return
-    v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: source } })
+    v.setState(EditorState.create({ doc: source, extensions: extsRef.current }))
   }
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setMarks.of(marks) })
@@ -293,28 +367,33 @@ export function SourceEditor(): JSX.Element {
   }
 
   // ── the preview : its own GL context, the last good program keeps playing ──
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const glRef = useRef<{
-    gl: WebGL2RenderingContext
-    rgl: WebGL2RenderingContext
-    state: { redirect: WebGLFramebuffer | null }
-    cur: ISFRenderer | null
-    out: { fbo: WebGLFramebuffer; tex: WebGLTexture }
-    inp: { fbo: WebGLFramebuffer; tex: WebGLTexture }
-    inGen: ISFRenderer | null
-    inGenId: string
-    live: WebGLTexture
-  } | null>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+  const glRef = useRef<PreviewGL | null>(null)
+  // the GPU reset (a driver restart) : the preview waits for its context back,
+  // and compile errors are not reported against a lost one
+  const [lost, setLost] = useState(false)
+  const [previewGen, setPreviewGen] = useState(0) // "restart the preview"
+  const compileRef = useRef<(source: string) => void>(() => {})
   const fxInputRef = useRef(fxInput)
   fxInputRef.current = fxInput
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const host = previewRef.current
+    if (!host) return
+    // A canvas of its own for each mount : the dev app's StrictMode mounts, cleans
+    // up and mounts again, and the cleanup loses the context, which the same
+    // canvas then handed back lost (every compile reported an error).
+    const canvas = document.createElement('canvas')
     canvas.width = W
     canvas.height = H
+    canvas.className = 'block w-full rounded border border-border bg-black'
+    canvas.style.aspectRatio = '16 / 9'
+    host.appendChild(canvas)
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false })
-    if (!gl) return
-    const { gl: rgl, state } = makeRedirectableGL(gl)
+    if (!gl) {
+      setLost(true)
+      return () => { canvas.remove() }
+    }
+    setLost(false)
     const target = (): { fbo: WebGLFramebuffer; tex: WebGLTexture } => {
       const tex = gl.createTexture()!
       gl.bindTexture(gl.TEXTURE_2D, tex)
@@ -329,23 +408,28 @@ export function SourceEditor(): JSX.Element {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
       return { fbo, tex }
     }
-    const live = gl.createTexture()!
-    gl.bindTexture(gl.TEXTURE_2D, live)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]))
-    const g = { gl, rgl, state, cur: null as ISFRenderer | null, out: target(), inp: target(), inGen: null as ISFRenderer | null, inGenId: '', live }
+    // everything on the context : built at the start, and again once a lost
+    // context comes back (what was on the old one is gone with it)
+    const build = (): PreviewGL => {
+      const { gl: rgl, state } = makeRedirectableGL(gl)
+      const live = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, live)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]))
+      return { gl, rgl, state, cur: null, out: target(), inp: target(), inGen: null, inGenId: '', live }
+    }
+    let g: PreviewGL = build()
     glRef.current = g
     let raf = 0
     let lastLive = 0
     let liveW = 1
     let liveH = 1
-    const onLost = (e: Event): void => { e.preventDefault(); cancelAnimationFrame(raf) }
-    canvas.addEventListener('webglcontextlost', onLost)
     const loop = (): void => {
       raf = requestAnimationFrame(loop)
+      const { state } = g
       const cur = g.cur
       if (!cur) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -377,7 +461,7 @@ export function SourceEditor(): JSX.Element {
               g.inGen = null
               g.inGenId = want
               const src = SHADER_BY_ID[want]?.source
-              if (src) { const r = new ISFRenderer(rgl); try { r.loadSource(src) } catch { /* runtime */ } if (r.valid) g.inGen = r }
+              if (src) { const r = new ISFRenderer(g.rgl); try { r.loadSource(src) } catch { /* runtime */ } if (r.valid) g.inGen = r }
             }
             if (g.inGen) {
               state.redirect = g.inp.fbo
@@ -401,28 +485,58 @@ export function SourceEditor(): JSX.Element {
         /* a broken frame : the next one tries again */
       }
     }
+    // A GPU reset (a driver restart) : the loop stops and the editor says so,
+    // instead of reporting every compile as an error against a dead context.
+    // When the context comes back, everything is built again and the code
+    // compiled anew.
+    const onLost = (e: Event): void => {
+      e.preventDefault() // ask for it back
+      cancelAnimationFrame(raf)
+      glRef.current = null
+      setLost(true)
+    }
+    const onRestored = (): void => {
+      g = build()
+      glRef.current = g
+      lastLive = 0
+      setLost(false)
+      compileRef.current(draftRef.current.source)
+      raf = requestAnimationFrame(loop)
+    }
+    canvas.addEventListener('webglcontextlost', onLost)
+    canvas.addEventListener('webglcontextrestored', onRestored)
+    // a restarted preview (its button) : the code compiles at once
+    if (previewGen > 0) compileRef.current(draftRef.current.source)
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
       canvas.removeEventListener('webglcontextlost', onLost)
-      try { g.cur?.cleanup() } catch { /* gone */ }
-      try { g.inGen?.cleanup() } catch { /* gone */ }
-      for (const x of [g.out, g.inp]) { gl.deleteTexture(x.tex); gl.deleteFramebuffer(x.fbo) }
-      gl.deleteTexture(g.live)
-      glRef.current = null
+      canvas.removeEventListener('webglcontextrestored', onRestored)
+      if (!gl.isContextLost()) {
+        try { g.cur?.cleanup() } catch { /* gone */ }
+        try { g.inGen?.cleanup() } catch { /* gone */ }
+        for (const x of [g.out, g.inp]) { gl.deleteTexture(x.tex); gl.deleteFramebuffer(x.fbo) }
+        gl.deleteTexture(g.live)
+      }
+      if (glRef.current === g) glRef.current = null
+      // released now (this canvas is never used again) : the browser keeps few
       gl.getExtension('WEBGL_lose_context')?.loseContext()
+      canvas.remove()
     }
-  }, [])
+  }, [previewGen])
   const evNames = useRef(new Set<string>())
   const fired = useRef(new Set<string>()) // events pressed since the last frame
 
+  // what the last compile said about which source (a save reads it)
+  const compiledRef = useRef<{ source: string; ok: boolean } | null>(null)
   /** Compile into the preview; the errors, mapped back onto your lines. */
   const compile = (source: string): void => {
     const g = glRef.current
-    if (!g) return
+    if (!g || g.gl.isContextLost()) return // the status line says the preview is lost
     const t0 = performance.now()
     const lints = lintIsf(source)
     const { renderer, errors } = compileIsf(g.gl, g.rgl, source)
+    compiledRef.current = { source, ok: !!renderer }
     if (renderer) {
       try { g.cur?.cleanup() } catch { /* gone */ }
       g.cur = renderer
@@ -432,6 +546,15 @@ export function SourceEditor(): JSX.Element {
     }
     setMarksState([...errors, ...lints])
     setStatus({ ok: false, ms: performance.now() - t0, at: Date.now() })
+  }
+  compileRef.current = compile
+  /** Does it compile ? The last compile's word when it was this source, else
+   *  compiled now (the preview, or a context of its own when the preview has
+   *  none). null : no GL to tell. */
+  const compiles = (source: string): boolean | null => {
+    if (compiledRef.current?.source !== source) compile(source)
+    if (compiledRef.current?.source === source) return compiledRef.current.ok
+    return compilesAlone(source)
   }
 
   // compile a moment after typing stops
@@ -468,7 +591,7 @@ export function SourceEditor(): JSX.Element {
   const openMine = (id: string): void => {
     const s = SHADER_BY_ID[id]
     if (!s) return
-    const d = { name: s.name, source: s.source, userId: id, saved: s.source, from: 'yours' }
+    const d = { name: s.name, source: s.source, userId: id, saved: s.source, from: 'yours', base: s.source }
     setDraft(d)
     loadText(s.source)
   }
@@ -482,18 +605,51 @@ export function SourceEditor(): JSX.Element {
   // ── save / delete / use ──
   const save = async (force = false): Promise<string | null> => {
     const d = draftRef.current
-    const name = d.name.trim()
-    if (!name) { showToast('Name it first.', 'warn'); return null }
+    const gen = genRef.current
+    const typed = d.name.trim()
+    if (!typed) { showToast('Name it first.', 'warn'); return null }
+    // the id of the name main saves it under (cut to 80 characters, the
+    // characters a file can't carry made spaces), so the question below is
+    // asked about the shader it really replaces
+    const name = fileNameOf(typed)
     const id = userShaderId(name)
-    const other = userShaders.find((u) => u.id === id && u.id !== d.userId && !u.fromSession)
-    if (other && !force) { setConfirm('overwrite'); return null }
+    if (!force) {
+      const other = userShaders.find((u) => u.id === id && u.id !== d.userId)
+      if (other) { setConfirm(other.fromSession ? 'session' : 'overwrite'); return null }
+      if (id === d.userId && elsewhereOf(d) !== null) {
+        setConfirm('elsewhere')
+        showToast('It changed elsewhere since you opened it : reload it, keep yours, or save again to write over it.', 'warn', 6000)
+        return null
+      }
+    }
     setConfirm('')
+    // One that does not compile is still written (your work is kept), but the
+    // version that plays stays : loaded, it would empty every layer it is on.
+    const ok = compiles(d.source)
     const r = await window.api.shadersSave(name, d.source)
     if (!r?.ok) { showToast(`Not saved : ${r?.error ?? 'the Shaders folder refused it'}`, 'warn', 6000); return null }
-    const info = registerUserShader(r.name, d.source)
-    upsert(info)
-    setDraft({ ...draftRef.current, name: r.name, userId: info.id, saved: d.source })
-    showToast(`Saved “${r.name}” in your Shaders`, 'ok')
+    const prev = SHADER_BY_ID[userShaderId(r.name)]
+    let info: UserShaderInfo
+    const loaded = ok !== false || !prev
+    if (loaded) {
+      info = registerUserShader(r.name, d.source)
+    } else {
+      info = { id: prev.id, name: prev.name, category: prev.category === 'FX' ? 'FX' : 'Generator' }
+    }
+    upsert(info) // a file of yours now (no longer only the session's)
+    // another shader opened while this one was saved : it stays as it is
+    if (genRef.current === gen) {
+      const cur = draftRef.current
+      setDraft({
+        ...cur,
+        name: cur.name.trim() === typed ? r.name : cur.name,
+        userId: info.id,
+        saved: d.source,
+        base: SHADER_BY_ID[info.id]?.source
+      })
+    }
+    if (loaded) showToast(`Saved “${r.name}” in your Shaders`, 'ok')
+    else showToast(`Saved “${r.name}”, not loaded : it has errors (the last good version keeps playing)`, 'warn', 6000)
     return info.id
   }
   const del = async (): Promise<void> => {
@@ -501,7 +657,10 @@ export function SourceEditor(): JSX.Element {
     if (!d.userId) return
     if (confirm !== 'delete') { setConfirm('delete'); return }
     setConfirm('')
+    const gen = genRef.current
     await window.api.shadersDelete(SHADER_BY_ID[d.userId]?.name ?? d.name)
+    // another shader opened meanwhile : only the one deleted changes
+    const keepDraft = (): void => { if (genRef.current === gen) setDraft({ ...draftRef.current, userId: null, saved: '', base: undefined }) }
     const st = useStore.getState()
     const playing = userShaderIdsIn(st.composition)
     userShaderIdsIn(st.scenes, playing)
@@ -509,19 +668,28 @@ export function SourceEditor(): JSX.Element {
       // still on screen (or in a scene) : it keeps playing, the session carries it
       const info = st.userShaders.find((u) => u.id === d.userId)
       if (info) upsert({ ...info, fromSession: true })
-      setDraft({ ...d, userId: null, saved: '' })
+      keepDraft()
       showToast(`“${d.name}” removed from your Shaders folder : it keeps playing where it is (the session carries it)`, 'ok', 5000)
       return
     }
     unregisterUserShader(d.userId)
     removeUser(d.userId)
-    setDraft({ ...d, userId: null, saved: '' })
+    keepDraft()
     showToast(`“${d.name}” removed from your Shaders (it stays open here)`, 'ok')
+  }
+  /** The version made elsewhere : open it (yours goes), or keep yours (to save over it). */
+  const takeElsewhere = (keepMine: boolean): void => {
+    const d = draftRef.current
+    const live = elsewhereOf(d)
+    if (live === null || !d.userId) return
+    setConfirm('')
+    if (keepMine) setDraft({ ...d, saved: live, base: live })
+    else openMine(d.userId)
   }
   // Ctrl/Cmd+S saves the shader while the editor is open (the App leaves the
   // session alone then), from the code or anywhere on the page
   const saveKeyRef = useRef(save)
-  saveKeyRef.current = () => save(confirm === 'overwrite')
+  saveKeyRef.current = () => save(forced)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return
@@ -533,9 +701,11 @@ export function SourceEditor(): JSX.Element {
   }, [])
   const useIt = async (where: 'slot' | 'layer' | 'master'): Promise<void> => {
     const d = draftRef.current
+    // the code on screen is what plays : not while it has errors
+    if (compiles(d.source) === false) { showToast('It has errors : fix them, then use it.', 'warn'); return }
     let id = d.userId
-    if (!id || d.source !== d.saved || !useStore.getState().userShaders.some((u) => u.id === id)) id = await save()
-    if (!id) return
+    if (!id || d.source !== d.saved || SHADER_BY_ID[id]?.source !== d.source || !useStore.getState().userShaders.some((u) => u.id === id)) id = await save()
+    if (!id || SHADER_BY_ID[id]?.source !== d.source) return
     const st = useStore.getState()
     const sel = selection?.type === 'source' ? selection : null
     const layer = sel?.layer ?? 0
@@ -578,8 +748,19 @@ export function SourceEditor(): JSX.Element {
         <span className="font-mono text-[10px] text-muted">
           {mine ? (dirty ? '● changed' : 'saved') : `not saved yet · ${draft.from}`}
         </span>
-        <button className="btn text-[11px]" onClick={() => void save(confirm === 'overwrite')} title="Save it in your Shaders folder under this name (a built-in is never written over)">
-          {confirm === 'overwrite' ? 'replace yours ?' : 'Save'}
+        {elsewhere !== null && (
+          <span className="flex items-center gap-1 font-mono text-[10px] text-[rgb(217_164_65)]" title="It was saved again since you opened it (by the agent, another save, a session's own version)">
+            changed elsewhere :
+            <button className="btn px-1.5 text-[10px]" onClick={() => takeElsewhere(false)} title="Open the version that is there now (what you wrote here goes)">reload</button>
+            <button className="btn px-1.5 text-[10px]" onClick={() => takeElsewhere(true)} title="Keep what you wrote here : a save writes it over the other version">keep mine</button>
+          </span>
+        )}
+        <button
+          className="btn text-[11px]"
+          onClick={() => void save(forced)}
+          title="Save it in your Shaders folder under this name (a built-in is never written over; with errors it is saved but not loaded : the last good version keeps playing)"
+        >
+          {confirm === 'overwrite' ? 'replace yours ?' : confirm === 'session' ? 'replace the session one ?' : confirm === 'elsewhere' ? 'write over it ?' : 'Save'}
         </button>
         <span className="font-mono text-[9px] text-muted">use :</span>
         {category === 'Generator' ? (
@@ -611,7 +792,7 @@ export function SourceEditor(): JSX.Element {
             {confirm === 'delete' ? 'delete ?' : 'delete'}
           </button>
         )}
-        <button className="btn text-[12px]" onClick={() => close(false)} title="Close (Alt+E / Esc). What you were writing stays here.">✕ Close</button>
+        <button className="btn text-[12px]" onClick={() => close(false)} title={`Close (${SOURCE_EDITOR_KEY} / Esc). What you were writing stays here.`}>✕ Close</button>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -640,11 +821,19 @@ export function SourceEditor(): JSX.Element {
 
         {/* the preview, the problems, the controls */}
         <aside className="no-scrollbar flex w-[420px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel p-2">
-          <canvas ref={canvasRef} className="w-full rounded border border-border bg-black" style={{ aspectRatio: '16 / 9' }} />
+          {/* the preview's canvas : made by its effect, one per mount */}
+          <div ref={previewRef} />
           <div className="flex items-center gap-2 font-mono text-[10px]">
-            <span className={status.ok ? 'text-success' : 'text-danger'}>
-              {status.at === 0 ? 'compiling…' : status.ok ? `✓ compiled in ${Math.round(status.ms)} ms` : `✕ ${errs.length} error${errs.length === 1 ? '' : 's'} : the last good version plays`}
-            </span>
+            {lost ? (
+              <span className="flex items-center gap-1.5 text-danger">
+                ✕ preview lost (the GPU restarted)
+                <button className="btn px-1.5 text-[10px]" onClick={() => setPreviewGen((n) => n + 1)} title="Start the preview again on a new context">restart it</button>
+              </span>
+            ) : (
+              <span className={status.ok ? 'text-success' : 'text-danger'}>
+                {status.at === 0 ? 'compiling…' : status.ok ? `✓ compiled in ${Math.round(status.ms)} ms` : `✕ ${errs.length} error${errs.length === 1 ? '' : 's'} : the last good version plays`}
+              </span>
+            )}
             <div className="flex-1" />
             {category === 'FX' && (
               <select className="input select-compact text-[10px]" value={fxInput} onChange={(e) => setFxInput(e.target.value)} title="What the effect reads in the preview">
@@ -671,6 +860,7 @@ export function SourceEditor(): JSX.Element {
           </div>
           <p className="font-mono text-[9px] leading-relaxed text-muted">
             ISF : the JSON header declares the controls (float, long, bool, color, point2D, event; an image named inputImage makes it an effect; PASSES with PERSISTENT targets keep frames).
+            {' A control\'s "HINT": "…" is its hover help (here and in the Inspector). '}
             Use isf_FragNormCoord, RENDERSIZE, TIME, IMG_NORM_PIXEL. A uniform float PH_name; is TIME integrated at the input called name (no jumps when it moves).
           </p>
         </aside>
@@ -680,17 +870,18 @@ export function SourceEditor(): JSX.Element {
 }
 
 function CtlRow({ c, value, onChange }: { c: Ctl; value: unknown; onChange: (v: unknown) => void }): JSX.Element {
-  const label = <span className="w-20 shrink-0 truncate font-mono text-[10px] text-muted" title={c.name}>{c.name}</span>
+  const label = <span className="w-20 shrink-0 truncate font-mono text-[10px] text-muted" title={c.hint ? `${c.name} : ${c.hint}` : c.name}>{c.name}</span>
   if (c.type === 'bool')
     return <label className="flex items-center gap-2">{label}<input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} /></label>
   if (c.type === 'event')
     return <div className="flex items-center gap-2">{label}<button className="btn px-2 text-[10px]" onClick={() => onChange(true)}>fire ▸</button></div>
   if (c.type === 'long') {
-    const vs = c.values ?? Array.from({ length: Math.max(1, Math.round(c.max - c.min) + 1) }, (_, i) => c.min + i)
+    // a menu (headerOf made a wide MIN..MAX a slider); a long VALUES list is cut
+    const vs = (c.values?.length ? c.values : [c.min]).slice(0, 256)
     return (
       <div className="flex items-center gap-2">{label}
         <select className="input select-compact min-w-0 flex-1 text-[10px]" value={Number(value ?? vs[0])} onChange={(e) => onChange(Number(e.target.value))}>
-          {vs.map((v, i) => <option key={v} value={v}>{c.labels?.[i] ?? v}</option>)}
+          {vs.map((v, i) => <option key={i} value={v}>{c.labels?.[i] ?? v}</option>)}
         </select>
       </div>
     )
@@ -719,8 +910,8 @@ function CtlRow({ c, value, onChange }: { c: Ctl; value: unknown; onChange: (v: 
   const v = typeof value === 'number' ? value : c.min
   return (
     <div className="flex items-center gap-2">{label}
-      <input type="range" min={c.min} max={c.max} step={(c.max - c.min) / 500 || 0.01} value={v} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-accent" />
-      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2)}</span>
+      <input type="range" min={c.min} max={c.max} step={c.integer ? 1 : (c.max - c.min) / 500 || 0.01} value={v} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-accent" />
+      <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{c.integer || Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2)}</span>
     </div>
   )
 }

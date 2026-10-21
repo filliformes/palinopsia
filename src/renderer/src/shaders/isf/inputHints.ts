@@ -3,7 +3,8 @@
 // Focused on the always-on finalizers (Vibe · Context · Finalizer) : the params
 // a first-timer meets in Finishing and can't guess from the label alone.
 // Every input of every source, effect and node has one : a new control ships
-// with its hint (your own shaders, from the Source Editor, have none).
+// with its hint (your own shaders, and any ISF, carry theirs as a "HINT" in
+// their header : inputs.ts reads it).
 
 export const INPUT_HINTS: Record<string, Record<string, string>> = {
   // ── Silhouette (the Body camera's cutout) ───────────────────────────

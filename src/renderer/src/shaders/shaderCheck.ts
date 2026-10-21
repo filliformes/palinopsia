@@ -38,6 +38,48 @@ export function lintIsf(source: string): ShaderMark[] {
   return out
 }
 
+/** What an error says. The runtime throws `new Error({ message, type })`, whose
+ *  message reads "[object Object]" : that is never shown. */
+function messageOf(e: unknown): string {
+  if (!e) return ''
+  if (typeof e === 'string') return e
+  const m = (e as { message?: unknown }).message
+  if (typeof m === 'string' && m && m !== '[object Object]') return m
+  if (m && typeof m === 'object') return messageOf(m)
+  const s = String(e)
+  return s === '[object Object]' || s === 'Error: [object Object]' ? '' : s
+}
+
+/** The vertex stage's and the link's errors, for a fragment shader that compiles. */
+function linkErrors(gl: WebGL2RenderingContext, vertexSource: string | undefined, fs: WebGLShader): ShaderMark[] {
+  const out: ShaderMark[] = []
+  const logLines = (log: string, what: string): void => {
+    for (const l of log.split('\n')) {
+      const t = l.replace(/^(ERROR|WARNING):\s*\d+:\d+:\s*/, '').trim()
+      if (t && !/^WARNING/.test(l) && t !== '\0') out.push({ line: 0, level: 'error', msg: `${what} : ${t}` })
+    }
+  }
+  if (!vertexSource) return out
+  const vs = gl.createShader(gl.VERTEX_SHADER)
+  if (!vs) return out
+  gl.shaderSource(vs, vertexSource)
+  gl.compileShader(vs)
+  if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+    logLines(gl.getShaderInfoLog(vs) ?? '', 'the vertex stage')
+  } else {
+    const p = gl.createProgram()
+    if (p) {
+      gl.attachShader(p, vs)
+      gl.attachShader(p, fs)
+      gl.linkProgram(p)
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) logLines(gl.getProgramInfoLog(p) ?? '', 'linking')
+      gl.deleteProgram(p)
+    }
+  }
+  gl.deleteShader(vs)
+  return out
+}
+
 /** Build it on `rgl` (a makeRedirectableGL wrapper of `gl`) : the renderer when
  *  it compiles (the caller owns it), else the errors, mapped back onto the
  *  source's lines (0 : no line). */
@@ -57,7 +99,7 @@ export function compileIsf(
   if (r && r.valid && !thrown) return { renderer: r, errors: [] }
   const errs: ShaderMark[] = []
   const lines = source.split('\n')
-  const msg = String((r?.error as { message?: string } | undefined)?.message ?? r?.error ?? thrown ?? '')
+  const msg = messageOf(r?.error) || messageOf(thrown)
   const open = Math.max(0, lines.findIndex((l) => l.includes('/*')))
   const close = lines.findIndex((l) => l.includes('*/'))
   if (/metadata|There is no metadata/i.test(msg)) {
@@ -66,11 +108,10 @@ export function compileIsf(
   } else if (r?.fragmentShader) {
     // The runtime throws its GLSL log away : compile the shader it built again
     // here, read the log, and move each line back onto the source's.
-    const sh = gl.createShader(gl.FRAGMENT_SHADER)!
-    gl.shaderSource(sh, r.fragmentShader)
-    gl.compileShader(sh)
-    const log = gl.getShaderInfoLog(sh) ?? ''
-    gl.deleteShader(sh)
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!
+    gl.shaderSource(fs, r.fragmentShader)
+    gl.compileShader(fs)
+    const log = gl.getShaderInfoLog(fs) ?? ''
     const prefix = ISFParser.fragmentShaderSkeleton.split('[[main]]')[0].replace('[[uniforms]]', r.model?.uniformDefs ?? '')
     const before = prefix.split('\n').length // GLSL line of the source's "*/" line
     for (const l of log.split('\n')) {
@@ -80,6 +121,11 @@ export function compileIsf(
       const line = gLine >= before && close >= 0 ? close + 1 + (gLine - before) : 0
       errs.push({ line: line >= 1 && line <= lines.length ? line : 0, level: 'error', msg: m[2].trim() })
     }
+    // The fragment compiles alone : the vertex stage or the link failed (a
+    // varying with no vertex counterpart, an ISF file whose .vs stayed behind,
+    // too many inputs). Their logs say which; they have no line of yours.
+    if (!errs.length && gl.getShaderParameter(fs, gl.COMPILE_STATUS)) errs.push(...linkErrors(gl, r.vertexShader, fs))
+    gl.deleteShader(fs)
     if (!errs.length) errs.push({ line: 0, level: 'error', msg: msg || 'It does not compile.' })
   } else {
     errs.push({ line: 0, level: 'error', msg: msg || 'It does not compile.' })
@@ -106,6 +152,16 @@ function stillGL(): StillGL | null {
   const { gl: rgl, state } = makeRedirectableGL(gl)
   still = { canvas, gl, rgl, state }
   return still
+}
+
+/** Does `source` compile ? On the still's own context (the Source Editor's
+ *  save, when its preview has none). null : no WebGL2 to tell. */
+export function compilesAlone(source: string): boolean | null {
+  const g = stillGL()
+  if (!g) return null
+  const { renderer } = compileIsf(g.gl, g.rgl, source)
+  try { renderer?.cleanup() } catch { /* gone */ }
+  return !!renderer
 }
 
 function target(gl: WebGL2RenderingContext, w: number, h: number): { fbo: WebGLFramebuffer; tex: WebGLTexture } {

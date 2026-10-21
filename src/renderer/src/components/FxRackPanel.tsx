@@ -17,6 +17,7 @@ import { ContextMenu } from './ContextMenu'
 import { useFxMenuItems } from './fxMenu'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { isFileDrag } from './fileDrop'
+import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
 
 // The unit being dragged, shared by every rack so a chip can be dropped into
 // ANOTHER rack (a layer ↔ the Master FX) as well as reordered in its own.
@@ -60,7 +61,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
   // Your own effects (the Source Editor), first
   const mine = useStore((s) => s.userShaders)
   const options: SearchOption[] = [
-    ...mine.filter((u) => u.category === 'FX').map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: 'One of your shaders (the Source Editor, Alt+E)' })),
+    ...mine.filter((u) => u.category === 'FX').map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: `One of your shaders (the Source Editor, ${SOURCE_EDITOR_KEY})` })),
     ...groups.flatMap((grp) =>
       grp.shaders.map((f) => ({ value: f.id, label: f.name, group: grp.group, keywords: keywordsFor(f.id), title: blurbFor(f.id) }))
     )

@@ -9,7 +9,7 @@ import { promises as fs, mkdirSync } from 'fs'
 import { basename, extname, join } from 'path'
 import { userFilesBase } from './paths'
 import { lastDir, rememberDir } from './lastDir'
-import { userShaderId } from '@shared/userShaderId'
+import { fileNameOf, userShaderId } from '@shared/userShaderId'
 
 const EXT = /\.(fs|frag|glsl|isf)$/i
 
@@ -25,9 +25,40 @@ export function shadersDir(): string {
   }
 }
 
-/** A name a file can carry (the shader's name IS its file name). */
-const fileNameOf = (name: string): string =>
-  name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'shader'
+// ── history : no overwrite is final ──────────────────────────────────────
+// Before a shader file is written over or removed (a save under its name, by
+// you or the agent, its twin spellings, a delete), its content is kept in
+// Shaders/.history/<name>/ (the newest HISTORY_KEEP versions), like a session's.
+// The hidden folder never reaches the menus (list() reads only shader files).
+const HISTORY_KEEP = 30
+const stamp = (): string => {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`
+}
+async function keepHistory(file: string, next: string | null): Promise<void> {
+  let old: string
+  try {
+    old = await fs.readFile(file, 'utf8')
+  } catch {
+    return // nothing there yet
+  }
+  if (old === next) return // unchanged : no new version
+  const dir = join(shadersDir(), '.history', basename(file, extname(file)))
+  await fs.mkdir(dir, { recursive: true })
+  const at = stamp()
+  let to = join(dir, `${at}${extname(file)}`)
+  for (let n = 2; n < 50; n++) {
+    try { await fs.access(to) } catch { break } // a free name
+    to = join(dir, `${at} ${n}${extname(file)}`)
+  }
+  await fs.writeFile(to, old, 'utf8')
+  const files = (await fs.readdir(dir)).filter((f) => EXT.test(f)).sort()
+  for (const f of files.slice(0, Math.max(0, files.length - HISTORY_KEEP))) await fs.rm(join(dir, f)).catch(() => {})
+}
+const keep = async (file: string, next: string | null): Promise<void> => {
+  try { await keepHistory(file, next) } catch (e) { console.error('[shaders] history copy failed:', (e as Error).message) }
+}
 
 async function list(): Promise<Array<{ name: string; file: string; source: string; mtime: number }>> {
   const d = shadersDir()
@@ -68,10 +99,14 @@ export function registerUserShaders(): void {
   ipcMain.handle('shaders:save', async (_e, name: string, source: string) => {
     const n = fileNameOf(String(name ?? ''))
     const file = join(shadersDir(), `${n}.fs`)
+    const src = String(source ?? '')
     try {
-      await fs.writeFile(file, String(source ?? ''), 'utf8')
+      // what it replaces (this file, its twins) goes to the history first
+      const twins = await filesOf(n)
+      for (const f of twins) await keep(f, src)
+      await fs.writeFile(file, src, 'utf8')
       // the same shader under another spelling or extension : this one replaces it
-      for (const f of await filesOf(n)) if (f.toLowerCase() !== file.toLowerCase()) await fs.unlink(f).catch(() => {})
+      for (const f of twins) if (f.toLowerCase() !== file.toLowerCase()) await fs.unlink(f).catch(() => {})
       return { ok: true, name: n, file }
     } catch (e) {
       return { ok: false, name: n, file, error: (e as Error).message }
@@ -80,6 +115,7 @@ export function registerUserShaders(): void {
   ipcMain.handle('shaders:delete', async (_e, name: string) => {
     let gone = false
     for (const f of await filesOf(fileNameOf(String(name ?? '')))) {
+      await keep(f, null)
       try { await fs.unlink(f); gone = true } catch { /* not this one */ }
     }
     return gone

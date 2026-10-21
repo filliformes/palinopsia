@@ -43,6 +43,37 @@ interface RawInput {
   LABELS?: string[]
   COMPACT?: boolean
   INTEGER?: boolean
+  HINT?: string
+}
+
+/** The widest MIN..MAX a `long` without VALUES is offered as a menu. Wider, it is
+ *  an integer slider : one menu entry per integer froze the app on 0..65535 and
+ *  crashed it on 0..1e10. */
+export const LONG_MENU_MAX = 64
+
+/** A `long` control as every reader takes it (the Inspector, OSC, modulation,
+ *  the agent, the Source Editor) : its VALUES when it declares them (a menu),
+ *  MIN..MAX as a menu when that is a small range, else an integer slider. */
+export function longShape(raw: { MIN?: unknown; MAX?: unknown; VALUES?: unknown; LABELS?: unknown; DEFAULT?: unknown }):
+  | { menu: true; values: number[]; labels?: string[] }
+  | { menu: false; min: number; max: number } {
+  const labels = Array.isArray(raw.LABELS) ? raw.LABELS.map((l) => String(l)) : undefined
+  const vs = raw.VALUES
+  if (Array.isArray(vs) && vs.length && vs.every((v) => typeof v === 'number' && Number.isFinite(v)))
+    return { menu: true, values: vs as number[], labels }
+  const fin = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x)
+  let lo = Math.round(fin(raw.MIN) ? raw.MIN : 0)
+  let hi = Math.round(fin(raw.MAX) ? raw.MAX : Math.max(lo + 1, fin(raw.DEFAULT) ? raw.DEFAULT : lo + 1))
+  if (hi < lo) [lo, hi] = [hi, lo]
+  if (hi - lo + 1 <= LONG_MENU_MAX) return { menu: true, values: Array.from({ length: hi - lo + 1 }, (_, i) => lo + i), labels }
+  return { menu: false, min: lo, max: hi }
+}
+
+/** A header's own hover-help for a control ("HINT" : your shaders, any ISF). */
+export function hintOf(raw: { HINT?: unknown }): string | undefined {
+  if (typeof raw.HINT !== 'string') return undefined
+  const h = raw.HINT.replace(/\s+/g, ' ').trim()
+  return h ? (h.length > 400 ? `${h.slice(0, 397)}...` : h) : undefined
 }
 
 const cache = new Map<string, IsfInputDesc[]>()
@@ -75,22 +106,28 @@ export function inputsForShader(shaderId: string): IsfInputDesc[] {
   const hints = INPUT_HINTS[shaderId]
   for (const raw of parseHeader(shader.source)) {
     if (!raw.NAME || !raw.TYPE) continue
-    const type = raw.TYPE as IsfInputDesc['type']
+    let type = raw.TYPE as IsfInputDesc['type']
     if (type === 'image') continue
     const def =
       typeof raw.DEFAULT === 'boolean' ? (raw.DEFAULT ? 1 : 0) : raw.DEFAULT
+    let { MIN: min, MAX: max, VALUES: values, LABELS: labels, INTEGER: integer } = raw
+    if (type === 'long') {
+      const l = longShape(raw)
+      if (l.menu) ({ values, labels } = l)
+      else { type = 'float'; min = l.min; max = l.max; integer = true; values = undefined; labels = undefined }
+    }
     out.push({
       name: raw.NAME,
       type,
       label: raw.LABEL ?? raw.NAME,
-      min: raw.MIN,
-      max: raw.MAX,
+      min,
+      max,
       def,
-      values: raw.VALUES,
-      labels: raw.LABELS,
+      values,
+      labels,
       compact: raw.COMPACT,
-      integer: raw.INTEGER,
-      hint: hints?.[raw.NAME]
+      integer,
+      hint: hints?.[raw.NAME] ?? hintOf(raw)
     })
   }
   cache.set(shaderId, out)

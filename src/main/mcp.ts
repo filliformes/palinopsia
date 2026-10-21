@@ -21,8 +21,8 @@ const INSTRUCTIONS = [
   'Palinopsia is a live visual instrument : four layers (each two sources A/B mixed, with effect racks) over a background, then master effects, played by a performer who may be on stage.',
   'Start with get_state; look with snapshot after a change, and judge what you see.',
   'Controls take values in their own units (describe_shader has the ranges). Units are addressed L1.A, L1.fx.2, master.fx.1, master.context, bg.',
-  'Write new sources or effects with write_shader : it compiles, shows you the result, and saves them as the performer\'s own.',
-  'Every change you make is one undo step for the performer (Ctrl+Z), and undo reverts. Make deliberate changes, a few at a time, and say what you changed.'
+  'Write new sources or effects with write_shader : it compiles, shows you the result, and saves them as the performer\'s own (never over one of theirs unless they ask).',
+  'Each change you make is one undo step for the performer (Ctrl+Z), and a result says when one made none. Your undo takes back only your own last changes, never the performer\'s. Make deliberate changes, a few at a time, and say what you changed.'
 ].join('\n')
 
 type GetWindow = () => BrowserWindow | null

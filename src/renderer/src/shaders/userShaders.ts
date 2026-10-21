@@ -7,9 +7,39 @@
 
 import { SHADER_BY_ID, type IsfShader } from './isf'
 import { invalidateInputs } from './isf/inputs'
-import { USER_PREFIX, userShaderId } from '@shared/userShaderId'
+import { USER_PREFIX, fileNameOf, userShaderId } from '@shared/userShaderId'
 
-export { USER_PREFIX, userShaderId }
+export { USER_PREFIX, fileNameOf, userShaderId }
+
+/** The Source Editor's key : Alt+E, and on a Mac Cmd+Option+E (Option+E alone
+ *  is the acute accent there). */
+export const SOURCE_EDITOR_KEY =
+  typeof window !== 'undefined' && (window as { api?: { platform?: string } }).api?.platform === 'darwin' ? '⌘⌥E' : 'Alt+E'
+
+// The Shaders folder's listing at start (App.tsx) : a session loaded before it
+// arrives takes a shader of yours for one only the session has, and its own
+// version is lost to the file's. The installation boot waits for it.
+let markReady: () => void = () => {}
+export const userShadersReady: Promise<void> = new Promise((res) => { markReady = res })
+export function markUserShadersReady(): void {
+  markReady()
+}
+
+// A count of the sources entered (by you, the agent, a session) : the Source
+// Editor notices its shader changed underneath it.
+let revision = 0
+const watchers = new Set<() => void>()
+export function userShaderRevision(): number {
+  return revision
+}
+export function onUserShaderChange(fn: () => void): () => void {
+  watchers.add(fn)
+  return () => { watchers.delete(fn) }
+}
+const changed = (): void => {
+  revision++
+  for (const fn of watchers) fn()
+}
 
 export interface UserShaderInfo {
   id: string
@@ -44,7 +74,7 @@ export function registerUserShader(name: string, source: string, fromSession = f
   SHADER_BY_ID[id] = { id, name, category, source, user: true } as IsfShader
   invalidateInputs(id)
   // a new source, or one coming back after a delete : where it plays loads it
-  if (!prev || prev.source !== source) reloads.add(id)
+  if (!prev || prev.source !== source) { reloads.add(id); changed() }
   return { id, name, category, fromSession }
 }
 
@@ -53,6 +83,7 @@ export function unregisterUserShader(id: string): void {
   delete SHADER_BY_ID[id]
   invalidateInputs(id)
   reloads.add(id)
+  changed()
 }
 
 /** The ids whose source changed since the last call (the App loop hands them
