@@ -1,4 +1,4 @@
-import { ndiConfigure, ndiOnStatus, ndiInFind, ndiInOpen, ndiInClose } from './ndi'
+import { ndiConfigure, ndiOnStatus, ndiInFind, ndiInOpen, ndiInClose, ndiAudioOpen, ndiAudioClose } from './ndi'
 import { avfList, avfOpen, avfClose, avfStatus } from './avcapture'
 import { shareLocal } from './share'
 import './recWriter' // real-time DXV3 recording : the file writer
@@ -226,6 +226,10 @@ const api: ExposedApi = {
   ndiInFind: (waitMs?: number) => ndiInFind(waitMs),
   ndiInOpen: (name: string) => ndiInOpen(name),
   ndiInClose: (name: string) => ndiInClose(name),
+  // NDI audio in (an Audio Layer slot) : its receiver runs here too; the sound
+  // goes over a port handed to the slot's AudioWorklet (never through the page).
+  ndiAudioOpen: (id: string, name: string, rate: number, token: string) => ndiAudioOpen(id, name, rate, token),
+  ndiAudioClose: (id: string, token: string) => ndiAudioClose(id, token),
   // USB input (macOS) : an iPhone by USB and the other cameras Chromium cannot
   // list, captured here (src/preload/avcapture.ts); frames reach the page over
   // their own port, like NDI's.

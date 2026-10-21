@@ -50,6 +50,12 @@ interface Lib {
   fs_destroy: (f: Ptr) => void
   fs_capture: (f: Ptr, v: Record<string, unknown>, fieldType: number) => void
   fs_free: (f: Ptr, v: Record<string, unknown>) => void
+  // NDI audio in (an Audio Layer slot) : null in a runtime without them (an old
+  // copy another app ships), which must not keep the rest from loading
+  fs_audio: ((f: Ptr, a: Record<string, unknown>, sampleRate: number, channels: number, samples: number) => void) | null
+  fs_free_audio: ((f: Ptr, a: Record<string, unknown>) => void) | null
+  fs_depth: ((f: Ptr) => number) | null
+  recv_conn: (r: Ptr) => number
 }
 
 interface Frame {
@@ -118,6 +124,11 @@ function loadKoffi(): Koffi | null {
       source_to_connect_to: 'NDIlib_source_t', color_format: 'int', bandwidth: 'int',
       allow_video_fields: 'bool', p_ndi_recv_name: 'const char *'
     })
+    // planar float, one channel after the other (channel_stride_in_bytes apart)
+    koffi.struct('NDIlib_audio_frame_v2_t', {
+      sample_rate: 'int', no_channels: 'int', no_samples: 'int', timecode: 'int64_t',
+      p_data: 'float *', channel_stride_in_bytes: 'int', p_metadata: 'const char *', timestamp: 'int64_t'
+    })
     return koffi
   } catch (e) {
     status.state = 'error'
@@ -128,6 +139,7 @@ function loadKoffi(): Koffi | null {
 
 function bind(k: Koffi, path: string): Lib {
   const l = k.load(path)
+  const opt = (def: string): unknown => { try { return l.func(def) } catch { return null } }
   return {
     unload: () => l.unload(),
     initialize: l.func('bool NDIlib_initialize()'),
@@ -147,7 +159,11 @@ function bind(k: Koffi, path: string): Lib {
     fs_create: l.func('void *NDIlib_framesync_create(void *p_receiver)'),
     fs_destroy: l.func('void NDIlib_framesync_destroy(void *p_instance)'),
     fs_capture: l.func('void NDIlib_framesync_capture_video(void *p_instance, _Out_ NDIlib_video_frame_v2_t *p_video_data, int field_type)'),
-    fs_free: l.func('void NDIlib_framesync_free_video(void *p_instance, NDIlib_video_frame_v2_t *p_video_data)')
+    fs_free: l.func('void NDIlib_framesync_free_video(void *p_instance, NDIlib_video_frame_v2_t *p_video_data)'),
+    fs_audio: opt('void NDIlib_framesync_capture_audio(void *p_instance, _Out_ NDIlib_audio_frame_v2_t *p_audio_data, int sample_rate, int no_channels, int no_samples)'),
+    fs_free_audio: opt('void NDIlib_framesync_free_audio(void *p_instance, NDIlib_audio_frame_v2_t *p_audio_data)'),
+    fs_depth: opt('int NDIlib_framesync_audio_queue_depth(void *p_instance)'),
+    recv_conn: l.func('int NDIlib_recv_get_no_connections(void *p_instance)')
   } as unknown as Lib
 }
 
@@ -463,6 +479,7 @@ function closeRecv(r: InRecv): void {
 /** The library is about to go (a network change, a reload) : stop receiving. */
 function beforeUnload(): void {
   for (const r of recvs.values()) closeRecv(r)
+  for (const t of taps.values()) closeTap(t)
   if (finder && lib) { try { lib.find_destroy(finder) } catch { /* ignore */ } }
   finder = null
 }
@@ -470,6 +487,7 @@ function beforeUnload(): void {
 /** A fresh library : reopen every receiver a layer still wants. */
 function afterInit(): void {
   for (const r of recvs.values()) if (r.alive && !r.recv) openRecv(r)
+  for (const t of taps.values()) if (t.alive && !t.recv) openTap(t)
 }
 
 function openRecv(r: InRecv): void {
@@ -611,4 +629,249 @@ export function ndiInClose(name: string): void {
   r.alive = false
   recvs.delete(name)
   closeRecv(r)
+}
+
+// ── NDI AUDIO IN : an NDI source's sound as an Audio Layer slot ─────────────
+// One receiver per slot (a "tap"), AUDIO ONLY (the sender sends it no picture),
+// on the same library and the same discovery as the video input. Even a source
+// a layer already shows gets its own : the video one asks for the highest
+// bandwidth, and each frame sync hands its audio to one reader.
+//
+// The sound goes through NDI's frame sync too : it resamples the source to the
+// rate asked (the audio context's) and to the pace it is pulled at, so the
+// sender's clock never has to match ours. Pulled HERE, and handed to the slot's
+// AudioWorklet processor (audio/ndiAudio.worklet.js) over a port the page only
+// passes on : planar float, every channel of the source (up to 16), transferred.
+//
+// How it is pulled (all measured outside the app, the processor included) :
+// - STEADY and SMALL : every ~5 ms (a timer, and each report of the processor,
+//   which runs on the sound card's clock), what the time since the last pull is
+//   worth. The frame sync keeps only ~10-20 ms queued : pulled every 16 ms (or
+//   on the processor's demand, in the sound card's bursts) it ran dry and padded
+//   silence several times a minute; every 5 ms, not once in a minute.
+// - TRIMMED toward the processor's buffer target by at most 300 ppm (the sound
+//   card's clock against ours : any card's drift) : a faster trim looked to the
+//   frame sync like a wobbling reader and it re-synced (dropouts).
+// - the frame sync SHORT of it (the next packet a little late) : what it holds,
+//   the rest at the next pull, up to 30 ms behind (then all of it : a source
+//   gone, silence), rather than its padding of silence.
+// - a hold-up of the window (a heavy frame) : the next pull takes the time it
+//   lasted (the frame sync kept it), the processor skips what is too much.
+// Sender clock to the sound card's output : ~49 ms (sd 1.3); a card 300 ppm
+// off : still 43-56 ms after 90 s.
+
+interface AudioTap {
+  id: string // the slot ('A' / 'B')
+  name: string
+  rate: number
+  recv: Ptr
+  fs: Ptr
+  port: MessagePort | null
+  token: string // whose port it is (a slot's old processor letting go must not close its new one)
+  alive: boolean
+  seq: number
+  sent: Array<[number, number]> // chunks [seq, frames] the processor has not acknowledged yet
+  err: number // the processor's buffer below its target, frames (smoothed)
+  reportAt: number // its last report (none for 300 ms : its context stopped, no pulls)
+  lastPull: number
+  acc: number // frames due, not pulled yet
+  conn: number // NDI connections (0 : the source is not there)
+  connAt: number
+  quietAt: number // when a message last went out (it hears the connection at least every 250 ms)
+  linger: ReturnType<typeof setTimeout> | null
+}
+const taps = new Map<string, AudioTap>()
+const BANDWIDTH_AUDIO_ONLY = 10
+const MAX_AUDIO_CH = 16
+const AUDIO_TICK = 5 // ms
+const AUDIO_TRIM = 0.0003 // 300 ppm
+let audioTimer: ReturnType<typeof setInterval> | null = null
+
+function openTap(t: AudioTap): void {
+  if (!lib) return
+  try {
+    t.recv = lib.recv_create({
+      source_to_connect_to: { p_ndi_name: t.name, p_url_address: null },
+      color_format: RGBX_RGBA, bandwidth: BANDWIDTH_AUDIO_ONLY, allow_video_fields: false,
+      p_ndi_recv_name: 'Palinopsia'
+    })
+    t.fs = t.recv ? lib.fs_create(t.recv) : null
+  } catch {
+    closeTap(t)
+  }
+}
+
+/** Its receiver goes (the library going, or the tap). The audio copy is
+ *  synchronous : nothing of NDI's is held between calls. */
+function closeTap(t: AudioTap): void {
+  if (lib) {
+    if (t.fs) { try { lib.fs_destroy(t.fs) } catch { /* ignore */ } }
+    if (t.recv) { try { lib.recv_destroy(t.recv) } catch { /* ignore */ } }
+  }
+  t.fs = null
+  t.recv = null
+  t.conn = 0
+}
+
+function dropTap(t: AudioTap): void {
+  t.alive = false
+  if (t.linger) { clearTimeout(t.linger); t.linger = null }
+  try { t.port?.close() } catch { /* ignore */ }
+  t.port = null
+  closeTap(t)
+}
+
+/** The processor's report : its buffer, its target, the last chunk it got. */
+function onReport(t: AudioTap, d: { t?: string; fill?: number; ack?: number; target?: number } | null): void {
+  if (!d || d.t !== 'want' || !t.port) return
+  const ack = Number(d.ack) || 0
+  while (t.sent.length && t.sent[0][0] <= ack) t.sent.shift()
+  let inflight = 0
+  for (const s of t.sent) inflight += s[1]
+  // smoothed (~0.3 s) : the reports jitter with the sound card's bursts
+  const err = (Number(d.target) || 0) - (Number(d.fill) || 0) - inflight
+  t.err += (err - t.err) * 0.02
+  t.reportAt = performance.now()
+  pullTap(t, t.reportAt)
+}
+
+/** What the time since the last pull is worth (see above), sent on. */
+function pullTap(t: AudioTap, now: number): void {
+  const port = t.port
+  if (!port) return
+  if (lib && t.recv && now - t.connAt > 500) {
+    t.connAt = now
+    try { t.conn = lib.recv_conn(t.recv) } catch { t.conn = 0 }
+  }
+  const status = (): void => {
+    if (now - t.quietAt <= 250) return
+    t.quietAt = now
+    try { port.postMessage({ t: 'a', seq: t.seq, n: 0, ch: 0, conn: t.conn }) } catch { /* closed */ }
+  }
+  // the processor quiet (its audio context stopped) : nothing pulled (NDI drops what piles up)
+  if (!t.reportAt || now - t.reportAt > 300) {
+    t.lastPull = 0
+    t.acc = 0
+    status()
+    return
+  }
+  const dt = t.lastPull ? Math.min(250, now - t.lastPull) : AUDIO_TICK
+  if (dt * t.rate < 32000) { status(); return } // under ~0.7 ms : the next one
+  t.lastPull = now
+  const base = (dt / 1000) * t.rate
+  t.acc = Math.min(t.rate / 4, t.acc + base + base * AUDIO_TRIM * Math.max(-1, Math.min(1, t.err / (t.rate * 0.01))))
+  const fs = t.fs
+  const l = lib
+  if (!l || !fs || !l.fs_audio || !l.fs_free_audio) { status(); return }
+  let want = Math.floor(t.acc)
+  if (want >= 32 && l.fs_depth) {
+    try {
+      const depth = l.fs_depth(fs)
+      if (depth < want && t.acc - depth < t.rate * 0.03) want = depth
+    } catch { /* take it all */ }
+  }
+  if (want < 32) { status(); return }
+  t.acc -= want
+  const f: Record<string, unknown> = {}
+  let got = false
+  try {
+    // 0 channels : the source's own; the rate asked : NDI resamples to it
+    l.fs_audio(fs, f, t.rate, 0, want)
+    got = true
+    const n = Number(f.no_samples) | 0, all = Number(f.no_channels) | 0, stride = Number(f.channel_stride_in_bytes) | 0
+    const ch = Math.min(MAX_AUDIO_CH, all)
+    // (no sound yet : no data, no channels)
+    if (f.p_data && n > 0 && ch > 0 && stride >= n * 4) {
+      const buf = new ArrayBuffer(n * 4 * ch)
+      const k = koffi!
+      const mc = getMemcpy(k)
+      if (mc && stride === n * 4) mc(buf, f.p_data, n * 4 * ch)
+      else {
+        for (let c = 0; c < ch; c++) {
+          new Float32Array(buf, c * n * 4, n).set(k.decode(f.p_data, c * stride, k.array('float', n, 'Typed')) as Float32Array)
+        }
+      }
+      t.seq++
+      t.sent.push([t.seq, n])
+      if (t.sent.length > 64) t.sent.shift() // a processor that stopped acknowledging
+      port.postMessage({ t: 'a', seq: t.seq, n, ch: all, conn: t.conn, buf }, [buf])
+      t.quietAt = now
+    }
+  } catch {
+    /* drop this pull */
+  } finally {
+    if (got) { try { l.fs_free_audio(fs, f) } catch { /* ignore */ } }
+  }
+  status()
+}
+
+function pullTaps(): void {
+  const now = performance.now()
+  let any = false
+  for (const t of taps.values()) {
+    if (!t.port) continue
+    any = true
+    pullTap(t, now)
+  }
+  if (!any && audioTimer) { clearInterval(audioTimer); audioTimer = null }
+}
+
+/** Start (or take back) the receiver for one slot's NDI source, and hand the
+ *  page a fresh port for its processor (window message 'opsia:ndiaudioport'
+ *  carrying `token`). `rate` : the audio context's. False : no NDI runtime, or
+ *  NDI refused the receiver. */
+export async function ndiAudioOpen(id: string, name: string, rate: number, token: string): Promise<boolean> {
+  let t = taps.get(id)
+  if (t && (t.name !== name || t.rate !== rate)) {
+    dropTap(t)
+    taps.delete(id)
+    t = undefined
+  }
+  if (!t) {
+    t = {
+      id, name, rate, recv: null, fs: null, port: null, token: '', alive: true, seq: 0, sent: [],
+      err: 0, reportAt: 0, lastPull: 0, acc: 0, conn: 0, connAt: 0, quietAt: 0, linger: null
+    }
+    taps.set(id, t)
+  }
+  const tap = t
+  if (tap.linger) { clearTimeout(tap.linger); tap.linger = null }
+  tap.alive = true
+  // this open's now (a close for it, even of one that failed, lets the tap go)
+  tap.token = token
+  if (!(await ensureLib())) return false
+  if (taps.get(id) !== tap || !tap.alive || tap.token !== token) return false // let go (or opened again) meanwhile
+  if (!tap.recv) openTap(tap)
+  try { tap.port?.close() } catch { /* ignore */ }
+  const mc = new MessageChannel()
+  tap.port = mc.port1
+  tap.sent = []
+  tap.err = 0
+  tap.reportAt = 0
+  tap.lastPull = 0
+  tap.acc = 0
+  tap.quietAt = 0
+  mc.port1.onmessage = (ev): void => onReport(tap, ev.data)
+  if (!audioTimer) audioTimer = setInterval(pullTaps, AUDIO_TICK)
+  window.postMessage({ t: 'opsia:ndiaudioport', token }, '*', [mc.port2])
+  return !!tap.fs && !!lib?.fs_audio
+}
+
+/** A slot lets go of its NDI source (`token` : the open it was). The receiver
+ *  lingers two seconds : the same slot opening it again (an audio context
+ *  rebuilt after a device error, an undo) takes it back without NDI's few
+ *  seconds of connecting. */
+export function ndiAudioClose(id: string, token: string): void {
+  const t = taps.get(id)
+  if (!t || t.token !== token) return
+  try { t.port?.close() } catch { /* ignore */ }
+  t.port = null
+  t.sent = []
+  if (t.linger) clearTimeout(t.linger)
+  t.linger = setTimeout(() => {
+    t.linger = null
+    if (taps.get(id) !== t || t.port) return
+    taps.delete(id)
+    dropTap(t)
+  }, 2000)
 }

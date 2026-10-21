@@ -1,10 +1,10 @@
 // The Audio Layer : the layers tab's sound, under L4. Two slots, A and B, each a
-// sound file (played like an Import Audio slot, through engine/clipPlayer.ts) or
-// a live audio input (a device, one of its channels or a pair), each at its own
-// volume and pan; the mix between them, then the layer's volume, into Sonify's
-// mix (the worklet's third input, after its master) : the output EQ, the limiter,
-// the recordings and Space all have it. Sonify off, the engine still runs for it,
-// its voices silent.
+// sound file (played like an Import Audio slot, through engine/clipPlayer.ts),
+// a live audio input (a device, one of its channels or a pair) or an NDI®
+// source's sound (audio/ndiAudioIn.ts), each at its own volume and pan; the mix
+// between them, then the layer's volume, into Sonify's mix (the worklet's third
+// input, after its master) : the output EQ, the limiter, the recordings and Space
+// all have it. Sonify off, the engine still runs for it, its voices silent.
 //
 // No React and no store here (the store imports Sonify's engine) : App feeds the
 // state in (sync) and ticks the transport once a frame.
@@ -14,6 +14,7 @@ import { ClipPlayer } from '../engine/clipPlayer'
 import { analyseFrame, frameBufs, readFeature, zero, type AudioFeatureName, type AudioFeatures, type FrameBufs } from '../engine/audioIn'
 import { videoKey, videoPlayheads } from '../engine/videoState'
 import { sonifyEngine } from './sonify'
+import { openNdiAudio, type NdiAudioStatus, type NdiAudioTap } from './ndiAudioIn'
 
 /** The Audio Layer's index where the video seams key by layer (playheads,
  *  seeks, a modulator listening to a slot's sound). */
@@ -43,9 +44,10 @@ export function sanitizeAudioLayer(v: unknown): AudioLayerState {
   const slot = (x: unknown): AudioLayerSlot | null => {
     if (!x || typeof x !== 'object') return null
     const q = x as Record<string, unknown>
-    const kind = q.kind === 'live' ? 'live' : q.kind === 'file' ? 'file' : null
+    const kind = q.kind === 'live' ? 'live' : q.kind === 'file' ? 'file' : q.kind === 'ndi' ? 'ndi' : null
     if (!kind) return null
     if (kind === 'file' && !str(q.mediaId)) return null
+    if (kind === 'ndi' && !str(q.ndiName)) return null
     const s: AudioLayerSlot = {
       kind,
       volume: num(q.volume, kind === 'file' ? 0.8 : 1, 0, 2),
@@ -64,8 +66,11 @@ export function sanitizeAudioLayer(v: unknown): AudioLayerState {
       s.ignoreGlobalSpeed = q.ignoreGlobalSpeed === true
       s.keepPitch = q.keepPitch === true
     } else {
-      s.deviceId = str(q.deviceId)
-      s.deviceLabel = str(q.deviceLabel)
+      if (kind === 'ndi') s.ndiName = str(q.ndiName)
+      else {
+        s.deviceId = str(q.deviceId)
+        s.deviceLabel = str(q.deviceLabel)
+      }
       s.chL = Math.round(num(q.chL, 0, 0, 31))
       s.chR = Math.round(num(q.chR, 1, -1, 31))
     }
@@ -92,6 +97,7 @@ export function mixGain(slot: AudioSlotName, mix: number): number {
 function sourceKey(s: AudioLayerSlot | null): string {
   if (!s) return ''
   if (s.kind === 'file') return `f:${s.mediaId ?? ''}`
+  if (s.kind === 'ndi') return `n:${s.ndiName ?? ''}`
   return `l:${s.deviceId ?? ''}`
 }
 
@@ -104,8 +110,8 @@ function channelPair(s: AudioLayerSlot, n: number): [number, number] {
 }
 const pairKey = (s: AudioLayerSlot): string => `${s.chL ?? 0}:${s.chR ?? 1}`
 
-/** Can the layer sound : a file, or a live input armed (one not open yet holds
- *  no engine and lights nothing : nothing can sound through it). */
+/** Can the layer sound : a file, or a live input (or an NDI source) armed (one
+ *  not open yet holds no engine and lights nothing : nothing can sound through it). */
 export function layerSounds(st: AudioLayerState, armed: AudioLayerArmed): boolean {
   const can = (x: AudioLayerSlot | null, a: boolean): boolean => !!x && (x.kind === 'file' || a)
   return can(st.A, armed.A) || can(st.B, armed.B)
@@ -141,6 +147,8 @@ interface Chain {
   ch: string // the channel pair wired (chL:chR)
   rewireT: number // a channel change waiting for its dip to land
   req: number
+  // an NDI source (its channels picked in its processor : no splitter)
+  ndi?: NdiAudioTap | null
 }
 
 const RAMP = 0.015 // a gain or pan change glides (a stepped one clicked)
@@ -160,6 +168,7 @@ class AudioLayerEngine {
   private seeks: Record<AudioSlotName, number | null> = { A: null, B: null }
   private resumeAt: Record<AudioSlotName, number> = { A: 0, B: 0 } // a rebuilt file starts here
   private live: Record<AudioSlotName, SlotInfo> = { A: NO_INFO, B: NO_INFO }
+  private ndiStat: Record<AudioSlotName, NdiAudioStatus | null> = { A: null, B: null }
   // the device a lost default input was : it opens again only on that one, never
   // on whatever became the default meanwhile (a laptop's microphone)
   private lostLabel: Record<AudioSlotName, string> = { A: '', B: '' }
@@ -361,7 +370,10 @@ class AudioLayerEngine {
     c.split = null
     c.merge = null
     c.srcG = null
+    const ndi = c.ndi
+    c.ndi = null
     const end = (): void => {
+      ndi?.close()
       player?.dispose()
       try { elSrc?.disconnect(); streamSrc?.disconnect(); split?.disconnect(); merge?.disconnect(); srcG?.disconnect() } catch { /* gone */ }
       stream?.getTracks().forEach((t) => t.stop())
@@ -412,18 +424,23 @@ class AudioLayerEngine {
         c = { key: '', vol, pan, an, mixG, srcG: null, player: null, elSrc: null, stream: null, streamSrc: null, split: null, merge: null, ch: '', rewireT: 0, req: 0 }
         this.chains[s] = c
       }
-      // a live input opens only once armed (picked, or its open button)
-      const key = cfg.kind === 'live' && !this.armed[s] ? '' : sourceKey(cfg)
+      // a live input (or an NDI source) opens only once armed (picked, or its open button)
+      const key = cfg.kind !== 'file' && !this.armed[s] ? '' : sourceKey(cfg)
       if (key !== c.key) {
         this.dropSource(c, true)
         c.key = key
         if (!key) {
           this.lostLabel[s] = ''
           this.stopRetry(s)
-          this.setLive(s, { ...NO_INFO, label: cfg.deviceLabel ?? '' })
+          this.setLive(s, { ...NO_INFO, label: (cfg.kind === 'ndi' ? cfg.ndiName : cfg.deviceLabel) ?? '' })
         } else if (cfg.kind === 'file') this.openFile(s, c, cfg)
+        else if (cfg.kind === 'ndi') this.openNdi(s, c, cfg)
         else this.openLive(s, c, cfg)
       } else if (cfg.kind === 'live' && c.merge && pairKey(cfg) !== c.ch) this.rewire(c, cfg)
+      else if (cfg.kind === 'ndi' && c.ndi && pairKey(cfg) !== c.ch) {
+        c.ch = pairKey(cfg)
+        c.ndi.channels(cfg.chL ?? 0, cfg.chR ?? 1)
+      }
       const v = cfg.mute ? 0 : Math.max(0, Math.min(2, cfg.volume))
       c.vol.gain.setTargetAtTime(v, t, RAMP)
       c.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, cfg.pan || 0)), t, RAMP)
@@ -543,6 +560,53 @@ class AudioLayerEngine {
       // (a lost one waits for its device to come back : a device change)
       if (!lost) this.retryLater(s, c)
     })
+  }
+
+  /** An NDI® source's sound : its receiver in the preload, the sound straight to
+   *  a worklet (audio/ndiAudioIn.ts). A source not there yet, or gone, waits :
+   *  NDI finds it again by its name, and it plays as soon as it is back (no
+   *  retry needed, the slot says "lost" meanwhile). */
+  private openNdi(s: AudioSlotName, c: Chain, cfg: AudioLayerSlot): void {
+    const ctx = this.ctx
+    const name = cfg.ndiName ?? ''
+    if (!ctx || !name) return
+    const req = ++c.req
+    this.ndiStat[s] = null
+    this.setLive(s, { ...NO_INFO, label: name })
+    const opened = performance.now()
+    let seen = false // connected once
+    let goneAt = 0
+    openNdiAudio(ctx, s, name, cfg.chL ?? 0, cfg.chR ?? 1, (st) => {
+      if (req !== c.req || this.chains[s] !== c) return
+      this.ndiStat[s] = st
+      const now = performance.now()
+      if (st.connected) { seen = true; goneAt = 0 } else if (!goneAt) goneAt = now
+      // gone for a second (or not found in 12 s : NDI often takes 4 to 8 to
+      // connect) : lost, until it is back
+      const lost = !st.connected && (seen ? now - goneAt > 1000 : now - opened > 12000)
+      this.setLive(s, {
+        ...NO_INFO, label: name, channels: st.channels, lost,
+        error: lost ? (seen ? 'the NDI source left the network' : 'the NDI source is not on the network') : ''
+      })
+    }).then((tap) => {
+      if (req !== c.req || this.chains[s] !== c || this.ctx !== ctx) { tap.close(); return }
+      // (the channels as they are now : picked again while it was opening)
+      const now = this.st[s]
+      const chs = now?.kind === 'ndi' ? now : cfg
+      tap.channels(chs.chL ?? 0, chs.chR ?? 1)
+      c.ndi = tap
+      c.ch = pairKey(chs)
+      tap.node.connect(this.fadeIn(ctx, c))
+    }).catch((e: unknown) => {
+      if (req !== c.req) return
+      console.warn('[audio layer] NDI source unavailable', e)
+      this.setLive(s, { ...NO_INFO, label: name, error: e instanceof Error ? e.message : String(e) || 'unavailable' })
+    })
+  }
+
+  /** An NDI slot's delivery (channels, connected, its buffer), null : none. */
+  ndiStats(s: AudioSlotName): NdiAudioStatus | null {
+    return this.chains[s]?.ndi ? this.ndiStat[s] : null
   }
 
   /** An armed input that would not open with its device there (its driver still
