@@ -79,10 +79,21 @@ function snap(): Snapshot {
   }
 }
 
+// The composition field by field : a copy with the same contents (the baseline
+// given the Link session's tempo, see writeLinkTempo) is no change.
+function sameComposition(a: CompositionState, b: CompositionState): boolean {
+  if (a === b) return true
+  const x = a as unknown as Record<string, unknown>
+  const y = b as unknown as Record<string, unknown>
+  for (const k in x) if (x[k] !== y[k]) return false
+  for (const k in y) if (!(k in x)) return false
+  return true
+}
+
 // Reference-compare the watched slices : any change = a pending undo step.
 function differs(a: Snapshot, b: Snapshot): boolean {
   return (
-    a.composition !== b.composition ||
+    !sameComposition(a.composition, b.composition) ||
     a.scenes !== b.scenes ||
     a.activeSceneId !== b.activeSceneId ||
     a.sequence !== b.sequence ||
@@ -214,6 +225,24 @@ export function runSilently(fn: () => void): void {
   }
 }
 
+/** The tempo of the Ableton Link session, written here by ./link.ts : nobody's
+ *  edit, so never an undo step, and unlike runSilently it leaves an edit still
+ *  in its quiet window alone. A linked app's tempo ramp writes it every frame
+ *  for seconds : through runSilently each write closed the edit in progress, so
+ *  a fader drag during the ramp became one undo step per frame and evicted the
+ *  history. The baseline takes the new tempo, so the edit's step never
+ *  carries it. */
+export function writeLinkTempo(bpm: number): void {
+  applying = true
+  try {
+    useStore.setState((s) => ({ composition: { ...s.composition, bpm } }))
+  } finally {
+    applying = false
+  }
+  if (!quietTimer || !committed) committed = snap()
+  else committed = { ...committed, composition: { ...committed.composition, bpm } }
+}
+
 /** Flush any pending quiet-timer commit immediately (called before undo and
  *  before a silent change). True when it committed a step. */
 function flushPending(): boolean {
@@ -258,7 +287,7 @@ function onlyTempo(a: Snapshot, b: Snapshot): boolean {
 // Leans on the reference-compare : the first slice whose reference differs wins.
 function describeDiff(a: Snapshot, b: Snapshot): string {
   const c1 = a.composition, c2 = b.composition
-  if (c1 !== c2) {
+  if (!sameComposition(c1, c2)) {
     if (c1.layers !== c2.layers) return 'layers'
     if (c1.modMatrix !== c2.modMatrix || c1.modulators !== c2.modulators) return 'modulation'
     if (c1.metaKnobs !== c2.metaKnobs) return 'meta knobs'
@@ -278,6 +307,8 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
     a.tonicity !== b.tonicity || a.shutter !== b.shutter || a.drift !== b.drift ||
     a.flow !== b.flow || a.superFlicker !== b.superFlicker
   ) return 'feel'
+  // a control or a layer made persistent, or let go
+  if (a.pins !== b.pins) return 'persistent'
   if (a.vibePresetName !== b.vibePresetName) return 'vibe'
   if (a.name !== b.name) return 'name'
   return 'change'

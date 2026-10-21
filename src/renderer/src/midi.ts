@@ -28,6 +28,7 @@ import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
 import { useStore } from './store'
 import { tempoEdited } from './tempoEvents'
+import { linkBeats, linkQuantum } from './link'
 import type { SoniConfig } from './audio/sonify'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
@@ -167,6 +168,7 @@ export interface MidiDevice {
 //                   drift/flow/shutter/superFlicker) — NOT mod-matrix targets,
 //                   so MIDI is the only hardware route to them
 // layer:<i>:mix     CC → layer i's A↔B source crossfade (0..1)
+// layer:<i>:harmony CC → layer i's A·B hue (match ↔ clash)
 // surface:x / :y    CC → the Metasurface cursor axis (drives scene-morphing;
 //                   activates the surface; needs >=2 placed scenes)
 // sonify:master     CC → Sonify master gain
@@ -195,7 +197,7 @@ export function isContinuousTarget(id: string): boolean {
     id === 'bg:opacity' ||
     id === 'bg:speed' ||
     id === 'bg:depth' ||
-    /^layer:\d+:(mix|opacity)$/.test(id)
+    /^layer:\d+:(mix|harmony|opacity)$/.test(id)
   )
 }
 
@@ -213,8 +215,8 @@ export function midiTargetLabel(id: string): string {
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
   if (id === 'bg:speed') return 'BACKGROUND speed'
   if (id === 'bg:depth') return 'BACKGROUND shadow'
-  const lm = /^layer:(\d+):(mix|opacity)$/.exec(id)
-  if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : 'opacity'}`
+  const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
+  if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : lm[2] === 'harmony' ? 'A·B hue' : 'opacity'}`
   const sv = /^sonify:voice:(\d+)$/.exec(id)
   if (sv) {
     const k = SONI_VOICE_KEYS[Number(sv[1])]
@@ -319,6 +321,10 @@ class MidiManager {
   // MIDI clock scheduler state (output side).
   private clockTimer: number | null = null
   private nextPulse = 0
+  // With Ableton Link : the next pulse to send, counted on Link's beat (24 a
+  // beat), and the pulse the Start waits for (the top of the next Link bar).
+  private linkPulse: number | null = null
+  private startPulse: number | null = null
 
   async init(): Promise<boolean> {
     if (!('requestMIDIAccess' in navigator)) {
@@ -374,18 +380,63 @@ class MidiManager {
   }
 
   /** Send MIDI Start + a 24-PPQN clock at the app BPM. Uses Web MIDI timestamped
-   *  sends with a look-ahead so the tempo stays tight despite JS timer jitter. */
+   *  sends with a look-ahead so the tempo stays tight despite JS timer jitter.
+   *  With Ableton Link enabled the pulses fall on Link's beat (as it sounds) and
+   *  the Start waits for the top of the next Link bar, so the follower's bars
+   *  land where every linked app's do. */
   private startClock(): void {
     const out = this.output()
     if (!out) return
     const now = performance.now()
-    try { out.send([0xfa]) } catch { /* port busy */ } // Start
+    const lb = linkBeats(now, false)
+    this.startPulse = null
+    if (lb != null) {
+      const q = linkQuantum()
+      this.startPulse = Math.ceil(lb / q - 1e-6) * q * 24
+    } else {
+      try { out.send([0xfa]) } catch { /* port busy */ } // Start
+    }
     this.nextPulse = now
+    this.linkPulse = null
     const LOOKAHEAD = 120, TICK = 25
     const schedule = (): void => {
       const cur = performance.now()
       const o = this.output()
       if (!o) return
+      const b0 = linkBeats(cur, false)
+      if (b0 != null) {
+        // On Link's grid : pulse k falls on beat k/24, stamped from Link's beat
+        // line (its tempo is the slope).
+        const perMs = ((linkBeats(cur + 1000, false) ?? b0) - b0) / 1000
+        if (!(perMs > 0)) return
+        const due = Math.floor(b0 * 24) + 1
+        let k = this.linkPulse
+        // the first pulse, a stall of more than half a second, or Link's beat
+        // re-counted (a new bar size) : on from the next pulse due. A shorter
+        // stall sends what it missed, as the free clock does.
+        if (k == null || (due - k) / 24 / perMs > 500 || (k - due) / 24 / perMs > LOOKAHEAD + 250) k = due
+        for (;;) {
+          const t = cur + (k / 24 - b0) / perMs
+          if (t >= cur + LOOKAHEAD) break
+          const at = Math.max(cur, t)
+          if (this.startPulse != null && k >= this.startPulse) {
+            try { o.send([0xfa], at) } catch { /* port gone */ } // Start, on the top of the bar
+            this.startPulse = null
+          }
+          try { o.send([0xf8], at) } catch { /* port gone */ }
+          k++
+        }
+        this.linkPulse = k
+        // where the free clock carries on if Link is turned off
+        this.nextPulse = cur + (k / 24 - b0) / perMs
+        return
+      }
+      this.linkPulse = null
+      if (this.startPulse != null) {
+        // Link turned off before its bar came : start now
+        try { o.send([0xfa]) } catch { /* port gone */ }
+        this.startPulse = null
+      }
       const bpm = useStore.getState().composition.bpm || 120
       const interval = 60000 / (bpm * 24)
       // Never let a stall dump a burst : if we've fallen far behind, resync.
@@ -404,7 +455,8 @@ class MidiManager {
     try { this.output()?.send([0xfc]) } catch { /* port gone */ } // Stop
   }
 
-  /** Re-align the follower's downbeat to now (Stop then Start). */
+  /** Re-align the follower's downbeat to now (Stop then Start); with Ableton
+   *  Link, to the top of the next Link bar. */
   resyncClock(): void {
     if (this.clockTimer == null) return
     this.stopClock()

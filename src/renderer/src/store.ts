@@ -942,6 +942,8 @@ function dropRemovedInputs(c: CompositionState): CompositionState {
 export function normalizeComposition(c: CompositionState): CompositionState {
   return dropRemovedInputs({
     ...c,
+    // a hand-edited session with no BPM (or null) : the default, not a NaN tempo
+    bpm: Number.isFinite(c.bpm) ? c.bpm : 120,
     // Older sessions have no Background slab : normalize to the blank (off) one;
     // an older slab gets the fields it lacks (a missing speed ran the clock at 0).
     background: c.background

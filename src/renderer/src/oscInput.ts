@@ -28,7 +28,7 @@
 //   /opsia/layer{n}/video[/{A|B}]/grainsync            i index | f 0..1 | s free|1/16|1/8|1/4|1/2
 //   /opsia/layer{n}/coupling/mode                     i index | f 0..1 | s name
 //   /opsia/layer{n}/coupling/amount|tightness         f 0..1
-//   /opsia/layer{n}/coupling/feature                  i index | f 0..1 | s name (level flux transient centroid band pitch noisiness)
+//   /opsia/layer{n}/coupling/feature                  i index | s name (level flux transient centroid band pitch noisiness) | f 0..1 (over the first six)
 //   /opsia/layer{n}/coupling/band                     i 0..5 | f 0..1 (the band feature's band, 0 = the lowest)
 //   /opsia/coupling                                    >= 0.5 (the master switch : every layer's coupling)
 //   /opsia/master/fx/{i}/{input}                       f 0..1 → range
@@ -219,6 +219,11 @@ function blendFrom(args: Args): BlendMode | null {
 const COUPLING_MODES: readonly CouplingMode[] = ['off', 'lean', 'hocket', 'cut', 'gate', 'drift']
 // noisiness last : the indices before it keep their meaning
 const COUPLING_FEATURES: readonly AudioFeature[] = ['level', 'flux', 'transient', 'centroid', 'band', 'pitch', 'noisiness']
+// what a 0..1 float spreads over : the six before noisiness, as it always did
+const COUPLING_FLOAT_FEATURES = COUPLING_FEATURES.slice(0, 6)
+// The audio features Pandore pushes as /opsia/audio/<name> (the bands apart),
+// noisiness included : documented, it used to be dropped on arrival.
+const OSC_AUDIO_FEATURES = ['level', 'flux', 'transient', 'centroid', 'pitch', 'noisiness'] as const
 
 // Video transport enums + the transport's log speed range (mirrors the UI
 // slider in VideoTransport.tsx : 1/64× .. 128×; it was left at 1/28 when the
@@ -292,7 +297,13 @@ function route(address: string, args: Args): void {
         const slot: 'A' | 'B' = segs[4] === 'B' ? 'B' : 'A'
         if (segs[5] === undefined) {
           const str = firstStr(args)
-          if (str !== null) st.setSourceShader(li, slot, resolveGenerator(str))
+          if (str === null) return
+          // "none" empties it; a name it does not know leaves it as it is (it
+          // used to empty the slot, a typo blanking the layer mid-show)
+          const lc = str.trim().toLowerCase()
+          if (lc === 'none' || lc === 'off' || lc === '') { st.setSourceShader(li, slot, null); return }
+          const id = resolveGenerator(str)
+          if (id) st.setSourceShader(li, slot, id)
           return
         }
         if (segs[5] === 'fx') {
@@ -392,7 +403,11 @@ function route(address: string, args: Args): void {
           const m = enumFrom(args, COUPLING_MODES)
           if (m) st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, mode: m } })
         } else if (which === 'feature') {
-          const feat = enumFrom(args, COUPLING_FEATURES)
+          // an index or a name reaches all seven; a 0..1 float spreads over the
+          // six there were before noisiness, so the floats a controller or a
+          // saved scene sends keep the feature they always chose
+          const byIndex = args[0]?.type === 'i' || typeof args[0]?.value === 'string'
+          const feat = enumFrom(args, byIndex ? COUPLING_FEATURES : COUPLING_FLOAT_FEATURES)
           if (feat) st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, feature: feat } })
         } else if (which === 'amount' || which === 'tightness') {
           st.patchLayer(li, { coupling: { ...st.composition.layers[li].coupling, [which]: clamp01(n) } })
@@ -538,8 +553,8 @@ function route(address: string, args: Args): void {
 
     // Audio features from Pandore (the audio brain). These bypass the store —
     // they feed the audio bus straight, read per-frame by `audio` modulators.
-    //   /opsia/audio/{level|flux|transient|centroid|pitch}   f 0..1
-    //   /opsia/audio/band/{1..6}                             f 0..1
+    //   /opsia/audio/{level|flux|transient|centroid|pitch|noisiness}   f 0..1
+    //   /opsia/audio/band/{1..6}                                       f 0..1
     case 'audio': {
       const feat = segs[2]
       if (feat === 'band') {
@@ -547,13 +562,7 @@ function route(address: string, args: Args): void {
         if (bi >= 0) audioBus.setOscFeature('band', clamp01(n), bi)
         return
       }
-      if (
-        feat === 'level' ||
-        feat === 'flux' ||
-        feat === 'transient' ||
-        feat === 'centroid' ||
-        feat === 'pitch'
-      ) {
+      if ((OSC_AUDIO_FEATURES as readonly string[]).includes(feat)) {
         audioBus.setOscFeature(feat as AudioFeatureName, clamp01(n))
       }
       return
@@ -1088,9 +1097,10 @@ export function routeOsc(address: string, args: Args): void {
   }
 }
 
-/** Subscribe to inbound OSC and apply it. Returns an unsubscribe fn. */
+/** Subscribe to inbound OSC and apply it (and keep the OSCQuery tree in step
+ *  with the structure). Returns an unsubscribe fn. */
 export function initOscInput(): () => void {
-  return window.api.onOscReceived((batch) => {
+  const off = window.api.onOscReceived((batch) => {
     for (const m of batch) {
       try {
         route(m.address, m.args)
@@ -1099,6 +1109,11 @@ export function initOscInput(): () => void {
       }
     }
   })
+  const offShape = watchOscQueryShape()
+  return () => {
+    off()
+    offShape()
+  }
 }
 
 /** Push (start=true) or clear (start=false) the listener + OSCQuery for the
@@ -1184,9 +1199,13 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
     add(`/opsia/layer${n}/coupling/amount`, 0, 1, l?.coupling?.amount ?? 0.5, 'A/B coupling depth')
     add(`/opsia/layer${n}/coupling/tightness`, 0, 1, l?.coupling?.tightness ?? 0.7, 'A/B coupling tightness')
+    // Feature and band are indexes, advertised and mirrored as ints : as 0..1
+    // floats, a fader built from the advertisement pushed to the top sent 1.0,
+    // band 1 (a whole number is the band), and the mirrored value came back as
+    // another band; noisiness had no place among the floats.
     const cf = Math.max(0, COUPLING_FEATURES.indexOf(l?.coupling?.feature ?? 'transient'))
-    add(`/opsia/layer${n}/coupling/feature`, 0, 1, cf / (COUPLING_FEATURES.length - 1), 'A/B coupling audio feature (index)')
-    add(`/opsia/layer${n}/coupling/band`, 0, 1, (l?.coupling?.band ?? 0) / 5, 'A/B coupling : the band feature\'s band (0 lowest … 1 highest)')
+    addI(`/opsia/layer${n}/coupling/feature`, 0, COUPLING_FEATURES.length - 1, cf, 'A/B coupling audio feature : 0 level · 1 flux · 2 transient · 3 centroid · 4 band · 5 pitch · 6 noisiness')
+    addI(`/opsia/layer${n}/coupling/band`, 0, 5, l?.coupling?.band ?? 0, 'A/B coupling : the band feature\'s band (0 lowest … 5 highest)')
     // Video transport : advertised (slot-explicit) only while the slot actually
     // holds a video. `position` is a one-shot seek — advertised for discovery
     // but never echoed outbound (the playhead flies at frame rate).
@@ -1391,7 +1410,7 @@ function enumerateLeaves(): Leaf[] {
   }
   add('/opsia/bpm', 20, 800, st.composition.bpm, 'Tempo (raw BPM)')
   // Audio features Pandore PUSHES (consumed by `audio` modulators) : never echoed.
-  for (const feat of ['level', 'flux', 'transient', 'centroid', 'pitch'] as const) {
+  for (const feat of OSC_AUDIO_FEATURES) {
     add(`/opsia/audio/${feat}`, 0, 1, 0, `Audio ${feat} (0..1)`, false)
   }
   for (let b = 1; b <= 6; b++) add(`/opsia/audio/band/${b}`, 0, 1, 0, `Audio band ${b} energy (0..1)`, false)
@@ -1470,7 +1489,9 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/audiolayer/mix', 0, 1, al.mix, 'The Audio Layer : A to B (0.5 = both whole)')
     add('/opsia/audiolayer/mute', 0, 1, al.mute ? 1 : 0, 'The Audio Layer : mute (>= 0.5)')
     const filesPlay = (['A', 'B'] as const).some((sl) => al[sl]?.kind === 'file' && al[sl]?.videoPlaying !== false)
-    add('/opsia/audiolayer/play', 0, 1, filesPlay ? 1 : 0, 'The Audio Layer : both files from their in points together (>= 0.5), or paused')
+    // a start from the in points on its rising edge : never mirrored, or a
+    // destination that sends its state back restarted both files mid-show
+    add('/opsia/audiolayer/play', 0, 1, filesPlay ? 1 : 0, 'The Audio Layer : both files from their in points together (>= 0.5), or paused', false)
     for (const sl of ['A', 'B'] as const) {
       const x = al[sl]
       if (!x) continue
@@ -1531,9 +1552,36 @@ export function oscLeafList(): Array<{ path: string; desc: string }> {
   return enumerateLeaves().map((l) => ({ path: l.path, desc: l.desc }))
 }
 
+// The advertised tree follows the structure : a source or an effect loaded
+// brings its own leaves, and so do a video or an Audio Layer file, the Body
+// camera, a World added. Looked at again (at most twice a second) after the
+// store changes while OSC in listens, and re-sent when the leaf list itself
+// changed; the values travel by feedback and the WS stream. It used to be
+// published only when OSC in started.
+let publishedShape = ''
+let shapeTimer: ReturnType<typeof setTimeout> | null = null
+const shapeOf = (leaves: Leaf[]): string => leaves.map((l) => `${l.path}|${l.int ? 'i' : 'f'}|${l.min}|${l.max}`).join('\n')
+
+function watchOscQueryShape(): () => void {
+  const unsub = useStore.subscribe(() => {
+    if (shapeTimer || !useStore.getState().oscListening) return
+    shapeTimer = setTimeout(() => {
+      shapeTimer = null
+      if (useStore.getState().oscListening && shapeOf(enumerateLeaves()) !== publishedShape) publishOscQuery()
+    }, 500)
+  })
+  return () => {
+    unsub()
+    if (shapeTimer) clearTimeout(shapeTimer)
+    shapeTimer = null
+  }
+}
+
 /** Enumerate the address space and hand it to the OSCQuery server. */
 export function publishOscQuery(): void {
-  const nodes: OscQueryLeaf[] = enumerateLeaves().map((n) => ({
+  const leaves = enumerateLeaves()
+  publishedShape = shapeOf(leaves)
+  const nodes: OscQueryLeaf[] = leaves.map((n) => ({
     full_path: n.path,
     type: n.int ? 'i' : 'f',
     range: { min: n.min, max: n.max },
