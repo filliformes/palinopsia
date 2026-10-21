@@ -47,7 +47,7 @@ import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { canHostFx } from './fxScopes'
 import { modTargetKey } from './modKey'
-import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, sameDeep } from './persist'
+import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
@@ -2122,7 +2122,9 @@ function dropSlotTargets(
 
 /** A hand swap of a slot : its patching goes (dropSlotTargets), and so do its
  *  pinned inputs (persist.ts holds a slot's input by name : kept, the pin would
- *  hold the next source's input of the same name at every recall after). */
+ *  hold the next source's input of the same name at every recall after). The
+ *  whole slot's pin ('src:<i>:<A|B>') stays : it is the slot that is pinned, so
+ *  the new source is the one it holds. */
 function swapSlot(
   s: { pins: string[] },
   c: CompositionState,
@@ -2561,6 +2563,11 @@ export const useStore = create<StoreState>((set, get) => ({
       // a rack on an empty source would process nothing (OSC, a stale menu)
       const src = which === 'A' ? cur.sourceA : which === 'B' ? cur.sourceB : null
       if (which !== 'layer' && (!src || src.kind === 'none')) return {}
+      // a persistent source keeps its rack whole : nothing to deal
+      if (which !== 'layer' && s.pins.includes(slotPin(layer, which))) {
+        showToast(`L${layer + 1} ${which} is persistent : unpin it first (right-click the source)`, 'warn', 4200)
+        return {}
+      }
       const old = which === 'A' ? cur.sourceAFx : which === 'B' ? cur.sourceBFx : cur.fx
       const next = randomizeRack(which)
       // the pinned effects stay where they sit, the rest is dealt around them
@@ -3454,6 +3461,8 @@ export const useStore = create<StoreState>((set, get) => ({
     const sel = s.selection
     set({
       composition: c,
+      // (a pinned effect stays pinned in its new rack)
+      pins: movePins(s.pins, from, to, instId),
       selection: sel && sel.type === 'fx' && sel.instId === instId ? { type: 'fx', scope: to, instId } : sel
     })
     return true
@@ -5144,7 +5153,15 @@ export const useStore = create<StoreState>((set, get) => ({
       activeSceneId: s.activeSceneId === id ? null : s.activeSceneId
     })),
   pins: [],
-  togglePin: (key) => set((s) => ({ pins: s.pins.includes(key) ? s.pins.filter((k) => k !== key) : [...s.pins, key] })),
+  togglePin: (key) =>
+    set((s) => {
+      const on = !s.pins.includes(key)
+      const pins = on ? [...s.pins, key] : s.pins.filter((k) => k !== key)
+      // a World's modulator made persistent is yours from then on (no World takes it back)
+      const m = on ? /^mod:(\d+)$/.exec(key) : null
+      const modulators = m ? releaseWorldMod(s.composition.modulators, Number(m[1])) : s.composition.modulators
+      return modulators === s.composition.modulators ? { pins } : { pins, composition: { ...s.composition, modulators } }
+    }),
   unpin: (key) => set((s) => ({ pins: s.pins.filter((k) => k !== key) })),
   clearPins: () => set({ pins: [] }),
   setInEveryScene: (key, label) => {

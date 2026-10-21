@@ -16,6 +16,8 @@ import { showToast } from './Toast'
 import { warnModMatrixFull } from './AutoControls'
 import { inputsForShader } from '../shaders/isf/inputs'
 import type { MenuItem } from './ContextMenu'
+import { usePinItems } from './Pin'
+import { PIN_WORDS, unitPin } from '../persist'
 
 /** The float (i.e. modulatable) inputs of a shader, as ModTargets built by `build`. */
 export function floatModTargets(
@@ -55,11 +57,16 @@ export function useFxMenuItems(
   const copyFxTo = useStore((s) => s.copyFxTo)
   const layerCount = useStore((s) => s.composition.layers.length)
 
+  // The whole effect persistent (persist.ts) : no scene, dice or Generate
+  // changes it or takes it out of its rack
+  const unitName = SHADER_BY_ID[shaderId ?? '']?.name ?? shaderId ?? 'effect'
+  const pinItems = usePinItems(instId ? unitPin(scope, instId) : null, `${unitName} (${rackName(scope).replace(/^the /, '')})`, PIN_WORDS.unit)
+
   const run = (fn: () => void) => (): void => {
     fn()
     close()
   }
-  const items: MenuItem[] = []
+  const items: MenuItem[] = pinItems.length ? [...pinItems, { label: '', divider: true }] : []
 
   // Modulation actions : "Assign and randomize" seeds+re-rolls random mod (source +
   // Mul) onto this FX's parameters ; "Randomize modulation" re-rolls only what's

@@ -20,6 +20,8 @@ import { useShallow } from 'zustand/react/shallow'
 import type { ClipAudioSrc } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
+import { usePin } from './Pin'
+import { modPin, PIN_WORDS } from '../persist'
 
 // The type menu, in families (a new type goes in the one it belongs to) :
 // shapes in time, patterns on a clock, chance, gestures with a body of their
@@ -116,6 +118,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
   const update = useStore((s) => s.updateModulator)
   // How many matrix targets this modulator drives : a glance at what's wired.
   const drives = useStore((s) => s.composition.modMatrix.filter((a) => a.mod === index).length)
+  // the card persistent (right-click) : its configuration rides every scene,
+  // dice and Generate; a gold border, a gold name
+  const pin = usePin(modPin(index), `M${index + 1}`, PIN_WORDS.mod)
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
@@ -127,7 +132,10 @@ function ModCard({ index }: { index: number }): JSX.Element {
       className={`flex h-40 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
+      style={pin.pinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)' } : undefined}
+      onContextMenu={pin.onContextMenu}
     >
+      {pin.menu}
       <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={() => update(index, { enabled: !m.enabled })}
@@ -136,7 +144,13 @@ function ModCard({ index }: { index: number }): JSX.Element {
           }`}
           title={m.enabled ? 'On : click to disable' : 'Off : click to enable'}
         />
-        <span className="font-mono text-[10px] text-muted">M{index + 1}</span>
+        <span
+          className="font-mono text-[10px]"
+          style={{ color: pin.pinned ? 'rgb(var(--c-pin))' : 'rgb(var(--c-muted))' }}
+          title={pin.pinned ? 'Persistent : no scene, dice or Generate changes this modulator (right-click to unpin)' : 'Right-click : make this modulator persistent'}
+        >
+          M{index + 1}
+        </span>
         {drives > 0 && (
           <span
             className="shrink-0 font-mono text-[9px] leading-4 text-accent"

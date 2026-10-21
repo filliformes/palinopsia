@@ -7,7 +7,8 @@ import type { FxInstance, ModTarget, SidechainRef, SourceSlot } from '@shared/ty
 import { Blink } from './Blink'
 import { FX_OPACITY_INPUT } from '@shared/types'
 import { randomizeInputs } from '../randomize'
-import { pinnedInputs } from '../persist'
+import { pinnedInputs, PIN_WORDS, slotPin } from '../persist'
+import { usePinItems } from './Pin'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { blurbFor } from '../shaders/isf/shaderBlurbs'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
@@ -200,6 +201,12 @@ export function Inspector(): JSX.Element {
     headerUnit?.shaderId,
     () => setHeaderMenu(null),
     !!headerUnit?.locked
+  )
+  // ...and a source's : its whole slot persistent, as on its card in the layer
+  const srcPinItems = usePinItems(
+    selection?.type === 'source' ? slotPin(selection.layer, selection.slot) : null,
+    selection?.type === 'source' ? `L${selection.layer + 1} ${selection.slot}, the whole source` : '',
+    PIN_WORDS.slot
   )
   // "Randomize the inspected unit" (the ⚄ header button) as a learnable MIDI
   // action : register a thunk that a bound pad (rand:inspector) fires. Reset to a
@@ -515,22 +522,27 @@ export function Inspector(): JSX.Element {
   }
 
   // Header right-click menu : an FX gets copy/paste + modulation (useFxMenuItems);
-  // a source/background gets "Randomize modulation" only when it already carries
-  // modulation. No items ⇒ no menu (right-click does nothing).
+  // a source its pin entries (Persistent source); a source/background "Randomize
+  // modulation" only when it already carries modulation. No items ⇒ no menu
+  // (right-click does nothing).
   const isSourceSel = selection?.type === 'source' || selection?.type === 'background'
   const srcModCands =
     isSourceSel && modTargetFor ? floatModTargets(shaderId, modTargetFor) : []
-  const srcMenuItems: MenuItem[] = hasModulationOn(composition.modMatrix, srcModCands)
-    ? [
-        {
-          label: 'Randomize modulation',
-          onClick: () => {
-            randomizeModulation(srcModCands, false)
-            setHeaderMenu(null)
+  const srcMenuItems: MenuItem[] = [
+    ...srcPinItems,
+    ...(hasModulationOn(composition.modMatrix, srcModCands)
+      ? [
+          ...(srcPinItems.length ? [{ label: '', divider: true }] : []),
+          {
+            label: 'Randomize modulation',
+            onClick: () => {
+              randomizeModulation(srcModCands, false)
+              setHeaderMenu(null)
+            }
           }
-        }
-      ]
-    : []
+        ]
+      : [])
+  ]
   const menuItems = fxHere ? headerMenuItems : srcMenuItems
   const menuOpenable = fxHere ? true : srcMenuItems.length > 0
 

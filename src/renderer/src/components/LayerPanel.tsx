@@ -34,7 +34,7 @@ import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
 import { Blink } from './Blink'
 import { PinZone, usePinItems } from './Pin'
-import { layerPin, layerSpeedPin } from '../persist'
+import { layerPin, layerSpeedPin, PIN_WORDS, slotPin } from '../persist'
 import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
 
 export function LayerPanel({ index }: { index: number }): JSX.Element {
@@ -72,7 +72,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const pasteLayer = useStore((s) => s.pasteLayer)
   const hasCopiedLayer = useStore((s) => s.copiedLayer !== null)
 
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  // (`slot` : the right-click landed on a source card, its pin entries lead)
+  const [menu, setMenu] = useState<{ x: number; y: number; slot?: 'A' | 'B' } | null>(null)
   // Which OUT drawer is open (blend, mask, feedback) : one at a time.
   const [outTab, setOutTab] = useState<OutTab | null>(null)
   const [savePrompt, setSavePrompt] = useState(false)
@@ -172,14 +173,21 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
 
   function onContextMenu(e: MouseEvent): void {
     e.preventDefault()
-    setMenu({ x: e.clientX, y: e.clientY })
+    const slot = (e.target as HTMLElement).closest?.('[data-slot]')?.getAttribute('data-slot')
+    setMenu({ x: e.clientX, y: e.clientY, slot: slot === 'A' || slot === 'B' ? slot : undefined })
   }
   // the whole layer persistent : no scene, Randomize, Generate or World changes it
   const wholeKey = layerPin(index)
   const wholePinned = useStore((s) => s.pins.includes(wholeKey))
   const wholeItems = usePinItems(wholeKey, `L${index + 1}, the whole layer`, { pin: 'Persistent layer', every: 'Set this layer in every scene' })
+  // ...or one whole source slot (its source and its effects : a right-click on its card)
+  const pinnedA = useStore((s) => s.pins.includes(slotPin(index, 'A')))
+  const pinnedB = useStore((s) => s.pins.includes(slotPin(index, 'B')))
+  const slotItemsA = usePinItems(slotPin(index, 'A'), `L${index + 1} A, the whole source`, PIN_WORDS.slot)
+  const slotItemsB = usePinItems(slotPin(index, 'B'), `L${index + 1} B, the whole source`, PIN_WORDS.slot)
 
   const menuItems: MenuItem[] = [
+    ...(menu?.slot ? [...(menu.slot === 'A' ? slotItemsA : slotItemsB), { divider: true, label: '' }] : []),
     ...wholeItems,
     { divider: true, label: '' },
     { label: 'Init layer', onClick: () => initLayer(index) },
@@ -319,6 +327,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 <SourceRow
                   card
                   label="A"
+                  pinned={pinnedA}
                   shaderId={layer.sourceA.shaderId}
                   sourceKind={layer.sourceA.kind}
                   mediaId={layer.sourceA.mediaId}
@@ -337,6 +346,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                 <SourceRow
                   card
                   label="B"
+                  pinned={pinnedB}
                   shaderId={layer.sourceB?.shaderId ?? null}
                   sourceKind={layer.sourceB?.kind ?? 'none'}
                   mediaId={layer.sourceB?.mediaId}
@@ -604,7 +614,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          header={`Layer ${index + 1}`}
+          header={menu.slot ? `Layer ${index + 1} · source ${menu.slot}` : `Layer ${index + 1}`}
           items={menuItems}
           onClose={() => setMenu(null)}
         />
@@ -861,6 +871,7 @@ function Indented({ children }: { children: ReactNode }): JSX.Element {
 function SourceRow({
   card = false,
   label,
+  pinned = false,
   shaderId,
   sourceKind,
   mediaId,
@@ -877,6 +888,8 @@ function SourceRow({
   /** A card (layout 2 : A and B side by side) : the picker over the effects. */
   card?: boolean
   label: string
+  /** The whole slot is persistent (right-click it) : a gold outline. */
+  pinned?: boolean
   shaderId: string | null
   sourceKind: SourceKind
   mediaId?: string
@@ -987,6 +1000,8 @@ function SourceRow({
             : `flex min-w-0 items-center gap-1.5 rounded transition-shadow ${dropOver ? 'ring-2 ring-accent' : ''}`
         }
         onClick={onSelect}
+        data-slot={label}
+        style={pinned && !dropOver ? { boxShadow: '0 0 0 1px rgb(var(--c-pin) / 0.8)' } : undefined}
         onDragOver={(e) => {
           if (!isFileDrag(e)) return
           e.preventDefault()
@@ -1002,7 +1017,7 @@ function SourceRow({
           setDropOver(false)
           void onDropFiles(e)
         }}
-        title={`Source ${label} : drop a film, a sound file or a folder here`}
+        title={`${pinned ? 'Persistent : no scene, dice or Generate changes this source or its effects (right-click to unpin). ' : ''}Source ${label} : drop a film, a sound file or a folder here. Right-click : make it persistent`}
       >
         {/* (a card : the label, the picker and "+ fx" on one line, the
             effects under them, led by the chain's on/off) */}

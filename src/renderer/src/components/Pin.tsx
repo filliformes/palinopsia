@@ -1,8 +1,9 @@
 // Persistence in the UI : a right-click on a control offers "Persistent" (no
 // scene, Randomize, Variation, Generate, World or mix preset changes it) and
 // "Set in every scene" (what plays now, written into each scene once). A
-// pinned control wears a thin bar at its left (styles.css [data-pinned]).
-// The rule itself lives in persist.ts.
+// pinned control wears a thin bar at its left (styles.css [data-pinned]); a
+// pinned effect chip, source card or modulator card a gold outline (their own
+// components), a pinned layer a gold border. The rule itself lives in persist.ts.
 
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { useStore } from '../store'
@@ -28,15 +29,16 @@ export function usePinItems(key: string | null, label: string, words?: { pin: st
   ]
 }
 
-/** A right-click menu with the pin entries for one control. */
-export function usePin(key: string | null, label: string): {
+/** A right-click menu with the pin entries for one control (or one whole
+ *  thing : `words` names it). */
+export function usePin(key: string | null, label: string, words?: { pin: string; every: string }): {
   pinned: boolean
   onContextMenu: (e: MouseEvent) => void
   menu: ReactNode
 } {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   const pinned = useStore((s) => (key ? s.pins.includes(key) : false))
-  const items = usePinItems(key, label)
+  const items = usePinItems(key, label, words)
   const onContextMenu = (e: MouseEvent): void => {
     if (!key) return
     e.preventDefault()

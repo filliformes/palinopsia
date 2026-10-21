@@ -186,7 +186,8 @@ export function SceneBank(): JSX.Element {
 
 // What is persistent (persist.ts) : how many, and the list (each one in words,
 // dimmed when it is not in the picture now, × unpins it). Only while there is
-// something pinned : a right-click on a control or a layer pins it.
+// something pinned : a right-click on a control, an effect, a source, a
+// modulator card or a layer pins it.
 function PinsChip(): JSX.Element | null {
   const count = useStore((s) => s.pins.length)
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
@@ -200,7 +201,7 @@ function PinsChip(): JSX.Element | null {
         onClick={(e: MouseEvent) => setAt({ x: e.clientX, y: e.clientY })}
         className="rounded border px-1.5 py-0.5 font-mono text-[11px] transition-colors hover:bg-panel3/60"
         style={{ borderColor: 'rgb(var(--c-pin) / 0.6)', color: 'rgb(var(--c-pin))' }}
-        title="Persistent : what no scene, Randomize, Variation, Generate or World changes. Click for the list (right-click a control or a layer to pin or unpin it)"
+        title="Persistent : what no scene, Randomize, Variation, Generate or World changes. Click for the list (right-click a control, an effect, a source, a modulator or a layer to pin or unpin it)"
       >
         ◆ {count} persistent
       </button>

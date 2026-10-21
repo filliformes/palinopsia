@@ -18,6 +18,7 @@ import { useFxMenuItems } from './fxMenu'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { isFileDrag } from './fileDrop'
 import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
+import { unitPin } from '../persist'
 
 // The unit being dragged, shared by every rack so a chip can be dropped into
 // ANOTHER rack (a layer ↔ the Master FX) as well as reordered in its own.
@@ -246,6 +247,10 @@ function FxUnit({
   const moveFx = useStore((s) => s.moveFx)
   const setSelection = useStore((s) => s.setSelection)
   const showFinishingSub = useStore((s) => s.showFinishingSub)
+  // the whole effect persistent (right-click) : a gold outline
+  const pinned = useStore((s) => s.pins.includes(unitPin(scope, f.id)))
+  const pinStyle = pinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)' } : undefined
+  const pinWords = pinned ? 'Persistent : no scene, dice or Generate changes it (right-click to unpin). ' : ''
 
   if (f.locked) {
     // Pinned finalizers (Vibe → Context → Finalizer) : always last, unremovable,
@@ -266,7 +271,8 @@ function FxUnit({
     return (
       <span
         className={`flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${borderCls} bg-panel`}
-        title={`${lockedName} : a pinned finalizer stage. Dot bypasses; click the name to edit.`}
+        style={pinStyle}
+        title={`${pinWords}${lockedName} : a pinned finalizer stage. Dot bypasses; click the name to edit.`}
         onContextMenu={onContextMenu}
       >
         {fxMenu}
@@ -305,10 +311,11 @@ function FxUnit({
         e.stopPropagation() // don't fall through to the row's tail drop
         onDropOn?.(e)
       }}
-      title="Drag to reorder, or into another rack (a layer ↔ the Master FX) to move it there; hold Ctrl or Alt while dropping to copy instead. Right-click for copy and paste." 
+      title={`${pinWords}Drag to reorder, or into another rack (a layer ↔ the Master FX) to move it there; hold Ctrl or Alt while dropping to copy instead. Right-click for copy and paste, or to make it persistent.`}
       className={`group relative flex min-w-0 shrink-0 cursor-grab items-center gap-1 rounded border bg-panel px-1.5 py-0.5 ${
         selected ? 'border-accent/70' : 'border-border'
       }`}
+      style={pinStyle}
     >
       <button
         onClick={() => toggleFx(scope, f.id)}
