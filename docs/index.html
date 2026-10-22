@@ -65,7 +65,13 @@
 
   h2{font-size:14px; text-transform:uppercase; letter-spacing:.14em; color:var(--accent);
     margin:56px 0 4px; font-weight:700}
-  h2 + p.section-lede{margin-top:6px; color:var(--muted)}
+  details.news{margin:28px 0 0}
+  details.news > summary{cursor:pointer; list-style:none}
+  details.news > summary::-webkit-details-marker{display:none}
+  details.news > summary h2{display:inline-block; margin:0}
+  details.news > summary h2::before{content:"▸ "; display:inline-block; width:1.1em}
+  details.news[open] > summary h2::before{content:"▾ "}
+  h2 + p.section-lede, details.news > summary + p.section-lede{margin-top:6px; color:var(--muted)}
   section p{margin:14px 0}
 
   /* Download cards */
@@ -218,149 +224,6 @@
       <figure><img src="images/shot-orbit.jpg" alt="Orbit"><figcaption><b>Orbit.</b> A figure of dots the camera circles : a ring rolling through itself, a globe, a galaxy.</figcaption></figure>
       <figure><img src="images/shot-oil-sky.jpg" alt="Oil Sky"><figcaption><b>Oil Sky.</b> A sky of billowing cloud over the horizon, painted in thick oil.</figcaption></figure>
     </div>
-  </section>
-
-  <section id="new-130">
-    <h2>New in 1.3.0</h2>
-    <p class="section-lede">The audio update. Sound gets a layer of its own under the four layers of picture, the tempo is shared with Live and every Ableton Link app, and the instrument opens up : write your own shaders, or let an AI agent on your computer play along.</p>
-    <ul class="new">
-      <li><b>The Audio Layer</b> : a strip for sound under Layer 4. Two slots, A and B, each a sound file, a live input (a microphone, your interface's inputs, one channel or a stereo pair) or the sound of an <b>NDI® source</b> on the network (a DAW's NDI plug-in on another computer, OBS), each with its own volume, pan and mute, a mix between them and meters. It plays through Sonify's output, Sonify on or off, so the output EQ, the recordings and Space have it, and everything that listens to sound can listen to it. Its volumes, pans and a file's speed, in, out and playhead take modulators like any control : a modulated playhead scrubs.</li>
-      <li><b>Ableton Link</b> : enable it in the Connect tab <kbd>A</kbd> and Palinopsia shares the tempo and the bar with Live, DJ software and every Link app on your network. Modulators synced to the BPM and the Sonify sequencers land on the music's downbeat, and a latency setting keeps the picture on the beat through a slow projector. Turn on <b>start / stop sync</b> and pressing play in Live starts Palinopsia on the bar (the MIDI clock, the scene sequencer, the Sonify sequencers); its <b>PLAYING / STOPPED</b> button plays or stops every linked app.</li>
-      <li><b>Write your own shaders</b> <kbd>Alt+E</kbd> : the Source Editor starts from a template, a copy of any built-in source or effect, or an ISF file. It compiles as you type into a live preview, the last version that worked keeps playing, and a mistake is marked on its line. Saved, it joins the source and effect menus; sessions carry the shaders they play.</li>
-      <li><b>Let an AI agent play along</b> : turn on <b>Agent (MCP)</b> in the Connect tab and an agent on your computer can read what plays, look at the output, set sources, controls, effects and scenes, and write shaders, seeing each one run before handing it to you. Every change it makes is one undo, it cannot touch the Flash safety, and only your own computer can connect. Off until you turn it on.</li>
-      <li><b>Codec Mosh</b>, the real datamosh : a new effect sends the picture through an actual video encoder and decoder and withholds the keyframes between them. At a cut, the new motion drags the old picture around until a clean frame returns. Two master chains (Codec Rot, Keyframe Hunger) and a Generate theme.</li>
-      <li><b>Field Store</b>, a store that never fades : a new node keeps a coarse copy of the picture, written only where a key lets it through (the bright parts, the edges, what moves, another layer). A moving figure leaves hard stamps of itself instead of a soft trail, a picture can be painted in by what moves (<b>reveal</b>), or a figure vanish into what was there before (<b>protect</b>). Ten presets, three master chains and two Generate themes, Field Store and Revealed.</li>
-      <li><b>Shatter</b>, <b>Crawl</b> and <b>Store Zoom</b>, three new effects. Shatter switches a regularly grabbed still with the live picture through a pattern, so motion shows as texture; Crawl colours each place by how long ago it changed, so motion leaves bands of colour that crawl; Store Zoom is a hardware frame store's zoom, uneven blocks, wide pixels, a wrapping scroll and a moving mirror. A new Frame Store group of master chains and three Generate themes in a Frame Store family. The effect and source pickers are sorted into clearer families too (Frame Store, Analog, Codec, Optical, Film; Painted and Geometry sources).</li>
-      <li><b>Shape a modulation</b> : each binding's <b>⌇</b> opens three tools between the modulator and the parameter. <b>Combine</b> it with one or two other modulators, set a <b>threshold</b> so only real hits move the picture, or <b>integrate</b> it : the kick turns a rotation or a hue one notch per beat, and the picture stays where the music left it.</li>
-      <li><b>The Mixer, the home of A and B</b> <kbd>M</kbd> : each layer's column shows how its sources meet, with a crossfader from A to B and a white line where the sound pushes it, the <b>hue</b> harmony with swatches of the colors (B takes A's colors, or their opposite), and the <b>coupling</b> to the sound with a live meter. The coupling matches the sound's level (<b>auto</b>), so a quiet track moves the mix as far as a loud one and silence leaves it still. One <b>≈ coupling</b> switch pauses every layer's coupling at once, and each column says whether its layer is active (and why not).</li>
-      <li><b>A clearer, smaller layer strip</b> : each layer reads top to bottom in the order the picture goes through it, its steps named in the margin (<b>IN</b>, <b>MIX</b>, <b>FX</b>, <b>OUT</b>), each on a soft panel of its own color. Blend, mask and feedback are tabs, Speed and Vary share a line, a power button turns a whole chain of effects off and on, and a typical layer is about a third shorter.</li>
-      <li><b>Search everything</b> <kbd>Ctrl+K</kbd> : type and a palette finds any effect, source, preset, master chain, Generate theme, page or command, and every parameter of what is loaded. Enter puts a source in the selected slot or an effect in the selected rack, or shows the parameter and flashes it. Every pick is one undo.</li>
-      <li><b>Persistent</b> : right-click any control, a whole layer, an effect, a source or a modulator card, and choose Persistent. No scene, Randomize, Variation, Generate, World or preset changes it while everything around it moves; an effect keeps its place in its rack, a source slot its film and effects, a modulator its settings. A thin gold bar or border marks it. The same menu has <b>Set in every scene</b> : what plays now goes into every scene at once.</li>
-      <li><b>Oil Cloud</b> and <b>Cloud Study</b>, two new sources : one billowing cloud floating in the dark, and a whole sky of them under a low sun, ray-traced then painted in thick oil, the strokes following their forms. Crisp on the dome, with presets, master chains and the Oil Cloud and Oil Sky themes.</li>
-      <li><b>Lattice has four more forms</b> : a <b>tunnel</b> of dots to fly down forever, and a <b>sphere</b>, a <b>torus</b> and a spiral <b>galaxy</b> the camera circles. On the full dome they keep their proportions, round and in the middle. Two new themes, Warp Tunnel and Orbit.</li>
-      <li><b>Effects that follow the dome</b> : on the full dome, rotations turn around the zenith and feedback echoes nest in circles, rain, ash, streaks and trails fall down the walls, the film grain stays fine and round, fine patterns no longer shimmer where the dome squeezes the picture, and the Flash safety tightens while the dome is on.</li>
-      <li><b>Missing media, found again</b> : when a session's films or sounds are gone, a banner names them and <b>Relink…</b> finds them by name in a folder you pick. <b>Collect into the session's folder</b> copies every file a session uses beside it, so it travels between computers in one piece.</li>
-      <li><b>A better World page</b> <kbd>W</kbd> : it says what a World will change, morphs into it, lets you pick the layers it couples, reads a World from what is on screen, and previews on your own layers and your live sound. A <b>World amount</b> dial, playable by modulators, Meta knobs and OSC, fades its mood in and out live.</li>
-      <li><b>Sound drives the picture from a film</b> : an audio modulator can listen to a layer's clip at its playhead, a film's soundtrack or a sound file, reversed, scrubbed or in grains, even while the film plays silent. And <b>Import audio</b>, a new source that plays a sound file like a film and shows its waveform.</li>
-      <li><b>Sonify hears your edits</b> : an eleventh voice, <b>Assemblage</b>, plays an Assemblage's own sound cut with the picture, each clip's place on the map giving its note and pan. The Filter voice can play the Audio Layer, and the output EQ keeps presets, one for each room, its glue included.</li>
-      <li><b>Everyday comforts</b> : drag films, sounds, folders and sessions in from your desktop, recent sessions under Open ▾, a preview you can size or make big (<kbd>V</kbd>), the Output page in a window of its own from the Output button's right-click menu, a <b>50 add</b> blend mode, and the Feel macros (Density and the others) saved with each session. The audio/midi/osc tab is now called Connect.</li>
-      <li><b>Free software under the GPL</b> (version 3 or later), so that Ableton Link can be built in. Versions up to 1.2.10 stay MIT.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-1210">
-    <h2>New in 1.2.10</h2>
-    <p class="section-lede">The key moves on its own time. A small release for the key sequencer and Sonify's controls.</p>
-    <ul class="new">
-      <li><b>A key that is no metronome</b> : in free time, the key sequencer's <b>every</b> takes a modulator or a Meta knob, and <b>vary</b> draws each wait at random around it (at full, anywhere from a quarter to four times as long).</li>
-      <li><b>Picture on your own keys</b> : Picture can choose from a list of up to 8 keys you write, the picture's color and light picking the nearest one. Its wheel shows them as dots.</li>
-      <li><b>Sonify's modulation works like the rest of the app</b> : its M chips open the Inspector's own binding row right under the parameter, a right-click on one clears that parameter's modulation, and a modulated slider's number moves with the modulation.</li>
-      <li><b>The sequencers fold</b> to their headers, and keep playing.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.10.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-129">
-    <h2>New in 1.2.9</h2>
-    <p class="section-lede">Clean sound, sharp projector. A release for long installations : nothing clicks, the wall stays crisp, and the picture holds a steady frame rate.</p>
-    <ul class="new">
-      <li><b>No more clicks</b> : the Chord, the Collage's films starting, stopping and changing, and every change made to the room while it plays (the output EQ, Space, the headphones, the output device, Sonify switched off) now fade cleanly. Voices moving on a dome glide from speaker to speaker.</li>
-      <li><b>Sharp enlargement</b> : below render scale 1, the projector enlarges the picture through a sharper filter, so edges, grain and dust stay crisp on the wall at a lighter render. And a <b>¾</b> render scale.</li>
-      <li><b>Empty layers cost nothing</b> : a layer with no source and no effect no longer draws, and the picture stays the same to the last bit.</li>
-      <li><b>Steadier controls</b> : the EQ editor costs the picture nothing, a click no longer nudges an EQ point or a voice on the room map, a Shift-drag no longer undoes what the key sequencer or MIDI just changed, and a mistyped renderer address keeps the one before.</li>
-      <li><b>A Collage that never shows black</b> : pieces added all at once show a film right away while their own films load.</li>
-      <li><b>Measured</b> : a steady 60 fps with a full Collage wall, every Sonify voice and Space on a dome, the Sonify page open or closed.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.9.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-128">
-    <h2>New in 1.2.8</h2>
-    <p class="section-lede">Sound in the dome. The voices leave the stereo pair and take their places in the room, the way the picture takes its place on the dome.</p>
-    <ul class="new">
-      <li><b>Space</b> <kbd>S</kbd> : every Sonify voice sounds where it plays in the picture, carried through the fulldome mapping, on your own speakers (rings and domes built in, or any SpatGRIS speaker setup, up to 32 channels) or as objects for <b>SpatGRIS</b>, the renderer of the SAT Satosphère's 93 speakers (ADM-OSC too).</li>
-      <li><b>Played, not only placed</b> : drag a voice on the room map or its numbers up and down, bind its place to a modulator or a Meta knob, move it over OSC. An LFO on the azimuth spins a voice round and round the dome.</li>
-      <li><b>Hear the dome on headphones</b> : the speakers (or SpatGRIS's objects) placed around your head, in stereo, so a dome piece can be prepared anywhere.</li>
-      <li><b>The Collage, piece by piece</b> : each piece of a wall of films can be a sound of its own, from where it is on the dome, and every piece playing shows on the map.</li>
-      <li><b>Satosphère in one click</b> : a 210° domemaster at 4096 × 4096, the whole picture over the whole dome, NDI at 60 fps and the voices for the venue's SpatGRIS.</li>
-      <li><b>An output EQ for Sonify</b> : twelve bands to tune the room, drawn over the live spectrum, each point dragged across for its frequency and up and down for its gain. And a <b>feather</b> for the projection warp.</li>
-      <li><b>A finished mix</b> : one compressor holds all the Collage films at one level, and a <b>glue</b> after the EQ binds the whole of Sonify, one knob and five voicings (clean, warm, punch, bite, slow).</li>
-      <li><b>A windy film, tamed</b> : the Collage voice gets its own input level, high-pass and low-pass before its resonators, and how hard it drives the Ring bank.</li>
-      <li><b>18 scales</b>, from harmonic minor to the blues and the diminished, and a key sequencer whose <b>Picture</b> now follows the picture : the root walks the whole circle as its colors shift. The Chord's number of voices can be modulated, and its spread opens both ways.</li>
-      <li><b>Lighter</b> : piled Collage walls in about half the GPU time, Toile 60 % lighter, the Collage loading only the films its pieces show.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.8.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-127">
-    <h2>New in 1.2.7</h2>
-    <p class="section-lede">The whole frame. The finished picture played as one, a camera framed and mirrored, an iPhone by cable, a Collage that piles its films up, and an Inspector that explains every control.</p>
-    <ul class="new">
-      <li><b>Output transform</b> : slide, scale, turn, spin, feather and flip the whole finished picture on the projector and every output, with black, repeated or mirrored edges. Every slider takes a modulator or a Meta knob, and OSC and the dataflou mesh reach them all.</li>
-      <li><b>Framing that frames</b> : a camera or a film keeps its own shape (fit : cover or contain), the crop really cuts, feather softens the edge, and a <b>mirror</b> turns it left to right for the selfie view, upside down, or both.</li>
-      <li><b>People</b> : a video or a camera finds the people in its own picture and keeps only them, blurs the room around them, takes them out, or draws them as a white matte.</li>
-      <li><b>An iPhone or iPad by USB</b> as a live input on a Mac : what its Camera app shows plays in the layer, by cable, with nothing to install on the phone. Built for installations, it joins by itself when it comes back.</li>
-      <li><b>A Collage that piles up</b> : <b>stack</b> lays the pieces at their own heights with soft shadows, <b>torn</b> and <b>shaped</b> cut them as torn paper or rounded cut-outs, <b>warp</b> bends them, up to 100 films deal into the wall, and a <b>Paste-Up</b> theme in Generate.</li>
-      <li><b>A circle that stays round on the projector</b> (the output shape's post warp, with z tilt and z turn), and <b>a keystone per piece</b>, saved with the session.</li>
-      <li><b>The Inspector, tidied</b> : the busiest panels sorted into columns, the controls that do nothing in the current setting greyed out, and every control of every source and effect explained on hover.</li>
-      <li><b>Played from anywhere</b> : Vary, every randomize, layer mute and background opacity over OSC and the dataflou mesh, and 32 modulator bindings per session.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.7.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-126">
-    <h2>New in 1.2.6</h2>
-    <p class="section-lede">Points and planes. Points in three dimensions in front of a moving camera, any layer laid on a plane that runs to the horizon, bars that lean and cross, and a fulldome you can play.</p>
-    <ul class="new">
-      <li><b>Lattice</b>, a new source : a lattice of points in space through a moving camera. A floor of dots that sinks into a gravity well and rings with ripples, heaves like a sea or rises with the sound; or a room of points the camera flies through forever, streaking them into a warp.</li>
-      <li><b>Perspective</b>, a new effect : any layer laid on a plane and seen through a lens. A floor to the horizon, a wall running off to the side, a curved screen, a travelling ribbon. Flat line fields become architecture.</li>
-      <li><b>Lowercase : slant</b>, full-height bars that each lean their own way and cross into X shapes and fans, dealt on the step and held.</li>
-      <li><b>A Space family in Generate</b> (Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor, Line Wall, Data Floor, Crossing) and a <b>Space</b> group of nine master chains that lay the whole picture on a floor, a wall, a ribbon or a horizon.</li>
-      <li><b>A fulldome you can play</b> : every mapping slider takes a modulator or a Meta knob, spin reaches a full turn a second, and feather softens the picture's own edges.</li>
-      <li><b>A quiet console</b> : the readback warning Chromium printed thirteen times a second is gone, and a projector capture costs a third of what it did.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.6.md">release notes</a>.</p>
-  </section>
-
-  <section id="new-125">
-    <h2>New in 1.2.5</h2>
-    <p class="section-lede">Data and rhythm. A source of machine-cut marks, a sound voice that reads the picture as data, a Vary for every layer, and the readout that used to stall the frame rate made free.</p>
-    <ul class="new">
-      <li><b>Lowercase</b>, a new source : machine-cut marks on a stepped clock. A data matrix, blocks, bars, ticks, a scan rule, a lattice, sprocket ladders and a slab with bars cut out of it, landing on a step and holding, each deal a fresh draw or, with scroll, a stream. It pulses on its own, or plays any rhythm you bind to its gate, and it can read another layer as a 1-bit halftone of cells. At 512 cells the slab is a barcode.</li>
-      <li><b>Signal</b>, a new Sonify voice <kbd>S</kbd> : read heads walk the picture on a clock and every bright cell they cross fires a micro-grain, from a 0.2 ms tick to a 500 ms ring. The picture is the pattern; point it at Lowercase and the marks play themselves. Up to four heads drift in and out of step, and every grain lands on its exact sample.</li>
-      <li><b>A Vary for each layer</b>, under its Speed : the same nudge as the global Vary, aimed at one layer, and a modulation target, so a pattern can fire it.</li>
-      <li><b>Re-deal one rack</b> from a layer's right-click menu : the effects of source A, of source B, or the layer's own, and nothing else. Dealt racks now reach four effects.</li>
-      <li><b>You see what fires.</b> Every Vary, the Randomize button and the return-to-default buttons blink when they act, however they were triggered.</li>
-      <li><b>A free picture readout.</b> The vision features, Sonify's taps and the depth input used to stop the graphics chip for about 17 ms each read on a Mac. They are queued now, and on an Apple-silicon Mac Mini a session with the Performance tab open went from as low as 42 to a steady 50 frames on a 50 Hz display.</li>
-      <li><b>The frame rate reads against your display</b> (<span class="mono">50 fps / 50 Hz</span>), dropped frames are counted, and the GPU and VRAM meters work on a Mac.</li>
-      <li><b>Esc closes a fullscreen output</b>, so one display can never trap you, and screen capture on a Mac says how to grant its permission instead of showing black.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.5.md">release notes</a>.</p>
-  </section>
-
-  <section id="new">
-    <h2>New in 1.2</h2>
-    <p class="section-lede">The dome and the grain. The biggest release yet: the picture goes under a dome and over the network, the camera reads movement, the sound gets a key of its own, and every change now morphs.</p>
-    <ul class="new">
-      <li><b>Fulldome output.</b> A square domemaster (2K or 4K, 180 to 230°) feeding the projector, NDI, Spout, Syphon and recording, with a 3D dome simulator to check it from the seat or from outside.</li>
-      <li><b>NDI in and out, built in.</b> Any NDI source on the network plays in a layer like a webcam, and Palinopsia is its own NDI source, 4096² at 30 fps. No NDI yet? One click installs the runtime.</li>
-      <li><b>Real-time DXV3 recording</b>, the GPU compressing each frame as it goes, with the Sonify sound when it plays. <b>Syphon</b> on macOS, the twin of Spout.</li>
-      <li><b>Every change morphs.</b> Scene recalls, Randomize, the sequencer, sessions, New and Generate move into the next composition over the Morph time, live and layer by layer, with no flick.</li>
-      <li><b>A dataflou node.</b> Palinopsia joins the dataflou mesh: the other instruments on the network see what it senses and what plays it, and wire to it both ways, no central computer. A monitor shows every node and connection.</li>
-      <li><b>Resolume OSC mapper</b> <kbd>K</kbd>. Open a Resolume composition and wire Palinopsia's signals to its layers, clips and effects on a pin board, with snapshots, a lock and a dice.</li>
-      <li><b>The camera reads movement.</b> A motion field, six movement qualities of a body (energy, fluidity, suddenness…), and a <b>Silhouette</b> source that cuts the body out of the room, no green screen. Tracking runs on its own thread.</li>
-      <li><b>Living surfaces.</b> New Organic generators that grow, crack, drift and heal (Grown, Colony, Ground, Scan), and the whole family lit as a relief.</li>
-      <li><b>Film damage, rebuilt from real film</b>: dust, fibers, scratches and a hair in the gate per gauge, plus a dirt burst you can fire on a beat.</li>
-      <li><b>A key sequencer</b> for Sonify composes the root and scale of every voice over time (a list, the circle of fifths, shared notes, a pivot, the picture's color), each mode drawn as it thinks, with a glide between keys.</li>
-      <li><b>Hear the Collage.</b> A new Sonify voice plays the wall's films at once, each piece placed in the stereo field and tuned to your key, through a Ring bank inspired by the S-4. And a real level meter, in decibels.</li>
-      <li><b>Generate builds scenes that move</b>: 100 recipes using the whole instrument, with Dome, Film Wall and Node Workshop families and 25 new master chains.</li>
-      <li><b>Installations look after themselves</b>: start with the computer, heal a crashed or frozen picture, reopen a closed output, reconnect the camera and the sound card, keep a log.</li>
-      <li><b>The Background reads like the stack.</b> It comes first in the Layers column (Background, then Layers 1 to 4, bottom to top), folds like a layer, and its <b>group</b> mode lets it show through the layers' dark parts; Generate and New let the ground show.</li>
-      <li><b>A Picture readout</b> under Performance : every feature the picture reports (light, color, texture, motion, depth), live, in plain words.</li>
-      <li><b>An OSC monitor</b> shows every message in and out, live, and effects travel between racks with a drag. Sonify's output device sits in the audio tab too.</li>
-    </ul>
-    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">release notes</a>.</p>
   </section>
 
   <section id="quickstart">
@@ -552,6 +415,151 @@
     <p>When you want the full vocabulary (46 sources, 56 effects, 27 native nodes, 119 Generate recipes, the modulation matrix, the sequencers, the 11 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">1.3.0 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
+  <hr class="soft">
+
+  <details class="news" id="new-130" open>
+    <summary><h2>New in 1.3.0</h2></summary>
+    <p class="section-lede">The audio update. Sound gets a layer of its own under the four layers of picture, the tempo is shared with Live and every Ableton Link app, and the instrument opens up : write your own shaders, or let an AI agent on your computer play along.</p>
+    <ul class="new">
+      <li><b>The Audio Layer</b> : a strip for sound under Layer 4. Two slots, A and B, each a sound file, a live input (a microphone, your interface's inputs, one channel or a stereo pair) or the sound of an <b>NDI® source</b> on the network (a DAW's NDI plug-in on another computer, OBS), each with its own volume, pan and mute, a mix between them and meters. It plays through Sonify's output, Sonify on or off, so the output EQ, the recordings and Space have it, and everything that listens to sound can listen to it. Its volumes, pans and a file's speed, in, out and playhead take modulators like any control : a modulated playhead scrubs.</li>
+      <li><b>Ableton Link</b> : enable it in the Connect tab <kbd>A</kbd> and Palinopsia shares the tempo and the bar with Live, DJ software and every Link app on your network. Modulators synced to the BPM and the Sonify sequencers land on the music's downbeat, and a latency setting keeps the picture on the beat through a slow projector. Turn on <b>start / stop sync</b> and pressing play in Live starts Palinopsia on the bar (the MIDI clock, the scene sequencer, the Sonify sequencers); its <b>PLAYING / STOPPED</b> button plays or stops every linked app.</li>
+      <li><b>Write your own shaders</b> <kbd>Alt+E</kbd> : the Source Editor starts from a template, a copy of any built-in source or effect, or an ISF file. It compiles as you type into a live preview, the last version that worked keeps playing, and a mistake is marked on its line. Saved, it joins the source and effect menus; sessions carry the shaders they play.</li>
+      <li><b>Let an AI agent play along</b> : turn on <b>Agent (MCP)</b> in the Connect tab and an agent on your computer can read what plays, look at the output, set sources, controls, effects and scenes, and write shaders, seeing each one run before handing it to you. Every change it makes is one undo, it cannot touch the Flash safety, and only your own computer can connect. Off until you turn it on.</li>
+      <li><b>Codec Mosh</b>, the real datamosh : a new effect sends the picture through an actual video encoder and decoder and withholds the keyframes between them. At a cut, the new motion drags the old picture around until a clean frame returns. Two master chains (Codec Rot, Keyframe Hunger) and a Generate theme.</li>
+      <li><b>Field Store</b>, a store that never fades : a new node keeps a coarse copy of the picture, written only where a key lets it through (the bright parts, the edges, what moves, another layer). A moving figure leaves hard stamps of itself instead of a soft trail, a picture can be painted in by what moves (<b>reveal</b>), or a figure vanish into what was there before (<b>protect</b>). Ten presets, three master chains and two Generate themes, Field Store and Revealed.</li>
+      <li><b>Shatter</b>, <b>Crawl</b> and <b>Store Zoom</b>, three new effects. Shatter switches a regularly grabbed still with the live picture through a pattern, so motion shows as texture; Crawl colours each place by how long ago it changed, so motion leaves bands of colour that crawl; Store Zoom is a hardware frame store's zoom, uneven blocks, wide pixels, a wrapping scroll and a moving mirror. A new Frame Store group of master chains and three Generate themes in a Frame Store family. The effect and source pickers are sorted into clearer families too (Frame Store, Analog, Codec, Optical, Film; Painted and Geometry sources).</li>
+      <li><b>Shape a modulation</b> : each binding's <b>⌇</b> opens three tools between the modulator and the parameter. <b>Combine</b> it with one or two other modulators, set a <b>threshold</b> so only real hits move the picture, or <b>integrate</b> it : the kick turns a rotation or a hue one notch per beat, and the picture stays where the music left it.</li>
+      <li><b>The Mixer, the home of A and B</b> <kbd>M</kbd> : each layer's column shows how its sources meet, with a crossfader from A to B and a white line where the sound pushes it, the <b>hue</b> harmony with swatches of the colors (B takes A's colors, or their opposite), and the <b>coupling</b> to the sound with a live meter. The coupling matches the sound's level (<b>auto</b>), so a quiet track moves the mix as far as a loud one and silence leaves it still. One <b>≈ coupling</b> switch pauses every layer's coupling at once, and each column says whether its layer is active (and why not).</li>
+      <li><b>A clearer, smaller layer strip</b> : each layer reads top to bottom in the order the picture goes through it, its steps named in the margin (<b>IN</b>, <b>MIX</b>, <b>FX</b>, <b>OUT</b>), each on a soft panel of its own color. Blend, mask and feedback are tabs, Speed and Vary share a line, a power button turns a whole chain of effects off and on, and a typical layer is about a third shorter.</li>
+      <li><b>Search everything</b> <kbd>Ctrl+K</kbd> : type and a palette finds any effect, source, preset, master chain, Generate theme, page or command, and every parameter of what is loaded. Enter puts a source in the selected slot or an effect in the selected rack, or shows the parameter and flashes it. Every pick is one undo.</li>
+      <li><b>Persistent</b> : right-click any control, a whole layer, an effect, a source or a modulator card, and choose Persistent. No scene, Randomize, Variation, Generate, World or preset changes it while everything around it moves; an effect keeps its place in its rack, a source slot its film and effects, a modulator its settings. A thin gold bar or border marks it. The same menu has <b>Set in every scene</b> : what plays now goes into every scene at once.</li>
+      <li><b>Oil Cloud</b> and <b>Cloud Study</b>, two new sources : one billowing cloud floating in the dark, and a whole sky of them under a low sun, ray-traced then painted in thick oil, the strokes following their forms. Crisp on the dome, with presets, master chains and the Oil Cloud and Oil Sky themes.</li>
+      <li><b>Lattice has four more forms</b> : a <b>tunnel</b> of dots to fly down forever, and a <b>sphere</b>, a <b>torus</b> and a spiral <b>galaxy</b> the camera circles. On the full dome they keep their proportions, round and in the middle. Two new themes, Warp Tunnel and Orbit.</li>
+      <li><b>Effects that follow the dome</b> : on the full dome, rotations turn around the zenith and feedback echoes nest in circles, rain, ash, streaks and trails fall down the walls, the film grain stays fine and round, fine patterns no longer shimmer where the dome squeezes the picture, and the Flash safety tightens while the dome is on.</li>
+      <li><b>Missing media, found again</b> : when a session's films or sounds are gone, a banner names them and <b>Relink…</b> finds them by name in a folder you pick. <b>Collect into the session's folder</b> copies every file a session uses beside it, so it travels between computers in one piece.</li>
+      <li><b>A better World page</b> <kbd>W</kbd> : it says what a World will change, morphs into it, lets you pick the layers it couples, reads a World from what is on screen, and previews on your own layers and your live sound. A <b>World amount</b> dial, playable by modulators, Meta knobs and OSC, fades its mood in and out live.</li>
+      <li><b>Sound drives the picture from a film</b> : an audio modulator can listen to a layer's clip at its playhead, a film's soundtrack or a sound file, reversed, scrubbed or in grains, even while the film plays silent. And <b>Import audio</b>, a new source that plays a sound file like a film and shows its waveform.</li>
+      <li><b>Sonify hears your edits</b> : an eleventh voice, <b>Assemblage</b>, plays an Assemblage's own sound cut with the picture, each clip's place on the map giving its note and pan. The Filter voice can play the Audio Layer, and the output EQ keeps presets, one for each room, its glue included.</li>
+      <li><b>Everyday comforts</b> : drag films, sounds, folders and sessions in from your desktop, recent sessions under Open ▾, a preview you can size or make big (<kbd>V</kbd>), the Output page in a window of its own from the Output button's right-click menu, a <b>50 add</b> blend mode, and the Feel macros (Density and the others) saved with each session. The audio/midi/osc tab is now called Connect.</li>
+      <li><b>Free software under the GPL</b> (version 3 or later), so that Ableton Link can be built in. Versions up to 1.2.10 stay MIT.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-1210">
+    <summary><h2>New in 1.2.10</h2></summary>
+    <p class="section-lede">The key moves on its own time. A small release for the key sequencer and Sonify's controls.</p>
+    <ul class="new">
+      <li><b>A key that is no metronome</b> : in free time, the key sequencer's <b>every</b> takes a modulator or a Meta knob, and <b>vary</b> draws each wait at random around it (at full, anywhere from a quarter to four times as long).</li>
+      <li><b>Picture on your own keys</b> : Picture can choose from a list of up to 8 keys you write, the picture's color and light picking the nearest one. Its wheel shows them as dots.</li>
+      <li><b>Sonify's modulation works like the rest of the app</b> : its M chips open the Inspector's own binding row right under the parameter, a right-click on one clears that parameter's modulation, and a modulated slider's number moves with the modulation.</li>
+      <li><b>The sequencers fold</b> to their headers, and keep playing.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.10.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-129">
+    <summary><h2>New in 1.2.9</h2></summary>
+    <p class="section-lede">Clean sound, sharp projector. A release for long installations : nothing clicks, the wall stays crisp, and the picture holds a steady frame rate.</p>
+    <ul class="new">
+      <li><b>No more clicks</b> : the Chord, the Collage's films starting, stopping and changing, and every change made to the room while it plays (the output EQ, Space, the headphones, the output device, Sonify switched off) now fade cleanly. Voices moving on a dome glide from speaker to speaker.</li>
+      <li><b>Sharp enlargement</b> : below render scale 1, the projector enlarges the picture through a sharper filter, so edges, grain and dust stay crisp on the wall at a lighter render. And a <b>¾</b> render scale.</li>
+      <li><b>Empty layers cost nothing</b> : a layer with no source and no effect no longer draws, and the picture stays the same to the last bit.</li>
+      <li><b>Steadier controls</b> : the EQ editor costs the picture nothing, a click no longer nudges an EQ point or a voice on the room map, a Shift-drag no longer undoes what the key sequencer or MIDI just changed, and a mistyped renderer address keeps the one before.</li>
+      <li><b>A Collage that never shows black</b> : pieces added all at once show a film right away while their own films load.</li>
+      <li><b>Measured</b> : a steady 60 fps with a full Collage wall, every Sonify voice and Space on a dome, the Sonify page open or closed.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.9.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-128">
+    <summary><h2>New in 1.2.8</h2></summary>
+    <p class="section-lede">Sound in the dome. The voices leave the stereo pair and take their places in the room, the way the picture takes its place on the dome.</p>
+    <ul class="new">
+      <li><b>Space</b> <kbd>S</kbd> : every Sonify voice sounds where it plays in the picture, carried through the fulldome mapping, on your own speakers (rings and domes built in, or any SpatGRIS speaker setup, up to 32 channels) or as objects for <b>SpatGRIS</b>, the renderer of the SAT Satosphère's 93 speakers (ADM-OSC too).</li>
+      <li><b>Played, not only placed</b> : drag a voice on the room map or its numbers up and down, bind its place to a modulator or a Meta knob, move it over OSC. An LFO on the azimuth spins a voice round and round the dome.</li>
+      <li><b>Hear the dome on headphones</b> : the speakers (or SpatGRIS's objects) placed around your head, in stereo, so a dome piece can be prepared anywhere.</li>
+      <li><b>The Collage, piece by piece</b> : each piece of a wall of films can be a sound of its own, from where it is on the dome, and every piece playing shows on the map.</li>
+      <li><b>Satosphère in one click</b> : a 210° domemaster at 4096 × 4096, the whole picture over the whole dome, NDI at 60 fps and the voices for the venue's SpatGRIS.</li>
+      <li><b>An output EQ for Sonify</b> : twelve bands to tune the room, drawn over the live spectrum, each point dragged across for its frequency and up and down for its gain. And a <b>feather</b> for the projection warp.</li>
+      <li><b>A finished mix</b> : one compressor holds all the Collage films at one level, and a <b>glue</b> after the EQ binds the whole of Sonify, one knob and five voicings (clean, warm, punch, bite, slow).</li>
+      <li><b>A windy film, tamed</b> : the Collage voice gets its own input level, high-pass and low-pass before its resonators, and how hard it drives the Ring bank.</li>
+      <li><b>18 scales</b>, from harmonic minor to the blues and the diminished, and a key sequencer whose <b>Picture</b> now follows the picture : the root walks the whole circle as its colors shift. The Chord's number of voices can be modulated, and its spread opens both ways.</li>
+      <li><b>Lighter</b> : piled Collage walls in about half the GPU time, Toile 60 % lighter, the Collage loading only the films its pieces show.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.8.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-127">
+    <summary><h2>New in 1.2.7</h2></summary>
+    <p class="section-lede">The whole frame. The finished picture played as one, a camera framed and mirrored, an iPhone by cable, a Collage that piles its films up, and an Inspector that explains every control.</p>
+    <ul class="new">
+      <li><b>Output transform</b> : slide, scale, turn, spin, feather and flip the whole finished picture on the projector and every output, with black, repeated or mirrored edges. Every slider takes a modulator or a Meta knob, and OSC and the dataflou mesh reach them all.</li>
+      <li><b>Framing that frames</b> : a camera or a film keeps its own shape (fit : cover or contain), the crop really cuts, feather softens the edge, and a <b>mirror</b> turns it left to right for the selfie view, upside down, or both.</li>
+      <li><b>People</b> : a video or a camera finds the people in its own picture and keeps only them, blurs the room around them, takes them out, or draws them as a white matte.</li>
+      <li><b>An iPhone or iPad by USB</b> as a live input on a Mac : what its Camera app shows plays in the layer, by cable, with nothing to install on the phone. Built for installations, it joins by itself when it comes back.</li>
+      <li><b>A Collage that piles up</b> : <b>stack</b> lays the pieces at their own heights with soft shadows, <b>torn</b> and <b>shaped</b> cut them as torn paper or rounded cut-outs, <b>warp</b> bends them, up to 100 films deal into the wall, and a <b>Paste-Up</b> theme in Generate.</li>
+      <li><b>A circle that stays round on the projector</b> (the output shape's post warp, with z tilt and z turn), and <b>a keystone per piece</b>, saved with the session.</li>
+      <li><b>The Inspector, tidied</b> : the busiest panels sorted into columns, the controls that do nothing in the current setting greyed out, and every control of every source and effect explained on hover.</li>
+      <li><b>Played from anywhere</b> : Vary, every randomize, layer mute and background opacity over OSC and the dataflou mesh, and 32 modulator bindings per session.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.7.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-126">
+    <summary><h2>New in 1.2.6</h2></summary>
+    <p class="section-lede">Points and planes. Points in three dimensions in front of a moving camera, any layer laid on a plane that runs to the horizon, bars that lean and cross, and a fulldome you can play.</p>
+    <ul class="new">
+      <li><b>Lattice</b>, a new source : a lattice of points in space through a moving camera. A floor of dots that sinks into a gravity well and rings with ripples, heaves like a sea or rises with the sound; or a room of points the camera flies through forever, streaking them into a warp.</li>
+      <li><b>Perspective</b>, a new effect : any layer laid on a plane and seen through a lens. A floor to the horizon, a wall running off to the side, a curved screen, a travelling ribbon. Flat line fields become architecture.</li>
+      <li><b>Lowercase : slant</b>, full-height bars that each lean their own way and cross into X shapes and fans, dealt on the step and held.</li>
+      <li><b>A Space family in Generate</b> (Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor, Line Wall, Data Floor, Crossing) and a <b>Space</b> group of nine master chains that lay the whole picture on a floor, a wall, a ribbon or a horizon.</li>
+      <li><b>A fulldome you can play</b> : every mapping slider takes a modulator or a Meta knob, spin reaches a full turn a second, and feather softens the picture's own edges.</li>
+      <li><b>A quiet console</b> : the readback warning Chromium printed thirteen times a second is gone, and a projector capture costs a third of what it did.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.6.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-125">
+    <summary><h2>New in 1.2.5</h2></summary>
+    <p class="section-lede">Data and rhythm. A source of machine-cut marks, a sound voice that reads the picture as data, a Vary for every layer, and the readout that used to stall the frame rate made free.</p>
+    <ul class="new">
+      <li><b>Lowercase</b>, a new source : machine-cut marks on a stepped clock. A data matrix, blocks, bars, ticks, a scan rule, a lattice, sprocket ladders and a slab with bars cut out of it, landing on a step and holding, each deal a fresh draw or, with scroll, a stream. It pulses on its own, or plays any rhythm you bind to its gate, and it can read another layer as a 1-bit halftone of cells. At 512 cells the slab is a barcode.</li>
+      <li><b>Signal</b>, a new Sonify voice <kbd>S</kbd> : read heads walk the picture on a clock and every bright cell they cross fires a micro-grain, from a 0.2 ms tick to a 500 ms ring. The picture is the pattern; point it at Lowercase and the marks play themselves. Up to four heads drift in and out of step, and every grain lands on its exact sample.</li>
+      <li><b>A Vary for each layer</b>, under its Speed : the same nudge as the global Vary, aimed at one layer, and a modulation target, so a pattern can fire it.</li>
+      <li><b>Re-deal one rack</b> from a layer's right-click menu : the effects of source A, of source B, or the layer's own, and nothing else. Dealt racks now reach four effects.</li>
+      <li><b>You see what fires.</b> Every Vary, the Randomize button and the return-to-default buttons blink when they act, however they were triggered.</li>
+      <li><b>A free picture readout.</b> The vision features, Sonify's taps and the depth input used to stop the graphics chip for about 17 ms each read on a Mac. They are queued now, and on an Apple-silicon Mac Mini a session with the Performance tab open went from as low as 42 to a steady 50 frames on a 50 Hz display.</li>
+      <li><b>The frame rate reads against your display</b> (<span class="mono">50 fps / 50 Hz</span>), dropped frames are counted, and the GPU and VRAM meters work on a Mac.</li>
+      <li><b>Esc closes a fullscreen output</b>, so one display can never trap you, and screen capture on a Mac says how to grant its permission instead of showing black.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.5.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new">
+    <summary><h2>New in 1.2</h2></summary>
+    <p class="section-lede">The dome and the grain. The biggest release yet: the picture goes under a dome and over the network, the camera reads movement, the sound gets a key of its own, and every change now morphs.</p>
+    <ul class="new">
+      <li><b>Fulldome output.</b> A square domemaster (2K or 4K, 180 to 230°) feeding the projector, NDI, Spout, Syphon and recording, with a 3D dome simulator to check it from the seat or from outside.</li>
+      <li><b>NDI in and out, built in.</b> Any NDI source on the network plays in a layer like a webcam, and Palinopsia is its own NDI source, 4096² at 30 fps. No NDI yet? One click installs the runtime.</li>
+      <li><b>Real-time DXV3 recording</b>, the GPU compressing each frame as it goes, with the Sonify sound when it plays. <b>Syphon</b> on macOS, the twin of Spout.</li>
+      <li><b>Every change morphs.</b> Scene recalls, Randomize, the sequencer, sessions, New and Generate move into the next composition over the Morph time, live and layer by layer, with no flick.</li>
+      <li><b>A dataflou node.</b> Palinopsia joins the dataflou mesh: the other instruments on the network see what it senses and what plays it, and wire to it both ways, no central computer. A monitor shows every node and connection.</li>
+      <li><b>Resolume OSC mapper</b> <kbd>K</kbd>. Open a Resolume composition and wire Palinopsia's signals to its layers, clips and effects on a pin board, with snapshots, a lock and a dice.</li>
+      <li><b>The camera reads movement.</b> A motion field, six movement qualities of a body (energy, fluidity, suddenness…), and a <b>Silhouette</b> source that cuts the body out of the room, no green screen. Tracking runs on its own thread.</li>
+      <li><b>Living surfaces.</b> New Organic generators that grow, crack, drift and heal (Grown, Colony, Ground, Scan), and the whole family lit as a relief.</li>
+      <li><b>Film damage, rebuilt from real film</b>: dust, fibers, scratches and a hair in the gate per gauge, plus a dirt burst you can fire on a beat.</li>
+      <li><b>A key sequencer</b> for Sonify composes the root and scale of every voice over time (a list, the circle of fifths, shared notes, a pivot, the picture's color), each mode drawn as it thinks, with a glide between keys.</li>
+      <li><b>Hear the Collage.</b> A new Sonify voice plays the wall's films at once, each piece placed in the stereo field and tuned to your key, through a Ring bank inspired by the S-4. And a real level meter, in decibels.</li>
+      <li><b>Generate builds scenes that move</b>: 100 recipes using the whole instrument, with Dome, Film Wall and Node Workshop families and 25 new master chains.</li>
+      <li><b>Installations look after themselves</b>: start with the computer, heal a crashed or frozen picture, reopen a closed output, reconnect the camera and the sound card, keep a log.</li>
+      <li><b>The Background reads like the stack.</b> It comes first in the Layers column (Background, then Layers 1 to 4, bottom to top), folds like a layer, and its <b>group</b> mode lets it show through the layers' dark parts; Generate and New let the ground show.</li>
+      <li><b>A Picture readout</b> under Performance : every feature the picture reports (light, color, texture, motion, depth), live, in plain words.</li>
+      <li><b>An OSC monitor</b> shows every message in and out, live, and effects travel between racks with a drag. Sonify's output device sits in the audio tab too.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.2.0.md">release notes</a>.</p>
+  </details>
+
   <footer>
     Palinopsia, a visual instrument by <a href="https://github.com/filliformes">Vincent Fillion</a>. Free software, GPL-3.0-or-later.<br>
     The visual sibling to <a href="https://github.com/filliformes/dataFLOU">dataFLOU</a>, played over OSC by Pandore.
@@ -559,5 +567,10 @@
   </footer>
 
 </div>
+<script>
+  // A link to a "New in" version opens it.
+  function openNews(){ var el = location.hash && document.getElementById(location.hash.slice(1)); if (el && el.tagName === 'DETAILS') el.open = true }
+  window.addEventListener('hashchange', openNews); openNews()
+</script>
 </body>
 </html>
