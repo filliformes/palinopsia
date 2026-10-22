@@ -627,7 +627,7 @@
         <thead><tr><th>Address</th><th>Arg</th><th>Does</th></tr></thead>
         <tbody>
           <tr><td class="addr"><span class="lit">/opsia/vision/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One picture feature — <code>brightness · contrast · motion · edges · entropy · centroidX · centroidY · warmth · saturation · hue · depth · depthSpread · flowX · flowY · divergence · curl · coherence</code> (the last five are the picture's motion field : which way it flows, whether it spreads out or closes in, whether it turns, and whether it moves as one).</td></tr>
-          <tr><td class="addr"><span class="lit">/opsia/body/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One body feature, streamed while the Body camera runs : hands, pose, face, the nine silhouette zones, presence, the camera's motion field <code>flowEnergy · flowX · flowY · flowDivergence · flowCurl · flowCoherence · flowCenterX · flowCenterY · flowArea</code>, and the movement qualities <code>moveEnergy · moveExpansion · moveFluidity · moveSuddenness · moveDirectness · moveSymmetry</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/body/</span><span class="v">{feature}</span></td><td class="arg">f 0..1 →</td><td class="desc">One body feature, streamed while the Body camera runs : hands, each hand's shape <code>handLeft… · handRight…</code> + <code>CurlThumb · CurlIndex · CurlMiddle · CurlRing · CurlPinky · PinchIndex · PinchMiddle · PinchRing · PinchPinky · Angle · Facing · Span</code> (curls 1 = curled, pinches 1 = touching, angle 0.5 = upright, facing 1 = palm toward the camera, span 1 = close), pose, face, the nine silhouette zones, presence, the camera's motion field <code>flowEnergy · flowX · flowY · flowDivergence · flowCurl · flowCoherence · flowCenterX · flowCenterY · flowArea</code>, and the movement qualities <code>moveEnergy · moveExpansion · moveFluidity · moveSuddenness · moveDirectness · moveSymmetry</code>.</td></tr>
         </tbody>
       </table>
     </div>
@@ -641,8 +641,9 @@
       <span class="sec-note">outbound only · under <b>/body/</b>, not /opsia</span>
     </div>
     <p class="blurb">The Body page's gesture rules can fire their own OSC. When a rule fires and its
-      <b>OSC out</b> is on, Opsia sends a bang to the OSC-out target — so a body gesture (a pinch, a pose,
-      a shadow covering a screen zone, someone walking into frame) can play the sound side. These live
+      <b>OSC out</b> is on, Opsia sends a bang to the OSC-out target, so a body gesture (a pinch, a hand shape
+      such as a fist, a peace sign or horns, a pose, a shadow covering a screen zone, someone walking
+      into frame) can play the sound side. These live
       under <code>/body/…</code>, outside the <code>/opsia</code> namespace, with the name you gave the rule.</p>
     <div class="tbl-scroll">
       <table>

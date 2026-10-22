@@ -15,7 +15,7 @@ import { modEngine } from './engine/modulation'
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
 import { visionBus, VISION_FEATURES, type VisionFeatureName } from './engine/visionIn'
 import { bodyBus } from './engine/bodyIn'
-import { BODY_FEATURES, type BodyFeature, type OscInEvent } from '@shared/types'
+import { BODY_FEATURE_GROUPS, type BodyFeature, type OscInEvent } from '@shared/types'
 import type { ResoKind, ResoOutput } from '@shared/resolume'
 import { oscLeafList, oscLeafValues } from './oscInput'
 import { sendOscBatch } from './oscMonitor'
@@ -42,7 +42,11 @@ export function resoSourceCatalogue(): ResoSourceDesc[] {
   st.composition.metaKnobs.forEach((k, i) => r.push({ source: `meta:${i + 1}`, label: `Meta ${i + 1}${k.name ? ` · ${k.name}` : ''}`, group: 'Meta knobs' }))
   for (const [k, l] of AUDIO_SOURCES) r.push({ source: `audio:${k}`, label: `audio ${l}`, group: 'Audio' })
   for (const v of VISION_FEATURES) r.push({ source: `vision:${v}`, label: `vision ${v}`, group: 'Vision' })
-  for (const b of BODY_FEATURES) r.push({ source: `body:${b}`, label: `body ${b}`, group: 'Body' })
+  // the 24 hand-shape ones apart, after the rest of the body
+  const shape = (g: { title: string }): boolean => g.title === 'Hand shape'
+  for (const g of [...BODY_FEATURE_GROUPS.filter((x) => !shape(x)), ...BODY_FEATURE_GROUPS.filter(shape)]) {
+    for (const b of g.keys) r.push({ source: `body:${b}`, label: `body ${b}`, group: shape(g) ? 'Body · hand shape' : 'Body' })
+  }
   for (const l of oscLeafList()) r.push({ source: `osc:${l.path}`, label: l.path, group: 'Palinopsia OSC' })
   return r
 }

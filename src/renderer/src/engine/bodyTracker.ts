@@ -21,6 +21,7 @@ import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
 import { createBodyWorker } from './bodyWorker'
+import { handShape, HandSlots, HandSmoother, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
@@ -69,12 +70,44 @@ const WRIST = 0, THUMB = 4, INDEX = 8, PINKY = 20, INDEX_MCP = 5, PINKY_MCP = 17
 // Face-mesh canonical indices (478) used for head pose from geometry.
 const F_NOSE = 1, F_CHIN = 152, F_FORE = 10, F_LCHEEK = 234, F_RCHEEK = 454, F_LEYE = 33, F_REYE = 263
 
+// Hand shapes (engine/handShape.ts) : each shape's gesture for the left and the
+// right slot, and each slot's feature names.
+const SHAPE_GESTURE: Record<HandShapeId, readonly [BodyGesture, BodyGesture]> = {
+  fist: ['fistLeft', 'fistRight'], open: ['openLeft', 'openRight'], point: ['pointLeft', 'pointRight'],
+  peace: ['peaceLeft', 'peaceRight'], thumbUp: ['thumbUpLeft', 'thumbUpRight'], thumbDown: ['thumbDownLeft', 'thumbDownRight'],
+  ok: ['okLeft', 'okRight'], horns: ['hornsLeft', 'hornsRight'], call: ['callLeft', 'callRight'], gun: ['gunLeft', 'gunRight']
+}
+/** A shape's short name, for the camera preview's label. */
+const SHAPE_LABEL: Record<HandShapeId, string> = {
+  fist: 'fist', open: 'open', point: 'point', peace: 'peace', thumbUp: 'thumb up', thumbDown: 'thumb down',
+  ok: 'ok', horns: 'horns', call: 'call', gun: 'gun'
+}
+interface ShapeKeys { curl: BodyFeature[]; pinch: BodyFeature[]; angle: BodyFeature; facing: BodyFeature; span: BodyFeature }
+const SHAPE_KEYS: Record<HandSlot, ShapeKeys> = {
+  left: {
+    curl: ['handLeftCurlThumb', 'handLeftCurlIndex', 'handLeftCurlMiddle', 'handLeftCurlRing', 'handLeftCurlPinky'],
+    pinch: ['handLeftPinchIndex', 'handLeftPinchMiddle', 'handLeftPinchRing', 'handLeftPinchPinky'],
+    angle: 'handLeftAngle', facing: 'handLeftFacing', span: 'handLeftSpan'
+  },
+  right: {
+    curl: ['handRightCurlThumb', 'handRightCurlIndex', 'handRightCurlMiddle', 'handRightCurlRing', 'handRightCurlPinky'],
+    pinch: ['handRightPinchIndex', 'handRightPinchMiddle', 'handRightPinchRing', 'handRightPinchPinky'],
+    angle: 'handRightAngle', facing: 'handRightFacing', span: 'handRightSpan'
+  }
+}
+/** One hand slot's shape reading : its smoothing, its held shape, its last wrist. */
+interface SlotShape { smoother: HandSmoother; reader: ShapeReader; had: boolean; wx: number; wy: number }
+const slotShape = (): SlotShape => ({ smoother: new HandSmoother(), reader: new ShapeReader(), had: false, wx: 0, wy: 0 })
+
 /** One tracked camera frame : from the worker, or the main-thread fallback. */
 interface WorkerResult {
   ts: number
   camT: number
   newFrame: boolean
   hands: NormalizedLandmark[][]
+  // MediaPipe's handedness for each hand (left / right as a mirrored picture's),
+  // when it gave one
+  handed?: Array<HandLabel | null>
   pose: NormalizedLandmark[] | null
   face: NormalizedLandmark[] | null
   blend: Array<{ categoryName: string; score: number }> | null
@@ -90,6 +123,9 @@ export interface BodyPreview {
   pose: NormalizedLandmark[] | null // one body
   face: NormalizedLandmark[] | null // one face mesh (478 pts)
   mirror: boolean
+  // The shape each hand holds now, at its wrist (raw camera coordinates), for a
+  // label on the preview : "L fist", "R peace".
+  shapes: Array<{ x: number; y: number; label: string }>
 }
 
 class BodyTracker {
@@ -145,6 +181,10 @@ class BodyTracker {
   private latestPose: NormalizedLandmark[] | null = null
   private latestFace: NormalizedLandmark[] | null = null
   private prevPose: NormalizedLandmark[] | null = null
+  // Which hand is which (handShape.ts), and each slot's shape reading.
+  private handSlots = new HandSlots()
+  private shape: Record<HandSlot, SlotShape> = { left: slotShape(), right: slotShape() }
+  private latestShapes: BodyPreview['shapes'] = []
   private pinchDown = { left: false, right: false }
   private prevTwoHands: Array<{ x: number; y: number }> | null = null // last frame's two wrist positions (for cross)
   private clapArmed = true
@@ -202,8 +242,14 @@ class BodyTracker {
       hands: this.latestHands,
       pose: this.latestPose,
       face: this.latestFace,
-      mirror: this.cfg?.mirror ?? true
+      mirror: this.cfg?.mirror ?? true,
+      shapes: this.latestShapes
     }
+  }
+
+  /** The shape each hand slot holds now (null : none), for tests and the UI. */
+  handShapes(): Record<HandSlot, HandShapeId | null> {
+    return { left: this.shape.left.reader.current(), right: this.shape.right.reader.current() }
   }
 
   /** Cameras the browser exposes (labels appear once permission is granted). */
@@ -484,6 +530,8 @@ class BodyTracker {
     this.latestPose = null
     this.latestFace = null
     this.prevPose = null
+    this.handsGone()
+    this.handSlots.reset()
     for (const ch of ['body', 'hands', 'face'] as const) this.presState[ch] = { on: false, cand: false, since: 0 }
     bodyBus.setLive(false, false, false)
     this.resetFlow()
@@ -549,11 +597,20 @@ class BodyTracker {
 
     let blendshapes: Array<{ categoryName: string; score: number }> | null = null
     let hands: NormalizedLandmark[][] = []
+    let handed: Array<HandLabel | null> = []
     let pose: NormalizedLandmark[] | null = null
     let face: NormalizedLandmark[] | null = null
     const mpT0 = performance.now()
     try {
-      if (this.hands) hands = this.hands.detectForVideo(video, ts).landmarks ?? []
+      if (this.hands) {
+        const hr = this.hands.detectForVideo(video, ts)
+        hands = hr.landmarks ?? []
+        const hd = hr.handedness ?? []
+        handed = hands.map((_, i) => {
+          const c = hd[i]?.[0]
+          return c ? { name: c.categoryName, score: c.score } : null
+        })
+      }
       if (this.pose) {
         const pr = this.pose.detectForVideo(video, ts)
         pose = pr.landmarks?.[0] ?? null
@@ -578,7 +635,7 @@ class BodyTracker {
     }
     const ms = performance.now() - mpT0
     perfMeter.add('mediapipe', ms) // Performance panel
-    this.process({ ts, camT, newFrame, hands, pose, face, blend: blendshapes, sil: null, ms }, flowOut)
+    this.process({ ts, camT, newFrame, hands, handed, pose, face, blend: blendshapes, sil: null, ms }, flowOut)
   }
 
   /** One tracked frame (the worker's result, or the main thread's) → features,
@@ -608,7 +665,7 @@ class BodyTracker {
 
     // A hold whose detector isn't present this frame must reset, or a vanished
     // hand / body leaves it half-counted and it fires spuriously on return.
-    if (!hasHands) { this.hold('holdPinchLeft', false); this.hold('holdPinchRight', false) }
+    if (!hasHands) { this.hold('holdPinchLeft', false); this.hold('holdPinchRight', false); this.handsGone() }
     if (!hasPose) { this.hold('holdHandsUp', false); this.hold('holdArmsWide', false) }
     if (!hasFace) this.hold('holdMouthOpen', false)
 
@@ -630,16 +687,14 @@ class BodyTracker {
       handsPresent: hasHands ? 1 : 0,
       facePresent: hasFace ? 1 : 0
     }
-    if (hasHands) this.deriveHands(this.latestHands, mirror, out, cfg)
+    if (hasHands) this.deriveHands(this.latestHands, r.handed ?? [], mirror, out, cfg, ts)
     if (hasPose) {
       this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
       this.poseLostAt = 0
       // Movement qualities : derivatives, so only real camera frames (with the
       // frame's own media time), never a repeated picture.
       if (r.newFrame) {
-        const video = this.video
-        const aspect = video && video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 4 / 3
-        const e = this.effort.push(this.latestPose as NormalizedLandmark[], r.camT, aspect, this.sens('impulse'), this.sens('freeze'))
+        const e = this.effort.push(this.latestPose as NormalizedLandmark[], r.camT, this.camAspect(), this.sens('impulse'), this.sens('freeze'))
         if (e.impulse) this.emit('impulse')
         if (e.freeze) this.emit('freeze')
       }
@@ -652,6 +707,23 @@ class BodyTracker {
     if (flowOut) Object.assign(out, flowOut)
     bodyBus.update(out)
     this.prevPose = this.latestPose
+  }
+
+  /** The camera's width over its height (landmarks are normalised per axis). */
+  private camAspect(): number {
+    const video = this.video
+    return video && video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 4 / 3
+  }
+
+  /** No hand in view : each slot's shape starts over when a hand comes back. */
+  private handsGone(): void {
+    for (const k of ['left', 'right'] as const) {
+      const st = this.shape[k]
+      st.reader.reset()
+      st.smoother.reset()
+      st.had = false
+    }
+    this.latestShapes = []
   }
 
   /** The pose is gone : after a second, the movement qualities start over (a
@@ -749,17 +821,22 @@ class BodyTracker {
   // ── Hands → features + pinch gestures ──────────────────────────────────
   private deriveHands(
     handsLm: NormalizedLandmark[][],
+    handed: ReadonlyArray<HandLabel | null>,
     mirror: boolean,
     out: Partial<Record<BodyFeature, number>>,
-    cfg: BodyControlConfig
+    cfg: BodyControlConfig,
+    ts: number
   ): void {
     const mx = (x: number): number => (mirror ? 1 - x : x)
-    // Assign hands to left/right SLOTS by screen position (robust vs handedness
-    // labels), after mirroring so "left" is the performer's left in a selfie view.
-    const scored = handsLm.map((lm) => ({ lm, x: mx(lm[WRIST].x) }))
-    scored.sort((a, b) => a.x - b.x)
-    const left = scored[0]?.lm ?? null
-    const right = (scored[1]?.lm ?? null) as NormalizedLandmark[] | null
+    // Hands to the left / right SLOTS (handShape.ts HandSlots) : two hands by where
+    // they are on screen, after mirroring so "left" is the performer's left in a
+    // selfie view (robust vs handedness labels); one hand keeps the side it had,
+    // else goes to its own side by its handedness (a lone right hand is the right).
+    const aspect = this.camAspect()
+    const slots = this.handSlots.assign(handsLm.map((lm) => lm[WRIST]), handed, mirror, aspect, ts)
+    const left = slots.left >= 0 ? handsLm[slots.left] : null
+    const right = slots.right >= 0 ? handsLm[slots.right] : null
+    this.deriveShapes(left, right, mirror, aspect, out, cfg, ts)
 
     const openness = (lm: NormalizedLandmark[]): number => {
       const palm = dist(lm[INDEX_MCP], lm[PINKY_MCP]) || 1e-3
@@ -824,6 +901,53 @@ class BodyTracker {
   private pinchGate(slot: 'left' | 'right', down: boolean): void {
     if (down && !this.pinchDown[slot]) this.emit(slot === 'left' ? 'pinchLeft' : 'pinchRight')
     this.pinchDown[slot] = down
+  }
+
+  // ── Hand shapes → curls, pinches, roll, facing, span + shape gestures ──
+  /** Each slot's hand through its smoothing into handShape() (handShape.ts) : the
+   *  shape features, and a held shape (fist, peace...) firing its gesture once. */
+  private deriveShapes(
+    left: NormalizedLandmark[] | null,
+    right: NormalizedLandmark[] | null,
+    mirror: boolean,
+    aspect: number,
+    out: Partial<Record<BodyFeature, number>>,
+    cfg: BodyControlConfig,
+    ts: number
+  ): void {
+    // A new shape must hold an eighth of the hold time (0.15 s at the default
+    // 1.2 s) before it fires : long enough not to flicker, short enough to play.
+    const settle = Math.min(400, Math.max(60, (cfg.holdMs ?? 1200) / 8))
+    const shapes: BodyPreview['shapes'] = []
+    for (const s of ['left', 'right'] as const) {
+      const lm = s === 'left' ? left : right
+      const st = this.shape[s]
+      if (!lm) {
+        if (st.had) { st.reader.reset(); st.smoother.reset(); st.had = false }
+        continue
+      }
+      // A hand new to this slot (or another hand : the wrist jumped) starts afresh.
+      const w = lm[WRIST]
+      if (st.had && Math.hypot((w.x - st.wx) * aspect, w.y - st.wy) > 0.3) { st.reader.reset(); st.smoother.reset() }
+      st.had = true
+      st.wx = w.x
+      st.wy = w.y
+      const f = handShape(st.smoother.push(lm, ts, aspect), { aspect, mirror, rawLeft: rawLeftFor(s, mirror) })
+      if (!f) continue
+      const K = SHAPE_KEYS[s]
+      for (let i = 0; i < 5; i++) out[K.curl[i]] = f.curl[i]
+      for (let i = 0; i < 4; i++) out[K.pinch[i]] = f.pinch[i]
+      // The roll holds its last value while the fingers point at the camera.
+      if (f.axisSure > 0.2) out[K.angle] = f.angle
+      out[K.facing] = f.facing
+      out[K.span] = f.span
+      const si = s === 'left' ? 0 : 1
+      const fired = st.reader.push(f, ts, settle, (id) => this.sens(SHAPE_GESTURE[id][si]))
+      if (fired) this.emit(SHAPE_GESTURE[fired][si])
+      const cur = st.reader.current()
+      if (cur) shapes.push({ x: w.x, y: w.y, label: `${s === 'left' ? 'L' : 'R'} ${SHAPE_LABEL[cur]}` })
+    }
+    this.latestShapes = shapes
   }
 
   // ── Pose → features + hands-up gesture ─────────────────────────────────

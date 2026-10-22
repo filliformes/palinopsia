@@ -22,6 +22,11 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 const REST: Record<BodyFeature, number> = {
   handLeftHeight: 0, handRightHeight: 0, handLeftX: 0.5, handRightX: 0.5,
   handLeftOpen: 0, handRightOpen: 0, handsApart: 0, handsHeight: 0,
+  handLeftCurlThumb: 0, handLeftCurlIndex: 0, handLeftCurlMiddle: 0, handLeftCurlRing: 0, handLeftCurlPinky: 0,
+  handRightCurlThumb: 0, handRightCurlIndex: 0, handRightCurlMiddle: 0, handRightCurlRing: 0, handRightCurlPinky: 0,
+  handLeftPinchIndex: 0, handLeftPinchMiddle: 0, handLeftPinchRing: 0, handLeftPinchPinky: 0,
+  handRightPinchIndex: 0, handRightPinchMiddle: 0, handRightPinchRing: 0, handRightPinchPinky: 0,
+  handLeftAngle: 0.5, handRightAngle: 0.5, handLeftFacing: 0.5, handRightFacing: 0.5, handLeftSpan: 0, handRightSpan: 0,
   bodyMotion: 0, bodyLean: 0.5, bodySway: 0.5, armSpan: 0, bodyHeight: 0.5, handsUp: 0, weightLR: 0.5,
   faceJawOpen: 0, faceSmile: 0, faceBrowUp: 0, faceBlink: 0, faceMouthPucker: 0,
   faceHeadYaw: 0.5, faceHeadPitch: 0.5, faceHeadRoll: 0.5,

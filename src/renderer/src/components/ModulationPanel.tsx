@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
-import { BODY_FEATURES, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
+import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
 import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
@@ -603,13 +603,17 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={bc.feature}
-              title="Which body feature this modulator follows : the live camera of the performer (hand height / side / openness, hands apart, whole-body motion, lean, arm span, stance, hands-up). Turn embodied control on and pick a camera on the Body page (B)."
+              title="Which body feature this modulator follows : the live camera of the performer (hand height / side / openness, a hand's shape : finger curls, pinches, roll, facing, span; hands apart, whole-body motion, lean, arm span, stance, hands-up, the face, the silhouette zones, the motion field). Turn embodied control on and pick a camera on the Body page (B)."
               onChange={(e) => update(index, { body: { ...bc, feature: e.target.value as BodyFeature } })}
             >
-              {BODY_FEATURES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
+              {BODY_FEATURE_GROUPS.map((g) => (
+                <optgroup key={g.title} label={g.title}>
+                  {g.keys.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

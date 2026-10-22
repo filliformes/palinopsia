@@ -14,6 +14,29 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Hand shapes** (`engine/handShape.ts` : pure geometry on MediaPipe's 21 hand points,
+  no new model). 24 new body features, per hand : a **curl** per finger (from joint angles
+  measured on long chords, so the landmarks' jitter does not read as curling), the
+  thumb's **pinch** to each fingertip (in the hand's own palms, 1 touching), the
+  **angle** (roll as you see it, 0.5 upright, stops at a quarter turn each way), the
+  **facing** (palm toward / away, from the palm's normal and the hand's chirality) and
+  the **span** (apparent size on a log scale, a stand-in for distance). Measured in a
+  square space (x and depth × the camera's aspect), on the points lightly smoothed first
+  (a time constant of 70 ms that shortens as the hand moves). They stream as
+  `/opsia/body/<feature>`, list in OSCQuery and the agent's `list_controls` while the
+  camera runs, feed body modulators (whose menu is now grouped by body region) and the
+  Resolume mapper (their own "Body · hand shape" group), and show in the monitor's new
+  **HAND SHAPE** group. 20 new gestures : **fist, open, point, peace, thumb up, thumb
+  down, ok, horns, call, gun**, each L and R, recognised from the curl vector with enter
+  and exit thresholds, a settle (an eighth of the hold time) and a short release, so a
+  held shape fires once; the global and per-gesture sensitivity widen or narrow the
+  thresholds. The camera preview names the shape each hand holds. Tested on synthetic
+  hands (10 shapes plus half-curled hands, at many rolls, yaws, pitches, palm or back,
+  four sizes, four aspect ratios, a mirroring camera or not, Mirror on and off, a ±20 %
+  depth-scale error, jitter at 2 % of a palm) : 98.7 % recognised, no shape ever taken
+  for another, a half-curled hand never firing; a shape held 4 s fires once (400 of
+  400). Not yet with a real camera.
+
 - **Every source and effect has at least ten presets** (`shaders/isf/presets.ts`) :
   Silhouette gets its first ten (cutout, matte, shadow and hole, with and without
   echoes : its own look only, a preset never turns the camera on), and Shatter, Crawl,
@@ -41,6 +64,21 @@ that CI builds into cross-platform releases.
   dialog or a network source, and a rule whose target is gone says "(gone)" and does
   nothing. The same vocabulary (`actions.ts`, listed by `triggerCatalog.ts`) reaches MIDI :
   the MIDI section's new **learn** list binds a pad to any of them.
+
+### Changed
+
+- **A lone hand goes to its own side** (`HandSlots`, `engine/handShape.ts`). With two
+  hands in view nothing changes (the one on your left as the preview shows it is L).
+  With one, it used to always be L (a lone right hand moved `handLeftHeight` and fired
+  `pinchLeft`); now it keeps the side it had while it stays in view, else takes its own
+  from MediaPipe's handedness (now passed back by the tracking worker; on an unmirrored
+  camera MediaPipe's "Left" is the performer's right, and the sense is learned again
+  from every frame that shows both hands, so a camera that mirrors corrects itself), so
+  a lone right hand is R wherever it is. Its labels vote for a quarter second after it
+  comes into view. Tested on synthetic hands on a raw and a mirroring camera with Mirror
+  on and off (two hands, a lone hand anywhere, a lone hand sweeping across, a pair losing
+  one, labels 15 % wrong, labels the other way round) : every case right but a few lone
+  hands whose labels were made wrong (97.5 to 99.5 %).
 
 ## v1.3.0 — 2026-10-21
 

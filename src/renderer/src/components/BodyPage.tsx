@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
+import { BODY_FEATURE_GROUPS } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
 import { fireTrigger, midiTargetLabel } from '../midi'
@@ -47,7 +48,11 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   bodyEnter: 'body in', bodyLeave: 'body out', handsEnter: 'hands in', handsLeave: 'hands out', faceEnter: 'face in', faceLeave: 'face out',
   swipeLeft: 'swipe L', swipeRight: 'swipe R', swipeUp: 'swipe up', swipeDown: 'swipe down',
   approach: 'approach', withdraw: 'withdraw', spinCW: 'turn cw', spinCCW: 'turn ccw', stillness: 'stillness',
-  impulse: 'impulse', freeze: 'freeze'
+  impulse: 'impulse', freeze: 'freeze',
+  fistLeft: 'fist L', fistRight: 'fist R', openLeft: 'open L', openRight: 'open R', pointLeft: 'point L', pointRight: 'point R',
+  peaceLeft: 'peace L', peaceRight: 'peace R', thumbUpLeft: 'thumb up L', thumbUpRight: 'thumb up R',
+  thumbDownLeft: 'thumb down L', thumbDownRight: 'thumb down R', okLeft: 'ok L', okRight: 'ok R',
+  hornsLeft: 'horns L', hornsRight: 'horns R', callLeft: 'call L', callRight: 'call R', gunLeft: 'gun L', gunRight: 'gun R'
 }
 const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage']
 
@@ -75,17 +80,32 @@ const ACTION_TOKEN: Record<string, string> = {
 }
 // Silhouette zone features in row-major order (TL..BR), for the preview grid.
 const ZONE_KEYS: BodyFeature[] = ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR']
-// Group the feature list for a legible monitor. Each group gets a color so the
-// bars and its margin word read at a glance which body region a value belongs to.
-const FEATURE_GROUPS: Array<{ title: string; color: string; hint: string; keys: BodyFeature[] }> = [
-  { title: 'Hands', color: '#ff8e0f', hint: 'each hand’s height, side and openness, how far apart they are', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
-  { title: 'Pose', color: '#49a6e6', hint: 'the whole body : motion, lean, sway, arm span, height, hands up, weight', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
-  { title: 'Face', color: '#5fc281', hint: 'jaw, smile, brow, blink, pucker, and the head’s turn, nod and tilt', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
-  { title: 'Silhouette (zones)', color: '#b98cff', hint: 'how much of each 3×3 zone the body’s shadow covers (Silhouette on)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
-  { title: 'Motion field', color: '#e0b04a', hint: 'the camera’s motion : how much moves, which way, spreading or closing, turning, where (Motion on)', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
-  { title: 'Movement qualities', color: '#e0708f', hint: 'how the body moves : energy, expansion, fluidity, suddenness, directness, symmetry', keys: ['moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry'] },
-  { title: 'Presence', color: '#8b93a7', hint: 'a body, hands, a face in the frame', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
-]
+// Group the feature list for a legible monitor (the groups themselves are shared
+// with the body modulator's menu : BODY_FEATURE_GROUPS). Each group gets a color
+// so the bars and its margin word read at a glance which body region a value
+// belongs to.
+const GROUP_LOOK: Record<string, { color: string; hint: string }> = {
+  Hands: { color: '#ff8e0f', hint: 'each hand’s height, side and openness, how far apart they are' },
+  'Hand shape': { color: '#36c5c0', hint: 'each hand’s finger curls (0 straight, 1 curled), the thumb’s pinch to each fingertip (1 touching), its roll as you see it (0.5 upright), which way the palm faces (1 toward the camera) and its span (1 close to the camera)' },
+  Pose: { color: '#49a6e6', hint: 'the whole body : motion, lean, sway, arm span, height, hands up, weight' },
+  Face: { color: '#5fc281', hint: 'jaw, smile, brow, blink, pucker, and the head’s turn, nod and tilt' },
+  'Silhouette (zones)': { color: '#b98cff', hint: 'how much of each 3×3 zone the body’s shadow covers (Silhouette on)' },
+  'Motion field': { color: '#e0b04a', hint: 'the camera’s motion : how much moves, which way, spreading or closing, turning, where (Motion on)' },
+  'Movement qualities': { color: '#e0708f', hint: 'how the body moves : energy, expansion, fluidity, suddenness, directness, symmetry' },
+  Presence: { color: '#8b93a7', hint: 'a body, hands, a face in the frame' }
+}
+const FEATURE_GROUPS: Array<{ title: string; color: string; hint: string; keys: BodyFeature[] }> = BODY_FEATURE_GROUPS.map((g) => ({
+  ...g, ...(GROUP_LOOK[g.title] ?? { color: '#8b93a7', hint: '' })
+}))
+/** The monitor's name for a feature : the hand-shape ones shortened to fit
+ *  ("L curl thumb", "R pinch ring", "L facing"), the rest as they are. */
+function featureLabel(k: BodyFeature): string {
+  const m = /^hand(Left|Right)(Curl|Pinch|Angle|Facing|Span)(\w*)$/.exec(k)
+  if (!m) return k
+  const side = m[1] === 'Left' ? 'L' : 'R'
+  const what = m[2].toLowerCase()
+  return `${side} ${what}${m[3] ? ' ' + m[3].toLowerCase() : ''}`
+}
 
 function Toggle({ on, label, onClick, title }: { on: boolean; label: string; onClick: () => void; title?: string }): JSX.Element {
   return (
@@ -179,6 +199,21 @@ export function BodyPage(): JSX.Element {
         for (const p of pv.face) { g.beginPath(); g.arc(p.x * W, p.y * H, 1, 0, 7); g.fill() }
       }
       g.restore()
+      // The shape each hand holds now, under its wrist (drawn unmirrored, so the
+      // words read the right way round).
+      if (pv.shapes.length) {
+        g.font = '600 13px ui-monospace, monospace'
+        g.textAlign = 'center'
+        g.lineWidth = 3
+        for (const s of pv.shapes) {
+          const x = (pv.mirror ? 1 - s.x : s.x) * W, y = Math.min(H - 6, s.y * H + 22)
+          g.strokeStyle = 'rgba(0,0,0,0.75)'
+          g.strokeText(s.label, x, y)
+          g.fillStyle = 'rgba(54,197,192,0.95)'
+          g.fillText(s.label, x, y)
+        }
+        g.textAlign = 'start'
+      }
       // Silhouette : the 3×3 sensor grid, each cell lit by how much shadow fills it
       // (drawn in screen space, over the mirrored image : TL = performer's top-left).
       if (useStore.getState().bodyControl.silhouette) {
@@ -302,6 +337,12 @@ export function BodyPage(): JSX.Element {
   // Gestures grouped by body region, for the rule builder dropdowns.
   const GESTURE_GROUPS: Array<{ label: string; keys: BodyGesture[] }> = [
     { label: 'Hands', keys: ['pinchLeft', 'pinchRight', 'clap', 'cross'] },
+    {
+      label: 'Hand shapes',
+      keys: ['fistLeft', 'fistRight', 'openLeft', 'openRight', 'pointLeft', 'pointRight', 'peaceLeft', 'peaceRight',
+        'thumbUpLeft', 'thumbUpRight', 'thumbDownLeft', 'thumbDownRight', 'okLeft', 'okRight', 'hornsLeft', 'hornsRight',
+        'callLeft', 'callRight', 'gunLeft', 'gunRight']
+    },
     { label: 'Pose', keys: ['handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight'] },
     { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
     { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] },
@@ -381,7 +422,7 @@ export function BodyPage(): JSX.Element {
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
+              <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands) : each hand's height, side and openness, and its shape (finger curls, pinches, roll, facing, span; fist, open, point, peace, thumb up / down, ok, horns, call, gun for rules)" />
               <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
               <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
               <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
@@ -395,7 +436,7 @@ export function BodyPage(): JSX.Element {
                 type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
                 onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
                 className="min-w-0 flex-1"
-                title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
+                title="How easily gestures fire (pinch distance, clap gap, hands-up threshold, how straight or curled the fingers must be for a hand shape). Higher = easier."
               />
               <span className="w-8 shrink-0 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
             </label>
@@ -405,7 +446,7 @@ export function BodyPage(): JSX.Element {
                 type="range" min={400} max={3000} step={50} value={cfg.holdMs}
                 onChange={(e) => patch({ holdMs: Number(e.target.value) })}
                 className="min-w-0 flex-1"
-                title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
+                title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire. A hand shape (fist, peace, …) settles in an eighth of it before it fires."
               />
               <span className="w-8 shrink-0 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
             </label>
@@ -470,7 +511,7 @@ export function BodyPage(): JSX.Element {
                     const v = vals[k] ?? 0
                     return (
                       <div key={k} className="flex min-w-0 items-center gap-1.5">
-                        <span className="w-[92px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{k}</span>
+                        <span className="w-[92px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{featureLabel(k)}</span>
                         <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
                           <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: grp.color }} />
                         </div>

@@ -14,9 +14,9 @@
 //
 // Messages in  : init {urls} · config {cfg} · frame {bitmap, ts, camT, newFrame,
 //                silhouette, mirror, full} (the bitmap is transferred) · stop
-// Messages out : ready · configured · error {msg} · result {hands, pose, face,
-//                blend, sil, people, ts, camT, newFrame, ms} (the mask buffer
-//                transferred)
+// Messages out : ready · configured · error {msg} · result {hands, handed, pose,
+//                face, blend, sil, people, ts, camT, newFrame, ms} (the mask
+//                buffer transferred; handed : each hand's handedness label)
 //
 // cfg.people (default 1) : how many bodies Pose looks for; with several, the
 // silhouette is every one of them, merged (a layer's People, personMask.ts).
@@ -120,10 +120,19 @@ function workerMain(): void {
 
   const detect = (m: any): void => {
     const t0 = performance.now()
-    const out: any = { t: 'result', ts: m.ts, camT: m.camT, newFrame: m.newFrame, hands: [], pose: null, face: null, blend: null, sil: null, people: 0 }
+    const out: any = { t: 'result', ts: m.ts, camT: m.camT, newFrame: m.newFrame, hands: [], handed: [], pose: null, face: null, blend: null, sil: null, people: 0 }
     const bmp = m.bitmap
     try {
-      if (hands) out.hands = hands.detectForVideo(bmp, m.ts).landmarks ?? []
+      if (hands) {
+        const hr = hands.detectForVideo(bmp, m.ts)
+        out.hands = hr.landmarks ?? []
+        // MediaPipe's left / right for each hand (it reads a mirrored picture's)
+        const hd = hr.handedness ?? hr.handednesses ?? []
+        out.handed = out.hands.map((_: any, i: number) => {
+          const c = hd[i] && hd[i][0]
+          return c ? { name: c.categoryName, score: c.score } : null
+        })
+      }
       if (pose) {
         const pr = pose.detectForVideo(bmp, m.ts)
         out.pose = (pr.landmarks && pr.landmarks[0]) || null
