@@ -549,6 +549,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     size: 'How big each point is. On a plane, 1 makes neighbors touch; in a volume the points stay small, like stars.',
     vary: 'Lets some points grow large and bright and others dim, from one draw per point : at 0 every point is the same.',
     jitter: 'Loosens the lattice : each point strays from its place, toward a random scatter at 1.',
+    irregular: 'Turns every point from a round dot into a shape of its own, on every form : first a soft wobble, then ink drops, seeds, pollen, torn paper and thin slivers, each turned its own way and held still on the screen while it streaks. Far, tiny points keep a simple outline : lobes and ragged edges need a few pixels to show. 0 = round points.',
+    evolve: 'How fast the shapes slowly morph and tumble. 0 = every point keeps its shape, frozen. Only with irregular above 0.',
     tilt: 'Leans the camera down toward the plane (negative : up). Toward the ends it looks almost straight down or up. Round a sphere, torus or galaxy : how high the camera circles (a galaxy seen edge-on at 0).',
     turn: 'The direction the camera faces, all the way around (round a shape : where it stands round it).',
     height: 'How high the camera stands above the plane. Low skims the dots, high looks down on the whole field. In a tunnel : its radius. Round a sphere, torus or galaxy : how far the camera stands (low : inside the sphere). Unused in a volume.',
@@ -959,6 +961,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     audioScatter: 'Each column of ash gusts sideways on its own sample of the live audio waveform (neighboring columns move together, so gusts travel across the bed). 0 = off.',
     count: 'How many rows of flecks fit in the frame height : higher = smaller cells, a denser fall (about half the cells hold a fleck). The fall keeps its speed on screen.',
     size: 'Fleck size as a share of its cell (the smallest stay about a pixel wide and dim instead of flickering).',
+    irregular: 'Turns every fleck from a round dot into a shape of its own : first a soft wobble, then ink drops, seeds, torn paper and thin slivers, each turned its own way and kept as it falls. Lobes and ragged edges need big flecks to show. 0 = round flecks.',
+    evolve: 'How fast the shapes slowly morph and tumble. 0 = every fleck keeps its shape, frozen. Only with irregular above 0.',
     tint: 'Color of the rare accent flecks (how many : accent). The others are a pale gray.'
   },
   murmuration: {
@@ -1094,6 +1098,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     speed: 'How fast the field travels along the flow. Changes glide, no jump.',
     flow: 'Direction of travel, in radians : 0 = right, 1.57 = up, 3.14 = left, 4.71 = down. Turning it bends the path, no jump.',
     size: 'Point size as a share of a cell (tiny points dim instead of flickering).',
+    irregular: 'Turns every point from a round dot into a shape of its own : first a soft wobble, then ink drops, seeds, pollen, torn paper and thin slivers, each turned its own way. The trail sweeps the shape along behind it. Lobes and ragged edges need big points to show. 0 = round points.',
+    evolve: 'How fast the shapes slowly morph and tumble. 0 = every point keeps its shape, frozen. Only with irregular above 0.',
     trail: 'Length of the streak behind each point, in cells.',
     fade: 'Trail brightness from head to tail : 0 = even dashes, 1 = a bright head fading to nothing.',
     jitter: 'How far each point wanders around its place in the grid.',

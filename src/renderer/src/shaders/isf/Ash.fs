@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Ash : sparse particulate falling at per-column rates with lateral wander and flicker; rare flecks carry the accent. Near-black particulate weather : settling, not snowing: matte, slow, asymmetric. Physics sets the mass: low = heavy flecks dropping fast and straight, high = light ash drifting down softly with more sway and float. Audio scatter gusts each column sideways on its own live sample.",
+  "DESCRIPTION": "Ash : sparse particulate falling at per-column rates with lateral wander and flicker; rare flecks carry the accent. Near-black particulate weather : settling, not snowing: matte, slow, asymmetric. Physics sets the mass: low = heavy flecks dropping fast and straight, high = light ash drifting down softly with more sway and float. Audio scatter gusts each column sideways on its own live sample. Irregular turns every fleck into a shape of its own (ink drops, seeds, torn paper, slivers), evolve morphs and tumbles them.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Particles"],
@@ -8,6 +8,8 @@
     { "NAME": "speed",   "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,  "DEFAULT": 0.25 },
     { "NAME": "physics", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.35 },
     { "NAME": "size",    "TYPE": "float", "MIN": 0.02, "MAX": 0.35, "DEFAULT": 0.08 },
+    { "NAME": "irregular", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0 },
+    { "NAME": "evolve",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.25 },
     { "NAME": "wander",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.4 },
     { "NAME": "flicker", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.3 },
     { "NAME": "accent",  "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,  "DEFAULT": 0.25 },
@@ -22,6 +24,8 @@
 // speed·count·mix(1, 0.32, physics) = speed·count − 0.68·speed·count·physics.
 uniform float PH_speed_x_count;
 uniform float PH_speed_x_count_x_physics;
+// EVOLVE : the flecks' shapes morph and tumble on their own clock (lib/blob.glsl).
+uniform float PH_evolve; // wrap 100.5309649
 
 // Rows repeat seamlessly every WRAP cells, so the scroll can wrap forever and
 // every hash input stays small (no lattice after hours).
@@ -46,6 +50,8 @@ float vnoise(vec2 p) {
 }
 
 // @dome
+
+// @blob
 
 // Per-element audio : the shared waveform texture (row 0), ±1 around silence.
 float aud(float idx01) {
@@ -91,9 +97,17 @@ void main() {
   // Wide in x so a fleck scattered off its own column is still found : ±2
   // columns, one more only when these settings (strong wander, loud audio
   // scatter) can carry a fleck that far. The clamp below is a safety net.
+  // IRREGULAR : each fleck an outline of its own, reaching up to ext radii.
+  float ext = 1.0 + BLOB_REACH * irregular;
   float maxSx = 0.425 + 0.5 * wander * sway + 0.22 * physics + 1.5 * audioScatter;
   float R = maxSx > 2.5 - rad ? 3.0 : 2.0;
   float reachX = R + 0.5 - rad;
+  if (irregular > 0.0) {
+    R = maxSx > 2.5 - rad * ext ? 3.0 : 2.0;
+    reachX = R + 0.5 - rad * ext;
+  }
+  float radPx = rad * RENDERSIZE.y / count;
+  float inner = mix(0.5, 0.65, irregular);
 
   float lum = 0.0;
   float acc = 0.0;
@@ -127,7 +141,20 @@ void main() {
       float d = length(vec2((qx - pos.x) * tx, qy - pos.y));
       // Flicker: slow per-fleck brightness breathing.
       float fl = 1.0 - flicker * (0.5 + 0.5 * sin(TIME * (1.0 + hash12(cell) * 3.0) + hash12(cell + 3.0) * 6.28));
-      float dot_ = (1.0 - smoothstep(rad * 0.5, rad, d)) * fl * dim;
+      float cov = 1.0 - smoothstep(rad * 0.5, rad, d);
+      if (irregular > 0.0) {
+        // its own shape : the soft falloff follows the outline (irregular 0 keeps
+        // the round fleck, bit for bit)
+        cov = 0.0;
+        if (d < rad * ext) {
+          vec3 sd = vec3(hash12(cell + 41.0), hash12(cell + 43.0), hash12(cell + 47.0));
+          // the offset written apart from d's : shared, the compiler re-rounds d
+          // and the round fleck moved by a level here and there
+          vec2 bs = blobShape(vec2(qx * tx - pos.x * tx, qy - pos.y) / rad, sd, irregular, PH_evolve, radPx);
+          cov = 1.0 - smoothstep(inner, 1.0, bs.y);
+        }
+      }
+      float dot_ = cov * fl * dim;
       if (dome) {
         // its distance from the zenith; fades in past a height of its own
         float rf = -2.0 * (pos.y - scroll) / count;

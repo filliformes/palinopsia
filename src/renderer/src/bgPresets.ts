@@ -76,8 +76,8 @@ export const BG_PRESETS: BgPreset[] = [
   { id: 'bg-topo', name: 'Topography', shaderId: 'contour', inputs: { rate: 0.06, scale: 2, levels: 9, width: 0.12, warp: 0.5, fill: 0.35 }, opacity: 0.6 },
 
   // ── Particles & sparse motion ────────────────────────────────────────
-  { id: 'bg-ashfall', name: 'Ashfall', shaderId: 'ash', inputs: { count: 18, speed: 0.15, physics: 0.5, size: 0.08, wander: 0.4, flicker: 0.25, accent: 0.1 }, opacity: 0.7 },
-  { id: 'bg-dust', name: 'Dust motes', shaderId: 'particle-drift', inputs: { count: 12, speed: 0.2, flow: 1.6, size: 0.06, trail: 0.5, jitter: 0.3, vary: 0.6 }, opacity: 0.55 },
+  { id: 'bg-ashfall', name: 'Ashfall', shaderId: 'ash', inputs: { count: 18, speed: 0.15, physics: 0.5, size: 0.08, irregular: 0, evolve: 0.25, wander: 0.4, flicker: 0.25, accent: 0.1 }, opacity: 0.7 },
+  { id: 'bg-dust', name: 'Dust motes', shaderId: 'particle-drift', inputs: { count: 12, speed: 0.2, flow: 1.6, size: 0.06, irregular: 0, evolve: 0.25, trail: 0.5, jitter: 0.3, vary: 0.6 }, opacity: 0.55 },
   { id: 'bg-distantflock', name: 'Distant flock', shaderId: 'murmuration', inputs: { count: 22, speed: 0.35, cohesion: 0.85, size: 0.045, stretch: 0.5 }, opacity: 0.5, fx: [{ shaderId: 'fx-grade', inputs: { brightness: -0.05, saturation: 0.5 } }] },
 
   // ── Faint structure ──────────────────────────────────────────────────

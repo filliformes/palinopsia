@@ -101,7 +101,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-wide-time': ['reverb', 'delay', 'echo', 'trails', 'blur', 'ghost'],
 
   // ── Generators / sources ─────────────────────────────────────────────
-  ash: ['particles', 'ash', 'snow', 'embers', 'texture', 'audio'],
+  ash: ['particles', 'ash', 'snow', 'embers', 'texture', 'audio', 'organic', 'irregular', 'blob', 'confetti', 'torn paper', 'shards'],
   'column-scan': ['scan', 'lines', 'displace', 'waveform', 'oscillator', 'audio', 'oscilloscope'],
   congeal: ['feedback', 'flow', 'organic', 'warp', 'field', 'audio', 'trails'],
   'oil-cloud': ['cloud', 'volumetric', 'volume', 'raymarch', 'ray tracing', 'oil', 'paint', 'painting', 'painterly', 'impasto', 'billow', 'smoke', 'explosion', 'nebula', 'blob', '3d'],
@@ -109,7 +109,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   contour: ['contour', 'topographic', 'lines', 'noise', 'matte', 'map', 'audio'],
   differential: ['polyrhythm', 'oscillator', 'waves', 'harmonograph', 'geometry', 'contour'],
   'direct-marks': ['film', 'scratches', 'marks', 'ink', 'hand-drawn', 'cameraless'],
-  'gen-lattice': ['dots', 'points', '3d', 'stars', 'starfield', 'grid', 'perspective', 'space', 'well', 'ripple', 'tunnel', 'warp', 'sphere', 'globe', 'torus', 'donut', 'ring', 'galaxy', 'spiral'],
+  'gen-lattice': ['dots', 'points', '3d', 'stars', 'starfield', 'grid', 'perspective', 'space', 'well', 'ripple', 'tunnel', 'warp', 'sphere', 'globe', 'torus', 'donut', 'ring', 'galaxy', 'spiral', 'organic', 'irregular', 'blob', 'pollen', 'cells'],
   'lowercase': ['data', 'grid', 'strobe', 'minimal', 'barcode', 'sprocket', 'rhythm', 'black and white', 'slant', 'crossing lines'],
   'drift-field': ['flow', 'noise', 'bands', 'drift', 'matte'],
   'dye-field': ['paint', 'dye', 'ink', 'pigment', 'organic'],
@@ -127,7 +127,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   mycelium: ['network', 'branches', 'growth', 'organic', 'roots'],
   'op-art': ['op-art', 'optical', 'illusion', 'moiré', 'geometry'],
   organic: ['fire', 'water', 'organic', 'elemental', 'nature'],
-  'particle-drift': ['particles', 'points', 'trails', 'flow', 'drift', 'audio'],
+  'particle-drift': ['particles', 'points', 'trails', 'flow', 'drift', 'audio', 'organic', 'irregular', 'blob', 'ink', 'seeds', 'pollen', 'confetti'],
   ramps: ['gradient', 'ramp', 'voltage', 'test', 'matte', 'wipe', 'key'],
   'gen-silhouette': ['silhouette', 'background removal', 'cutout', 'key', 'matte', 'body', 'camera', 'shadow', 'person', 'segmentation', 'green screen'],
   'gen-veins': ['veins', 'leaf', 'venation', 'roots', 'space colonization', 'botany', 'branching', 'tree', 'organic', 'nature'],

@@ -14,6 +14,47 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Organic shapes for Lattice, Ash and Particle Drift** (Vincent : "I don't want to
+  only have pills-looking dots, I want them more organic"). Each of the three sources
+  has a new **irregular** control (0 = the round dots and capsules exactly as before,
+  bit for bit : old sessions and presets do not change) and an **evolve** control.
+  Raising irregular turns every point into an outline of its own, dealt from its own
+  random numbers so no two are alike and each keeps its shape : first a soft wobble and
+  stretch (up to about 0.45), then one of four kinds, sometimes crossed : ink drops
+  (low harmonics, egg-ish), petals (3 to 7 rounded lobes pinched between, seeds and
+  pollen), torn paper (a rough polygon with a ragged, fbm-like edge) and shards (long
+  thin slivers), each turned its own way. Evolve morphs the outlines and tumbles them
+  slowly (0 = frozen). One shared outline function (`shaders/isf/lib/blob.glsl`, the
+  `// @blob` include, the same text in the ISF shaders and the native Lattice) keeps the
+  edges anti-aliased over one pixel (distance corrected for the outline's slope and
+  stretch), keeps each shape at about a round dot's mass (measured : Ash 7.1 → 7.2 mean
+  level at irregular 1, trail-less Particle Drift 11.1 → 10.9), and fades lobes and
+  ragged edges out on points too small to show them (no shimmer). Ash keeps its soft
+  flecks (the falloff follows the outline); in Particle Drift the head takes the shape
+  and the trail behind it becomes a wisp of the shape's width thinning toward its tail
+  (a comet, a smear of ink : a trailed field reads about a fifth lighter at 1); Lattice
+  draws it on every form (plane, volume, tunnel, sphere, torus, galaxy), held still on
+  the screen while a point streaks (a streak sweeps the whole outline, as a long
+  exposure would), its quads grown by the outline's reach and the shape skipped past it.
+  0 is checked bit for bit against the old code (56 frames on the RTX : Ash and
+  Particle Drift at several presets, 16:9 and square, 5 s and 30 min of show time, and
+  all 20 Lattice presets : 0 differing bytes). Writing the new path's offset apart from
+  the old distance was needed : shared, the D3D compiler re-rounded the round dots by
+  one level in a few pixels. Evolve's phase is an
+  integrated `PH_evolve` wrapped at 32 pi, every rate a whole number of turns per wrap.
+  Cost on the RTX 4070 at 1920x1080 (the whole app, vsync off, irregular 0 → 1) : Ash
+  155 → 153 fps, Particle Drift 158 → 146 (with trails), Lattice 195 → 161 on a plane of
+  big dots (the worst case : its quads hold the outline's reach, the shape is skipped
+  past it) and 190 → 170 on a galaxy; with vsync every case holds 60 fps, at 4K too.
+  Nine new presets (Lattice : Seed floor, Pollen globe, Spore galaxy; Particle Drift :
+  Pollen, Ink in water, Paper scraps; Ash : Torn confetti, Ink drops, Seed fall; 1593 →
+  1602 presets), every
+  older preset of the three (and the two Background presets) sets irregular 0. The dice
+  draw it low (0 to 0.35 / 0.4); the Orbit theme now and then builds its figure of
+  organic points, the Murmuration theme lets its drift and ash turn organic, Crystal Room
+  stays a perfect lattice. Hints, keywords, blurbs, and evolve greys out while irregular
+  is 0.
+
 - **Every source and effect has at least ten presets** (`shaders/isf/presets.ts`) :
   Silhouette gets its first ten (cutout, matte, shadow and hole, with and without
   echoes : its own look only, a preset never turns the camera on), and Shatter, Crawl,
