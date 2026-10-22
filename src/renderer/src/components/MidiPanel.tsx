@@ -3,10 +3,13 @@
 // them. Binding happens live via the toolbar's MIDI LEARN button (dataFLOU's
 // Ableton-style mode); this panel is the ledger.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { MidiBinding } from '@shared/types'
-import { describeBinding, midi, midiTargetLabel, type MidiDevice } from '../midi'
+import { describeBinding, midi, type MidiDevice } from '../midi'
 import { useStore } from '../store'
+import { triggerLabel, triggerOptions } from '../triggerCatalog'
+import { SearchSelect } from './SearchSelect'
+import { showToast } from './Toast'
 
 export function MidiPanel(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed['midi'])
@@ -25,6 +28,18 @@ export function MidiPanel(): JSX.Element {
   const metaKnobs = useStore((s) => s.composition.metaKnobs)
   const setMidiBinding = useStore((s) => s.setMidiBinding)
   const updateMetaKnob = useStore((s) => s.updateMetaKnob)
+  const learnTarget = useStore((s) => s.midiLearnTarget)
+  const setLearnTarget = useStore((s) => s.setMidiLearnTarget)
+  // "learn an action" : the whole trigger vocabulary (the one a Body rule fires),
+  // most of it with no control on screen to click in learn mode
+  const composition = useStore((s) => s.composition)
+  const scenes = useStore((s) => s.scenes)
+  const worlds = useStore((s) => s.worlds)
+  const learnOptions = useMemo(
+    () => triggerOptions(useStore.getState()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [composition, scenes, worlds]
+  )
 
   const [devices, setDevices] = useState<MidiDevice[]>(() => midi.listDevices())
   const [outputs, setOutputs] = useState<MidiDevice[]>(() => midi.listOutputs())
@@ -199,6 +214,27 @@ export function MidiPanel(): JSX.Element {
             <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted">→ {outputName || 'no output'}</span>
           </div>
 
+          {/* Learn an action : pick any trigger of the shared vocabulary (the
+              layers, the loaded effects' triggers, Worlds, Generate, Meta,
+              modulators, Feel, tempo, the output...), then hit a pad. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 font-mono text-[9px] uppercase text-muted">learn</span>
+            <SearchSelect
+              value=""
+              resetAfterPick
+              placeholder={learnMode && learnTarget ? `waiting : ${triggerLabel(learnTarget)}` : 'an action, then hit a pad…'}
+              options={learnOptions}
+              menuWidth={300}
+              className="min-w-0 flex-1 px-1 py-0.5 text-[11px]"
+              onChange={(id) => {
+                setLearnMode(true)
+                setLearnTarget(id)
+                showToast(`MIDI Learn : hit a pad or press a button for ${triggerLabel(id)}`, 'ok', 5000)
+              }}
+              title="Bind a pad to any action, even one with no control on screen : the same vocabulary a Body rule fires (the layers, the loaded effects' triggers, Worlds, Generate, Meta, modulators, Feel, tempo, the key, the Audio Layer, the output). Pick it, then hit a pad or press a button."
+            />
+          </div>
+
           {/* The bindings ledger. */}
           {rows.length === 0 ? (
             <div className="rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed text-muted">
@@ -214,7 +250,7 @@ export function MidiPanel(): JSX.Element {
                   className="flex min-w-0 items-center gap-2 rounded bg-panel2/40 px-1.5 py-0.5"
                 >
                   <span className="min-w-0 flex-1 truncate font-mono text-[10px]">
-                    {midiTargetLabel(r.id)}
+                    {triggerLabel(r.id)}
                   </span>
                   <span className="shrink-0 font-mono text-[9px] text-accent2">
                     {describeBinding(r.binding)}
