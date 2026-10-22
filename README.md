@@ -930,9 +930,10 @@ inspector column.
 
 ![The macro-form sequencer](docs/images/interface-sequencer.jpg)
 
-*Tagged scenes across the top, the live monitor at the bottom, and the transport
-column on the right: dwell clock, transition style, selection strategy, the
-Repose–Disturbance–Repose climate arc, and the punctuation toggles.*
+*Tagged scenes across the top with the tag editor for the selected one, the live
+monitor at the bottom, and the column on the right: dwell clock, transition style,
+selection strategy, the Breathe and Repose–Disturbance–Repose climate-arc overlays,
+and the slow long-forms below them.*
 
 ## Worlds / diegesis (key `W`)
 
@@ -1123,7 +1124,14 @@ frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows 
 render (on a machine where that thread cannot start, they run on the main thread as
 before). The models ship inside the app, so it works offline and in kiosk.
 
-**Capture bar** (one distributed line): **Hands** (21 landmarks per hand, up to two)
+**Layout.** Like the layer strip's IN / MIX / FX / OUT, every section is named in the
+left margin, in its color, on a faint panel of that color (hover the word for what the
+section does) : **TRACK** (the capture line), the camera preview beside the feature
+monitor's seven groups, then **NEW RULE** (the builder line) and **RULES** (the saved
+rules). The header holds the tracking state, the last gesture recognized and the camera
+picker.
+
+**TRACK** (one distributed line): **Hands** (21 landmarks per hand, up to two)
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
 reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
@@ -1131,21 +1139,21 @@ model; cheap) · **Mirror** (selfie view) · **Hi-res** (track on every display 
 instead of once per new camera frame : for a fast camera, at about twice the cost) ·
 **sensitivity**
 (how easily gestures fire, a global default that any single gesture can override) ·
-**hold time** (how long a held pose must last) · **OSC out**. The camera picker sits
-in the page header.
+**hold time** (how long a held pose must last) · **OSC out**.
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
 the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
 lean / sway / motion-energy / arm-span / stance / weight, the movement qualities (below),
 the face blendshapes and head pose, and (with Silhouette on) each of the nine **zone
-coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **Feature monitor** shows
-them live, grouped and colour-coded by body region (Hands · Pose · Movement qualities ·
-Face · Silhouette · Motion field · Presence); its **→**
+coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **feature monitor** shows
+them live, one row per body region, its name in the margin in the region's color (Hands ·
+Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
+the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
 open a filter, or the body's motion drive feedback, continuously.
 
-**Gestures → actions (the rule builder).** The **Create actions** panel authors rules:
+**Gestures → actions (the rule builder).** The **NEW RULE** line authors rules:
 **one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
 when both land close **together** (`+`) or **in order** (`→`); an **exclusive** combo
 swallows its component gestures' own singles (a chord that doesn't also play its
@@ -2083,13 +2091,13 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **119 visual themes** in 17 families
-(Analog Video Synthesis, Glitch/Datamosh (Shatter : motion broken into a pattern),
-Cameraless/Direct Film, Optical/Op-Art, Organic/Reaction-Diffusion, Data/Parametric,
-Feedback/Afterimage (Field Store and Revealed : stamps that never fade, a picture painted
-in by what moves; Trail Crawl : bands of colour behind the motion),
-Cinematic/Atmospheric (Oil Sky : a cloudscape in thick oil, from Cloud Study), Retro
-Screen (Store Zoom : a hardware zoom's uneven blocks), Minimal/Structural, Datamosh &
+**Generate** (toolbar) : a dropdown of **119 visual themes** in 18 families
+(Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
+Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
+Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
+motion broken into a pattern; Trail Crawl : bands of colour behind the motion; Store
+Zoom : a hardware zoom's uneven blocks), Cinematic/Atmospheric (Oil Sky : a cloudscape in
+thick oil, from Cloud Study), Retro Screen, Minimal/Structural, Datamosh &
 Compression (Codec Rot : a real video codec starved of keyframes, through Codec Mosh),
 **Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
@@ -2348,8 +2356,13 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
 
 - **Any standard ISF effect below can be placed in any of the five racks** : placement is not restricted by effect, and your own effects from the
   [Source Editor](#source-editor--your-own-shaders-alte) (**my shaders**, first in the
-  picker) go anywhere too. The picker (grouped by sub-category) is the
-  same everywhere. Each unit has enable, dry/wet **opacity** (double-click → 1),
+  picker) go anywhere too. The picker is the same everywhere, grouped by
+  family : **Analog** (the video signal's own faults : NTSC, Tracking, Sync Loss, Decay,
+  Scanlines, CRT Screen, Rutt), **Blur**, **Codec** (datamosh and compression : Codec
+  Mosh, Datamosh, Mosh Blocks, Compress, Databend, Byte Corrupt, Ringing), **Color**,
+  **Convolution**, **Distortion**, **Feedback**, **Film** (Aperture, Grain), **Frame Store**
+  (Field Store, Shatter, Crawl, Store Zoom), **Glitch**, **Optical** (Phosphene, Pulfrich,
+  Optical Rain), **Stylize**, **Time** and **Utility**. Each unit has enable, dry/wet **opacity** (double-click → 1),
   drag-reorder, presets, a dice `⚄`, and a **reset `↺`** (the whole effect back to
   its defaults).
 - **Right-click any effect** (its chip, or its name in the Inspector) to **copy**
@@ -2376,8 +2389,8 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   whole master chain with one of **125** designed chains and sets the Vibe to match (the
   finalizers stay). The newer ones sit in six groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
-  bus, and Field Store : Hard Memory, Sixteen Levels, Strobe Ghost), **Store** (Shatter,
-  Crawl and Store Zoom, alone or in pairs), **Node recipes** (a node that reads another
+  bus), **Frame Store** (Field Store : Hard Memory, Sixteen Levels, Strobe Ghost; then
+  Shatter, Crawl and Store Zoom, alone or in pairs), **Node recipes** (a node that reads another
   layer is wired, when the preset is applied, to a layer in use), **Dome** (dome-safe :
   Context's vignette off, nothing framing the edges) and **Space** (the whole picture
   laid on a plane by Perspective : a floor, a corridor wall, a ribbon, a horizon, a
@@ -2385,10 +2398,14 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   **Sound** (made for a waveform : Phosphor, Tape Floor, Relief); they keep the scene's
   palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
-- **The source pickers have sections** : **Organic** (living matter : reaction, growth,
-  water, fire, ground), **Analog** (the analog video-synth lineage : RGB Oscillators, Sync
-  Osc, Slit Scan, Ramps, Column Scan, Differential, Interference), then every other
-  generator. Type `analog` or `organic` to list a whole section.
+- **The source pickers have sections** : **Live** (imports, cameras, captures, network
+  streams, and 👤 **Silhouette**, the body cut out of the room), **Organic** (living
+  matter : reaction, growth, water, fire, ground), **Painted** (Oil Cloud, Cloud Study),
+  **Analog** (the analog video-synth lineage : RGB Oscillators, Sync Osc, Slit Scan, Ramps,
+  Column Scan, Differential, Interference), **Geometry** (lines, grids, dots and shapes :
+  Contour, Direct Marks, Grid Drift, Lattice, Lowercase, Op-Art, Recurse, Shapes, Slabs,
+  Ten Print), then every other generator. Type `analog`, `organic`, `painted` or
+  `geometry` to list a whole section.
 - **Every picker is searchable : by concept, not just name.** Click the `+ fx` box, a
   source picker, a preset list or the Generate menu and type : the list filters by name,
   family, *and* a set of **keyword tags** written in a musician's vocabulary. So a **visual
@@ -2619,7 +2636,7 @@ picture (an image input named `inputImage` makes it an effect).
 
 *The Source Editor : your shaders and every built-in one to copy on the left, the code
 in the middle (here the feedback template, a trail that keeps the last frame), and on
-the right the live preview, "compiled in 9 ms" and the controls its header declares,
+the right the live preview, its compile time and the controls its header declares,
 playing it there. Save, **use** (on the selected slot) and **new from…** sit along the
 top.*
 

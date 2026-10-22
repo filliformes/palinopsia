@@ -1,19 +1,21 @@
 // Body (key B) : embodied control. A full-page takeover like Sonify / Output.
 // Turn a camera on (opt-in), and MediaPipe Hands + Pose + Face read the performer
 // into the body bus (engine/bodyIn.ts). Top row : the live camera with the
-// skeleton on it + the capture controls (left), and the feature monitor (right,
-// what is moving, one-click into a modulator). Below, full width : the rule
-// builder ("Create actions"). Every action is authored as a rule : one gesture
+// skeleton on it (left), and the feature monitor (right, what is moving,
+// one-click into a modulator). Above them the tracking line, below them the
+// rule builder and the rules. Each section's name sits in the left margin, as
+// in the layer strip. Every action is authored as a rule : one gesture
 // (or two combined) fires an action and/or an OSC bang (/body/<name>). No fixed
 // per-gesture map.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
 import { fireTrigger, midiTargetLabel } from '../midi'
 import { useStore } from '../store'
 import { showToast } from './Toast'
+import { MarginLabel } from './MarginLabel'
 
 // Standard MediaPipe hand connections (21 landmarks).
 const HAND_CONN: Array<[number, number]> = [
@@ -70,16 +72,16 @@ const ACTION_TOKEN: Record<string, string> = {
 }
 // Silhouette zone features in row-major order (TL..BR), for the preview grid.
 const ZONE_KEYS: BodyFeature[] = ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR']
-// Group the feature list for a legible monitor. Each group gets a colour so the
-// bars and header read at a glance which body region a value belongs to.
-const FEATURE_GROUPS: Array<{ title: string; color: string; keys: BodyFeature[] }> = [
-  { title: 'Hands', color: '#ff8e0f', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
-  { title: 'Pose', color: '#49a6e6', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
-  { title: 'Face', color: '#5fc281', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
-  { title: 'Silhouette (zones)', color: '#b98cff', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
-  { title: 'Motion field', color: '#e0b04a', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
-  { title: 'Movement qualities', color: '#e0708f', keys: ['moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry'] },
-  { title: 'Presence', color: '#8b93a7', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
+// Group the feature list for a legible monitor. Each group gets a color so the
+// bars and its margin word read at a glance which body region a value belongs to.
+const FEATURE_GROUPS: Array<{ title: string; color: string; hint: string; keys: BodyFeature[] }> = [
+  { title: 'Hands', color: '#ff8e0f', hint: 'each hand’s height, side and openness, how far apart they are', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
+  { title: 'Pose', color: '#49a6e6', hint: 'the whole body : motion, lean, sway, arm span, height, hands up, weight', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
+  { title: 'Face', color: '#5fc281', hint: 'jaw, smile, brow, blink, pucker, and the head’s turn, nod and tilt', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
+  { title: 'Silhouette (zones)', color: '#b98cff', hint: 'how much of each 3×3 zone the body’s shadow covers (Silhouette on)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
+  { title: 'Motion field', color: '#e0b04a', hint: 'the camera’s motion : how much moves, which way, spreading or closing, turning, where (Motion on)', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
+  { title: 'Movement qualities', color: '#e0708f', hint: 'how the body moves : energy, expansion, fluidity, suddenness, directness, symmetry', keys: ['moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry'] },
+  { title: 'Presence', color: '#8b93a7', hint: 'a body, hands, a face in the frame', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
 
 function Toggle({ on, label, onClick, title }: { on: boolean; label: string; onClick: () => void; title?: string }): JSX.Element {
@@ -340,16 +342,30 @@ export function BodyPage(): JSX.Element {
           ? `tracking · ${[live.hands && 'hands', live.pose && 'pose', live.face && 'face'].filter(Boolean).join(' + ')}`
           : 'no body in frame'
 
+  // The page reads like the layer strip : every section's name sits in the
+  // left margin in its color, on a faint panel of that color, beside rows that
+  // are there anyway (a title line per section cost a whole row each). What
+  // the old section paragraphs said now rides on the margin words' tooltips.
+  const SEC = 'rgb(var(--c-accent2))'
+  const SEC_TINT = 'rgb(var(--c-accent2) / 0.06)'
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
-      {/* Header */}
+      {/* Header : the page, the tracking state, the last gesture recognized, the camera */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Body</span>
-        <span className="font-mono text-[10px] text-muted">embodied control · MediaPipe Hands + Pose + Face</span>
         <div className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full ${cfg.enabled && (live.hands || live.pose || live.face) ? 'animate-pulse bg-red-500' : cfg.enabled ? 'bg-yellow-500' : 'bg-muted'}`} />
           <span className="font-mono text-[10px] text-muted">{statusText}</span>
         </div>
+        {/* Currently recognized gesture : lights up for ~0.7 s each time one fires. */}
+        <span
+          className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
+            cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
+          }`}
+          title="The most recent gesture the tracker recognized"
+        >
+          {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
+        </span>
         <label className="flex items-center gap-1.5" title="Which camera feeds the tracker (a dedicated low-res capture, independent of any webcam layer)">
           <span className="font-mono text-[10px] text-muted">camera</span>
           <select
@@ -368,275 +384,308 @@ export function BodyPage(): JSX.Element {
         <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-        {/* Tracking controls : one distributed line (which streams to track,
-            how easily gestures fire and hold, and the OSC-out toggle). The two
-            sliders grow to fill so there's no blank space. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-border bg-panel2 px-2.5 py-1.5">
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
-            <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
-            <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
-            <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
-            <Toggle on={!!cfg.flow} label="Motion" onClick={() => patch({ flow: !cfg.flow })} title="Read the camera's motion field (optical flow, no body model) : how much moves and which way, whether it spreads out (someone approaches, arms open) or closes in, turns, sweeps one way or scatters, and where. Gestures : swipe L/R/up/down, approach, withdraw, turn, and stillness when the room stops moving. Works on anything that moves, a crowd, a curtain, a hand. Cheap." />
-            <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
-            <Toggle on={!!cfg.hiRes} label="Hi-res" onClick={() => patch({ hiRes: !cfg.hiRes })} title="Hi-res tracking : run the trackers on every display frame (60 Hz or more) instead of once per new camera frame. Finer, faster-reacting landmarks with a high-frame-rate camera; about twice the tracking cost. Off by default." />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+        {/* TRACK : which streams to track, how easily gestures fire and hold,
+            and the OSC-out toggle, on one distributed line. The two sliders
+            grow to fill so there's no blank space. */}
+        <SectionRow
+          word="TRACK"
+          color={SEC}
+          tint={SEC_TINT}
+          top="mt-[6px]"
+          title="Tracking : what the camera reads (hands, pose, face, silhouette, motion), how easily gestures fire and how long a hold takes, and OSC out for the rules"
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands)" />
+              <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
+              <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
+              <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
+              <Toggle on={!!cfg.flow} label="Motion" onClick={() => patch({ flow: !cfg.flow })} title="Read the camera's motion field (optical flow, no body model) : how much moves and which way, whether it spreads out (someone approaches, arms open) or closes in, turns, sweeps one way or scatters, and where. Gestures : swipe L/R/up/down, approach, withdraw, turn, and stillness when the room stops moving. Works on anything that moves, a crowd, a curtain, a hand. Cheap." />
+              <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
+              <Toggle on={!!cfg.hiRes} label="Hi-res" onClick={() => patch({ hiRes: !cfg.hiRes })} title="Hi-res tracking : run the trackers on every display frame (60 Hz or more) instead of once per new camera frame. Finer, faster-reacting landmarks with a high-frame-rate camera; about twice the tracking cost. Off by default." />
+            </div>
+            <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+              <span className="shrink-0">sensitivity</span>
+              <input
+                type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
+                onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
+                className="min-w-0 flex-1"
+                title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
+              />
+              <span className="w-8 shrink-0 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
+            </label>
+            <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
+              <span className="shrink-0">hold time</span>
+              <input
+                type="range" min={400} max={3000} step={50} value={cfg.holdMs}
+                onChange={(e) => patch({ holdMs: Number(e.target.value) })}
+                className="min-w-0 flex-1"
+                title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
+              />
+              <span className="w-8 shrink-0 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
+            </label>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Toggle
+                on={cfg.oscOut}
+                label="OSC out"
+                onClick={() => patch({ oscOut: !cfg.oscOut })}
+                title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup, so the body plays the sound side too."
+              />
+              <span className="font-mono text-[10px] text-muted">→ /body/…</span>
+            </div>
           </div>
-          <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
-            <span className="shrink-0">sensitivity</span>
-            <input
-              type="range" min={0} max={1} step={0.01} value={cfg.sensitivity}
-              onChange={(e) => patch({ sensitivity: Number(e.target.value) })}
-              className="min-w-0 flex-1"
-              title="How easily gestures fire (pinch distance, clap gap, hands-up threshold). Higher = easier."
-            />
-            <span className="w-8 shrink-0 text-right text-text">{cfg.sensitivity.toFixed(2)}</span>
-          </label>
-          <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">
-            <span className="shrink-0">hold time</span>
-            <input
-              type="range" min={400} max={3000} step={50} value={cfg.holdMs}
-              onChange={(e) => patch({ holdMs: Number(e.target.value) })}
-              className="min-w-0 flex-1"
-              title="How long a pose must be held for a hold gesture (hold up, hold pinch, …) to fire."
-            />
-            <span className="w-8 shrink-0 text-right text-text">{(cfg.holdMs / 1000).toFixed(1)}s</span>
-          </label>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Toggle
-              on={cfg.oscOut}
-              label="OSC out"
-              onClick={() => patch({ oscOut: !cfg.oscOut })}
-              title="When a rule fires, also send an OSC bang to /body/<its OSC name> at the OSC-out target set in I/O setup, so the body plays the sound side too."
-            />
-            <span className="font-mono text-[10px] text-muted">→ /body/…</span>
-          </div>
-        </div>
-        {/* Top row : camera preview · live feature monitor. Stretch both columns to
-            a shared height so their bottoms line up ; the preview fills its column
+        </SectionRow>
+
+        {/* Camera preview · live feature monitor. Both columns stretch to a
+            shared height so their bottoms line up; the preview fills its column
             (letterboxed, so it never distorts). */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-        {/* Left : the enable button + live camera preview */}
-        <div className="flex shrink-0 flex-col gap-2 lg:w-[520px]">
-          <button
-            onClick={() => patch({ enabled: !cfg.enabled })}
-            className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
-              cfg.enabled
-                ? 'border border-accent bg-accent/15 text-accent'
-                : 'border border-border bg-panel3/70 text-muted hover:bg-panel3 hover:text-text'
-            }`}
-            title="Open the camera and start tracking. Off by default : a camera is opt-in and never opens on its own."
-          >
-            {cfg.enabled ? '● embodied control ON : camera live' : 'Enable embodied control (opens camera)'}
-          </button>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
+          {/* Left : the enable button + live camera preview */}
+          <div className="flex shrink-0 flex-col gap-2 lg:w-[520px]">
+            <button
+              onClick={() => patch({ enabled: !cfg.enabled })}
+              className={`w-full rounded px-3 py-2 font-mono text-[12px] transition-colors ${
+                cfg.enabled
+                  ? 'border border-accent bg-accent/15 text-accent'
+                  : 'border border-border bg-panel3/70 text-muted hover:bg-panel3 hover:text-text'
+              }`}
+              title="Open the camera and start tracking. Off by default : a camera is opt-in and never opens on its own."
+            >
+              {cfg.enabled ? '● embodied control ON : camera live' : 'Enable embodied control (opens camera)'}
+            </button>
 
-          <div className="relative min-h-[300px] w-full flex-1 overflow-hidden rounded border border-border bg-black">
-            <canvas ref={canvasRef} width={480} height={360} className="h-full w-full object-contain" />
-            {!cfg.enabled && (
-              <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[11px] text-muted">
-                enable to preview the camera and skeleton
-              </div>
-            )}
+            {/* (the canvas fills the box rather than sizing it : the monitor
+                beside it sets the row's height, the preview letterboxes in it) */}
+            <div className="relative min-h-[300px] w-full flex-1 overflow-hidden rounded border border-border bg-black">
+              <canvas ref={canvasRef} width={480} height={360} className="absolute inset-0 h-full w-full object-contain" />
+              {!cfg.enabled && (
+                <div className="absolute inset-0 flex items-center justify-center px-4 text-center font-mono text-[11px] text-muted">
+                  enable to preview the camera and skeleton
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Right : the live feature monitor (two columns). */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <section className="flex-1 rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-accent2">Feature monitor</div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
+          {/* Right : the live feature monitor, one row per body region, its
+              name in the margin. The columns are as many as the width holds
+              (never fewer than the names and numbers need), so it reads the
+              same at every UI zoom. */}
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            {FEATURE_GROUPS.map((grp) => (
+              <SectionRow
+                key={grp.title}
+                word={grp.title.toUpperCase()}
+                color={grp.color}
+                tint={grp.color + '12'}
+                top="mt-[2px]"
+                title={`${grp.title} : ${grp.hint}. Live 0..1 values; → routes one into a free modulator slot.`}
+              >
+                <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(196px, 1fr))' }}>
+                  {grp.keys.map((k) => {
+                    const v = vals[k] ?? 0
+                    return (
+                      <div key={k} className="flex min-w-0 items-center gap-1.5">
+                        <span className="w-[92px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{k}</span>
+                        <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
+                          <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: grp.color }} />
+                        </div>
+                        <span className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">{v.toFixed(2)}</span>
+                        <button
+                          onClick={() => toSlot(k)}
+                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                          title={`Route ${k} into the first free modulator slot`}
+                        >→</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </SectionRow>
+            ))}
+            <p className="px-1 text-[10px] leading-snug text-muted">
               Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
             </p>
-            <div className="flex flex-col gap-2">
-              {FEATURE_GROUPS.map((grp) => (
-                <div
-                  key={grp.title}
-                  className="rounded-md border-l-2 py-2 pl-2.5 pr-1"
-                  style={{ borderColor: grp.color, background: grp.color + '12' }}
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5 border-b pb-1" style={{ borderColor: grp.color + '33' }}>
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: grp.color }} />
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-wide" style={{ color: grp.color }}>{grp.title}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 xl:grid-cols-3 2xl:grid-cols-4">
-                    {grp.keys.map((k) => {
-                      const v = vals[k] ?? 0
-                      return (
-                        <div key={k} className="flex items-center gap-1.5">
-                          <span className="w-[74px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{k}</span>
-                          <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
-                            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: grp.color }} />
-                          </div>
-                          <span className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">{v.toFixed(2)}</span>
-                          <button
-                            onClick={() => toSlot(k)}
-                            className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                            title={`Route ${k} into the first free modulator slot`}
-                          >→</button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          </div>
         </div>
-        </div>{/* end top row */}
 
-        {/* Create actions : the rule builder, full width under the row. The only
-            gesture routing : every action is a rule, single or a two-gesture combo. */}
-        <section className="rounded border border-border bg-panel2 p-2">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2">Create actions</span>
-              {/* Currently recognised gesture : lights up for ~0.7s each time one fires. */}
-              <span
-                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] transition-colors ${
-                  cur?.fresh ? 'border-accent bg-accent/20 text-accent' : 'border-border bg-panel3/50 text-muted'
-                }`}
-                title="The most recent gesture the tracker recognized"
-              >
-                {cur ? `⚡ ${GESTURE_LABEL[cur.g]}` : 'no gesture yet'}
-              </span>
-            </div>
-            <p className="mb-2 text-[10px] leading-snug text-muted">
-              One gesture, or two combined, fires an action and/or an OSC bang. A combo triggers when both land close together (<span className="text-text">+</span>) or in order (<span className="text-text">→</span>). Leave the name blank for an auto label like <span className="text-text">“{namePreview}”</span> ; leave OSC blank for <span className="text-text">/body/{oscPreview}</span>. Set the action to <span className="text-text">nothing</span> for an OSC-only rule.
-            </p>
-
-            {/* Builder line : name · gesture(s) · action · OSC · save */}
-            <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded border border-border/60 bg-panel3/30 p-1.5">
-              <input
-                value={rName}
-                onChange={(e) => setRName(e.target.value)}
-                placeholder={namePreview}
-                spellCheck={false}
-                className="input h-[26px] w-44 text-[11px]"
-                title="A label for this rule. Blank = the auto name shown as the placeholder."
-              />
-              <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="First gesture">
-                {gestureOptionEls}
-              </select>
-              {rG2 == null ? (
-                <button
-                  onClick={() => setRG2(rG1)}
-                  className="rounded border border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                  title="Combine a second gesture into this action"
-                >
-                  + gesture&nbsp;2
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => setRCombo((c) => (c === 'together' ? 'then' : 'together'))}
-                    className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[12px] text-accent"
-                    title={rCombo === 'together' ? 'Both together (order-independent). Click for a sequence.' : 'In sequence (first, then second). Click for together.'}
-                  >
-                    {comboSym(rCombo)}
-                  </button>
-                  <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="Second gesture">
-                    {gestureOptionEls}
-                  </select>
-                  <button
-                    onClick={() => setRExcl((v) => !v)}
-                    className={`rounded border px-1.5 py-1 font-mono text-[10px] ${rExcl ? 'border-accent bg-accent/15 text-accent' : 'border-border bg-panel3/70 text-muted hover:text-text'}`}
-                    title="Exclusive : when this combo fires, swallow the two gestures' own single actions (a chord that doesn't also play its notes). Adds a small delay to those singles."
-                  >
-                    excl
-                  </button>
-                  <button onClick={() => setRG2(null)} className="rounded px-1 font-mono text-[12px] text-muted hover:text-danger" title="Remove the second gesture">×</button>
-                </>
-              )}
-              <span className="font-mono text-[11px] text-muted">→</span>
-              <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “nothing” makes an OSC-only rule.">
-                {actionOptionEls}
-              </select>
-              <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">
-                <span className="rounded-l border border-r-0 border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted">/body/</span>
-                <input
-                  value={rOsc}
-                  onChange={(e) => setROsc(e.target.value)}
-                  placeholder={oscPreview}
-                  spellCheck={false}
-                  className="input h-[26px] w-32 rounded-l-none text-[11px]"
-                />
-              </div>
+        {/* NEW RULE : the rule builder on one line (name · gesture(s) · action ·
+            OSC · save). The only gesture routing : every action is a rule,
+            single or a two-gesture combo. */}
+        <SectionRow
+          word="NEW RULE"
+          color={SEC}
+          tint={SEC_TINT}
+          top="mt-[7px]"
+          title={`Create actions : one gesture, or two combined, fires an action and/or an OSC bang. A combo triggers when both land close together (+) or in order (→). Leave the name blank for an auto label like “${namePreview}”; leave OSC blank for /body/${oscPreview}. Set the action to “nothing” for an OSC-only rule.`}
+        >
+          <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+            <input
+              value={rName}
+              onChange={(e) => setRName(e.target.value)}
+              placeholder={namePreview}
+              spellCheck={false}
+              className="input h-[26px] w-44 text-[11px]"
+              title="A label for this rule. Blank = the auto name shown as the placeholder."
+            />
+            <select value={rG1} onChange={(e) => setRG1(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="First gesture">
+              {gestureOptionEls}
+            </select>
+            {rG2 == null ? (
               <button
-                onClick={addRule}
-                className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
-                title="Save this rule"
+                onClick={() => setRG2(rG1)}
+                className="rounded border border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                title="Combine a second gesture into this action"
               >
-                save
+                + gesture&nbsp;2
               </button>
-            </div>
-
-            {/* Saved rules */}
-            {cfg.rules.length === 0 ? (
-              <p className="text-[10px] text-muted">No custom rules yet.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-1 lg:grid-cols-2 2xl:grid-cols-3">
-                {cfg.rules.map((r) => {
-                  const lit = curRule?.id === r.id && curRule.fresh
-                  return (
-                    <div
-                      key={r.id}
-                      className={`flex items-center gap-1.5 rounded border px-1.5 py-1 font-mono text-[10px] transition-colors ${lit ? 'border-accent bg-accent/15' : 'border-border bg-panel3/30'}`}
-                    >
-                      <button
-                        onClick={() => updateRule(r.id, { enabled: !r.enabled })}
-                        className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
-                        title={r.enabled ? 'Enabled : click to disable' : 'Disabled : click to enable'}
-                      />
-                      <span className="w-20 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
-                      <span className="min-w-0 flex-1 truncate text-muted">
-                        {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{labelForAction(r.action)}</span>
-                      </span>
-                      {r.osc && (
-                        <span
-                          className={`shrink-0 truncate font-mono text-[9px] ${cfg.oscOut ? 'text-accent2/70' : 'text-muted/40'}`}
-                          title={cfg.oscOut ? `Sends /body/${r.osc} over OSC` : `Would send /body/${r.osc} (OSC out is off)`}
-                        >
-                          /body/{r.osc}
-                        </span>
-                      )}
-                      {r.g2 ? (
-                        <button
-                          onClick={() => updateRule(r.id, { exclusive: !r.exclusive })}
-                          className={`shrink-0 rounded border px-1 text-[9px] ${r.exclusive ? 'border-accent text-accent' : 'border-border text-muted/60 hover:text-text'}`}
-                          title={r.exclusive ? 'Exclusive : swallows the component singles. Click to disable.' : 'Not exclusive : the component gestures also fire their own actions. Click to make exclusive.'}
-                        >
-                          excl
-                        </button>
-                      ) : (
-                        <span
-                          className="flex shrink-0 items-center gap-1"
-                          title={`Sensitivity for “${GESTURE_LABEL[r.g1]}” : how easily it fires. Per-gesture (shared by any rule using it) ; now ${Math.round(gestureSens(r.g1) * 100)}%${cfg.gestureSensitivity[r.g1] == null ? ' (following the global slider)' : ''}. Double-click to reset to the global.`}
-                        >
-                          <span className="text-[8px] uppercase tracking-wide text-muted/60">sens</span>
-                          <input
-                            type="range" min={0} max={1} step={0.01}
-                            value={gestureSens(r.g1)}
-                            onChange={(e) => setGestureSens(r.g1, Number(e.target.value))}
-                            onDoubleClick={() => resetGestureSens(r.g1)}
-                            className={`h-1 w-14 ${cfg.gestureSensitivity[r.g1] == null ? 'accent-muted' : 'accent-accent'}`}
-                          />
-                        </span>
-                      )}
-                      <button
-                        onClick={() => fireTrigger(r.action)}
-                        disabled={r.action === 'none'}
-                        className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 text-[10px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
-                        title="Fire this rule's action now"
-                      >
-                        test
-                      </button>
-                      <button onClick={() => deleteRule(r.id)} className="shrink-0 rounded px-1 text-[12px] text-muted hover:text-danger" title="Delete this rule">×</button>
-                    </div>
-                  )
-                })}
-              </div>
+              <>
+                <button
+                  onClick={() => setRCombo((c) => (c === 'together' ? 'then' : 'together'))}
+                  className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[12px] text-accent"
+                  title={rCombo === 'together' ? 'Both together (order-independent). Click for a sequence.' : 'In sequence (first, then second). Click for together.'}
+                >
+                  {comboSym(rCombo)}
+                </button>
+                <select value={rG2} onChange={(e) => setRG2(e.target.value as BodyGesture)} className="input select-compact h-[26px] w-[108px] text-[11px]" title="Second gesture">
+                  {gestureOptionEls}
+                </select>
+                <button
+                  onClick={() => setRExcl((v) => !v)}
+                  className={`rounded border px-1.5 py-1 font-mono text-[10px] ${rExcl ? 'border-accent bg-accent/15 text-accent' : 'border-border bg-panel3/70 text-muted hover:text-text'}`}
+                  title="Exclusive : when this combo fires, swallow the two gestures' own single actions (a chord that doesn't also play its notes). Adds a small delay to those singles."
+                >
+                  excl
+                </button>
+                <button onClick={() => setRG2(null)} className="rounded px-1 font-mono text-[12px] text-muted hover:text-danger" title="Remove the second gesture">×</button>
+              </>
             )}
-          </section>
+            <span className="font-mono text-[11px] text-muted">→</span>
+            <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “nothing” makes an OSC-only rule.">
+              {actionOptionEls}
+            </select>
+            <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">
+              <span className="rounded-l border border-r-0 border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted">/body/</span>
+              <input
+                value={rOsc}
+                onChange={(e) => setROsc(e.target.value)}
+                placeholder={oscPreview}
+                spellCheck={false}
+                className="input h-[26px] w-32 rounded-l-none text-[11px]"
+              />
+            </div>
+            <button
+              onClick={addRule}
+              className="rounded border border-accent bg-accent/15 px-2 py-1 font-mono text-[11px] text-accent hover:bg-accent/25"
+              title="Save this rule"
+            >
+              save
+            </button>
+          </div>
+        </SectionRow>
+
+        {/* RULES : the saved rules, as many columns as the width holds */}
+        <SectionRow
+          word="RULES"
+          color={SEC}
+          tint={SEC_TINT}
+          top="mt-[5px]"
+          title="The saved rules : the box turns one on or off, test fires its action now, × deletes it. A single-gesture rule carries that gesture's own sensitivity; a combo its exclusive switch. A rule lights while it fires."
+        >
+          {cfg.rules.length === 0 ? (
+            <p className="py-1 text-[10px] text-muted">No rules yet : make one on the line above.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-1 py-0.5 lg:grid-cols-2 2xl:grid-cols-3">
+              {cfg.rules.map((r) => {
+                const lit = curRule?.id === r.id && curRule.fresh
+                return (
+                  <div
+                    key={r.id}
+                    className={`flex items-center gap-1.5 rounded border px-1.5 py-1 font-mono text-[10px] transition-colors ${lit ? 'border-accent bg-accent/15' : 'border-border bg-panel3/30'}`}
+                  >
+                    <button
+                      onClick={() => updateRule(r.id, { enabled: !r.enabled })}
+                      className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
+                      title={r.enabled ? 'Enabled : click to disable' : 'Disabled : click to enable'}
+                    />
+                    <span className="w-20 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-muted">
+                      {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{labelForAction(r.action)}</span>
+                    </span>
+                    {r.osc && (
+                      <span
+                        className={`shrink-0 truncate font-mono text-[9px] ${cfg.oscOut ? 'text-accent2/70' : 'text-muted/40'}`}
+                        title={cfg.oscOut ? `Sends /body/${r.osc} over OSC` : `Would send /body/${r.osc} (OSC out is off)`}
+                      >
+                        /body/{r.osc}
+                      </span>
+                    )}
+                    {r.g2 ? (
+                      <button
+                        onClick={() => updateRule(r.id, { exclusive: !r.exclusive })}
+                        className={`shrink-0 rounded border px-1 text-[9px] ${r.exclusive ? 'border-accent text-accent' : 'border-border text-muted/60 hover:text-text'}`}
+                        title={r.exclusive ? 'Exclusive : swallows the component singles. Click to disable.' : 'Not exclusive : the component gestures also fire their own actions. Click to make exclusive.'}
+                      >
+                        excl
+                      </button>
+                    ) : (
+                      <span
+                        className="flex shrink-0 items-center gap-1"
+                        title={`Sensitivity for “${GESTURE_LABEL[r.g1]}” : how easily it fires. Per-gesture (shared by any rule using it) ; now ${Math.round(gestureSens(r.g1) * 100)}%${cfg.gestureSensitivity[r.g1] == null ? ' (following the global slider)' : ''}. Double-click to reset to the global.`}
+                      >
+                        <span className="text-[8px] uppercase tracking-wide text-muted/60">sens</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={gestureSens(r.g1)}
+                          onChange={(e) => setGestureSens(r.g1, Number(e.target.value))}
+                          onDoubleClick={() => resetGestureSens(r.g1)}
+                          className={`h-1 w-14 ${cfg.gestureSensitivity[r.g1] == null ? 'accent-muted' : 'accent-accent'}`}
+                        />
+                      </span>
+                    )}
+                    <button
+                      onClick={() => fireTrigger(r.action)}
+                      disabled={r.action === 'none'}
+                      className="shrink-0 rounded border border-border bg-panel3/70 px-1.5 text-[10px] text-muted hover:border-accent hover:text-accent disabled:opacity-30"
+                      title="Fire this rule's action now"
+                    >
+                      test
+                    </button>
+                    <button onClick={() => deleteRule(r.id)} className="shrink-0 rounded px-1 text-[12px] text-muted hover:text-danger" title="Delete this rule">×</button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </SectionRow>
       </div>
+    </div>
+  )
+}
+
+// One section of the page : its word in the left margin (MarginLabel, as the
+// layer strip's IN / MIX / FX / OUT), the content beside it, on a faint panel
+// of its color. A long name breaks onto two lines in the 60 px margin.
+function SectionRow({
+  word,
+  color,
+  tint,
+  title,
+  top,
+  children
+}: {
+  word: string
+  color: string
+  tint: string
+  title: string
+  /** The margin word's offset : the content's first line. */
+  top: string
+  children: ReactNode
+}): JSX.Element {
+  return (
+    <div className="flex min-w-0 items-start gap-2 rounded-[5px] px-1.5 py-1" style={{ background: tint }}>
+      <MarginLabel word={word} color={color} title={title} className={`w-[60px] ${top}`} />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   )
 }

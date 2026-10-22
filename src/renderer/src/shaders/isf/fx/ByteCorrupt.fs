@@ -2,7 +2,7 @@
   "DESCRIPTION": "Byte Corrupt : bit-depth quantization with channel entanglement: values crushed to few levels, then per-block arithmetic scrambling folds channels into each other on a stepped clock. Data damage, not noise. `warp byte` bends the block grid and gives every block its own rotation / zoom / offset so the mosaic stops reading as clean squares : irregular warped fragments instead. `chaos` stretches a few regions into slivers and shears their content. `audio` raises the odds per block column from that column's band of the live spectrum (bass on the left).",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Codec", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "depth",    "TYPE": "float", "MIN": 2.0, "MAX": 16.0, "DEFAULT": 6.0, "LABEL": "levels" },

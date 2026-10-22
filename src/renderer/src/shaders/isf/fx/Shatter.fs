@@ -2,7 +2,7 @@
   "DESCRIPTION": "Shatter : motion shown as texture. A still frame is grabbed again and again (at GRAB RATE, on a beat division with SYNC, or on grab ▸) and a 1-bit PATTERN switches each pixel between that held still and the live picture. Where nothing moves the still equals the live picture and the pattern vanishes; wherever something moves, the pattern appears. DENSITY is the share of the pattern that shows the still. FLIP trades the pattern's two halves on a clock and SLIDE moves it : both keep that share, so a fine pattern never flashes as a whole, only its moving parts shimmer. KEY uses the picture's own darks as the pattern : a moving bright subject leaves its last grab behind. Keeps the layer's transparency.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Time", "Texture"],
+  "CATEGORIES": ["FX", "Frame Store", "Time", "Texture"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "rate",    "TYPE": "float", "MIN": 0.0, "MAX": 8.0,  "DEFAULT": 1.5, "LABEL": "grab rate (Hz)" },

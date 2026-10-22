@@ -2,7 +2,7 @@
   "DESCRIPTION": "Compress : intra-frame compression artifacts (the JPEG / MPEG keyframe look, not motion). The image is cut into macroblocks, each crushed toward its DC average plus a coarse low-frequency reconstruction (blockiness and tone banding as quality drops); chroma is subsampled to the block so color bleeds across luma edges; and blocks with strong edges pick up a diagonal basis-pattern ripple (the mosquito noise of a starved encoder). `vary` gives every block its own quality, as a real encoder's per-macroblock quantizer does. Block size follows the frame height, so the look holds at 4K and on the dome.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Codec", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "block",   "TYPE": "float", "MIN": 2.0, "MAX": 32.0, "DEFAULT": 8.0,  "LABEL": "block" },

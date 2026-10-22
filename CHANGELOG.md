@@ -5,7 +5,7 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
-### Added (after the audit)
+### Added
 
 - **Every source and effect has at least ten presets** (`shaders/isf/presets.ts`) :
   Silhouette gets its first ten (cutout, matte, shadow and hole, with and without
@@ -16,6 +16,33 @@ that CI builds into cross-platform releases.
   every input (zoom, ground, rate, glow, light angle), so one picked after another no
   longer keeps the last one's zoom or ground. 1542 → 1593 presets, every value checked
   against its input's range and the new ones rendered in a test copy.
+
+## v1.3.0 — 2026-10-21
+
+### Added (after the audit)
+
+- **The Body page takes less room.** Its sections are named in the left margin, the way
+  the layer strip names IN / MIX / FX / OUT : TRACK (what the camera reads, sensitivity,
+  hold time, OSC out), the feature monitor's seven groups (Hands, Pose, Face, Silhouette,
+  Motion field, Movement qualities, Presence, each in its own color on a faint panel of
+  that color), NEW RULE (the rule builder) and RULES. No more title line per section, the
+  explanations ride on the margin words' tooltips, the last gesture recognized moves to
+  the page header, and the monitor holds as many columns as its width allows, at any UI
+  zoom. The margin word is one shared component (`MarginLabel.tsx`); the layer strip's
+  looks the same.
+- **The pickers are sorted into clearer families.** Effects : a new **Frame Store** group
+  (Field Store, Shatter, Crawl, Store Zoom, which were split between Time and Distortion),
+  **Analog** (NTSC, Tracking, Sync Loss, Decay, Scanlines, CRT Screen, Rutt) and **Codec**
+  (Codec Mosh, Datamosh, Mosh Blocks, Compress, Databend, Byte Corrupt, Ringing) take
+  fourteen effects out of Glitch (29 → 15); Feedback Zoom joins Feedback; Phosphene,
+  Pulfrich and Optical Rain share **Optical**; Aperture and Grain make **Film**; Scanner
+  and Slit Buffer go to Time, Pixelmask to Stylize. No group holds a single effect any
+  more. Sources : two new sections, **Painted** (Oil Cloud, Cloud Study) and **Geometry**
+  (ten line, grid, dot and shape generators), between Organic, Analog and the rest; the
+  Silhouette source gets its 👤 like the other live entries. Generate : the five store
+  themes (Field Store, Revealed, Shatter, Trail Crawl, Store Zoom) are one **Frame Store**
+  family (18 families), each moving exactly as before; master chains : all nine store
+  chains in one **Frame Store** group. The FX group reader now keeps two-word groups.
 
 - **Grain on the dome is film grain again** (`shaders/isf/lib/finalGrain.glsl`,
   `engine/dome.ts`, `domeSignal.ts`, `isfTextureBridge.ts`) : the Finalizer's film and
@@ -127,11 +154,11 @@ that CI builds into cross-platform releases.
   above 1 it is off-frame until you pan : its hint says so); **lines** (256) and **pixel
   width** (1.5) are the store's own. It matched a JS model of the counters pixel for
   pixel.
-- For the three : ten presets each, a **Store** group of six master chains (Store ·
+- For the three : eight presets each, a **Frame Store** group of six master chains (Store ·
   Shatter, Catch-up, Trail Crawl, Crawl Mosaic, Uneven Zoom, Mirror Scroll; they keep
   the scene's palette mix), three Generate themes each putting its effect on the bottom
-  layer over moving sources (**Shatter** in Glitch / Datamosh, **Trail Crawl** in
-  Feedback / Afterimage, **Store Zoom** in Retro Screen), dice ranges (the staging
+  layer over moving sources (**Shatter**, **Trail Crawl**, **Store Zoom**, in the Frame
+  Store family), dice ranges (the staging
   switches sync, flip, ground, mirror and scroll in `RANDOMIZE_SKIP`), hints, keywords,
   blurbs, Inspector column groups and grey-outs. Nothing special on the dome : Shatter
   and Crawl work per pixel with patterns scaled to the frame height, Store Zoom zooms
@@ -165,8 +192,8 @@ that CI builds into cross-platform releases.
   0.25 s, a carried-over store crumbles in over 0.4 s, a size change resamples at most
   every 0.25 s. Ten presets (Hard trail, Beat stamps, Color stamps, Strobe ghost,
   Catch-up, Live mosaic, Motion reveal, Vanish, First arrivals, Drifting lattice), three
-  master chains under Time & memory (**Hard Memory**, **Sixteen Levels**, **Strobe
-  Ghost**), two Generate themes in Feedback / Afterimage (**Field Store**, **Revealed**),
+  master chains in the Frame Store group (**Hard Memory**, **Sixteen Levels**, **Strobe
+  Ghost**), two Generate themes in the Frame Store family (**Field Store**, **Revealed**),
   hints for all 17 inputs, keywords, a blurb, Inspector columns (mode / key / clock /
   store; ink hue and step grey out outside color trail, key level and invert with key
   none, N unless the clock counts frames), the Orbit voice in auto-Sonify. Any rack
@@ -513,7 +540,7 @@ that CI builds into cross-platform releases.
   streaks at its tail, its relief (a soft rise from the rim, bristle grooves) lit from
   the upper left, over a basket-weave canvas. Integrated clocks `PH_drift` / `PH_evolve`
   wrapped at the noise period; `DOME_FILL` keeps the view and the strokes square on the
-  dome. Ten presets, hints, keywords, a blurb, grouped Inspector columns (cloud / light
+  dome. Nine presets, hints, keywords, a blurb, grouped Inspector columns (cloud / light
   / paint), the **Oil on Canvas** master chain (Toile paint + grade + grain), the **Oil
   Sky** Generate theme. Verified in a test copy : 60 fps at 1080p and 4K, flat and on the
   dome master, no shader errors. (A first version smeared the cloud along its contours
@@ -1136,7 +1163,7 @@ verified before fixing), then the fixes, checked in a test copy where a machine 
   pyramid (one RG8 texture, each level an eighth of the one below : a column reads at most
   8 texels however long the file) : view whole / loop / scroll, style filled / outline /
   bars, the played part lit. Its look is the `gen-audio` header (presets, modulation, OSC
-  reach it; kept out of the generator pools : it needs a file). Ten presets, three master
+  reach it; kept out of the generator pools : it needs a file). Seven presets, three master
   chains in a new **Sound** group (Phosphor, Tape Floor, Relief). Plays on Sonify's output
   device through its own `<audio>`; a muted (or soloed-out) layer is silent; a format
   Chromium can't decode plays from its audio-only m4a copy. The media scheme now serves

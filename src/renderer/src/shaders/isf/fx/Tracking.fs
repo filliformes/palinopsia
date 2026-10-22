@@ -2,7 +2,7 @@
   "DESCRIPTION": "Tracking : VHS tracking error, rebuilt on an open-source VHS-glitch shader model (credited in THIRD_PARTY_NOTICES.md). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
   "CREDIT": "Palinopsia; derived from an MIT / CC BY 3.0 VHS-glitch shader, attribution in THIRD_PARTY_NOTICES.md",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Analog", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "band",     "TYPE": "float", "MIN": 0.0, "MAX": 0.4, "DEFAULT": 0.12, "LABEL": "band height" },

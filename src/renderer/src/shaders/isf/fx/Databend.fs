@@ -2,7 +2,7 @@
   "DESCRIPTION": "Databend : the byte-editing register (editing the stream, not the motion : distinct from datamosh's smear). Horizontal bands tear and jump sideways on a stepped clock, smearing the edge column into the gap (or wrapping around the frame, as a shifted byte run does, with `wrap`); some bands HOLD their top line and repeat it downward (the byte 'repeat' smear); per band the color channels rotate and drift out of registration; and a subset of bands go stroboscopic. `audio` raises each band's odds from its own band of the live spectrum; `fire` corrupts every band while held. Linear fragmentation, flicker, banded corruption : the databent-video look.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch"],
+  "CATEGORIES": ["FX", "Codec", "Glitch"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "bands",   "TYPE": "float", "MIN": 4.0, "MAX": 160.0, "DEFAULT": 40.0, "LABEL": "bands" },

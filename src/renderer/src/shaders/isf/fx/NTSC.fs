@@ -2,7 +2,7 @@
   "DESCRIPTION": "NTSC : the crosstalk of composite-video decode. ARTIFACT bleeds the picture's fine luma detail into the color subcarrier so sharp vertical edges shimmer with dot-crawl rainbows (CARRIER tunes the subcarrier frequency : low = the coarse crawl of broadcast NTSC, high = the finest the raster can draw). FRINGE misregisters the chroma sideways for the smeared-color bleed. INTERLACE separates the two scan fields : alternate lines take a small hue rotation (FIELD HUE) and brightness offset, and FIELD CRAWL slides the pattern so it shivers. Every size is relative to the frame height, so the look holds at 4K or on the dome. A cheap real-time approximation of composite artifacts, not a full encode/decode. It sits on the picture before the grade.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Glitch", "Color"],
+  "CATEGORIES": ["FX", "Analog", "Glitch", "Color"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "artifact",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "artifact" },

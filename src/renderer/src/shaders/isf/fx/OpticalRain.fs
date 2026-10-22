@@ -2,7 +2,7 @@
   "DESCRIPTION": "Optical Rain : stereoscopic texture. Shatters the image's edges into vertical streaks that drift downward (an 'optical rain'), each fragment carrying a horizontal red/cyan disparity, so under the Finalizer's anaglyph 3D a floating tactile texture emerges off the stereoscopic membrane, 'beyond form'. Only ever fragments the incoming image; it invents no pattern of its own. No psychedelia.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Stereo"],
+  "CATEGORIES": ["FX", "Optical", "Stereo"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "amount",    "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,   "DEFAULT": 0.6,   "LABEL": "fragment" },

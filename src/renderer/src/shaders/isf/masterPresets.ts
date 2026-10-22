@@ -773,7 +773,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   // Field Store on the whole picture : hard stamps that never fade, the whole
   // frame through a coarse 16-level store, strobed see-through echoes.
   {
-    name: 'Hard Memory', group: 'Time & memory',
+    name: 'Hard Memory', group: 'Frame Store',
     fx: [
       { shaderId: 'node-fieldstore', inputs: { mode: 0, show: 0, key: 0, threshold: 0.6, invert: 0, clock: 1, every: 4, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
       { shaderId: 'fx-grade', inputs: { contrast: 1.08, saturation: 0.95, lift: 0.01 } }
@@ -781,7 +781,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
   },
   {
-    name: 'Sixteen Levels', group: 'Time & memory',
+    name: 'Sixteen Levels', group: 'Frame Store',
     fx: [
       { shaderId: 'node-fieldstore', inputs: { mode: 4, show: 0, key: 5, threshold: 0.5, invert: 0, clock: 0, every: 5, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
       { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 1.05, lift: 0.0 } }
@@ -789,7 +789,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0.1 }
   },
   {
-    name: 'Strobe Ghost', group: 'Time & memory',
+    name: 'Strobe Ghost', group: 'Frame Store',
     fx: [
       { shaderId: 'node-fieldstore', inputs: { mode: 2, show: 0, key: 0, threshold: 0.35, invert: 0, clock: 1, every: 8, size: 2, bits: 4, slideX: 0, slideY: 0, hue: 0.08, drift: 0.05, keep: 0, mix: 1 } },
       { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.9, lift: 0.02 } }
@@ -898,7 +898,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   // ── Store : frame-store tricks (Shatter, Crawl, Store Zoom). No mixSrc : a
   //    Generate scene keeps its palette mapping. ──
   {
-    name: 'Store · Shatter', group: 'Store',
+    name: 'Store · Shatter', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-shatter', inputs: { rate: 1.5, sync: 0, pattern: 0, scale: 3, density: 0.5, flip: 0, slide: 0, wet: 1 } },
       { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.05, saturation: 0.95, lift: 0.01, gamma: 1 } }
@@ -906,7 +906,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
   },
   {
-    name: 'Store · Catch-up', group: 'Store',
+    name: 'Store · Catch-up', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-shatter', inputs: { rate: 2, sync: 0, pattern: 7, scale: 3, density: 0.45, flip: 0, slide: 0, wet: 1 } },
       { shaderId: 'fx-store-zoom', inputs: { zoom: 1, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } }
@@ -914,7 +914,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.08, saturation: 0.9, gamma: 1, autoLevel: 0.2 }
   },
   {
-    name: 'Store · Trail Crawl', group: 'Store',
+    name: 'Store · Trail Crawl', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-crawl', inputs: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 1, cycle: 0.1, steps: 8, palette: 0, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0, parasites: 0 } }
@@ -922,7 +922,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.15 }
   },
   {
-    name: 'Store · Crawl Mosaic', group: 'Store',
+    name: 'Store · Crawl Mosaic', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-crawl', inputs: { threshold: 0.08, fade: 8, ground: 0, wet: 1, band: 0.8, cycle: 0.12, steps: 8, palette: 1, stops: 4, colorA: [0.03, 0.03, 0.04, 1], colorB: [0.12, 0.2, 0.28, 1], colorC: [0.78, 0.5, 0.22, 1], colorD: [0.94, 0.9, 0.8, 1], colorE: [1, 1, 1, 1] } },
       { shaderId: 'fx-store-zoom', inputs: { zoom: 3.3, stretch: 0, magnify: 0, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 200, wide: 1.5, wet: 1 } }
@@ -930,7 +930,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.2 }
   },
   {
-    name: 'Store · Uneven Zoom', group: 'Store',
+    name: 'Store · Uneven Zoom', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-store-zoom', inputs: { zoom: 2.6, stretch: 0, magnify: 1, mirror: 0, panX: 0, panY: 0, scrollX: 0, scrollY: 0, lines: 256, wide: 1.5, wet: 1 } },
       { shaderId: 'fx-posterize', inputs: { levels: 16, gamma: 1 } }
@@ -938,7 +938,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.2 }
   },
   {
-    name: 'Store · Mirror Scroll', group: 'Store',
+    name: 'Store · Mirror Scroll', group: 'Frame Store',
     fx: [
       { shaderId: 'fx-store-zoom', inputs: { zoom: 1.4, stretch: 0, magnify: 1, mirror: 1, panX: 0.3, panY: 0, scrollX: 0, scrollY: 0.04, lines: 256, wide: 1.5, wet: 1 } },
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0, parasites: 0 } }

@@ -2,7 +2,7 @@
   "DESCRIPTION": "Pixelmask : stencil the image through a pattern (aperture grille / shadow mask / dots / grid / noise): the picture only shows where the mask is lit, everything else darkens. The RGB-triad shadow-mask option splits the pattern into red/green/blue stripes for a real tube-phosphor read. Scale is in 1080p pixels and snaps to whole pixels, so the pattern holds its size at 4K and stays crisp at the smallest scales.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
-  "CATEGORIES": ["FX", "Texture", "Scan"],
+  "CATEGORIES": ["FX", "Stylize", "Texture", "Scan"],
   "INPUTS": [
     { "NAME": "inputImage", "TYPE": "image" },
     { "NAME": "pattern", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4], "LABELS": ["grille", "shadowmask", "dots", "grid", "noise"], "DEFAULT": 0 },
