@@ -395,6 +395,16 @@ export type BodyFeature =
   | 'handRightOpen'
   | 'handsApart' // wrist-to-wrist distance : 0 together, 1 wide (the accordion)
   | 'handsHeight' // mean of both wrists' height
+  // Hand shape (engine/handShape.ts : geometry on the same 21 points, per hand).
+  // Curls from joint angles, pinches in the hand's own palms, so both read the
+  // same near the camera or far from it.
+  | 'handLeftCurlThumb' | 'handLeftCurlIndex' | 'handLeftCurlMiddle' | 'handLeftCurlRing' | 'handLeftCurlPinky' // 0 straight, 1 curled
+  | 'handRightCurlThumb' | 'handRightCurlIndex' | 'handRightCurlMiddle' | 'handRightCurlRing' | 'handRightCurlPinky'
+  | 'handLeftPinchIndex' | 'handLeftPinchMiddle' | 'handLeftPinchRing' | 'handLeftPinchPinky' // thumb tip to that fingertip : 0 apart, 1 touching
+  | 'handRightPinchIndex' | 'handRightPinchMiddle' | 'handRightPinchRing' | 'handRightPinchPinky'
+  | 'handLeftAngle' | 'handRightAngle' // roll as you see it : 0 fingers left, 0.5 up, 1 right
+  | 'handLeftFacing' | 'handRightFacing' // 0 back of the hand, 0.5 edge-on, 1 palm toward the camera
+  | 'handLeftSpan' | 'handRightSpan' // apparent size : 0 far from the camera, 1 close
   // Pose (whole body)
   | 'bodyMotion' // overall landmark velocity / energy 0..1
   | 'bodyLean' // torso lean : 0 left, 0.5 centred, 1 right
@@ -441,17 +451,28 @@ export type BodyFeature =
   | 'bodyPresent'
   | 'handsPresent'
   | 'facePresent'
-export const BODY_FEATURES: BodyFeature[] = [
-  'handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX',
-  'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight',
-  'bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR',
-  'faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker',
-  'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll',
-  'zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover',
-  'flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea',
-  'moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry',
-  'bodyPresent', 'handsPresent', 'facePresent'
+// The features by body region : the Body page's monitor rows and the body
+// modulator's menu groups. Each hand-shape pair sits left then right.
+export const BODY_FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> = [
+  { title: 'Hands', keys: ['handLeftHeight', 'handRightHeight', 'handLeftX', 'handRightX', 'handLeftOpen', 'handRightOpen', 'handsApart', 'handsHeight'] },
+  {
+    title: 'Hand shape',
+    keys: [
+      'handLeftCurlThumb', 'handRightCurlThumb', 'handLeftCurlIndex', 'handRightCurlIndex', 'handLeftCurlMiddle', 'handRightCurlMiddle',
+      'handLeftCurlRing', 'handRightCurlRing', 'handLeftCurlPinky', 'handRightCurlPinky',
+      'handLeftPinchIndex', 'handRightPinchIndex', 'handLeftPinchMiddle', 'handRightPinchMiddle',
+      'handLeftPinchRing', 'handRightPinchRing', 'handLeftPinchPinky', 'handRightPinchPinky',
+      'handLeftAngle', 'handRightAngle', 'handLeftFacing', 'handRightFacing', 'handLeftSpan', 'handRightSpan'
+    ]
+  },
+  { title: 'Pose', keys: ['bodyMotion', 'bodyLean', 'bodySway', 'armSpan', 'bodyHeight', 'handsUp', 'weightLR'] },
+  { title: 'Face', keys: ['faceJawOpen', 'faceSmile', 'faceBrowUp', 'faceBlink', 'faceMouthPucker', 'faceHeadYaw', 'faceHeadPitch', 'faceHeadRoll'] },
+  { title: 'Silhouette (zones)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
+  { title: 'Motion field', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
+  { title: 'Movement qualities', keys: ['moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry'] },
+  { title: 'Presence', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
+export const BODY_FEATURES: BodyFeature[] = BODY_FEATURE_GROUPS.flatMap((g) => g.keys)
 
 // Discrete body gestures : one-shot onsets (threshold + cooldown, like the audio
 // bus's `transient`). An early slice of the ① trigger/event layer : each fires a
@@ -485,6 +506,12 @@ export type BodyGesture =
   | 'approach' | 'withdraw' | 'spinCW' | 'spinCCW' | 'stillness'
   // Movement qualities (the pose) : a burst out of calm, a quick stop held still.
   | 'impulse' | 'freeze'
+  // Hand shapes (engine/handShape.ts : read from the fingers' curls) : each fires
+  // once when the shape is made and has held a moment, per hand, and again only
+  // after the hand has let it go.
+  | 'fistLeft' | 'fistRight' | 'openLeft' | 'openRight' | 'pointLeft' | 'pointRight'
+  | 'peaceLeft' | 'peaceRight' | 'thumbUpLeft' | 'thumbUpRight' | 'thumbDownLeft' | 'thumbDownRight'
+  | 'okLeft' | 'okRight' | 'hornsLeft' | 'hornsRight' | 'callLeft' | 'callRight' | 'gunLeft' | 'gunRight'
 export const BODY_GESTURES: BodyGesture[] = [
   'pinchLeft', 'pinchRight', 'clap', 'cross',
   'handsUp', 'leanLeft', 'leanRight', 'crouch', 'jump', 'armsCross', 'tPose', 'raiseLeft', 'raiseRight',
@@ -496,7 +523,10 @@ export const BODY_GESTURES: BodyGesture[] = [
   'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR',
   'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave',
   'swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness',
-  'impulse', 'freeze'
+  'impulse', 'freeze',
+  'fistLeft', 'fistRight', 'openLeft', 'openRight', 'pointLeft', 'pointRight',
+  'peaceLeft', 'peaceRight', 'thumbUpLeft', 'thumbUpRight', 'thumbDownLeft', 'thumbDownRight',
+  'okLeft', 'okRight', 'hornsLeft', 'hornsRight', 'callLeft', 'callRight', 'gunLeft', 'gunRight'
 ]
 
 // What a gesture fires : one of the shared discrete-trigger action ids (the same

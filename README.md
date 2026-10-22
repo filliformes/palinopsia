@@ -781,8 +781,9 @@ Two of the types close the loop **from the image back to control**:
 One type follows the **live performer** instead of the picture:
 
 - **`body`** follows a feature off the [Body page's](#body--embodied-control-key-b)
-  webcam (a hand's height / openness, body lean / motion, a face blendshape, head
-  pose, or a silhouette zone's coverage) : the room in the frame plays the
+  webcam (a hand's height / openness, a finger's curl or pinch, a hand's roll /
+  facing / span, body lean / motion, a face blendshape, head pose, or a silhouette
+  zone's coverage; its menu is grouped by body region) : the room in the frame plays the
   instrument. The `audio` follower also gained a **`noisiness`** feature (spectral
   flatness) : bind a sound's noise to a layer's tint saturation and the *sound
   colours the picture* (the other direction of the same crossmodal table).
@@ -1132,7 +1133,7 @@ before). The models ship inside the app, so it works offline and in kiosk.
 **Layout.** Like the layer strip's IN / MIX / FX / OUT, every section is named in the
 left margin, in its color, on a faint panel of that color (hover the word for what the
 section does) : **TRACK** (the capture line), the camera preview beside the feature
-monitor's seven groups, then **NEW RULE** (the builder line) and **RULES** (the saved
+monitor's eight groups, then **NEW RULE** (the builder line) and **RULES** (the saved
 rules). The header holds the tracking state, the last gesture recognized and the camera
 picker.
 
@@ -1147,12 +1148,13 @@ instead of once per new camera frame : for a fast camera, at about twice the cos
 **hold time** (how long a held pose must last) · **OSC out**.
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
-the body bus: hand height / horizontal / openness, hands-apart (the accordion), body
+the body bus: hand height / horizontal / openness, each hand's **shape** (finger curls,
+pinches, roll, facing, span : below), hands-apart (the accordion), body
 lean / sway / motion-energy / arm-span / stance / weight, the movement qualities (below),
 the face blendshapes and head pose, and (with Silhouette on) each of the nine **zone
 coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **feature monitor** shows
 them live, one row per body region, its name in the margin in the region's color (Hands ·
-Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
+Hand shape · Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
 the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
@@ -1213,7 +1215,8 @@ to a truncated `/body/HandsUpRndMod`. With **OSC out** on, a firing rule also se
 **single-gesture** rule carries its own **sensitivity** slider (double-click resets it
 to the global), so one gesture can be tuned to fire eagerly or reluctantly on its own.
 
-The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **pose** (hands-up,
+The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **hand shapes** (fist,
+open, point, peace, thumb up / down, ok, horns, call, gun, each L and R : below), **pose** (hands-up,
 lean L/R, crouch, jump, arms-cross, T-pose, single-hand raise L/R), **face** (mouth-pop,
 brow-raise, wink L/R, smile, frown, brow-furrow, squint, cheek-puff, kiss, jaw / mouth
 L/R, tongue-out, blink, head turn / nod / tilt), **holds** (a sustained pose that fires
@@ -1223,6 +1226,43 @@ regions past a threshold), and **presence** edges (body / hands / face **in / ou
 debounced enter-and-leave onsets, the installation trigger for someone walking into or
 out of frame). A live **⚡ recognised** pill in the panel header names the last gesture
 the tracker saw.
+
+**Hand shape** reads each hand's fingers from the same 21 points (Hands on, no other
+model). Per hand, `handLeft…` and `handRight…`, all 0..1 :
+
+- **curl** of each finger (`…CurlThumb`, `…CurlIndex`, `…CurlMiddle`, `…CurlRing`,
+  `…CurlPinky` : 0 straight, 1 curled), from the joints' angles, so it reads the same
+  close to the camera or across the room;
+- **pinch**, the thumb tip to each fingertip (`…PinchIndex`, `…PinchMiddle`,
+  `…PinchRing`, `…PinchPinky` : 1 touching, 0 apart), measured in the hand's own palms;
+- **angle**, the hand's roll as you see it (`…Angle` : 0.5 upright, 0 fingers pointing
+  left, 1 pointing right). It stops at the two ends past a quarter turn, so turning the
+  hand like a dial from left to right sweeps the whole range, and it holds its value
+  while the fingers point at the camera;
+- **facing**, which way the palm faces (`…Facing` : 1 toward the camera, 0.5 edge-on,
+  0 the back of the hand);
+- **span**, how big the hand looks (`…Span` : 0 across the room, 1 right at the lens),
+  a stand-in for its distance to the camera.
+
+The camera's shape is taken out first (on a 16:9 camera the raw points skew every
+angle), and the points are smoothed a touch before the angles are read (through the
+camera's jitter a still finger would read as curling); a fast hand is smoothed less.
+
+The **hand shapes** are gestures for rules, per hand : **fist**, **open** (all five
+out), **point** (the index), **peace** (index and middle), **thumb up**, **thumb down**,
+**ok** (thumb and index tips touching, the other three out), **horns** (index and
+pinky), **call** (thumb and pinky) and **gun** (thumb and index), each **L** and **R**
+(the rule builder's "Hand shapes" group). A shape fires once when the hand makes it and
+holds it an eighth of the hold time (0.15 s by default), then again only after the hand
+has let it go : a held fist is one onset, not a stream. The sensitivity (the slider, or
+a single-gesture rule's own) sets how straight or how curled the fingers must be. The
+camera preview names the shape each hand holds now, under its wrist ("R fist").
+
+Which hand is which : with two hands in view, the one on your left as the preview shows
+it (so Mirror counts) is **L**, as before. A **lone hand now goes to its own side** : a
+right hand alone is **R** wherever it is in the picture (MediaPipe's left / right,
+checked against every frame that shows both hands), and keeps its side while it stays
+in view. Before, a lone hand always read as L.
 
 **Silhouette** is the shadow-theatre control: the pose segmentation mask is reduced to
 a 3×3 coverage grid drawn over the camera preview, each cell lighting up as your shadow
@@ -1260,7 +1300,8 @@ Fluidity and directness hold their last value while the body is still. Gestures 
 **impulse** (a burst out of calm) and **freeze** (a quick stop held still).
 
 With **OSC out** on in the app, every body feature also streams as
-`/opsia/body/<feature>` while the camera runs, beside the picture's `/opsia/vision/*`.
+`/opsia/body/<feature>` while the camera runs (the hand-shape ones too, such as
+`/opsia/body/handRightPinchIndex`), beside the picture's `/opsia/vision/*`.
 
 ## Output & mapping (key `O`)
 
