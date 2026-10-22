@@ -33,3 +33,6 @@ dist-tsc/
 # binary put there per machine, never committed.
 /resources/ndi/*/*
 !/resources/ndi/*/.gitkeep
+
+# Vincent's own prompt notes (kept locally, never published)
+Sonification Mode prompt.txt
