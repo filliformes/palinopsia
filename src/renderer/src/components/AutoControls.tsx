@@ -771,11 +771,14 @@ function CompactCluster({
     const raw = values[inp.name]
     const v = typeof raw === 'number' ? raw : def
     if (inp.type === 'long') {
+      // As wide as its longest choice (a select with no width of its own takes
+      // that of its widest option, here plus the chevron's room) : a fixed
+      // 48 px cut "smooth" and "brightest channel" (Luma Blur, Gooey...).
       return (
         <div className="flex items-center justify-between gap-2">
           {labelEl(inp)}
           <select
-            className="input select-compact w-12 shrink-0 !px-1 !py-0 text-[10px]"
+            className="input select-compact max-w-full shrink-0 !py-0 !pl-1 !pr-4 text-[10px]"
             value={v}
             onChange={(e) => onChange(inp.name, Number(e.target.value))}
             title={inp.label}

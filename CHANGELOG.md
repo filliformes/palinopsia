@@ -38,6 +38,34 @@ that CI builds into cross-platform releases.
   0.9975 to 0.9997) and runs 1.5x faster than fp16 there. A copy without the files says
   "run npm run fetch:depth"; CI fetches them (cached) before building on all three
   platforms.
+- **A right-click menu opens right against its button** (`ContextMenu.tsx`). Menus were
+  placed from an estimate of their height (28 px a row plus 40) and from the cursor, so
+  the Output button's menu, near the bottom of the window, opened well above the button
+  (36 px at 100 %, 45 px at 125 % in a test window; more with Close Output in the list)
+  and wherever on it the click was. A menu now measures itself before it shows
+  (`placeMenu`) : one with an `anchor` (the Output, Body, Seq and Sonify buttons) opens
+  4 px over or under its button, lined up with it, and a menu at the cursor opens under
+  it, or above it with its bottom at the cursor when there is no room under it (from
+  its right edge when there is none to the right), always inside its window, at any UI
+  zoom.
+- **The layer's A and B letters sit in the middle of their buttons** (also the
+  background's BG and the Audio Layer's A and B). The toolbar look's `px-2.5` comes later
+  in the stylesheet than the button's own `px-0`, so it won : 10 px each side in a 24 px
+  button left the letter 2 px of room, and it sat 2 to 2.6 px right of center (now within 0.25 px).
+  `!px-0` now; the buttons keep their size.
+- **A small dropdown in the Inspector is as wide as its longest choice** (`CompactCluster`
+  in `AutoControls.tsx`). Its fixed 48 px cut Luma Blur's and Toile's "smooth", Faultline's
+  and Decimate's "free (rate)", Gooey's "brightest channel", Matte's and Corrode's
+  "transparent". Measured over all 128 source, node and effect panels in a test copy : no
+  dropdown is cut anywhere now, and no other column moved.
+- **The Sequencer's resize edges stay under the hand at any UI zoom**
+  (`SequencePage.tsx`) : the inspector column's edge and the live monitor's top edge took
+  the pointer's screen pixels as page pixels, so at 125 % they ran a quarter ahead of the
+  pointer. They now divide by the zoom, in the app and in the Sequencer's own window.
+- **The Assemblage source's Inspector has the film transport's margins**
+  (`AssembleTransport.tsx`) : its edit, transport, timeline, speed and MOD rows ran from
+  edge to edge of the panel, on its border; they now sit inside it, under a rule, like a
+  film's and the Framing below.
 
 - **The Master FX chain menu names the chain that plays** (`MasterRackStrip` derives it
   from the loaded effects : the chain picked by hand or by an action while it is still
@@ -108,6 +136,22 @@ that CI builds into cross-platform releases.
   depth-scale error, jitter at 2 % of a palm) : 98.7 % recognised, no shape ever taken
   for another, a half-curled hand never firing; a shape held 4 s fires once (400 of
   400). Not yet with a real camera.
+- **Body, the Sequencer and Sonify in a window of their own**, like the Output page
+  (`PageWindow.tsx`, which `OutputPageWindow.tsx` became, now serving the four pages; main
+  allows the four window names in `PAGE_WINDOW_TITLES` and raises one with
+  `pageWindow:focus`). Right-click the Body, Seq or Sonify button : **Body…** / **Body in a
+  window**, **Sequencer…** / **Sequencer in a window**, **Sonify…** / **Sonify in a
+  window**. The same rules as the Output page's window : never remembered
+  (`bodyPageWindow` / `sequencePageWindow` / `sonifyPageWindow` reset when the page
+  closes), its title says what it is, closing it closes the page, **⇲** puts it back in
+  the app, `B` / `Q` / `S` bring it forward instead of closing it, `Esc` there stays
+  there, the other keys play the instrument. What the two pages draw and listen to now uses the
+  window they are in (`ownerWindow`) : the camera preview and its skeleton, Sonify's
+  mirror overlay, meters, key-sequencer bar and Space map (its pixel ratio too), the
+  Sonify `M` key, the Space boxes' typing check, the trigger pickers (`SearchSelect`) and
+  their outside click. Sonify in its window keeps drawing while World, Sequence or
+  Resolume is open over the instrument (`sonifyCovered(el)`), and Body or the Sequencer
+  in its window no longer counts as covering Sonify, the EQ editor or World's keys.
 
 - **Every source and effect has at least ten presets** (`shaders/isf/presets.ts`) :
   Silhouette gets its first ten (cutout, matte, shadow and hole, with and without

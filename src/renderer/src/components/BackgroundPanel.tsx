@@ -215,7 +215,7 @@ export function BackgroundPanel(): JSX.Element {
             <button
               type="button"
               onClick={() => shaderId && setSelection({ type: 'background' })}
-              className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : shaderId ? TBTN_IDLE_ON : TBTN_IDLE}`}
+              className={`${TBTN} w-[34px] !px-0 text-center ${selected ? TBTN_LIT : shaderId ? TBTN_IDLE_ON : TBTN_IDLE}`}
               title={shaderId ? 'Show the Background source\'s parameters in the Inspector' : 'Pick a ground first'}
             >
               BG

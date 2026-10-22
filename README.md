@@ -61,11 +61,11 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 18 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
-- [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
+- [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
-- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
+- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
-- [Sonify : image to sound](#sonify--image-to-sound-key-s) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
+- [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · Generate (119 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
@@ -225,9 +225,9 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `M` / `F` / `G` | Right column → Mixer / Finishing / **Feel** (Layers is the default view : `M` toggles Mixer↔Layers, or click the tab) |
 | `O` | Output / Mapping page (while it is in its own window : brings it forward) |
 | `W` | World editor |
-| `Q` | Sequence page |
-| `S` | **Sonify** page (image-to-sound engine) |
-| `B` | **Body** page : embodied control (a camera → gestures + modulators) |
+| `Q` | Sequence page (while it is in its own window : brings it forward) |
+| `S` | **Sonify** page (image-to-sound engine) (while it is in its own window : brings it forward) |
+| `B` | **Body** page : embodied control (a camera → gestures + modulators) (while it is in its own window : brings it forward) |
 | `K` | **Resolume OSC mapper** page : drive any Resolume address from Palinopsia's signals |
 | `E` | Right column → **assemble** (the automatic editor) |
 | `Alt+E` (`Cmd+Option+E` on a Mac) | **Source Editor** : write a shader of your own, or a copy of a built-in one |
@@ -673,9 +673,11 @@ Left → right:
 - **Output** (opens the Output / mapping page; lights while the external output is on;
   right-click : **Watch the Output in a window** or close it, or the
   [Output page in a window](#output--mapping-key-o) of its own) · **Body** (opens the embodied-control
-  page; lights while the camera is live; also key `B`) · **Seq** (opens the
-  sequencer; lights when running) · **Sonify** (opens Sonify; lights while the sound
-  engine runs).
+  page; lights while the camera is live; also key `B`; right-click : **Body in a
+  window**) · **Seq** (opens the sequencer; lights when running; right-click :
+  **Sequencer in a window**) · **Sonify** (opens
+  Sonify; lights while the sound engine runs; right-click : **Sonify in a window**). A
+  right-click menu on one of these buttons opens right against the button.
 - **Vary** (a baseline-anchored variant : structure fixed, values nudged) + amount.
 - **amt** Randomize intensity (gentle walk ↔ full re-roll) · **Randomize**
   split-button (main fires the selected scope; `▾` picks the scope : see
@@ -962,6 +964,17 @@ transitions, and subtle no-exact-repeat variation; overlays **Breathe**
 rupture / monomedia** punctuation; supports audio/chaos-armed deferred advance; and
 exports a Markdown **relation-score** (`⤓ score`). Needs ≥2 scenes to play.
 
+**In a window of its own.** Right-click the **Seq** button, **Sequencer in a window** :
+the whole page opens in its own window (titled *Palinopsia · Sequencer*), to steer the
+run on one screen while the picture plays full size on the other. The same rules as the
+[Output page's window](#output--mapping-key-o) : the scene cards, the tag editor, the
+transport and the long-forms are live there, its live monitor mirrors the picture, the
+monitor's top edge and the inspector column's edge still resize under your hand (at any
+UI zoom), `Q` brings the window forward instead of closing it, your other keys still play
+the instrument, **⇲ back into the app** puts the page back over the instrument and
+closing the window closes the page. It is never remembered : the next time, the
+Sequencer opens in the app.
+
 Three **durational long-forms** run underneath the scene clock (minutes-scale):
 
 | Long-form | What it does |
@@ -1173,6 +1186,17 @@ MediaPipe models run on **their own thread** : the picture only hands each camer
 frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows the
 render (on a machine where that thread cannot start, they run on the main thread as
 before). The models ship inside the app, so it works offline and in kiosk.
+
+**In a window of its own.** Right-click the **Body** button, **Body in a window** : the
+whole page opens in its own window (titled *Palinopsia · Body*), to keep the camera
+preview and the rules in view on another screen while you play. The same rules as the
+[Output page's window](#output--mapping-key-o) : every control is live, your keys still
+play the instrument from there (`B` brings the window forward, it does not close it;
+`Esc`, `Enter`, the arrows, `Delete` and `Backspace` stay in that window, where `Esc`
+closes its pickers), its pickers open inside it, **⇲** puts the page back over the
+instrument and closing the window closes the page. It is never remembered : the next
+time, Body opens in the app. The window comes back where you last left it. The camera
+stays off until you press **Enable**, in the window as in the app.
 
 **Layout.** Like the layer strip's IN / MIX / FX / OUT, every section is named in the
 left margin, in its color, on a faint panel of that color (hover the word for what the
@@ -1392,7 +1416,10 @@ bottom:
   that window. **⇲ back into the app**
   puts it back over the instrument; closing the window closes the page. The page
   otherwise always opens in the app (`O`, the Output button); while it is in its window,
-  `O` brings that window forward. The window comes back where you last left it.
+  `O` brings that window forward. The window comes back where you last left it. The
+  [Body](#body--embodied-control-key-b), [Sequencer](#sequencer-key-q) and
+  [Sonify](#sonify--image-to-sound-key-s) pages open in a window of their own the same
+  way (right-click their buttons).
 - **Fullscreen output** : pick a display; borderless-fullscreen or windowed. The
   output window shows the control window's exact pixels, streamed at the
   projector's own resolution and keystoned on its side. A tap of `Esc` on a
@@ -1712,6 +1739,16 @@ or need to restart.
 The instrument's sound half : the image itself synthesizes audio, in real time,
 inside the app (an AudioWorklet engine : no external software). A full-page
 takeover: the live composite mirrored large with the **probes drawn on it** : because the probe is the instrument, plus the eleven voices' strips and a master bus. Every parameter explains itself on hover.
+
+**In a window of its own.** Right-click the **Sonify** button, **Sonify in a window** : the
+whole page opens in its own window (titled *Palinopsia · Sonify*), to play the sound on
+one screen beside the picture on another. The same rules as the
+[Output page's window](#output--mapping-key-o) : every control, probe and meter is live
+there (and keeps moving while a page like World is open over the instrument), `M` there
+switches its Voices / Mixer view, `S` brings the window forward instead of closing it,
+your other keys still play the instrument, **⇲** puts the page back over the instrument
+and closing the window closes the page (the sound plays on, as when the page closes in
+the app). It is never remembered : the next time, Sonify opens in the app.
 
 **The eleven voices** (each one lineage of the sonification literature):
 

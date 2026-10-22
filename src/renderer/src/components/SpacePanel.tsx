@@ -32,6 +32,7 @@ import {
 import type { SonifyModParam } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { Row, RangeRow, Seg, Shell, Stepper, chip, sonifyCovered, themeVar } from './sonifyUi'
+import { ownerWindow } from './ownerWindow'
 import { showToast } from './Toast'
 
 const MODE_HINT: Record<SpaceMode, string> = {
@@ -59,11 +60,12 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
   const setVoice = useStore((s) => s.setSpaceVoice)
   const domeOn = useStore((s) => s.dome.enabled)
   const [, setTick] = useState(0)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null) // (which window the panel is in)
   useEffect(() => {
-    const id = window.setInterval(() => { if (!sonifyCovered()) setTick((t) => t + 1) }, 300)
+    const id = window.setInterval(() => { if (!sonifyCovered(rootRef.current)) setTick((t) => t + 1) }, 300)
     return () => window.clearInterval(id)
   }, [])
-  const fileRef = useRef<HTMLInputElement>(null)
   const on = space.mode !== 'stereo'
   const outCh = sonifyEngine.outputChannels()
   const layout = activeLayout(space)
@@ -94,7 +96,7 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
   const [open, setOpen] = useState<SpaceVoice | null>(null)
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={rootRef} className="flex flex-col gap-2">
       <Shell
         title="Space"
         hint="Sonify's voices placed in the room, the way the picture is placed on the dome. Choose a multichannel output above (a sound card, or a Dante Virtual Soundcard to reach a venue's Dante network). The recordings keep the stereo mix : a stereo take of the piece, and the stereo backup a venue asks for."
@@ -348,7 +350,7 @@ function ScrubBox({ value, min, max, perPx, wrap, dim, liveKey, onChange, title 
   const onPointerDown = (e: RPointerEvent<HTMLSpanElement>): void => {
     if (e.button !== 0 || dim) return
     const input = ref.current?.querySelector('input')
-    if (input && document.activeElement === input) return // typing : the box is a text box
+    if (input && input.ownerDocument.activeElement === input) return // typing : the box is a text box (its own window's focus)
     e.preventDefault() // no focus yet : this may be a drag
     const el = e.currentTarget
     el.setPointerCapture(e.pointerId)
@@ -479,16 +481,19 @@ function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@
     // Its size from its box on screen (under the UI zoom, clientWidth is not what
     // it shows), read when the box changes, not every frame; at least twice its
     // CSS size, as before.
+    // (the window it is in : the Sonify page may have its own, on a screen of
+    // another pixel ratio, with its own frames)
+    const view = ownerWindow(ref.current)
     let size = 0
-    const ro = new ResizeObserver(() => {
+    const ro = new view.ResizeObserver(() => {
       const cv = ref.current
-      if (cv) size = Math.round(Math.max(2 * cv.clientWidth, cv.getBoundingClientRect().width * (window.devicePixelRatio || 1)))
+      if (cv) size = Math.round(Math.max(2 * cv.clientWidth, cv.getBoundingClientRect().width * (view.devicePixelRatio || 1)))
     })
     if (ref.current) ro.observe(ref.current)
     const draw = (): void => {
-      raf = requestAnimationFrame(draw)
+      raf = view.requestAnimationFrame(draw)
       const cv = ref.current
-      if (!cv || !size || sonifyCovered()) return
+      if (!cv || !size || sonifyCovered(cv)) return
       if (cv.width !== size) { cv.width = size; cv.height = size }
       const g = cv.getContext('2d')
       if (!g) return
@@ -569,7 +574,7 @@ function SpaceMap({ setVoice }: { setVoice: (v: SpaceVoice, p: Partial<import('@
       g.globalAlpha = 1
     }
     draw()
-    return () => { cancelAnimationFrame(raf); ro.disconnect() }
+    return () => { view.cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
   return <canvas ref={ref} onPointerDown={onDown} onPointerMove={onHover} className="mx-auto aspect-square w-full max-w-[320px]" style={{ touchAction: 'none' }} />
 }

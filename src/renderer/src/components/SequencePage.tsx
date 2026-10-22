@@ -21,6 +21,7 @@ import {
 import { frameWeaveActiveCell } from '../engine/frameWeave'
 import { climateFromColour } from '../worlds'
 import { showToast } from './Toast'
+import { effectiveZoom } from './uiZoom'
 
 const SYNCHRESIS: CouplingMode[] = ['lean', 'hocket', 'cut', 'gate', 'drift']
 const SYNCHRESIS_INFO: Record<string, string> = {
@@ -44,11 +45,15 @@ const CLIMATE_COLOR: Record<SceneClimate, string> = {
 }
 
 export function SequencePage({
-  canvasRef
+  canvasRef,
+  inWindow = false
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
+  /** Drawn in its own window (PageWindow.tsx), not over the instrument. */
+  inWindow?: boolean
 }): JSX.Element {
   const setOpen = useStore((s) => s.setSequencePageOpen)
+  const setInWindow = useStore((s) => s.setSequencePageWindow)
   const scenes = useStore(useShallow((s) => s.scenes))
   const activeSceneId = useStore((s) => s.activeSceneId)
   const worlds = useStore(useShallow((s) => s.worlds))
@@ -146,11 +151,22 @@ export function SequencePage({
         </button>
         <NowMeter running={seq.running} />
         <div className="flex-1" />
+        {/* In its own window (from the Seq button's right-click menu) : back in
+            over the instrument. */}
+        {inWindow && (
+          <button
+            onClick={() => setInWindow(false)}
+            className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+            title="Put the Sequencer back over the instrument"
+          >
+            ⇲ back into the app
+          </button>
+        )}
         <button
           onClick={() => setOpen(false)}
           className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
         >
-          ← back to instrument
+          {inWindow ? 'close' : '← back to instrument'}
         </button>
       </header>
 
@@ -341,9 +357,12 @@ export function SequencePage({
             const startX = e.clientX
             const startW = seqAsideW
             const el = e.target as HTMLElement
+            // the pointer moves in screen pixels, the width is in the zoomed
+            // page's own (at 125 % the edge ran a quarter ahead of the hand)
+            const z = effectiveZoom(el)
             el.setPointerCapture(e.pointerId)
             const move = (ev: PointerEvent): void => {
-              const w = Math.max(240, Math.min(640, startW + (startX - ev.clientX)))
+              const w = Math.max(240, Math.min(640, startW + (startX - ev.clientX) / z))
               setSeqAsideW(w)
               localStorage.setItem('opsia.seqAsideW', String(w))
             }
@@ -618,7 +637,7 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
     const v = Number(localStorage.getItem('opsia.seqPreviewH'))
     return Number.isFinite(v) && v >= 100 ? v : 150
   })
-  const drag = useRef<{ startY: number; startH: number; last: number } | null>(null)
+  const drag = useRef<{ startY: number; startH: number; last: number; z: number } | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -645,13 +664,14 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
         className="h-1.5 shrink-0 cursor-row-resize bg-border/60 transition-colors hover:bg-accent/60"
         style={{ touchAction: 'none' }}
         onPointerDown={(e) => {
-          drag.current = { startY: e.clientY, startH: height, last: height }
+          // (screen pixels to the zoomed page's own, as the column's edge)
+          drag.current = { startY: e.clientY, startH: height, last: height, z: effectiveZoom(e.currentTarget) }
           ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
         }}
         onPointerMove={(e) => {
           const d = drag.current
           if (!d) return
-          const h = Math.max(100, Math.min(560, d.startH + (d.startY - e.clientY)))
+          const h = Math.max(100, Math.min(560, d.startH + (d.startY - e.clientY) / d.z))
           d.last = h
           setHeight(h)
         }}

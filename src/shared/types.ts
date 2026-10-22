@@ -852,10 +852,21 @@ export const DEFAULT_LAYER_VARY = 0.15
 // 2026-10-13 : raise it to 32).
 export const MAX_MOD_ASSIGNMENTS = 32
 
-/** The window.open name of the Output page in its own window : a blank page the
- *  control window draws the page into (renderer OutputPageWindow.tsx), which
- *  main lets open (and only that one). */
+/** The window.open names of the pages that can open in a window of their own
+ *  (the Output, Body, Seq and Sonify buttons' right-click menus) : a blank page the
+ *  control window draws the page into (renderer PageWindow.tsx), which main lets
+ *  open (and only these). */
 export const OUTPUT_PAGE_FRAME = 'opsia-output-page'
+export const BODY_PAGE_FRAME = 'opsia-body-page'
+export const SONIFY_PAGE_FRAME = 'opsia-sonify-page'
+export const SEQUENCE_PAGE_FRAME = 'opsia-sequence-page'
+/** Each page window's title, by its window.open name. */
+export const PAGE_WINDOW_TITLES: Record<string, string> = {
+  [OUTPUT_PAGE_FRAME]: 'Palinopsia · Output',
+  [BODY_PAGE_FRAME]: 'Palinopsia · Body',
+  [SONIFY_PAGE_FRAME]: 'Palinopsia · Sonify',
+  [SEQUENCE_PAGE_FRAME]: 'Palinopsia · Sequencer'
+}
 // What the AUTOMATIC binders may use (Randomize, Generate, a World's audio
 // route) : the old 12, so a randomized session keeps the amount of motion it
 // always had and the rest of the room stays for the hand.
@@ -1540,7 +1551,8 @@ export interface ExposedApi {
   // union bounds (each projector a separate, adjacent monitor).
   outputOpenSpan: (displayIds: number[]) => Promise<boolean>
   outputClose: () => Promise<boolean>
-  outputPageFocus: () => Promise<boolean>
+  /** Bring a page's own window (Output, Body, Sonify, Sequencer : its window.open name) to the front. */
+  pageWindowFocus: (frame: string) => Promise<boolean>
   // What Esc does in the output window : 'hold' (an installation : held 1.5 s),
   // 'close' (a fullscreen output covering the control window : a tap closes it)
   // or 'return' (the control window is reachable : focus goes back to it).

@@ -13,6 +13,7 @@ import { NOTE_NAMES, KEY_MODES, euclidHit, everyToPos, isScale, posToEvery } fro
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase, keySeqWaitMs } from '../audio/soniKeySeq'
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered, LiveNum } from './sonifyUi'
+import { ownerWindow } from './ownerWindow'
 import { KeySeqVisual } from './KeySeqVisual'
 import { registerLiveOverlay } from './liveOverlay'
 
@@ -115,10 +116,12 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
   const barRef = useRef<HTMLDivElement | null>(null)
   const waitRef = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
+    // (on the frames of the window it is in : the Sonify page may have its own)
+    const view = ownerWindow(barRef.current ?? waitRef.current)
     let id = 0
     const f = (): void => {
-      id = requestAnimationFrame(f)
-      if (sonifyCovered()) return
+      id = view.requestAnimationFrame(f)
+      if (sonifyCovered(barRef.current ?? waitRef.current)) return
       const p = keySeqPhase(performance.now(), soniBeats())
       if (barRef.current) barRef.current.style.width = p < 0 ? '0%' : `${(p * 100).toFixed(1)}%`
       if (waitRef.current) {
@@ -127,8 +130,8 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
         if (waitRef.current.textContent !== t) waitRef.current.textContent = t
       }
     }
-    id = requestAnimationFrame(f)
-    return () => cancelAnimationFrame(id)
+    id = view.requestAnimationFrame(f)
+    return () => view.cancelAnimationFrame(id)
   }, [folded])
 
   const p = (patch: Partial<SoniKeySeq>): void => set(patch)

@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerLiveOverlay } from './liveOverlay'
+import { ownerWindow } from './ownerWindow'
 
 /** A theme color variable ("r g b"), read once per theme : read every frame,
  *  getComputedStyle forced a style recalculation after the meters had written
@@ -42,10 +43,15 @@ export function parseDb(text: string): number | null {
 
 /** Something hides the Sonify page (another full page over it, the Source
  *  Editor, the window minimized) : its drawing loops skip the frame and its key
- *  handlers rest (the EQ editor's took Esc and Delete from under the editor). */
-export function sonifyCovered(): boolean {
+ *  handlers rest (the EQ editor's took Esc and Delete from under the editor).
+ *  `el` : what is drawing. In the Sonify page's own window only that window
+ *  hides it (the pages over the instrument are elsewhere); a page in a window of
+ *  its own (Body, Sequence) covers nothing in the instrument. */
+export function sonifyCovered(el?: Element | null): boolean {
+  const doc = el?.ownerDocument
+  if (doc && doc !== document) return doc.hidden
   const s = useStore.getState()
-  return document.hidden || s.worldPageOpen || s.sequencePageOpen || s.bodyPageOpen || s.resolumePageOpen || s.sourceEditorOpen
+  return document.hidden || s.worldPageOpen || (s.sequencePageOpen && !s.sequencePageWindow) || (s.bodyPageOpen && !s.bodyPageWindow) || s.resolumePageOpen || s.sourceEditorOpen
 }
 
 /** The on / play pill of a card's header. */
@@ -292,12 +298,16 @@ export function GrMeter({ get, wide, title }: { get: () => number; wide?: boolea
   const barRef = useRef<HTMLDivElement | null>(null)
   const numRef = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
+    // on its own window's frames (the Sonify page may have one), timed by one
+    // clock (a window of its own counts its frame times from its own start)
+    const view = ownerWindow(barRef.current ?? numRef.current)
     let raf = 0, shown = -2, held = 0, at = performance.now()
-    const tick = (now: number): void => {
-      raf = requestAnimationFrame(tick)
+    const tick = (): void => {
+      raf = view.requestAnimationFrame(tick)
+      const now = performance.now()
       const dt = Math.min(0.25, (now - at) / 1000)
       at = now
-      if (sonifyCovered()) return
+      if (sonifyCovered(numRef.current)) return
       const g = get()
       // fast down, slow back (12 dB/s) : a reduction stays readable
       held = g < 0 ? -1 : g >= held ? g : Math.max(g, held - 12 * dt)
@@ -309,8 +319,8 @@ export function GrMeter({ get, wide, title }: { get: () => number; wide?: boolea
         numRef.current.style.color = v >= 0.1 ? 'rgb(var(--c-accent2))' : ''
       }
     }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    raf = view.requestAnimationFrame(tick)
+    return () => view.cancelAnimationFrame(raf)
   }, [get])
   if (!wide) {
     return <span ref={numRef} title={title} className="w-[22px] shrink-0 text-center font-mono text-[8px] tabular-nums text-muted">off</span>
@@ -358,6 +368,7 @@ export function LiveNum({ liveKey, value, fmt, className, title }: {
     if (!liveKey || !el) return
     return registerLiveOverlay({
       key: liveKey,
+      view: ownerWindow(el), // (the Sonify page's own window : its own frames)
       apply: (v) => {
         st.current.live = true
         const t = st.current.fmt(v)

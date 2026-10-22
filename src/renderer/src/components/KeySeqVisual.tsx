@@ -318,9 +318,10 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
   const hist = useRef<number[]>([])
   const avg = useRef(0)
   const [, setTick] = useState(0)
+  const svgRef = useRef<SVGSVGElement | null>(null) // (which window it is in)
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (sonifyCovered()) return
+      if (sonifyCovered(svgRef.current)) return
       if (visionBus.hasData()) {
         const m = visionBus.feature('motion')
         hist.current = [...hist.current, m].slice(-56)
@@ -348,7 +349,7 @@ function PictureVis({ ks, cur, col }: { ks: SoniKeySeq; cur: Key; col: Col }): J
   const thr = Math.max(0.12, avg.current * 3 + 0.02)
   return (
     <Stage caption={has ? (cuts ? 'a new key at each scene cut (the spikes past the line)' : list ? 'its color picks the nearest of your keys on the wheel (the dots), its light the mood among theirs' : range > 0.01 ? "its color picks the root, its light the mood, within the piece's own (the arc : its palette, the tick : its color now)" : 'its color picks the root, its brightness the mood') : 'the picture is read while the sequencer plays or this page is open'}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
         {/* the hue wheel */}
         {Array.from({ length: 24 }, (_, i) => {
           const a0 = (i / 24) * TAU - Math.PI / 2, a1 = ((i + 1) / 24) * TAU - Math.PI / 2

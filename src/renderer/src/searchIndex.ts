@@ -269,13 +269,14 @@ function writeValues(u: Unit, values: Record<string, Value>): void {
 
 // ── The control a pick reveals ──────────────────────────────────────────
 
-/** The full pages over the instrument : closed so a control under them shows. */
+/** The full pages over the instrument : closed so a control under them shows
+ *  (a page in its own window covers nothing : it stays). */
 function uncover(): void {
   const s = useStore.getState()
   if (s.worldPageOpen) s.setWorldPageOpen(false)
-  if (s.sonifyPageOpen) s.setSonifyPageOpen(false)
-  if (s.sequencePageOpen) s.setSequencePageOpen(false)
-  if (s.bodyPageOpen) s.setBodyPageOpen(false)
+  if (s.sonifyPageOpen && !s.sonifyPageWindow) s.setSonifyPageOpen(false)
+  if (s.sequencePageOpen && !s.sequencePageWindow) s.setSequencePageOpen(false)
+  if (s.bodyPageOpen && !s.bodyPageWindow) s.setBodyPageOpen(false)
   if (s.resolumePageOpen) s.setResolumePageOpen(false)
   if (s.outputPageOpen && !s.outputPageWindow) s.setOutputPageOpen(false)
 }

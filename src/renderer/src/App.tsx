@@ -59,7 +59,7 @@ import { PictureReadout } from './components/PictureReadout'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
-import { OutputPageWindow } from './components/OutputPageWindow'
+import { PageWindow } from './components/PageWindow'
 import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
 import { SequencePage } from './components/SequencePage'
@@ -274,7 +274,7 @@ function RecPill(): JSX.Element | null {
 function BodyPip(): JSX.Element | null {
   const enabled = useStore((s) => s.bodyControl.enabled)
   const pageOpen = useStore((s) => s.bodyPageOpen)
-  const overPage = useStore((s) => s.sonifyPageOpen || (s.outputPageOpen && !s.outputPageWindow) || s.worldPageOpen || s.sequencePageOpen || s.resolumePageOpen || s.sourceEditorOpen)
+  const overPage = useStore((s) => (s.sonifyPageOpen && !s.sonifyPageWindow) || (s.outputPageOpen && !s.outputPageWindow) || s.worldPageOpen || (s.sequencePageOpen && !s.sequencePageWindow) || s.resolumePageOpen || s.sourceEditorOpen)
   const setPage = useStore((s) => s.setBodyPageOpen)
   const [live, setLive] = useState(false)
   useEffect(() => {
@@ -578,6 +578,7 @@ export default function App(): JSX.Element {
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const outputPageWindow = useStore((s) => s.outputPageWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
+  const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const renderScale = useStore((s) => s.renderScale)
   const compW = useStore((s) => s.compW)
   const compH = useStore((s) => s.compH)
@@ -603,7 +604,9 @@ export default function App(): JSX.Element {
     return () => { alive = false; off?.() }
   }, [])
   const sequencePageOpen = useStore((s) => s.sequencePageOpen)
+  const sequencePageWindow = useStore((s) => s.sequencePageWindow)
   const bodyPageOpen = useStore((s) => s.bodyPageOpen)
+  const bodyPageWindow = useStore((s) => s.bodyPageWindow)
   const resolumePageOpen = useStore((s) => s.resolumePageOpen)
   const domeOn = useStore((s) => s.dome.enabled)
   const domeRes = useStore((s) => s.dome.res)
@@ -965,18 +968,20 @@ export default function App(): JSX.Element {
         st.setWorldPageOpen(!st.worldPageOpen)
         return
       }
-      // Q: open/close the Sequence (macro-form) page.
+      // Q: open/close the Sequence (macro-form) page. While it is in its own
+      // window, Q brings that window up.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'q') {
         e.preventDefault()
         const st = useStore.getState()
-        st.setSequencePageOpen(!st.sequencePageOpen)
+        st.setSequencePageOpen(st.sequencePageWindow || !st.sequencePageOpen)
         return
       }
-      // S : the Sonify page (image-to-sound engine).
+      // S : the Sonify page (image-to-sound engine). While it is in its own
+      // window, S brings that window up (as O does the Output page's).
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 's') {
         e.preventDefault()
         const st = useStore.getState()
-        st.setSonifyPageOpen(!st.sonifyPageOpen)
+        st.setSonifyPageOpen(st.sonifyPageWindow || !st.sonifyPageOpen)
         return
       }
       // K : the Resolume OSC mapper page.
@@ -986,11 +991,12 @@ export default function App(): JSX.Element {
         st.setResolumePageOpen(!st.resolumePageOpen)
         return
       }
-      // B : the Body page (embodied control : MediaPipe Hands + Pose).
+      // B : the Body page (embodied control : MediaPipe Hands + Pose). While it
+      // is in its own window, B brings that window up.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'b') {
         e.preventDefault()
         const st = useStore.getState()
-        st.setBodyPageOpen(!st.bodyPageOpen)
+        st.setBodyPageOpen(st.bodyPageWindow || !st.bodyPageOpen)
         return
       }
       // Bare letters: view / panel shortcuts (guarded against typing in fields).
@@ -1088,12 +1094,12 @@ export default function App(): JSX.Element {
           st.setResolumePageOpen(false)
           return
         }
-        if (st.bodyPageOpen) {
+        if (st.bodyPageOpen && !st.bodyPageWindow) {
           e.preventDefault()
           st.setBodyPageOpen(false)
           return
         }
-        if (st.sequencePageOpen) {
+        if (st.sequencePageOpen && !st.sequencePageWindow) {
           e.preventDefault()
           st.setSequencePageOpen(false)
           return
@@ -1103,7 +1109,7 @@ export default function App(): JSX.Element {
           st.setWorldPageOpen(false)
           return
         }
-        if (st.sonifyPageOpen) {
+        if (st.sonifyPageOpen && !st.sonifyPageWindow) {
           e.preventDefault()
           st.setSonifyPageOpen(false)
           return
@@ -2442,13 +2448,33 @@ export default function App(): JSX.Element {
       {/* ── Output / Mapping page : full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && !outputPageWindow && <OutputPage canvasRef={canvasRef} />}
-      {outputPageOpen && outputPageWindow && <OutputPageWindow canvasRef={canvasRef} />}
-      {sonifyPageOpen && <SonifyPage canvasRef={canvasRef} />}
+      {sonifyPageOpen && !sonifyPageWindow && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sourceEditorOpen && <SourceEditor />}
-      {sequencePageOpen && <SequencePage canvasRef={canvasRef} />}
-      {bodyPageOpen && <BodyPage />}
+      {sequencePageOpen && !sequencePageWindow && <SequencePage canvasRef={canvasRef} />}
+      {bodyPageOpen && !bodyPageWindow && <BodyPage />}
       {resolumePageOpen && <ResolumePage />}
+      {/* ...or each in a window of its own (its button's right-click menu) */}
+      {outputPageOpen && outputPageWindow && (
+        <PageWindow page="output">
+          <OutputPage canvasRef={canvasRef} inWindow />
+        </PageWindow>
+      )}
+      {bodyPageOpen && bodyPageWindow && (
+        <PageWindow page="body">
+          <BodyPage inWindow />
+        </PageWindow>
+      )}
+      {sonifyPageOpen && sonifyPageWindow && (
+        <PageWindow page="sonify">
+          <SonifyPage canvasRef={canvasRef} inWindow />
+        </PageWindow>
+      )}
+      {sequencePageOpen && sequencePageWindow && (
+        <PageWindow page="sequence">
+          <SequencePage canvasRef={canvasRef} inWindow />
+        </PageWindow>
+      )}
       <BodyPip />
 
       {/* Crash recovery : offer to restore the last autosave after an unclean exit. */}
