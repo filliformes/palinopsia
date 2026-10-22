@@ -13,6 +13,9 @@ import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, Gestur
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
 import { fireTrigger, midiTargetLabel } from '../midi'
+import { actionInfo } from '../actions'
+import { triggerLabel, triggerOptions } from '../triggerCatalog'
+import { SearchSelect, type SearchOption } from './SearchSelect'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { MarginLabel } from './MarginLabel'
@@ -233,7 +236,7 @@ export function BodyPage(): JSX.Element {
     if (id === 'scene:prev') return 'goes to previous scene'
     if (id.startsWith('scene:')) return `recalls scene ${Number(id.slice(6)) + 1}`
     const sv = /^sonify:voice:(\d+)$/.exec(id); if (sv) return `toggles ${SONI_VOICE_NAMES[Number(sv[1])] ?? 'a voice'}`
-    return ACTION_VERB[id] ?? midiTargetLabel(id).toLowerCase()
+    return ACTION_VERB[id] ?? actionInfo(id)?.verb ?? midiTargetLabel(id).toLowerCase()
   }
   // Auto OSC token : a truncated CamelCase name from the gesture(s) + action, e.g.
   // hands up + randomize modulators → "HandsUpRndMod". Used when the OSC box is blank.
@@ -247,7 +250,7 @@ export function BodyPage(): JSX.Element {
     if (id === 'scene:prev') return 'ScnPrev'
     if (id.startsWith('scene:')) return `Scn${Number(id.slice(6)) + 1}`
     const sv = /^sonify:voice:(\d+)$/.exec(id); if (sv) return `Voice${Number(sv[1]) + 1}`
-    return ACTION_TOKEN[id] ?? camel(midiTargetLabel(id))
+    return ACTION_TOKEN[id] ?? actionInfo(id)?.token ?? camel(midiTargetLabel(id))
   }
   const autoName = (g1: BodyGesture, g2: BodyGesture | null, combo: 'together' | 'then', action: GestureAction): string =>
     `${ruleTrigger({ g1, g2, combo })} ${actionVerb(action)}`
@@ -280,41 +283,22 @@ export function BodyPage(): JSX.Element {
     const gs = { ...cfg.gestureSensitivity }; delete gs[g]; patch({ gestureSensitivity: gs })
   }
 
-  // Action vocabulary, organised into categories for the dropdowns. Every id is
-  // handled by fireTrigger (the shared MIDI/keyboard/gesture executor).
+  // What a rule fires : the whole shared trigger vocabulary (triggerCatalog.ts :
+  // the dice, the layers, the triggers of what is loaded, the effects, scenes,
+  // Worlds, Generate, Meta, modulators, Feel, tempo and sound, Sonify, the
+  // transport, the output, sessions), in the app's searchable list, "nothing"
+  // first. Rebuilt when what it lists changes (the loaded effects, the scenes,
+  // the Worlds, the knobs' names).
+  const composition = useStore((s) => s.composition)
   const scenes = useStore((s) => s.scenes)
-  const actionGroups = useMemo(() => {
-    const opt = (id: string): { id: string; label: string } => ({ id, label: midiTargetLabel(id) })
-    return [
-      { label: 'Randomize', opts: [
-        'fire:randomize', 'rand:all', 'rand:sources', 'rand:sourcefx', 'rand:layerfx', 'rand:mods', 'rand:finishing',
-        'rand:bg', 'rand:master', 'rand:meta', 'rand:inspector', 'rand:sonify', 'rand:resolume', 'fire:vary',
-        'rand:layer:0', 'rand:layer:1', 'rand:layer:2', 'rand:layer:3'
-      ].map(opt) },
-      { label: 'Transport / performance', opts: ['fire:flush', 'fire:freeze', 'fire:record', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo'].map(opt) },
-      { label: 'Master FX', opts: ['master:chain'].map(opt) },
-      { label: 'Scenes', opts: [opt('scene:next'), opt('scene:prev'), ...scenes.map((s, i) => ({ id: `scene:${i}`, label: `Scene ${i + 1}${s.name ? ' · ' + s.name : ''}` }))] },
-      { label: 'Sonify', opts: [opt('fire:sonify'), ...SONI_VOICE_NAMES.map((n, i) => ({ id: `sonify:voice:${i}`, label: `Sonify: ${n}` }))] },
-      { label: 'Session', opts: ['session:new', 'session:load', 'session:open'].map(opt) }
-    ]
-  }, [scenes])
-  const actionLabelMap = useMemo(() => {
-    const m: Record<string, string> = { none: 'nothing' }
-    for (const grp of actionGroups) for (const o of grp.opts) m[o.id] = o.label
-    return m
-  }, [actionGroups])
-  const labelForAction = (id: GestureAction): string => actionLabelMap[id] ?? (id === 'none' ? 'nothing' : midiTargetLabel(id))
-
-  const actionOptionEls = (
-    <>
-      <option value="none">nothing</option>
-      {actionGroups.map((grp) => (
-        <optgroup key={grp.label} label={grp.label}>
-          {grp.opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </optgroup>
-      ))}
-    </>
+  const worlds = useStore((s) => s.worlds)
+  const actionOptions = useMemo<SearchOption[]>(
+    () => [{ value: 'none', label: 'nothing (OSC only)', title: 'An OSC-only rule : it fires nothing in the picture, only its /body/ bang' }, ...triggerOptions(useStore.getState())],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [composition, scenes, worlds]
   )
+  // (a rule whose target is gone says so : triggerLabel)
+  const labelForAction = (id: GestureAction): string => triggerLabel(id)
   // Gestures grouped by body region, for the rule builder dropdowns.
   const GESTURE_GROUPS: Array<{ label: string; keys: BodyGesture[] }> = [
     { label: 'Hands', keys: ['pinchLeft', 'pinchRight', 'clap', 'cross'] },
@@ -561,9 +545,14 @@ export function BodyPage(): JSX.Element {
               </>
             )}
             <span className="font-mono text-[11px] text-muted">→</span>
-            <select value={rAction} onChange={(e) => setRAction(e.target.value)} className="input select-compact h-[26px] w-[172px] text-[11px]" title="What the rule fires. “nothing” makes an OSC-only rule.">
-              {actionOptionEls}
-            </select>
+            <SearchSelect
+              value={rAction}
+              options={actionOptions}
+              onChange={(v) => setRAction(v)}
+              menuWidth={300}
+              className="h-[26px] w-[200px] text-[11px]"
+              title={`What the rule fires : ${triggerLabel(rAction)}. Type to search (a layer, an effect, a World, a family…); “nothing” makes an OSC-only rule.`}
+            />
             <div className="flex items-center" title="Custom OSC name. The message sent is /body/<name>. Blank = the truncated default shown as the placeholder.">
               <span className="rounded-l border border-r-0 border-border bg-panel3/70 px-1.5 py-1 font-mono text-[10px] text-muted">/body/</span>
               <input

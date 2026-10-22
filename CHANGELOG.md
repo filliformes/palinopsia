@@ -5,6 +5,26 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **A body plays the whole instrument.** What a Body rule fires grew from the dice, the
+  transport, scenes and Sonify to some 250 (about 190 of them new), picked from the app's
+  searchable list ("nothing" first) : each layer's mute, solo, FX on/off, feedback,
+  freeze / run, next / previous / random source (the side you see, the dice's pool),
+  A↔B over the Morph time, next blend, vary and punch (opacity up and back, no undo step);
+  every trigger of the effects and sources loaded now ("L2 FX · Field Store · grab",
+  found by itself); next / previous / random master chain and finishing on/off; a random
+  scene; next / previous / random World or one by name; Generate a random theme, the next
+  in its family or one of a family; each Meta knob up / down / random / flip; each
+  modulator's retrigger and on/off; each Feel dial up / down and a reset; BPM ×2 / ÷2,
+  Ableton Link play / stop, the key (a change now, a fifth or a semitone up or down), the
+  Audio Layer's play / stop / mute; a screenshot, and the output turned, spinning,
+  flipped or reset. Every action writes through the store (undo, the morph, Flash safety),
+  leaves what is persistent alone and says so, never opens a camera, a microphone, a file
+  dialog or a network source, and a rule whose target is gone says "(gone)" and does
+  nothing. The same vocabulary (`actions.ts`, listed by `triggerCatalog.ts`) reaches MIDI :
+  the MIDI section's new **learn** list binds a pad to any of them.
+
 ## v1.3.0 — 2026-10-21
 
 ### Added (after the audit)

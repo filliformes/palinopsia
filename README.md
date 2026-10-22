@@ -1085,6 +1085,11 @@ Learnable targets:
   session **New / Load / Open**, and the dice (each layer's, the Background's, the
   master parameters', the Meta knobs', the selected Inspector unit's, the Resolume
   pins).
+- **Any action of the shared vocabulary** (the one a [Body](#body--embodied-control-key-b)
+  rule fires : the layers' mute / solo / sources / A↔B / punch..., the loaded effects'
+  triggers, Worlds, Generate, Meta, modulators, Feel, tempo, the key, the Audio Layer,
+  the output), most with no control on screen : pick it in the MIDI section's
+  **learn** list, then hit a pad.
 - **Scene chips** : a pad recalls that scene *slot* (like the `1`–`9` keys); a
   pad can also step **scene next / prev**.
 
@@ -1157,12 +1162,51 @@ open a filter, or the body's motion drive feedback, continuously.
 **one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
 when both land close **together** (`+`) or **in order** (`→`); an **exclusive** combo
 swallows its component gestures' own singles (a chord that doesn't also play its
-notes). Every action is drawn from the **shared trigger vocabulary** (identical to
-MIDI Learn and the keyboard): the Randomize scopes (everything / sources / source-FX /
-layer-FX / modulators / finishing / background / master / meta / inspector / Sonify /
-per-layer), the transport (Vary, Flush, Freeze, Record, Tap, sequencer, Sonify-seq,
-**Undo / Redo**), Master-FX on/off, scenes (next / prev / a numbered slot), Sonify
-voices, and session New / Load / Open. Leave a rule's **name** blank and it auto-labels
+notes). Every action is drawn from the **shared trigger vocabulary** (the same one
+MIDI Learn binds, see [MIDI](#midi)), picked from a searchable list (type a layer, an
+effect, a World, a family...; **nothing** first, for an OSC-only rule) :
+
+- **Randomize** : the scopes (everything / sources / source FX / layer FX / modulators /
+  finishing / background / master / Meta / inspector / Sonify / Resolume pins), Vary,
+  each layer's dice.
+- **Layer 1 to 4** : mute, solo, **FX on/off** (the layer rack's power), feedback on/off,
+  **freeze / run** (the layer's time stops while the others run; again, its speed comes
+  back), **next / previous / random source** (on the side you see : A, or B when the mix
+  leans to it; from the dice's pool, so never a source that needs you; random deals its
+  settings as the dice do), **A↔B** (a crossfade to the other source over the Morph time;
+  again mid-way, it turns back), **next blend**, the layer's **vary**, and **punch** (its
+  opacity up and back in half a second, a dip when it is already full : no undo step).
+- **Triggers (what is loaded)** : every trigger (`▸`) of every effect and source loaded
+  now, found by itself : `L2 FX · Field Store · grab`, `L1 A · Ten Print · reseed`,
+  `Master · Finalizer · dirt burst`... A trigger fires every unit of that effect in that
+  rack, as its FIRE button.
+- **Effects** : the master chain on/off, **next / previous / random chain** (the chain
+  presets), finishing on/off.
+- **Scenes** : next, previous, **random**, a numbered slot.
+- **Worlds** : next, previous, random, or one by name (over the Morph time).
+- **Generate** : a random theme, the **next theme in its family**, or a random theme of
+  one family (one entry per family). Like a pad's New, it never stops to ask : unsaved
+  work is kept as a recovery copy, and undo brings the session back.
+- **Meta** : each knob up or down a tenth, to a random place, or flipped to the far end,
+  over its own smoothing.
+- **Modulators** : each card's retrigger (its ⟳) and on/off.
+- **Feel** : each of the eight dials up or down a tenth, and a reset to neutral.
+- **Tempo and sound** : tap, **BPM ×2 / ÷2**, **Ableton Link play / stop** (with start /
+  stop sync on), the **key** (a change now the key sequencer's way, up or down a fifth, up
+  or down a semitone, over the key glide), the **Audio Layer** (play / stop, A or B play /
+  stop, mute; a live input is only muted, never opened).
+- **Sonify** : on/off and each voice. **Transport** : flush, freeze, record, the three
+  sequencers, undo / redo.
+- **Output** : a **screenshot** (into the Recorded folder, no dialog), the output
+  transform **turned 90°**, **spinning** or not, **flipped** X or Y, reset.
+- **Session** : New, Load, Open.
+
+An action leaves whatever is **persistent** alone (a pinned layer, blend, source,
+Meta knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
+its button would. Fired again and again it stays cheap : a second A↔B mid-way turns
+back, a punch restarts. No action opens a camera, a microphone or a network source. A
+rule whose target is gone (an effect no longer loaded, a scene slot past the bank, a
+deleted World) says **(gone)** and does nothing. Leave a rule's **name** blank and it auto-labels
 itself ("hands up randomizes modulators"); leave its **OSC** name blank and it defaults
 to a truncated `/body/HandsUpRndMod`. With **OSC out** on, a firing rule also sends its
 `/body/<name>` bang to the OSC-out target, so the body plays the sound side too. A

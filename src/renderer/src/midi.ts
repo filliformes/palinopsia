@@ -30,6 +30,7 @@ import { useStore } from './store'
 import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum } from './link'
 import type { SoniConfig } from './audio/sonify'
+import { actionLabel, fireAction } from './actions'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
 // Field-macro CC targets → their store setters. These "feel" dials aren't
@@ -88,7 +89,10 @@ function toggleSoniVoice(i: number): void {
 // action here makes it available to all three at once (this is how you "create a
 // new gesture action" : add a case, list its id below, and it appears in the
 // Body page's per-gesture dropdown, labelled by midiTargetLabel). scene:<i> and
-// sonify:voice:<i> are handled dynamically by index.
+// sonify:voice:<i> are handled dynamically by index. The larger vocabulary that
+// plays the layers, triggers, Worlds, Generate, Meta, modulators, Feel, tempo,
+// key, Audio Layer and output lives in ./actions.ts (ids act:...), handed over
+// below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
   'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo',
@@ -148,6 +152,8 @@ export function fireTrigger(id: string): void {
   } else if (id.startsWith('sonify:voice:')) {
     const i = Number(id.slice(13))
     if (Number.isFinite(i)) toggleSoniVoice(i)
+  } else if (id.startsWith('act:')) {
+    fireAction(id)
   }
 }
 
@@ -298,7 +304,7 @@ export function midiTargetLabel(id: string): string {
     case 'fire:redo':
       return 'REDO'
     default:
-      return id
+      return id.startsWith('act:') ? actionLabel(id) : id
   }
 }
 

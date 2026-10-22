@@ -274,6 +274,9 @@ const DERIVED_COLORS: Record<string, (out: Record<string, number | number[]>, sk
 // the pickers, OSC and their Generate themes.
 const HEAVY_GENERATORS = new Set(['oil-cloud', 'cloud-study'])
 const RANDOM_GENERATORS = GENERATORS.filter((g) => (!g.native || g.dice) && !HEAVY_GENERATORS.has(g.id))
+/** The sources the dice deal from : a body rule's source steps walk the same
+ *  pool (actions.ts), so a gesture never lands on a source that needs you. */
+export const DICE_SOURCES = RANDOM_GENERATORS
 const BG_DICE_SOURCES = BG_SOURCES.filter((g) => !HEAVY_GENERATORS.has(g.id))
 function randomSlot(): SourceSlot {
   const gen = pick(RANDOM_GENERATORS)
