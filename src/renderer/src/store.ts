@@ -50,7 +50,7 @@ import { modTargetKey } from './modKey'
 import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
-import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
+import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
@@ -1673,6 +1673,10 @@ interface StoreState {
   // The full-page Body view (B). Transient.
   bodyPageOpen: boolean
   setBodyPageOpen: (on: boolean) => void
+  // ...in its own window (PageWindow.tsx), asked for from the Body button's
+  // right-click menu. Only while it is open, as the Output page's.
+  bodyPageWindow: boolean
+  setBodyPageWindow: (on: boolean) => void
   // Resolume OSC mapper : Palinopsia signals (rows) × Resolume addresses
   // (columns). Travels with the session; also kept in localStorage so it
   // survives a restart before the session is saved. Every edit is refused while
@@ -1815,7 +1819,7 @@ interface StoreState {
   // The full-page Output / Mapping view is showing. Transient.
   outputPageOpen: boolean
   setOutputPageOpen: (on: boolean) => void
-  // ...in its own window rather than over the instrument (OutputPageWindow.tsx),
+  // ...in its own window rather than over the instrument (PageWindow.tsx),
   // asked for from the Output button's right-click menu. Only while it is open :
   // the page always opens in the app otherwise.
   outputPageWindow: boolean
@@ -1849,6 +1853,10 @@ interface StoreState {
   // every write : one write path, same as everything else.
   sonifyPageOpen: boolean
   setSonifyPageOpen: (on: boolean) => void
+  // ...in its own window (PageWindow.tsx), asked for from the Sonify button's
+  // right-click menu. Only while it is open, as the Output page's.
+  sonifyPageWindow: boolean
+  setSonifyPageWindow: (on: boolean) => void
   // The Source Editor (Alt+E) : a full-page takeover. Transient.
   sourceEditorOpen: boolean
   setSourceEditorOpen: (on: boolean) => void
@@ -2052,6 +2060,10 @@ interface StoreState {
   sequenceTo: (id: string, variation: number, crossfadeMs: number) => void
   sequencePageOpen: boolean
   setSequencePageOpen: (on: boolean) => void
+  // ...in its own window (PageWindow.tsx), asked for from the Seq button's
+  // right-click menu. Only while it is open, as the Output page's.
+  sequencePageWindow: boolean
+  setSequencePageWindow: (on: boolean) => void
 
   // Session round-tripping
   newSession: () => void
@@ -4210,7 +4222,14 @@ export const useStore = create<StoreState>((set, get) => ({
       return { bodyControl } // pushed to the tracker by an App effect watching it
     }),
   bodyPageOpen: false,
-  setBodyPageOpen: (on) => set({ bodyPageOpen: on }),
+  setBodyPageOpen: (on) => {
+    // Already open in its window : bring that window up instead.
+    if (on && get().bodyPageOpen && get().bodyPageWindow) void window.api.pageWindowFocus(BODY_PAGE_FRAME).catch(() => {})
+    // closed (in the app or its window) : the next time, it opens in the app
+    set(on ? { bodyPageOpen: true } : { bodyPageOpen: false, bodyPageWindow: false })
+  },
+  bodyPageWindow: false,
+  setBodyPageWindow: (on) => set({ bodyPageWindow: on }),
   resolume: loadResolume(),
   dataflou: loadDataflou(),
   setDataflou: (patch) =>
@@ -4438,7 +4457,7 @@ export const useStore = create<StoreState>((set, get) => ({
   outputPageOpen: false,
   setOutputPageOpen: (on) => {
     // Already open in its window : bring that window up instead.
-    if (on && get().outputPageOpen && get().outputPageWindow) void window.api.outputPageFocus().catch(() => {})
+    if (on && get().outputPageOpen && get().outputPageWindow) void window.api.pageWindowFocus(OUTPUT_PAGE_FRAME).catch(() => {})
     // closed (in the app or its window) : the next time, it opens in the app
     set(on ? { outputPageOpen: true } : { outputPageOpen: false, outputPageWindow: false })
   },
@@ -4509,7 +4528,14 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   strobeSafeDomeBack: null,
   sonifyPageOpen: false,
-  setSonifyPageOpen: (on) => set({ sonifyPageOpen: on }),
+  setSonifyPageOpen: (on) => {
+    // Already open in its window : bring that window up instead.
+    if (on && get().sonifyPageOpen && get().sonifyPageWindow) void window.api.pageWindowFocus(SONIFY_PAGE_FRAME).catch(() => {})
+    // closed (in the app or its window) : the next time, it opens in the app
+    set(on ? { sonifyPageOpen: true } : { sonifyPageOpen: false, sonifyPageWindow: false })
+  },
+  sonifyPageWindow: false,
+  setSonifyPageWindow: (on) => set({ sonifyPageWindow: on }),
   sourceEditorOpen: false,
   setSourceEditorOpen: (on) => set({ sourceEditorOpen: on }),
   userShaders: [],
@@ -5343,7 +5369,14 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
   sequencePageOpen: false,
-  setSequencePageOpen: (on) => set({ sequencePageOpen: on }),
+  setSequencePageOpen: (on) => {
+    // Already open in its window : bring that window up instead.
+    if (on && get().sequencePageOpen && get().sequencePageWindow) void window.api.pageWindowFocus(SEQUENCE_PAGE_FRAME).catch(() => {})
+    // closed (in the app or its window) : the next time, it opens in the app
+    set(on ? { sequencePageOpen: true } : { sequencePageOpen: false, sequencePageWindow: false })
+  },
+  sequencePageWindow: false,
+  setSequencePageWindow: (on) => set({ sequencePageWindow: on }),
 
   newSession: () => {
     // A blank slate. Goes through the normal composition write path, so it

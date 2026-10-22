@@ -135,7 +135,7 @@ function WorldEditor(): JSX.Element {
       if (e.ctrlKey || e.metaKey || e.altKey) return
       // A page drawn over this one has the keys : Enter here would apply a World out of sight.
       const st = useStore.getState()
-      if (st.sourceEditorOpen || st.sequencePageOpen || st.bodyPageOpen || st.resolumePageOpen) return
+      if (st.sourceEditorOpen || (st.sequencePageOpen && !st.sequencePageWindow) || (st.bodyPageOpen && !st.bodyPageWindow) || st.resolumePageOpen) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault(); e.stopPropagation()
         keysRef.current.step(1)

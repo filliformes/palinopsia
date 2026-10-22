@@ -34,7 +34,7 @@ export function OutputPage({
   inWindow = false
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
-  /** Drawn in its own window (OutputPageWindow.tsx), not over the instrument. */
+  /** Drawn in its own window (PageWindow.tsx), not over the instrument. */
   inWindow?: boolean
 }): JSX.Element {
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)

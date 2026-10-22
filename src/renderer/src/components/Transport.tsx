@@ -95,13 +95,21 @@ export function Transport(): JSX.Element {
   const seqRunning = useStore((s) => s.sequence.running)
   const sonifyOn = useStore((s) => s.sonify.on)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
+  const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
   const outputOn = useStore((s) => s.outputActive)
   // Right-click on Output : open it in a window beside the controls (the picture
   // the projector gets, the domemaster on the dome) to tweak while watching it.
   // A fullscreen or spanned output stays on its projector (main refuses, says why).
-  const [outMenu, setOutMenu] = useState<{ x: number; y: number } | null>(null)
+  // On Output, Body, Seq and Sonify : the page in the app, or in a window of its
+  // own. The menu opens against the button, wherever on it the click was.
+  type MenuPage = 'output' | 'body' | 'sequence' | 'sonify'
+  const [pageMenu, setPageMenu] = useState<{ page: MenuPage; x: number; y: number; anchor: HTMLElement } | null>(null)
+  const openPageMenu = (page: MenuPage) => (e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault()
+    setPageMenu({ page, x: e.clientX, y: e.clientY, anchor: e.currentTarget })
+  }
   const openWindowedOutput = async (): Promise<void> => {
     try {
       const r = await window.api.outputOpen(-1, true) // -1 : the screen the controls are on
@@ -127,6 +135,40 @@ export function Transport(): JSX.Element {
         const st = useStore.getState()
         st.setOutputPageWindow(true)
         st.setOutputPageOpen(true)
+      }
+    }
+  ]
+  // (already in its window : "Body…" brings that window up, as O and B do)
+  const bodyItems: MenuItem[] = [
+    { label: 'Body…', onClick: () => useStore.getState().setBodyPageOpen(true) },
+    {
+      label: 'Body in a window',
+      onClick: () => {
+        const st = useStore.getState()
+        st.setBodyPageWindow(true)
+        st.setBodyPageOpen(true)
+      }
+    }
+  ]
+  const seqItems: MenuItem[] = [
+    { label: 'Sequencer…', onClick: () => useStore.getState().setSequencePageOpen(true) },
+    {
+      label: 'Sequencer in a window',
+      onClick: () => {
+        const st = useStore.getState()
+        st.setSequencePageWindow(true)
+        st.setSequencePageOpen(true)
+      }
+    }
+  ]
+  const sonifyItems: MenuItem[] = [
+    { label: 'Sonify…', onClick: () => useStore.getState().setSonifyPageOpen(true) },
+    {
+      label: 'Sonify in a window',
+      onClick: () => {
+        const st = useStore.getState()
+        st.setSonifyPageWindow(true)
+        st.setSonifyPageOpen(true)
       }
     }
   ]
@@ -373,22 +415,28 @@ export function Transport(): JSX.Element {
         {/* Output : fullscreen / mapping / record / senders (also O). */}
         <button
           onClick={() => setOutputPageOpen(true)}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setOutMenu({ x: e.clientX, y: e.clientY })
-          }}
+          onContextMenu={openPageMenu('output')}
           className={`${TBTN} ${outputOn ? TBTN_LIT : TBTN_IDLE}`}
-          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on. Right-click : open it in a window, to tweak while watching it"
+          title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on. Right-click : watch the Output in a window, or open this page in a window"
         >
           {outputOn ? '◉ Output' : '⛶ Output'}
         </button>
-        {outMenu && <ContextMenu x={outMenu.x} y={outMenu.y} items={outItems} onClose={() => setOutMenu(null)} />}
+        {pageMenu && (
+          <ContextMenu
+            x={pageMenu.x}
+            y={pageMenu.y}
+            anchor={pageMenu.anchor}
+            items={{ output: outItems, body: bodyItems, sequence: seqItems, sonify: sonifyItems }[pageMenu.page]}
+            onClose={() => setPageMenu(null)}
+          />
+        )}
         {/* Body : embodied control (MediaPipe Hands + Pose + Face). Lights while
             the camera is live (a privacy tell) (also B). */}
         <button
           onClick={() => setBodyPageOpen(true)}
+          onContextMenu={openPageMenu('body')}
           className={`${TBTN} ${bodyOn ? TBTN_LIT : TBTN_IDLE}`}
-          title="Open Body, embodied control : camera gestures drive actions and OSC (B). Lights while the camera is live."
+          title="Open Body, embodied control : camera gestures drive actions and OSC (B). Lights while the camera is live. Right-click : open it in a window"
         >
           {bodyOn ? '◉ Body' : 'Body'}
         </button>
@@ -396,8 +444,9 @@ export function Transport(): JSX.Element {
           <MidiLearnOverlay id="fire:seq" />
           <button
             onClick={() => setSequencePageOpen(true)}
+            onContextMenu={openPageMenu('sequence')}
             className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE}`}
-            title="Open the Sequence / macro-form auto-pilot (Q)"
+            title="Open the Sequence / macro-form auto-pilot (Q). Right-click : open it in a window"
           >
             {seqRunning ? '▶ Seq' : 'Seq'}
           </button>
@@ -405,9 +454,11 @@ export function Transport(): JSX.Element {
         <span className="relative flex shrink-0">
           <MidiLearnOverlay id="fire:sonify" />
           <button
-            onClick={() => setSonifyPageOpen(!sonifyPageOpen)}
+            // (in its own window : brings that window up, as S does)
+            onClick={() => setSonifyPageOpen(sonifyPageWindow || !sonifyPageOpen)}
+            onContextMenu={openPageMenu('sonify')}
             className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
-            title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running"
+            title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running. Right-click : open it in a window"
           >
             {sonifyOn ? '◉ Sonify' : 'Sonify'}
           </button>

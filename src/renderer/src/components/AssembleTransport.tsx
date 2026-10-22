@@ -114,7 +114,9 @@ export function AssembleTransport({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    // the film transport's frame (a rule above, its inner margin) : it ran from
+    // edge to edge of the Inspector, the labels and the timeline on its border
+    <div className="flex min-w-0 flex-col gap-1.5 border-t border-border px-2 py-2">
       {/* The edit : the bank's, or this slot's own (a new or a varied cut). */}
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="w-10 shrink-0 font-mono text-[9px] uppercase text-muted">edit</span>

@@ -11,9 +11,9 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     rows: [
       ['O', 'Output / mapping (in its own window : brings it up)'],
       ['W', 'World editor'],
-      ['Q', 'Sequence (macro-form)'],
-      ['S', 'Sonify (image → sound)'],
-      ['B', 'Body (embodied control)'],
+      ['Q', 'Sequence (macro-form; in its own window : brings it up)'],
+      ['S', 'Sonify (image → sound; in its own window : brings it up)'],
+      ['B', 'Body (embodied control; in its own window : brings it up)'],
       ['K', 'Resolume OSC mapper'],
       [SOURCE_EDITOR_KEY, 'Source Editor : write a shader, or a copy of any one, as your own (again : close it)']
     ]
@@ -100,7 +100,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Right-click an M', 'Clear all the modulation on that control'],
       ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],
       ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
-      ['Right-click Output', 'Watch the Output in a window · the Output page in a window']
+      ['Right-click Output', 'Watch the Output in a window · the Output page in a window'],
+      ['Right-click Body, Seq or Sonify', 'The page in a window of its own']
     ]
   },
   {

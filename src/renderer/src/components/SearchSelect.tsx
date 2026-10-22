@@ -16,6 +16,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { effectiveZoom } from './uiZoom'
+import { ownerWindow } from './ownerWindow'
 
 export interface SearchOption {
   value: string
@@ -121,28 +122,30 @@ export function SearchSelect({
   useEffect(() => setCursor(0), [query])
 
   // Anchor in VIEWPORT space : the racks live inside scrollable, clipping
-  // columns where an absolutely-positioned menu gets cut off.
+  // columns where an absolutely-positioned menu gets cut off. The viewport of
+  // the window the button is in (a page can have a window of its own : Body).
   useLayoutEffect(() => {
     if (!open) return
+    const view = ownerWindow(btnRef.current)
     const place = (): void => {
       const btn = btnRef.current
       const b = btn?.getBoundingClientRect()
       if (!btn || !b) return
       // Viewport pixels → the zoomed chrome's own pixels (see uiZoom.ts).
       const z = effectiveZoom(btn)
-      const room = window.innerHeight - b.bottom
+      const room = view.innerHeight - b.bottom
       setRect({
-        left: Math.max(4, Math.min(b.left, window.innerWidth - menuWidth * z - 4)) / z,
+        left: Math.max(4, Math.min(b.left, view.innerWidth - menuWidth * z - 4)) / z,
         top: (room > 260 * z ? b.bottom + 2 : b.top - 2) / z,
         below: room > 260 * z
       })
     }
     place()
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
+    view.addEventListener('scroll', place, true)
+    view.addEventListener('resize', place)
     return () => {
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
+      view.removeEventListener('scroll', place, true)
+      view.removeEventListener('resize', place)
     }
     // uiZoom : zooming the UI moves the button without any resize or scroll
     // event, so re-anchor on it too.
@@ -150,12 +153,13 @@ export function SearchSelect({
 
   useEffect(() => {
     if (!open) return
+    const view = ownerWindow(btnRef.current) // (its own window's clicks)
     const down = (e: globalThis.MouseEvent): void => {
       const t = e.target as Node
       if (!popRef.current?.contains(t) && !btnRef.current?.contains(t)) setOpen(false)
     }
-    window.addEventListener('mousedown', down)
-    return () => window.removeEventListener('mousedown', down)
+    view.addEventListener('mousedown', down)
+    return () => view.removeEventListener('mousedown', down)
   }, [open])
 
   // Keep the highlighted row visible while arrowing through a long list.
@@ -197,7 +201,7 @@ export function SearchSelect({
           ref={popRef}
           style={{
             left: rect.left,
-            ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight / effectiveZoom(btnRef.current) - rect.top }),
+            ...(rect.below ? { top: rect.top } : { bottom: ownerWindow(btnRef.current).innerHeight / effectiveZoom(btnRef.current) - rect.top }),
             width: menuWidth
           }}
           className="fixed z-50 flex max-h-[17rem] flex-col overflow-hidden rounded border border-border bg-panel2 shadow-lg"

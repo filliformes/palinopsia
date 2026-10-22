@@ -19,6 +19,7 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { MarginLabel } from './MarginLabel'
+import { ownerWindow } from './ownerWindow'
 
 // Standard MediaPipe hand connections (21 landmarks).
 const HAND_CONN: Array<[number, number]> = [
@@ -103,10 +104,17 @@ function Toggle({ on, label, onClick, title }: { on: boolean; label: string; onC
   )
 }
 
-export function BodyPage(): JSX.Element {
+export function BodyPage({
+  inWindow = false
+}: {
+  /** Drawn in its own window (PageWindow.tsx), not over the instrument. */
+  inWindow?: boolean
+} = {}): JSX.Element {
   const cfg = useStore((s) => s.bodyControl)
   const setCfg = useStore((s) => s.setBodyControl)
   const setOpen = useStore((s) => s.setBodyPageOpen)
+  const setInWindow = useStore((s) => s.setBodyPageWindow)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
   const [vals, setVals] = useState<Record<string, number>>({})
@@ -136,9 +144,11 @@ export function BodyPage(): JSX.Element {
   // Preview + monitor loop : draw the mirrored camera with the skeleton on it,
   // and snapshot the bus features for the meters. Runs while the page is open.
   useEffect(() => {
+    // on the frames of the window the page is in (it may have its own)
+    const view = ownerWindow(rootRef.current)
     let raf = 0
     const draw = (): void => {
-      raf = requestAnimationFrame(draw)
+      raf = view.requestAnimationFrame(draw)
       const canvas = canvasRef.current
       if (!canvas) return
       const g = canvas.getContext('2d')
@@ -196,7 +206,7 @@ export function BodyPage(): JSX.Element {
         }
       }
     }
-    raf = requestAnimationFrame(draw)
+    raf = view.requestAnimationFrame(draw)
     const monitor = window.setInterval(() => {
       const all = bodyBus.all()
       setVals({ ...all })
@@ -207,7 +217,7 @@ export function BodyPage(): JSX.Element {
       const lr = bodyBus.lastRule()
       setCurRule(lr ? { id: lr.id, fresh: lr.ageMs < 700 } : null)
     }, 90)
-    return () => { cancelAnimationFrame(raf); window.clearInterval(monitor) }
+    return () => { view.cancelAnimationFrame(raf); window.clearInterval(monitor) }
   }, [])
 
   // Route a feature into the first free modulator slot (quick-bind : then the
@@ -333,7 +343,7 @@ export function BodyPage(): JSX.Element {
   const SEC = 'rgb(var(--c-accent2))'
   const SEC_TINT = 'rgb(var(--c-accent2) / 0.06)'
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg">
+    <div ref={rootRef} className="fixed inset-0 z-40 flex flex-col bg-bg">
       {/* Header : the page, the tracking state, the last gesture recognized, the camera */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-3 py-2">
         <span className="text-[13px] font-semibold">Body</span>
@@ -364,8 +374,14 @@ export function BodyPage(): JSX.Element {
           </select>
         </label>
         <div className="flex-1" />
-        <span className="font-mono text-[9px] text-muted">B / Esc closes</span>
-        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (Esc)">✕</button>
+        {/* In its own window (from the Body button's right-click menu) : back in
+            over the instrument, or closed (B brings the window up). */}
+        {inWindow ? (
+          <button onClick={() => setInWindow(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Back into the app : Body over the instrument again">⇲</button>
+        ) : (
+          <span className="font-mono text-[9px] text-muted">B / Esc closes</span>
+        )}
+        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title={inWindow ? 'Close this window' : 'Close (Esc)'}>✕</button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">

@@ -1023,10 +1023,12 @@ function SourceRow({
             effects under them, led by the chain's on/off) */}
         <div className={card ? 'flex min-w-0 items-center gap-1' : 'contents'}>
         {/* A real button (it selects this source : its controls go to the
-            Inspector); the click bubbles to the row's onSelect. */}
+            Inspector); the click bubbles to the row's onSelect. !px-0 : the
+            toolbar look's px-2.5 comes later in the stylesheet and beat a plain
+            px-0, so the letter overflowed its 2 px of room and sat off center. */}
         <button
           type="button"
-          className={`${TBTN} ${card ? 'w-[24px]' : 'w-[34px]'} shrink-0 px-0 text-center ${selected ? TBTN_LIT : active ? TBTN_IDLE_ON : TBTN_IDLE}`}
+          className={`${TBTN} ${card ? 'w-[24px]' : 'w-[34px]'} shrink-0 !px-0 text-center ${selected ? TBTN_LIT : active ? TBTN_IDLE_ON : TBTN_IDLE}`}
           title={`Source ${label} : show its controls in the Inspector`}
         >
           {label}

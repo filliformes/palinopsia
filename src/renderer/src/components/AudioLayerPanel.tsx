@@ -323,7 +323,7 @@ function SlotRow({ slot }: { slot: AudioSlotName }): JSX.Element {
     >
       <button
         type="button"
-        className={`${TBTN} w-[34px] px-0 text-center ${selected ? TBTN_LIT : s ? TBTN_IDLE_ON : TBTN_IDLE}`}
+        className={`${TBTN} w-[34px] !px-0 text-center ${selected ? TBTN_LIT : s ? TBTN_IDLE_ON : TBTN_IDLE}`}
         title={`Slot ${slot} : show its controls in the Inspector`}
       >
         {slot}

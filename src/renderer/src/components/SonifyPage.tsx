@@ -10,6 +10,7 @@ import { isValidElement, useEffect, useRef, useState, useSyncExternalStore, type
 import { Blink } from './Blink'
 import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
+import { ownerWindow } from './ownerWindow'
 import { collageFilmed, randomSonify, randomizeVoice, suggestSonify, type SoniVoiceKey } from '../audio/autoSonify'
 import { defaultSoniConfig, ringFreqs, SCALE_LABEL, SCALE_ORDER, SCALE_SHORT, sonifyEngine, type SoniConfig } from '../audio/sonify'
 import { deleteSoniPreset, listSoniPresets, loadSoniPreset, saveSoniPreset } from '../audio/soniPresets'
@@ -571,8 +572,16 @@ function SonifySequencer({ presets, onWidth }: { presets: string[]; onWidth: (dx
 const subLineArm = (fn: () => void): (() => void) => sonifyEngine.onLineArm(fn)
 const lineArmedNow = (): boolean => sonifyEngine.lineInArmed()
 
-export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
+export function SonifyPage({
+  canvasRef,
+  inWindow = false
+}: {
+  canvasRef: RefObject<HTMLCanvasElement | null>
+  /** Drawn in its own window (PageWindow.tsx), not over the instrument. */
+  inWindow?: boolean
+}): JSX.Element {
   const setOpen = useStore((s) => s.setSonifyPageOpen)
+  const setInWindow = useStore((s) => s.setSonifyPageWindow)
   const cfg = useStore((s) => s.sonify)
   const setSonify = useStore((s) => s.setSonify)
   const bpm = useStore((s) => s.composition.bpm)
@@ -661,11 +670,14 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   const [presetName, setPresetName] = useState('')
   // While the Sonify page is open, M toggles ITS Voices↔Mixer view. Capture phase
   // + stopPropagation so it beats (and suppresses) App's window M handler, which
-  // would otherwise toggle the right-panel mixer underneath.
+  // would otherwise toggle the right-panel mixer underneath. On the page's own
+  // window : in a window of its own, M there is its view (never handed on to the
+  // instrument), and M over the instrument is the instrument's.
   useEffect(() => {
+    const view = ownerWindow(mirrorRef.current)
     const onKey = (e: KeyboardEvent): void => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'm') return
-      if (document.querySelector('[data-soni-modal]')) return // the EQ editor has the keys
+      if (view.document.querySelector('[data-soni-modal]')) return // the EQ editor has the keys
       const el = e.target as HTMLElement | null
       if (
         el &&
@@ -676,8 +688,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       e.stopPropagation()
       setView((v) => (v === 'mixer' ? 'voices' : 'mixer'))
     }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    view.addEventListener('keydown', onKey, true)
+    return () => view.removeEventListener('keydown', onKey, true)
   }, [])
   const diceWhole = (): void => setSonify({ ...randomSonify(cfg), on: cfg.on, sinkId: cfg.sinkId })
   // The output EQ stays : it tunes the room, not the sound.
@@ -743,7 +755,7 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       const w = bw / bh > a ? bh * a : bw
       setPic((p) => (Math.abs(p.w - w) < 0.5 && Math.abs(p.h - w / a) < 0.5 ? p : { w, h: w / a }))
     }
-    const ro = new ResizeObserver(fit)
+    const ro = new (ownerWindow(box).ResizeObserver)(fit) // (its own window's, which sees it resize)
     ro.observe(box)
     video.addEventListener('resize', fit)
     video.addEventListener('loadedmetadata', fit)
@@ -760,6 +772,9 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
   // the worklet says they are (its ~10 Hz report, run on at their REAL rate :
   // sync and modulation included); a local clock stands in before the first.
   useEffect(() => {
+    // on the frames of the window it is in (the page may have its own); timed by
+    // the instrument's clock, the one the engine stamps its reports with
+    const view = ownerWindow(mirrorRef.current)
     let raf = 0
     let sweepPhase = useStore.getState().sonify.spectra.x
     let fSweep = useStore.getState().sonify.filter.x
@@ -767,12 +782,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
     let last = performance.now()
     const wrap = (v: number): number => ((v % 1) + 1) % 1
     const paint = (): void => {
-      raf = requestAnimationFrame(paint)
+      raf = view.requestAnimationFrame(paint)
       const now = performance.now()
       const dt = (now - last) / 1000
       last = now
       // (resting while another page covers this one : it kept drawing unseen)
-      if (sonifyCovered()) return
+      if (sonifyCovered(mirrorRef.current)) return
       const c = overlayRef.current
       const st = useStore.getState().sonify
       const lp = sonifyEngine.isRunning() ? sonifyEngine.liveProbes : ({} as Record<string, number>)
@@ -893,8 +908,8 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       // 10 Hz flicker. Orange while the limiter works.
       if (meterRef.current) meterStep(meterRef.current, now)
     }
-    raf = requestAnimationFrame(paint)
-    return () => cancelAnimationFrame(raf)
+    raf = view.requestAnimationFrame(paint)
+    return () => view.cancelAnimationFrame(raf)
   }, [])
 
   // Probe dragging on the mirror : scan line / orbit centre / orbit radius.
@@ -1102,7 +1117,12 @@ export function SonifyPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         />
         <div className="flex-1" />
         {/* (the "S / Esc closes" hint lives in the button's tooltip : the bar holds one row at 100 % down to a 1,400 px window) */}
-        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Close (S or Esc)">✕</button>
+        {/* In its own window (from the Sonify button's right-click menu) : back
+            in over the instrument, or closed (S brings the window up). */}
+        {inWindow && (
+          <button onClick={() => setInWindow(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title="Back into the app : Sonify over the instrument again">⇲</button>
+        )}
+        <button onClick={() => setOpen(false)} className="rounded px-2 py-0.5 text-[12px] text-muted hover:text-text" title={inWindow ? 'Close this window' : 'Close (S or Esc)'}>✕</button>
       </div>
 
       <div className="flex min-h-0 flex-1">

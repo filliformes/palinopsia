@@ -21,7 +21,7 @@ import { dirname, join } from 'path'
 import { pathToFileURL } from 'url'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import type { Session, LightConfig } from '@shared/types'
-import { OUTPUT_PAGE_FRAME } from '@shared/types'
+import { PAGE_WINDOW_TITLES } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
@@ -509,7 +509,7 @@ function createWindow(): void {
   // Closing the control window closes the projector output with it.
   mainWindow.on('closed', () => {
     outputWindow?.close()
-    if (outputPageWindow && !outputPageWindow.isDestroyed()) outputPageWindow.close()
+    closePageWindows()
     mainWindow = null
     // A quit asked for while the window was open (Cmd+Q, the Dock) goes on once
     // the window has closed through its Save prompt (see before-quit).
@@ -517,14 +517,15 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    // The Output page in its own window : a blank page of the control window's
-    // own, which its renderer draws the page into (OutputPageWindow.tsx). The
-    // only window a page may open.
-    if (details.frameName === OUTPUT_PAGE_FRAME && (details.url === 'about:blank' || details.url === '')) {
+    // The Output, Body, Sonify or Sequence page in its own window : a blank page of the
+    // control window's own, which its renderer draws the page into
+    // (PageWindow.tsx). The only windows a page may open.
+    const pageTitle = Object.hasOwn(PAGE_WINDOW_TITLES, details.frameName) ? PAGE_WINDOW_TITLES[details.frameName] : null
+    if (pageTitle && (details.url === 'about:blank' || details.url === '')) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          title: 'Palinopsia · Output',
+          title: pageTitle,
           minWidth: 640,
           minHeight: 420,
           backgroundColor: '#0d0d0f',
@@ -537,8 +538,9 @@ function createWindow(): void {
     return { action: 'deny' }
   })
   mainWindow.webContents.on('did-create-window', (child, details) => {
-    if (details.frameName !== OUTPUT_PAGE_FRAME) return
-    outputPageWindow = child
+    const frame = details.frameName
+    if (!Object.hasOwn(PAGE_WINDOW_TITLES, frame)) return
+    pageWindows.set(frame, child)
     child.setMenuBarVisibility(false)
     // Its place is remembered (the page asks for it) : if that screen is gone,
     // bring it onto the one the controls are on.
@@ -569,14 +571,14 @@ function createWindow(): void {
       })
     }
     child.on('closed', () => {
-      if (outputPageWindow === child) outputPageWindow = null
+      if (pageWindows.get(frame) === child) pageWindows.delete(frame)
     })
   })
-  // A reload of the control window takes the page's drawing with it : close
-  // its window rather than leave it empty (the page reopens it on demand).
+  // A reload of the control window takes the pages' drawing with it : close
+  // their windows rather than leave them empty (a page reopens it on demand).
   mainWindow.webContents.on('did-start-navigation', (d) => {
     if (!d.isMainFrame || d.isSameDocument) return
-    if (outputPageWindow && !outputPageWindow.isDestroyed()) outputPageWindow.close()
+    closePageWindows()
   })
 
   guardNavigation(mainWindow)
@@ -596,8 +598,12 @@ function createWindow(): void {
 //   windowed   → a normal 16:9 window (easy to Window-Capture in OBS)
 let outputWindow: BrowserWindow | null = null
 let outputKind: 'full' | 'windowed' | 'span' | null = null
-// The Output page in its own window (see the control window's open handler).
-let outputPageWindow: BrowserWindow | null = null
+// The pages in their own windows (Output, Body, Sonify, Sequence), by window.open name
+// (see the control window's open handler).
+const pageWindows = new Map<string, BrowserWindow>()
+function closePageWindows(): void {
+  for (const w of pageWindows.values()) if (!w.isDestroyed()) w.close()
+}
 
 /** What Esc does in the output window, decided when it is pressed :
  *  · 'hold'   : an installation, where Esc must be HELD (the renderer times it).
@@ -1073,11 +1079,11 @@ app.whenReady().then(async () => {
     outputWindow?.close()
     return true
   })
-  // Bring the Output page's window to the front (O, or the Output page… menu,
-  // while the page is in its own window). A page's own focus() cannot raise a
-  // window on Windows.
-  safeHandle('outputPage:focus', () => {
-    const w = outputPageWindow
+  // Bring a page's own window to the front (O, B, S or Q, or its button, while the
+  // page is in its own window). A page's own focus() cannot raise a window on
+  // Windows.
+  safeHandle('pageWindow:focus', (_e, frame) => {
+    const w = typeof frame === 'string' ? pageWindows.get(frame) : undefined
     if (!w || w.isDestroyed()) return false
     if (w.isMinimized()) w.restore()
     w.show()
