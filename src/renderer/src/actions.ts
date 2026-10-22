@@ -308,6 +308,10 @@ function applyChain(k: number): void {
   get().applyMasterPreset(p.fx, p.vibe, p.context) // (through the pins' gate)
   lastChain = k
 }
+/** The chain an action applied last (the Master FX strip's menu names it). */
+export function lastActionChain(): string | null {
+  return MASTER_PRESETS[lastChain]?.name ?? null
+}
 
 // Generate replaces the session : as a learned MIDI pad's New, it never stops
 // the show to ask, it keeps a recovery copy of unsaved work instead (and undo

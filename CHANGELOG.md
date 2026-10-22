@@ -5,6 +5,13 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Fixed
+
+- **The Master FX chain menu names the chain that plays** (`MasterRackStrip` derives it
+  from the loaded effects : the chain picked by hand or by an action while it is still
+  loaded, else any chain with the same effects, else the placeholder), so a chain changed
+  by a rule, a MIDI pad, a scene, a Generate or the dice no longer leaves a stale name.
+
 ### Added
 
 - **Every source and effect has at least ten presets** (`shaders/isf/presets.ts`) :

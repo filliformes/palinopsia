@@ -106,6 +106,7 @@ import { initMidi, fireTrigger, midi } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
+import { lastActionChain } from './actions'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
 
 // ── Vibe Palette (P / Shift+P) & Context (C / Shift+C) shortcuts ───────
@@ -2605,8 +2606,21 @@ function MasterRackStrip(): JSX.Element {
   const applyMasterPreset = useStore((s) => s.applyMasterPreset)
   const randomizeMasterParams = useStore((s) => s.randomizeMasterParams)
   const toggleMasterChain = useStore((s) => s.toggleMasterChain)
-  // The select keeps showing the applied chain's name.
-  const [applied, setApplied] = useState('')
+  // The menu names the chain that plays : the one picked here or by an action
+  // while it is still loaded, else a chain with the same effects (a scene, a
+  // Generate, the dice), else nothing.
+  const [picked, setApplied] = useState('')
+  const chainIds = master.filter((f) => !f.locked).map((f) => f.shaderId).join('|')
+  const plays = (name: string | null): boolean =>
+    !!name && MASTER_PRESETS.find((p) => p.name === name)?.fx.map((f) => f.shaderId).join('|') === chainIds
+  const byAction = lastActionChain()
+  const applied = plays(picked)
+    ? picked
+    : plays(byAction)
+      ? byAction!
+      : chainIds
+        ? (MASTER_PRESETS.find((p) => p.fx.map((f) => f.shaderId).join('|') === chainIds)?.name ?? '')
+        : ''
   const [flashing, flash] = useFlash()
   // Regular (user-added) FX wrap on the left; the three pinned finalizers
   // (Vibe / Context / Finalizer) stay clustered at the rightmost : clicking one
