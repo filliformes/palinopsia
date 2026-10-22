@@ -1,113 +1,177 @@
-// Monocular depth estimator (the return to real Z). Lazy-loads transformers.js
-// (Hugging Face, WebGPU) from a CDN on first use — so there is NO build-time
-// dependency and nothing ships in the installer; the library + the small
-// Depth-Anything model download once, when the user first switches Depth to "AI",
-// and are cached by the browser. Inference runs at low res, ASYNC and throttled,
-// fully decoupled from the 60 Hz render loop : the loop just polls `take()` for the
-// latest depth map and the compositor temporally smooths it. Online-only feature.
+// Monocular depth estimator (the return to real Z) : Depth Anything V2 Small
+// through Transformers.js, both SHIPPED with the app (resources/depth, fetched
+// at build time by `npm run fetch:depth`) and loaded over opsia-asset://depth/,
+// so it works offline and in a kiosk and nothing is ever fetched from the
+// network (workers/depthWorker.ts refuses to start if a network path is left).
 //
-// NOTE: the model path is UNVERIFIED on-GPU (WebGPU availability + speed on the
-// Aero). The synthetic-depth mode (Compositor.setSyntheticDepth) exercises the
-// whole downstream path — Parallax FX, binding, EMA — without any of this.
+// The model runs on a thread of its own (the worker), fed a small frame of the
+// picture at the inference size (`res` on the long side, the depth menu's
+// detail), async and throttled (~11 Hz), fully decoupled from the 60 Hz render
+// loop : the loop just polls `take()` for the latest map and the compositor
+// smooths it with its EMA. WebGPU (fp16) first, WebAssembly (8-bit) after.
 
-// The CDN specifier is hidden from the bundler (`@vite-ignore`) so rollup never
-// tries to resolve @huggingface/transformers at build time. Resolved at runtime.
-const CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2'
-const MODEL = 'onnx-community/depth-anything-v2-small'
+import DepthWorker from '../workers/depthWorker?worker&inline'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Lib = any
-let libPromise: Promise<Lib> | null = null
-function loadLib(): Promise<Lib> {
-  if (!libPromise) {
-    libPromise = import(/* @vite-ignore */ CDN).then((m: Lib) => {
-      m.env.allowLocalModels = false
-      m.env.useBrowserCache = true
-      return m
-    })
-  }
-  return libPromise
-}
+export type DepthStatus = 'off' | 'loading' | 'ready' | 'missing' | 'failed'
 
-export type DepthStatus = 'off' | 'loading' | 'ready' | 'failed'
+/** The inference sizes the depth menu offers (long side, px; multiples of 14,
+ *  the model's patch). 518 is the model's own training size. */
+export const DEPTH_RES_STEPS = [252, 392, 518] as const
+export const DEPTH_RES_DEFAULT = 392
+
+export const DEPTH_MISSING_MESSAGE = 'Depth AI is not in this copy of the app : run npm run fetch:depth, then restart it'
+
+type DepthMap = { data: Float32Array; w: number; h: number }
 
 class DepthEngine {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private pipe: any = null
-  private loading = false
-  private failed = false
+  private worker: Worker | null = null
   private busy = false
   private lastRun = 0
-  private result: { data: Float32Array; w: number; h: number } | null = null
+  private result: DepthMap | null = null
   private fresh = false
+  // A running engine that stops (a graphics reset takes WebGPU with it) starts
+  // again by itself, 3 s later, up to 3 times per switch-on.
+  private retryAt = 0
+  private retries = 0
   /** Minimum ms between inferences (~11 Hz). Depth is slow, so this is plenty. */
   minIntervalMs = 90
   status: DepthStatus = 'off'
+  /** 'webgpu' or 'wasm' once ready. */
+  backend = ''
+  dtype = ''
+  /** Why it is missing or failed (shown in a toast). */
+  message = ''
+  /** Last inference time (ms, on the worker) and model load time. */
+  inferMs = 0
+  loadMs = 0
+  /** Inference size, long side (px). */
+  res: number = DEPTH_RES_DEFAULT
 
-  private async ensure(): Promise<void> {
-    if (this.pipe || this.loading || this.failed) return
-    this.loading = true
+  /** The frame size the model is fed for a picture of this aspect (w / h) : the
+   *  long side at `res`, the short one by the aspect, both multiples of 14. On
+   *  the processor (no WebGPU) it reads at the lightest size whatever the menu
+   *  says : 252 px takes ~0.33 s there, 392 px ~0.85 s (measured, 8-bit). */
+  inputSize(aspect: number): [number, number] {
+    const res = this.backend === 'wasm' ? Math.min(this.res, DEPTH_RES_STEPS[0]) : this.res
+    const long = Math.max(56, Math.round(res / 14) * 14)
+    const a = aspect > 0 && Number.isFinite(aspect) ? aspect : 16 / 9
+    const short = Math.max(56, Math.round(long / Math.max(a, 1 / a) / 14) * 14)
+    return a >= 1 ? [long, short] : [short, long]
+  }
+
+  private start(): void {
+    if (this.worker || this.status === 'missing' || this.status === 'failed') return
+    if (performance.now() < this.retryAt) return
     this.status = 'loading'
+    let w: Worker
     try {
-      const lib = await loadLib()
-      try {
-        this.pipe = await lib.pipeline('depth-estimation', MODEL, { device: 'webgpu', dtype: 'fp16' })
-      } catch {
-        // WebGPU missing / model dtype unavailable → CPU (WASM) fallback (slow).
-        this.pipe = await lib.pipeline('depth-estimation', MODEL, { device: 'wasm', dtype: 'q8' })
-      }
-      this.status = 'ready'
+      w = new DepthWorker()
     } catch (e) {
-      console.error('[depth] model load failed (needs network + WebGPU/WASM):', e)
-      this.failed = true
-      this.status = 'failed'
-    } finally {
-      this.loading = false
+      this.fail(`could not start its thread (${String(e)})`)
+      return
+    }
+    this.worker = w
+    w.onmessage = (e: MessageEvent): void => {
+      if (this.worker !== w) return // released meanwhile
+      this.onWorker(e.data)
+    }
+    w.onerror = (e: ErrorEvent): void => {
+      if (this.worker !== w) return
+      e.preventDefault()
+      this.fail(e.message || 'its thread stopped')
+    }
+    // Test builds only : force the processor path to check the fallback.
+    const wasmOnly = !!import.meta.env.VITE_OPSIA_TEST && !!(globalThis as { __depthWasmOnly?: boolean }).__depthWasmOnly
+    w.postMessage({ t: 'load', wasmOnly })
+  }
+
+  private onWorker(m: { t: string; [k: string]: unknown }): void {
+    if (m.t === 'depth') {
+      this.result = { data: m.data as Float32Array, w: m.w as number, h: m.h as number }
+      this.fresh = true
+      this.inferMs = m.ms as number
+      this.busy = false
+    } else if (m.t === 'status') {
+      if (m.status === 'ready') {
+        this.status = 'ready'
+        this.backend = String(m.backend)
+        this.dtype = String(m.dtype)
+        this.loadMs = m.ms as number
+        console.info(`[depth] Depth Anything V2 Small ready on ${this.backend} (${this.dtype}), loaded from the app in ${this.loadMs} ms`)
+      } else if (m.status === 'missing') {
+        this.stopWorker()
+        this.status = 'missing'
+        this.message = DEPTH_MISSING_MESSAGE
+        console.warn(`[depth] ${DEPTH_MISSING_MESSAGE} (resources/depth has no manifest)`)
+      } else if (m.status === 'failed') {
+        this.fail(String(m.message))
+      }
+    } else if (m.t === 'log') {
+      console.warn(`[depth] ${String(m.text)}`)
     }
   }
 
-  /** Feed a low-res RGBA frame. Kicks off (lazy) load + throttled async inference. */
+  private fail(why: string): void {
+    const wasReady = this.status === 'ready'
+    this.stopWorker()
+    if (wasReady && this.retries < 3) {
+      this.retries++
+      this.status = 'off'
+      this.retryAt = performance.now() + 3000
+      console.warn(`[depth] Depth AI stopped (${why}) : starting it again`)
+      return
+    }
+    this.status = 'failed'
+    this.message = wasReady ? `Depth AI stopped : ${why}` : `Depth AI could not start : ${why}`
+    console.error(`[depth] ${this.message}`)
+  }
+
+  private stopWorker(): void {
+    this.worker?.terminate()
+    this.worker = null
+    this.busy = false
+  }
+
+  /** Feed a frame at inputSize(). Starts the engine on first use, then runs one
+   *  inference at a time, at most every minIntervalMs. */
   update(rgba: Uint8Array, w: number, h: number, nowMs: number): void {
-    void this.ensure()
-    if (!this.pipe || this.busy || this.failed) return
+    this.start()
+    if (this.status !== 'ready' || this.busy || !this.worker) return
     if (nowMs - this.lastRun < this.minIntervalMs) return
     this.lastRun = nowMs
     this.busy = true
-    void this.run(rgba.slice(0, w * h * 4), w, h)
-  }
-
-  private async run(rgba: Uint8Array, w: number, h: number): Promise<void> {
-    try {
-      const lib = await loadLib()
-      const img = new lib.RawImage(rgba, w, h, 4)
-      const out = await this.pipe(img)
-      const dm = out?.depth ?? (Array.isArray(out) ? out[0]?.depth : null)
-      if (dm && dm.data) {
-        const dw = dm.width as number, dh = dm.height as number, ch = (dm.channels as number) ?? 1
-        const n = dw * dh
-        const data = new Float32Array(n)
-        let mn = 1e9, mx = -1e9
-        for (let i = 0; i < n; i++) { const v = dm.data[i * ch] / 255; data[i] = v; if (v < mn) mn = v; if (v > mx) mx = v }
-        const inv = mx > mn ? 1 / (mx - mn) : 1
-        for (let i = 0; i < n; i++) data[i] = (data[i] - mn) * inv // normalize to 0..1
-        this.result = { data, w: dw, h: dh }
-        this.fresh = true
-      }
-    } catch (e) {
-      console.error('[depth] inference failed:', e)
-      this.failed = true
-      this.status = 'failed'
-    } finally {
-      this.busy = false
-    }
+    const copy = rgba.slice(0, w * h * 4)
+    this.worker.postMessage({ t: 'frame', rgba: copy, w, h }, [copy.buffer])
   }
 
   /** The newest depth map since the last call, or null if nothing new. */
-  take(): { data: Float32Array; w: number; h: number } | null {
+  take(): DepthMap | null {
     if (!this.fresh || !this.result) return null
     this.fresh = false
     return this.result
   }
+
+  /** Depth left the AI mode : end the thread (it frees the model and the GPU
+   *  memory it holds). Turning it on again retries a failed or missing engine. */
+  release(): void {
+    this.stopWorker()
+    this.status = 'off'
+    this.retries = 0
+    this.retryAt = 0
+    this.backend = ''
+    this.dtype = ''
+    this.message = ''
+    this.result = null
+    this.fresh = false
+  }
 }
 
 export const depthEngine = new DepthEngine()
+
+// A hot update re-runs this module as a new copy : end the old copy's thread
+// (dev only, compiled out of builds).
+if (import.meta.hot) {
+  const g = globalThis as { __opsiaDepth?: DepthEngine }
+  g.__opsiaDepth?.release()
+  g.__opsiaDepth = depthEngine
+}

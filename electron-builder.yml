@@ -59,6 +59,23 @@ extraResources:
   # build only (Electron 44 / Chromium always has wasm SIMD).
   - from: resources/mediapipe
     to: mediapipe
+  # The AI depth engine : Transformers.js, its WebAssembly runtime and Depth
+  # Anything V2 Small (fp16 for WebGPU, 8-bit for the WebAssembly fallback),
+  # about 95 MB, fetched pinned and hash-checked by `npm run fetch:depth` (CI runs
+  # it before every build; never committed). The renderer loads it over
+  # opsia-asset://depth/, so depth works offline. Only the files the fetch
+  # script verifies are shipped (no README, no half-downloaded .part).
+  - from: resources/depth
+    to: depth
+    filter:
+      - manifest.json
+      - transformers.min.js
+      - ort-wasm-simd-threaded.jsep.wasm
+      - models/onnx-community/depth-anything-v2-small/config.json
+      - models/onnx-community/depth-anything-v2-small/preprocessor_config.json
+      - models/onnx-community/depth-anything-v2-small/onnx/model_fp16.onnx
+      - models/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx
+      - licenses/*
   # The NDI runtime, when one was put in resources/ndi/<os> before building
   # (see resources/ndi/README.md). The NDI licence allows shipping it in the
   # application's own folder; without it the app uses the machine's NDI.

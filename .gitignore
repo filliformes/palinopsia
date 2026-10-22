@@ -36,3 +36,9 @@ dist-tsc/
 
 # Vincent's own prompt notes (kept locally, never published)
 Sonification Mode prompt.txt
+
+# The AI depth engine a build ships (Transformers.js, onnxruntime-web, Depth
+# Anything V2 Small, about 100 MB) : fetched by `npm run fetch:depth`
+# (scripts/fetch-depth.mjs, every file hash-checked), never committed.
+/resources/depth/*
+!/resources/depth/README.md

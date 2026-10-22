@@ -19,7 +19,7 @@ import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTrigger } from './engine/modulation'
 import { visionBus } from './engine/visionIn'
-import { depthEngine } from './engine/depthEstimate'
+import { depthEngine, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
@@ -132,6 +132,7 @@ function logOnce(what: string, e: unknown): void {
   console.error(`[${what}]`, e)
 }
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
+let depthStatusShown = '' // the depth engine state last told (a toast when it is missing or fails)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
 let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
 let lastLightsOn = false
@@ -339,6 +340,8 @@ export default function App(): JSX.Element {
   const setTheme = useStore((s) => s.setTheme)
   const depthMode = useStore((s) => s.depthMode)
   const setDepthMode = useStore((s) => s.setDepthMode)
+  const depthRes = useStore((s) => s.depthRes)
+  const setDepthRes = useStore((s) => s.setDepthRes)
   // MIDI Learn + Flush moved up to the top bar (World moved down to the Transport).
   const midiLearnMode = useStore((s) => s.midiLearnMode)
   const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
@@ -1225,7 +1228,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage } })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1745,18 +1748,31 @@ export default function App(): JSX.Element {
             comp!.clearDepth()
             visionBus.setDepth(0.5, 0) // flat : no depth signal
           }
+          // Out of AI : end the model's thread (frees its GPU memory); coming
+          // back starts it again from the app's own files in a second or two.
+          if (st.depthMode !== 'estimate') {
+            depthEngine.release()
+            depthStatusShown = ''
+          }
         }
         if (st.depthMode === 'estimate') {
           // Throttle to the estimator's cadence (~11 Hz) : it cannot consume more,
-          // and every sample is still a 256² downsample draw. The readback is
-          // asynchronous (see gridReadback.ts), so this hands the estimator a
-          // frame from one or two frames back and the EMA absorbs the difference.
+          // and every sample is still a downsample draw. The frame is read at the
+          // inference size (the depth menu's detail, the picture's own aspect).
+          // The readback is asynchronous (see gridReadback.ts), so this hands the
+          // estimator a frame from one or two frames back and the EMA absorbs it.
           if (now - lastDepthSample > 85) {
             lastDepthSample = now
             perfMeter.begin('depth')
-            const df = comp!.depthFrame(256)
+            depthEngine.res = st.depthRes
+            const [iw, ih] = depthEngine.inputSize(comp!.w / comp!.h)
+            const df = comp!.depthFrame(iw, ih)
             if (df) depthEngine.update(df.data, df.w, df.h, now)
             perfMeter.end('depth')
+          }
+          if (depthEngine.status !== depthStatusShown) {
+            depthStatusShown = depthEngine.status
+            if (depthEngine.status === 'missing' || depthEngine.status === 'failed') showToast(depthEngine.message, 'warn', 9000)
           }
           const dr = depthEngine.take()
           if (dr) {
@@ -2222,12 +2238,27 @@ export default function App(): JSX.Element {
           className="input select-compact w-24 shrink-0 text-[11px]"
           style={{ paddingLeft: 6 }}
           value={depthMode}
-          onChange={(e) => setDepthMode(e.target.value as 'off' | 'synth' | 'estimate')}
-          title="Depth engine (2.5D) : fills the depth map the Parallax FX reads. off = flat (passthrough) · synth = a test depth bowl · AI = monocular depth estimation (downloads a small model on first use; needs network + WebGPU)."
+          onChange={(e) => {
+            const v = e.target.value
+            // An AI detail entry sets the inference size and turns AI on.
+            if (v.startsWith('res:')) {
+              setDepthRes(Number(v.slice(4)))
+              setDepthMode('estimate')
+            } else setDepthMode(v as 'off' | 'synth' | 'estimate')
+          }}
+          title={`Depth engine (2.5D) : fills the depth map Parallax, Luma Blur's depth focus and Pulfrich read. off = flat (passthrough) · synth = a test depth bowl · AI = a depth model reading the picture, on the graphics card, offline (it ships with the app). AI detail = the size it reads the picture at : ${DEPTH_RES_STEPS[0]} px costs least, ${DEPTH_RES_STEPS[DEPTH_RES_STEPS.length - 1]} px is the model's own size. Now ${depthRes} px.`}
         >
           <option value="off">depth: off</option>
           <option value="synth">depth: synth</option>
           <option value="estimate">depth: AI</option>
+          <optgroup label="AI detail">
+            {DEPTH_RES_STEPS.map((px, i) => (
+              <option key={px} value={`res:${px}`}>
+                {px === depthRes ? '● ' : '\u2003'}
+                {px} px{i === 0 ? ' : lightest' : i === DEPTH_RES_STEPS.length - 1 ? ' : finest' : ''}
+              </option>
+            ))}
+          </optgroup>
         </select>
         {/* Theme : sizes to its widest entry (no fixed width). */}
         <select
