@@ -3,7 +3,7 @@
 > *palinopsia (n.): the persistence or recurrence of a visual image after the stimulus is gone.*
 
 An **OSC-controlled ISF visual instrument** : the visual sibling to
-[dataFLOU](https://github.com/filliformes/dataFLOU). A lightweight Electron +
+[dataFLOU](https://github.com/filliformes/dataFLOU_compositor). A lightweight Electron +
 WebGL2 **four-layer compositor**, *played* over OSC (by [Pandore](https://github.com/filliformes))
 rather than patched like a tool. It composites layers of shader synthesis and
 treated video through blend modes, per-source / per-layer / master ISF effect
