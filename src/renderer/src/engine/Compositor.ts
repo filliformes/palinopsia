@@ -2623,23 +2623,25 @@ export class Compositor {
     this.setDepth(d, S, S, 1);
   }
 
-  /** Read the presented frame down to size×size RGBA (the depth estimator input).
+  /** Read the presented frame down to w×h RGBA (the depth estimator input, at
+   *  the picture's own aspect : a squashed square read worse depth).
    *  Asynchronous like visionSample : queues this frame, returns one from a
    *  frame or two back. The estimator runs at ~11Hz and smooths its result into
    *  the map with an EMA, so it cannot tell the difference. */
-  depthFrame(size: number): { data: Uint8Array; w: number; h: number } | null {
+  depthFrame(w: number, h: number = w): { data: Uint8Array; w: number; h: number } | null {
     if (!this.lastPresent) return null;
     if (!this.depthRead) this.depthRead = new GridReadback(this.gl);
-    this.depthRead.kick(size, size, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    this.depthRead.kick(w, h, this.lastPresent, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
     const got = this.depthRead.takeLatest();
     if (!got) return null;
     // readPixels is bottom-up; the depth model expects an upright picture (its
-    // sky / ground priors), so hand it the rows top-down.
-    const src = got.grid, row = size * 4;
+    // sky / ground priors), so hand it the rows top-down. A grid queued before a
+    // size change lands at its own size : use what landed.
+    const src = got.grid, gw = got.w, gh = got.h, row = gw * 4;
     if (!this.depthFlipBuf || this.depthFlipBuf.length !== src.length) this.depthFlipBuf = new Uint8Array(src.length);
     const out = this.depthFlipBuf;
-    for (let y = 0; y < size; y++) out.set(src.subarray((size - 1 - y) * row, (size - y) * row), y * row);
-    return { data: out, w: size, h: size };
+    for (let y = 0; y < gh; y++) out.set(src.subarray((gh - 1 - y) * row, (gh - y) * row), y * row);
+    return { data: out, w: gw, h: gh };
   }
 
   /** Ensure a shared depth map exists (cleared to neutral until one is computed).

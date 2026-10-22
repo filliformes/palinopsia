@@ -49,6 +49,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The AI depth engine (Transformers.js, its WebAssembly runtime, Depth
+      # Anything V2 Small : about 95 MB, pinned and hash-checked) ships inside the
+      # app so depth works offline. Kept between runs, keyed on the fetch script
+      # (it holds every URL and hash), and required : a build without it would
+      # ship a Depth AI that only says it is missing.
+      - name: Cache the depth engine
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/depth
+            !resources/depth/README.md
+          key: depth-${{ runner.os }}-${{ hashFiles('scripts/fetch-depth.mjs') }}
+      - name: Fetch the depth engine
+        run: npm run fetch:depth
       - name: Build Spout addon (Windows only)
         if: matrix.platform == 'win'
         shell: bash

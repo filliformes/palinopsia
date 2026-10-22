@@ -74,6 +74,9 @@ JS
 # the rm -rf above must never reach through into the repo.
 mkdir -p "$OUT/resources"
 cp -r "$ROOT/resources/mediapipe" "$OUT/resources/"
+# The AI depth engine (Depth AI, about 95 MB) once `npm run fetch:depth` has
+# filled it : copied the same way. Without it the copy says the files are missing.
+[ -d "$ROOT/resources/depth" ] && cp -r "$ROOT/resources/depth" "$OUT/resources/"
 # The native addons built in this checkout (Ableton Link, Spout…) : copied where
 # the app looks for them (its own folder's native/<name>/build/Release).
 for d in "$ROOT"/native/*/build/Release; do

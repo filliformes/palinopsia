@@ -1,6 +1,8 @@
 // opsia-asset:// : a read-only local scheme for BUNDLED static assets that a
-// library must fetch at runtime. Today it serves the MediaPipe wasm + landmark
-// models for embodied control (engine/bodyTracker.ts).
+// library must fetch at runtime. It serves the MediaPipe wasm + landmark models
+// for embodied control (engine/bodyTracker.ts) and the AI depth engine
+// (engine/depthEstimate.ts : Transformers.js, its WebAssembly runtime and the
+// Depth Anything V2 Small model, fetched by `npm run fetch:depth`).
 //
 // Why a scheme and not a relative URL : the packaged renderer runs from file://,
 // where Chromium blocks fetch()/importScripts of file:// resources — and that is
@@ -11,9 +13,11 @@
 //
 //   opsia-asset://local/wasm/vision_wasm_internal.js
 //   opsia-asset://local/models/hand_landmarker.task
+//   opsia-asset://depth/transformers.min.js
 //
-// The host segment ("local") is ignored; the pathname is resolved under the
-// bundled mediapipe/ dir. Read-only, extension-allowlisted, traversal-guarded.
+// The host picks the bundled dir : "depth" is resources/depth, anything else
+// ("local") resources/mediapipe. Read-only, extension-allowlisted,
+// traversal-guarded.
 
 import { app, protocol } from 'electron'
 import { createReadStream, statSync } from 'fs'
@@ -28,6 +32,7 @@ const MIME: Record<string, string> = {
   task: 'application/octet-stream',
   data: 'application/octet-stream',
   bin: 'application/octet-stream',
+  onnx: 'application/octet-stream',
   json: 'application/json'
 }
 const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? ''
@@ -49,6 +54,14 @@ function mediapipeBase(): string {
     : join(app.getAppPath(), 'resources', 'mediapipe')
 }
 
+/** The bundled depth/ base (`npm run fetch:depth` fills it; extraResources ships
+ *  it as resources/depth when packaged). */
+function depthBase(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'depth')
+    : join(app.getAppPath(), 'resources', 'depth')
+}
+
 /** Must run BEFORE app ready : privileged + secure + fetch-capable so MediaPipe's
  *  internal fetch / wasm instantiation works from the packaged file:// renderer. */
 export function registerAssetScheme(): void {
@@ -62,13 +75,16 @@ export function handleAssetProtocol(): void {
   protocol.handle(ASSET_SCHEME, async (request) => {
     if (request.method === 'OPTIONS') return reply(null, 204, { 'Access-Control-Allow-Methods': 'GET, HEAD' })
     let rel: string
+    let host: string
     try {
-      rel = decodeURIComponent(new URL(request.url).pathname.replace(/^\//, ''))
+      const u = new URL(request.url)
+      rel = decodeURIComponent(u.pathname.replace(/^\//, ''))
+      host = u.hostname
     } catch {
       return reply('bad url', 400)
     }
     if (!ALLOWED_EXT.has(extOf(rel))) return reply('forbidden', 403)
-    const base = mediapipeBase()
+    const base = host === 'depth' ? depthBase() : mediapipeBase()
     // Resolve under base and refuse anything that escapes it (path traversal).
     const filePath = normalize(join(base, rel))
     if (filePath !== base && !filePath.startsWith(base + sep)) {

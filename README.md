@@ -63,7 +63,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 18 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
 - [Sequencer](#sequencer-key-q) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
-- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b)
+- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
@@ -127,6 +127,7 @@ The papers, books and standards the instrument draws on are listed in
 
 ```bash
 npm install
+npm run fetch:depth  # the AI depth engine into resources/depth (once, about 95 MB)
 npm run dev          # electron-vite dev (edits hot-reload into the running app)
 npm run typecheck    # tsc : node + web projects (both must be green)
 npm run build        # electron-vite build (bundle only)
@@ -148,6 +149,16 @@ tools.
 A hot update re-runs the edited module in place. The long-lived engines (Sonify, the
 audio input, the body tracker) shut down their previous copy when that happens, so a
 reload is only needed after a main-process or preload change.
+
+**Depth AI** ships its engine inside the app. `npm run fetch:depth`
+(`scripts/fetch-depth.mjs`) downloads Transformers.js 3.0.2, the onnxruntime-web
+WebAssembly runtime it pins (1.21.0-dev.20241024) and Depth Anything V2 Small (fp16 and
+8-bit weights, at a fixed revision) from cdn.jsdelivr.net and huggingface.co into
+`resources/depth` (git-ignored, about 95 MB), checks every file against its SHA-256,
+skips what is already there and writes a manifest last; `npm run fetch:depth -- --check`
+only verifies. The build copies the verified files into the app (`extraResources`), and
+CI runs the script before every build (cached). Without them the app runs, and Depth AI
+asks for the fetch.
 
 NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
 `npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
@@ -686,6 +697,39 @@ every rack effect (Light Trails, Wide Time, Slit Buffer, Context's trails), so a
 runaway feedback build-up clears instantly without reloading anything. Generators
 that grow their picture (Reaction, Colony…) are left alone : their buffer *is* the
 picture.
+
+### Depth (2.5D)
+
+The header's **depth** menu fills the one depth map the depth-aware pieces read :
+[Parallax](#native-nodes), [Pulfrich](#native-nodes) and **Luma Blur**'s depth focus,
+and the picture's `depth` / `depthSpread` features (the `vision` modulators, OSC, the
+readout).
+
+- **off** : no depth. The depth-aware pieces fall back to the picture's brightness.
+- **synth** : a test bowl (near in the middle, far at the edges), no model.
+- **AI** : a depth model (Depth Anything V2 Small) reads the finished picture about ten
+  times a second, and the map follows it. It runs on the graphics card (WebGPU, fp16
+  weights) and, on a computer without WebGPU, on the processor (WebAssembly, 8-bit
+  weights, read at 252 px : about three maps a second), always on a thread of its own :
+  the render loop only hands it a small frame and takes the map back. **It ships inside
+  the app** (Transformers.js 3.0.2, the onnxruntime-web runtime it pins and the model :
+  95 MB installed, about 66 MB of the download), so it works offline and in an
+  installation, starts in about a second (2.3 s the very first time, while the graphics
+  driver builds its shaders) and never reaches the network.
+- **AI detail** (the same menu) : the size the model reads the picture at, on its long
+  side : **252 px** (lightest), **392 px** (the default) or **518 px** (the model's own
+  size). The frame keeps the picture's shape. On the RTX 4070 laptop, a 1920×1080
+  composition : 60 fps with depth off and 60 fps with it on at all three sizes, each map
+  taking about 19, 24 and 33 ms on the graphics card at 252, 392 and 518 px, ten maps a
+  second, under 0.1 ms of each frame on the render thread.
+
+The map holds steady : the model answers relative depth on a scale that drifts from
+frame to frame, and stretching each answer to its own range made the whole map brighten
+and darken each time something came in or left. The map follows the model's range over
+about 1.5 s instead, and the compositor smooths it on top. Turning depth off ends the
+model's thread and frees its graphics memory; picking AI again starts it in under a
+second. A copy built from source without the model says so when AI is picked : run `npm
+run fetch:depth` (see [Building from source](#getting-started)).
 
 ## Feel : the global macros (key `G`)
 
@@ -3152,6 +3196,7 @@ the UI (`src/renderer/src/mcp/tools.ts`, listed in `src/shared/mcpTools.ts`).
 | Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer; the Ableton Link SDK in an N-API addon (main); a dataflou mesh node (main); an MCP server for the Agent (Streamable HTTP, 127.0.0.1 only) |
 | Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE and (H.264) for Codec Mosh; ffmpeg for recording delivery and the clips' sound analysis |
 | Audio | Web Audio (local analyser + the Sonify AudioWorklet engine, which also plays the Audio Layer) + OSC audio bus |
+| Depth | Transformers.js 3.0.2 + onnxruntime-web (WebGPU, else WebAssembly) running Depth Anything V2 Small on a worker thread; shipped in the app, offline |
 | Output | Fullscreen HDMI · Spout (DX11) / Syphon (Metal) · NDI (built in) · HIVE (HEVC/TCP + mDNS) · DXV3 real-time recording : every consumer reads the clean picture through its own GPU conversion + asynchronous readback ring (`engine/frameCapture.ts`), none stalls the render loop |
 
 ## Architecture
@@ -3252,4 +3297,7 @@ additional permission for the NDI® runtime ([LICENSE-EXCEPTIONS.md](LICENSE-EXC
 Releases up to v1.2.10 were MIT and keep that license. The Source Editor is built on
 [CodeMirror](https://codemirror.net) (MIT). It compiles in the
 [Ableton Link](https://github.com/Ableton/link) SDK (GPL-2.0-or-later) and asio
-(Boost); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+(Boost). Depth AI runs [Transformers.js](https://github.com/huggingface/transformers.js)
+(Apache-2.0) and [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT) with
+the [Depth Anything V2 Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small)
+model (Apache-2.0), shipped in the app. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -7,6 +7,38 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Depth AI works, offline : the depth model ships inside the app**
+  (`engine/depthEstimate.ts`, `workers/depthWorker.ts`, `main/assets.ts`,
+  `scripts/fetch-depth.mjs`). It imported Transformers.js from a CDN and the model from
+  the Hugging Face hub at first use, and the page's own security policy refuses those
+  downloads (`connect-src` allows only the app's files, `opsia-asset:`, blobs and data :
+  measured, a fetch to huggingface.co raises a violation), so it could never load. Now
+  Transformers.js 3.0.2, the onnxruntime-web WebAssembly runtime it pins
+  (1.21.0-dev.20241024-d9ca84ef96) and Depth Anything V2 Small (fp16 for WebGPU, 8-bit
+  for the WebAssembly fallback) are fetched at build time by `npm run fetch:depth`
+  (pinned, SHA-256 checked, from cdn.jsdelivr.net and huggingface.co only, a manifest
+  written last), shipped in `resources/depth` (95 MB installed, about 66 MB more in the
+  installer, never in git) and served over `opsia-asset://depth/`. Remote models are off
+  and every path the library can build points inside the app (the worker refuses to
+  start otherwise). The model runs on a worker thread : creating its session and the
+  WebAssembly fallback are synchronous, seconds of a frozen picture on the render
+  thread. The frame it reads keeps the picture's shape (it was squashed to a square) at
+  the size the depth menu's new **AI detail** picks (252 / 392 / 518 px on the long
+  side, 392 by default; the processor reads at 252 whatever the menu says), and the map
+  no longer pumps : each answer was stretched to its own min..max (twice); the map
+  follows the model's range over 1.5 s, then the compositor's EMA as before. Depth off
+  ends the thread and frees its graphics memory; a running engine that stops (a graphics
+  reset) starts again by itself. Measured in the test copy on the RTX 4070 at 1920×1080
+  : 60.0 fps off, 60.0 to 60.1 on at 252 / 392 / 518 px, 19 / 24 / 33 ms a map on WebGPU
+  (median), 10 maps a second, 0.05 to 0.09 ms a frame on the render thread, loaded in
+  0.98 s (2.3 s the first time); the WebAssembly fallback 0.31 s a map, still 60 fps;
+  every depth request went to `opsia-asset://depth/` with http and https blocked. fp16
+  stays on WebGPU : q4f16 ran 4x slower and misread a floor (r 0.37 against fp16), 8-bit
+  fell back to the processor there (0.87 s); 8-bit on the processor matches fp16 (r
+  0.9975 to 0.9997) and runs 1.5x faster than fp16 there. A copy without the files says
+  "run npm run fetch:depth"; CI fetches them (cached) before building on all three
+  platforms.
+
 - **The Master FX chain menu names the chain that plays** (`MasterRackStrip` derives it
   from the loaded effects : the chain picked by hand or by an action while it is still
   loaded, else any chain with the same effects, else the placeholder), so a chain changed

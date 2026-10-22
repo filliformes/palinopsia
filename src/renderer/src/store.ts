@@ -53,6 +53,7 @@ import { corpusMap } from './assemble/match'
 import { BLEND_MODES, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
+import { DEPTH_RES_DEFAULT, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
@@ -1943,6 +1944,9 @@ interface StoreState {
   // Depth engine mode (2.5D) : off · synthetic test bowl · AI monocular estimate.
   depthMode: 'off' | 'synth' | 'estimate'
   setDepthMode: (m: 'off' | 'synth' | 'estimate') => void
+  /** AI depth detail : the inference size, long side in px (per machine). */
+  depthRes: number
+  setDepthRes: (px: number) => void
   collapsed: Record<string, boolean>
   toggleSection: (key: string) => void
   setCollapsed: (key: string, collapsed: boolean) => void
@@ -4956,6 +4960,15 @@ export const useStore = create<StoreState>((set, get) => ({
   setDepthMode: (m) => {
     localStorage.setItem('opsia.depthMode', m)
     set({ depthMode: m })
+  },
+  depthRes: ((): number => {
+    const v = lsNum('opsia.depthRes')
+    return (DEPTH_RES_STEPS as readonly number[]).includes(v) ? v : DEPTH_RES_DEFAULT
+  })(),
+  setDepthRes: (px) => {
+    if (!(DEPTH_RES_STEPS as readonly number[]).includes(px)) return
+    localStorage.setItem('opsia.depthRes', String(px))
+    set({ depthRes: px })
   },
 
   oscEnabled: localStorage.getItem('opsia.oscEnabled') === '1',

@@ -33,3 +33,9 @@ dist-tsc/
 # binary put there per machine, never committed.
 /resources/ndi/*/*
 !/resources/ndi/*/.gitkeep
+
+# The AI depth engine a build ships (Transformers.js, onnxruntime-web, Depth
+# Anything V2 Small, about 100 MB) : fetched by `npm run fetch:depth`
+# (scripts/fetch-depth.mjs, every file hash-checked), never committed.
+/resources/depth/*
+!/resources/depth/README.md
