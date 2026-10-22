@@ -44,6 +44,7 @@ import organicRelief from './lib/organicRelief.glsl?raw'
 import analogParasites from './lib/analogParasites.glsl?raw'
 import domeLib from './lib/dome.glsl?raw'
 import finalGrain from './lib/finalGrain.glsl?raw'
+import blobLib from './lib/blob.glsl?raw'
 import metamorph from './Metamorph.fs?raw'
 import syncOsc from './SyncOsc.fs?raw'
 import differential from './Differential.fs?raw'
@@ -1042,7 +1043,10 @@ export const GENERATORS: IsfShader[] = [
       vary: [0.3, 0.9],
       fade: [0, 0.8],
       density: [0.35, 1],
-      audioPulse: [0, 0.6]
+      audioPulse: [0, 0.6],
+      // low : the dice mostly keep round points, sometimes a soft wobble
+      irregular: [0, 0.4],
+      evolve: [0, 0.4]
     }
   },
   {
@@ -1087,7 +1091,10 @@ export const GENERATORS: IsfShader[] = [
       wander: [0.15, 0.8],
       flicker: [0.1, 0.7],
       accent: [0.05, 0.6],
-      audioScatter: [0, 0.5]
+      audioScatter: [0, 0.5],
+      // low : the dice mostly keep round flecks, sometimes a soft wobble
+      irregular: [0, 0.4],
+      evolve: [0, 0.4]
     }
   },
   {
@@ -1626,7 +1633,7 @@ export const GENERATORS: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Lattice : a lattice of points in space, seen through a moving camera. FORM lays them on a PLANE (a floor of dots seen from above), fills a VOLUME with them (a room of stars), lines a TUNNEL with them (flown down forever), or spreads them over a SPHERE, a TORUS or a spiral GALAXY the camera circles (FLY turns those, HEIGHT is the distance). COUNT is how many per side, SIZE how big, VARY lets a few grow large and bright, JITTER loosens the grid into a scatter. TILT, TURN, HEIGHT and LENS frame the camera, FLY carries it forward, SPIN turns it. Where the camera looks, a WELL sinks the plane into a funnel (in a volume it pulls the points into a knot), over REACH; RIPPLE rings out from it (RINGS of them, travelling at PACE), SWELL heaves the surface, AUDIO lifts it with the spectrum (bass at the heart), SIDECHAIN with another layer’s brightness. STREAK draws each point as the trail of the camera’s motion, FOG fades the distance. Never additive : overlapping dots never pile up into a glow.',
+        'Lattice : a lattice of points in space, seen through a moving camera. FORM lays them on a PLANE (a floor of dots seen from above), fills a VOLUME with them (a room of stars), lines a TUNNEL with them (flown down forever), or spreads them over a SPHERE, a TORUS or a spiral GALAXY the camera circles (FLY turns those, HEIGHT is the distance). COUNT is how many per side, SIZE how big, VARY lets a few grow large and bright, JITTER loosens the grid into a scatter. TILT, TURN, HEIGHT and LENS frame the camera, FLY carries it forward, SPIN turns it. Where the camera looks, a WELL sinks the plane into a funnel (in a volume it pulls the points into a knot), over REACH; RIPPLE rings out from it (RINGS of them, travelling at PACE), SWELL heaves the surface, AUDIO lifts it with the spectrum (bass at the heart), SIDECHAIN with another layer’s brightness. STREAK draws each point as the trail of the camera’s motion, FOG fades the distance. IRREGULAR turns every point into a shape of its own (ink drops, seeds, pollen, torn paper, slivers), EVOLVE morphs and tumbles them. Never additive : overlapping dots never pile up into a glow.',
       CATEGORIES: ['Generator', 'Geometry'],
       INPUTS: [
         { NAME: 'form', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['plane', 'volume', 'tunnel', 'sphere', 'torus', 'galaxy'], DEFAULT: 0, LABEL: 'form' },
@@ -1634,6 +1641,8 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'size', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'size' },
         { NAME: 'vary', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'vary' },
         { NAME: 'jitter', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'jitter' },
+        { NAME: 'irregular', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'irregular' },
+        { NAME: 'evolve', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'evolve' },
         { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.45, LABEL: 'tilt' },
         { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
         { NAME: 'height', TYPE: 'float', MIN: 0.3, MAX: 30, DEFAULT: 10, LABEL: 'height' },
@@ -1659,7 +1668,7 @@ export const GENERATORS: IsfShader[] = [
       count: [90, 220], size: [0.15, 0.6], vary: [0, 0.6], jitter: [0, 0.35], tilt: [0.15, 0.7], turn: [-1, 1],
       height: [4, 18], lens: [0.35, 0.8], fly: [-0.3, 0.3], spin: [-0.08, 0.08], well: [0, 0.8], reach: [0.15, 0.6],
       ripple: [0, 0.6], rings: [1.5, 6], pace: [-0.6, 0.6], swell: [0, 0.5], audio: [0, 0.4], side: [0, 0],
-      streak: [0, 0.4], fog: [0.2, 0.6]
+      streak: [0, 0.4], fog: [0.2, 0.6], irregular: [0, 0.35], evolve: [0, 0.4]
     }
   }
 ]
@@ -2042,9 +2051,11 @@ export const ALL_SHADERS: IsfShader[] = [
 // Shared GLSL at a shader's include line, whatever its list : "// @dome"
 // (lib/dome.glsl : turns and falls on the dome's disc under full-dome fill) and
 // "// @grain" (lib/finalGrain.glsl : the Finalizer's grain, which the dome stage
-// also draws after the mapping). The header is untouched.
+// also draws after the mapping) and "// @blob" (lib/blob.glsl : the organic
+// outlines of the point sources' IRREGULAR). The header is untouched.
 for (const s of ALL_SHADERS) {
   if (s.source.includes('// @dome')) s.source = s.source.replace('// @dome', domeLib)
+  if (s.source.includes('// @blob')) s.source = s.source.replace('// @blob', blobLib)
   if (s.source.includes('// @grain')) s.source = s.source.replace('// @grain', finalGrain)
 }
 

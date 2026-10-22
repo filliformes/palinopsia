@@ -19,10 +19,15 @@
 //   forever (its position wraps at 4096 cells, where every per-point draw repeats,
 //   so the wrap is seamless). The lattice's edge always fades out, so the wrap is
 //   never seen; FOG fades it sooner.
+// - IRREGULAR turns each point into an outline of its own (lib/blob.glsl : ink
+//   drops, seeds, torn paper, slivers), dealt from its own random numbers and
+//   held still on the screen while it streaks; EVOLVE morphs and tumbles them. At
+//   0 the round capsule is drawn exactly as before.
 
 import { EngineGL, SlotClock, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator } from './nativeGenerators'
 import { domeFill } from './domeSignal'
+import BLOB_GLSL from '../shaders/isf/lib/blob.glsl?raw'
 
 const VS = `#version 300 es
 precision highp float;
@@ -54,8 +59,12 @@ uniform float uAudio, uSide;
 uniform float uFogStart, uEdge;
 uniform int uHasAudio, uHasSide;
 uniform sampler2D uAudioTex, uSideTex;
+uniform float uBlobExt;       // IRREGULAR : how far an outline may reach, in radii (1 = round)
 out vec2 vLocal;
 out float vLen, vRad, vAmp;
+flat out vec3 vSeed;          // the point's own three numbers, for its outline
+flat out vec2 vDir;           // the streak's direction, to hold the outline still on screen
+vec3 gSeed;
 
 vec3 hash33(vec3 p3) {
   p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
@@ -107,6 +116,7 @@ void gridPoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) {
   vec3 h = hash33(id + vec3(7.0, 13.0, 29.0));
   vec3 jit = (hash33(id.zxy + 101.0) - 0.5) * uJitter;
   if (uForm == 0) jit.y = 0.0;
+  gSeed = hash33(id + vec3(53.0, 71.0, 97.0));
 
   // Camera-relative position, world units. The plane lies at the camera's height
   // below it (uCam.y holds that height for the plane).
@@ -200,6 +210,7 @@ void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) 
   float fk = float(k);
   vec3 h = hash33(vec3(fk, 3.0, 7.0) + 11.0);
   vec3 h2 = hash33(vec3(7.0, fk, 3.0) + 23.0);
+  gSeed = hash33(vec3(fk * 0.37, 43.0, 19.0));
   sizeK = mix(1.0, 0.5 + 2.6 * pow(h.z, 4.0), uVary);
   amp = mix(1.0, 0.45 + 0.55 * h.y, uVary);
   if (uForm == 2) {
@@ -211,6 +222,7 @@ void shapePoint(int k, out vec3 P, out vec3 Pp, out float amp, out float sizeK) 
     float zc = cellNear(ir, uCam.z, nR);
     float idz = mod(zc, 4096.0);
     vec3 jt = (hash33(vec3(ia, idz, 5.0)) - 0.5) * uJitter;
+    gSeed = hash33(vec3(ia, idz, 61.0));
     // every other ring half a step round : the wall is woven, not ruled
     float th = (ia + 0.5 * mod(idz, 2.0) + jt.x) * 6.2831853 / float(nA);
     vec3 rad = vec3(cos(th), sin(th), 0.0);
@@ -339,8 +351,12 @@ void main() {
   vec2 dir2 = L > 0.01 ? (pc - pp) / L : vec2(1.0, 0.0);
   vec2 nrm = vec2(-dir2.y, dir2.x);
   int vid = gl_VertexID;
-  float a = (vid & 1) == 0 ? -rPx - 1.0 : L + rPx + 1.0;
-  float b = (vid & 2) == 0 ? -rPx - 1.0 : rPx + 1.0;
+  // the quad holds the outline's whole reach (exactly the round dot's at 1)
+  float ex = rPx * uBlobExt;
+  float a = (vid & 1) == 0 ? -ex - 1.0 : L + ex + 1.0;
+  float b = (vid & 2) == 0 ? -ex - 1.0 : ex + 1.0;
+  vSeed = gSeed;
+  vDir = dir2;
   vec2 px = pp + dir2 * a + nrm * b;
   vLocal = vec2(a, b);
   vLen = L;
@@ -353,11 +369,31 @@ const DOT_FS = `#version 300 es
 precision highp float;
 in vec2 vLocal;
 in float vLen, vRad, vAmp;
+flat in vec3 vSeed;
+flat in vec2 vDir;
+uniform float uIrr, uEvolve;  // IRREGULAR, and the EVOLVE phase (wrapped at BLOB_WRAP)
+uniform float uBlobExt;       // how far an outline may reach, in radii
 out vec4 o;
+${BLOB_GLSL}
 void main() {
   float ca = clamp(vLocal.x, 0.0, vLen);
-  float d = length(vec2(vLocal.x - ca, vLocal.y));
-  float cov = clamp(vRad - d + 0.5, 0.0, 1.0);
+  vec2 lv = vec2(vLocal.x - ca, vLocal.y);
+  float cov;
+  if (uIrr > 0.0) {
+    // its own outline, swept along the streak and turned back to the screen's
+    // frame, so the shape holds still whichever way the point streaks. Past its
+    // reach (the quad's corners) nothing to draw : most outlines stay well
+    // inside it (half within 1.44 radii at irregular 1, the reach is 2.6).
+    cov = 0.0;
+    if (dot(lv, lv) < vRad * vRad * uBlobExt * uBlobExt + 2.0 * vRad * uBlobExt + 1.0) {
+      vec2 scr = lv.x * vDir + lv.y * vec2(-vDir.y, vDir.x);
+      vec2 bs = blobShape(scr / vRad, vSeed, uIrr, uEvolve, vRad);
+      cov = clamp(0.5 - bs.x * vRad, 0.0, 1.0);
+    }
+  } else {
+    float d = length(lv);
+    cov = clamp(vRad - d + 0.5, 0.0, 1.0);
+  }
   // A streak fades toward its tail, the way a long exposure does.
   float tail = vLen > vRad ? mix(0.25, 1.0, ca / max(vLen, 1e-4)) : 1.0;
   float v = cov * vAmp * tail;
@@ -384,6 +420,10 @@ const WRAP = 4096
 const MAX_LEAN = 1.3963 // 80 degrees : straight down or up the basis degenerates
 const EXTENT = 64 // the lattice's side in world units, whatever the count
 const SHAPE_R = 12 // the sphere's, the torus's and the galaxy's radius, world units
+// lib/blob.glsl's BLOB_WRAP (32 pi) and BLOB_REACH : the EVOLVE phase wraps there,
+// and an outline reaches 1 + BLOB_REACH x IRREGULAR radii at most.
+const BLOB_WRAP = 32 * Math.PI
+const BLOB_REACH = 1.6
 
 type V3 = [number, number, number]
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -418,6 +458,8 @@ export class LatticeSource implements NativeGenerator {
   // The swell's phase wraps at 5120 : a whole number of noise periods (512) for
   // every rate it is read at (x 0.6 : 3072, x 0.7 : 3584), so no wrap re-deals it.
   private swellPh = Math.random() * 5120
+  // EVOLVE's phase : the outlines morph and tumble on it (wraps seamlessly).
+  private evolvePh = Math.random() * BLOB_WRAP
   private cellS = 0
   private audioTex: WebGLTexture | null = null
   private sideTex: WebGLTexture | null = null
@@ -517,6 +559,10 @@ export class LatticeSource implements NativeGenerator {
       this.stream = (this.stream + turnRate * 0.04 * dt) % 1
     }
 
+    const irr = Math.max(0, Math.min(1, num(I, 'irregular', 0)))
+    const evolve = Math.max(0, Math.min(1, num(I, 'evolve', 0.25)))
+    this.evolvePh = (this.evolvePh + evolve * dt) % BLOB_WRAP
+
     const pace = num(I, 'pace', 0.3)
     this.ripplePh = (this.ripplePh + pace * 2 * Math.PI * dt) % (Math.PI * 2)
     this.swellPh = (this.swellPh + pace * 0.6 * dt) % 5120
@@ -598,6 +644,7 @@ export class LatticeSource implements NativeGenerator {
       // never 1 : smoothstep with equal edges is undefined (§3)
       .f1('uFogStart', 0.98 - 0.9 * fog).f1('uEdge', 0.8)
       .i1('uHasAudio', hasAudio).i1('uHasSide', hasSide)
+      .f1('uBlobExt', 1 + BLOB_REACH * irr).f1('uIrr', irr).f1('uEvolve', this.evolvePh)
       .i1('uAudioTex', 0).i1('uSideTex', 1)
     // A unit the program samples must hold a texture even when the branch that
     // reads it is off, or WebGL warns on every draw : the 1x1 blank stands in.

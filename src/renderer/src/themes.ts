@@ -479,6 +479,11 @@ export const THEMES: Theme[] = [
     world: 'musical',
     palette: [K, [0.1, 0.12, 0.2, 1], [0.75, 0.78, 0.85, 1]],
     sources: ['murmuration', 'particle-drift', 'ash'],
+    // the drifting points and the ash sometimes turn organic : drops, seeds, torn flecks
+    pickInputs: {
+      'particle-drift': { irregular: [0, 0.35, 0.6, 0.8], evolve: [0.15, 0.3] },
+      ash: { irregular: [0, 0.35, 0.6], evolve: [0.2, 0.35] }
+    },
     layerFx: ['fx-light-trails', 'fx-streak', 'fx-difference-bloom'],
     blends: ['screen', 'add'], density: 0.55, feedback: 0.3, drift: 0.25,
     nativeNodes: ['node-ibfv', 'node-gooey', 'node-convolve']
@@ -1424,7 +1429,9 @@ export const THEMES: Theme[] = [
         form: [3, 4, 5], fly: [0.1, 0.2, 0.3], spin: [0, 0.02, -0.02], tilt: [0.15, 0.35, 0.55], turn: [0, 0.5, -0.5],
         height: [8, 10, 12], well: [0, 0.5, 0.7], reach: [0.25, 0.4], ripple: [0, 0.4], rings: [3, 4], pace: [0.4, 0.6],
         swell: [0, 0.2], jitter: [0, 0.2], vary: [0.2, 0.5], count: [180, 220], size: [0.3, 0.4], fog: [0.35, 0.5],
-        lens: [0.55, 0.65], streak: [0], audio: [0], side: [0]
+        lens: [0.55, 0.65], streak: [0], audio: [0], side: [0],
+        // now and then a figure of organic points (seeds, pollen) instead of dots
+        irregular: [0, 0, 0.4, 0.7], evolve: [0.15, 0.3]
       }
     },
     layerFx: ['fx-grade'],
@@ -1442,7 +1449,7 @@ export const THEMES: Theme[] = [
       'gen-lattice': {
         form: [1], jitter: [0], vary: [0, 0.2], fly: [0.05, 0.1], spin: [0.02, 0.03, -0.02], tilt: [0.05, 0.1, -0.05],
         turn: [0, 0.15, -0.15], count: [140, 160, 180], well: [0], ripple: [0], swell: [0], audio: [0], streak: [0],
-        fog: [0.3, 0.4], size: [0.3, 0.4], lens: [0.65, 0.75]
+        fog: [0.3, 0.4], size: [0.3, 0.4], lens: [0.65, 0.75], irregular: [0]
       }
     },
     layerFx: ['fx-grade'],

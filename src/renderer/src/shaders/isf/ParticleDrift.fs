@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Particle Drift : sparse points carried through a flow direction with capsule trails, wandering inside their cells. The generative point-field register, matte over near-black; trails stretch out behind each point and can fade from a bright head, never bloom. DENSITY thins the field below one point per cell; AUDIO PULSE lets every point swell with its own frequency band.",
+  "DESCRIPTION": "Particle Drift : sparse points carried through a flow direction with capsule trails, wandering inside their cells. The generative point-field register, matte over near-black; trails stretch out behind each point and can fade from a bright head, never bloom. DENSITY thins the field below one point per cell; AUDIO PULSE lets every point swell with its own frequency band. IRREGULAR turns every point into a shape of its own (ink drops, seeds, pollen, torn paper, slivers) that its trail sweeps along; EVOLVE morphs and tumbles them.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["Generator", "Particles"],
@@ -8,6 +8,8 @@
     { "NAME": "speed",  "TYPE": "float", "MIN": 0.0,  "MAX": 20.0,   "DEFAULT": 0.4 },
     { "NAME": "flow",   "TYPE": "float", "MIN": 0.0,  "MAX": 6.2832, "DEFAULT": 0.5, "LABEL": "flow angle" },
     { "NAME": "size",   "TYPE": "float", "MIN": 0.02, "MAX": 0.4,    "DEFAULT": 0.09 },
+    { "NAME": "irregular", "TYPE": "float", "MIN": 0.0, "MAX": 1.0,  "DEFAULT": 0.0 },
+    { "NAME": "evolve", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,    "DEFAULT": 0.25 },
     { "NAME": "trail",  "TYPE": "float", "MIN": 0.0,  "MAX": 2.0,    "DEFAULT": 0.7 },
     { "NAME": "fade",   "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,    "DEFAULT": 0.0, "LABEL": "trail fade" },
     { "NAME": "jitter", "TYPE": "float", "MIN": 0.0,  "MAX": 1.0,    "DEFAULT": 0.5 },
@@ -26,6 +28,8 @@
 uniform float PH_pdriftX;
 uniform float PH_pdriftY;
 uniform float PH_vary;
+// EVOLVE : the points' shapes morph and tumble on their own clock (lib/blob.glsl).
+uniform float PH_evolve; // wrap 100.5309649
 
 float hash13(vec3 p3) {
   p3 = fract(p3 * 0.1031);
@@ -55,6 +59,8 @@ vec2 wob2(vec2 key, float x) {
   return mix(hash44(vec4(key, i, 3.0)).xy, hash44(vec4(key, i1, 3.0)).xy, f);
 }
 
+// @blob
+
 // The shared spectrum (row 1, log-spaced : 0 = bass, 1 = treble), 0..1.
 float spec(float idx01) {
   vec2 ac = vec2(clamp(idx01, 0.0, 1.0), 0.75);
@@ -78,8 +84,20 @@ void main() {
   // traversal) and test each one plus its two side neighbours : long trails
   // are no longer cut square at the edge of a 3×3 search.
   float reach = trail * (1.0 + 0.7 * vary) + 1.2;   // longest trail + head + wander
+  // IRREGULAR : each point an outline of its own, reaching up to ext radii. The
+  // walk then starts further behind and goes further ahead by what the largest
+  // head gained, and takes a second side neighbor when such a head can reach
+  // past the first (at 0 : the walk as it always was).
+  float ext = 1.0 + BLOB_REACH * irregular;
+  float rMax = size * 0.8 * mix(1.0, 1.7, vary) * (1.0 + 1.5 * audioPulse);
+  float gain = BLOB_REACH * irregular * rMax;
+  float sR = irregular > 0.0 && rMax * ext > 0.6 ? 2.0 : 1.0;
   vec2 q0 = q - dir;                                 // start a cell behind
   float ell = reach + 1.0;
+  if (irregular > 0.0) {
+    q0 = q - dir * (1.0 + gain);
+    ell = reach + 1.0 + 2.0 * gain;
+  }
   vec2 sd = vec2(dir.x >= 0.0 ? 1.0 : -1.0, dir.y >= 0.0 ? 1.0 : -1.0);
   vec2 ad = max(abs(dir), vec2(1e-4));
   vec2 cellD = floor(q0);
@@ -90,7 +108,8 @@ void main() {
 
   float lum = 0.0;
   for (int k = 0; k < 9; k++) {
-    for (int s = -1; s <= 1; s++) {
+    for (int s = -2; s <= 2; s++) {
+      if (abs(float(s)) > sR) continue;
       vec2 cell = cellD + side * float(s);
       vec2 cm = cmD + side * float(s);                 // = mod(cell, WRAP)
       cm += WRAP * (step(cm, vec2(-0.5)) - step(vec2(WRAP - 0.5), cm));
@@ -128,6 +147,26 @@ void main() {
       float r0 = size * szf * 0.8;
       float r = max(r0, 0.75 * px);
       float dotv = 1.0 - smoothstep(r - 0.5 * px, r + 0.5 * px, dc);
+      if (irregular > 0.0) {
+        // its own shape at the head; behind it the trail is a wisp of the shape's
+        // own width, thinning toward its tail (a comet, a smear of ink). Irregular
+        // 0 keeps the round capsule above, bit for bit; near 0 this is that capsule.
+        dotv = 0.0;
+        if (dc < r * ext + px) {
+          vec3 seed = hash44(vec4(cm, 4.0, 0.0)).xyz;
+          vec2 bh = blobShape(delta / r, seed, irregular, PH_evolve, r / px);
+          float cov = 1.0 - smoothstep(-0.5 * px, 0.5 * px, bh.x * r);
+          if (along > 0.0) {
+            float tw = mix(1.0, mix(0.95, 0.5, along / max(L, 1e-3)), smoothstep(0.0, 0.6, irregular));
+            // the offset written apart from dc's : shared, the compiler re-rounds
+            // dc and the round capsule moved by a level here and there
+            vec2 lv = vec2(q.x - pp.x + dir.x * along, q.y - pp.y + dir.y * along);
+            vec2 bt = blobShape(lv / (r * tw), seed, irregular, PH_evolve, r * tw / px);
+            cov = max(cov, 1.0 - smoothstep(-0.5 * px, 0.5 * px, bt.x * r * tw));
+          }
+          dotv = cov;
+        }
+      }
       dotv *= 1.0 - 0.9 * fade * along / (L + 1e-3);
       lum = max(lum, dotv * bf * clamp(r0 / r, 0.35, 1.0));
     }

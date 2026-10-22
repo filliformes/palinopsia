@@ -54,7 +54,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('paint', 'brush', 'mixing', 'impasto', 'canvas')
   ],
   'gen-lattice': [
-    g('points', 'form', 'count', 'size', 'vary', 'jitter', 'ink', 'ground'),
+    g('points', 'form', 'count', 'size', 'irregular', 'evolve', 'vary', 'jitter', 'ink', 'ground'),
     g('camera', 'tilt', 'turn', 'height', 'lens', 'fly', 'spin', 'streak', 'fog'),
     g('well', 'well', 'reach', 'ripple', 'rings', 'pace', 'swell', 'audio', 'side')
   ],
@@ -226,6 +226,8 @@ const put = (d: Why, names: string[], why: string): void => {
 const NO_RELIEF = 'Relief is at 0 : no light to angle.'
 /** One input greyed out when `on`. */
 const one = (on: boolean, name: string, why: string): Why => (on ? { [name]: why } : {})
+// The point sources' IRREGULAR (lib/blob.glsl) : EVOLVE morphs shapes that only exist above 0.
+const NO_SHAPE = 'Irregular is at 0 : the points are round, there is no shape to evolve.'
 const DIMS: Record<string, (q: Dim) => Why> = {
   // one flat color, or the gradient's three stops : never both
   'solid-color': ({ zero, is }) => {
@@ -248,6 +250,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('ripple')) put(d, ['rings'], 'Ripple is at 0.')
     if (zero('ripple') && zero('swell')) put(d, ['pace'], 'Ripple and swell are at 0 : nothing to pace.')
     if (zero('fly') && zero('spin')) put(d, ['streak'], 'Fly and spin are at 0 : nothing moves to streak.')
+    if (zero('irregular')) put(d, ['evolve'], NO_SHAPE)
     if (!is('form', 1) && ['well', 'ripple', 'swell', 'audio', 'side'].every(zero))
       put(d, ['reach'], 'Well, ripple, swell, audio and sidechain are at 0 : nothing to reach.')
     return d
@@ -306,7 +309,11 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   slabs: ({ zero }) => one(zero('accent'), 'tint', 'Accent is at 0 : no accent cells to color.'),
-  'particle-drift': ({ zero }) => one(zero('trail'), 'fade', 'Trail is at 0 : no trail to fade.'),
+  'particle-drift': ({ zero }) => ({
+    ...one(zero('trail'), 'fade', 'Trail is at 0 : no trail to fade.'),
+    ...one(zero('irregular'), 'evolve', NO_SHAPE)
+  }),
+  ash: ({ zero }) => one(zero('irregular'), 'evolve', 'Irregular is at 0 : the flecks are round, there is no shape to evolve.'),
   shapes: ({ is }) => one(is('shape', 0, 1, 4), 'spin', 'This shape does not turn.'),
   'ten-print': ({ zero }) => one(zero('accent'), 'tint', 'Accent is at 0 : no accent cells to color.'),
   differential: ({ zero }) => one(zero('rate'), 'ratio', 'Rate is at 0 : the waves do not spread.'),
