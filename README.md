@@ -54,6 +54,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 **Play it**
 - [What it looks like](#what-it-looks-like) · [Concept](#concept) · [Getting started](#getting-started) · [Your first five minutes](#your-first-five-minutes)
 - [Keyboard shortcuts](#keyboard-shortcuts) · [search everything](#search-everything-ctrlk) (`Ctrl+K`)
+- [Clicking the preview](#clicking-the-preview) : play on the picture itself, with the mouse or a pinching hand (Marbling's drops, combs and swirls)
 
 **The instrument**
 - [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files, live inputs and NDI® sources into Sonify's mix
@@ -67,11 +68,11 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · Generate (119 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · Generate (121 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-46) (46 : 45 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (56 FX) ·
+- [Sources](#sources-47) (47 : 46 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (56 FX) ·
   [Native nodes](#native-nodes) (27) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (20)
 - [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
@@ -205,7 +206,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 119 themed recipes that build a coherent
+   **Generate** in the toolbar : 121 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet, and **`Ctrl+K`** to
@@ -294,6 +295,35 @@ the Meta bar unfolds) and the control flashes twice. **↑ ↓** and **PgUp / Pg
 **Tab** jumps to the next kind, **Esc** (or `Ctrl+K` again, or a click outside) closes
 it. It opens in the Output page's own window too. Bare `K` still opens the Resolume
 mapper.
+
+---
+
+## Clicking the preview
+
+A source can take the mouse : click, hold or drag on the **preview** (the big preview,
+`V`, too) and you play on the picture itself. Today that source is **Marbling** (see
+[Sources](#sources-47)); with none on the picture the cursor stays the arrow and a click
+does nothing, as ever.
+
+- **Where it goes.** To the source selected in the Inspector when it takes a click,
+  else to the topmost visible layer whose source does, the Background last. The
+  preview's corner says which one and what a click does there ("L1 A · Marbling · click :
+  a drop · hold : pour · drag : a trail · 25 drops · 16K points"), and the cursor turns
+  into a crosshair over it.
+- **Where it lands.** Right under the cursor, whatever the UI zoom, however the preview
+  is letterboxed, and through the keystone, the output transform or the dome : with the
+  full dome on, the preview shows the domemaster and a click on it is mapped back through
+  the dome's own lookup (every mode : full dome, panorama, screen), so the paint lands
+  where you clicked on the dome.
+- **Undo and the session.** Each gesture (press, move, let go) is one undo step, and
+  what you did by hand is kept on the source's slot : the session, and each scene, reopen
+  the same picture (Marbling pours its log back in at load). What moves by itself (the
+  automatic drops, the currents) is live and never saved as such. The log keeps the last
+  2,000 gestures; past that the oldest leave it (a toast says so).
+- **A pinching hand is a pointer too** : the Body page's **Pinch = click** (TRACK row).
+  Each hand is its own pointer, so two hands and the mouse can play at once.
+- **OSC** : `/opsia/layer{n}/source/{A|B}/drop x y [size]` (and `/opsia/bg/source/drop`)
+  drops paint at a place from a controller.
 
 ---
 
@@ -1209,11 +1239,28 @@ picker.
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
 reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
-model; cheap) · **Mirror** (selfie view) · **Hi-res** (track on every display frame
+model; cheap) · **Mirror** (selfie view) · **Pinch = click** (each hand's pinch plays on
+the picture like a click on the preview, below) · **Hi-res** (track on every display frame
 instead of once per new camera frame : for a fast camera, at about twice the cost) ·
 **sensitivity**
 (how easily gestures fire, a global default that any single gesture can override) ·
 **hold time** (how long a held pose must last) · **OSC out**.
+
+**Pinch = click** (off by default, saved on this computer like the rest of the Body
+settings). While the Body camera runs (it never opens by itself), each hand's pinch acts
+as a pointer on the picture, through the same routing as the mouse
+([Clicking the preview](#clicking-the-preview)) : the pinch closing is a press, moving
+while pinched drags (a trail of drops, a stylus, a swirl : the click tool's), opening the
+fingers lets go, and holding the pinch still pours. Two hands are two pointers at once.
+The point is halfway between the thumb and index tips, smoothed like the hand shapes, the
+camera's frame laid straight onto the picture (mirrored with **Mirror**; straight rather
+than cropped, so every corner of the picture can be reached). The pinch is the rules' own
+(the **sensitivity** sets how close the fingers must come), with a little give before it
+lets go, so a jittery frame never lifts the pen. A ring on the preview (and on the camera
+preview here) shows where each hand points, lit while it pinches; it is drawn over the
+preview only, never into the picture or the output. Pinches are live, like the automatic
+drops : never in the undo history or the session (an evening of gestures would flood
+both).
 
 **Features → modulators.** Every tracked quantity is a normalised 0..1 **feature** on
 the body bus: hand height / horizontal / openness, each hand's **shape** (finger curls,
@@ -2257,7 +2304,7 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **119 visual themes** in 18 families
+**Generate** (toolbar) : a dropdown of **121 visual themes** in 18 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
@@ -2428,9 +2475,9 @@ don't flood your history.
 
 ---
 
-## Sources (46)
+## Sources (47)
 
-46 sources : 45 generators that produce an image from nothing (all but two : Collage
+47 sources : 46 generators that produce an image from nothing (all but two : Collage
 plays a folder of films, Silhouette reads the Body camera), and **Audio**, the waveform of
 a sound file you import (it needs a file, so no dice or theme deals it; see
 [Audio sources](#audio-sources)). Any generator can fill **Source A or B**
@@ -2439,7 +2486,7 @@ Randomize sub-ranges and its own preset bank. Your own generators from the
 [Source Editor](#source-editor--your-own-shaders-alte) list first, under **my shaders**.
 
 <details>
-<summary><b>The full source catalogue (46)</b> (click to expand)</summary>
+<summary><b>The full source catalogue (47)</b> (click to expand)</summary>
 
 | Source | Description |
 |---|---|
@@ -2472,6 +2519,7 @@ Randomize sub-ranges and its own preset bank. Your own generators from the
 | **Direct Marks** | Hand-drawn direct-film marks : ruled lines, dots or scratches in flat ink, appearing on a gate you can drive from audio (marks on the beat). |
 | **Lowercase** | Machine-cut marks on a stepped clock, in nine figures : a **matrix** of cells that subdivide into one to three narrow bars, **blocks**, **bars**, **ticks**, a scan **rule**, a thin **grid**, sprocket **ladders** down the frame edges, one white **slab** with bars cut out of it, and **slant** : full-height bars that each lean their own way (**split** is how far) and cross into X shapes and fans, thin ones and fat ones, dealt and held like the rest. Everything lands on a step and holds; nothing sweeps. It pulses on its own (**rate** up to 120 steps a second, divided by **step**, one deal kept for up to 32 steps by **hold**; every deal a fresh draw, or with **scroll** the same one slid a cell along, a stream of data), and binding its **gate** to a Euclid, a Spastic or an audio transient plays that rhythm instead. **cells** runs to 512 : the grid figures turn to crisp 1-bit static as cells fall below a pixel, and the slab becomes a barcode of about 128 bars. A **sidechain** reads another layer one sample per cell, so a film arrives as a 1-bit halftone of cells on this clock. One accent color marks a regular lattice of cells, and the previous step trails behind as a filmed projection does. Sonify's **Signal** voice reads its marks back as data. |
 | **Lattice** *(native)* | A lattice of points in space seen through a moving camera. **form** : a **plane** of dots (a floor seen from the camera's **height**), a **volume** of them the camera flies through (a room of stars), a **tunnel** (the inside of an endless tube of dots, flown down whatever the view, its radius the **height**; with **streak**, a warp tunnel), or a **sphere**, a **torus** or a spiral **galaxy** the camera circles (**tilt** and **turn** place it round the shape, **height** is its distance, low going inside the sphere; **fly** spins the globe, rolls the torus through itself, wheels the galaxy while its points stream out along the arms). On those, the **well** narrows the tunnel into a throat ahead, dents the sphere and pinches the torus where they face you, and swells the galaxy's bulge; **audio** runs round the tunnel's wall (bass at the floor) and out from the galaxy's core. **On the full dome** (fisheye, fill) the Lattice is stretched over the dome like any source, centered at the zenith, but keeps its proportions (the dome spreads a wide frame's width and height over the same circle : the view is kept square there, so a sphere stays round), and the sphere, torus and galaxy stand back to sit in the middle of the dome instead of bending down to its rim. **count** points per side (the lattice keeps its size, so more is denser), **size**, **vary** (a few large and bright), **jitter** (the grid loosened toward a scatter), **irregular** (every point a shape of its own instead of a round dot, on every form : a soft wobble first, then ink drops, seeds and pollen, torn paper and slivers, each turned its own way and held still on the screen while it streaks; far, tiny points keep a simple outline), **evolve** (the shapes morph and tumble slowly, 0 = frozen). The camera : **tilt**, **turn**, **lens**, **fly** (forward forever : the lattice wraps around the camera and its edge always fades, so its end never shows), **spin**. Where it looks, a **well** sinks the plane into a funnel (in a volume it pulls the points into a knot) over **reach**, **ripple** rings out from it (**rings**, travelling at **pace**), **swell** heaves it like a sea, **audio** lifts it with the live spectrum (bass at the heart), and the **sidechain** row picks a layer whose brightness raises the dots where each one appears, so that picture stands up out of the field. **streak** draws each point as the trail of the camera's motion, **fog** fades the distance. Dots are anti-aliased capsules, never under 1.5 px across (a far dot dims instead of shimmering), blended so overlaps never pile into a glow; a transparent **ground** shows the layers below between them. Twenty-three presets (Gravity well, Calm sea, Pond, Starfield, Crystal room, Knot, Warp, Spectrum floor, Low flight, Relief; Warp tunnel, Breathing tunnel, Throat, Globe, Pulse sphere, Inside the sphere, Rolling torus, Pinched ring, Galaxy, Edge-on galaxy; Seed floor, Pollen globe, Spore galaxy with irregular points) and two Generate themes for the new forms (Warp Tunnel, Orbit : its figures now and then made of organic points). Runs on the Background too (sound, no sidechain). |
+| **Marbling** *(native)* | Paint floating on water, as in marbled paper (ebru) : flat colors with crisp, smooth edges. Every new drop pushes the paint already on the water out of its circle, so older drops become rings, crescents and lobes around it, and **crowding** sets the old law of the bath : the more paint on the water, the smaller each new drop spreads. Built on the closed forms of mathematical marbling (Lu, Jaffer et al., 2012) : a drop, a tine line and a vortex are maps of the whole water that keep every drop's area, so nothing overlaps or tears; each drop is an outline of hundreds of points, filled on the GPU with a stencil pass into a 4x multisampled buffer, crisp at 1080p, 4K and on the dome (60 fps with 500 drops and 90K points, measured at both). **evolve** (default 0.3) carries the paint on slow currents (**currents** is their size), with a **comb** raked across now and then, back, then crosswise (**comb spacing**, **comb angle**), and a **swirl** drifting over the water; 0 is still water and the picture holds. **auto drops** land by themselves (per second, or on the beat with **sync**), **audio** drops them on the sound's onsets, bigger when it is louder; **drop size**, **size spread**, **spread time** (how long one takes to open). **drop ▸** one at a random place, **sprinkle ▸** a handful (**sprinkle count**), **clear ▸** the water emptied in a short dissolve. Past the **points budget** the most stretched of the older drops dissolve into the water, so it runs for hours (an hour at the defaults stays near 60K points). Six colors in turn or at random (**colors**, **order**) and the **water** (its alpha lets the layers below through : the **Glass** preset floats the paint over another layer). **Click the preview** to play on it ([Clicking the preview](#clicking-the-preview)) : the **click tool** drops (click : a drop, hold : keep pouring it, drag : a trail of drops), combs (drag a stylus through the paint; shift-drag : a five-tine comb at the comb spacing) or swirls (press, then circle round the point). The drop ▸, sprinkle ▸ and clear ▸ triggers are Body and MIDI actions like every loaded trigger. On the full dome (fill) the view is kept square, so drops stay round. Twelve presets (Classic bath, Tulip, Combed stone, Night water, Still water, Whirlpool, Tide, Glass, Rain, On the beat, Ink rings, Big pours), the **Marbled paper** master chains (Endpaper, Inked Edges, Rippled Bath, Riso Print) and two Generate themes (Marbled Paper, Night Bath). |
 | **Dye Field** | Subtractive pigment pooling over a near-black emulsion, disciplined toward decay and crystallisation : painted-on-film dye, never additive glow. `relief` lights the pooled dye as a thin skin of paint. |
 | **Colony** | Living matter that grows across a surface, one `kind` at a time : **lichen** on granite (grey-green, orange and pale crusts cracking into areolae as they age, a black rim where colonies meet, bare rock where the ground is poor), **mould** on agar (a white growing margin, a green sporulating centre, rings), **burning paper** (a dim ember front, scorch ahead, char and ash behind), **rust** on steel spreading from scratches (orange, then red-brown, pitted and flaking; `palette` toward copper gives verdigris). The fronts have the roughness measured on real growth, colonies stop short of each other, all lit as a relief. `ground` : its own surface, or transparent so it grows over the layer below. `regrow ▸` starts again, `regrow every` cycles on its own; `grain` sets the cell size so it looks the same from 1080p to a 4096² dome. |
 | **Ground** | The surfaces under the living things, built the way the real ones form and lit as a relief : **cracked mud** drying (plates shrink apart, cracks widen and their edges curl, a thinner second generation splits them late; `drying` fixed or on a 45 s cycle), **sand ripples** migrating under a veering wind (gentle stoss, steep lee, heavy minerals in the troughs), **rock strata** (beds of very different thickness, hard ones standing proud, laminae, joints that never line up), **wood** end grain (early / late wood, rays, drying checks), **bark** (furrowed plates, fibre). `palette` shifts each to an alternate material (red clay, black sand, limestone, walnut, birch). |
@@ -2552,7 +2600,7 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   finishing units at its end; the chain's effects run underneath across the whole width,
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **125** designed chains and sets the Vibe to match (the
+  whole master chain with one of **129** designed chains and sets the Vibe to match (the
   finalizers stay). The newer ones sit in six groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Frame Store** (Field Store : Hard Memory, Sixteen Levels, Strobe Ghost; then
@@ -2940,6 +2988,7 @@ another protocol and is not shown.
 | `…/vary` | trigger | **Vary** this layer : a variant at its own amount (its Vary button) |
 | `…/source/{A\|B}` | s | Set source shader (id / name; `none` empties the slot, a name it does not know leaves it as it is) |
 | `…/source/{A\|B}/{input}` | f · color · point2D | A source shader input |
+| `…/source/{A\|B}/drop` | f f [f] | **Marbling** : a drop at (x, y), 0..1 of the frame (y up), its size × the drop size (default 1). Live, not logged. One number is the plain `drop ▸` trigger |
 | `…/source/{A\|B}/fx/{i}/{input}` | f · color · point2D | A Source-FX unit input |
 | `…/fx/{i}/{input}` | f · color · point2D | A Layer-FX unit input |
 | `…/coupling/mode` | i / f / s | `off·lean·hocket·cut·gate·drift` |
@@ -2982,6 +3031,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `bg/blend` | bool → **group** (≥ 0.5) else **blend in** |
 | `bg/randomize` | trigger : the Background's own dice |
 | `bg/source` · `bg/source/{input}` · `bg/fx/{i}/{input}` | Background source (a ground's id or name, or `none`; anything else is ignored) / its inputs / FX inputs |
+| `bg/source/drop` | **Marbling** on the Background : `f x f y [f size]`, a drop at a place |
 
 **Coupling master switch** : `/opsia/coupling` (≥ 0.5 : every layer's A/B coupling on; below : paused).
 

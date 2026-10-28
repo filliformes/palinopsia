@@ -208,3 +208,13 @@ export function computeWarpVerts(c: number[], pxW: number, pxH: number): Float32
 }
 
 export const IDENTITY_CORNERS = [0, 0, 1, 0, 1, 1, 0, 1]
+
+/** A point of the warped output (0..1, top-left origin) → where it reads the
+ *  frame (u, v, v up), as the present pass does; null for a degenerate quad. */
+export function warpLookup(c: number[], x: number, y: number): [number, number] | null {
+  const inv = invert(squareToQuad(c))
+  if (!inv) return null
+  const w = inv[6] * x + inv[7] * y + inv[8]
+  if (Math.abs(w) < 1e-12) return null
+  return [(inv[0] * x + inv[1] * y + inv[2]) / w, (inv[3] * x + inv[4] * y + inv[5]) / w]
+}

@@ -18,6 +18,7 @@
 //   /opsia/layer{n}/source/{A|B}                       s shaderId | name | "none"
 //   /opsia/layer{n}/source/{A|B}/{input}              f 0..1 → range
 //   /opsia/layer{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
+//   /opsia/layer{n}/source/{A|B}/drop                  f x f y [f size] : Marbling, a drop at (x, y) (0..1, y up; size × the drop size, default 1)
 //   /opsia/layer{n}/fx/{i}/{input}                    f 0..1 → range
 //   /opsia/layer{n}/video[/{A|B}]/play|loop|grain     >= 0.5 (slotless form: first video slot)
 //   /opsia/layer{n}/video[/{A|B}]/direction            i index | f 0..1 | s forward|reverse|pendulum
@@ -40,6 +41,7 @@
 //   /opsia/bg/randomize                                 trigger (the Background's own dice)
 //   /opsia/bg/source                                    s shaderId | name | "none"
 //   /opsia/bg/source/{input}                           f 0..1 → range (color/point2D: N args)
+//   /opsia/bg/source/drop                              f x f y [f size] : Marbling on the Background, a drop at (x, y)
 //   /opsia/bg/fx/{i}/{input}                           f 0..1 → range
 //   /opsia/density|proximity                            f 0..1 (field macros)
 //   /opsia/gesture                                      f 0..1 (Gesture ⇄ Texture)
@@ -114,6 +116,7 @@ import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_PIECES, SPACE_VOICES, placeField
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
 import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
+import { sourceEvent } from './pointerInput'
 
 type Args = OscInEvent['args']
 // Sonify : the voices that read the picture (they have a tap), each voice's
@@ -125,6 +128,11 @@ const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined
 }
 const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
+
+/** Every argument as a number (non-numbers : NaN, which the engine ignores). */
+function oscNums(args: Args): number[] {
+  return args.map((a) => (typeof a.value === 'number' ? a.value : Number(a.value)))
+}
 
 function firstNum(args: Args): number {
   const a = args[0]
@@ -321,6 +329,8 @@ function route(address: string, args: Args): void {
         const input = segs[5]
         const sid = sourceShaderId(li, slot)
         if (!sid) return
+        // Marbling : a drop at a place (two numbers or more; one number is the plain trigger)
+        if (input === 'drop' && args.length >= 2 && sourceEvent({ layer: li, slot }, 'drop', oscNums(args))) return
         const v = resolveInputValue(sid, input, args)
         if (v !== null) st.setSourceInput(li, slot, input, v)
         return
@@ -485,6 +495,7 @@ function route(address: string, args: Args): void {
         }
         const sid = st.composition.background?.source?.shaderId
         if (!sid) return
+        if (segs[3] === 'drop' && args.length >= 2 && sourceEvent('bg', 'drop', oscNums(args))) return
         const v = resolveInputValue(sid, segs[3], args)
         if (v !== null) st.setBackgroundInput(segs[3], v)
         return

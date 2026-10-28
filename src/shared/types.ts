@@ -155,6 +155,19 @@ export interface SourceSlot extends ShaderInstance {
   // Collage `feed: assemblages` : one small edit per piece, copied out of the
   // Assemble bank so the session does not depend on machine-local storage.
   collageEdls?: import('./collage').CollageEdl[]
+  // What was done by hand on the picture (Marbling : drops, combs, swirls made
+  // with the mouse on the preview), one entry per gesture with its events and
+  // their steps, so the session (and each scene) reopens the same picture. The
+  // engine replays it; a malformed one is cut to what is valid.
+  handOps?: HandGestureLog[]
+}
+
+/** One gesture made by hand on a source's picture (one undo step). `k` : the
+ *  source's own record kind ('m' : Marbling), `ev` : its events, flat numbers. */
+export interface HandGestureLog {
+  k: string
+  id: number
+  ev: number[]
 }
 
 // Where a native convolution node reads its "impulse"/energy source from: another
@@ -575,6 +588,7 @@ export interface BodyControlConfig {
   sensitivity: number // 0..1 : global gain on gesture thresholds (higher = easier)
   gestureSensitivity: Partial<Record<BodyGesture, number>> // per-gesture override of `sensitivity` (a gesture with its own value fires at that threshold instead of the global one)
   holdMs: number // how long a pose must be held for a hold-* gesture to fire (ms)
+  pinchPointer?: boolean // each hand's pinch acts as a pointer on the picture (pointerInput.ts : Marbling's drops), off by default
   oscOut: boolean // when a rule fires, also send /body/<its osc name> over OSC
   gestures: Partial<Record<BodyGesture, GestureAction>> // legacy per-gesture map (unused : all routing is rules now; kept for stored configs)
   rules: GestureRule[] // user-authored rules (single + combo) from the rule builder

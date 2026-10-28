@@ -203,6 +203,15 @@ export function BodyPage({
         g.fillStyle = 'rgba(120,200,255,0.95)'
         for (const p of pv.pose) { g.beginPath(); g.arc(p.x * W, p.y * H, 2, 0, 7); g.fill() }
       }
+      // "pinch = click" : where each hand points, lit while it pinches
+      for (const p of pv.pinches) {
+        g.beginPath()
+        g.arc(p.x * W, p.y * H, 9, 0, 7)
+        g.lineWidth = 2.5
+        g.strokeStyle = p.down ? 'rgba(255,142,15,1)' : 'rgba(255,255,255,0.8)'
+        if (p.down) { g.fillStyle = 'rgba(255,142,15,0.35)'; g.fill() }
+        g.stroke()
+      }
       if (pv.face) {
         // The 478-point mesh as a faint dot cloud : reads as a mask, confirms lock.
         g.fillStyle = 'rgba(180,255,180,0.5)'
@@ -444,6 +453,7 @@ export function BodyPage({
               <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
               <Toggle on={!!cfg.flow} label="Motion" onClick={() => patch({ flow: !cfg.flow })} title="Read the camera's motion field (optical flow, no body model) : how much moves and which way, whether it spreads out (someone approaches, arms open) or closes in, turns, sweeps one way or scatters, and where. Gestures : swipe L/R/up/down, approach, withdraw, turn, and stillness when the room stops moving. Works on anything that moves, a crowd, a curtain, a hand. Cheap." />
               <Toggle on={cfg.mirror} label="Mirror" onClick={() => patch({ mirror: !cfg.mirror })} title="Selfie view : moving right moves the value right" />
+              <Toggle on={!!cfg.pinchPointer} label="Pinch = click" onClick={() => patch({ pinchPointer: !cfg.pinchPointer })} title="Each hand's pinch plays on the picture like a click on the preview (Marbling and any source that takes a click) : pinch to press, move while pinched to drag, open the fingers to let go; hold the pinch still to pour. The point between the thumb and index tips is laid straight onto the picture (mirrored with Mirror); a ring on the preview shows where each hand points, lit while it pinches. The sensitivity sets how close the fingers must come. Live : never kept in the session or the undo. Needs Hands." />
               <Toggle on={!!cfg.hiRes} label="Hi-res" onClick={() => patch({ hiRes: !cfg.hiRes })} title="Hi-res tracking : run the trackers on every display frame (60 Hz or more) instead of once per new camera frame. Finer, faster-reacting landmarks with a high-frame-rate camera; about twice the tracking cost. Off by default." />
             </div>
             <label className="flex min-w-[200px] flex-1 items-center gap-2 font-mono text-[11px] text-muted">

@@ -53,6 +53,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light', 'sun', 'sunHeight', 'glow', 'shadow', 'sky', 'light', 'shade'),
     g('paint', 'brush', 'mixing', 'impasto', 'canvas')
   ],
+  // three columns (a fourth wrapped under them at the Inspector's width)
+  'gen-marble': [
+    g('water', 'water', 'evolve', 'currents', 'swirl', 'comb', 'spacing', 'angle', 'budget', 'clear'),
+    g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime', 'drop', 'sprinkle', 'sprinkleN'),
+    g('paint', 'tool', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
+  ],
   'gen-lattice': [
     g('points', 'form', 'count', 'size', 'irregular', 'evolve', 'vary', 'jitter', 'ink', 'ground'),
     g('camera', 'tilt', 'turn', 'height', 'lens', 'fly', 'spin', 'streak', 'fog'),
@@ -242,6 +248,21 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     d.curve = 'Contour is at 0 : there is no curve to lengthen.'
     // (warp bends a cut-up's films too, through the same mode)
     if (zero('warp') || isnt('shape', 0)) d.contourMode = 'Contour is at 0 : nothing is warped.'
+    return d
+  },
+  // Marbling (engine/marbleWorker.ts) : the currents, the comb and the swirl all
+  // run on EVOLVE; SYNC only times AUTO; COLORS takes the first N colors.
+  'gen-marble': ({ zero, is }) => {
+    const d: Why = {}
+    if (zero('evolve')) put(d, ['currents', 'swirl', 'comb', 'spacing', 'angle'], 'Evolve is at 0 : the water is still.')
+    if (zero('comb')) put(d, ['spacing', 'angle'], 'Comb is at 0 : no comb is raked across.')
+    if (zero('auto')) put(d, ['sync'], 'Auto drops is at 0 : no drop lands by itself.')
+    for (let n = 2; n <= 5; n++) {
+      if (is('count', n)) {
+        const off = ['color3', 'color4', 'color5', 'color6'].slice(n - 2)
+        put(d, off, `Colors is ${n} : only the first ${n} colors are dropped.`)
+      }
+    }
     return d
   },
   'gen-lattice': ({ zero, is }) => {

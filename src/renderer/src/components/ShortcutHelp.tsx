@@ -29,7 +29,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
-      ['V', 'Big preview : fold the panels under it (and back)']
+      ['V', 'Big preview : fold the panels under it (and back)'],
+      ['Click the preview', 'Play on a source that takes a click (Marbling : a drop · hold : pour · drag : a trail; shift-drag : a comb)']
     ]
   },
   {

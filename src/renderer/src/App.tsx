@@ -24,6 +24,8 @@ import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
 import StreamRelay from './workers/streamRelay?worker&inline'
+import { setPointerHost, attachPreviewPointer } from './pointerInput'
+import PreviewPointerOverlay from './components/PreviewPointerOverlay'
 import { sonifyEngine } from './audio/sonify'
 import { spaceEngine } from './audio/space'
 import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession, registerShowPanels } from './commands'
@@ -315,6 +317,12 @@ export default function App(): JSX.Element {
   const previewRef = useRef<HTMLDivElement | null>(null)
   const previewColRef = useRef<HTMLElement | null>(null)
   const compositorRef = useRef<Compositor | null>(null)
+  // the preview canvas as an input (Marbling's drops) : nothing happens unless a
+  // source that takes the pointer is on the picture
+  useEffect(() => {
+    const cv = canvasRef.current
+    return cv ? attachPreviewPointer(cv) : undefined
+  }, [])
   // Metasurface : last-nearest scene index, so a structure jump (a new nearest)
   // crossfades instead of snapping. -1 = surface inactive / nothing placed.
   const surfaceNearest = useRef(-1)
@@ -1245,6 +1253,8 @@ export default function App(): JSX.Element {
       depthModePrev = ''
       // The `0` key + the Transport's flush button both fire panic through here.
       registerPanic(() => compositorRef.current?.panic())
+      // clicking the preview : the sources that take the pointer (pointerInput.ts)
+      setPointerHost(() => compositorRef.current)
       // The agent's snapshot and the Source Editor's live input read it here.
       registerOutputCanvas(() => canvas)
       // Warm the video encoder and the sound bus up, once, after the launch has
@@ -2326,6 +2336,7 @@ export default function App(): JSX.Element {
             />
             {/* FPS bottom-right, mirroring the resolution tag bottom-left. */}
             <FpsTag />
+            <PreviewPointerOverlay canvasRef={canvasRef} />
             <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
               {domeOn
                 ? `dome · ${domeRes}² master from ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`

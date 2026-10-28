@@ -109,6 +109,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   contour: ['contour', 'topographic', 'lines', 'noise', 'matte', 'map', 'audio'],
   differential: ['polyrhythm', 'oscillator', 'waves', 'harmonograph', 'geometry', 'contour'],
   'direct-marks': ['film', 'scratches', 'marks', 'ink', 'hand-drawn', 'cameraless'],
+  'gen-marble': ['marbling', 'marble', 'ebru', 'suminagashi', 'paint', 'ink', 'drops', 'drop', 'liquid', 'water', 'fluid', 'float', 'comb', 'swirl', 'paper', 'flat', 'pattern', 'click', 'mouse', 'draw', 'interactive', 'pour'],
   'gen-lattice': ['dots', 'points', '3d', 'stars', 'starfield', 'grid', 'perspective', 'space', 'well', 'ripple', 'tunnel', 'warp', 'sphere', 'globe', 'torus', 'donut', 'ring', 'galaxy', 'spiral', 'organic', 'irregular', 'blob', 'pollen', 'cells'],
   'lowercase': ['data', 'grid', 'strobe', 'minimal', 'barcode', 'sprocket', 'rhythm', 'black and white', 'slant', 'crossing lines'],
   'drift-field': ['flow', 'noise', 'bands', 'drift', 'matte'],

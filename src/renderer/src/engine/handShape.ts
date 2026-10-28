@@ -401,6 +401,45 @@ export function shapeFit(id: HandShapeId, f: HandShapeFeatures, sens: number, gi
   return m
 }
 
+/** A hand's pinch as a pointer (the Body page's "pinch = click", pointerInput.ts) :
+ *  closes when the thumb-to-index distance (the rules' pinch measure, over the
+ *  hand's size) drops under the rules' own threshold (so the Body sensitivity
+ *  applies), opens again only past it plus the shapes' hysteresis, for
+ *  RELEASE_MS (a jittery frame does not lift the pen). */
+export class PinchPointer {
+  down = false
+  private offSince: number | null = null
+
+  /** One tracked frame (`now` in ms) : 'down' / 'up' on a change, else null. */
+  push(amount: number, threshold: number, now: number): 'down' | 'up' | null {
+    if (!this.down) {
+      if (amount < threshold) {
+        this.down = true
+        this.offSince = null
+        return 'down'
+      }
+      return null
+    }
+    if (amount > threshold + HYS) {
+      if (this.offSince === null) this.offSince = now
+      if (now - this.offSince >= RELEASE_MS) {
+        this.down = false
+        this.offSince = null
+        return 'up'
+      }
+    } else this.offSince = null
+    return null
+  }
+
+  /** The hand is gone (or the toggle off) : true when it was pinching. */
+  reset(): boolean {
+    const was = this.down
+    this.down = false
+    this.offSince = null
+    return was
+  }
+}
+
 /** One hand slot's held shape : fires once when a shape is entered and has held
  *  for the settle time, lets go when it no longer fits with the exit thresholds
  *  (or another shape takes over), then can fire again. */

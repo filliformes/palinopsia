@@ -346,6 +346,7 @@
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/source/<span class="v">{slot}</span></td><td class="arg">s</td><td class="desc">Swap the source generator : a <code>shaderId</code> (a shader of your own from the Source Editor goes by its <code>user-…</code> id), a built-in's display <b>name</b>, or <code>none</code>. The one already there keeps its settings. <code>none</code> empties the slot; a name it does not know leaves the slot as it is.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A source shader <b>input</b>, scaled to its range.</td></tr>
           <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-source</b> FX unit <code>i</code>.</td></tr>
+          <tr><td class="addr"><span class="lit">…/</span>source/<span class="v">{slot}</span>/drop</td><td class="arg">f f [f]</td><td class="desc"><b>Marbling</b> : a drop at <code>x y</code> (0..1 of the frame, y up), its size × the drop size (default 1). Live : never in the undo or the session. One number is the plain <code>drop ▸</code> trigger.</td></tr>
           <tr><td class="addr"><span class="lit">…/layer</span><span class="v">{n}</span>/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on the <b>per-layer</b> FX unit <code>i</code>.</td></tr>
         </tbody>
       </table>
@@ -419,6 +420,7 @@
           <tr><td class="addr"><span class="lit">/opsia/</span>bg/randomize</td><td class="arg"><span class="tag trig">trigger</span></td><td class="desc">The Background's own <b>dice</b> : a new ground and rack, keeping opacity, speed, shadow and mode.</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>bg/source</td><td class="arg">s</td><td class="desc">Swap the ground (a ground's id or name, or <code>none</code>; anything else is ignored).</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>bg/source/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">A background source <b>input</b>, scaled to range.</td></tr>
+          <tr><td class="addr"><span class="lit">/opsia/</span>bg/source/drop</td><td class="arg">f f [f]</td><td class="desc"><b>Marbling</b> on the Background : a drop at <code>x y</code> [size].</td></tr>
           <tr><td class="addr"><span class="lit">/opsia/</span>bg/fx/<span class="v">{i}</span>/<span class="v">{input}</span></td><td class="arg">f 0..1 →</td><td class="desc">An input on background FX unit <code>i</code>.</td></tr>
         </tbody>
       </table>

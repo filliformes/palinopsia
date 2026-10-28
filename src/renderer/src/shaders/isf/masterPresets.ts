@@ -772,6 +772,41 @@ export const MASTER_PRESETS: MasterPreset[] = [
   },
   // Field Store on the whole picture : hard stamps that never fade, the whole
   // frame through a coarse 16-level store, strobed see-through echoes.
+  // ── Marbled paper : chains for Marbling's flat paint (they keep its palette :
+  // mixSrc 1, no palette map). ──
+  {
+    name: 'Endpaper', group: 'Marbled paper',
+    fx: [
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.5, chroma: 0, parasites: 0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.04, saturation: 0.96, lift: 0.015, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Inked Edges', group: 'Marbled paper',
+    fx: [
+      { shaderId: 'fx-edge', inputs: { gain: 1.3, blend: 0.4, ink: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Rippled Bath', group: 'Marbled paper',
+    fx: [
+      { shaderId: 'fx-displace', inputs: { amount: 0.008, scale: 3.5, rate: 0.12 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 1.05, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Riso Print', group: 'Marbled paper',
+    fx: [
+      { shaderId: 'fx-dither', inputs: { levels: 4, scale: 2, amount: 0.55 } },
+      { shaderId: 'fx-grain', inputs: { character: 0, amount: 0.06, size: 2, chroma: 0.1, parasites: 0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0.01, contrast: 1.08, saturation: 0.9, lift: 0.03, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
+  },
   {
     name: 'Hard Memory', group: 'Frame Store',
     fx: [

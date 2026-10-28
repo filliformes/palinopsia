@@ -1670,6 +1670,58 @@ export const GENERATORS: IsfShader[] = [
       ripple: [0, 0.6], rings: [1.5, 6], pace: [-0.6, 0.6], swell: [0, 0.5], audio: [0, 0.4], side: [0, 0],
       streak: [0, 0.4], fog: [0.2, 0.6], irregular: [0, 0.35], evolve: [0, 0.4]
     }
+  },
+  {
+    // Native (engine/MarbleSource.ts, model engine/marbleModel.ts, stepped in
+    // workers/marbleWorker.ts) : drops as outlines, stencil-filled flat.
+    // Painterly : paint floated on water and laid on paper, a painted matter.
+    id: 'gen-marble',
+    name: 'Marbling',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Marbling : drops of paint on water, flat colors with crisp edges. Each drop pushes the paint already there into rings and lobes around it, and the more paint on the water, the smaller each new drop spreads (CROWDING). EVOLVE carries it all on slow currents (CURRENTS is their size), with a slow COMB raked across now and then (its SPACING and ANGLE) and a SWIRL drifting over the water : at 0 the water is still and the picture holds. AUTO drops land by themselves (a rate, or on the beat with SYNC), AUDIO drops them on the sound’s onsets, DROP SIZE and SIZE SPREAD shape them, SPREAD TIME is how long one takes to open. Past the POINTS BUDGET the oldest drops dissolve into the water, so it runs for hours. Six colors and the WATER (its alpha lets the layers below through), taken in turn or at random. Click the preview to play on it (CLICK TOOL) : a drop, hold to pour, drag for a trail; a stylus or a comb; a swirl. What you do by hand is kept in the session.',
+      CATEGORIES: ['Generator', 'Painterly'],
+      INPUTS: [
+        { NAME: 'evolve', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'evolve' },
+        { NAME: 'currents', TYPE: 'float', MIN: 0.3, MAX: 3, DEFAULT: 1, LABEL: 'currents' },
+        { NAME: 'comb', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'comb' },
+        { NAME: 'spacing', TYPE: 'float', MIN: 0.02, MAX: 0.3, DEFAULT: 0.08, LABEL: 'comb spacing' },
+        { NAME: 'angle', TYPE: 'float', MIN: -1.5708, MAX: 1.5708, DEFAULT: 0, LABEL: 'comb angle' },
+        { NAME: 'swirl', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'swirl' },
+        { NAME: 'auto', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 0.5, LABEL: 'auto drops' },
+        { NAME: 'sync', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['free', '1/4', '1/2', 'beat', '2 beats', 'bar'], DEFAULT: 0, LABEL: 'sync' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.05, MAX: 1, DEFAULT: 0.45, LABEL: 'drop size' },
+        { NAME: 'vary', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'size spread' },
+        { NAME: 'crowding', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'crowding' },
+        { NAME: 'spreadTime', TYPE: 'float', MIN: 0.1, MAX: 3, DEFAULT: 0.6, LABEL: 'spread time' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'budget', TYPE: 'float', MIN: 10, MAX: 150, DEFAULT: 60, LABEL: 'points budget' },
+        { NAME: 'color1', TYPE: 'color', DEFAULT: [0.12, 0.17, 0.37, 1], LABEL: 'color 1' },
+        { NAME: 'color2', TYPE: 'color', DEFAULT: [0.82, 0.58, 0.2, 1], LABEL: 'color 2' },
+        { NAME: 'color3', TYPE: 'color', DEFAULT: [0.72, 0.27, 0.36, 1], LABEL: 'color 3' },
+        { NAME: 'color4', TYPE: 'color', DEFAULT: [0.94, 0.9, 0.81, 1], LABEL: 'color 4' },
+        { NAME: 'color5', TYPE: 'color', DEFAULT: [0.1, 0.1, 0.11, 1], LABEL: 'color 5' },
+        { NAME: 'color6', TYPE: 'color', DEFAULT: [0.37, 0.43, 0.28, 1], LABEL: 'color 6' },
+        { NAME: 'water', TYPE: 'color', DEFAULT: [0.95, 0.94, 0.91, 1], LABEL: 'water' },
+        { NAME: 'count', TYPE: 'long', VALUES: [2, 3, 4, 5, 6], LABELS: ['2', '3', '4', '5', '6'], DEFAULT: 6, LABEL: 'colors' },
+        { NAME: 'order', TYPE: 'long', VALUES: [0, 1], LABELS: ['in turn', 'random'], DEFAULT: 0, LABEL: 'order' },
+        { NAME: 'tool', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['drops', 'comb', 'swirl'], DEFAULT: 0, LABEL: 'click tool' },
+        { NAME: 'sprinkleN', TYPE: 'float', MIN: 4, MAX: 64, DEFAULT: 24, LABEL: 'sprinkle count' },
+        { NAME: 'drop', TYPE: 'event', LABEL: 'drop ▸' },
+        { NAME: 'sprinkle', TYPE: 'event', LABEL: 'sprinkle ▸' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' }
+      ]
+    })}*/`,
+    // The points budget is the machine's, the click tool and the beat sync are
+    // staging : never dealt. The palette rolls through its presets, not the dice.
+    curated: {
+      evolve: [0.15, 0.6], currents: [0.6, 1.8], comb: [0, 0.5], spacing: [0.04, 0.14], angle: [-1.5708, 1.5708], swirl: [0, 0.5],
+      auto: [0.25, 1.4], sync: [0, 0], size: [0.25, 0.7], vary: [0.2, 0.7], crowding: [0.4, 0.9], spreadTime: [0.35, 1.2],
+      audio: [0, 0.4], budget: [60, 60], count: [4, 6], order: [0, 1], tool: [0, 0], sprinkleN: [16, 40]
+    }
   }
 ]
 

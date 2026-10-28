@@ -1229,9 +1229,14 @@ export class ISFLayer {
   }
 
   /** Activate/swap/refresh/clear a registry engine (engine/nativeGenerators.ts). */
-  setNative(slot: 'A' | 'B', id: string | null, inputs: Record<string, number | number[]> | null): void {
-    const next = syncNativeSlot(slot === 'A' ? this.natA : this.natB, this.shared.gl, this.w, this.h, id, inputs);
+  setNative(slot: 'A' | 'B', id: string | null, inputs: Record<string, number | number[]> | null, ops?: import('@shared/types').HandGestureLog[]): void {
+    const next = syncNativeSlot(slot === 'A' ? this.natA : this.natB, this.shared.gl, this.w, this.h, id, inputs, ops);
     if (slot === 'A') this.natA = next; else this.natB = next;
+  }
+
+  /** The slot's registry engine (pointerInput.ts : a source that takes the pointer). */
+  nativeSrc(slot: 'A' | 'B'): import('./nativeGenerators').NativeGenerator | null {
+    return (slot === 'A' ? this.natA : this.natB)?.src ?? null;
   }
 
   /** Activate/refresh/clear a native COLLAGE source (a wall of film pieces). */
@@ -2124,6 +2129,26 @@ export class Compositor {
   /** Sonify's Collage voice : every Collage wall in the composition (layers A/B
    *  and the background), each with how visible it is (layer opacity, mute /
    *  solo, the A/B mix) so a hidden wall falls silent and a fading one fades. */
+  /** A layer slot's or the Background's registry engine (pointerInput.ts). */
+  pointerEngine(t: { layer: number; slot: 'A' | 'B' } | 'bg'): import('./nativeGenerators').NativeGenerator | null {
+    if (t === 'bg') return this.bgNat?.src ?? null;
+    return this.layers[t.layer]?.nativeSrc(t.slot) ?? null;
+  }
+
+  /** How the canvas shows the frame now (pointerMap.ts : a click mapped back to
+   *  the frame through the dome, the keystone and the output transform). */
+  displayState(): import('./pointerMap').DisplayState {
+    const d = this.domeCfg;
+    return {
+      aspect: this.w / Math.max(1, this.h),
+      dome: d,
+      domeRot: d ? ((d.rotate + this.domeSpinDeg()) * Math.PI) / 180 : 0,
+      outX: !d && outXformActive(this.outXCfg, this.outXSpin) ? this.outXCfg : null,
+      outXSpin: this.outXSpin,
+      warp: !d && this.warpActive ? this.warpCorners.slice() : null
+    };
+  }
+
   /** The fulldome stage's spin phase in degrees (Space : sound that turns with
    *  the dome picture). 0 while the dome is off. */
   domeSpinDeg(): number {
@@ -2965,7 +2990,7 @@ export class Compositor {
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
-      L.setNative('A', natA, natA ? l.sourceA.inputs : null);
+      L.setNative('A', natA, natA ? l.sourceA.inputs : null, l.sourceA.handOps);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs, folder: l.sourceA.collageFolder } : null);
       L.setAudio('A', l.sourceA.kind === 'audio' && l.sourceA.mediaId ? { url: l.sourceA.mediaId, path: l.sourceA.mediaPath ?? '', inputs: l.sourceA.inputs } : null, i);
@@ -2988,7 +3013,7 @@ export class Compositor {
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
-      L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null);
+      L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null, l.sourceB?.handOps);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
       L.setAudio('B', l.sourceB?.kind === 'audio' && l.sourceB.mediaId ? { url: l.sourceB.mediaId, path: l.sourceB.mediaPath ?? '', inputs: l.sourceB.inputs } : null, i);
@@ -3041,7 +3066,7 @@ export class Compositor {
       this.bgParam = null;
     }
     const bgNatId = bg && nativeGeneratorFactory(bgId) ? bgId : null;
-    this.bgNat = syncNativeSlot(this.bgNat, this.shared.gl, this.w, this.h, bgNatId, bgNatId && bg ? bg.source.inputs : null);
+    this.bgNat = syncNativeSlot(this.bgNat, this.shared.gl, this.w, this.h, bgNatId, bgNatId && bg ? bg.source.inputs : null, bg?.source.handOps);
     // 'gen-text' is native (kept out of loadIsf) but has no background handler :
     // TextSource.render needs a sidechain texture the background path never wires,
     // so it can't satisfy the one-arg bgNativeSource contract. The curated picker

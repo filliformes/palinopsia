@@ -31,7 +31,7 @@ import type {
   SidechainRef,
   SourceSlot,
   World, LightPath } from '@shared/types'
-import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, AudioLayerSlot, AudioLayerState } from '@shared/types'
+import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
@@ -45,6 +45,7 @@ import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
+import { PRESETS_BY_ID } from './shaders/isf/presets'
 import { canHostFx } from './fxScopes'
 import { modTargetKey } from './modKey'
 import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
@@ -987,6 +988,19 @@ function withoutGateHair(c: CompositionState): CompositionState {
   }
 }
 
+// A slot's hand-made log (Marbling's gestures) : capped, the oldest leaving
+// first, so a show that runs for hours keeps a session file of a sane size.
+export const HAND_LOG_MAX = 2000
+const HAND_LOG_NUMBERS = 200000
+
+/** Marbling's `clear ▸` empties the water, and with it the hand-made log (one
+ *  undo step brings both back). */
+function withClearedHandOps(src: SourceSlot, name: string, value: number | number[]): SourceSlot {
+  if (name !== 'clear' || src.shaderId !== 'gen-marble' || !src.handOps?.length) return src
+  if (!(typeof value === 'number' && value >= 0.5)) return src
+  return { ...src, handOps: [] }
+}
+
 // Migrate a composition loaded from disk (or a recalled scene) up to the current
 // schema : backfill new layer/background/master/modulator/metaKnob fields so an
 // older session — or a scene inside one — can never hand the engine an undefined
@@ -1140,6 +1154,10 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
   // A shader's inputs : curated random draws, then the theme's own picks.
   const pickedInputs = (id: string): Record<string, number | number[]> => {
     const inputs = randomizeInputs(id, {})
+    const named = theme.presets?.[id]
+    const name = named?.length ? pickOf(named) : null
+    const preset = name ? PRESETS_BY_ID[id]?.find((p) => p.name === name) : undefined
+    if (preset) Object.assign(inputs, preset.values)
     const picks = theme.pickInputs?.[id]
     if (picks) for (const k in picks) if (picks[k].length) inputs[k] = pickOf(picks[k])
     return inputs
@@ -1494,6 +1512,10 @@ interface StoreState {
     name: string,
     value: number | number[]
   ) => void
+  /** A gesture made by hand on a source's picture (Marbling) joins its slot's
+   *  log. Returns false when the slot no longer plays that source. Trims the
+   *  oldest past HAND_LOG_MAX (true in `trimmed`). */
+  appendHandOp: (target: { layer: number; slot: 'A' | 'B' } | 'bg', shaderId: string, entry: HandGestureLog) => { ok: boolean; trimmed: boolean }
   patchLayer: (layer: number, partial: Partial<LayerState>) => void
 
   // FX racks (Phase 3) : one action surface for all four rack scopes.
@@ -3032,7 +3054,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return {
         composition: {
           ...s.composition,
-          background: { ...bg, source: { ...bg.source, inputs: { ...bg.source.inputs, [name]: value } } }
+          background: { ...bg, source: withClearedHandOps({ ...bg.source, inputs: { ...bg.source.inputs, [name]: value } }, name, value) }
         }
       }
     }),
@@ -3242,16 +3264,50 @@ export const useStore = create<StoreState>((set, get) => ({
           if (slot === 'A')
             return {
               ...l,
-              sourceA: { ...l.sourceA, inputs: { ...l.sourceA.inputs, [name]: value } }
+              sourceA: withClearedHandOps({ ...l.sourceA, inputs: { ...l.sourceA.inputs, [name]: value } }, name, value)
             }
           if (!l.sourceB) return l
           return {
             ...l,
-            sourceB: { ...l.sourceB, inputs: { ...l.sourceB.inputs, [name]: value } }
+            sourceB: withClearedHandOps({ ...l.sourceB, inputs: { ...l.sourceB.inputs, [name]: value } }, name, value)
           }
         })
       }
     })),
+  appendHandOp: (target, shaderId, entry) => {
+    let ok = false
+    let trimmed = false
+    const add = (src: SourceSlot): SourceSlot => {
+      if (src.kind !== 'generator' || src.shaderId !== shaderId) return src
+      ok = true
+      const log = [...(src.handOps ?? []), entry]
+      // the cap : the oldest gestures leave the log (their paint stays on the
+      // water until the points budget dissolves it)
+      let n = 0
+      for (const g of log) n += g.ev.length
+      while (log.length > 1 && (log.length > HAND_LOG_MAX || n > HAND_LOG_NUMBERS)) {
+        n -= log.shift()!.ev.length
+        trimmed = true
+      }
+      return { ...src, handOps: log }
+    }
+    set((s) => {
+      if (target === 'bg') {
+        const bg = s.composition.background
+        if (!bg) return {}
+        return { composition: { ...s.composition, background: { ...bg, source: add(bg.source) } } }
+      }
+      return {
+        composition: {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, target.layer, (l) =>
+            target.slot === 'A' ? { ...l, sourceA: add(l.sourceA) } : l.sourceB ? { ...l, sourceB: add(l.sourceB) } : l
+          )
+        }
+      }
+    })
+    return { ok, trimmed }
+  },
   patchLayer: (layer, partial) =>
     set((s) => ({
       composition: {

@@ -21,7 +21,8 @@ import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
 import { createBodyWorker } from './bodyWorker'
-import { handShape, HandSlots, HandSmoother, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
+import { handShape, HandSlots, HandSmoother, PinchPointer, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
+import { bodyPointer, setHandCursors, HAND_PID, type HandCursor } from '../pointerInput'
 
 // opsia-asset:// URLs (served by main from the bundled resources/mediapipe dir).
 const WASM_BASE = 'opsia-asset://local/wasm'
@@ -126,6 +127,9 @@ export interface BodyPreview {
   // The shape each hand holds now, at its wrist (raw camera coordinates), for a
   // label on the preview : "L fist", "R peace".
   shapes: Array<{ x: number; y: number; label: string }>
+  // "pinch = click" : where each hand points (raw camera coordinates, between
+  // the thumb and index tips), lit while it pinches.
+  pinches: Array<{ x: number; y: number; down: boolean }>
 }
 
 class BodyTracker {
@@ -185,6 +189,11 @@ class BodyTracker {
   private handSlots = new HandSlots()
   private shape: Record<HandSlot, SlotShape> = { left: slotShape(), right: slotShape() }
   private latestShapes: BodyPreview['shapes'] = []
+  // "pinch = click" : each slot's pinch point (smoothed, raw camera coordinates)
+  // and its pointer state
+  private pinchAt: Record<HandSlot, { x: number; y: number } | null> = { left: null, right: null }
+  private pinchPtr: Record<HandSlot, PinchPointer> = { left: new PinchPointer(), right: new PinchPointer() }
+  private latestPinches: BodyPreview['pinches'] = []
   private pinchDown = { left: false, right: false }
   private prevTwoHands: Array<{ x: number; y: number }> | null = null // last frame's two wrist positions (for cross)
   private clapArmed = true
@@ -243,7 +252,8 @@ class BodyTracker {
       pose: this.latestPose,
       face: this.latestFace,
       mirror: this.cfg?.mirror ?? true,
-      shapes: this.latestShapes
+      shapes: this.latestShapes,
+      pinches: this.latestPinches
     }
   }
 
@@ -506,6 +516,7 @@ class BodyTracker {
   }
 
   stop(): void {
+    this.releasePinches()
     this.startGen++ // invalidate any start() still resolving its awaits
     this.running = false
     this.starting = false
@@ -688,6 +699,7 @@ class BodyTracker {
       facePresent: hasFace ? 1 : 0
     }
     if (hasHands) this.deriveHands(this.latestHands, r.handed ?? [], mirror, out, cfg, ts)
+    else this.pinchPointers(null, null, mirror, cfg, ts)
     if (hasPose) {
       this.derivePose(this.latestPose as NormalizedLandmark[], mirror, out, cfg, ts)
       this.poseLostAt = 0
@@ -873,6 +885,7 @@ class BodyTracker {
     const pinchR = right ? pinchAmt(right) < 0.35 + this.sens('pinchRight') * 0.35 : false
     this.pinchGate('left', pinchL)
     this.pinchGate('right', pinchR)
+    this.pinchPointers(left ? pinchAmt(left) : null, right ? pinchAmt(right) : null, mirror, cfg, ts)
     this.hold('holdPinchLeft', pinchL)
     this.hold('holdPinchRight', pinchR)
 
@@ -896,6 +909,42 @@ class BodyTracker {
     } else {
       this.prevTwoHands = null
     }
+  }
+
+  /** "pinch = click" : each hand's pinch as a pointer on the picture
+   *  (pointerInput.ts), at the point between its thumb and index tips, the
+   *  camera's frame laid straight onto the composition (mirrored with Mirror). */
+  private pinchPointers(amtL: number | null, amtR: number | null, mirror: boolean, cfg: BodyControlConfig, ts: number): void {
+    const on = !!cfg.pinchPointer
+    const cursors: HandCursor[] = []
+    const raw: BodyPreview['pinches'] = []
+    for (const s of ['left', 'right'] as const) {
+      const amt = s === 'left' ? amtL : amtR
+      const pp = this.pinchPtr[s]
+      const pid = HAND_PID + (s === 'left' ? 0 : 1)
+      const at = this.pinchAt[s]
+      if (!on || amt === null || !at) {
+        if (pp.reset()) bodyPointer(pid, 'up', 0, 0)
+        continue
+      }
+      const u = mirror ? 1 - at.x : at.x
+      const v = 1 - at.y
+      const ev = pp.push(amt, 0.35 + this.sens(s === 'left' ? 'pinchLeft' : 'pinchRight') * 0.35, ts)
+      if (ev === 'down') bodyPointer(pid, 'down', u, v)
+      else if (ev === 'up') bodyPointer(pid, 'up', u, v)
+      else if (pp.down) bodyPointer(pid, 'move', u, v)
+      cursors.push({ pid, u, v, down: pp.down })
+      raw.push({ x: at.x, y: at.y, down: pp.down })
+    }
+    setHandCursors(cursors)
+    this.latestPinches = raw
+  }
+
+  /** Every pinching hand lets go (the camera stopped, the toggle went off). */
+  private releasePinches(): void {
+    for (const s of ['left', 'right'] as const) if (this.pinchPtr[s].reset()) bodyPointer(HAND_PID + (s === 'left' ? 0 : 1), 'up', 0, 0)
+    setHandCursors([])
+    this.latestPinches = []
   }
 
   private pinchGate(slot: 'left' | 'right', down: boolean): void {
@@ -922,6 +971,7 @@ class BodyTracker {
     for (const s of ['left', 'right'] as const) {
       const lm = s === 'left' ? left : right
       const st = this.shape[s]
+      this.pinchAt[s] = null
       if (!lm) {
         if (st.had) { st.reader.reset(); st.smoother.reset(); st.had = false }
         continue
@@ -932,7 +982,10 @@ class BodyTracker {
       st.had = true
       st.wx = w.x
       st.wy = w.y
-      const f = handShape(st.smoother.push(lm, ts, aspect), { aspect, mirror, rawLeft: rawLeftFor(s, mirror) })
+      const sm = st.smoother.push(lm, ts, aspect)
+      // the pinch point (thumb tip 4, index tip 8), smoothed with the shape's landmarks
+      if (sm.length >= 9) this.pinchAt[s] = { x: (sm[4].x + sm[8].x) / 2, y: (sm[4].y + sm[8].y) / 2 }
+      const f = handShape(sm, { aspect, mirror, rawLeft: rawLeftFor(s, mirror) })
       if (!f) continue
       const K = SHAPE_KEYS[s]
       for (let i = 0; i < 5; i++) out[K.curl[i]] = f.curl[i]

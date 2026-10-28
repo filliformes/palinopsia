@@ -74,6 +74,58 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Marbling, a new source, and clicking the preview** (Vincent, from stills of a water
+  marbling drawing app : "could we make a version of it as a new source inside
+  Palinopsia ? ... Maybe this could give the way to Palinopsia supporting the mouseclick
+  on the visual preview screen as an input"). `gen-marble` (native, Painterly section) :
+  drops of paint on water as outlines, flat colors, crisp edges. The model
+  (`engine/marbleModel.ts`, pure) applies the closed forms of mathematical marbling
+  (Lu, Jaffer et al., 2012) to every point : the drop push `c + (p - c)·sqrt(1 + r²/|p - c|²)`
+  (spreading in steps that add up exactly to the one-shot drop), tine lines (a `sech`
+  falloff instead of the paper's `exp`, so a combed tip rounds off within a pixel and its
+  two sides never cross), vortices, and the currents as plane-wave shears (each keeps
+  every area exactly). Outlines are resampled (Catmull-Rom splits past 4 px at 1080p,
+  merges under 1.2 px, finer at sharp turns). Spreading, pouring, dissolving and every
+  hand-made event run on a fixed 60 Hz step, so a logged gesture replays to the same
+  points. The water runs in a worker (`workers/marbleWorker.ts` : at 90K points the
+  currents, spreading and resample cost ~5 ms a frame) which also lays out the draw : a
+  stencil fan per outline and a depth-tested cover of its box, drops whose boxes are
+  apart sharing one draw (a few dozen draws for 500 drops), into a 4x MSAA buffer shared
+  by every Marbling slot, resolved and reused while nothing moves (`engine/MarbleSource.ts`).
+  Inputs : evolve (default 0.3), currents, swirl, comb (+ spacing, angle), auto drops
+  (+ sync to the beat), audio (onsets), drop size, size spread, crowding (the more paint,
+  the smaller each new drop), spread time, points budget (past it the most stretched of
+  the older drops dissolve), six colors + water (alpha : the layers below through),
+  colors, order, click tool, sprinkle count, drop / sprinkle / clear triggers. Twelve
+  presets, a **Marbled paper** chain group (Endpaper, Inked Edges, Rippled Bath, Riso
+  Print), two Living Surfaces themes (Marbled Paper, Night Bath; a theme can now name
+  which of a source's presets it draws from : `presets` in `themes.ts`). Measured on the
+  RTX 4070 : 60 fps at 1080p and at 4K with ~480 drops and ~95K points evolving and
+  spreading (vsync, p95 frame 16.8 ms); uncapped 158 to 203 fps; the source's own main
+  thread cost 0.1 to 0.3 ms a frame. An hour of show at the defaults stays near 60K
+  points. Headless tests : 5,734 assertions (drops stay disjoint, incremental = one-shot
+  to 1e-9, comb and swirl keep every outline simple and counter-clockwise, edges within
+  bounds over 1,000 random operations, the log replays to the identical points, a
+  malformed log sanitizes).
+  **Clicking the preview** (`pointerInput.ts`, `engine/pointerMap.ts`) : the preview canvas
+  (and the big preview) is an input for a source that takes it (`pointer?` on a native
+  generator) : the Inspector's selected slot first, else the topmost visible layer, the
+  Background last; crosshair cursor and a hint in the preview's corner; the click mapped
+  through the canvas box (CSS zoom safe), the keystone, the output transform and the
+  dome's own lookup (every dome mode). A mouse gesture is one undo step and joins the
+  slot's `handOps` log (sessions and scenes reopen the same picture : save, New, load
+  measured pixel-identical; capped at 2,000 gestures); `clear ▸` empties it. OSC
+  `/opsia/layer{n}/source/{A|B}/drop x y [size]` and `/opsia/bg/source/drop`; the drop /
+  sprinkle / clear triggers are Body and MIDI actions.
+  **Pinch = click** (Body page, TRACK row, off by default) : each hand's pinch is a pointer
+  through the same routing (two hands at once), at the smoothed point between thumb and
+  index tips, camera frame laid straight on the picture (mirrored with Mirror), the rules'
+  pinch threshold with the hand shapes' hysteresis and release time (`PinchPointer` in
+  `engine/handShape.ts`); rings on the preview (and the Body camera preview) show where
+  each hand points. Body gestures are live, never logged. Tested with synthetic hands
+  through the tracker's own `process()` (no camera) : pour, trail, two hands at once,
+  Mirror on and off.
+
 - **Organic shapes for Lattice, Ash and Particle Drift** (Vincent : "I don't want to
   only have pills-looking dots, I want them more organic"). Each of the three sources
   has a new **irregular** control (0 = the round dots and capsules exactly as before,

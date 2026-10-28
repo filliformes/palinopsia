@@ -188,6 +188,9 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'lowercase': /^(ink|ground)$/,
   // Points of light on a dark ground : the field stays a white dot on near-black.
   'gen-lattice': /^(ink|ground)$/,
+  // Marbling : a palette and its water are chosen together (its presets), six
+  // hues rolled apart would clash.
+  'gen-marble': /^(color[1-6]|water)$/,
   'sync-osc': /^loA$/,
   // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
   // set it racing), Crawl's ground (clear hides the picture under it) and Store

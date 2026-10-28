@@ -71,6 +71,9 @@ export interface Theme {
   /** Value draws per source, effect or node : one of the listed values (a single
    *  value is fixed). */
   pickInputs?: Record<string, Record<string, number[]>>
+  /** Per source : one of these of its own presets (shaders/isf/presets.ts, by
+   *  name), applied before pickInputs : a palette the dice would not roll. */
+  presets?: Record<string, string[]>
   /** Lines a Text source draws from (one to three, stepped with `next line`). */
   words?: string[]
   /** A/B source-mix modes (default normal / screen / difference / multiply). */
@@ -1059,6 +1062,59 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade', 'fx-grain', 'fx-light-trails'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.2,
     vibe: { mixSrc: 0.65 }
+  }),
+  // Marbling : paint floating on water, kept in its own palette (a preset, the
+  // Vibe at source mix 1) and a crisp World (little haze or trails : flat
+  // color and sharp edges are the look). Its slow motion never sweeps what
+  // re-deals or reloads it.
+  mk({
+    id: 'marbled-paper', name: 'Marbled Paper', family: 'Living Surfaces',
+    blurb: 'Paint floating on water : drops push the older ones into rings and lobes, slow currents comb them into a marbled sheet.',
+    world: 'parametric',
+    palette: [[0.1, 0.1, 0.12, 1], [0.45, 0.35, 0.3, 1], [0.95, 0.93, 0.88, 1]],
+    sources: ['gen-marble'],
+    // (the Background : a plain one, never a second Marbling under the paint's
+    // water, and out of sight : in group mode it tinted the black paint)
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-marble': ['Classic bath', 'Tulip', 'Combed stone', 'Whirlpool', 'Tide', 'Rain', 'Ink rings', 'Big pours'] },
+    // drops keep landing (a big pour's slow rate would leave the page bare), and
+    // the grain is a fine film grain : a scanline grain streaks flat paint
+    pickInputs: {
+      'gen-marble': { auto: [0.8, 1.2, 1.6] },
+      'fx-grain': { character: [1], amount: [0.04, 0.06, 0.08], parasites: [0], chroma: [0] },
+      'fx-grade': { brightness: [0], contrast: [1, 1.06], saturation: [0.95, 1.05], lift: [0, 0.015], gamma: [1] }
+    },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    // no depth shading, no colored light glow : flat paint stays flat
+    context: { trails: 0, haze: 0, bloom: 0.04, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.04], skip: '^(budget|count|order|tool|sync|sprinkleN|audio|auto|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'night-bath', name: 'Night Bath', family: 'Living Surfaces',
+    blurb: 'Bright inks floating on dark water, carried by slow currents and swirls, the bath rippling under them.',
+    world: 'parametric',
+    palette: [[0.02, 0.02, 0.03, 1], [0.3, 0.2, 0.35, 1], [0.95, 0.85, 0.6, 1]],
+    sources: ['gen-marble'],
+    // the Background stays out of it : in group mode it shows through every dark
+    // part of the layers (the dark water came out the palette's purple)
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-marble': ['Night water'] },
+    pickInputs: {
+      // small drops and a strong crowding law : the dark water keeps showing between them
+      'gen-marble': { evolve: [0.25, 0.32, 0.4], swirl: [0.15, 0.25, 0.35], comb: [0, 0.1, 0.2], auto: [0.6, 0.9], currents: [0.9, 1.2, 1.6], order: [0, 1], size: [0.25, 0.32], crowding: [0.9, 1], sprinkleN: [12, 16], budget: [80] },
+      'fx-displace': { amount: [0.004, 0.007], scale: [3, 4.5], rate: [0.08, 0.14] },
+      'fx-grade': { brightness: [0], contrast: [1.05, 1.12], saturation: [1, 1.1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    stackFx: [['fx-displace']],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0.06, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.04], skip: '^(budget|count|order|tool|sync|sprinkleN|audio|auto|bloom|lift|haze)$' }
   }),
   mk({
     id: 'dry-earth', name: 'Dry Earth', family: 'Living Surfaces',

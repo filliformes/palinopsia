@@ -19,6 +19,24 @@ import { PhysarumSource } from './PhysarumSource'
 import { MyceliumSource } from './MyceliumSource'
 import { VeinsSource } from './VeinsSource'
 import { LatticeSource } from './LatticeSource'
+import { MarbleSource } from './MarbleSource'
+import type { HandGestureLog } from '@shared/types'
+
+/** A pointer on the picture (the mouse on the preview, a pinching hand), for a
+ *  source that takes it (pointerInput.ts routes it). `u`, `v` : the frame's own
+ *  coordinates, 0..1, v up. `pid` : which pointer (the mouse, each hand), so
+ *  several gestures can run at once. `commit` : set for a pointer whose
+ *  gestures are kept (the mouse) : called with the gesture's log entry when it
+ *  ends, to land in the slot's log (one undo step). */
+export interface SourcePointer {
+  phase: 'down' | 'move' | 'up' | 'cancel'
+  pid: number
+  u: number
+  v: number
+  shift?: boolean
+  alt?: boolean
+  commit?: (entry: HandGestureLog) => void
+}
 
 export interface NativeGenerator {
   /** The slot's whole input map, from the store, every frame. */
@@ -32,6 +50,17 @@ export interface NativeGenerator {
    *  the slot's sidechain layer (null when none or on the Background), handed in
    *  just before render. An engine that reads neither leaves this out. */
   feed?(audio: WebGLTexture | null, side: WebGLTexture | null): void
+  /** Optional : the slot's hand-made log (its `handOps`), from the store, every
+   *  sync (the same array until it changes). */
+  handOps?(ops: readonly HandGestureLog[] | undefined): void
+  /** Optional : the engine takes a pointer on the picture (Marbling's drops). */
+  pointer?(ev: SourcePointer): void
+  /** What a click does now, for the preview's hint. */
+  pointerHint?(): string
+  /** A short line on its state (drops, points) for the hint. */
+  status?(): string
+  /** A remote event (OSC, an action) : a name and its numbers. */
+  event?(name: string, args: number[]): void
   // No PANIC hook on purpose : a generator's state IS the picture (Compositor.panic);
   // each engine carries its own regrow / reseed event instead.
   dispose(): void
@@ -46,7 +75,8 @@ const REGISTRY: Record<string, Factory> = {
   'gen-physarum': (gl, w, h) => new PhysarumSource(gl, w, h),
   mycelium: (gl, w, h) => new MyceliumSource(gl, w, h),
   'gen-veins': (gl, w, h) => new VeinsSource(gl, w, h),
-  'gen-lattice': (gl, w, h) => new LatticeSource(gl, w, h)
+  'gen-lattice': (gl, w, h) => new LatticeSource(gl, w, h),
+  'gen-marble': (gl, w, h) => new MarbleSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)
@@ -69,7 +99,8 @@ export function syncNativeSlot(
   w: number,
   h: number,
   id: string | null,
-  inputs: Record<string, number | number[]> | null
+  inputs: Record<string, number | number[]> | null,
+  ops?: readonly HandGestureLog[]
 ): NativeSlot | null {
   const make = nativeGeneratorFactory(id)
   if (!make || !id) {
@@ -81,6 +112,9 @@ export function syncNativeSlot(
     cur?.src.dispose()
     slot = { id, src: make(gl, w, h) }
   }
-  if (inputs) slot.src.update(inputs)
+  if (inputs) {
+    slot.src.update(inputs)
+    slot.src.handOps?.(ops)
+  }
   return slot
 }
