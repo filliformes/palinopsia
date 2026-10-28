@@ -474,7 +474,11 @@ export function fireAction(id: string): void {
       const m = st.composition.modulators[n]
       if (!m) return
       if (p[3] === 'trig') modEngine.retrigger(n) // (no setting changes : plays even on a persistent card)
-      else if (p[3] === 'fill') modEngine.setFillLatch(n, !modEngine.fillLatched(n)) // (nor does FILL : a performance state)
+      else if (p[3] === 'fill') {
+        // (nor does FILL : a performance state); on a card that is not steps
+        // (now) it is gone and does nothing
+        if (m.type === 'steps') modEngine.setFillLatch(n, !modEngine.fillLatched(n))
+      }
       else if (p[3] === 'onoff' && !held(st, [modPin(n)], `M${n + 1}`)) st.updateModulator(n, { enabled: !m.enabled })
       return
     }
@@ -635,7 +639,7 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       if (!Number.isInteger(n) || n < 0) return null
       if (p[3] === 'trig') return { label: `${modName(st, n)} retrigger`, verb: `retriggers mod ${n + 1}`, token: `Mod${n + 1}Trig`, group: 'Modulators', title: 'Its ⟳ : back to the start of its cycle (an LFO, a rhythm), or from zero (a ramp, an envelope). A modulator on its own clock or following a signal does not move', gone: !st.composition.modulators[n] }
       if (p[3] === 'onoff') return { label: `${modName(st, n)} on/off`, verb: `switches mod ${n + 1}`, token: `Mod${n + 1}OnOff`, group: 'Modulators', title: 'Turns the modulator card on or off', gone: !st.composition.modulators[n] }
-      if (p[3] === 'fill') return { label: `${modName(st, n)} fill on/off`, verb: `fills mod ${n + 1}`, token: `Mod${n + 1}Fill`, group: 'Modulators', title: 'A steps card’s FILL, kept on or let go : the steps set to play only in a fill come in, those set to play only outside one fall silent. Does nothing on another type', gone: !st.composition.modulators[n] }
+      if (p[3] === 'fill') return { label: `${modName(st, n)} fill on/off`, verb: `fills mod ${n + 1}`, token: `Mod${n + 1}Fill`, group: 'Modulators', title: 'A steps card’s FILL, kept on or let go : the steps set to play only in a fill come in, those set to play only outside one fall silent. Does nothing on another type', gone: st.composition.modulators[n]?.type !== 'steps' }
       return null
     }
     case 'feel': {

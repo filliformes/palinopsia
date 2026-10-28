@@ -193,7 +193,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), Steps back to step 1 of a new first pass (with Ableton Link enabled its steps stay on the shared bar and only the passes count anew), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
+          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), Steps back to step 1 of a new run (a BPM-synced Steps card with Ableton Link enabled stays on the shared count, so its first pass starts at its next step 1), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
         >
           ⟳
         </button>
@@ -936,6 +936,8 @@ function StepStrip({ index }: { index: number }): JSX.Element {
   const onMove = (e: React.PointerEvent<HTMLDivElement>): void => {
     const g = gesture.current
     if (!g || g.id !== e.pointerId) return
+    // (the button came up somewhere this window never heard of)
+    if ((e.buttons & 1) === 0) return finish()
     if (!g.drawing) {
       if (Math.abs(e.clientX - g.x0) < STEP_DEAD_PX && Math.abs(e.clientY - g.y0) < STEP_DEAD_PX) return
       g.drawing = true
@@ -971,6 +973,27 @@ function StepStrip({ index }: { index: number }): JSX.Element {
     write(after)
     commitNow()
   }
+  // A stroke ends whatever ends it : the button let go, the capture lost (a
+  // switch to another window, a notification taking the focus : the mouse's
+  // release then lands elsewhere), a move with no button down, the window
+  // losing the focus, the card going away. A drawn stroke is still ONE undo step.
+  const finish = (): void => {
+    const g = gesture.current
+    if (!g) return
+    gesture.current = null
+    if (g.drawing) endStroke(g)
+  }
+  const finishRef = useRef(finish)
+  finishRef.current = finish
+  useEffect(() => {
+    const win = ownerWindow(boxRef.current)
+    const blur = (): void => finishRef.current()
+    win.addEventListener('blur', blur)
+    return () => {
+      win.removeEventListener('blur', blur)
+      finishRef.current()
+    }
+  }, [])
   const onUp = (e: React.PointerEvent<HTMLDivElement>): void => {
     const g = gesture.current
     if (!g || g.id !== e.pointerId) return
@@ -988,10 +1011,7 @@ function StepStrip({ index }: { index: number }): JSX.Element {
     write({ ...cur, on })
   }
   const onCancel = (e: React.PointerEvent<HTMLDivElement>): void => {
-    const g = gesture.current
-    if (!g || g.id !== e.pointerId) return
-    gesture.current = null
-    if (g.drawing) endStroke(g)
+    if (gesture.current?.id === e.pointerId) finish()
   }
   const onContext = (e: React.MouseEvent<HTMLDivElement>): void => {
     e.preventDefault()
@@ -1062,7 +1082,7 @@ function StepStrip({ index }: { index: number }): JSX.Element {
         {
           label: `${tick(cur.kind === 'first')}only the first time through`,
           onClick: () => setCond('first'),
-          title: 'Plays on the first pass only. A run starts when the card is turned on, retriggered, a session loads, or Ableton Link starts playing'
+          title: 'Plays on the first pass only. A run starts when the card is turned on, retriggered, a session loads (a Persistent card carries on) or Ableton Link starts playing (a BPM-synced card, on the bar); a scene or the dice bringing another pattern count the passes anew from its next step 1. A run joining mid-pattern counts from its first step 1'
         },
         { label: `${tick(cur.kind === 'notFirst')}every time but the first`, onClick: () => setCond('!first'), title: 'Silent on the first pass, then plays every time' },
         { label: '', divider: true },
@@ -1116,6 +1136,7 @@ function StepStrip({ index }: { index: number }): JSX.Element {
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onCancel}
+        onLostPointerCapture={onCancel}
         onContextMenu={onContext}
       >
         {Array.from({ length: STEP_MAX }, (_, i) => {
@@ -1137,7 +1158,7 @@ function StepStrip({ index }: { index: number }): JSX.Element {
               >
                 <div
                   className={`absolute inset-x-0 bottom-0 ${on ? 'bg-accent/55 group-data-[play=hit]:bg-accent' : 'border border-muted/70'}`}
-                  style={{ height: `${v * 100}%` }}
+                  style={{ height: on ? `max(1px, ${v * 100}%)` : `${v * 100}%` }}
                 />
               </div>
               <StepMark c={c} />
@@ -1145,7 +1166,17 @@ function StepStrip({ index }: { index: number }): JSX.Element {
           )
         })}
       </div>
-      {menuEl}
+      {menuEl && (
+        <span
+          className="contents"
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+        >
+          {menuEl}
+        </span>
+      )}
     </>
   )
 }
@@ -1156,8 +1187,21 @@ function FillButton({ index }: { index: number }): JSX.Element {
   const on = useSyncExternalStore(modEngine.onFill, () => modEngine.fill(index))
   const latched = useSyncExternalStore(modEngine.onFill, () => modEngine.fillLatched(index))
   const release = (): void => modEngine.setFillHeld(index, false)
+  const ref = useRef<HTMLButtonElement | null>(null)
+  // a held FILL never sticks : let go when the window loses the focus (the
+  // release lands elsewhere) or the button goes away (the card changed type)
+  useEffect(() => {
+    const win = ownerWindow(ref.current)
+    const blur = (): void => modEngine.setFillHeld(index, false)
+    win.addEventListener('blur', blur)
+    return () => {
+      win.removeEventListener('blur', blur)
+      modEngine.setFillHeld(index, false)
+    }
+  }, [index])
   return (
     <button
+      ref={ref}
       onPointerDown={(e) => {
         if (e.button !== 0) return
         if (e.shiftKey) return modEngine.setFillLatch(index, !modEngine.fillLatched(index))

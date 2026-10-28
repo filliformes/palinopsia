@@ -42,10 +42,12 @@ export function parseStepCond(c: unknown): ParsedCond {
     case '!first':
       return { kind: 'notFirst' }
   }
-  const p = /^p(\d{1,2})$/.exec(c)
+  // a chance in whole percent : 'p0' (no chance at all, which the menu never
+  // writes) reads as the rarest one, 1 %, never as always; 100 % and more is always
+  const p = /^p(\d{1,3})$/.exec(c)
   if (p) {
     const n = Number(p[1])
-    return n >= 1 && n <= 99 ? { kind: 'prob', p: n } : ALWAYS
+    return n >= 100 ? ALWAYS : { kind: 'prob', p: Math.max(1, n) }
   }
   const ab = /^(\d):(\d)$/.exec(c)
   if (ab) {
@@ -77,7 +79,9 @@ export function stepCondOf(c: ParsedCond): StepCond {
 }
 
 /** Does a step with this condition play on this pass (1 = the first of the
- *  run), FILL being on or off? A probability draws anew each time round. */
+ *  run, 0 = the run-in before the first step 1), FILL being on or off? A
+ *  probability draws anew each time round. In the run-in, first and A:B wait
+ *  and "every time but the first" plays. */
 export function condPlays(c: ParsedCond, pass: number, fill: boolean, rnd: () => number = Math.random): boolean {
   switch (c.kind) {
     case 'always':
@@ -85,7 +89,7 @@ export function condPlays(c: ParsedCond, pass: number, fill: boolean, rnd: () =>
     case 'prob':
       return rnd() * 100 < c.p
     case 'ab':
-      return ((((pass - 1) % c.b) + c.b) % c.b) + 1 === c.a
+      return pass >= 1 && ((pass - 1) % c.b) + 1 === c.a
     case 'fill':
       return fill
     case 'notFill':
@@ -93,7 +97,7 @@ export function condPlays(c: ParsedCond, pass: number, fill: boolean, rnd: () =>
     case 'first':
       return pass === 1
     case 'notFirst':
-      return pass > 1
+      return pass !== 1
   }
 }
 
@@ -133,19 +137,23 @@ export function sanitizeSteps(raw: unknown): StepsConfig {
   const vals = arr(r.values)
   const ons = arr(r.on)
   const conds = arr(r.cond)
-  const len = Number(r.length)
-  const swing = Number(r.swing)
-  const glide = Number(r.glide)
+  // numbers only, finite ones (JSON writes a NaN as null : Number(null) is 0,
+  // a length of 1, so a null takes the default like any other junk)
+  const num = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null)
+  const len = num(r.length)
+  const swing = num(r.swing)
+  const glide = num(r.glide)
   return {
-    length: Number.isFinite(len) ? Math.max(1, Math.min(STEP_MAX, Math.round(len))) : d.length,
+    length: len != null ? Math.max(1, Math.min(STEP_MAX, Math.round(len))) : d.length,
     values: d.values.map((v, i) => {
-      const x = Number(vals[i])
-      return vals[i] != null && Number.isFinite(x) ? clamp01(x) : v
+      const x = num(vals[i])
+      return x != null ? clamp01(x) : v
     }),
-    on: d.on.map((v, i) => (typeof ons[i] === 'boolean' ? (ons[i] as boolean) : v)),
+    // (a hand-written 0 / 1 reads as off / on)
+    on: d.on.map((v, i) => (typeof ons[i] === 'boolean' ? (ons[i] as boolean) : ons[i] === 0 ? false : ons[i] === 1 ? true : v)),
     cond: d.cond.map((_, i) => stepCondOf(parseStepCond(conds[i]))),
-    swing: Number.isFinite(swing) ? Math.max(SWING_MIN, Math.min(SWING_MAX, swing)) : d.swing,
-    glide: Number.isFinite(glide) ? clamp01(glide) : d.glide,
+    swing: swing != null ? Math.max(SWING_MIN, Math.min(SWING_MAX, swing)) : d.swing,
+    glide: glide != null ? clamp01(glide) : d.glide,
     rest: r.rest === 'zero' ? 'zero' : 'hold'
   }
 }
@@ -164,6 +172,22 @@ export function stepsOf(m: { steps?: StepsConfig }): StepsConfig {
   )
     return s
   return sanitizeSteps(s)
+}
+
+/** The same pattern : the same length, values, rests and conditions (swing,
+ *  glide and what a silent step does are its feel, not its pattern). A scene
+ *  recall that brings another pattern starts the passes anew; the same one
+ *  keeps the run. */
+export function samePattern(a: StepsConfig | undefined, b: StepsConfig | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  const x = stepsOf({ steps: a })
+  const y = stepsOf({ steps: b })
+  if (stepLength(x) !== stepLength(y)) return false
+  for (let i = 0; i < STEP_MAX; i++) {
+    if (x.values[i] !== y.values[i] || !!x.on[i] !== !!y.on[i] || x.cond[i] !== y.cond[i]) return false
+  }
+  return true
 }
 
 /** The length to play, whole and in range. */

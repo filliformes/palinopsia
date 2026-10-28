@@ -283,6 +283,11 @@ function tickPlay(now: number): void {
       // next bar)
       ps.pending = true
       ps.last = null
+      // a real play (seen stopped before, not joined while it was playing) :
+      // each BPM-synced steps card starts its run when the beat IT reads (the
+      // picture's lead) reaches the play's bar, so pass 1 lands on that bar's
+      // step at any latency
+      if (before === false && p) modEngine.restartRunsAt(p.at)
     } else if (playing === false && before) {
       // a stop : what goes stops, and starts again with the next play (a stop
       // before the play's bar came keeps what that play was to start)
@@ -300,8 +305,6 @@ function tickPlay(now: number): void {
   if (b != null && b < p.at - 1e-3) return
   ps.pending = false
   setSeqs(true, ps.resume ?? firstPlay())
-  // the steps modulators start their run on the same bar (pass 1 : first, A:B)
-  modEngine.restartRuns()
 }
 
 // Something started or stopped here on purpose (./playEvents.ts).

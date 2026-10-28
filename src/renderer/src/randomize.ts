@@ -579,13 +579,21 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
   const modulators = c.modulators.map((m, i): ModulatorConfig => {
     if (i === keep) return m
     if (!chosen.includes(i)) return { ...m, enabled: false }
-    return {
+    const mm: ModulatorConfig = {
       ...freshModulator(m, true),
       type: pick(recipe.types),
       shape: pick(recipe.shapes),
       sync: chance(recipe.bpm) ? 'bpm' : 'free',
       rateHz: logRate()
     }
+    // Steps change the level on EVERY step : on 1/16 a theme's draw would be a
+    // hard flicker (8 a second at 120 BPM). A theme's steps run on 1/8 or
+    // slower, or slide (the plain dice may keep 1/16).
+    if (mm.type === 'steps' && mm.sync === 'bpm' && mm.divisionIdx < 4) {
+      if (chance(0.5)) mm.divisionIdx = 4 + Math.floor(rnd() * 2)
+      else mm.steps = { ...mm.steps, glide: Math.max(mm.steps.glide, Math.round(range(0.2, 0.5) * 100) / 100) }
+    }
+    return mm
   })
   const cap = AUTO_MOD_BUDGET - 1 // room for the World's audio route
   const out: ModAssignment[] = []

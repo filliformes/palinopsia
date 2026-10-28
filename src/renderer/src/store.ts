@@ -51,9 +51,9 @@ import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, m
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
-import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
+import { makeDefaultModulator, makeDefaultModulators, modEngine } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
-import { sanitizeSteps } from './engine/stepSeq'
+import { samePattern, sanitizeSteps } from './engine/stepSeq'
 import { DEPTH_RES_DEFAULT, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
@@ -2278,6 +2278,19 @@ function dropLayerTargets(c: CompositionState, layer: number): CompositionState 
 const keep = (s: { composition: CompositionState; pins: string[] }, c: CompositionState): CompositionState =>
   keepPersistent(c, s.composition, s.pins)
 
+// A scene recall, the scene sequencer or the dice that REPLACE a steps card's
+// pattern (its length, values, rests or conditions) start that card's passes
+// anew : its next step 1 is pass 1, the clock untouched (first and A:B count
+// from the new pattern). The same pattern recalled keeps the run. Called after
+// the morph forked its ghosts : the outgoing pattern carries on there.
+function notePatterns(prev: ModulatorConfig[], next: ModulatorConfig[]): void {
+  for (let i = 0; i < 8; i++) {
+    const a = prev[i]
+    const b = next[i]
+    if (a?.type === 'steps' && b?.type === 'steps' && !samePattern(a.steps, b.steps)) modEngine.newPasses(i)
+  }
+}
+
 // A whole-layer change by a menu (init, dice, a preset, paste) on a pinned
 // layer : nothing, and it says why.
 function layerHeld(s: { pins: string[] }, layer: number, quiet = false): boolean {
@@ -3550,6 +3563,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // (the pinned effects stay in the racks it deals : keepPinnedUnits)
       const composition = keep(s, keepPinnedUnits(randomizeComposition(s.composition, scope, intensity), s.composition, s.pins))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now()) // morph to the new draw
+      notePatterns(s.composition.modulators, composition.modulators)
       // A structural randomize is a fresh starting point : drop the Variation
       // baseline so the next Variation press anchors on this new scene.
       return { composition, variationBaseline: null }
@@ -5191,6 +5205,7 @@ export const useStore = create<StoreState>((set, get) => ({
       // Normalize defensively (idempotent) : a scene may predate a schema field.
       const composition = keep(s, normalizeComposition(scene.composition))
       beginSceneMorph(s.composition, composition, s.morphMs, performance.now())
+      notePatterns(s.composition.modulators, composition.modulators)
       resetCouplingState(true) // a stale cut mustn't seed the recalled scene (a drift keeps its momentum : the recall eases)
       // Restore the scene's World for the selector label (composition already
       // carries its baked effect); add it to the bank if this install lacks it.
@@ -5367,6 +5382,7 @@ export const useStore = create<StoreState>((set, get) => ({
         normalizeComposition(variation > 0 ? varyComposition(scene.composition, variation) : scene.composition)
       )
       beginSceneMorph(s.composition, composition, Math.max(0, crossfadeMs), performance.now())
+      notePatterns(s.composition.modulators, composition.modulators)
       const worlds = ensureWorld(s.worlds, scene.world)
       const world = worldIdIn(worlds, scene.world, s.world)
       if (world !== s.world) localStorage.setItem('opsia.world', world)
@@ -5458,6 +5474,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // Full diegetic scene : visuals + the theme's World (coupling + Context mood +
     // audio routing) + field-macro / temperament biases. Undoable (morph write path).
     if (!THEME_BY_ID[themeId]) return
+    const prevMods = get().composition.modulators
     set((s) => {
       const theme = THEME_BY_ID[themeId]
       if (!theme) return s
@@ -5526,6 +5543,7 @@ export const useStore = create<StoreState>((set, get) => ({
     })
     // a new session (it may reuse the Collage films of the one before) : its
     // media status starts over
+    notePatterns(prevMods, get().composition.modulators)
     emitSessionLoaded()
   },
   loadSession: (s) => {
@@ -5574,6 +5592,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // relay : each new layer fades in once compiled, the old ones out). At Morph
     // 0 : hold the last frame until the new one is ready, then dissolve.
     const before = get()
+    const prevMods = before.composition.modulators
     // A session from before a World flagged its modulator : its slot 8 is
     // recognized once, here (adoptLegacyWorldMod), never again after.
     const incoming = adoptLegacyWorldMod(normalizeComposition(s.composition))
@@ -5701,6 +5720,7 @@ export const useStore = create<StoreState>((set, get) => ({
       } as SoniConfig)
     }
     // what wants to know (the session's media check) hears it loaded
+    notePatterns(prevMods, get().composition.modulators)
     emitSessionLoaded()
   },
   exportSession: () => {

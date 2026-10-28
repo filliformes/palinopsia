@@ -803,29 +803,39 @@ retrigger. The modulator the active World installs for its audio routing carries
 **`steps`** is a **step sequencer with conditional steps and swing** : up to 16 steps,
 each a value you **draw** on the card's strip (drag up or down, across the bars to draw
 several; a click makes a step a rest or plays it again), played one per clock tick (free
-Hz or a BPM division). While Ableton Link is enabled the step number is the shared count,
-so step 1 lands on the bar, also after a jump. **Right-click a step** for its one
+Hz or a BPM division). On a BPM division with Ableton Link enabled the step number is the
+shared count : the right step again after any jump, and step 1 on the bar when the length
+fits the bar (16, 8 or 4 at 1/16; a length of 5, 6, 7 or 12 runs across the bar); a card on
+the Hz clock ignores Link. **Right-click a step** for its one
 **condition** : always; **by chance** (10 / 25 / 50 / 75 / 90 %, drawn anew each time
 round); **on some passes** (A:B : pass A of every B, 1:2 to 8:8 in a grid, counted from
 the start of the run); **only in a fill** / **only outside a fill**; **only the first time
 through** / **every time but the first**; the same menu makes the step a rest, ends the
 pattern there, sets what a silent step does (**holds** the value, or **drops to 0**),
 clears the conditions and randomizes the pattern. A run (pass 1) starts when the card is
-turned on, retriggered (⟳), a session loads, or Ableton Link starts playing (start / stop
-sync, on its bar). **FILL** rides the rate line : hold it for a fill, Shift-click keeps it
-on; a Body rule or a MIDI pad switches it (`MOD n fill on/off`, `act:mod:<n>:fill`; FILL
-is never saved). **LEN** 1..16 (the steps past it dimmed and kept), **SWG** 50..75 %
-(every second step lands late by (swing − 50) % × 2 of a step : 75 % is half a step, so a
+turned on, retriggered (⟳), a session loads (a Persistent card carries on, its FILL too),
+or Ableton Link starts playing (start / stop sync : a BPM-synced card starts on the play's
+bar as the picture sees it, whatever the latency; nothing restarts when Palinopsia joins a
+session already playing). A run that joins Link's count mid-pattern counts its run-in as
+pass 0 (first and A:B wait, "every time but the first" plays) : pass 1 starts at its first
+step 1. A scene recall, the scene sequencer or the dice that bring another pattern (its
+length, values, rests or conditions) count the passes anew from its next step 1, the clock
+untouched; the same pattern recalled keeps the run. **FILL** rides the rate line : hold it
+for a fill, Shift-click keeps it on (a held FILL lets go when the window loses the focus);
+a Body rule or a MIDI pad switches it (`MOD n fill on/off`, `act:mod:<n>:fill`; on a card
+that is not steps it reads "(gone)" and does nothing; FILL is never saved). **LEN** 1..16
+(the steps past it dimmed and kept), **SWG** 50..75 % (every second step lands late by (swing − 50) % × 2 of a step : 75 % is half a step, so a
 step never reaches the next; free Hz, BPM and Link alike), **GLIDE** 0..1 of a step (a
 half-cosine slide, 0 = hard steps). The marks under the steps show the conditions at a
 glance : a chance fills its share of the mark, an A:B lights its pass among the B, a fill
 step is marked in the accent (faint : only outside a fill), a first one in the text color
 (faint : every time but the first). Its probabilities are its SLIP, so it has no SLIP
-control. A stroke of drawing is one undo step. The dice and the stepped Generate families
-(Glitch / Datamosh, Datamosh & Compression, Cameraless, Data / Parametric, Retro Screen,
-Film Wall, and Space's Data Floor) draw it with musical patterns : a short motif repeated
-with changes, a few rests, now and then a condition, mostly straight, sometimes a little
-swing.
+control. A stroke of drawing is one undo step, also when it ends by the window losing
+the focus. The dice and the stepped Generate families (Glitch / Datamosh, Datamosh &
+Compression, Cameraless, Data / Parametric, Retro Screen, Film Wall, and Space's Data
+Floor) draw it with musical patterns : a short motif repeated with changes, a few rests,
+now and then a condition, mostly straight, sometimes a little swing. A theme's steps on a
+BPM division run on 1/8 or slower, or glide : never a hard flicker on every 1/16.
 
 Three **generative** types (borrowed from the LZX Videomancer vocabulary) join the
 stepped family and take **SLIP** like the rest:

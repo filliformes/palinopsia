@@ -19,6 +19,7 @@ import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTrigger } from './engine/modulation'
 import { onSessionLoaded } from './sessionEvents'
+import { modPin } from './persist'
 import { visionBus } from './engine/visionIn'
 import { depthEngine, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
@@ -1926,10 +1927,13 @@ export default function App(): JSX.Element {
     // auto-fire every LFO cycle would bury the 100-level undo history.
     setVaryTrigger((layer) => runSilently(() => useStore.getState().varyLayer(layer)))
     // A session loaded (Open, New, Generate...) : every steps modulator starts a
-    // new run (its first pass, its A:B count from 1) and no FILL stays on.
+    // new run (its first pass, its A:B count from 1) and no FILL stays on, but a
+    // card the session holds Persistent carries on (its run, its FILL).
     const offSessionSteps = onSessionLoaded(() => {
-      modEngine.restartRuns()
-      modEngine.clearFills()
+      const pins = useStore.getState().pins
+      const pinned = (i: number): boolean => pins.includes(modPin(i))
+      modEngine.restartRuns(pinned)
+      modEngine.clearFills(pinned)
     })
     // The installation watchdog in main : the frame count, every 5 s.
     const aliveTimer = window.setInterval(() => window.api.appAlive(engineFrames), 5000)
