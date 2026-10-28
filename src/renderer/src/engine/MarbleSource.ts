@@ -150,6 +150,12 @@ export class MarbleSource implements NativeGenerator {
   private prevT = 0
   private stat = { drops: 0, points: 0, spreading: false, replaying: false }
   private rand = Math.random
+  // the worker's last frame changed nothing (still water : it is ticked slowly, or not at all)
+  private idle = false
+  // something for the worker this frame (an event, a pointer, the log) : tick now
+  private kick = true
+  private sentKey = ''
+  private pendAudio = 0
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     this.g = new EngineGL(gl, 'marble')
@@ -198,6 +204,7 @@ export class MarbleSource implements NativeGenerator {
     }
     this.waiting = false
     this.stat = { drops: m.drops, points: m.points, spreading: m.spreading, replaying: m.replaying }
+    this.idle = !m.changed && !m.spreading && !m.replaying
     if (m.changed) {
       // a frame not drawn yet hands its buffers straight back
       if (this.frame) this.ret.push(this.frame.pos.buffer as ArrayBuffer, this.frame.idx.buffer as ArrayBuffer, this.frame.cov.buffer as ArrayBuffer, this.frame.grp.buffer as ArrayBuffer)
@@ -227,6 +234,7 @@ export class MarbleSource implements NativeGenerator {
     if (ev.phase === 'down' && ev.commit) this.commits.set(ev.pid, ev.commit)
     if (ev.phase === 'cancel') this.commits.delete(ev.pid)
     this.send({ t: 'ptr', phase: ev.phase, pid: ev.pid, x, y, shift: !!ev.shift, log: !!ev.commit, s: this.settings() })
+    this.kick = true
   }
 
   pointerHint(): string {
@@ -249,6 +257,7 @@ export class MarbleSource implements NativeGenerator {
       } else this.send({ t: 'ev', name: 'drop' })
     } else if (name === 'sprinkle') this.send({ t: 'ev', name: 'sprinkle', n: Number.isFinite(args[0]) ? args[0] : undefined })
     else if (name === 'clear') this.send({ t: 'ev', name: 'clear' })
+    this.kick = true
   }
 
   private settings(): MarbleSettings {
@@ -264,6 +273,9 @@ export class MarbleSource implements NativeGenerator {
       tool: Math.round(num(I, 'tool', 0)),
       combSpacing: Math.max(0.01, num(I, 'spacing', 0.08)),
       budget: Math.max(5, Math.min(200, num(I, 'budget', 60))) * 1000,
+      // the picture's pixels a frame height (under the dome's fill the view is
+      // square, spread over the frame's longer side too)
+      px: domeFill() > 0 ? Math.max(this.w, this.h) : this.h,
       auto: Math.max(0, num(I, 'auto', 0.5)),
       sync: Math.round(num(I, 'sync', 0)),
       bpm: tempoBpm(),
@@ -290,12 +302,13 @@ export class MarbleSource implements NativeGenerator {
     if (hw !== this.hw) { this.hw = hw; this.dirty = true }
 
     // the trigger buttons (rising edges, read now : modulation lands between update and render)
-    if (this.evClear.fired(num(I, 'clear', 0))) this.send({ t: 'ev', name: 'clear' })
-    if (this.evSprinkle.fired(num(I, 'sprinkle', 0))) this.send({ t: 'ev', name: 'sprinkle' })
-    if (this.evDrop.fired(num(I, 'drop', 0))) this.send({ t: 'ev', name: 'drop' })
+    if (this.evClear.fired(num(I, 'clear', 0))) { this.send({ t: 'ev', name: 'clear' }); this.kick = true }
+    if (this.evSprinkle.fired(num(I, 'sprinkle', 0))) { this.send({ t: 'ev', name: 'sprinkle' }); this.kick = true }
+    if (this.evDrop.fired(num(I, 'drop', 0))) { this.send({ t: 'ev', name: 'drop' }); this.kick = true }
     if (this.logDirty) {
       this.logDirty = false
       this.send({ t: 'log', log: this.log ?? [] })
+      this.kick = true
     }
 
     // the sound : an onset (the shared bus's transient) lands a drop, by chance AUDIO
@@ -307,30 +320,41 @@ export class MarbleSource implements NativeGenerator {
       this.prevT = t
     }
 
-    // a tick to the worker when it is ready (the clock that passed meanwhile goes with it)
+    // a tick to the worker when it is ready (the clock that passed meanwhile goes
+    // with it), at most ~70 a second : an uncapped renderer drove the water at
+    // its own 150-200 Hz, every tick a full step of every point (the picture is
+    // drawn every frame, from the last water). On still water (nothing moving or
+    // spreading, no beat to keep, no setting changed) 10 a second carry the clock
+    // to the auto drops, none when nothing can land by itself : the worker rests.
     this.pendDt += dt
+    if (audio > this.pendAudio) this.pendAudio = audio
     const now = performance.now()
-    if (!this.waiting || now - this.sentAt > 300) {
+    const cur = {
+      evolve: Math.max(0, Math.min(1, num(I, 'evolve', 0.3))),
+      scale: Math.max(0.2, num(I, 'currents', 1)),
+      comb: Math.max(0, Math.min(1, num(I, 'comb', 0.25))),
+      combSpacing: Math.max(0.01, num(I, 'spacing', 0.08)),
+      combAngle: num(I, 'angle', 0),
+      swirl: Math.max(0, Math.min(1, num(I, 'swirl', 0.2)))
+    }
+    const s = this.settings()
+    let gap = 14
+    if (this.idle && !this.kick && this.pendAudio === 0 && cur.evolve === 0 && s.sync === 0) {
+      const key = JSON.stringify(s) + JSON.stringify(cur)
+      if (key === this.sentKey) gap = s.auto > 0 ? 100 : Infinity
+    }
+    // (the worker answers every tick; 2 s without an answer is a last resort, never
+    // a pace : a resend after 300 ms piled ticks onto a worker that was only slow)
+    if (this.waiting ? now - this.sentAt > 2000 : now - this.sentAt >= gap) {
       const ret = this.ret
       this.ret = []
-      this.send({
-        t: 'tick',
-        dt: this.pendDt,
-        cur: {
-          evolve: Math.max(0, Math.min(1, num(I, 'evolve', 0.3))),
-          scale: Math.max(0.2, num(I, 'currents', 1)),
-          comb: Math.max(0, Math.min(1, num(I, 'comb', 0.25))),
-          combSpacing: Math.max(0.01, num(I, 'spacing', 0.08)),
-          combAngle: num(I, 'angle', 0),
-          swirl: Math.max(0, Math.min(1, num(I, 'swirl', 0.2)))
-        },
-        s: this.settings(),
-        audio,
-        ret
-      }, ret)
+      this.send({ t: 'tick', dt: this.pendDt, cur, s, audio: this.pendAudio, ret }, ret)
       this.pendDt = 0
+      this.pendAudio = 0
+      this.kick = false
       this.waiting = true
       this.sentAt = now
+      if (this.idle) this.sentKey = JSON.stringify(s) + JSON.stringify(cur)
     }
 
     if (!this.pic) this.pic = g.target(this.w, this.h, { float: false })

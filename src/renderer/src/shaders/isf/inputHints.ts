@@ -557,7 +557,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     crowding: 'The more paint on the water, the smaller each new drop spreads : how strongly. 0 = every drop spreads to full size however full the water is.',
     spreadTime: 'How long a drop takes to open on the water, in seconds.',
     audio: 'Drops land on the sound’s onsets (the shared audio input), bigger when it is louder : the chance an onset drops paint. 0 = the sound drops nothing.',
-    budget: 'How many outline points the water holds (in thousands) before the oldest drops dissolve into it, so it can run for hours. Lower it on a slower machine; it is never dealt by the dice.',
+    budget: 'How many outline points the water holds (in thousands, counted as a 4K picture draws them : a 1080p picture keeps the same drops in about half) before the oldest drops dissolve into it, so it can run for hours. Lower it on a slower machine; it is never dealt by the dice.',
     water: 'The water’s color, under all the paint. Its alpha lets the layers below show through where there is no paint (0 : only the paint is drawn).',
     count: 'How many of the six colors are dropped (the first ones).',
     color1: 'A paint color. Its alpha lets the layers below show through that paint (1 : opaque, as marbling paint is).',

@@ -33,7 +33,8 @@ export interface MarbleSettings {
   order: number
   tool: number
   combSpacing: number
-  budget: number // points
+  budget: number // points, as 4K samples the outlines (a smaller picture holds the same drops in fewer)
+  px: number // the picture's pixels a frame height : outlines sampled no finer than it shows
   auto: number // drops a second
   sync: number // 0 free, else 1/4, 1/2, 1, 2, 4 beats
   bpm: number
@@ -193,40 +194,34 @@ function take(len: number): ArrayBuffer {
 }
 
 const occ: Uint8Array[] = []
+// the frame's own lists, kept from one frame to the next (no garbage a frame)
+let vis = new Int32Array(256)
+let gOf = new Int32Array(256)
+let base = new Int32Array(256)
+let order: number[] = []
 
 function buildFrame(): void {
   const hw = model.hw, hh = model.hh
   const drops = model.drops
   const N = drops.length
-  // visible drops, their exact boxes (the model's are kept for its own tests)
-  let pts = 0, tri = 0
-  const vis: number[] = []
-  const box = new Float64Array(N * 4)
+  if (vis.length < N) { vis = new Int32Array(N * 2); gOf = new Int32Array(N * 2); base = new Int32Array(N * 2) }
+  // visible drops (the model keeps every box exact : each transform updates it)
+  let nv = 0, pts = 0, tri = 0
   for (let i = 0; i < N; i++) {
     const d = drops[i]
-    const xy = d.xy
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
-    for (let k = 0; k < d.n * 2; k += 2) {
-      const x = xy[k], y = xy[k + 1]
-      if (x < x0) x0 = x
-      if (x > x1) x1 = x
-      if (y < y0) y0 = y
-      if (y > y1) y1 = y
-    }
-    box[i * 4] = x0; box[i * 4 + 1] = y0; box[i * 4 + 2] = x1; box[i * 4 + 3] = y1
-    if (x1 < -hw || x0 > hw || y1 < -hh || y0 > hh || d.n < 3) continue
-    vis.push(i)
+    if (d.maxX < -hw || d.minX > hw || d.maxY < -hh || d.minY > hh || d.n < 3) continue
+    vis[nv++] = i
     pts += d.n
     tri += d.n - 2
   }
   // groups : drops whose boxes are apart on a coarse grid share a group
-  const gOf = new Int32Array(vis.length)
   let groups = 0
   const cx = (x: number): number => Math.max(0, Math.min(GW - 1, Math.floor(((x + hw) / (2 * hw)) * GW)))
   const cy = (y: number): number => Math.max(0, Math.min(GH - 1, Math.floor(((y + hh) / (2 * hh)) * GH)))
   for (const o of occ) o.fill(0)
-  vis.forEach((i, v) => {
-    const a = cx(box[i * 4]), b = cy(box[i * 4 + 1]), c = cx(box[i * 4 + 2]), e = cy(box[i * 4 + 3])
+  for (let v = 0; v < nv; v++) {
+    const d = drops[vis[v]]
+    const a = cx(d.minX), b = cy(d.minY), c = cx(d.maxX), e = cy(d.maxY)
     let g = 0
     for (;; g++) {
       if (g === occ.length) occ.push(new Uint8Array(GW * GH))
@@ -240,23 +235,27 @@ function buildFrame(): void {
     }
     gOf[v] = g
     if (g + 1 > groups) groups = g + 1
-  })
+  }
   const pos = new Float32Array(take(pts * 2), 0, pts * 2)
   const idx = new Uint32Array(take(tri * 3), 0, tri * 3)
-  const cov = new Float32Array(take(vis.length * 30), 0, vis.length * 30)
+  const cov = new Float32Array(take(nv * 30), 0, nv * 30)
   const grp = new Int32Array(take(groups * 4), 0, groups * 4)
   // outlines, in the drops' order
-  const base = new Int32Array(vis.length)
   let p = 0
-  vis.forEach((i, v) => {
-    const d = drops[i]
+  for (let v = 0; v < nv; v++) {
+    const d = drops[vis[v]]
     base[v] = p >> 1
-    for (let k = 0; k < d.n * 2; k++) pos[p++] = d.xy[k]
-  })
+    const xy = d.xy
+    const n2 = d.n * 2
+    for (let k = 0; k < n2; k++) pos[p++] = xy[k]
+  }
   // fans and covers, group by group
-  const order = vis.map((_, v) => v).sort((a, b) => gOf[a] - gOf[b] || a - b)
+  order.length = nv
+  for (let v = 0; v < nv; v++) order[v] = v
+  order.sort((a, b) => gOf[a] - gOf[b] || a - b)
   let ii = 0, ci = 0, gi = -1
-  for (const v of order) {
+  for (let q = 0; q < nv; q++) {
+    const v = order[q]
     const g = gOf[v]
     if (g !== gi) {
       if (gi >= 0) { grp[gi * 4 + 1] = ii - grp[gi * 4]; grp[gi * 4 + 3] = ci / 5 - grp[gi * 4 + 2] }
@@ -270,12 +269,14 @@ function buildFrame(): void {
     for (let j = 1; j < d.n - 1; j++) { idx[ii++] = o; idx[ii++] = o + j; idx[ii++] = o + j + 1 }
     // a hair past the outline, so the cover always reaches its last sample
     const m = 1e-3
-    const x0 = box[i * 4] - m, y0 = box[i * 4 + 1] - m, x1 = box[i * 4 + 2] + m, y1 = box[i * 4 + 3] + m
+    const x0 = d.minX - m, y0 = d.minY - m, x1 = d.maxX + m, y1 = d.maxY + m
     const depth = 1 - (i + 1) / (N + 2)
     const slot = d.col
     const fade = Math.max(0, Math.min(1, d.fade))
-    for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) {
-      cov[ci++] = x; cov[ci++] = y; cov[ci++] = depth; cov[ci++] = slot; cov[ci++] = fade
+    for (let c = 0; c < 6; c++) {
+      cov[ci++] = c === 1 || c === 2 || c === 4 ? x1 : x0
+      cov[ci++] = c >= 2 && c !== 3 ? y1 : y0
+      cov[ci++] = depth; cov[ci++] = slot; cov[ci++] = fade
     }
   }
   if (gi >= 0) { grp[gi * 4 + 1] = ii - grp[gi * 4]; grp[gi * 4 + 3] = ci / 5 - grp[gi * 4 + 2] }
@@ -310,6 +311,7 @@ self.onmessage = (e: MessageEvent<ToWorker>): void => {
     // the settings ride with every pointer event : a click before the first tick still lands
     S = m.s
     model.hw = m.s.hw
+    model.setDensity(m.s.px)
     if (replayIt && m.phase === 'down') return
     const s = settings()
     if (m.phase === 'down') {
@@ -345,55 +347,69 @@ self.onmessage = (e: MessageEvent<ToWorker>): void => {
     return
   }
   if (m.t === 'tick') {
-    for (const b of m.ret ?? []) if (pool.length < 12 && b.byteLength) pool.push(b)
-    S = m.s
-    model.hw = m.s.hw
-    model.budget = Math.max(5000, m.s.budget)
-    const dt = Math.max(0, Math.min(0.25, m.dt))
-    if (replayIt) {
-      const until = performance.now() + 9
-      let done = false
-      while (performance.now() < until) {
-        if (replayIt.next().done) { done = true; break }
-      }
-      if (done) replayIt = null
-      buildFrame()
-      return
+    // every tick is answered, even one that threw : the page sends the next only
+    // on an answer (it used to resend after 300 ms, and a worker slower than that
+    // under evolve 1 piled ticks up behind each other : 480 ms each, never caught up)
+    let answered = false
+    try {
+      tick(m)
+      answered = true
+    } finally {
+      if (!answered) idleFrame()
     }
-    if (!started) {
-      started = true
-      if (m.s.auto > 0 && !model.drops.length && !applied.length) {
-        const n = Math.max(1, Math.min(64, Math.round(m.s.sprinkleN)))
-        for (let i = 0; i < n; i++) randomDrop(0.7)
-      }
-    }
-    if (m.cur.evolve > 0 && dt > 0 && model.drops.length) { model.currents(dt, m.cur); changed = true }
-    // automatic drops : a rate, or the beat
-    if (m.s.auto > 0 && dt > 0) {
-      const beat = BEATS[Math.max(0, Math.min(5, Math.round(m.s.sync)))]
-      if (beat > 0) {
-        beatAcc += (dt * m.s.bpm) / 60
-        let k = 0
-        while (beatAcc >= beat && k++ < 4) { randomDrop(); beatAcc -= beat }
-        if (beatAcc >= beat) beatAcc %= beat
-      } else {
-        autoAcc += dt * m.s.auto
-        let k = 0
-        while (autoAcc >= 1 && k++ < 4) { randomDrop(); autoAcc -= 1 }
-        if (autoAcc >= 1) autoAcc %= 1
-      }
-    }
-    // the sound : a drop on an onset (its size from the level)
-    if (m.audio > 0) randomDrop(0.5 + m.audio * 1.2)
-    // the fixed clock
-    acc += dt
-    let k = 0
-    while (acc >= STEP && k++ < 8) {
-      if (model.active() || hands.active()) changed = true
-      model.stepOnce()
-      acc -= STEP
-    }
-    if (acc >= STEP) acc %= STEP
-    if (changed) { changed = false; buildFrame() } else idleFrame()
   }
+}
+
+function tick(m: Extract<ToWorker, { t: 'tick' }>): void {
+  for (const b of m.ret ?? []) if (pool.length < 12 && b.byteLength) pool.push(b)
+  S = m.s
+  model.hw = m.s.hw
+  model.setDensity(m.s.px)
+  model.budget = Math.max(5000, m.s.budget)
+  const dt = Math.max(0, Math.min(0.25, m.dt))
+  if (replayIt) {
+    const until = performance.now() + 9
+    let done = false
+    while (performance.now() < until) {
+      if (replayIt.next().done) { done = true; break }
+    }
+    if (done) replayIt = null
+    buildFrame()
+    return
+  }
+  if (!started) {
+    started = true
+    if (m.s.auto > 0 && !model.drops.length && !applied.length) {
+      const n = Math.max(1, Math.min(64, Math.round(m.s.sprinkleN)))
+      for (let i = 0; i < n; i++) randomDrop(0.7)
+    }
+  }
+  if (m.cur.evolve > 0 && dt > 0 && model.drops.length) { model.currents(dt, m.cur); changed = true }
+  // automatic drops : a rate, or the beat
+  if (m.s.auto > 0 && dt > 0) {
+    const beat = BEATS[Math.max(0, Math.min(5, Math.round(m.s.sync)))]
+    if (beat > 0) {
+      beatAcc += (dt * m.s.bpm) / 60
+      let k = 0
+      while (beatAcc >= beat && k++ < 4) { randomDrop(); beatAcc -= beat }
+      if (beatAcc >= beat) beatAcc %= beat
+    } else {
+      autoAcc += dt * m.s.auto
+      let k = 0
+      while (autoAcc >= 1 && k++ < 4) { randomDrop(); autoAcc -= 1 }
+      if (autoAcc >= 1) autoAcc %= 1
+    }
+  }
+  // the sound : a drop on an onset (its size from the level)
+  if (m.audio > 0) randomDrop(0.5 + m.audio * 1.2)
+  // the fixed clock
+  acc += dt
+  let k = 0
+  while (acc >= STEP && k++ < 8) {
+    if (model.active() || hands.active()) changed = true
+    model.stepOnce()
+    acc -= STEP
+  }
+  if (acc >= STEP) acc %= STEP
+  if (changed) { changed = false; buildFrame() } else idleFrame()
 }

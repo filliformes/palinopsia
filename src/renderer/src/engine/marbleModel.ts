@@ -27,12 +27,23 @@
 // automatic drops are live : never logged.
 
 export const STEP = 1 / 60
-/** An edge longer than this is split (frame heights : ~4 px at 1080p; a drop
- *  stretched from afar is resampled once it has stretched 1 %, so an edge can
- *  run up to 1 % over). */
+/** An edge longer than this is split, at the finest (frame heights : 8.6 px at
+ *  4K; a drop stretched from afar is resampled once it has stretched 1 %, so an
+ *  edge can run up to 1 % over). */
 export const MAX_EDGE = 0.004
 /** Two edges shorter than this around a point merge it away (unless it is a corner). */
 export const MIN_EDGE = 0.0011
+/** The picture size MAX_EDGE is made for (pixels a frame height : 4K). A smaller
+ *  picture samples its outlines coarser, the same ~8.6 px between points as 4K,
+ *  up to COARSEST × MAX_EDGE : at 1080p about half the points for the same drops
+ *  (the sharp tips keep their fine sampling). The points budget counts at this size. */
+export const REF_PX = 2160
+const COARSEST = 2
+/** A drop drawn out thinner than this (its mean width, 2 area / perimeter, in
+ *  the picture's pixels) dissolves into the water : a combed or swirled sliver
+ *  under half a pixel is nearly all outline (points) and hardly any paint, and
+ *  the comb only ever draws it longer. */
+export const THIN_PX = 0.5
 const MIN_PTS = 8
 const MAX_DROP_PTS = 1500
 /** Steps a dissolve takes (1.5 s), and the quicker one of `clear`. */
@@ -64,6 +75,7 @@ export interface Drop {
   spreading: boolean
   fade: number // 1 → 0 while it dissolves into the water
   fadeStep: number // how much fade it loses per step (0 : not dissolving)
+  cap: number // while dissolving : the most points it may have (it stops growing)
   touched: boolean
   stretch: number // how much far pushes have stretched it since its last resample
   minX: number
@@ -175,7 +187,13 @@ export class MarbleModel {
   /** Half the view's width and height, in frame heights. */
   hw = 16 / 18
   hh = 0.5
+  /** Points, counted as 4K samples them (see budgetPoints). */
   budget = 60000
+  /** The picture's pixels a frame height (setDensity). */
+  px = REF_PX
+  /** The longest edge now : MAX_EDGE at 4K and above, up to twice that below. */
+  maxEdge = MAX_EDGE
+  private max2 = MAX_EDGE * MAX_EDGE
   private nextId = 1
   /** Steps the last resample or transform changed something : replay may skip
    *  only fully quiet stretches. */
@@ -197,6 +215,21 @@ export class MarbleModel {
 
   get count(): number {
     return this.drops.length
+  }
+
+  /** The picture's size (pixels a frame height) : outlines are sampled no finer
+   *  than it can show. Existing outlines follow at their next resample. */
+  setDensity(px: number): void {
+    if (!(px > 0) || px === this.px) return
+    this.px = px
+    this.maxEdge = MAX_EDGE * Math.max(1, Math.min(COARSEST, REF_PX / px))
+    this.max2 = this.maxEdge * this.maxEdge
+  }
+
+  /** The budget in points at this size : the same outlines, sampled coarser on a
+   *  smaller picture, so the same drops stay on the water at 1080p and at 4K. */
+  budgetPoints(): number {
+    return Math.round(this.budget * (MAX_EDGE / this.maxEdge))
   }
 
   /** Anything moving on the fixed clock (spreading, pouring, dissolving). */
@@ -224,18 +257,9 @@ export class MarbleModel {
   pushAll(cx: number, cy: number, r2: number): void {
     if (!(r2 > 0)) return
     for (const d of this.drops) {
-      const xy = d.xy
-      const n2 = d.n * 2
-      for (let i = 0; i < n2; i += 2) {
-        const dx = xy[i] - cx
-        const dy = xy[i + 1] - cy
-        const l2 = dx * dx + dy * dy
-        const s = Math.sqrt(1 + r2 / (l2 > 1e-24 ? l2 : 1e-24))
-        xy[i] = cx + dx * s
-        xy[i + 1] = cy + dy * s
-      }
       // its edges stretch where the push is strong (resample it this step), and
-      // a little at a distance : those add up until they reach 1 %
+      // a little at a distance : those add up until they reach 1 % (its box from
+      // before the push)
       if (!d.touched) {
         const ex = Math.max(d.minX - cx, 0, cx - d.maxX)
         const ey = Math.max(d.minY - cy, 0, cy - d.maxY)
@@ -243,6 +267,24 @@ export class MarbleModel {
         d.stretch += r2 / (2 * Math.max(dd, 1e-12))
         if (dd < r2 * 400 + 1e-4 || d.stretch > 0.01) d.touched = true
       }
+      const xy = d.xy
+      const n2 = d.n * 2
+      // the box follows the points (the frame is drawn from it : no pass of its own)
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+      for (let i = 0; i < n2; i += 2) {
+        const dx = xy[i] - cx
+        const dy = xy[i + 1] - cy
+        const l2 = dx * dx + dy * dy
+        const s = Math.sqrt(1 + r2 / (l2 > 1e-24 ? l2 : 1e-24))
+        const x = cx + dx * s, y = cy + dy * s
+        xy[i] = x
+        xy[i + 1] = y
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
+      }
+      d.minX = x0; d.minY = y0; d.maxX = x1; d.maxY = y1
     }
   }
 
@@ -272,9 +314,11 @@ export class MarbleModel {
         d.touched = true
         const xy = d.xy
         const n2 = d.n * 2
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
         for (let i = 0; i < n2; i += 2) {
-          const px = xy[i] - ax
-          const py = xy[i + 1] - ay
+          let x = xy[i], y = xy[i + 1]
+          const px = x - ax
+          const py = y - ay
           const u = px * mx + py * my
           let c = px * nx + py * ny
           if (tines > 1) {
@@ -282,16 +326,24 @@ export class MarbleModel {
             const t = Math.round(c / spacing)
             c = Math.abs(c - (t < 0 ? 0 : t > tines - 1 ? tines - 1 : t) * spacing)
           } else c = Math.abs(c)
-          if (c > reach) continue
-          // sech across the tine (the same tail as exp, but no cusp on the tine
-          // itself) : a tip rounds off within about a pixel, so the two sides of
-          // a long chevron never meet and cross
-          const wu = u / WIN
-          const e = Math.exp(-c / w)
-          const disp = z * ((2 * e) / (1 + e * e)) * Math.exp(-wu * wu)
-          xy[i] += disp * mx
-          xy[i + 1] += disp * my
+          if (c <= reach) {
+            // sech across the tine (the same tail as exp, but no cusp on the tine
+            // itself) : a tip rounds off within about a pixel, so the two sides of
+            // a long chevron never meet and cross
+            const wu = u / WIN
+            const e = Math.exp(-c / w)
+            const disp = z * ((2 * e) / (1 + e * e)) * Math.exp(-wu * wu)
+            x += disp * mx
+            y += disp * my
+            xy[i] = x
+            xy[i + 1] = y
+          }
+          if (x < x0) x0 = x
+          if (x > x1) x1 = x
+          if (y < y0) y0 = y
+          if (y > y1) y1 = y
         }
+        d.minX = x0; d.minY = y0; d.maxX = x1; d.maxY = y1
       }
       // the outlines follow between sub-strokes, so a long drag never folds them
       if (s < k - 1) this.resampleTouched()
@@ -322,17 +374,27 @@ export class MarbleModel {
       d.touched = true
       const xy = d.xy
       const n2 = d.n * 2
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
       for (let i = 0; i < n2; i += 2) {
-        const dx = xy[i] - cx
-        const dy = xy[i + 1] - cy
+        let x = xy[i], y = xy[i + 1]
+        const dx = x - cx
+        const dy = y - cy
         const l2 = dx * dx + dy * dy
-        if (l2 > reach2) continue
-        const a = dth * Math.exp(-l2 * iR2)
-        let c: number, s: number
-        if (a > 0.02 || a < -0.02) { c = Math.cos(a); s = Math.sin(a) } else { const a2 = a * a; c = 1 - a2 * 0.5 + a2 * a2 / 24; s = a - a * a2 / 6 }
-        xy[i] = cx + dx * c - dy * s
-        xy[i + 1] = cy + dx * s + dy * c
+        if (l2 <= reach2) {
+          const a = dth * Math.exp(-l2 * iR2)
+          let c: number, s: number
+          if (a > 0.02 || a < -0.02) { c = Math.cos(a); s = Math.sin(a) } else { const a2 = a * a; c = 1 - a2 * 0.5 + a2 * a2 / 24; s = a - a * a2 / 6 }
+          x = cx + dx * c - dy * s
+          y = cy + dx * s + dy * c
+          xy[i] = x
+          xy[i + 1] = y
+        }
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
       }
+      d.minX = x0; d.minY = y0; d.maxX = x1; d.maxY = y1
     }
   }
 
@@ -343,7 +405,7 @@ export class MarbleModel {
    *  crossed it), spreading to radius r over `steps` steps. `held` keeps it
    *  pouring until released. */
   drop(x: number, y: number, r: number, col: number, steps: number, held = false): Drop {
-    const n = Math.max(24, Math.min(MAX_DROP_PTS, Math.round((2 * Math.PI * r) / (MAX_EDGE * 0.75))))
+    const n = Math.max(24, Math.min(MAX_DROP_PTS, Math.round((2 * Math.PI * r) / (this.maxEdge * 0.75))))
     const r0 = r * LAND
     this.pushAll(x, y, r0 * r0)
     const xy = new Float64Array(n * 2)
@@ -356,7 +418,7 @@ export class MarbleModel {
     }
     const d: Drop = {
       id: this.nextId++, n, xy, col: col | 0, cx: x, cy: y, a0: Math.PI * r * r, area: Math.PI * r0 * r0,
-      steps: Math.max(1, Math.round(steps)), age: 0, pour: 0, held, spreading: true, fade: 1, fadeStep: 0,
+      steps: Math.max(1, Math.round(steps)), age: 0, pour: 0, held, spreading: true, fade: 1, fadeStep: 0, cap: 0,
       touched: true, stretch: 0, minX: x - r0, minY: y - r0, maxX: x + r0, maxY: y + r0
     }
     this.drops.push(d)
@@ -374,9 +436,18 @@ export class MarbleModel {
     for (const d of this.drops) {
       d.spreading = false
       d.held = false
+      if (d.fadeStep === 0) d.cap = d.n
       if (d.fadeStep === 0 || d.fadeStep < 1 / CLEAR_STEPS) d.fadeStep = 1 / CLEAR_STEPS
     }
     this.busy = true
+  }
+
+  /** The drop starts dissolving into the water (1.5 s) and stops growing : a
+   *  fading drop is still carried, but its outline gains no more points. */
+  private dissolve(d: Drop): void {
+    if (d.fadeStep > 0) return
+    d.fadeStep = 1 / DISSOLVE_STEPS
+    d.cap = d.n
   }
 
   /** Empty now (a rebuild starts from clean water). */
@@ -436,39 +507,47 @@ export class MarbleModel {
    *  regions behind everything are not forever halfway through fading (on a
    *  dark water they turned the whole ground khaki and plum). */
   keepBudget(): void {
+    // The points budget at this picture size. Drops already dissolving count
+    // half : they no longer grow and leave within 1.5 s, yet under a lively comb
+    // they were once half of all the points (153K for a 60K budget at evolve 1).
+    const B = this.budgetPoints()
     let live = 0
-    for (const d of this.drops) if (d.fadeStep === 0) live += d.n
-    if (live <= this.budget) return
+    for (const d of this.drops) live += d.fadeStep === 0 ? d.n : d.n * 0.5
+    if (live <= B) return
     const old = this.drops.slice(0, Math.max(1, Math.ceil(this.drops.length / 2))).filter((d) => d.fadeStep === 0 && !d.spreading)
     old.sort((a, b) => b.n / Math.sqrt(Math.max(b.area, 1e-6)) - a.n / Math.sqrt(Math.max(a.area, 1e-6)) || a.id - b.id)
     for (const d of old) {
-      if (live <= this.budget) break
-      d.fadeStep = 1 / DISSOLVE_STEPS
-      live -= d.n
+      if (live <= B) break
+      this.dissolve(d)
+      live -= d.n * 0.5
     }
     // still over (the older half was not enough) : the oldest of the rest
     for (const d of this.drops) {
-      if (live <= this.budget) break
+      if (live <= B) break
       if (d.fadeStep > 0 || d.spreading) continue
-      d.fadeStep = 1 / DISSOLVE_STEPS
-      live -= d.n
+      this.dissolve(d)
+      live -= d.n * 0.5
     }
   }
 
-  /** Resample every drop a transform touched (see resample). True when a drop changed. */
+  /** Resample every drop a transform touched (see resample). True when a drop
+   *  changed. A drop whose outline changed is checked for thinness here (only
+   *  then : a still drop never turns thin, and the log replays the same). */
   resampleTouched(): boolean {
     let changed = false
     for (const d of this.drops) {
       if (!d.touched) continue
       d.touched = false
       d.stretch = 0
-      if (this.resample(d)) changed = true
+      if (!this.resample(d)) continue
+      changed = true
       this.bbox(d)
+      if (!d.spreading && d.fadeStep === 0 && this.thin(d)) this.dissolve(d)
     }
     return changed
   }
 
-  /** All drops (the currents move them all). */
+  /** All drops. */
   resampleAll(): void {
     for (const d of this.drops) d.touched = true
     this.resampleTouched()
@@ -488,33 +567,65 @@ export class MarbleModel {
     d.minX = x0; d.minY = y0; d.maxX = x1; d.maxY = y1
   }
 
-  /** Keep the outline smooth without exploding : an edge past MAX_EDGE is split
-   *  on the curve through its neighbours (Catmull-Rom); a point whose two edges
-   *  are both under MIN_EDGE merges away, unless it sits on a corner or the drop
-   *  is still spreading (its tiny first circle). One pass, in place. */
+  /** Drawn out under THIN_PX on average (2 area / perimeter, in the picture's
+   *  pixels) : a sliver more outline than paint. */
+  thin(d: Drop): boolean {
+    const xy = d.xy
+    const n = d.n
+    let per = 0
+    for (let i = 0; i < n; i++) {
+      const j = i + 1 === n ? 0 : i + 1
+      per += Math.hypot(xy[j * 2] - xy[i * 2], xy[j * 2 + 1] - xy[i * 2 + 1])
+    }
+    return per > 0 && ((2 * d.area) / per) * this.px < THIN_PX
+  }
+
+  /** Would resample change this outline? Its own tests, in the same order and
+   *  without a square root. The currents ask it of every drop every frame (they
+   *  used to resample them all : a full pass and three square roots an edge). */
+  needsResample(d: Drop): boolean {
+    const n = d.n
+    const xy = d.xy
+    const MAX2 = this.max2
+    const canMerge = !d.spreading && n > MIN_PTS
+    // a dissolving drop at its cap gains no points (merges only)
+    const grow = d.fadeStep === 0 || d.n < d.cap
+    let x = xy[0], y = xy[1]
+    let ax = x - xy[n * 2 - 2], ay = y - xy[n * 2 - 1]
+    let la = ax * ax + ay * ay
+    for (let i = 0; i < n; i++) {
+      const j = i + 1 === n ? 0 : i + 1
+      const k = j + 1 === n ? 0 : j + 1
+      const xj = xy[j * 2], yj = xy[j * 2 + 1]
+      const ex = xj - x, ey = yj - y
+      const le = ex * ex + ey * ey
+      const bx = xy[k * 2] - xj, by = xy[k * 2 + 1] - yj
+      const lb = bx * bx + by * by
+      if (grow && (le > MAX2 || (le > TIP2 && (turns(ax, ay, la, ex, ey, le) || turns(ex, ey, le, bx, by, lb))))) return true
+      if (canMerge && j !== 0 && le < MIN2 && lb < MIN2 && straight(ex, ey, le, bx, by, lb)) return true
+      ax = ex; ay = ey; la = le
+      x = xj; y = yj
+    }
+    return false
+  }
+
+  /** Keep the outline smooth without exploding : an edge past the longest edge
+   *  (maxEdge : MAX_EDGE at 4K, coarser on a smaller picture) is split on the
+   *  curve through its neighbours (Catmull-Rom); a point whose two edges are both
+   *  under MIN_EDGE merges away, unless it sits on a corner or the drop is still
+   *  spreading (its tiny first circle). A dissolving drop never grows past its
+   *  cap. One pass, in place. */
   resample(d: Drop): boolean {
     const n = d.n
     const xy = d.xy
-    const MAX2 = MAX_EDGE * MAX_EDGE
-    const MIN2 = MIN_EDGE * MIN_EDGE
+    const MAX2 = this.max2
+    const maxE = this.maxEdge
     const canMerge = !d.spreading
     // quick test : most drops need nothing
-    let need = false
-    let extra = 0
-    for (let i = 0; i < n; i++) {
-      const j = i + 1 === n ? 0 : i + 1
-      const dx = xy[j * 2] - xy[i * 2], dy = xy[j * 2 + 1] - xy[i * 2 + 1]
-      const l2 = dx * dx + dy * dy
-      if (l2 > MAX2) { need = true; extra += Math.ceil((Math.sqrt(l2) + 2 * MIN_EDGE) / (MAX_EDGE * 0.8)) }
-      else if (canMerge && l2 < MIN2 && n > MIN_PTS) need = true
-      else if (l2 > TIP2 && sharp(xy, n, i, j)) { need = true; extra++ }
-    }
-    if (!need) return false
-    // room for every split (an edge after merges is at most its own length plus
-    // the merged short ones)
-    const cap = (n + extra + 16) * 2
-    if (scratch.length < cap) scratch = new Float64Array(cap * 2)
-    const o = scratch
+    if (!this.needsResample(d)) return false
+    let room = d.fadeStep === 0 ? Infinity : Math.max(0, d.cap - n)
+    let o = scratch
+    if (o.length < n * 4 + 64) o = scratch = new Float64Array(n * 8 + 64)
     let m = 0
     let lx = xy[0], ly = xy[1]
     o[m++] = lx; o[m++] = ly
@@ -529,20 +640,23 @@ export class MarbleModel {
         const ax = xj - lx, ay = yj - ly
         const bx = xy[k * 2] - xj, by = xy[k * 2 + 1] - yj
         const la = ax * ax + ay * ay, lb = bx * bx + by * by
-        if (la < MIN2 && lb < MIN2) {
-          const dot = ax * bx + ay * by
-          // a corner (turning more than ~30°) stays
-          if (dot > 0.866 * Math.sqrt(la * lb)) { kept--; continue }
-        }
+        // a corner (turning more than ~30°) stays
+        if (la < MIN2 && lb < MIN2 && straight(ax, ay, la, bx, by, lb)) { kept--; room++; continue }
       }
       // split the edge from the last kept point to p_j : a long one, or one
       // beside a sharp turn (the comb's pointed tips are sampled finer, so the
       // two sides of a thin tip never cross)
       const dx = xj - lx, dy = yj - ly
       const l2 = dx * dx + dy * dy
-      if (l2 > MAX2 || (l2 > TIP2 && sharp(xy, n, i, j))) {
-        // (a little short of MAX_EDGE : the curve bulges past its chord)
-        const parts = l2 > MAX2 ? Math.ceil(Math.sqrt(l2) / (MAX_EDGE * 0.8)) : 2
+      if (room > 0 && (l2 > MAX2 || (l2 > TIP2 && sharp(xy, n, i, j)))) {
+        // (a little short of the longest edge : the curve bulges past its chord)
+        const parts = Math.min(room + 1, l2 > MAX2 ? Math.ceil(Math.sqrt(l2) / (maxE * 0.8)) : 2)
+        room -= parts - 1
+        if (m + parts * 2 + 4 > o.length) {
+          const big = new Float64Array(Math.max(o.length * 2, m + parts * 2 + 64))
+          big.set(o.subarray(0, m))
+          o = scratch = big
+        }
         // Catmull-Rom through p_h, p_i, p_j, p_k (the last kept point stands for
         // p_i when points were merged before it : close enough, and exact for
         // the common case)
@@ -557,6 +671,11 @@ export class MarbleModel {
         }
       }
       if (j !== 0) {
+        if (m + 2 > o.length) {
+          const big = new Float64Array(o.length * 2)
+          big.set(o.subarray(0, m))
+          o = scratch = big
+        }
         o[m++] = xj; o[m++] = yj
         lx = xj; ly = yj
       }
@@ -597,7 +716,7 @@ export class MarbleModel {
     const n = Math.max(1, Math.ceil(Math.max((dt * sp) / 0.05, (c.comb * 0.11 * sp * dt) / (0.3 * cw))))
     for (let i = 0; i < Math.min(n, 12); i++) {
       this.currentsOnce(dt / n, c, sp)
-      if (i < n - 1) this.resampleAll()
+      if (i < n - 1) this.resampleTouched()
     }
   }
 
@@ -664,10 +783,10 @@ export class MarbleModel {
     const kx1 = kx[1], ky1 = ky[1], ax1 = ax[1], ay1 = ay[1], p1 = ph[1]
     const kx2 = kx[2], ky2 = ky[2], ax2 = ax[2], ay2 = ay[2], p2 = ph[2]
     for (const d of this.drops) {
-      d.touched = true
       const xy = d.xy
       const n2 = d.n * 2
       const swirlHere = sw !== 0 && !(Math.max(d.minX - scx, 0, scx - d.maxX) ** 2 + Math.max(d.minY - scy, 0, scy - d.maxY) ** 2 > sR2)
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
       for (let i = 0; i < n2; i += 2) {
         let x = xy[i], y = xy[i + 1]
         let w = fcos(x * kx0 + y * ky0 + p0)
@@ -689,7 +808,7 @@ export class MarbleModel {
           const dx = x - scx, dy = y - scy
           const l2 = dx * dx + dy * dy
           if (l2 < sR2) {
-            const a = sw * Math.exp(-l2 * isR2)
+            const a = sw * fexpNeg(l2 * isR2)
             const a2 = a * a
             const cs = 1 - a2 * 0.5, sn = a - a * a2 / 6
             x = scx + dx * cs - dy * sn
@@ -697,7 +816,15 @@ export class MarbleModel {
           }
         }
         xy[i] = x; xy[i + 1] = y
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
       }
+      d.minX = x0; d.minY = y0; d.maxX = x1; d.maxY = y1
+      // resampled only where an edge is due a split or a merge (they once all
+      // were, every frame : a third of the worker's time)
+      if (!d.touched && this.needsResample(d)) d.touched = true
     }
   }
 
@@ -739,8 +866,37 @@ export function fcos(x: number): number {
   return sgn * (1 - u * (0.5 - u * (1 / 24 - u * (1 / 720 - u * (1 / 40320 - u / 3628800)))))
 }
 
+const POW2N = new Float64Array(64).map((_, k) => 2 ** -k)
+
+/** e^-x for x ≥ 0, 2e-5 off at worst (the swirl's falloff, for ~60 % of the
+ *  points every frame : Math.exp is a call, this is inline arithmetic). A turn
+ *  keeps every area whatever angle drives it. */
+export function fexpNeg(x: number): number {
+  const t = x * 1.4426950408889634
+  if (!(t < 63)) return 0
+  const k = t | 0
+  const f = t - k
+  // 2^-f on [0, 1) : its Taylor series to f⁶
+  const p = 1 - f * (0.6931471805599453 - f * (0.2402265069591007 - f * (0.05550410866482158 - f * (0.009618129107628477 - f * (0.0013333558146428443 - f * 0.00015403530393381606)))))
+  return p * POW2N[k]
+}
+
 /** An edge long enough to split at a sharp turn (twice the merge length). */
 const TIP2 = (2.2 * MIN_EDGE) ** 2
+const MIN2 = MIN_EDGE * MIN_EDGE
+
+/** The outline turns by more than ~40° from edge a (squared length la) to edge
+ *  b : cos < 0.766, squared so no root is taken (a zero edge counts as a turn). */
+function turns(ax: number, ay: number, la: number, bx: number, by: number, lb: number): boolean {
+  const dot = ax * bx + ay * by
+  return dot <= 0 || dot * dot < 0.586756 * la * lb
+}
+
+/** It turns by less than ~30° (cos > 0.866) : not a corner, a point may merge away. */
+function straight(ax: number, ay: number, la: number, bx: number, by: number, lb: number): boolean {
+  const dot = ax * bx + ay * by
+  return dot > 0 && dot * dot > 0.749956 * la * lb
+}
 
 /** The outline turns sharply (more than ~40°) at either end of edge i → j. */
 function sharp(xy: Float64Array, n: number, i: number, j: number): boolean {
@@ -749,10 +905,8 @@ function sharp(xy: Float64Array, n: number, i: number, j: number): boolean {
   const ex = xy[j * 2] - xy[i * 2], ey = xy[j * 2 + 1] - xy[i * 2 + 1]
   const ax = xy[i * 2] - xy[h * 2], ay = xy[i * 2 + 1] - xy[h * 2 + 1]
   const bx = xy[k * 2] - xy[j * 2], by = xy[k * 2 + 1] - xy[j * 2 + 1]
-  const le = Math.sqrt(ex * ex + ey * ey)
-  const ca = (ax * ex + ay * ey) / (Math.sqrt(ax * ax + ay * ay) * le + 1e-30)
-  const cb = (bx * ex + by * ey) / (Math.sqrt(bx * bx + by * by) * le + 1e-30)
-  return ca < 0.766 || cb < 0.766
+  const le = ex * ex + ey * ey
+  return turns(ax, ay, ax * ax + ay * ay, ex, ey, le) || turns(ex, ey, le, bx, by, bx * bx + by * by)
 }
 
 function needsCopy(a: Float64Array, b: Float64Array, m: number): boolean {

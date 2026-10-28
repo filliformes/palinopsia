@@ -89,8 +89,8 @@ that CI builds into cross-platform releases.
   (spreading in steps that add up exactly to the one-shot drop), tine lines (a `sech`
   falloff instead of the paper's `exp`, so a combed tip rounds off within a pixel and its
   two sides never cross), vortices, and the currents as plane-wave shears (each keeps
-  every area exactly). Outlines are resampled (Catmull-Rom splits past 4 px at 1080p,
-  merges under 1.2 px, finer at sharp turns). Spreading, pouring, dissolving and every
+  every area exactly). Outlines are resampled (Catmull-Rom splits past ~8.6 px at 4K and
+  at 1080p alike, merges under 1.2 px at 1080p, finer at sharp turns : see Changed). Spreading, pouring, dissolving and every
   hand-made event run on a fixed 60 Hz step, so a logged gesture replays to the same
   points. The water runs in a worker (`workers/marbleWorker.ts` : at 90K points the
   currents, spreading and resample cost ~5 ms a frame) which also lays out the draw : a
@@ -322,6 +322,35 @@ that CI builds into cross-platform releases.
   the MIDI section's new **learn** list binds a pad to any of them.
 
 ### Changed
+
+- **Marbling's comb and swirl use far less of the computer** (`engine/marbleModel.ts`,
+  `workers/marbleWorker.ts`, `engine/MarbleSource.ts`). Measured first (RTX 4070 laptop,
+  Marbling alone, the worker timed inside itself over CDP) : every cost follows the point
+  count, and the budget let it run away. The currents marked every drop for resampling
+  every frame (a full pass, three square roots an edge, often to change nothing); evolve 1
+  with comb and swirl climbed to 142-191K points for a 60K budget (dissolving drops kept
+  growing) and the worker, at 54 ms a tick, moved the water 6 times a second; a tick
+  slower than 300 ms got resent and piled up behind itself. Now : outlines are sampled no
+  finer than the picture shows (the longest edge ~8.6 px at 4K and at 1080p alike, so
+  1080p carries about half the points; 4K and the dome unchanged; sharp tips keep their
+  fine sampling) and the points budget counts as 4K samples, so the same drops stay at any
+  size; a drop combed or swirled into a sliver under half a pixel (2 area / perimeter)
+  dissolves; a dissolving drop stops gaining points and counts half against the budget;
+  only drops whose edges are due a split or a merge are resampled (an exact square-root-free
+  test); every transform keeps each box exact (no extra pass a frame); the swirl's falloff
+  is inline arithmetic; the worker answers every tick and is ticked at most ~70 times a
+  second (an uncapped renderer drove it at its own rate), 10 a second on still water with
+  auto drops, not at all when nothing can land. At 1080p, first minute from a fresh
+  session : comb 1 + swirl 1 : points 60K → 31K (flat after 40 s), worker 11.5 → 5.7 ms a
+  tick and now 60 ticks a second (was 50), worker 52 → 34 % of a core, renderer process
+  72 → 51 %; evolve 1 + comb 1 + swirl 1 : points at most 142K → 45K, worker 54 → 8 ms a
+  tick, 6 → 58 ticks a second, renderer process 102 → 60 %; 60 fps held at 1080p and 4K
+  (4K comb + swirl unchanged by design : ~60K points, worker 10-11 ms). Same seed, same
+  ticks : the combed picture is the same; at evolve 1 the water is sparser, since the
+  budget now holds. Save → New → load pixel-identical (0 of 8.3 MB). Headless tests :
+  6,604 assertions (sampling bounds per size, ~0.54 x the points at 1080p, slivers
+  dissolve and stop growing, points within 1.6 x the budget at evolve 1 with no drop
+  leaving before it has faded, exact boxes, the log replays identically at 1080p).
 
 - **A lone hand goes to its own side** (`HandSlots`, `engine/handShape.ts`). With two
   hands in view nothing changes (the one on your left as the preview shows it is L).
