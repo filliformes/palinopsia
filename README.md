@@ -60,7 +60,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
-- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 18 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
+- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
@@ -791,7 +791,7 @@ Eight modulator slots, each of a chosen **type**, picked from a menu in five fam
 | Family | Types |
 |---|---|
 | **waves** (shapes in time) | `lfo` (7 shapes) · `ramp` · `adsr` |
-| **rhythms** (patterns on a clock) | `arp` · `euclid` · `turing` · `cellular` |
+| **rhythms** (patterns on a clock) | `arp` · `steps` · `euclid` · `turing` · `cellular` |
 | **random** (chance) | `random` · `sh` (sample and hold) · `slew` · `chaos` |
 | **gestures** (movement with a life of its own) | `organic` · `motion` · `physics` |
 | **listening** (follows the room) | `audio` · `vision` · `body` · `homeostat` |
@@ -799,6 +799,33 @@ Eight modulator slots, each of a chosen **type**, picked from a menu in five fam
 Each has a clock (free Hz or BPM division), type-specific params, a live meter, and
 retrigger. The modulator the active World installs for its audio routing carries `⊛`
 (wherever it sits) and Randomize leaves it alone; change it or its bindings and it is yours.
+
+**`steps`** is a **step sequencer with conditional steps and swing** : up to 16 steps,
+each a value you **draw** on the card's strip (drag up or down, across the bars to draw
+several; a click makes a step a rest or plays it again), played one per clock tick (free
+Hz or a BPM division). While Ableton Link is enabled the step number is the shared count,
+so step 1 lands on the bar, also after a jump. **Right-click a step** for its one
+**condition** : always; **by chance** (10 / 25 / 50 / 75 / 90 %, drawn anew each time
+round); **on some passes** (A:B : pass A of every B, 1:2 to 8:8 in a grid, counted from
+the start of the run); **only in a fill** / **only outside a fill**; **only the first time
+through** / **every time but the first**; the same menu makes the step a rest, ends the
+pattern there, sets what a silent step does (**holds** the value, or **drops to 0**),
+clears the conditions and randomizes the pattern. A run (pass 1) starts when the card is
+turned on, retriggered (⟳), a session loads, or Ableton Link starts playing (start / stop
+sync, on its bar). **FILL** rides the rate line : hold it for a fill, Shift-click keeps it
+on; a Body rule or a MIDI pad switches it (`MOD n fill on/off`, `act:mod:<n>:fill`; FILL
+is never saved). **LEN** 1..16 (the steps past it dimmed and kept), **SWG** 50..75 %
+(every second step lands late by (swing − 50) % × 2 of a step : 75 % is half a step, so a
+step never reaches the next; free Hz, BPM and Link alike), **GLIDE** 0..1 of a step (a
+half-cosine slide, 0 = hard steps). The marks under the steps show the conditions at a
+glance : a chance fills its share of the mark, an A:B lights its pass among the B, a fill
+step is marked in the accent (faint : only outside a fill), a first one in the text color
+(faint : every time but the first). Its probabilities are its SLIP, so it has no SLIP
+control. A stroke of drawing is one undo step. The dice and the stepped Generate families
+(Glitch / Datamosh, Datamosh & Compression, Cameraless, Data / Parametric, Retro Screen,
+Film Wall, and Space's Data Floor) draw it with musical patterns : a short motif repeated
+with changes, a few rests, now and then a condition, mostly straight, sometimes a little
+swing.
 
 Three **generative** types (borrowed from the LZX Videomancer vocabulary) join the
 stepped family and take **SLIP** like the rest:

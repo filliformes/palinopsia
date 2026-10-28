@@ -313,6 +313,7 @@ export type ModulatorType =
   | 'euclid'
   | 'turing'
   | 'cellular'
+  | 'steps'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 // `noisiness` (spectral flatness) is the crossmodal partner of image saturation :
@@ -632,6 +633,25 @@ export type ModCurve =
 
 export type ArpMode = 'up' | 'down' | 'upDown' | 'random' | 'drunk'
 
+/** When one step of a `steps` modulator plays (engine/stepSeq.ts reads it) :
+ *  'always'; 'p<percent>' that often ('p25'); '<a>:<b>' on the a-th of every b
+ *  passes through the pattern ('1:2', '3:4'), counted from the start of the run;
+ *  'fill' / '!fill' only while FILL is on / off; 'first' / '!first' only on the
+ *  run's first pass / on every pass but the first. */
+export type StepCond = 'always' | 'fill' | '!fill' | 'first' | '!first' | `p${number}` | `${number}:${number}`
+
+/** The `steps` modulator : a 16-step sequencer. Each array holds 16 entries
+ *  (the steps past `length` keep theirs, so a shorter pattern grows back). */
+export interface StepsConfig {
+  length: number // 1..16 steps played
+  values: number[] // each step's value (the bar's height), 0..1
+  on: boolean[] // false : a rest, it never plays
+  cond: StepCond[] // each step's condition
+  swing: number // 50..75 % : 50 straight; every second step lands late by (swing - 50) % x 2 of a step
+  glide: number // 0..1 of a step : the slide from one value to the next (0 = hard steps)
+  rest: 'hold' | 'zero' // a step that does not play : the output holds, or drops to 0
+}
+
 // One modulator slot's configuration (runtime state lives in the engine).
 export interface ModulatorConfig {
   type: ModulatorType
@@ -711,6 +731,10 @@ export interface ModulatorConfig {
   // (30/90/110/150), advanced one generation per clock; output = live-cell
   // density. Chaotic (30), fractal (90/150) or complex (110). Grid-locked → SLIP.
   cellular: { rule: number; cells: number }
+  // Step sequencer : up to 16 drawn values played in turn on the clock, each
+  // step on or a rest, each with a condition (chance, some passes, fill, first),
+  // swing and glide. Its own probabilities are this type's SLIP, so it has none.
+  steps: StepsConfig
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the

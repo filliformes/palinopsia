@@ -23,6 +23,7 @@ import { setTempoShared } from './sessionGuard'
 import { runSilently, writeLinkTempo } from './undo'
 import { onPlayEdited, type PlayThing } from './playEvents'
 import { soniClockPlayAt } from './audio/soniClock'
+import { modEngine } from './engine/modulation'
 
 export interface LinkSettings {
   enabled: boolean
@@ -299,6 +300,8 @@ function tickPlay(now: number): void {
   if (b != null && b < p.at - 1e-3) return
   ps.pending = false
   setSeqs(true, ps.resume ?? firstPlay())
+  // the steps modulators start their run on the same bar (pass 1 : first, A:B)
+  modEngine.restartRuns()
 }
 
 // Something started or stopped here on purpose (./playEvents.ts).

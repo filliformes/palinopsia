@@ -30,6 +30,7 @@ import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
+import { randomSteps } from './engine/stepSeq'
 
 export type RandomizeScope =
   | 'all'
@@ -384,7 +385,7 @@ const RAND_CURVES: ModCurve[] = [
 // Weighted toward the continuously interesting types.
 const TYPE_POOL: ModulatorType[] = [
   'lfo', 'lfo', 'lfo', 'sh', 'sh', 'chaos', 'chaos', 'random', 'slew', 'arp', 'ramp', 'adsr',
-  'euclid', 'turing', 'cellular'
+  'euclid', 'turing', 'cellular', 'steps'
 ]
 
 function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfig {
@@ -421,7 +422,10 @@ function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfi
     chaos: { r: range(3.5, 4) },
     euclid: { steps: Math.floor(range(8, 17)), pulses: Math.floor(range(2, 9)), decay: range(0.1, 0.6) },
     turing: { length: Math.floor(range(4, 13)), mutate: range(0.05, 0.4) },
-    cellular: { rule: pick([30, 90, 110, 150]), cells: Math.floor(range(16, 33)) }
+    cellular: { rule: pick([30, 90, 110, 150]), cells: Math.floor(range(16, 33)) },
+    // a short motif repeated with changes, a few rests, now and then a step on
+    // some passes, on a chance or for the fill; mostly straight
+    steps: randomSteps()
   }
 }
 

@@ -53,6 +53,7 @@ import { corpusMap } from './assemble/match'
 import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { makeDefaultModulator, makeDefaultModulators } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
+import { sanitizeSteps } from './engine/stepSeq'
 import { DEPTH_RES_DEFAULT, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
@@ -1058,10 +1059,15 @@ export function normalizeComposition(c: CompositionState): CompositionState {
     // Always 8 slots : a short array pads with disabled defaults (worlds.ts writes
     // the World's modulator slot directly, which would else punch holes), a long
     // one truncates, and each stored slot field-MERGES onto the default so a new
-    // block (e.g. `audio`) can't read undefined.
+    // block (e.g. `audio`) can't read undefined. The steps block is checked
+    // whole (its 16-long arrays, its conditions) : a merge alone would keep a
+    // broken one.
     modulators: (() => {
       const m = c.modulators ?? []
-      return makeDefaultModulators().map((d, i) => ({ ...d, ...(m[i] ?? {}) }))
+      return makeDefaultModulators().map((d, i) => {
+        const x = { ...d, ...(m[i] ?? {}) }
+        return { ...x, steps: sanitizeSteps(x.steps) }
+      })
     })(),
     // a binding's shaping, checked (a hand-edited file, an older or newer one)
     modMatrix: (c.modMatrix ?? []).map((a) => {

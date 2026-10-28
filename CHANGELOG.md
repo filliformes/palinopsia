@@ -7,6 +7,11 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The euclid card no longer scrolls under a BPM division** (`ModulationPanel.tsx`) :
+  its four rows under the division select overflowed the fixed card by 1 px (76 > 75,
+  measured in all 8 slots, zoom 1 and 1.25). They sit at the ADSR card's tighter
+  spacing now.
+
 - **Depth AI works, offline : the depth model ships inside the app**
   (`engine/depthEstimate.ts`, `workers/depthWorker.ts`, `main/assets.ts`,
   `scripts/fetch-depth.mjs`). It imported Transformers.js from a CDN and the model from
@@ -73,6 +78,63 @@ that CI builds into cross-platform releases.
   by a rule, a MIDI pad, a scene, a Generate or the dice no longer leaves a stale name.
 
 ### Added
+
+- **`steps` : a step-sequencer modulator with conditional steps and swing** (Vincent :
+  "A step-sequencer modulator with conditional steps (probability, 2:4, fill, first) and
+  swing"). The 19th modulator type, in the rhythms family beside arp, euclid, turing and
+  cellular. Up to 16 steps (`StepsConfig` in `shared/types.ts` : `length` 1..16 and
+  16-long `values` 0..1, `on`, `cond`, plus `swing` 50..75, `glide` 0..1, `rest` hold /
+  zero), played one per clock tick on the shared clock row (free Hz or a BPM division).
+  One condition per step, a plain string (`engine/stepSeq.ts` parses, checks and words
+  them) : `always`, `p<percent>` (the menu offers 10 / 25 / 50 / 75 / 90 : quick to pick
+  live, each a different feel; a session may carry any 1..99), `<a>:<b>` (pass a of every
+  b, b 2..8, from the start of the run), `fill` / `!fill`, `first` / `!first`. A rest or
+  a false condition holds the output (or sends it to 0 with `rest: 'zero'`); `glide`
+  slides over that share of the step's own length (a half cosine). Swing makes every even
+  step (2, 4, 6...) late by (swing − 50) % × 2 of a step, at most half a step, so a step
+  never overtakes the next; a swung step a late frame skipped over still plays, before
+  the next. With Ableton Link enabled the step index IS the shared count
+  (floor(beats / step) mod length : step 1 on the bar, the right step again after a
+  phase jump, the time inside a step Link's phase); free, it keeps the wall clock like the
+  other rhythm types (`*LastAdvanceAt` + the 4-period idle snap). A run (pass 1, for
+  first and A:B) starts when the card is turned on, retriggered, a session loads
+  (`onSessionLoaded` in App : `restartRuns()` and every FILL let go) and on Ableton Link's
+  play, on its bar (`link.ts tickPlay`, beside the sequencers). A length cut under the
+  playhead plays nothing past the end and goes on from step 1 at the next tick. FILL is
+  engine state, never saved (`setFillHeld` / `setFillLatch`, ghosts read their card's);
+  `act:mod:<n>:fill` toggles it for Body rules and MIDI pads (offered for steps cards;
+  triggers fire on the press only, so a toggle, no hold). Modulators have no OSC addresses
+  beyond `/opsia/randomize/modulators`, so none was added. The card keeps the fixed
+  silhouette : the clock row with **FILL** riding the rate line (held = momentary,
+  Shift-click = kept on, solid while kept), a 16-step strip (bars drawn by dragging, a
+  click = rest / play past a 3 px dead zone, pointers mapped through the boxes so any UI
+  zoom works, a stroke written live but silently and closed as ONE undo step however long
+  it pauses; rests drawn as outlines, the steps past the length dimmed, the playing step
+  framed by one rAF writing a data attribute; a 2 px mark under each conditioned step),
+  then `LEN` + `SWG` on one row and `GLIDE` under it. Right-click a step : a menu through
+  the shared `ContextMenu` (which gains `keepOpen` items and a `body` slot for the
+  sub-lists : the chances, and the A:B grid of 35 choices). Sessions check the block
+  whole (`sanitizeSteps` in `normalizeComposition` : 16-long arrays, known conditions,
+  ranges); an older session without it, or a broken one, loads the defaults (length 8,
+  a staircase up then down). The dice (`TYPE_POOL`, `randomSteps` : a short motif on five
+  levels repeated with changes, the downbeats leaning high, about one step in seven a rest
+  and one in six with a condition, 70 % straight, else 55..62 % swing) and the stepped
+  Generate families draw it. Verified : 188 headless assertions on the engine (order and
+  timing at Hz and BPM divisions, A:B 1:2 / 2:4 / 3:3 / 2:2 / 1:8 over 40 passes, chances
+  within 2 % over 10,000 passes, fill / not fill switching mid-run, first / not first and
+  every run start, hold vs zero, glide 0 vs 0.5 / 1 with a late frame, swing 50 / 62 / 75
+  at 1 ms and on uneven frames up to 170 ms with no step lost or overtaken, length changes
+  mid-run, Link after a phase jump and back to free time, sessions, the dice, a morph's
+  ghost); in the test copy on the RTX (real mouse events) 44 + 24 + 6 checks : a stroke with
+  a 600 ms pause undone in one step, rests, every menu entry and both sub-lists, FILL held
+  and kept, retrigger, the playhead in all 8 slots, the menu at the cursor at UI zoom
+  1.25, a binding to L1's opacity stepping on a white layer (the picture's mean luma 16 at
+  the 0.1 step, 142 at the 1.0 step), every swung step on the first frame at or after its
+  due time at 120 BPM, save → New → load exact, broken and older blocks, a pinned card
+  through five dice, Generate drawing it 10 times in 18 Glitch scenes, FILL fired from a
+  Body rule; the per-type sweep (19 types × Hz / BPM × 8 slots, UI zoom 1 and 1.25) : every
+  card 160 px, nothing overflows; console errors 0. Not verified live : Ableton Link (the
+  worktree test copy has no Link addon; the engine tests cover it).
 
 - **Organic shapes for Lattice, Ash and Particle Drift** (Vincent : "I don't want to
   only have pills-looking dots, I want them more organic"). Each of the three sources

@@ -4,10 +4,14 @@
 // painted by ONE rAF loop writing DOM styles directly from modEngine.values :
 // modulation never re-renders React at 60 Hz.
 
-import { useEffect, useRef, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, VisionFeature } from '@shared/types'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, VisionFeature } from '@shared/types'
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
+import { condLabel, parseStepCond, randomStepPattern, STEP_MAX, STEP_PROBS, stepLength, stepsOf, SWING_MAX, SWING_MIN, type ParsedCond } from '../engine/stepSeq'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+import { ownerWindow } from './ownerWindow'
+import { commitNow, runSilently } from '../undo'
 import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
@@ -28,7 +32,7 @@ import { modPin, PIN_WORDS } from '../persist'
 // own, and what follows the room (the sound, the picture, the performer).
 const MOD_GROUPS: Array<{ label: string; title: string; types: ModulatorType[] }> = [
   { label: 'waves', title: 'Shapes in time : a repeating wave, a one-shot sweep, an envelope', types: ['lfo', 'ramp', 'adsr'] },
-  { label: 'rhythms', title: 'Patterns on a clock : steps, euclidean pulses, a mutating loop, cells', types: ['arp', 'euclid', 'turing', 'cellular'] },
+  { label: 'rhythms', title: 'Patterns on a clock : a walk of levels, a drawn step sequence, euclidean pulses, a mutating loop, cells', types: ['arp', 'steps', 'euclid', 'turing', 'cellular'] },
   { label: 'random', title: 'Chance : random values, sample and hold, a glide, chaos', types: ['random', 'sh', 'slew', 'chaos'] },
   { label: 'gestures', title: 'Movement with a life of its own : drifting, traced, physical', types: ['organic', 'motion', 'physics'] },
   { label: 'listening', title: 'Follows the room : the sound, the picture, your body, a quality held steady', types: ['audio', 'vision', 'body', 'homeostat'] }
@@ -189,7 +193,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
+          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), Steps back to step 1 of a new first pass (with Ableton Link enabled its steps stay on the shared bar and only the passes count anew), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
         >
           ⟳
         </button>
@@ -274,6 +278,8 @@ function ModCard({ index }: { index: number }): JSX.Element {
               SMTH
             </button>
           )}
+          {/* Steps' FILL rides the rate line too : the card's one performance button. */}
+          {m.type === 'steps' && <FillButton index={index} />}
         </div>
       )}
 
@@ -488,7 +494,9 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       )
     case 'euclid':
       return (
-        <>
+        // Tighter than the card's own gap-1 (as ADSR) : four rows under the
+        // BPM division select overflowed the fixed card by 1 px.
+        <div className="flex min-w-0 flex-col gap-0.5">
           <SliderRow label="STEPS" value={m.euclid.steps} min={2} max={32} step={1} integer
             title="Euclidean : total steps the pattern spans."
             onChange={(v) => update(index, { euclid: { ...m.euclid, steps: Math.round(v), pulses: Math.min(m.euclid.pulses, Math.round(v)) } })} />
@@ -501,7 +509,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
             title={SLIP_HELP}
             onChange={(v) => update(index, { slip: v })} />
-        </>
+        </div>
       )
     case 'turing':
       return (
@@ -542,6 +550,8 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             onChange={(v) => update(index, { slip: v })} />
         </>
       )
+    case 'steps':
+      return <StepsParams index={index} />
     case 'audio': {
       const a = m.audio ?? { feature: 'level' as AudioFeature, band: 0, smooth: 0.2 }
       return (
@@ -707,6 +717,472 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     default:
       return null
   }
+}
+
+// ── Steps : the 16-step strip, its condition menu, FILL ───────────────
+const STEPS_LEN_HELP =
+  'LENGTH : how many of the 16 steps play before the pattern starts again (1 to 16). The steps ' +
+  'past it keep their values, dimmed, so a shorter pattern can grow back. Right-click a step : ' +
+  'the pattern ends there.'
+const STEPS_SWING_HELP =
+  'SWING : every second step (2, 4, 6...) lands late, for a looser groove. 50 % is straight; ' +
+  '75 % pushes it half a step late, as far as it goes, so it never reaches the step after it. ' +
+  'On the Hz clock, the BPM divisions and with Ableton Link alike.'
+const STEPS_GLIDE_HELP =
+  'GLIDE : how much of a step the output takes to slide to the next value. 0 = hard steps; ' +
+  '1 = it slides the whole step long, a continuous line through the values.'
+
+function StepsParams({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+  const sc = stepsOf(m)
+  const set = (patch: Partial<StepsConfig>): void => update(index, { steps: { ...sc, ...patch } })
+  const len = stepLength(sc)
+  const swing = Math.round(sc.swing)
+  const label = 'shrink-0 cursor-help font-mono text-[9px] text-muted underline decoration-dotted underline-offset-2'
+  return (
+    <>
+      <StepStrip index={index} />
+      {/* length and swing share a row (two-digit boxes : the input's own side
+          padding leaves w-7 room for "16", w-8 for "75") so the swing slider
+          keeps ~58 px of travel at zoom 1; glide has the full row under it */}
+      <div className="flex min-w-0 shrink-0 items-center gap-1">
+        <span className={label} title={STEPS_LEN_HELP}>
+          LEN
+        </span>
+        <BoundedNumberInput
+          value={len}
+          min={1}
+          max={STEP_MAX}
+          integer
+          onChange={(v) => set({ length: Math.round(v) })}
+          className="input w-7 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+          title={STEPS_LEN_HELP}
+        />
+        <span className={`${label} ml-0.5`} title={STEPS_SWING_HELP}>
+          SWG
+        </span>
+        <input
+          type="range"
+          min={SWING_MIN}
+          max={SWING_MAX}
+          step={1}
+          value={swing}
+          onChange={(e) => set({ swing: Number(e.target.value) })}
+          className="min-w-0 flex-1 accent-accent"
+          title={`${STEPS_SWING_HELP} Now ${swing} %.`}
+        />
+        <BoundedNumberInput
+          value={swing}
+          min={SWING_MIN}
+          max={SWING_MAX}
+          integer
+          onChange={(v) => set({ swing: v })}
+          className="input w-8 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+          title={`${STEPS_SWING_HELP} Now ${swing} %.`}
+        />
+      </div>
+      <SliderRow label="GLIDE" value={sc.glide} min={0} max={1}
+        title={STEPS_GLIDE_HELP}
+        onChange={(v) => set({ glide: v })} />
+    </>
+  )
+}
+
+// A press that moves less than this (px) is a click (play / rest); past it the
+// press draws.
+const STEP_DEAD_PX = 3
+
+type StripMenu = { x: number; y: number; step: number; view: 'main' | 'prob' | 'ab' }
+
+function stepTitle(i: number, v: number, on: boolean, c: ParsedCond, past: boolean): string {
+  const what = on
+    ? `${v.toFixed(2)}, ${c.kind === 'always' ? 'plays every time' : `plays ${condLabel(c)}`}`
+    : `a rest (its ${v.toFixed(2)} kept)`
+  return (
+    `Step ${i + 1}${past ? ' (past the length)' : ''} : ${what}. Drag up or down to draw ` +
+    '(across the steps to draw several), click : play or rest, right-click : when it plays, ' +
+    'the length, what a silent step does, randomize.'
+  )
+}
+
+// Under each step, what its condition is, at a glance : a chance fills its
+// share of the mark, a pass of every few lights its slot of them; FILL marks in
+// the accent (solid : only in a fill, faint : only outside one), first in the
+// text color (solid : only the first time, faint : every time but).
+function StepMark({ c }: { c: ParsedCond }): JSX.Element {
+  const base = 'h-[2px] shrink-0 rounded-[1px]'
+  switch (c.kind) {
+    case 'prob':
+      return (
+        <div className={`${base} bg-accent2/25`}>
+          <div className="h-full rounded-[1px] bg-accent2" style={{ width: `${c.p}%` }} />
+        </div>
+      )
+    case 'ab': {
+      const a = ((c.a - 1) / c.b) * 100
+      const b = (c.a / c.b) * 100
+      const dim = 'rgb(var(--c-accent2) / 0.25)'
+      return (
+        <div
+          className={base}
+          style={{ background: `linear-gradient(to right, ${dim} ${a}%, rgb(var(--c-accent2)) ${a}% ${b}%, ${dim} ${b}%)` }}
+        />
+      )
+    }
+    case 'fill':
+      return <div className={`${base} bg-accent`} />
+    case 'notFill':
+      return <div className={`${base} bg-accent/35`} />
+    case 'first':
+      return <div className={`${base} bg-text/80`} />
+    case 'notFirst':
+      return <div className={`${base} bg-text/30`} />
+    default:
+      return <div className={base} />
+  }
+}
+
+// A:B in a grid : one row per B (of 2 ... of 8), A across it.
+function AbGrid({ cur, onPick }: { cur: ParsedCond; onPick: (a: number, b: number) => void }): JSX.Element {
+  return (
+    <div className="flex flex-col gap-0.5 px-3 py-1.5">
+      {[2, 3, 4, 5, 6, 7, 8].map((b) => (
+        <div key={b} className="flex items-center gap-0.5">
+          <span className="w-9 shrink-0 font-mono text-[9px] text-muted">of {b}</span>
+          {Array.from({ length: b }, (_, j) => j + 1).map((a) => {
+            const sel = cur.kind === 'ab' && cur.a === a && cur.b === b
+            return (
+              <button
+                key={a}
+                onClick={() => onPick(a, b)}
+                className={`h-4 w-4 shrink-0 rounded-sm font-mono text-[9px] leading-4 transition-colors ${
+                  sel ? 'bg-accent/25 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:bg-accent/15 hover:text-accent'
+                }`}
+                title={`${a}:${b} : plays on pass ${a} of every ${b}`}
+              >
+                {a}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StepStrip({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+  const sc = stepsOf(m)
+  const len = stepLength(sc)
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const trackRef = useRef<HTMLDivElement | null>(null) // step 1's bar track : the height values are drawn against
+  const colRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [menu, setMenu] = useState<StripMenu | null>(null)
+  const gesture = useRef<{ id: number; x0: number; y0: number; step: number; drawing: boolean; before: number[]; lastX: number; lastY: number } | null>(null)
+
+  // What is in the store now (a gesture writes onto that, never onto an older render)
+  const live = (): StepsConfig => stepsOf(useStore.getState().composition.modulators[index])
+  const write = (next: StepsConfig): void => update(index, { steps: next })
+
+  // The playhead : one rAF writing a data attribute straight to the DOM (no
+  // re-render at frame rate, like the meter) : "hit" when the step played,
+  // "miss" when it came and stayed silent.
+  useEffect(() => {
+    const win = ownerWindow(boxRef.current)
+    let raf = 0
+    let shown = ''
+    const paint = (): void => {
+      const mm = useStore.getState().composition.modulators[index]
+      const v = modEngine.stepView(index)
+      const playing = !!mm?.enabled && mm.type === 'steps' && !!v?.run && !v.due
+      const key = playing && v ? `${v.idx}:${v.fired ? 'hit' : 'miss'}` : ''
+      if (key !== shown) {
+        shown = key
+        colRefs.current.forEach((el, i) => {
+          if (!el) return
+          if (playing && v && i === v.idx) el.dataset.play = v.fired ? 'hit' : 'miss'
+          else delete el.dataset.play
+        })
+      }
+      raf = win.requestAnimationFrame(paint)
+    }
+    raf = win.requestAnimationFrame(paint)
+    return () => win.cancelAnimationFrame(raf)
+  }, [index])
+
+  // Pointer → step and value through the boxes on screen (the UI zoom is a CSS
+  // zoom : client pixels and layout pixels differ, the boxes already agree).
+  const stepAtX = (clientX: number): number => {
+    const r = boxRef.current!.getBoundingClientRect()
+    return Math.max(0, Math.min(STEP_MAX - 1, Math.floor(((clientX - r.left) / Math.max(1, r.width)) * STEP_MAX)))
+  }
+  const valueAtY = (clientY: number): number => {
+    const r = (trackRef.current ?? boxRef.current!).getBoundingClientRect()
+    const v = 1 - (clientY - r.top) / Math.max(1, r.height)
+    return Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
+  }
+
+  const onDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    gesture.current = {
+      id: e.pointerId, x0: e.clientX, y0: e.clientY, step: stepAtX(e.clientX), drawing: false,
+      before: live().values.slice(), lastX: e.clientX, lastY: e.clientY
+    }
+  }
+  const onMove = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const g = gesture.current
+    if (!g || g.id !== e.pointerId) return
+    if (!g.drawing) {
+      if (Math.abs(e.clientX - g.x0) < STEP_DEAD_PX && Math.abs(e.clientY - g.y0) < STEP_DEAD_PX) return
+      g.drawing = true
+    }
+    // Every step the pointer crossed since the last move takes the stroke's
+    // height where it crossed that step's middle (a fast sweep skips none).
+    const cur = live()
+    const values = cur.values.slice()
+    const r = boxRef.current!.getBoundingClientRect()
+    const a = stepAtX(g.lastX)
+    const b = stepAtX(e.clientX)
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+      if (i === b) {
+        values[i] = valueAtY(e.clientY)
+        continue
+      }
+      const cx = r.left + ((i + 0.5) / STEP_MAX) * r.width
+      const t = Math.max(0, Math.min(1, (cx - g.lastX) / (e.clientX - g.lastX || 1)))
+      values[i] = valueAtY(g.lastY + (e.clientY - g.lastY) * t)
+    }
+    g.lastX = e.clientX
+    g.lastY = e.clientY
+    // live while drawing (the engine plays the stroke as it goes), but silently :
+    // the stroke becomes ONE undo step when it ends, however long it pauses
+    if (values.some((v, i) => v !== cur.values[i])) runSilently(() => write({ ...cur, values }))
+  }
+  const endStroke = (g: NonNullable<typeof gesture.current>): void => {
+    const after = live()
+    if (after.values.every((v, i) => v === g.before[i])) return
+    // back to before the stroke without a step, then the stroke as one edit,
+    // closed at once
+    runSilently(() => write({ ...after, values: g.before }))
+    write(after)
+    commitNow()
+  }
+  const onUp = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const g = gesture.current
+    if (!g || g.id !== e.pointerId) return
+    gesture.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* already released */
+    }
+    if (g.drawing) return endStroke(g)
+    // a click : the step plays or rests
+    const cur = live()
+    const on = cur.on.slice()
+    on[g.step] = !on[g.step]
+    write({ ...cur, on })
+  }
+  const onCancel = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const g = gesture.current
+    if (!g || g.id !== e.pointerId) return
+    gesture.current = null
+    if (g.drawing) endStroke(g)
+  }
+  const onContext = (e: React.MouseEvent<HTMLDivElement>): void => {
+    e.preventDefault()
+    e.stopPropagation() // (the card's own menu, Persistent, is under it)
+    setMenu({ x: e.clientX, y: e.clientY, step: stepAtX(e.clientX), view: 'main' })
+  }
+
+  let menuEl: ReactNode = null
+  if (menu) {
+    const k = menu.step
+    const cur = parseStepCond(sc.cond[k])
+    const close = (): void => setMenu(null)
+    const view = (v: StripMenu['view']) => (): void => setMenu({ ...menu, view: v })
+    const tick = (b: boolean): string => (b ? '✓ ' : '')
+    const setCond = (c: StepCond): void => {
+      const s = live()
+      const cond = s.cond.slice()
+      cond[k] = c
+      write({ ...s, cond })
+    }
+    let header = `Step ${k + 1} · ${condLabel(cur)}`
+    let body: ReactNode = undefined
+    let items: MenuItem[]
+    if (menu.view === 'prob') {
+      header = `Step ${k + 1} · plays by chance`
+      items = [
+        { label: '‹ back', keepOpen: true, onClick: view('main') },
+        { label: '', divider: true },
+        ...STEP_PROBS.map((p): MenuItem => ({
+          label: `${tick(cur.kind === 'prob' && cur.p === p)}${p} % of the time`,
+          onClick: () => setCond(`p${p}` as StepCond)
+        }))
+      ]
+    } else if (menu.view === 'ab') {
+      header = `Step ${k + 1} · on pass A of every B`
+      body = (
+        <AbGrid
+          cur={cur}
+          onPick={(a, b) => {
+            setCond(`${a}:${b}` as StepCond)
+            close()
+          }}
+        />
+      )
+      items = [
+        { label: '', divider: true },
+        { label: '‹ back', keepOpen: true, onClick: view('main') }
+      ]
+    } else {
+      const on = !!sc.on[k]
+      const anyCond = sc.cond.some((c) => parseStepCond(c).kind !== 'always')
+      items = [
+        { label: `${tick(cur.kind === 'always')}always`, onClick: () => setCond('always'), title: 'Plays every time round' },
+        {
+          label: `${tick(cur.kind === 'prob')}by chance${cur.kind === 'prob' ? ` (${cur.p} %)` : ''} ▸`,
+          keepOpen: true,
+          onClick: view('prob'),
+          title: 'Plays only some of the time, drawn anew each time round : the rhythm stays on the grid, some of its steps drop out'
+        },
+        {
+          label: `${tick(cur.kind === 'ab')}on some passes${cur.kind === 'ab' ? ` (${cur.a}:${cur.b})` : ''} ▸`,
+          keepOpen: true,
+          onClick: view('ab'),
+          title: 'Plays on one pass of every few through the pattern (1:2 the first of every two, 2:4 the second of every four...), counted from the start, so a short pattern becomes a longer phrase'
+        },
+        { label: `${tick(cur.kind === 'fill')}only in a fill`, onClick: () => setCond('fill'), title: 'Plays only while FILL is on' },
+        { label: `${tick(cur.kind === 'notFill')}only outside a fill`, onClick: () => setCond('!fill'), title: 'Falls silent while FILL is on' },
+        {
+          label: `${tick(cur.kind === 'first')}only the first time through`,
+          onClick: () => setCond('first'),
+          title: 'Plays on the first pass only. A run starts when the card is turned on, retriggered, a session loads, or Ableton Link starts playing'
+        },
+        { label: `${tick(cur.kind === 'notFirst')}every time but the first`, onClick: () => setCond('!first'), title: 'Silent on the first pass, then plays every time' },
+        { label: '', divider: true },
+        {
+          label: on ? 'make it a rest' : 'make it play',
+          onClick: () => {
+            const s = live()
+            const o = s.on.slice()
+            o[k] = !o[k]
+            write({ ...s, on: o })
+          }
+        },
+        {
+          label: `the pattern ends here (${k + 1} step${k ? 's' : ''})`,
+          disabled: len === k + 1,
+          onClick: () => write({ ...live(), length: k + 1 })
+        },
+        { label: '', divider: true },
+        {
+          label: `${tick(sc.rest !== 'zero')}a silent step holds the value`,
+          onClick: () => write({ ...live(), rest: 'hold' }),
+          title: 'A rest, or a step whose condition is not met, leaves the output where the last step put it'
+        },
+        {
+          label: `${tick(sc.rest === 'zero')}a silent step drops to 0`,
+          onClick: () => write({ ...live(), rest: 'zero' }),
+          title: 'A rest, or a step whose condition is not met, sends the output to 0 (through the glide)'
+        },
+        { label: '', divider: true },
+        {
+          label: 'clear all conditions',
+          disabled: !anyCond,
+          onClick: () => write({ ...live(), cond: new Array<StepCond>(STEP_MAX).fill('always') })
+        },
+        {
+          label: 'randomize the pattern',
+          onClick: () => write({ ...live(), ...randomStepPattern() }),
+          title: 'New values, a few rests and a few conditions; the length, swing and glide stay'
+        }
+      ]
+    }
+    menuEl = <ContextMenu x={menu.x} y={menu.y} header={header} body={body} items={items} onClose={close} />
+  }
+
+  return (
+    <>
+      <div
+        ref={boxRef}
+        className="flex min-h-[24px] min-w-0 flex-1 cursor-ns-resize touch-none select-none gap-px"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onCancel}
+        onContextMenu={onContext}
+      >
+        {Array.from({ length: STEP_MAX }, (_, i) => {
+          const v = Math.max(0, Math.min(1, Number(sc.values[i]) || 0))
+          const on = !!sc.on[i]
+          const c = parseStepCond(sc.cond[i])
+          return (
+            <div
+              key={i}
+              ref={(el) => {
+                colRefs.current[i] = el
+              }}
+              className={`group flex min-w-0 flex-1 flex-col gap-px ${i >= len ? 'opacity-30' : ''}`}
+              title={stepTitle(i, v, on, c, i >= len)}
+            >
+              <div
+                ref={i === 0 ? trackRef : undefined}
+                className="relative min-h-0 flex-1 overflow-hidden rounded-[1px] bg-panel3/40 group-data-[play=hit]:bg-panel3 group-data-[play=miss]:bg-panel3/80 group-data-[play=hit]:ring-1 group-data-[play=hit]:ring-inset group-data-[play=hit]:ring-text/50 group-data-[play=miss]:ring-1 group-data-[play=miss]:ring-inset group-data-[play=miss]:ring-muted/60"
+              >
+                <div
+                  className={`absolute inset-x-0 bottom-0 ${on ? 'bg-accent/55 group-data-[play=hit]:bg-accent' : 'border border-muted/70'}`}
+                  style={{ height: `${v * 100}%` }}
+                />
+              </div>
+              <StepMark c={c} />
+            </div>
+          )
+        })}
+      </div>
+      {menuEl}
+    </>
+  )
+}
+
+// FILL : held = on while pressed (the drum-machine way), Shift-click = kept on
+// until the next Shift-click. Lit while on; solid while kept on.
+function FillButton({ index }: { index: number }): JSX.Element {
+  const on = useSyncExternalStore(modEngine.onFill, () => modEngine.fill(index))
+  const latched = useSyncExternalStore(modEngine.onFill, () => modEngine.fillLatched(index))
+  const release = (): void => modEngine.setFillHeld(index, false)
+  return (
+    <button
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        if (e.shiftKey) return modEngine.setFillLatch(index, !modEngine.fillLatched(index))
+        e.currentTarget.setPointerCapture(e.pointerId)
+        modEngine.setFillHeld(index, true)
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
+      className={`shrink-0 touch-none rounded px-1 py-0.5 font-mono text-[9px] ${
+        latched
+          ? 'bg-accent text-bg ring-1 ring-accent'
+          : on
+            ? 'bg-accent/20 text-accent ring-1 ring-accent'
+            : 'bg-panel3/60 text-muted hover:text-accent'
+      }`}
+      title={
+        'FILL : hold it down and the steps set to play only in a fill come in, while those set to ' +
+        'play only outside one fall silent. Shift-click keeps it on (Shift-click again to let it go). ' +
+        `A Body rule or a MIDI pad can switch it too (MOD ${index + 1} fill on/off).${latched ? ' Kept on now.' : ''}`
+      }
+    >
+      FILL
+    </button>
+  )
 }
 
 // ── Small row helpers ─────────────────────────────────────────────────
