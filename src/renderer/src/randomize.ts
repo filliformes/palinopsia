@@ -30,6 +30,7 @@ import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
+import { randomSteps } from './engine/stepSeq'
 
 export type RandomizeScope =
   | 'all'
@@ -387,7 +388,7 @@ const RAND_CURVES: ModCurve[] = [
 // Weighted toward the continuously interesting types.
 const TYPE_POOL: ModulatorType[] = [
   'lfo', 'lfo', 'lfo', 'sh', 'sh', 'chaos', 'chaos', 'random', 'slew', 'arp', 'ramp', 'adsr',
-  'euclid', 'turing', 'cellular'
+  'euclid', 'turing', 'cellular', 'steps'
 ]
 
 function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfig {
@@ -424,7 +425,10 @@ function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfi
     chaos: { r: range(3.5, 4) },
     euclid: { steps: Math.floor(range(8, 17)), pulses: Math.floor(range(2, 9)), decay: range(0.1, 0.6) },
     turing: { length: Math.floor(range(4, 13)), mutate: range(0.05, 0.4) },
-    cellular: { rule: pick([30, 90, 110, 150]), cells: Math.floor(range(16, 33)) }
+    cellular: { rule: pick([30, 90, 110, 150]), cells: Math.floor(range(16, 33)) },
+    // a short motif repeated with changes, a few rests, now and then a step on
+    // some passes, on a chance or for the fill; mostly straight
+    steps: randomSteps()
   }
 }
 
@@ -578,13 +582,21 @@ export function themedMotion(c: CompositionState, recipe: MotionRecipe): Composi
   const modulators = c.modulators.map((m, i): ModulatorConfig => {
     if (i === keep) return m
     if (!chosen.includes(i)) return { ...m, enabled: false }
-    return {
+    const mm: ModulatorConfig = {
       ...freshModulator(m, true),
       type: pick(recipe.types),
       shape: pick(recipe.shapes),
       sync: chance(recipe.bpm) ? 'bpm' : 'free',
       rateHz: logRate()
     }
+    // Steps change the level on EVERY step : on 1/16 a theme's draw would be a
+    // hard flicker (8 a second at 120 BPM). A theme's steps run on 1/8 or
+    // slower, or slide (the plain dice may keep 1/16).
+    if (mm.type === 'steps' && mm.sync === 'bpm' && mm.divisionIdx < 4) {
+      if (chance(0.5)) mm.divisionIdx = 4 + Math.floor(rnd() * 2)
+      else mm.steps = { ...mm.steps, glide: Math.max(mm.steps.glide, Math.round(range(0.2, 0.5) * 100) / 100) }
+    }
+    return mm
   })
   const cap = AUTO_MOD_BUDGET - 1 // room for the World's audio route
   const out: ModAssignment[] = []

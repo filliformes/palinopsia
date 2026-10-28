@@ -28,7 +28,7 @@
 //   act:world:<next|prev|rand> · act:world:id:<id>
 //   act:gen:<rand|next> · act:gen:family:<family>
 //   act:meta:<k>:<up|down|rand|flip>
-//   act:mod:<n>:<trig|onoff>
+//   act:mod:<n>:<trig|onoff|fill>   (fill : a steps card's FILL, kept on / let go)
 //   act:feel:<macro>:<up|down> · act:feel:reset
 //   act:bpm:<double|half> · act:link:play
 //   act:key:<next|fifthup|fifthdown|up|down>
@@ -474,6 +474,11 @@ export function fireAction(id: string): void {
       const m = st.composition.modulators[n]
       if (!m) return
       if (p[3] === 'trig') modEngine.retrigger(n) // (no setting changes : plays even on a persistent card)
+      else if (p[3] === 'fill') {
+        // (nor does FILL : a performance state); on a card that is not steps
+        // (now) it is gone and does nothing
+        if (m.type === 'steps') modEngine.setFillLatch(n, !modEngine.fillLatched(n))
+      }
       else if (p[3] === 'onoff' && !held(st, [modPin(n)], `M${n + 1}`)) st.updateModulator(n, { enabled: !m.enabled })
       return
     }
@@ -634,6 +639,7 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       if (!Number.isInteger(n) || n < 0) return null
       if (p[3] === 'trig') return { label: `${modName(st, n)} retrigger`, verb: `retriggers mod ${n + 1}`, token: `Mod${n + 1}Trig`, group: 'Modulators', title: 'Its ⟳ : back to the start of its cycle (an LFO, a rhythm), or from zero (a ramp, an envelope). A modulator on its own clock or following a signal does not move', gone: !st.composition.modulators[n] }
       if (p[3] === 'onoff') return { label: `${modName(st, n)} on/off`, verb: `switches mod ${n + 1}`, token: `Mod${n + 1}OnOff`, group: 'Modulators', title: 'Turns the modulator card on or off', gone: !st.composition.modulators[n] }
+      if (p[3] === 'fill') return { label: `${modName(st, n)} fill on/off`, verb: `fills mod ${n + 1}`, token: `Mod${n + 1}Fill`, group: 'Modulators', title: 'A steps card’s FILL, kept on or let go : the steps set to play only in a fill come in, those set to play only outside one fall silent. Does nothing on another type', gone: st.composition.modulators[n]?.type !== 'steps' }
       return null
     }
     case 'feel': {
@@ -716,7 +722,10 @@ export function actionIds(st: St = get()): string[] {
   out.push('act:world:next', 'act:world:prev', 'act:world:rand', ...st.worlds.map((w) => `act:world:id:${w.id}`))
   out.push('act:gen:rand', 'act:gen:next', ...THEME_FAMILIES.map((f) => `act:gen:family:${f.family}`))
   st.composition.metaKnobs.forEach((_, k) => { for (const v of META_VERBS) out.push(`act:meta:${k}:${v}`) })
-  st.composition.modulators.forEach((_, n) => out.push(`act:mod:${n}:trig`, `act:mod:${n}:onoff`))
+  st.composition.modulators.forEach((m, n) => {
+    out.push(`act:mod:${n}:trig`, `act:mod:${n}:onoff`)
+    if (m.type === 'steps') out.push(`act:mod:${n}:fill`)
+  })
   for (const f of FEEL) out.push(`act:feel:${f.key}:up`, `act:feel:${f.key}:down`)
   out.push('act:feel:reset', 'act:bpm:double', 'act:bpm:half', 'act:link:play')
   out.push('act:key:next', 'act:key:fifthup', 'act:key:fifthdown', 'act:key:up', 'act:key:down')

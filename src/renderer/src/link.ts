@@ -23,6 +23,7 @@ import { setTempoShared } from './sessionGuard'
 import { runSilently, writeLinkTempo } from './undo'
 import { onPlayEdited, type PlayThing } from './playEvents'
 import { soniClockPlayAt } from './audio/soniClock'
+import { modEngine } from './engine/modulation'
 
 export interface LinkSettings {
   enabled: boolean
@@ -282,6 +283,11 @@ function tickPlay(now: number): void {
       // next bar)
       ps.pending = true
       ps.last = null
+      // a real play (seen stopped before, not joined while it was playing) :
+      // each BPM-synced steps card starts its run when the beat IT reads (the
+      // picture's lead) reaches the play's bar, so pass 1 lands on that bar's
+      // step at any latency
+      if (before === false && p) modEngine.restartRunsAt(p.at)
     } else if (playing === false && before) {
       // a stop : what goes stops, and starts again with the next play (a stop
       // before the play's bar came keeps what that play was to start)

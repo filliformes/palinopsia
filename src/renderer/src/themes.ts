@@ -124,7 +124,7 @@ const SLOW: MotionRecipe = {
   rate: [0.01, 0.06], bpm: 0, depth: [0.15, 0.35]
 }
 const STEPPED: MotionRecipe = {
-  mods: [2, 4], types: ['sh', 'euclid', 'turing', 'arp', 'random', 'lfo'], shapes: ['square', 'rndStep', 'spastic'],
+  mods: [2, 4], types: ['sh', 'euclid', 'turing', 'arp', 'steps', 'random', 'lfo'], shapes: ['square', 'rndStep', 'spastic'],
   rate: [0.3, 3], bpm: 0.7, depth: [0.3, 0.7]
 }
 const FAMILY_MOTION: Record<string, MotionRecipe> = {
@@ -135,7 +135,7 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
   'Glitch / Datamosh': STEPPED,
   'Datamosh & Compression': { ...STEPPED, rate: [0.15, 2], bpm: 0.5 },
   'Cameraless / Direct Film': {
-    mods: [2, 3], types: ['sh', 'euclid', 'random', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
+    mods: [2, 3], types: ['sh', 'euclid', 'steps', 'random', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
     rate: [0.2, 2], bpm: 0.5, depth: [0.3, 0.65]
   },
   'Optical / Op-Art': {
@@ -148,7 +148,7 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
   },
   'Living Surfaces': { ...SLOW, rate: [0.005, 0.05] },
   'Data / Parametric': {
-    mods: [2, 4], types: ['arp', 'euclid', 'turing', 'sh'], shapes: ['square', 'rndStep'],
+    mods: [2, 4], types: ['arp', 'euclid', 'turing', 'steps', 'sh'], shapes: ['square', 'rndStep'],
     rate: [0.25, 2], bpm: 0.8, depth: [0.3, 0.65]
   },
   'Feedback / Afterimage': {
@@ -157,7 +157,7 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
   },
   'Cinematic / Atmospheric': SLOW,
   'Retro Screen': {
-    mods: [2, 3], types: ['sh', 'lfo', 'turing'], shapes: ['square', 'triangle', 'rndStep'],
+    mods: [2, 3], types: ['sh', 'lfo', 'turing', 'steps'], shapes: ['square', 'triangle', 'rndStep'],
     rate: [0.1, 1.2], bpm: 0.5, depth: [0.25, 0.55]
   },
   'Minimal / Structural': {
@@ -166,7 +166,7 @@ const FAMILY_MOTION: Record<string, MotionRecipe> = {
   },
   Dome: { ...SLOW, rate: [0.008, 0.05] },
   'Film Wall': {
-    mods: [2, 3], types: ['sh', 'euclid', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
+    mods: [2, 3], types: ['sh', 'euclid', 'steps', 'lfo'], shapes: ['rndStep', 'square', 'triangle'],
     rate: [0.1, 1], bpm: 0.5, depth: [0.25, 0.55]
   },
   'Node Workshop': { ...MOTION_DEFAULT, rate: [0.03, 0.6], bpm: 0.35 },
@@ -1587,7 +1587,7 @@ export const THEMES: Theme[] = [
     },
     layerFx: ['fx-grade'],
     blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0, feedback: 0, density: 0.5,
-    motion: { mods: [1, 2], types: ['euclid', 'sh', 'lfo'], shapes: ['square', 'rndStep'], rate: [0.2, 1.5], bpm: 0.6, depth: [0.25, 0.5] }
+    motion: { mods: [1, 2], types: ['euclid', 'steps', 'sh', 'lfo'], shapes: ['square', 'rndStep'], rate: [0.2, 1.5], bpm: 0.6, depth: [0.25, 0.5] }
   }),
   mk({
     id: 'data-floor', name: 'Data Floor', family: 'Space',

@@ -15,6 +15,7 @@ import { setWorldAmountMod, worldAmountBase } from './worldAmount'
 import { auModBase, setAuMod } from './audioLayerMod'
 import { auBaseOf, auSpan, auValueOf } from '@shared/auMod'
 import { forkShapeGhosts, pruneShapes, shapeValue } from './modShape'
+import { condPlays, defaultSteps, parseStepCond, stepLength, stepsOf, swingLate } from './stepSeq'
 import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { audioBus } from './audioIn'
@@ -251,6 +252,25 @@ interface SlotState {
   turingLastAdvanceAt: number
   cellRow: number[] // cellular : the current 1-D generation
   cellLastAdvanceAt: number
+  // steps : the run (false : the next tick starts one, at step 1, pass 1)
+  stepRun: boolean
+  stepIdx: number // the step the clock is on (0-based)
+  // passes through the pattern since the run started : 1 = the first, 0 = the
+  // run-in before the first step 1 (a run that joined Link's count mid-pattern,
+  // a pattern a scene replaced : first and A:B wait for step 1)
+  stepPass: number
+  stepTick: number // Ableton Link : the shared count of steps it is on (NaN : free)
+  stepJoin: boolean // a run just started : its first Link tick decides pass 1 or the run-in
+  stepJoinFrom: number // ... and the tick the old run had already played there (NaN : none)
+  stepRestartBeat: number // Ableton Link's play : the bar this card starts a run on (NaN : none)
+  stepCold: boolean // off or another type since : the next step lands at once, no slide from a stale level
+  stepDue: boolean // the step is still to come (a swung one waits)
+  stepFired: boolean // ... it came and played (the card lights it)
+  stepFrom: number // the output slides from this value...
+  stepTo: number // ... to this one...
+  stepAt: number // ... from then (ms)...
+  stepDur: number // ... over this long (ms; 0 = a hard step)
+  stepLastAdvanceAt: number // when the step the clock is on began (straight, before swing)
   startedAt: number // ramp/adsr time base (reset by retrigger)
 }
 
@@ -327,8 +347,72 @@ function makeSlot(now: number): SlotState {
     turingLastAdvanceAt: now,
     cellRow: [],
     cellLastAdvanceAt: now,
+    stepRun: false,
+    stepIdx: 0,
+    stepPass: 1,
+    stepTick: NaN,
+    stepJoin: false,
+    stepJoinFrom: NaN,
+    stepRestartBeat: NaN,
+    stepCold: true,
+    stepDue: false,
+    stepFired: false,
+    stepFrom: 0,
+    stepTo: 0,
+    stepAt: now,
+    stepDur: 0,
+    stepLastAdvanceAt: now,
     startedAt: now
   }
+}
+
+// steps : a run begins (the card turned on, retriggered, a session loaded,
+// Ableton Link's play) : step 1 now, the first pass. With Link the first tick
+// decides : joined mid-pattern, the run-in is pass 0 (see the tick). The output
+// carries on from where it was : a restart never snaps the value.
+function startSteps(s: SlotState, now: number): void {
+  // (the tick the old run already played : a join on it under Link never
+  // plays that step twice, nor draws its chance again)
+  s.stepJoinFrom = s.stepDue ? NaN : s.stepTick
+  s.stepRun = true
+  s.stepJoin = true
+  s.stepIdx = 0
+  s.stepPass = 1
+  s.stepTick = NaN
+  s.stepDue = true
+  s.stepFired = false
+  s.stepRestartBeat = NaN
+  s.stepLastAdvanceAt = now
+}
+
+// steps : the card is off or another type : the next run is a new one, and its
+// first step lands at once (no slide from the level it had before).
+function coldSteps(s: SlotState): void {
+  s.stepRun = false
+  s.stepTick = NaN
+  s.stepRestartBeat = NaN
+  s.stepCold = true
+  s.stepFrom = 0
+  s.stepTo = 0
+  s.stepDur = 0
+}
+
+// steps : the output at time t, sliding from one step's value to the next over
+// the glide (the half-cosine ease S&H's smoothing uses : no corner at either end).
+function stepGlide(s: SlotState, t: number): number {
+  if (!(s.stepDur > 0)) return s.stepTo
+  const k = Math.max(0, Math.min(1, (t - s.stepAt) / s.stepDur))
+  return s.stepFrom + (s.stepTo - s.stepFrom) * (0.5 - 0.5 * Math.cos(k * Math.PI))
+}
+
+/** What the steps card shows of a slot : the step the clock is on, whether it
+ *  has come yet and played, the pass, and the run. */
+export interface StepView {
+  idx: number
+  due: boolean
+  fired: boolean
+  pass: number
+  run: boolean
 }
 
 // Euclidean : does step i carry one of `pulses` onsets spread evenly over `steps`?
@@ -370,8 +454,15 @@ export class ModEngine {
   readonly values: number[] = new Array(SLOTS).fill(0)
   private slots: SlotState[] = []
   private lastNow = 0
+  // FILL (the steps type) : held on the card's button, or latched (Shift-click,
+  // a Body rule, a MIDI pad). Runtime only, never in a session : a piece must
+  // not open in its fill. One per card; a morph's ghost reads its card's.
+  private fillHeld: boolean[] = new Array(8).fill(false)
+  private fillLatch: boolean[] = new Array(8).fill(false)
+  private fillSubs = new Set<() => void>()
 
-  /** Reset a slot's time base (ramp/adsr restart, phase to 0, arp to step 0). */
+  /** Reset a slot's time base (ramp/adsr restart, phase to 0, arp to step 0,
+   *  steps to step 1 of a new run). */
   retrigger(i: number): void {
     const s = this.slots[i]
     if (!s) return
@@ -379,6 +470,83 @@ export class ModEngine {
     s.phase = 0
     s.arpStep = 0
     s.arpDir = 1
+    s.stepRun = false
+  }
+
+  /** Every steps card starts a new run on its next tick (step 1, pass 1) : a
+   *  session loaded. The cards only (0..7) : a morph's ghosts carry the old
+   *  motion on unbroken. `keep` : the cards that carry on (a pinned one). */
+  restartRuns(keep?: (i: number) => boolean): void {
+    for (let i = 0; i < 8 && i < this.slots.length; i++) if (!keep?.(i)) this.slots[i].stepRun = false
+  }
+
+  /** Ableton Link's play, starting on the bar at `beat` (Link's count) : each
+   *  BPM-synced steps card starts its run when ITS count reaches that bar,
+   *  that is the beat it reads (the picture's lead), so pass 1 begins on the
+   *  step the picture shows at the bar whatever the latency. A card on the Hz
+   *  clock carries on. */
+  restartRunsAt(beat: number): void {
+    if (!Number.isFinite(beat)) return
+    for (let i = 0; i < 8 && i < this.slots.length; i++) this.slots[i].stepRestartBeat = beat
+  }
+
+  /** A scene, the sequencer or the dice replaced this card's pattern : its
+   *  passes count anew from its next step 1 (pass 1 there; the steps before it
+   *  are the run-in). The clock is not touched. */
+  newPasses(i: number): void {
+    const s = i < 8 ? this.slots[i] : undefined
+    if (!s || !s.stepRun) return // (a run still to start begins at pass 1 anyway)
+    s.stepPass = s.stepIdx === 0 && s.stepDue ? 1 : 0
+  }
+
+  /** FILL is on for this card (held or latched). */
+  fill(i: number): boolean {
+    const k = i & 7
+    return this.fillHeld[k] || this.fillLatch[k]
+  }
+  fillLatched(i: number): boolean {
+    return this.fillLatch[i & 7]
+  }
+  /** FILL while the card's button is held. */
+  setFillHeld(i: number, on: boolean): void {
+    const k = i & 7
+    if (this.fillHeld[k] === on) return
+    this.fillHeld[k] = on
+    this.emitFill()
+  }
+  /** FILL kept on (or let go). */
+  setFillLatch(i: number, on: boolean): void {
+    const k = i & 7
+    if (this.fillLatch[k] === on) return
+    this.fillLatch[k] = on
+    this.emitFill()
+  }
+  /** Every FILL off (a session loaded). `keep` : the cards that carry on. */
+  clearFills(keep?: (i: number) => boolean): void {
+    let changed = false
+    for (let k = 0; k < 8; k++) {
+      if (keep?.(k) || !(this.fillHeld[k] || this.fillLatch[k])) continue
+      this.fillHeld[k] = false
+      this.fillLatch[k] = false
+      changed = true
+    }
+    if (changed) this.emitFill()
+  }
+  /** Hear FILL change (the card's button). */
+  onFill = (fn: () => void): (() => void) => {
+    this.fillSubs.add(fn)
+    return () => {
+      this.fillSubs.delete(fn)
+    }
+  }
+  private emitFill(): void {
+    for (const fn of this.fillSubs) fn()
+  }
+
+  /** The steps card's view of a slot (null : no such slot yet). */
+  stepView(i: number): StepView | null {
+    const s = this.slots[i]
+    return s ? { idx: s.stepIdx, due: s.stepDue, fired: s.stepFired, pass: s.stepPass, run: s.stepRun } : null
   }
 
   /** A morph begins : each ghost slot takes over its modulator's exact state
@@ -389,6 +557,7 @@ export class ModEngine {
     while (this.slots.length < SLOTS) this.slots.push(makeSlot(now))
     for (let i = 0; i < 8; i++) {
       this.slots[i + 8] = structuredClone(this.slots[i])
+      this.slots[i + 8].stepRestartBeat = NaN // (a ghost never restarts : its motion carries on)
       this.values[i + 8] = this.values[i]
     }
     forkShapeGhosts()
@@ -407,10 +576,18 @@ export class ModEngine {
     for (let i = 0; i < n; i++) {
       const cfg = cfgs[i]
       const s = this.slots[i]
+      // a card that is no longer steps lets its FILL go (it would come back on)
+      if (i < 8 && cfg && cfg.type !== 'steps' && (this.fillHeld[i] || this.fillLatch[i])) {
+        this.fillHeld[i] = false
+        this.fillLatch[i] = false
+        this.emitFill()
+      }
       if (!cfg || !cfg.enabled) {
         this.values[i] = 0
+        coldSteps(s) // (turned back on : a new run)
         continue
       }
+      if (cfg.type !== 'steps') coldSteps(s)
       const hz = effectiveHz(cfg, bpm)
       let v01 = 0
       // Ableton Link : how many of this clock's cycles the shared beats say
@@ -714,6 +891,117 @@ export class ModEngine {
           }
           break
         }
+        case 'steps': {
+          // Step sequencer : one step per clock tick, each played or not by its
+          // own condition, every second step late by the swing. With Ableton
+          // Link (a BPM division) the step number IS the shared count (the
+          // right step again after any jump; step 1 on the bar when the length
+          // fits the bar) and the time inside a step its phase; free, it keeps
+          // the wall clock like the other rhythm types.
+          const sc = stepsOf(cfg)
+          const len = stepLength(sc)
+          // Ableton Link's play (restartRunsAt) : a BPM-synced card starts its
+          // run when its own count (the lead beat it reads) reaches the bar,
+          // before that tick's step plays; a card on the Hz clock carries on
+          if (!Number.isNaN(s.stepRestartBeat)) {
+            if (cfg.sync !== 'bpm' || linkCycles == null || linkBeats == null) s.stepRestartBeat = NaN
+            else if (linkBeats >= s.stepRestartBeat - 1e-6) startSteps(s, now)
+          }
+          if (!s.stepRun) startSteps(s, now)
+          if (hz > 0) {
+            const period = 1000 / hz
+            const lateMs = swingLate(sc.swing) * period
+            const late = (k: number): number => (k % 2 === 1 ? lateMs : 0)
+            const fill = this.fill(i)
+            const glide = Math.max(0, Math.min(1, Number(sc.glide) || 0))
+            // A step comes (`at` : when it was due, so a late frame still glides
+            // from the right moment) : it plays when it is on and its condition
+            // holds on this pass. One that does not play leaves the output
+            // where it is, or with rest = zero sends it to 0.
+            const play = (at: number): void => {
+              const k = s.stepIdx
+              const plays = !!sc.on[k] && condPlays(parseStepCond(sc.cond[k]), s.stepPass, fill)
+              s.stepDue = false
+              s.stepFired = plays
+              if (!plays && sc.rest !== 'zero') return
+              const to = plays ? Math.max(0, Math.min(1, Number(sc.values[k]) || 0)) : 0
+              // (a card just turned on lands on its step : no slide from the old level)
+              s.stepFrom = s.stepCold ? to : stepGlide(s, at)
+              s.stepCold = false
+              s.stepTo = to
+              s.stepAt = at
+              // the slide spans `glide` of this step's own length (swing makes
+              // the two steps of a pair uneven)
+              const next = k + 1 >= len ? 0 : k + 1
+              s.stepDur = glide * (period + late(next) - late(k))
+            }
+            // the length shrank under the playhead : nothing plays past the
+            // end, the next tick goes on from step 1
+            if (s.stepIdx >= len) {
+              s.stepIdx = len - 1
+              s.stepDue = false
+              s.stepFired = false
+            }
+            if (linkCycles != null) {
+              const tick = Math.floor(linkCycles + 1e-6)
+              const into = (linkCycles - tick) * period // ms into the step
+              if (tick !== s.stepTick) {
+                const d = tick - s.stepTick
+                if (d > 0 && d <= 64) {
+                  // the next step(s) : each one still due plays first, in order
+                  for (let t = s.stepTick + 1; t <= tick; t++) {
+                    if (s.stepDue) play(now - (linkCycles - (t - 1)) * period + late(s.stepIdx))
+                    s.stepIdx = ((t % len) + len) % len
+                    if (s.stepIdx === 0) s.stepPass++
+                    s.stepDue = true
+                  }
+                } else {
+                  // joined the shared count, or it jumped : the step it says
+                  s.stepIdx = ((tick % len) + len) % len
+                  if (s.stepJoin) {
+                    // a run joining mid-pattern : its run-in is pass 0, pass 1
+                    // starts at the first step 1 (the step the old run already
+                    // played on this tick does not play again)
+                    const played = tick === s.stepJoinFrom
+                    s.stepPass = s.stepIdx === 0 && !played ? 1 : 0
+                    s.stepDue = !played
+                  } else s.stepDue = true
+                }
+                s.stepTick = tick
+              }
+              s.stepJoin = false
+              // (free time carries on from here when Link stops)
+              s.stepLastAdvanceAt = now - into
+              if (s.stepDue && into >= late(s.stepIdx)) play(now - into + late(s.stepIdx))
+            } else {
+              s.stepTick = NaN
+              s.stepJoin = false
+              // after a hitch (a long frame, a hidden window) : the clock jumps by
+              // whole steps, the skipped ones pass silently (their passes counted),
+              // so the pattern stays on its beat; the last one plays below
+              const gap = now - s.stepLastAdvanceAt
+              if (gap > period * 4) {
+                const skip = Math.floor(gap / period) - 1
+                const total = s.stepIdx + skip
+                s.stepLastAdvanceAt += skip * period
+                s.stepPass += Math.floor(total / len)
+                s.stepIdx = total % len
+                s.stepDue = false
+              }
+              while (now - s.stepLastAdvanceAt >= period) {
+                // a swung step a frame skipped over still plays, before the next
+                if (s.stepDue) play(s.stepLastAdvanceAt + late(s.stepIdx))
+                s.stepLastAdvanceAt += period
+                s.stepIdx = s.stepIdx + 1 >= len ? 0 : s.stepIdx + 1
+                if (s.stepIdx === 0) s.stepPass++
+                s.stepDue = true
+              }
+              if (s.stepDue && now - s.stepLastAdvanceAt >= late(s.stepIdx)) play(s.stepLastAdvanceAt + late(s.stepIdx))
+            }
+          }
+          v01 = stepGlide(s, now)
+          break
+        }
         case 'audio': {
           // Follow one feature off the audio bus (OSC/local), or off a slot's
           // clip at its playhead (clipAudio.ts). Unclocked : the signal IS the
@@ -949,7 +1237,8 @@ export function makeDefaultModulator(): ModulatorConfig {
     homeostat: { feature: 'edges', setpoint: 0.5, gain: 0.4, adapt: 0.3 },
     euclid: { steps: 16, pulses: 5, decay: 0.35 },
     turing: { length: 8, mutate: 0.15 },
-    cellular: { rule: 90, cells: 24 }
+    cellular: { rule: 90, cells: 24 },
+    steps: defaultSteps()
   }
 }
 

@@ -57,6 +57,10 @@ export interface MenuItem {
   /** Optional trailing × : e.g. delete a preset without applying it. */
   onDelete?: () => void
   deleteTitle?: string
+  /** The menu stays open (an item that shows another list in its place). */
+  keepOpen?: boolean
+  /** Hover text. */
+  title?: string
 }
 
 // The room a menu keeps from the window's edges, and from the button it opens
@@ -95,7 +99,8 @@ export function ContextMenu({
   anchor,
   items,
   onClose,
-  header
+  header,
+  body
 }: {
   /** The cursor (viewport pixels) : the menu opens there. */
   x: number
@@ -107,6 +112,9 @@ export function ContextMenu({
   items: MenuItem[]
   onClose: () => void
   header?: ReactNode
+  /** Controls of its own between the header and the items (a grid of choices
+   *  too many for a list); they close the menu themselves. */
+  body?: ReactNode
 }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null)
   // Which window it opened in : a hidden mark in place finds that window's
@@ -186,6 +194,7 @@ export function ContextMenu({
           {header}
         </div>
       )}
+      {body}
       {items.map((item, i) =>
         item.divider ? (
           <div key={i} className="my-1 border-t border-border" />
@@ -193,9 +202,10 @@ export function ContextMenu({
           <div key={i} className="flex items-center">
             <button
               disabled={item.disabled}
+              title={item.title}
               onClick={() => {
                 item.onClick?.()
-                onClose()
+                if (!item.keepOpen) onClose()
               }}
               className={`flex-1 px-3 py-1 text-left text-[11px] transition-colors ${
                 item.disabled
