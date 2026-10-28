@@ -144,7 +144,7 @@
   <div class="wrap">
     <span class="brand">Palinopsia<span class="dot">.</span></span>
     <a class="link" href="#download">Download</a>
-    <a class="link" href="#new-130">What's new</a>
+    <a class="link" href="#new-131">What's new</a>
     <a class="link" href="#quickstart">Quickstart</a>
     <a class="link" href="#highlights">Highlights</a>
     <a class="link" href="#faq">FAQ</a>
@@ -162,7 +162,7 @@
 
     <div class="specs">
       <div class="s"><span class="n"><em>4</em></span><span class="l">layers</span></div>
-      <div class="s"><span class="n"><em>46</em></span><span class="l">sources</span></div>
+      <div class="s"><span class="n"><em>47</em></span><span class="l">sources</span></div>
       <div class="s"><span class="n"><em>56</em></span><span class="l">effects</span></div>
       <div class="s"><span class="n"><em>11</em></span><span class="l">sonify voices</span></div>
       <div class="s"><span class="n"><em>121</em></span><span class="l">one-click recipes</span></div>
@@ -233,7 +233,7 @@
       <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
       <li>In a layer's <b>IN</b> step, click its <b>A</b> button (or pick another source from the menu beside it) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
       <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the <b>Morph</b> time, live: set it long and one scene slowly becomes the next.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 119 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 121 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
     </ol>
     <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it. Looking for something? <kbd>Ctrl</kbd>+<kbd>K</kbd> finds any effect, source, preset or control as you type.</div>
   </section>
@@ -417,7 +417,25 @@
 
   <hr class="soft">
 
-  <details class="news" id="new-130" open>
+  <details class="news" id="new-131" open>
+    <summary><h2>New in 1.3.1</h2></summary>
+    <p class="section-lede">Paint, hands and steps. A release for playing with your hands : paint floated on water that you drop with a click or a pinch, a camera that reads your fingers, and a step sequencer with conditions and swing.</p>
+    <ul class="new">
+      <li><b>Marbling</b>, a new source : drops of paint floating on water, flat colors with crisp edges, each drop pushing the paint already there into rings and lobes. <b>evolve</b> keeps the water moving like a film, with slow currents, a comb and a swirl; drops can fall on a clock, on the beat or on sound.</li>
+      <li><b>Click the preview to play on it</b> : with Marbling on the picture, a click drops paint right under the cursor, holding pours, dragging leaves a trail, and the comb and swirl tools draw through the paint. What you place by hand is saved with the session.</li>
+      <li><b>Pinch to paint</b> : on the Body page, <b>Pinch = click</b> turns each hand's pinch into its own pointer, so both hands can pour paint at once.</li>
+      <li><b>A step sequencer</b> : a new modulator, <b>steps</b>, sixteen bars you draw, each step with a condition (by chance, on some passes like 2:4, only in a fill, only the first time through), swing and glide, and a <b>FILL</b> button.</li>
+      <li><b>Hand shapes</b> : the Body camera reads each hand's fingers (curl, pinch, roll, which way the palm faces, how near it is) as 24 new features, and ten held shapes fire rules : fist, open, point, peace, thumb up, thumb down, ok, horns, call and gun.</li>
+      <li><b>A body plays the whole instrument</b> : a Body rule can now fire some 250 actions from a searchable list (layers, the triggers of your effects, chains, scenes, Worlds, Generate, Meta knobs, modulators, the Feel, the tempo and the key, the Audio Layer, the output), and a MIDI pad can learn any of them.</li>
+      <li><b>Points that are not pills</b> : Lattice, Ash and Particle Drift have an <b>irregular</b> control that turns each point into a shape of its own (ink drops, seeds, torn paper, slivers) and an <b>evolve</b> that lets them morph.</li>
+      <li><b>Depth AI works, offline</b> : the depth model now ships inside the app, runs on the graphics card at 60 fps, and needs no internet.</li>
+      <li><b>Body, the Sequencer and Sonify in windows of their own</b>, like the Output page : right-click their button.</li>
+      <li><b>Every source and effect has at least ten presets</b>, and many small fixes : menus that open against their button, centered A and B letters, Inspector menus that show their whole choice.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.1.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-130">
     <summary><h2>New in 1.3.0</h2></summary>
     <p class="section-lede">The audio update. Sound gets a layer of its own under the four layers of picture, the tempo is shared with Live and every Ableton Link app, and the instrument opens up : write your own shaders, or let an AI agent on your computer play along.</p>
     <ul class="new">
