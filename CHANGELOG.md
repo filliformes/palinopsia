@@ -79,6 +79,32 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Add a session as scenes** (Vincent : "Load whole sessions as new scenes in the
+  current session. If the previously saved session that is loaded already contains
+  scenes, make a popup appear so the user can Yes or No choose to input these scenes in
+  the current session, clearly re-labeled"). **Open ▾ → Add a session as scenes…** (the
+  session open dialog) and right-click **Load** → **Add “X” as scenes** (the session
+  picked in the list). The session on screen stays : the file's own composition becomes
+  ONE scene named after the file; a file with scenes asks **“X” has N scenes. Add them
+  too?** (`AskModal`, PromptModal.tsx : Yes focused, Enter = Yes, Esc = No, both keys
+  stopped in the capture phase so Esc never also closes a page under it) and Yes appends
+  them in order as `X_Scene1`, `X_Scene2`… `sessionScenes.ts` : every composition goes
+  through `normalizeComposition` + `adoptLegacyWorldMod` like a load (one try per
+  picture; a scene with no picture is counted in the toast, "(1 could not be read)");
+  the file's own shaders through `adoptSessionShaders` (moved out of `loadSession`
+  unchanged, limited to the ids the added pictures play : a differing copy of yours
+  enters as "<name> (session)"); names never collide (" 2"); `SceneEntry.from` keeps
+  where a scene came from for its chip's tooltip ("“Intro” in Alpha"); one undo step
+  (`commitNow` around a single `setState`); `sessionMedia.check()` after, so the banner
+  names a missing film of an added scene. Session-level settings never apply (Audio
+  Layer, pins, Feel, dome, output transform, warp, speed / morph dials, Sonify,
+  sequencer, Surface places); a scene keeps its own World, tags and sound patch. A file
+  that is not a session, or holds no picture, says so in a toast and changes nothing.
+  The toast says what came in : "Added 1 + 3 scenes from Alpha". Verified in the test
+  copy through the real menus and keys : 43 checks (Yes / Enter, No / Esc, no question
+  for a session without scenes, collisions, one undo, Save asks after, save and reopen,
+  an older file, a broken file, a session shader, the media banner), page errors 0.
+
 - **Marbling, a new source, and clicking the preview** (Vincent, from stills of a water
   marbling drawing app : "could we make a version of it as a new source inside
   Palinopsia ? ... Maybe this could give the way to Palinopsia supporting the mouseclick

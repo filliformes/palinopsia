@@ -94,6 +94,54 @@ export function ConfirmModal({
   )
 }
 
+/** A plain question nothing is lost on (unlike ConfirmModal's) : Yes is the
+ *  accent and focused, Enter = Yes, Escape or a click outside = No (Enter on a
+ *  focused No is No). Its keys stop here, so Escape never also closes a page
+ *  under it. */
+export function AskModal({
+  title,
+  detail,
+  yesLabel = 'Yes',
+  noLabel = 'No',
+  onYes,
+  onNo
+}: {
+  title: string
+  detail?: string
+  yesLabel?: string
+  noLabel?: string
+  onYes: () => void
+  onNo: () => void
+}): JSX.Element {
+  const noRef = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    const key = (e: KeyboardEvent): void => {
+      if (e.key !== 'Enter' && e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape' || document.activeElement === noRef.current) onNo()
+      else onYes()
+    }
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+  }, [onYes, onNo])
+
+  return (
+    <ModalShell onCancel={onNo}>
+      <div className="text-[12px]">{title}</div>
+      {detail && <div className="text-[11px] text-muted">{detail}</div>}
+      <div className="flex justify-end gap-2">
+        <button ref={noRef} className="btn text-[11px]" onClick={onNo}>
+          {noLabel}
+        </button>
+        <button className="btn text-[11px] text-accent" onClick={onYes} autoFocus>
+          {yesLabel}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
 /** "Save changes?" before the session on screen is replaced : Save · Don't save ·
  *  Cancel. Save is focused (Enter saves); Escape or a click outside cancels. */
 export function SaveChangesModal({

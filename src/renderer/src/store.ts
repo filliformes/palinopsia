@@ -5612,38 +5612,9 @@ export const useStore = create<StoreState>((set, get) => ({
       return
     }
     // Your own shaders it plays, from the session itself : entered before the
-    // composition syncs. One you also have, but different : yours stays as it is
-    // (your file, your menus) and the session plays its own version, entered as
-    // "<name> (session)" under its own id.
-    if (s.userShaders && typeof s.userShaders === 'object') {
-      const remap = new Map<string, string>()
-      for (const [sid, u] of Object.entries(s.userShaders)) {
-        if (!u || typeof u.name !== 'string' || typeof u.source !== 'string') continue
-        const id = userShaderId(u.name)
-        const mine = get().userShaders.find((x) => x.id === id && !x.fromSession)
-        if (mine && SHADER_BY_ID[id] && SHADER_BY_ID[id].source !== u.source) {
-          // never over one of yours already called "<name> (session)" (saved
-          // from an earlier load) : the next free "(session 2)", "(session 3)"…
-          let alt = `${u.name} (session)`
-          let same = ''
-          for (let n = 2; n < 100; n++) {
-            const aid = userShaderId(alt)
-            if (!get().userShaders.some((x) => x.id === aid && !x.fromSession)) break
-            if (SHADER_BY_ID[aid]?.source === u.source) { same = aid; break } // yours already is it
-            alt = `${u.name} (session ${n})`
-          }
-          if (same) { remap.set(sid, same); continue }
-          const info = registerUserShader(alt, u.source, true)
-          get().upsertUserShader(info)
-          remap.set(sid, info.id)
-          continue
-        }
-        const info = registerUserShader(u.name, u.source, !mine)
-        get().upsertUserShader(mine ? { ...info, fromSession: false } : info)
-        if (info.id !== sid) remap.set(sid, info.id)
-      }
-      if (remap.size) s = { ...s, composition: remapShaderIds(s.composition, remap), scenes: s.scenes ? remapShaderIds(s.scenes, remap) : s.scenes }
-    }
+    // composition syncs (adoptSessionShaders).
+    const remap = adoptSessionShaders(s.userShaders)
+    if (remap.size) s = { ...s, composition: remapShaderIds(s.composition, remap), scenes: s.scenes ? remapShaderIds(s.scenes, remap) : s.scenes }
     // Another session over the Morph time, layer by layer and live (morph.ts
     // relay : each new layer fades in once compiled, the old ones out). At Morph
     // 0 : hold the last frame until the new one is ready, then dissolve.
@@ -5830,6 +5801,45 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   }
 }))
+
+/** A session file's own shaders (Source Editor), entered so it plays them :
+ *  on load, and when its scenes are added to the session on screen (`only` :
+ *  just the ids those scenes play). One you also have, but different : yours
+ *  stays as it is (your file, your menus) and the session plays its own
+ *  version, entered as "<name> (session)" under its own id. Returns the ids to
+ *  rename in the session (remapShaderIds). */
+export function adoptSessionShaders(list: Session['userShaders'], only?: Set<string>): Map<string, string> {
+  const remap = new Map<string, string>()
+  if (!list || typeof list !== 'object') return remap
+  const get = useStore.getState
+  for (const [sid, u] of Object.entries(list)) {
+    if (only && !only.has(sid)) continue
+    if (!u || typeof u.name !== 'string' || typeof u.source !== 'string') continue
+    const id = userShaderId(u.name)
+    const mine = get().userShaders.find((x) => x.id === id && !x.fromSession)
+    if (mine && SHADER_BY_ID[id] && SHADER_BY_ID[id].source !== u.source) {
+      // never over one of yours already called "<name> (session)" (saved
+      // from an earlier load) : the next free "(session 2)", "(session 3)"…
+      let alt = `${u.name} (session)`
+      let same = ''
+      for (let n = 2; n < 100; n++) {
+        const aid = userShaderId(alt)
+        if (!get().userShaders.some((x) => x.id === aid && !x.fromSession)) break
+        if (SHADER_BY_ID[aid]?.source === u.source) { same = aid; break } // yours already is it
+        alt = `${u.name} (session ${n})`
+      }
+      if (same) { remap.set(sid, same); continue }
+      const info = registerUserShader(alt, u.source, true)
+      get().upsertUserShader(info)
+      remap.set(sid, info.id)
+      continue
+    }
+    const info = registerUserShader(u.name, u.source, !mine)
+    get().upsertUserShader(mine ? { ...info, fromSession: false } : info)
+    if (info.id !== sid) remap.set(sid, info.id)
+  }
+  return remap
+}
 
 // Apply the persisted theme on module load so first paint is themed.
 applyTheme(useStore.getState().theme)
