@@ -23,6 +23,15 @@ that CI builds into cross-platform releases.
   by Generate alone (Marbled Paper twice, Night Bath once) : `shot-marbling.jpg`,
   `shot-marbled-paper.jpg`, `shot-night-bath.jpg` (1280x720).
 
+- **The OSC reference matches the site and takes about half the room** : the site's
+  dark look, nav and headings (the beige light scheme is gone), and each address is one
+  compact row, the address wrapping at its ` · ` and `/` with its arguments as chips
+  beside it and the description beside it on a wide screen or under it on a narrow one,
+  so nothing scrolls sideways at any width. An index of the 15 sections and a filter box
+  sit at the top (`/` focuses it, Esc clears it). 8,421 px tall at 1280 px wide instead of
+  15,921, Sonify's rows about half as tall; every address, argument and description is
+  word for word the same.
+
 ## v1.3.1 — 2026-10-29
 
 ### Fixed
