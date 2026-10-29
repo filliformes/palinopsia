@@ -3,9 +3,35 @@
 // the chain and the vibe are designed together; the vibe's settings merge
 // onto the locked unit without replacing it.
 
+import type { LayerState } from '@shared/types'
+
 /** Which layer a node in a chain preset reads, resolved when the preset is
  *  applied : the lowest, the highest, or the second active layer. */
 export type LayerPick = 'bottom' | 'top' | 'second'
+
+/** The layers a chain's node can read : a source in A or B, not muted, lowest
+ *  first. `reads` picks among them when a chain is applied (and a chain you
+ *  save names a node's layer by its place among them). */
+export function playingLayers(layers: LayerState[]): number[] {
+  return layers
+    .map((l, i) => (l.sourceA.kind !== 'none' || (l.sourceB && l.sourceB.kind !== 'none') ? i : -1))
+    .filter((i) => i >= 0 && !layers[i].mute)
+}
+
+/** The layer a pick lands on (none : no layer plays). */
+export function pickLayer(playing: number[], p: LayerPick): number | undefined {
+  if (!playing.length) return undefined
+  return p === 'bottom' ? playing[0] : p === 'top' ? playing[playing.length - 1] : (playing[1] ?? playing[playing.length - 1])
+}
+
+/** A layer as a pick, the way `pickLayer` reads it back (none : a third of
+ *  four playing layers, or a layer that does not play, has no name). */
+export function layerAsPick(playing: number[], layer: number): LayerPick | undefined {
+  if (playing[0] === layer) return 'bottom'
+  if (playing[playing.length - 1] === layer) return 'top'
+  if (playing[1] === layer) return 'second'
+  return undefined
+}
 
 export interface MasterPresetFx {
   shaderId: string
@@ -15,6 +41,10 @@ export interface MasterPresetFx {
   reads?: LayerPick
   /** Matte's second input (the matte itself). */
   reads2?: LayerPick
+  /** Bypassed when applied (absent : on). Your own chains keep it. */
+  enabled?: boolean
+  /** Dry/wet (absent : fully wet). Your own chains keep it. */
+  opacity?: number
 }
 
 export interface MasterPreset {

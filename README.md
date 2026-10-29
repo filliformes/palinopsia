@@ -2649,6 +2649,18 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   **Sound** (made for a waveform : Phosphor, Tape Floor, Relief); they keep the scene's
   palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
+- **Your own chains (my chains)** : right-click the Master FX strip (its empty space, or
+  any effect's chip : its menu ends with the same entry) and choose **Save chain as
+  preset…**, give it a name, and the chain as it plays now is kept on this computer : its
+  effects in order with every setting, which ones are on or off and how wet, and the Vibe
+  and Context settings. Your chains come first in the `chain presets…` menu under **my
+  chains**, in Ctrl+K and in the chain next / previous / random actions (a Body rule, a
+  MIDI pad), and the menu names one while it plays. Applying one is one undo, and what is
+  Persistent stays. A node that reads another layer keeps it the way the built-in chains
+  do, as the lowest, the second or the highest layer playing; a node reading an image, or
+  the third of four layers, will read no layer (saving says which). A name you already
+  have asks before replacing it; the same menu's **Rename my chain ▸** and **Delete my
+  chain ▸** (it asks first) look after them.
 - **The source pickers have sections** : **Live** (imports, cameras, captures, network
   streams, and 👤 **Silhouette**, the body cut out of the room), **Organic** (living
   matter : reaction, growth, water, fire, ground), **Painted** (Oil Cloud, Cloud Study),

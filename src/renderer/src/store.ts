@@ -46,6 +46,7 @@ import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpac
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
 import { SHADER_BY_ID } from './shaders/isf'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
+import { pickLayer, playingLayers, type LayerPick } from './shaders/isf/masterPresets'
 import { canHostFx } from './fxScopes'
 import { modTargetKey } from './modKey'
 import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
@@ -3247,18 +3248,17 @@ export const useStore = create<StoreState>((set, get) => ({
         )
       // A node that reads another layer is pointed at an active one (lowest,
       // highest or second); with no active layer it is left reading nothing.
-      const active = s.composition.layers
-        .map((l, i) => (l.sourceA.kind !== 'none' || (l.sourceB && l.sourceB.kind !== 'none') ? i : -1))
-        .filter((i) => i >= 0 && !s.composition.layers[i].mute)
-      const resolve = (p?: 'bottom' | 'top' | 'second'): SidechainRef | undefined => {
-        if (!p || !active.length) return undefined
-        const i = p === 'bottom' ? active[0] : p === 'top' ? active[active.length - 1] : (active[1] ?? active[active.length - 1])
-        return { kind: 'layer', layer: i }
+      const active = playingLayers(s.composition.layers)
+      const resolve = (p?: LayerPick): SidechainRef | undefined => {
+        const i = p ? pickLayer(active, p) : undefined
+        return i === undefined ? undefined : { kind: 'layer', layer: i }
       }
+      // (your own chains also carry each effect's on / off and dry / wet)
       const units: FxInstance[] = fx.map((f) => ({
         id: uid(),
         shaderId: f.shaderId,
-        enabled: true,
+        enabled: f.enabled ?? true,
+        ...(f.opacity !== undefined ? { opacity: f.opacity } : {}),
         inputs: { ...f.inputs },
         ...(f.reads && resolve(f.reads) ? { sidechain: resolve(f.reads) } : {}),
         ...(f.reads2 && resolve(f.reads2) ? { sidechain2: resolve(f.reads2) } : {})

@@ -107,10 +107,12 @@ import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/
 import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
 import { initMidi, fireTrigger, midi } from './midi'
-import { FX_SHADERS, GENERATORS, NATIVE_NODES, shaderSourceById } from './shaders/isf'
+import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
 import { lastActionChain } from './actions'
+import { MY_CHAINS, chainByKey, chainPlaying, userChainKey, useUserChains } from './userChains'
+import { MyChainDialogs, MyChainsMenu } from './components/MyChains'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
 
 // ── Vibe Palette (P / Shift+P) & Context (C / Shift+C) shortcuts ───────
@@ -2687,20 +2689,14 @@ function MasterRackStrip(): JSX.Element {
   const randomizeMasterParams = useStore((s) => s.randomizeMasterParams)
   const toggleMasterChain = useStore((s) => s.toggleMasterChain)
   // The menu names the chain that plays : the one picked here or by an action
-  // while it is still loaded, else a chain with the same effects (a scene, a
-  // Generate, the dice), else nothing.
+  // while it is still loaded, else a chain holding exactly these effects (yours
+  // first), else one with the same effects (a scene, a Generate, the dice),
+  // else nothing (userChains.ts chainPlaying).
   const [picked, setApplied] = useState('')
-  const chainIds = master.filter((f) => !f.locked).map((f) => f.shaderId).join('|')
-  const plays = (name: string | null): boolean =>
-    !!name && MASTER_PRESETS.find((p) => p.name === name)?.fx.map((f) => f.shaderId).join('|') === chainIds
-  const byAction = lastActionChain()
-  const applied = plays(picked)
-    ? picked
-    : plays(byAction)
-      ? byAction!
-      : chainIds
-        ? (MASTER_PRESETS.find((p) => p.fx.map((f) => f.shaderId).join('|') === chainIds)?.name ?? '')
-        : ''
+  const mine = useUserChains()
+  const applied = chainPlaying(master.filter((f) => !f.locked), [picked, lastActionChain()])
+  // right-click the strip : save the chain, rename or delete one of yours
+  const [chainMenu, setChainMenu] = useState<{ x: number; y: number } | null>(null)
   const [flashing, flash] = useFlash()
   // Regular (user-added) FX wrap on the left; the three pinned finalizers
   // (Vibe / Context / Finalizer) stay clustered at the rightmost : clicking one
@@ -2710,13 +2706,21 @@ function MasterRackStrip(): JSX.Element {
   // The "chain" On/Off state : on when every user FX is enabled.
   const chainOn = rackFx.length > 0 && rackFx.every((f) => f.enabled)
   return (
-    // A header line : the chain's controls (on, dice, presets, + fx, the two
-    // menus alike) and the finishing at its end; the effects underneath, across
-    // the whole width (a long chain runs under the finishing too).
+    <>
+    {/* A header line : the chain's controls (on, dice, presets, + fx, the two
+        menus alike) and the finishing at its end; the effects underneath, across
+        the whole width (a long chain runs under the finishing too). */}
     <div
       className={`flex min-w-0 flex-col gap-1.5 rounded-md border bg-panel2/40 p-2 transition-colors ${
         flashing ? 'animate-pulse border-danger ring-1 ring-danger' : 'border-border'
       }`}
+      // (an effect's chip and + fx keep menus of their own; a menu open in the
+      // window's menu host is not part of the strip)
+      onContextMenu={(e) => {
+        if (!e.currentTarget.contains(e.target as Node)) return
+        e.preventDefault()
+        setChainMenu({ x: e.clientX, y: e.clientY })
+      }}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       <span className="relative inline-flex shrink-0">
@@ -2761,15 +2765,23 @@ function MasterRackStrip(): JSX.Element {
         className="w-32 shrink-0 text-[10px]"
         value={applied}
         placeholder="chain presets…"
-        options={MASTER_PRESETS.map((p) => ({ value: p.name, label: p.name, group: p.group }))}
+        options={[
+          ...mine.map((p) => ({
+            value: userChainKey(p.name),
+            label: p.name,
+            group: MY_CHAINS,
+            title: `One of your chains : ${p.fx.map((f) => SHADER_BY_ID[f.shaderId]?.name ?? f.shaderId).join(' · ')}`
+          })),
+          ...MASTER_PRESETS.map((p) => ({ value: p.name, label: p.name, group: p.group }))
+        ]}
         onChange={(v) => {
-          const p = MASTER_PRESETS.find((x) => x.name === v)
-          if (p) {
-            applyMasterPreset(p.fx, p.vibe, p.context)
-            setApplied(p.name)
+          const e = chainByKey(v)
+          if (e) {
+            applyMasterPreset(e.preset.fx, e.preset.vibe, e.preset.context)
+            setApplied(v)
           }
         }}
-        title="Master chain presets : replaces the chain and sets the Vibe accordingly"
+        title="Master chain presets : replaces the chain and sets the Vibe accordingly. Right-click the strip to save the chain as one of yours"
       />
       <FxAddSelect scope={{ kind: 'master' }} className="w-32 shrink-0" />
       {/* Pinned finalizers : clustered at the rightmost, never wrapping apart.
@@ -2787,6 +2799,9 @@ function MasterRackStrip(): JSX.Element {
       {/* The chain's effects : their own rows, wrapping across the full width. */}
       {rackFx.length > 0 && <FxChips scope={{ kind: 'master' }} fx={rackFx} />}
     </div>
+    {chainMenu && <MyChainsMenu x={chainMenu.x} y={chainMenu.y} onClose={() => setChainMenu(null)} />}
+    <MyChainDialogs onSaved={setApplied} />
+    </>
   )
 }
 

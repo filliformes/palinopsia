@@ -79,6 +79,34 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **My chains : the Master FX chain saved as a preset** (Vincent : "Right-click on the
+  Master FX Chain : Save the chain as a new preset (you have to give it a name)").
+  Right-click the Master FX strip (its empty space; an effect chip's menu ends with the
+  same entry) → **Save chain as preset…** → a name (required, trimmed; a name you already
+  have asks to replace it, or goes back to the prompt). Saved : the chain's effects in
+  order (shaderId, every input, `enabled`, `opacity`), a node's layer read as
+  `MasterPreset.reads` / `reads2` ('bottom' | 'top' | 'second' among the playing layers,
+  `layerAsPick`; an image read, or the third of four playing layers, has no such name and
+  is dropped, the toast names the effect), and the Vibe and Context inputs as `vibe` /
+  `context`. Not saved : the Context's drawn light path, the Finalizer. `userChains.ts` :
+  localStorage `opsia.userChains`, a sanitizer on read (malformed rows, values and picks
+  left out, opacity clamped, a repeated name dropped, broken JSON = no chains, never a
+  crash); `allChains()` (yours first) feeds the strip's menu (a **my chains** group
+  first), Ctrl+K and the `act:chain:next / prev / rand` actions (the last chain an action
+  applied is now kept by its key, so saving or deleting one of yours does not shift it);
+  `chainPlaying()` is the strip's naming rule from 752ed49 with an exact pass first (every
+  value a chain sets, on / off and dry / wet), so a chain of yours saved from a built-in
+  one keeps its own name. Applied through `applyMasterPreset` (one undo step, the
+  Persistent gate), which now also takes an effect's `enabled` / `opacity` (absent : on,
+  fully wet, so the built-in chains apply as before); `playingLayers` / `pickLayer` moved
+  to masterPresets.ts (the same rule). **Rename my chain ▸** (a name another chain has is
+  refused) and **Delete my chain ▸** (asks first) in `components/MyChains.tsx`. Checked
+  in the test copy with real mouse events : a chain of Matte (reading bottom + top), Remap
+  (second), Grade off and Grain 60 % wet with a set Vibe and Context, saved, then New and
+  picked from the menu : 0 differences over 4 effects, 21 inputs, 12 Vibe and 10 Context
+  values and the three layer reads; undo = one step back; replace, rename, delete,
+  Ctrl+K, chain next / previous cycling through your chains (and named), a Persistent
+  effect kept; 10 malformed stored rows → 2 clean chains; console errors 0.
 - **Marbling, a new source, and clicking the preview** (Vincent, from stills of a water
   marbling drawing app : "could we make a version of it as a new source inside
   Palinopsia ? ... Maybe this could give the way to Palinopsia supporting the mouseclick

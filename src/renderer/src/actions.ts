@@ -42,7 +42,7 @@ import { layerPin, layerSpeedPin, modPin, slotPin, isPinnedTarget } from './pers
 import { DICE_SOURCES, randomizeInputs } from './randomize'
 import { SHADER_BY_ID, inPickerOrder } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
-import { MASTER_PRESETS } from './shaders/isf/masterPresets'
+import { allChains, chainByKey } from './userChains'
 import { THEMES, THEME_BY_ID, THEME_FAMILIES } from './themes'
 import { knobDisplayValue, setKnobTarget } from './metaSmooth'
 import { modEngine } from './engine/modulation'
@@ -295,22 +295,27 @@ function slotPlays(st: St, i: number, slot: 'A' | 'B', shaderId: string): boolea
 
 // ── Chains, scenes, Worlds, Generate ────────────────────────────────────────
 
-let lastChain = -1
+// Every chain, yours first (userChains.ts); the last one applied is kept by its
+// key, so saving or deleting one of yours does not shift it.
+let lastChain: string | null = null
 function currentChain(st: St): number {
   const ids = st.composition.master.filter((f) => !f.locked).map((f) => f.shaderId).join('|')
-  const same = (k: number): boolean => k >= 0 && MASTER_PRESETS[k]?.fx.map((f) => f.shaderId).join('|') === ids
-  if (same(lastChain)) return lastChain
-  return MASTER_PRESETS.findIndex((_, k) => same(k))
+  const all = allChains()
+  const same = (k: number): boolean => k >= 0 && all[k]?.preset.fx.map((f) => f.shaderId).join('|') === ids
+  const last = all.findIndex((e) => e.key === lastChain)
+  if (same(last)) return last
+  return all.findIndex((_, k) => same(k))
 }
 function applyChain(k: number): void {
-  const p = MASTER_PRESETS[k]
-  if (!p) return
-  get().applyMasterPreset(p.fx, p.vibe, p.context) // (through the pins' gate)
-  lastChain = k
+  const e = allChains()[k]
+  if (!e) return
+  get().applyMasterPreset(e.preset.fx, e.preset.vibe, e.preset.context) // (through the pins' gate)
+  lastChain = e.key
 }
-/** The chain an action applied last (the Master FX strip's menu names it). */
+/** The chain an action applied last, by its key (the Master FX strip's menu
+ *  names it). */
 export function lastActionChain(): string | null {
-  return MASTER_PRESETS[lastChain]?.name ?? null
+  return chainByKey(lastChain) ? lastChain : null
 }
 
 // Generate replaces the session : as a learned MIDI pad's New, it never stops
@@ -426,11 +431,11 @@ export function fireAction(id: string): void {
     }
     case 'chain': {
       const k = currentChain(st)
-      const n = MASTER_PRESETS.length
+      const n = allChains().length
       if (!n) return
       if (p[2] === 'next') applyChain(k < 0 ? 0 : (k + 1) % n)
       else if (p[2] === 'prev') applyChain(k < 0 ? n - 1 : (k - 1 + n) % n)
-      else if (p[2] === 'rand') applyChain(pickOne(MASTER_PRESETS.map((_, j) => j).filter((j) => j !== k)))
+      else if (p[2] === 'rand') applyChain(pickOne(allChains().map((_, j) => j).filter((j) => j !== k)))
       return
     }
     case 'finishing': st.toggleFinishing(); return
