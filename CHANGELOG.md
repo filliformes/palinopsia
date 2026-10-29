@@ -19,6 +19,10 @@ that CI builds into cross-platform releases.
   click, and says every page window plays the instrument; the bibliography adds the
   marbling paper Marbling is built on.
 
+- **Marbling in the gallery** : a row of three frames on the README and the site, made
+  by Generate alone (Marbled Paper twice, Night Bath once) : `shot-marbling.jpg`,
+  `shot-marbled-paper.jpg`, `shot-night-bath.jpg` (1280x720).
+
 ## v1.3.1 — 2026-10-29
 
 ### Fixed
