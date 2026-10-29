@@ -39,6 +39,15 @@ export const MIN_EDGE = 0.0011
  *  (the sharp tips keep their fine sampling). The points budget counts at this size. */
 export const REF_PX = 2160
 const COARSEST = 2
+/** The sampling's notches (setLevel) : 0 is the picture's own, the last samples
+ *  as 1080p does (COARSEST × MAX_EDGE), even steps between. At 1080p and below
+ *  they are all the same : nothing coarser to go to. */
+export const LEVELS = 4
+/** Past the picture's own spacing an edge must stay this close to its curve (the
+ *  sagitta, in the picture's pixels) : a coarser level only lengthens the flat
+ *  runs of an outline, its bends (a small drop, a curl, a comb's tip) keep the
+ *  picture's own spacing. */
+export const SAG_PX = 0.25
 /** A drop drawn out thinner than this (its mean width, 2 area / perimeter, in
  *  the picture's pixels) dissolves into the water : a combed or swirled sliver
  *  under half a pixel is nearly all outline (points) and hardly any paint, and
@@ -191,9 +200,23 @@ export class MarbleModel {
   budget = 60000
   /** The picture's pixels a frame height (setDensity). */
   px = REF_PX
-  /** The longest edge now : MAX_EDGE at 4K and above, up to twice that below. */
+  /** The longest edge the picture asks : MAX_EDGE at 4K and above, up to twice that below. */
+  fineEdge = MAX_EDGE
+  /** The longest edge now : fineEdge, or longer on the flat runs while the water
+   *  cannot keep up (setLevel). */
   maxEdge = MAX_EDGE
+  /** The sampling's notch (0 : the picture's own; see LEVELS). */
+  level = 0
+  /** The share of the picture's own points this level keeps for the same water
+   *  (measured as the level changes, 1 at level 0) : the budget holds the same drops. */
+  share = 1
+  /** The part of the budget kept while even the coarsest sampling cannot keep up (the
+   *  worker's governor, down to half; 1 : the whole budget). */
+  trim = 1
   private max2 = MAX_EDGE * MAX_EDGE
+  private fine2 = MAX_EDGE * MAX_EDGE
+  // 64 × the sagitta allowed past the picture's own spacing, squared (see bends)
+  private sag64 = 64 * (SAG_PX / REF_PX) ** 2
   private nextId = 1
   /** Steps the last resample or transform changed something : replay may skip
    *  only fully quiet stretches. */
@@ -205,6 +228,7 @@ export class MarbleModel {
   private combDir = 1
   private combLeg = 0
   private swirlT = 0
+  private subCarry = 0 // the part of a currents sub-step carried to the next frame
 
   constructor(seed = 1) {
     const r = rng(seed * 7919 + 13)
@@ -222,14 +246,59 @@ export class MarbleModel {
   setDensity(px: number): void {
     if (!(px > 0) || px === this.px) return
     this.px = px
-    this.maxEdge = MAX_EDGE * Math.max(1, Math.min(COARSEST, REF_PX / px))
+    this.fineEdge = MAX_EDGE * Math.max(1, Math.min(COARSEST, REF_PX / px))
+    this.fine2 = this.fineEdge * this.fineEdge
+    this.sag64 = 64 * (SAG_PX / px) ** 2
+    // a new picture size starts from its own sampling
+    this.level = 0
+    this.share = 1
+    this.levelEdge()
+  }
+
+  private levelEdge(): void {
+    // (level 0 : exactly fineEdge, so the picture's own sampling is the one it always was)
+    this.maxEdge = this.fineEdge * ((COARSEST * MAX_EDGE) / this.fineEdge) ** (this.level / (LEVELS - 1))
     this.max2 = this.maxEdge * this.maxEdge
   }
 
+  /** A coarser level would sample anything coarser (not at 1080p and below). */
+  canCoarsen(): boolean {
+    return this.level < LEVELS - 1 && this.fineEdge < COARSEST * MAX_EDGE
+  }
+
+  /** The sampling a notch coarser or finer (the worker's governor : a water that
+   *  cannot keep up lengthens the flat runs of its outlines, and goes back to the
+   *  picture's own sampling when there is time). Coarser merges the flat runs now,
+   *  finer splits what is now too long. The budget follows the points this
+   *  measured, so the same drops stay on the water (it would otherwise dissolve a
+   *  third of them the moment the water went coarser). */
+  setLevel(level: number): void {
+    // (1080p and below : nothing coarser, the sampling stays the picture's own)
+    const L = this.fineEdge < COARSEST * MAX_EDGE ? Math.max(0, Math.min(LEVELS - 1, Math.round(level))) : 0
+    if (L === this.level) return
+    const before = this.weight()
+    const finer = L < this.level
+    this.level = L
+    this.levelEdge()
+    for (const d of this.drops) if (finer ? this.resample(d) : this.decimate(d)) this.bbox(d)
+    const after = this.weight()
+    // (a near empty water measures nothing : a first guess, the worker measures it from then on)
+    this.share = L === 0 ? 1 : before > 2000 ? this.share * (after / before) : Math.sqrt(this.fineEdge / this.maxEdge)
+    this.busy = true
+  }
+
+  /** The points as the budget counts them (a dissolving drop counts half). */
+  weight(): number {
+    let w = 0
+    for (const d of this.drops) w += d.fadeStep === 0 ? d.n : d.n * 0.5
+    return w
+  }
+
   /** The budget in points at this size : the same outlines, sampled coarser on a
-   *  smaller picture, so the same drops stay on the water at 1080p and at 4K. */
+   *  smaller picture (or at a coarser level), so the same drops stay on the water
+   *  at 1080p and at 4K. */
   budgetPoints(): number {
-    return Math.round(this.budget * (MAX_EDGE / this.maxEdge))
+    return Math.round(this.budget * (MAX_EDGE / this.fineEdge) * this.share * this.trim)
   }
 
   /** Anything moving on the fixed clock (spreading, pouring, dissolving). */
@@ -405,7 +474,13 @@ export class MarbleModel {
    *  crossed it), spreading to radius r over `steps` steps. `held` keeps it
    *  pouring until released. */
   drop(x: number, y: number, r: number, col: number, steps: number, held = false): Drop {
-    const n = Math.max(24, Math.min(MAX_DROP_PTS, Math.round((2 * Math.PI * r) / (this.maxEdge * 0.75))))
+    // the picture's own spacing round its circle; at a coarser level fewer points,
+    // as long as each edge stays within the sagitta (a tenth to spare, so the
+    // resample never splits a fresh circle right back)
+    const c = 2 * Math.PI * r
+    const nFine = c / (this.fineEdge * 0.75)
+    const nSag = (1.1 * c) / Math.sqrt((8 * r * SAG_PX) / this.px)
+    const n = Math.max(24, Math.min(MAX_DROP_PTS, Math.round(Math.min(nFine, Math.max(c / (this.maxEdge * 0.75), nSag)))))
     const r0 = r * LAND
     this.pushAll(x, y, r0 * r0)
     const xy = new Float64Array(n * 2)
@@ -482,10 +557,11 @@ export class MarbleModel {
       busy = true
     }
     // dissolving
+    const boost = this.fadeBoost()
     let gone = false
     for (const d of this.drops) {
       if (d.fadeStep > 0) {
-        d.fade -= d.fadeStep
+        d.fade -= d.fadeStep * boost
         if (d.fade <= 0) gone = true
         busy = true
       }
@@ -528,6 +604,36 @@ export class MarbleModel {
       this.dissolve(d)
       live -= d.n * 0.5
     }
+  }
+
+  /** How much faster drops dissolve while the water holds more than 1.1 × its
+   *  budget, everything counted : up to 4 × (0.4 s) from 1.2 ×. A comb at full
+   *  strength stretches drops faster than they can leave in 1.5 s (20K points a
+   *  second at 1080p) : the drops on their way out once made the total 1.5 × the
+   *  budget, with a few big combed drops fading together. Under that (evolve 0.3,
+   *  the hand-made picture) the dissolve keeps its 1.5 s. */
+  private fadeBoost(): number {
+    const over = this.points / Math.max(1, this.budgetPoints()) - 1.1
+    return over > 0 ? Math.min(4, 1 + 30 * over) : 1
+  }
+
+  /** The live outlines' mean edge (their length over their points) : the worker
+   *  measures it to keep the budget at a coarser level holding the same water. */
+  meanEdge(): number {
+    let len = 0, pts = 0
+    for (const d of this.drops) {
+      if (d.fadeStep > 0) continue
+      const xy = d.xy
+      const n = d.n
+      pts += n
+      let px = xy[n * 2 - 2], py = xy[n * 2 - 1]
+      for (let i = 0; i < n * 2; i += 2) {
+        const x = xy[i], y = xy[i + 1]
+        len += Math.sqrt((x - px) * (x - px) + (y - py) * (y - py))
+        px = x; py = y
+      }
+    }
+    return pts ? len / pts : 0
   }
 
   /** Resample every drop a transform touched (see resample). True when a drop
@@ -587,6 +693,8 @@ export class MarbleModel {
     const n = d.n
     const xy = d.xy
     const MAX2 = this.max2
+    const FINE2 = this.fine2
+    const S = this.sag64
     const canMerge = !d.spreading && n > MIN_PTS
     // a dissolving drop at its cap gains no points (merges only)
     const grow = d.fadeStep === 0 || d.n < d.cap
@@ -601,7 +709,8 @@ export class MarbleModel {
       const le = ex * ex + ey * ey
       const bx = xy[k * 2] - xj, by = xy[k * 2 + 1] - yj
       const lb = bx * bx + by * by
-      if (grow && (le > MAX2 || (le > TIP2 && (turns(ax, ay, la, ex, ey, le) || turns(ex, ey, le, bx, by, lb))))) return true
+      // (past the picture's own spacing, a bend too : at level 0 that is past the longest)
+      if (grow && (le > MAX2 || (le > TIP2 && (turns(ax, ay, la, ex, ey, le) || turns(ex, ey, le, bx, by, lb))) || (le > FINE2 && (bends(ax, ay, la, ex, ey, S) || bends(bx, by, lb, ex, ey, S))))) return true
       if (canMerge && j !== 0 && le < MIN2 && lb < MIN2 && straight(ex, ey, le, bx, by, lb)) return true
       ax = ex; ay = ey; la = le
       x = xj; y = yj
@@ -620,6 +729,7 @@ export class MarbleModel {
     const xy = d.xy
     const MAX2 = this.max2
     const maxE = this.maxEdge
+    const FINE2 = this.fine2
     const canMerge = !d.spreading
     // quick test : most drops need nothing
     if (!this.needsResample(d)) return false
@@ -648,9 +758,12 @@ export class MarbleModel {
       // two sides of a thin tip never cross)
       const dx = xj - lx, dy = yj - ly
       const l2 = dx * dx + dy * dy
-      if (room > 0 && (l2 > MAX2 || (l2 > TIP2 && sharp(xy, n, i, j)))) {
+      // past the picture's own spacing where the outline bends : back to that
+      // spacing (at level 0 the two are one : past the longest edge)
+      const bend = l2 > FINE2 && bent(xy, n, i, j, this.sag64)
+      if (room > 0 && (bend || l2 > MAX2 || (l2 > TIP2 && sharp(xy, n, i, j)))) {
         // (a little short of the longest edge : the curve bulges past its chord)
-        const parts = Math.min(room + 1, l2 > MAX2 ? Math.ceil(Math.sqrt(l2) / (maxE * 0.8)) : 2)
+        const parts = Math.min(room + 1, bend || l2 > MAX2 ? Math.ceil(Math.sqrt(l2) / ((bend ? this.fineEdge : maxE) * 0.8)) : 2)
         room -= parts - 1
         if (m + parts * 2 + 4 > o.length) {
           const big = new Float64Array(Math.max(o.length * 2, m + parts * 2 + 64))
@@ -689,6 +802,67 @@ export class MarbleModel {
     return true
   }
 
+  /** The flat runs of an outline merged to the longest edge now (setLevel going
+   *  coarser), as a split would have left them : from each kept point the chord
+   *  reaches as far along as every point it skips stays within half the sagitta
+   *  of it, it is no longer than a split's part (4/5 of the longest edge : room to
+   *  stretch before it splits again) and it turns gently at both ends, so no split
+   *  rule takes it straight back. Never on a spreading drop (its first circle),
+   *  never its last point (the closing edge stays). */
+  decimate(d: Drop): boolean {
+    const n = d.n
+    if (d.spreading || n <= MIN_PTS) return false
+    const xy = d.xy
+    const lim2 = 0.64 * this.max2
+    const dev2 = this.sag64 / 256 // (SAG_PX / 2 / px)²
+    const S = this.sag64
+    const FINE2 = this.fine2
+    let o = scratch
+    if (o.length < n * 2 + 64) o = scratch = new Float64Array(n * 4 + 64)
+    let m = 0
+    let ax = xy[0], ay = xy[1]
+    o[m++] = ax; o[m++] = ay
+    // the kept edge into the last kept point
+    let ex = ax - xy[n * 2 - 2], ey = ay - xy[n * 2 - 1]
+    let kept = n
+    let j = 1
+    while (j < n) {
+      // the farthest point k the chord from a may reach (k = j : none skipped)
+      let k = j
+      for (let t = j + 1; t < n && kept - (t - j) >= MIN_PTS; t++) {
+        const cx = xy[t * 2] - ax, cy = xy[t * 2 + 1] - ay
+        const lc = cx * cx + cy * cy
+        if (!(lc > 0) || lc > lim2) break
+        let ok = true
+        for (let s = j; s < t && ok; s++) {
+          const qx = xy[s * 2] - ax, qy = xy[s * 2 + 1] - ay
+          const cr = cx * qy - cy * qx // the chord's length × p_s's distance from it
+          const along = cx * qx + cy * qy
+          ok = cr * cr <= dev2 * lc && along > 0 && along < lc
+        }
+        if (!ok) break
+        const t2 = t + 1 === n ? 0 : t + 1
+        const nx = xy[t2 * 2] - xy[t * 2], ny = xy[t2 * 2 + 1] - xy[t * 2 + 1]
+        const le = ex * ex + ey * ey, ln = nx * nx + ny * ny
+        if (straight(ex, ey, le, cx, cy, lc) && straight(cx, cy, lc, nx, ny, ln) &&
+            !(lc > FINE2 && (bends(ex, ey, le, cx, cy, S) || bends(nx, ny, ln, cx, cy, S)))) k = t
+      }
+      kept -= k - j
+      const xk = xy[k * 2], yk = xy[k * 2 + 1]
+      o[m++] = xk; o[m++] = yk
+      ex = xk - ax; ey = yk - ay
+      ax = xk; ay = yk
+      j = k + 1
+    }
+    const nn = m >> 1
+    if (nn === n) return false
+    d.xy.set(o.subarray(0, m))
+    this.points += nn - n
+    d.n = nn
+    if (d.fadeStep > 0) d.cap = Math.min(d.cap, nn)
+    return true
+  }
+
   /** Drops that drifted far off the view leave the water (not seen, not drawn). */
   cull(): void {
     const X = this.hw + CULL_MARGIN, Y = this.hh + CULL_MARGIN
@@ -711,9 +885,17 @@ export class MarbleModel {
     if (!(ev > 0) || !(dt > 0)) return
     const sp = ev * (0.6 + 1.4 * ev) // a gentle start, lively at 1
     // a long frame (a stall, a slow machine) in short ones, the outlines
-    // resampled between them, so the comb's shear never folds an outline
+    // resampled between them, so the comb's shear never folds an outline. The
+    // part of a sub-step left over is carried to the next frame : rounded up, a
+    // frame just past the limit took two whole passes, so a worker that slipped
+    // under ~44 frames a second (evolve 1, comb 1) had more to do each second
+    // (80 passes, not 60), slipped further, and sat at 3 water updates a second
+    // (the dome, measured). Carried, the passes a second never rise as frames
+    // slow (the outlines cross no more often : measured from 60 down to 15 a second).
     const cw = Math.max(0.01, c.combSpacing) * 0.16 + 0.004
-    const n = Math.max(1, Math.ceil(Math.max((dt * sp) / 0.05, (c.comb * 0.11 * sp * dt) / (0.3 * cw))))
+    this.subCarry += Math.max(1, (dt * sp) / 0.05, (c.comb * 0.11 * sp * dt) / (0.3 * cw))
+    const n = Math.floor(this.subCarry)
+    this.subCarry -= n
     for (let i = 0; i < Math.min(n, 12); i++) {
       this.currentsOnce(dt / n, c, sp)
       if (i < n - 1) this.resampleTouched()
@@ -907,6 +1089,26 @@ function sharp(xy: Float64Array, n: number, i: number, j: number): boolean {
   const bx = xy[k * 2] - xy[j * 2], by = xy[k * 2 + 1] - xy[j * 2 + 1]
   const le = ex * ex + ey * ey
   return turns(ax, ay, ax * ax + ay * ay, ex, ey, le) || turns(ex, ey, le, bx, by, bx * bx + by * by)
+}
+
+/** Edge e strays from its curve more than the sagitta allows, from the bend at
+ *  its end shared with edge a : the sagitta is about |e| sin θ / 8, and
+ *  |e| sin θ = |a × e| / |a| (compared squared : no root). */
+function bends(ax: number, ay: number, la: number, ex: number, ey: number, sag64: number): boolean {
+  const c = ax * ey - ay * ex
+  return c * c > sag64 * la
+}
+
+/** Edge i → j bends too much for its length at either end (see bends), or turns
+ *  back on itself there. */
+function bent(xy: Float64Array, n: number, i: number, j: number, sag64: number): boolean {
+  const h = i === 0 ? n - 1 : i - 1
+  const k = j + 1 === n ? 0 : j + 1
+  const ex = xy[j * 2] - xy[i * 2], ey = xy[j * 2 + 1] - xy[i * 2 + 1]
+  const ax = xy[i * 2] - xy[h * 2], ay = xy[i * 2 + 1] - xy[h * 2 + 1]
+  const bx = xy[k * 2] - xy[j * 2], by = xy[k * 2 + 1] - xy[j * 2 + 1]
+  if (ax * ex + ay * ey <= 0 || ex * bx + ey * by <= 0) return true
+  return bends(ax, ay, ax * ax + ay * ay, ex, ey, sag64) || bends(bx, by, bx * bx + by * by, ex, ey, sag64)
 }
 
 function needsCopy(a: Float64Array, b: Float64Array, m: number): boolean {

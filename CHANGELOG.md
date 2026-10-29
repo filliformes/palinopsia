@@ -5,6 +5,57 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Fixed
+
+- **Marbling keeps its water fluid on the dome and at 4K** (`engine/marbleModel.ts`,
+  `workers/marbleWorker.ts`). Measured first in the test copy under the Satosphère setup
+  (4096² master, 210° fill, 2048² composition, Marbling alone, auto 2 drops a second),
+  the window's renderer held on the efficiency cores (where a background window's worker
+  lands, about half as fast) : evolve 1 with comb and swirl at full moved the water 40
+  times a second for 20 s, then 3 times a second (each tick 320 ms) for good; the fulldome
+  gate's heaviest settings (every input at its top) moved it 5.3 times a second flat and 2
+  on the dome. Two causes. A frame 2048 px tall samples its outlines as 4K does, about
+  twice the points of 1080p (58K at evolve 0.3, 46-81K at evolve 1). And the currents cut
+  a long frame into whole sub-steps, rounded up : a worker that slipped under ~44 updates
+  a second at evolve 1 took two passes a frame (80 a second, not 60), slipped further and
+  sank to the 0.25 s frame. Now :
+  - The worker times its own ticks and, half a second over 10 ms, samples the flat runs of
+    the outlines a notch coarser (four levels, from the picture's own spacing to 1080p's,
+    never past it; far behind, straight to the coarsest), back a notch after 3 s with room
+    for its points, never while the log pours back. Past the picture's own spacing an edge
+    must stay within 0.25 px of its curve, so small drops, curls and comb tips keep their
+    sampling. Going coarser merges the flat runs at once (every dropped point within
+    0.125 px) and the budget follows the water's measured mean edge, so the same drops
+    stay. Level 0 is the sampling it always was, to the bit (the headless tests run
+    master's model beside it).
+  - Still behind at the coarsest (or at 1080p, which has nothing coarser), the water keeps
+    less paint : the budget trimmed 15 % at a time down to half (far behind, straight to
+    half), eased in over 0.75 s, given back first when there is room. Only the heaviest
+    settings on a slow core reach it; the defaults never do.
+  - The part of a sub-step left over carries to the next frame : the passes a second never
+    rise as frames slow, and outlines cross no more often (measured from 60 down to 15
+    frames a second, and at comb spacing 0.03).
+  - Past 1.1 × its budget the water dissolves drops faster (up to 4 ×, 0.4 s; at evolve
+    0.3 a dissolve keeps its 1.5 s) : a few big combed drops fading together held the total
+    at 1.5 × the budget; now 1.33 × at worst and the budget on average, with more live
+    paint than before (16.6 live drops against 15.2 at 1080p, evolve 1 + comb + swirl).
+  - The governor keeps its pace in seconds (a worker far behind ticks a few times a second,
+    and counted in ticks a notch took most of a minute).
+  After, same window, efficiency cores : the dome at evolve 0.3 updates 60 times a second
+  (the coarsest level, 28-31K points, ~100 drops), at evolve 1 + comb + swirl 60 a second
+  (26-29K, was 3); left to the scheduler (a fast core) the dome stays at level 0 at both,
+  60 a second (57-60K and 53-69K points). 1080p (efficiency cores) : evolve 0.3 unchanged
+  (level 0, the same points); evolve 1 + comb + swirl 60 a second at 27-38K points for its
+  30K budget (was 49-54 at 16-44K). Render 0.2-0.4 ms, 60 fps, no errors. The fulldome
+  gate : `PASS src:gen-marble flat 60 fps 59.7/s | dome 60 fps p95 17.3 60/s | heaviest
+  flat 60 fps 59.7/s dome 60 fps 59.7/s`. Stills of the 4096 master at the same tick
+  (exact 1/60 s ticks, seeded) : level 0 pixel-identical to before; the coarsest differs
+  on 0.2-0.4 % of the pixels, along edges, and small drops and comb tips look the same at
+  full size. Save, New, load : still pixel-identical at 1080p and on the dome; a picture
+  made at the coarsest loads back at level 0 with the same drops (0.07 % of bytes differ,
+  at edges). The worker's frame carries its `level`; `{ t: 'level', level }` pins it
+  (stills and tests only). 7,487 headless assertions.
+
 ### Docs
 
 - **The documentation catches up with v1.3.1** : the README's Architecture names the

@@ -19,7 +19,7 @@
 // water from the log, a long replay spread over frames.
 
 import {
-  MarbleModel, HandGestures, replay, sanitizeLog, spreadSteps, rng, STEP,
+  MarbleModel, HandGestures, replay, sanitizeLog, spreadSteps, rng, STEP, LEVELS,
   type Currents, type HandSettings, type MarbleGesture, type ModelSnapshot
 } from '../engine/marbleModel'
 
@@ -47,6 +47,9 @@ export type ToWorker =
   | { t: 'ev'; name: 'drop' | 'sprinkle' | 'clear'; x?: number; y?: number; size?: number; n?: number }
   | { t: 'log'; log: unknown }
   | { t: 'seed'; seed: number }
+  // the sampling held at one level (null : the governor decides) : the stills and
+  // the tests pin it, the page never sends it
+  | { t: 'level'; level: number | null }
 
 export type FromWorker =
   | {
@@ -61,6 +64,7 @@ export type FromWorker =
       spreading: boolean
       replaying: boolean
       changed: boolean
+      level: number // the sampling's notch (0 : the picture's own)
     }
   | { t: 'gesture'; pid: number; entry: MarbleGesture }
 
@@ -283,7 +287,7 @@ function buildFrame(): void {
   post(
     {
       t: 'frame', pos, idx, cov, grp, groups, drops: N, points: model.points, spreading: model.spreading(),
-      replaying: !!replayIt, changed: true
+      replaying: !!replayIt, changed: true, level: model.level
     },
     [pos.buffer, idx.buffer, cov.buffer, grp.buffer]
   )
@@ -292,8 +296,119 @@ function buildFrame(): void {
 function idleFrame(): void {
   post({
     t: 'frame', pos: new Float32Array(0), idx: new Uint32Array(0), cov: new Float32Array(0), grp: new Int32Array(0), groups: 0,
-    drops: model.drops.length, points: model.points, spreading: model.spreading(), replaying: !!replayIt, changed: false
+    drops: model.drops.length, points: model.points, spreading: model.spreading(), replaying: !!replayIt, changed: false,
+    level: model.level
   })
+}
+
+// ── The governor ────────────────────────────────────────────────────────
+// A water too big for this machine at this picture size steps visibly (a 2048²
+// dome frame at evolve 1 + comb + swirl : 65-87K points, 7-16 updates a second in
+// a background window, against 50-58 at 1080p). The worker times its own work :
+// behind 60 a second, it lengthens the flat runs of the outlines a notch at a time
+// (model.setLevel; the bends keep their sampling, so the paint keeps its edge),
+// and with time to spare goes back toward the picture's own sampling. Never while
+// the log pours back (it would come back at another sampling), never coarser
+// than 1080p samples (so 1080p itself never changes).
+// Its pace is in seconds, not ticks : a worker far behind ticks a few times a second,
+// and counted in ticks a notch took most of a minute.
+const G_HI = 10 // ms a tick (and the pointer's work since) : past this, ticks start to miss frames
+const G_LO = 7.5 // a notch finer must fit under this, by the points it measured
+let gEma = 0
+let gOverAt = -1 // when the ticks went over (-1 : they are not), and how many since
+let gOverN = 0
+let gUnderAt = -1
+let gWaitUntil = 0
+let gMeasuredAt = 0
+let gBusy = 0 // pointer and event work since the last tick
+let gPin: number | null = null
+// the share of points each level held when the water was last there (a notch finer's cost)
+let gShare = [1, 1, 1, 1]
+// Past the coarsest sampling (or at 1080p, where there is none) a water still behind
+// keeps less paint : the budget trimmed a notch at a time, down to half (the heaviest
+// settings, every input at its top : evolve, comb, swirl, 4 drops a second spreading
+// for 3 s, a 150K budget, moved the water 2 to 8 times a second, flat or dome). It
+// comes back first when there is room.
+const TRIM_MIN = 0.5
+const TRIM_STEP = 0.15
+let gTrim = 1
+let gTrimAt = 0
+// The water's own mean edge at the picture's sampling, in fineEdges (measured at
+// level 0 : 0.58-0.63 at evolve 0.3 and 1). A coarser level's budget follows it :
+// the points that hold the same outline length at the mean edge the water has now
+// (the merge as the level changes gives a third of the points back; the outlines
+// that grow coarse from then on, more).
+let gE0 = 0.62
+let gMeasure = 0
+
+function measure(): void {
+  if (model.points < 2000) return
+  const e = model.meanEdge() / model.fineEdge
+  if (!(e > 0)) return
+  if (model.level === 0) { gE0 += (e - gE0) * 0.3; return }
+  const target = Math.max(0.3, Math.min(1, gE0 / e))
+  model.share += (target - model.share) * 0.3
+  gShare[model.level] = model.share
+}
+
+function govern(ms: number): void {
+  const now = performance.now()
+  gEma += (ms - gEma) * 0.1
+  if (replayIt) { gOverAt = gUnderAt = -1; return }
+  // once a second (pinned, every 60 ticks : the stills come out the same each time)
+  if (gPin !== null ? ++gMeasure >= 60 : now - gMeasuredAt >= 1000) { gMeasure = 0; gMeasuredAt = now; measure() }
+  if (gPin !== null) {
+    // (a new picture size starts at level 0 : pinned, it goes straight back)
+    if (model.level !== gPin) { model.setLevel(gPin); changed = true }
+    return
+  }
+  // the trim eases to its mark (over ~0.75 s : the budget dissolves the extra drops one
+  // by one, not in a wave)
+  if (model.trim !== gTrim) {
+    const k = Math.min(1, Math.max(0, now - gTrimAt) / 750)
+    gTrimAt = now
+    model.trim = Math.abs(gTrim - model.trim) < 0.002 ? gTrim : model.trim + (gTrim - model.trim) * k
+  }
+  if (now < gWaitUntil) return
+  const L = model.level
+  if (gEma > G_HI && (model.canCoarsen() || gTrim > TRIM_MIN)) {
+    gUnderAt = -1
+    if (gOverAt < 0) { gOverAt = now; gOverN = 0 }
+    // half a second behind (and a few ticks : one slow tick is no trend) : a notch
+    // coarser; at the coarsest, a notch less paint on the water. Far behind (over
+    // twice the mark : a few ticks a second), straight to the coarsest, then straight
+    // to half the paint (a notch at a time took 20 s to catch up at the heaviest
+    // settings); what was too much comes back a notch at a time
+    if (++gOverN >= 3 && now - gOverAt >= 500) {
+      const far = gEma > 2 * G_HI
+      if (model.canCoarsen()) {
+        model.setLevel(far ? LEVELS - 1 : L + 1)
+        gShare[model.level] = model.share
+        gWaitUntil = now + 1000
+      } else {
+        gTrim = far ? TRIM_MIN : Math.max(TRIM_MIN, gTrim - TRIM_STEP)
+        gTrimAt = now
+        gWaitUntil = now + 1000
+      }
+      gOverAt = -1
+      changed = true
+    }
+    return
+  }
+  gOverAt = -1
+  // three seconds with room : the budget back first, then a notch finer (by the points
+  // it measured), toward the picture's own
+  const room = gTrim < 1 ? (gTrim + TRIM_STEP) / gTrim : L > 0 ? gShare[L - 1] / Math.max(0.05, gShare[L]) : 0
+  if (room > 0 && gEma * room < G_LO) {
+    if (gUnderAt < 0) gUnderAt = now
+    else if (now - gUnderAt >= 3000) {
+      if (gTrim < 1) { gTrim = Math.min(1, gTrim + TRIM_STEP); gTrimAt = now }
+      else model.setLevel(L - 1)
+      gUnderAt = -1
+      gWaitUntil = now + 2000
+      changed = true
+    }
+  } else gUnderAt = -1
 }
 
 // ── Messages ───────────────────────────────────────────────────────────
@@ -304,9 +419,47 @@ self.onmessage = (e: MessageEvent<ToWorker>): void => {
     model = new MarbleModel(m.seed)
     hands = new HandGestures(model)
     rand = rng(m.seed * 31 + 7)
+    gOverAt = gUnderAt = -1
+    gWaitUntil = 0
+    gShare = [1, 1, 1, 1]
+    // (the trim is the machine's : a new water starts with it)
+    model.trim = gTrim
+    return
+  }
+  if (m.t === 'level') {
+    gPin = m.level === null ? null : Math.max(0, Math.round(m.level))
+    if (gPin !== null) model.setLevel(gPin)
+    changed = true
     return
   }
   if (m.t === 'log') { syncLog(m.log); return }
+  if (m.t === 'tick') {
+    // every tick is answered, even one that threw : the page sends the next only
+    // on an answer (it used to resend after 300 ms, and a worker slower than that
+    // under evolve 1 piled ticks up behind each other : 480 ms each, never caught up)
+    let answered = false
+    const t0 = performance.now()
+    try {
+      tick(m)
+      answered = true
+    } finally {
+      if (!answered) idleFrame()
+    }
+    const ms = performance.now() - t0 + gBusy
+    gBusy = 0
+    govern(ms)
+    return
+  }
+  // the pointer's and the events' work counts with the next tick's
+  const t0 = performance.now()
+  try {
+    handInput(m)
+  } finally {
+    gBusy += performance.now() - t0
+  }
+}
+
+function handInput(m: Extract<ToWorker, { t: 'ptr' | 'ev' }>): void {
   if (m.t === 'ptr') {
     // the settings ride with every pointer event : a click before the first tick still lands
     S = m.s
@@ -344,19 +497,6 @@ self.onmessage = (e: MessageEvent<ToWorker>): void => {
       } else randomDrop(m.size ?? 1)
     }
     changed = true
-    return
-  }
-  if (m.t === 'tick') {
-    // every tick is answered, even one that threw : the page sends the next only
-    // on an answer (it used to resend after 300 ms, and a worker slower than that
-    // under evolve 1 piled ticks up behind each other : 480 ms each, never caught up)
-    let answered = false
-    try {
-      tick(m)
-      answered = true
-    } finally {
-      if (!answered) idleFrame()
-    }
   }
 }
 
