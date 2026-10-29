@@ -30,7 +30,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
       ['V', 'Big preview : fold the panels under it (and back)'],
-      ['Click the preview', 'Play on a source that takes a click (Marbling : a drop · hold : pour · drag : a trail; shift-drag : a comb)']
+      ['Click the preview', 'Play on a source that takes a click (Marbling : a drop · hold : pour · drag : a trail; its comb tool : drag a stylus, ⇧-drag a five-tine comb) · Body’s Pinch = click : a pinch does the same']
     ]
   },
   {
@@ -103,7 +103,9 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
       ['Right-click Output', 'Watch the Output in a window · the Output page in a window'],
       ['Right-click Body, Seq or Sonify', 'The page in a window of its own'],
-      ['Right-click the Master FX', 'Save the chain as one of yours (my chains) · rename or delete them']
+      ['Right-click the Master FX', 'Save the chain as one of yours (my chains) · rename or delete them'],
+      ['Right-click Load', 'Add the picked session as scenes · its earlier versions · link a folder of sessions'],
+      ['A steps card', 'Drag : draw the bars · click : rest / play · right-click a step : its condition · hold FILL (⇧-click : keep it on)']
     ]
   },
   {
@@ -155,7 +157,7 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }): JSX.Element 
           ))}
         </div>
         <p className="mt-3 border-t border-border pt-2 text-[10px] text-muted">
-          Bare letters are ignored while a text field is focused, and under the Source Editor (its keys are its own). In the Output page's own window they still play the instrument. Most of these are also MIDI-learnable : press{' '}
+          Bare letters are ignored while a text field is focused, and under the Source Editor (its keys are its own). In a page's own window (Output, Body, Sequencer, Sonify) they still play the instrument. Most of these are also MIDI-learnable : press{' '}
           <kbd className="rounded border border-border bg-panel2 px-1 font-mono text-[10px]">L</kbd>.
         </p>
       </div>

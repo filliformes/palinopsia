@@ -204,7 +204,7 @@
         <p class="hint"><span class="mono">chmod +x</span> the AppImage, then run it.</p>
       </div>
     </div>
-    <div class="note">Or build it yourself: <span class="mono">npm install</span>, then <span class="mono">npm run dev</span>. The whole app is on <a href="https://github.com/filliformes/palinopsia">GitHub</a>, free software under the GPL (version 3 or later).</div>
+    <div class="note">Or build it yourself: <span class="mono">npm install</span>, <span class="mono">npm run fetch:depth</span> (the depth AI, once), then <span class="mono">npm run dev</span>. The whole app is on <a href="https://github.com/filliformes/palinopsia">GitHub</a>, free software under the GPL (version 3 or later).</div>
   </section>
 
   <section>
@@ -246,14 +246,14 @@
         <img src="images/interface-sonify.jpg" alt="The Sonify page: the composite mirrored large with sound probes drawn on it, and the voice strips on the right.">
         <div class="body">
           <h3>Sonify<span class="k">S</span></h3>
-          <p>The image itself synthesizes audio in real time, inside the app, no external software. Eleven voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4, and an Assemblage's own sound, cut with the picture) with a shared reverb/delay tail, an output EQ with presets, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time. And every voice can take its place in the room : around a speaker dome, or as objects for SpatGRIS.</p>
+          <p>The image itself synthesizes audio in real time, inside the app, no external software. Eleven voices (a scanning spectrogram, the frame as an oscillator, grain clouds off motion, struck edges, raster audification, SSTV, resonant filters, read heads that play the picture as data, a chord bank, a Collage's own films heard as a tuned sound collage through a Ring bank inspired by the S-4, and an Assemblage's own sound, cut with the picture) with a shared reverb/delay tail, an output EQ with presets, an effects sequencer, and a key sequencer that composes the key of the whole instrument over time. And every voice can take its place in the room : around a speaker dome, or as objects for SpatGRIS. Right-click the Sonify button to open the page in a window of its own.</p>
         </div>
       </div>
       <div class="card">
         <img src="images/interface-sequencer.jpg" alt="The macro-form sequencer: tagged scenes across the top, a live monitor, and the transport column on the right.">
         <div class="body">
           <h3>Sequencer<span class="k">Q</span></h3>
-          <p>An auto-pilot over your scene bank. Tag each scene, then let it wander: weighted or climate-shaped selection, morph or cut transitions, and slow durational long-forms (Burial, Long-Take, Frame-Weave) that reshape the whole run over minutes.</p>
+          <p>An auto-pilot over your scene bank. Tag each scene, then let it wander: weighted or climate-shaped selection, morph or cut transitions, and slow durational long-forms (Burial, Long-Take, Frame-Weave) that reshape the whole run over minutes. Right-click the Seq button to keep it in a window of its own, on another screen.</p>
         </div>
       </div>
       <div class="card">
@@ -309,7 +309,7 @@
         </div>
       </div>
     </div>
-    <p>Under Layer 4, the <b>Audio Layer</b> plays sound : two slots of sound files, live inputs or NDI® sources, each with its own volume, pan and mute and a mix between them, through Sonify's output, Sonify on or off. <b>World</b> <kbd>W</kbd> sets the mood of the whole instrument (its atmosphere, its film character, how the layers couple to the sound), says what it will change before you apply it, and fades in and out with its World amount. <b>Body</b> <kbd>B</kbd> reads the room: turn a webcam on (opt-in) and MediaPipe reads your hands, pose, face and silhouette into the instrument. Route any tracked feature, any movement quality or the motion field into a modulator, or author gesture rules that fire actions and OSC: cover a screen zone with your shadow, or trigger on presence when someone walks into frame. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
+    <p>Under Layer 4, the <b>Audio Layer</b> plays sound : two slots of sound files, live inputs or NDI® sources, each with its own volume, pan and mute and a mix between them, through Sonify's output, Sonify on or off. <b>World</b> <kbd>W</kbd> sets the mood of the whole instrument (its atmosphere, its film character, how the layers couple to the sound), says what it will change before you apply it, and fades in and out with its World amount. <b>Body</b> <kbd>B</kbd> reads the room: turn a webcam on (opt-in) and MediaPipe reads your hands (down to each finger), pose, face and silhouette into the instrument. Route any tracked feature, any movement quality or the motion field into a modulator, or author gesture rules that fire actions and OSC: hold up a fist or a peace sign, cover a screen zone with your shadow, or trigger on presence when someone walks into frame. A rule can fire some 250 actions, from a layer's mute to the next master chain, a Generate theme or the key, and with <b>Pinch = click</b> each hand's pinch paints on the picture like the mouse. <b>Assemble</b> <kbd>E</kbd> is a concatenative video editor: point it at a folder of films and it edits a matching sequence live, as a layer source. And <b>Collage</b> is a source: a wall of films cut up like torn paper, every piece its own film, that you can modulate, run through effects and hear in Sonify.</p>
   </section>
 
   <section>
@@ -342,8 +342,16 @@
         <p class="a">Pick <b>Collage</b> as a layer source and open a folder in the Inspector: every piece plays its own film. Bind a modulator to <code>cuts</code> and the wall grows and shrinks a piece at a time; turn on <b>FX before shapes</b> to run the source's effects on the films while the seams and torn paper stay crisp; and turn on Sonify's <b>Collage</b> voice to hear them, tuned to your key.</p>
       </div>
       <div class="row">
+        <p class="q">Paint on the picture with the mouse?</p>
+        <p class="a">Put <b>Marbling</b> on a layer and click the preview: a click drops paint right where you clicked, holding pours, dragging leaves a trail of drops, and the Inspector's <b>click tool</b> switches to a comb or a swirl. It lands where you click on the big preview too, through the keystone and on the dome. Each gesture is one undo and is kept with the session. On the Body page, <b>Pinch = click</b> lets each hand's pinch do the same, two hands at once.</p>
+      </div>
+      <div class="row">
         <p class="q">Move an effect from a layer to the master?</p>
         <p class="a">Drag its chip onto the other rack (hold <kbd>Ctrl</kbd> to copy instead), or right-click it for <b>Copy to Master FX</b> / <b>Copy to Layer N FX</b>. Its modulation follows a move. A rack that can't host an effect says why.</p>
+      </div>
+      <div class="row">
+        <p class="q">Keep a master chain I like?</p>
+        <p class="a">Right-click the Master FX strip, choose <b>Save chain as preset…</b> and give it a name. The chain as it plays is kept on this computer: every effect with its settings, which ones are on and how wet, and the Vibe and Context. It comes first in the <b>chain presets…</b> menu under <b>my chains</b>, in <kbd>Ctrl</kbd>+<kbd>K</kbd> and in the next / previous chain actions; the same right-click renames or deletes it.</p>
       </div>
       <div class="row">
         <p class="q">Write my own shader?</p>
@@ -352,6 +360,10 @@
       <div class="row">
         <p class="q">Change scenes or sessions during a show without a jump?</p>
         <p class="a">Set the <b>Morph</b> time in the transport. Scene recalls, Randomize, the sequencer, loading a session, <b>New</b> and <b>Generate</b> all move into the next composition over that time, live: the same sources ease their every value, anything else crossfades layer by layer, and a new layer only fades in once it is ready. At Morph 0 a session holds the picture still while it compiles, then dissolves.</p>
+      </div>
+      <div class="row">
+        <p class="q">Build a set from sessions I already have?</p>
+        <p class="a"><b>Open ▾ → Add a session as scenes…</b> (or right-click <b>Load</b> for the session picked in the list) brings another session into the one you are playing, as a scene named after it. If it has scenes of its own, Palinopsia asks whether to add them too, as <b>Name_Scene1</b>, <b>Name_Scene2</b> and on. Your session keeps its own sound, pins, dome and settings; one undo takes it all back, and Save keeps it.</p>
       </div>
       <div class="row">
         <p class="q">Find an effect, a preset or a control fast?</p>
@@ -363,7 +375,7 @@
       </div>
       <div class="row">
         <p class="q">Use a MIDI controller?</p>
-        <p class="a">Press <kbd>L</kbd> to arm MIDI Learn from anywhere, click a control (it pulses), then move a knob or hit a pad. It stays armed, so you can map the next control right away.</p>
+        <p class="a">Press <kbd>L</kbd> to arm MIDI Learn from anywhere, click a control (it pulses), then move a knob or hit a pad. It stays armed, so you can map the next control right away. For an action with no control on screen (a layer's mute, the next master chain, a Generate theme, a step sequencer's fill), pick it in the MIDI section's <b>learn</b> list, then hit the pad.</p>
       </div>
       <div class="row">
         <p class="q">Sync it with Ableton Live?</p>
@@ -371,7 +383,7 @@
       </div>
       <div class="row">
         <p class="q">Play it with my body?</p>
-        <p class="a">Press <kbd>B</kbd> for Body. Turn a webcam on (opt-in, off by default) and MediaPipe reads your hands, pose, face and silhouette: route any tracked feature into a modulator, or author gesture rules that fire actions and OSC. Cover a screen zone with your shadow to trigger it, or fire on presence (someone walking into or out of frame) for an installation.</p>
+        <p class="a">Press <kbd>B</kbd> for Body. Turn a webcam on (opt-in, off by default) and MediaPipe reads your hands, pose, face and silhouette: route any tracked feature into a modulator (each finger's curl and pinch, the hand's roll, how near it is), or author gesture rules that fire actions and OSC. Ten hand shapes fire rules, each hand on its own (fist, open, point, peace, thumb up, thumb down, ok, horns, call, gun); cover a screen zone with your shadow to trigger it, or fire on presence (someone walking into or out of frame) for an installation. A rule picks what it fires from some 250 actions in a searchable list. To keep the camera and the rules on another screen, right-click the Body button for <b>Body in a window</b>.</p>
       </div>
       <div class="row">
         <p class="q">Drive it from another app?</p>
@@ -412,7 +424,7 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (47 sources, 56 effects, 27 native nodes, 121 Generate recipes, the modulation matrix, the sequencers, the 11 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.0.md">1.3.0 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (47 sources, 56 effects, 27 native nodes, 121 Generate recipes, the modulation matrix, the sequencers, the 11 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.1.md">1.3.1 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <hr class="soft">

@@ -68,7 +68,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · Generate (121 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (121 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
@@ -2364,7 +2364,8 @@ motion broken into a pattern; Trail Crawl : bands of colour behind the motion; S
 Zoom : a hardware zoom's uneven blocks), Cinematic/Atmospheric (Oil Sky : a cloudscape in
 thick oil, from Cloud Study), Retro Screen, Minimal/Structural, Datamosh &
 Compression (Codec Rot : a real video codec starved of keyframes, through Codec Mosh),
-**Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures),
+**Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures, and
+paint on water from Marbling : Marbled Paper and Night Bath),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
 overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
 out and piled at different heights in **Paste-Up** : it plays
@@ -2653,16 +2654,18 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
   whole master chain with one of **129** designed chains and sets the Vibe to match (the
-  finalizers stay). The newer ones sit in six groups : **Time & memory** (Réponse,
+  finalizers stay). The newer ones sit in seven groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Frame Store** (Field Store : Hard Memory, Sixteen Levels, Strobe Ghost; then
   Shatter, Crawl and Store Zoom, alone or in pairs), **Node recipes** (a node that reads another
   layer is wired, when the preset is applied, to a layer in use), **Dome** (dome-safe :
   Context's vignette off, nothing framing the edges) and **Space** (the whole picture
   laid on a plane by Perspective : a floor, a corridor wall, a ribbon, a horizon, a
-  curved screen, a thresholded data wall, a halftone or scan-relief floor; and Starlight, light trails that flatter points) and
-  **Sound** (made for a waveform : Phosphor, Tape Floor, Relief); they keep the scene's
-  palette mix. The `chain on/off` pill beside
+  curved screen, a thresholded data wall, a halftone or scan-relief floor; and Starlight, light trails that flatter points),
+  **Sound** (made for a waveform : Phosphor, Tape Floor, Relief) and **Marbled paper**
+  (made for Marbling's flat paint, its colors kept : Endpaper, a fine paper grain; Inked
+  Edges, the outlines inked; Rippled Bath, the water still rippling; Riso Print, a coarse
+  dithered print); they keep the scene's palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
 - **Your own chains (my chains)** : right-click the Master FX strip (its empty space, or
   any effect's chip : its menu ends with the same entry) and choose **Save chain as
@@ -2678,7 +2681,8 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   chain ▸** (it asks first) look after them.
 - **The source pickers have sections** : **Live** (imports, cameras, captures, network
   streams, and 👤 **Silhouette**, the body cut out of the room), **Organic** (living
-  matter : reaction, growth, water, fire, ground), **Painted** (Oil Cloud, Cloud Study),
+  matter : reaction, growth, water, fire, ground), **Painted** (Oil Cloud, Cloud Study,
+  Marbling),
   **Analog** (the analog video-synth lineage : RGB Oscillators, Sync Osc, Slit Scan, Ramps,
   Column Scan, Differential, Interference), **Geometry** (lines, grids, dots and shapes :
   Contour, Direct Marks, Grid Drift, Lattice, Lowercase, Op-Art, Recurse, Shapes, Slabs,
@@ -3395,7 +3399,9 @@ the UI (`src/renderer/src/mcp/tools.ts`, listed in `src/shared/mcpTools.ts`).
 
 ```
 src/
-  main/       Electron main : OSC in/out, OSCQuery, output window, HIVE in/out,
+  main/       Electron main : OSC in/out, OSCQuery, output window and the page
+              windows (Output, Body, Sequencer, Sonify), HIVE in/out, the bundled
+              models over opsia-asset:// (assets.ts : MediaPipe, the depth engine),
               video ingest (ffmpeg → all-intra cache), Assemble corpus analysis
               + edit export, the NDI runtime (find / install), Installation mode
               (start with the computer, self-healing, the log file), the clips'
@@ -3406,14 +3412,23 @@ src/
   preload/    contextBridge API surface (window.api), plus the Spout / Syphon / NDI
               senders, the NDI receiver and the DXV3 file writer (in the window's
               own process : a 4K frame costs 30–90 ms to move to another one)
-  renderer/   React UI + the WebGL2 engine
-    engine/   Compositor (per-layer ISF → blend → stack), modulation engine,
-              audio bus, coupling, Feel macros + Proximity, macro-form sequencer,
+  renderer/   React UI + the WebGL2 engine; the action vocabulary Body rules and
+              MIDI learn share (actions.ts, listed by triggerCatalog.ts), the
+              preview's clicks routed to a source (pointerInput.ts), your own
+              master chains (userChains.ts), a session added as scenes
+              (sessionScenes.ts); the page windows in components/PageWindow.tsx
+    engine/   Compositor (per-layer ISF → blend → stack), modulation engine
+              (the steps sequencer's model in stepSeq.ts), audio bus, coupling,
+              Feel macros + Proximity, macro-form sequencer,
               Video/Capture/Hive/Text/Parametric/Assemble/Collage sources, the
               native generators (nativeGenerators.ts : Lattice, Reaction, Fluid,
-              Slime Mold, Mycelium, Veins, Grown, each its own GL engine, handed
+              Slime Mold, Mycelium, Veins, Grown, Marbling (MarbleSource.ts, its
+              water in marbleModel.ts), each its own GL engine, handed
               the audio texture and its sidechain layer through an optional
-              feed()), native nodes (convNodes; Codec Mosh in codecMosh.ts, Field
+              feed(), and a pointer() for the ones the preview's clicks play,
+              mapped by pointerMap.ts), the body tracker and the hand shapes
+              (handShape.ts), depth AI (depthEstimate.ts), native nodes
+              (convNodes; Codec Mosh in codecMosh.ts, Field
               Store in fieldStore.ts), the tempo for ISF shaders (tempoSignal.ts), the
               A/B harmony (abHarmony.ts), modulation shaping (modShape.ts), the
               World amount (worldAmount.ts), the clip player and the clip-sound
@@ -3423,9 +3438,13 @@ src/
               every output (frameCapture.ts) and the small readback rings that
               turn the picture back into control data : vision, Sonify taps,
               depth, light zones, the mark scanline (gridReadback.ts)
+    workers/  off the render thread : Marbling's water (marbleWorker.ts), the depth
+              model (depthWorker.ts), DXV3 frames (dxvWorker.ts), the projector
+              relay (streamRelay.ts)
     shaders/  ISF .fs files + registry (curated ranges) + presets, shared GLSL pasted
               at an include line (lib/ : dome.glsl at `// @dome`, the Finalizer's
-              grain finalGrain.glsl at `// @grain`), your own
+              grain finalGrain.glsl at `// @grain`, the organic point outlines of
+              Lattice, Ash and Particle Drift blob.glsl at `// @blob`), your own
               shaders (userShaders.ts) and the compile + lint check the Source
               Editor and the Agent share (shaderCheck.ts)
     audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice,
