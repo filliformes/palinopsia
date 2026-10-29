@@ -94,6 +94,10 @@ Harris, M. J. (2004). Fast fluid dynamics simulation on the GPU. In R. Fernando 
 
 ↳ The GPU layout of the Fluid generator's solver (advection, Jacobi pressure, projection as fragment passes).
 
+Lu, S., Jaffer, A., Jin, X., Zhao, H., & Mao, X. (2012). Mathematical marbling. *IEEE Computer Graphics and Applications, 32*(6), 26–35. https://doi.org/10.1109/MCG.2011.51
+
+↳ The Marbling generator (`engine/marbleModel.ts`): the closed-form drop, tine line and vortex, each a map of the whole water that keeps every drop's area (the tine's falloff a `sech` instead of the paper's exponential).
+
 Stam, J. (1999). Stable fluids. In *Proceedings of the 26th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '99)* (pp. 121–128). ACM Press/Addison-Wesley. https://doi.org/10.1145/311535.311548
 
 ↳ The Fluid generator (`engine/FluidSource.ts`): ink, smoke and fire solved live with semi-Lagrangian advection and a pressure projection.
@@ -292,7 +296,7 @@ Lucas, B. D., & Kanade, T. (1981). An iterative image registration technique wit
 
 Lugaresi, C., Tang, J., Nash, H., McClanahan, C., Uboweja, E., Hays, M., Zhang, F., Chang, C.-L., Yong, M. G., Lee, J., Chang, W.-T., Hua, W., Georg, M., & Grundmann, M. (2019). *MediaPipe: A framework for building perception pipelines* (arXiv:1906.08172). arXiv. https://doi.org/10.48550/arXiv.1906.08172
 
-↳ The body tracker (`engine/bodyTracker.ts`): hands, pose, face blendshapes and the silhouette mask.
+↳ The body tracker (`engine/bodyTracker.ts`): hands, pose, face blendshapes and the silhouette mask; the hand shapes (`engine/handShape.ts`) are read from its 21 hand points.
 
 Niklaus, S., Mai, L., & Liu, F. (2017). Video frame interpolation via adaptive separable convolution. In *2017 IEEE International Conference on Computer Vision (ICCV)* (pp. 261–270). IEEE. https://doi.org/10.1109/ICCV.2017.37
 

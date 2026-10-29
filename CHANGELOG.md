@@ -5,6 +5,20 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Docs
+
+- **The documentation catches up with v1.3.1** : the README's Architecture names the
+  new pieces (the page windows, the action vocabulary, the preview's clicks, Marbling
+  and its worker, the steps model, the hand shapes, depth AI's worker, my chains, a
+  session as scenes, the `// @blob` outlines), the master chains sit in seven groups
+  with Marbled paper, Painted lists Marbling, Living Surfaces names Marbled Paper and
+  Night Bath; the site links the 1.3.1 notes, builds from source with
+  `npm run fetch:depth`, and its Body, Sequencer, Sonify and MIDI text and three new
+  questions (painting on the picture, keeping a chain, a set from your sessions) cover
+  the release; the cheat-sheet adds right-click Load, a steps card's gestures and Pinch =
+  click, and says every page window plays the instrument; the bibliography adds the
+  marbling paper Marbling is built on.
+
 ## v1.3.1 — 2026-10-29
 
 ### Fixed
