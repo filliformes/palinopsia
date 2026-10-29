@@ -15,6 +15,7 @@ import { canHostFx, refusalPopup } from '../fxScopes'
 import { showToast } from './Toast'
 import { ContextMenu } from './ContextMenu'
 import { useFxMenuItems } from './fxMenu'
+import { useSaveChainItem } from './MyChains'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { isFileDrag } from './fileDrop'
 import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
@@ -227,7 +228,10 @@ function FxUnit({
   onOver?: () => void
 }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const menuItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null), !!f.locked)
+  const unitItems = useFxMenuItems(scope, f.id, f.shaderId, () => setMenu(null), !!f.locked)
+  // on the Master FX strip the menu ends with the chain's own Save (MyChains.tsx)
+  const saveChain = useSaveChainItem()
+  const menuItems = scope.kind === 'master' ? [...unitItems, { label: '', divider: true }, saveChain] : unitItems
   const onContextMenu = (e: MouseEvent): void => {
     e.preventDefault()
     e.stopPropagation()

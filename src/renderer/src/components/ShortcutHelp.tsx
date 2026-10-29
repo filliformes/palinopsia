@@ -102,7 +102,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],
       ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
       ['Right-click Output', 'Watch the Output in a window · the Output page in a window'],
-      ['Right-click Body, Seq or Sonify', 'The page in a window of its own']
+      ['Right-click Body, Seq or Sonify', 'The page in a window of its own'],
+      ['Right-click the Master FX', 'Save the chain as one of yours (my chains) · rename or delete them']
     ]
   },
   {

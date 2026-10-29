@@ -37,7 +37,7 @@ import {
   sourceSection
 } from './shaders/isf'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
-import { MASTER_PRESETS } from './shaders/isf/masterPresets'
+import { allChains } from './userChains'
 import { keywordsFor } from './shaders/isf/keywords'
 import { blurbFor } from './shaders/isf/shaderBlurbs'
 import { generatorBlurb } from './shaders/isf/sourceBlurbs'
@@ -554,9 +554,10 @@ function presetItems(s: St, units: UnitInfo[]): SearchItem[] {
   return out
 }
 
+// (yours first : "my chains")
 function chainItems(): SearchItem[] {
-  return MASTER_PRESETS.map((p) => ({
-    key: `chain:${p.name}`,
+  return allChains().map(({ key, preset: p }) => ({
+    key: `chain:${key}`,
     kind: 'chain' as const,
     label: p.name,
     group: p.group ?? 'chains',
