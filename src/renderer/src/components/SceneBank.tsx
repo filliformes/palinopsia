@@ -137,7 +137,7 @@ export function SceneBank(): JSX.Element {
               onClick={() => recallScene(scene.id)}
               onDoubleClick={() => setRenamingId(scene.id)}
               className="max-w-[140px] truncate text-[11px]"
-              title={`Recall "${scene.name}" : double-click to rename`}
+              title={`Recall "${scene.name}"${scene.from ? ` (from ${scene.from})` : ''} : double-click to rename`}
             >
               {scene.name}
             </button>

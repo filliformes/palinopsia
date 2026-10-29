@@ -13,6 +13,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerLoadSession } from '../commands'
 import { leaveSession, markClean, markDirty } from '../sessionGuard'
 import { recentSessions } from '../recentSessions'
+import { addSessionAsScenes } from '../sessionScenes'
 
 type SessionEntry = { name: string; path: string; mtime: number; group?: string }
 
@@ -107,6 +108,13 @@ export function SessionLoader(): JSX.Element {
   const menuItems: MenuItem[] = menu
     ? [
         { label: 'Link a folder of sessions…', onClick: () => void addFolder() },
+        ...(sel
+          ? [{
+              label: `Add “${selName ?? 'session'}” as scenes`,
+              title: 'What it opens on becomes a scene of the session on screen (its own scenes too, if you want them). This session stays open.',
+              onClick: () => void addSessionAsScenes(sel)
+            }]
+          : []),
         ...(sel && menu.versions > 0
           ? [{ label: `Earlier versions of “${selName ?? 'session'}” (${menu.versions})…`, onClick: () => void earlierVersion() }]
           : []),
@@ -178,7 +186,7 @@ export function SessionLoader(): JSX.Element {
           onClick={() => void load(true)}
           onContextMenu={(e) => void openMenu(e)}
           disabled={busy}
-          title="Load the selected session · right-click to link a folder of sessions (all of them join the dropdown) · MIDI-learnable"
+          title="Load the selected session · right-click to add it as scenes, link a folder of sessions (all of them join the dropdown) or bring back an earlier version · MIDI-learnable"
         >
           Load
         </button>
@@ -189,7 +197,7 @@ export function SessionLoader(): JSX.Element {
           y={menu.y}
           items={menuItems}
           onClose={() => setMenu(null)}
-          header={<span className="font-mono text-[10px] text-muted">Session folders</span>}
+          header={<span className="font-mono text-[10px] text-muted">Sessions</span>}
         />
       )}
     </div>

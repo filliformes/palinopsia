@@ -992,6 +992,9 @@ export interface SceneEntry {
   // Metasurface : this scene's point on the continuous 0..1 scene-space plane.
   // Absent = not placed yet (auto-placed on first use of the Surface).
   surface?: { x: number; y: number }
+  // Added from another session file (Add a session as scenes) : where it came
+  // from, in words ("the session Alpha", "“Intro” in Alpha"), for its tooltip.
+  from?: string
 }
 
 // The scene-relation schema : the sequencer's data model.

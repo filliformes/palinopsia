@@ -717,8 +717,8 @@ The **top bar** stays on one line in a window narrower than the screen : as it
 narrows it tucks the SESSION / GENERATE labels away, then tightens the session name,
 the menus and the zoom readout, never dropping a button (only the 1024 px minimum
 window still wraps). It carries the session controls, one group (the name, the
-session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Session
-media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
+session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Add a
+session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
 button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
 zoom, the render-depth and theme selectors, and, at the far right, **⚡ Flush**, the panic
@@ -2312,6 +2312,21 @@ the player can't read, missing on this computer, is made again from its original
 **Collect into the session's folder** : every file is copied into a `<session> media`
 folder beside the session file, nothing overwritten, and the session points at the
 copies. Save afterwards and the session plus that folder open on any computer.
+
+**Add a session as scenes.** **Open ▾ → Add a session as scenes…** (or right-click
+**Load** → **Add “…” as scenes**, for the session picked in the list) brings another
+session into the scene bank of the one on screen, which stays open. What that session
+opens on becomes one scene named after its file; when it has scenes of its own, a
+question asks **“…” has N scenes. Add them too?** (**Yes** or Enter, **No** or Esc)
+and Yes adds them after it, in their order, as `Name_Scene1`, `Name_Scene2`… (a name
+already in the bank gets " 2"; hovering a scene says where it came from, with its
+old name). Only pictures come in : that session's Audio Layer, persistent controls,
+Feel, dome, output transform, speed and morph dials and Sonify settings stay those
+of the session on screen (an added scene keeps its own World and sound patch, as any
+scene does). An older session is brought up to date exactly as when it opens, your
+own shaders it plays come in as they do at a load (a different copy of one of yours
+as “name (session)”), and its films join the session media check above. One undo
+takes the whole lot back; Save keeps it.
 
 The file pickers (Open, Link a folder of sessions, a Collage or Assemble folder) open
 where they were last used, remembered across launches.

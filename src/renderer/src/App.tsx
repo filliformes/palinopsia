@@ -98,7 +98,8 @@ import { liveLight } from './lightPath'
 import { useFlash } from './components/useFlash'
 import { Transport } from './components/Transport'
 import { SessionLoader, GenerateMenu } from './components/TopBarMenus'
-import { ConfirmModal, SaveChangesModal } from './components/PromptModal'
+import { AskModal, ConfirmModal, SaveChangesModal } from './components/PromptModal'
+import { addSessionAsScenes, registerScenesAsker } from './sessionScenes'
 import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
 import { recentSessions } from './recentSessions'
 import { baseName, droppedPaths, isFileDrag, openDroppedSession, setSessionDropOpener } from './components/fileDrop'
@@ -412,6 +413,17 @@ export default function App(): JSX.Element {
       registerSessionAsker(null)
       clearTimeout(t)
     }
+  }, [])
+  // "Add its scenes too?" (Add a session as scenes) : Yes / No.
+  const [scenesAsk, setScenesAsk] = useState<{ title: string; detail: string; done: (yes: boolean) => void } | null>(null)
+  useEffect(() => {
+    registerScenesAsker(
+      (title, detail) =>
+        new Promise<boolean>((resolve) => {
+          setScenesAsk({ title, detail, done: (yes) => { setScenesAsk(null); resolve(yes) } })
+        })
+    )
+    return () => registerScenesAsker(null)
   }, [])
   useEffect(() => {
     let cancelled = false
@@ -2534,6 +2546,9 @@ export default function App(): JSX.Element {
         />
       )}
       {leaveAsk && <SaveChangesModal title={leaveAsk.title} detail={leaveAsk.detail} onChoose={leaveAsk.done} />}
+      {scenesAsk && (
+        <AskModal title={scenesAsk.title} detail={scenesAsk.detail} onYes={() => scenesAsk.done(true)} onNo={() => scenesAsk.done(false)} />
+      )}
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       <SearchEverything />
       <Toaster />
@@ -2862,6 +2877,12 @@ function PreviewSizer({
 /** Open ▾ : the sessions opened or saved lately (× takes one off the list). */
 function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  // another session's pictures as scenes of this one (the session stays)
+  const addAsScenes = {
+    label: 'Add a session as scenes…',
+    title: 'Pick a session file : what it opens on becomes a scene here (its own scenes too, if you want them). This session stays open.',
+    onClick: () => { setMenu(null); void addSessionAsScenes() }
+  }
   const list = menu ? recentSessions.list() : []
   // the same name twice : the folder tells them apart
   const label = (p: string, name: string): string =>
@@ -2895,9 +2916,10 @@ function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Eleme
                   })),
                   { label: '', divider: true },
                   { label: 'Clear the list', onClick: () => { recentSessions.clear(); setMenu(null) } },
+                  addAsScenes,
                   { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }
                 ]
-              : [{ label: 'No recent sessions yet', disabled: true }, { label: '', divider: true }, { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }]
+              : [{ label: 'No recent sessions yet', disabled: true }, { label: '', divider: true }, addAsScenes, { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }]
           }
           onClose={() => setMenu(null)}
         />
