@@ -31,6 +31,9 @@ that CI builds into cross-platform releases.
   sit at the top (`/` focuses it, Esc clears it). 8,421 px tall at 1280 px wide instead of
   15,921, Sonify's rows about half as tall; every address, argument and description is
   word for word the same.
+  Then (Vincent) its title and description say **Palinopsia**, with a sentence on **Opsia**
+  being the short name (and why every address starts with `/opsia`), and its 26 em dashes
+  became colons, commas or parentheses; the site and the README have none.
 
 ## v1.3.1 — 2026-10-29
 
