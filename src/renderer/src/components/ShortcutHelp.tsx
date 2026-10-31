@@ -96,7 +96,10 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
   {
     title: 'Mouse',
     rows: [
-      ['Double-click', 'A slider, fader or knob : back to its default'],
+      ['Double-click', 'A bar, slider, fader or knob : back to its default'],
+      ['Drag a bar', 'The Inspector and Finishing bars : anywhere along it (⇧ : a tenth of the speed) · a modulated bar moves its stored value by as much as you drag'],
+      ['Click a bar’s number', 'Type it · Enter keeps · Esc cancels'],
+      ['← → on a bar', 'Step it (⇧ : finer) · Enter : type its number'],
       ['Right-click a control', 'Persistent · Set in every scene (a whole layer, effect chip, source card or modulator card : right-click it)'],
       ['Right-click an M', 'Clear all the modulation on that control'],
       ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],

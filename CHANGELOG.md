@@ -7,6 +7,23 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The UI tab : the slider pointer and the UI theme** (Vincent, on the bars mockup :
+  "make Line the default one; and add a new 'UI' tab at the end of the inspector. There,
+  put the 'Slider Pointer' menu to choose them from, and also take the UI Theme dropdown
+  from the top toolbar and put it there"). The right column's eighth tab, **ui**
+  (`components/UiPanel.tsx`, `rightView: 'ui'`), last. **Slider pointer** : line
+  (default), notch, cap, lit edge, ruler, with a live bar beside the menu to try it on;
+  per machine (`components/sliderPointer.ts`, localStorage `opsia.sliderPointer`), set
+  as the root's `data-pointer` and drawn in CSS (`styles.css` "Bars"), so a switch
+  repaints every bar without re-rendering one; page windows copy the attribute
+  (`PageWindow.tsx`). On the light themes (cream, paper, light, pastel) the pointers
+  take the text color (`--bar-ptr`). **UI theme** : the top bar's theme menu, moved
+  (same sixteen themes, same `setTheme`, same `opsia.theme`). `Ctrl+K` : the **UI** tab,
+  **Slider pointer** and **UI theme** (`searchIndex.ts`, each flashes its setting). The
+  tabs' padding went from `px-2` to `px-1.5`, so the column (exactly as wide as its tabs)
+  stays 408 px with eight tabs (409 with seven). The top bar holds one line at 1024 px
+  (measured : one row of controls, 44 px, no horizontal scroll).
+
 - **MACRO : the Macro knobs row shows or hides, hidden by default** (Vincent : "I don't
   use it so often and I think neither will the average user for now; so I think it would
   save some UI space to be able to not see it all the time"). A **MACRO** button at the
@@ -82,6 +99,54 @@ that CI builds into cross-platform releases.
   rows identical. A color cell keeps a float cell's height (38 px).
 
 ### Changed
+
+- **Bars replace the classic sliders in the Inspector and the Finishing stages**
+  (Vincent, approving the mockup : "Yes that feels great"). Every source, node and effect
+  parameter (`AutoControls.tsx`, `GroupedControls.tsx`, the Finishing sections and their
+  header switches, the Vibe's opacity, the Inspector header's FX opacity) is one bar
+  (`components/Bar.tsx`), 22 px (`--bar-h`), the name inside on the left (mono 10 px,
+  uppercase), the value inside on the right (11 px, tabular, room for its widest form so
+  a moving value never jostles the name), the **M** chip in the bar's right end. Floats
+  fill from min (or from 0 when the range crosses it) in the accent at 42 %; **modulated**
+  the fill turns accent2 and plays the live value, painted by the shared rAF
+  (`liveOverlay.ts`) into CSS variables and the value's text node, while the pointer
+  stays on the stored value. Drag semantics kept from the native sliders : a plain drag is
+  absolute (a click jumps), a modulated drag moves the stored value by the drag's delta,
+  Shift drags at a tenth of the speed from where it is pressed (pressing or releasing it
+  mid-drag re-anchors : no jump); pointer x through `getBoundingClientRect`, so it holds
+  at any UI zoom. Click the number to type (Enter keeps, Esc cancels, blur keeps,
+  clamped), double-click resets; the focus target is a hidden `<input type="range">`, so
+  `Tab`, arrow keys (a 200th, Shift a 2000th), Page Up / Down, Home / End work and the
+  app's bare-key shortcuts stay quiet while a bar has the focus, as with the sliders.
+  Menus of up to three choices are segments when they fit a 12rem bar, else a menu bar
+  over a real `<select>` (type to jump); on / off is a switch bar; a color is a bar
+  painted in it (ink by luminance) over the native picker, with a small alpha bar
+  (neutral fill) unless the stage reads RGB only, and one M for its parts (`M2·3`,
+  `ColorModChip`); an event is a button bar and keeps its M (its hints say "bind M").
+  Kept : pins (`PinZone`), Ctrl+K's flash (`data-ctl`), the Modulate panel from the M,
+  right-click clears (`ModChip` / `ColorModChip`; `ModButton` / `ColorModButton` stay for
+  the pages still on sliders), DIMS grey-outs (the reason first in the bar's tooltip),
+  input hints as tooltips, XY pads at the right, every theme (tokens only; white
+  pointers). Layout : the flows are a grid of 12rem columns; grouped columns are 12rem
+  (four fit at 100 %), and when the band holds more columns than a panel has groups its
+  tallest groups spread over a second column, read top to bottom, if that lowers the
+  tallest (`spreadColumns`); Finishing sections hold two bars a row in their column;
+  Marbling regrouped into water · drops · hand · paint (tallest 10 → 8). Measured in the
+  test copy (RTX 4070, 1388×865, 100 %), all 129 panels : controls height 15853 → 10964
+  px (−31 %), no clipped number, nothing overflowing, 2 names ellipsized (tooltip whole);
+  Interference 102 → 63, Luma Blur 109 → 63, Marbling 232 → 220, Feedback 324 → 220,
+  Datamosh 361 → 220, Reaction 216 → 124; the Finishing stages unfolded : Vibe 562 →
+  490, Context 701 → 580, Finalizer 1085 → 757. Ten three-group panels stay 4 to 20 px
+  taller (two equally long groups cannot spread at four columns : Cloud Study 176 → 196,
+  Oil Cloud 162 → 172, Lattice 211 → 220…). Real CDP input : drag 25 → 75 % lands at
+  exactly 75 % at UI zoom 100 % and 125 %; Shift-drag 100 px = a tenth (2.5026 for
+  2.50255); a modulated bar (M1 sine 0.5 Hz) took 20 live fills in 2 s with its pointer
+  still, **0 bar renders** in those 2 s, 60 fps, and its drag moved the stored value by the
+  delta (1.4 → 1.916, 1.9158 expected); right-click on its M cleared it; 0 console errors.
+  Still on the classic sliders (not in this change) : the layer strips, the Mixer, the
+  Transport, the modulator cards and the Macro knobs, Sonify and its Space, the Sequencer,
+  the Background strip, the Feel tab, the Output page, the World page, Body, Assemble,
+  the Audio Layer, the Modulate panel's depth.
 
 - **Meta Controller → Macro Controller, everywhere it shows** (Vincent : "Change Meta
   Controller name to Macro Controller (in the app and everywhere)"). Every label, title,

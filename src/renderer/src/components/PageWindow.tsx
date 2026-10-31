@@ -102,7 +102,7 @@ function copyStyles(to: Document): void {
 }
 
 function copyRootAttributes(to: Document): void {
-  for (const a of ['data-theme', 'class', 'lang']) {
+  for (const a of ['data-theme', 'data-pointer', 'class', 'lang']) {
     const v = document.documentElement.getAttribute(a)
     if (v == null) to.documentElement.removeAttribute(a)
     else to.documentElement.setAttribute(a, v)

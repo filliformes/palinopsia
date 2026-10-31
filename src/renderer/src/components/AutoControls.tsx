@@ -1,17 +1,21 @@
 // AutoControls : themed controls generated from ISF INPUTS (brief §10.3).
-// The dataFLOU Pool→auto-UI pattern applied to ISF: float→slider+number,
-// bool→toggle, long→dropdown, color→swatch+alpha, point2D→XY pad, honouring
-// each input's declared range and default. This is the simplexité payoff:
-// the shader header IS the control surface.
+// The dataFLOU Pool→auto-UI pattern applied to ISF, honouring each input's
+// declared range and default : since v1.3.2 every input is a BAR (Bar.tsx) :
+// float → a filled bar, bool → a switch bar, long → segments (up to three
+// choices) or a menu bar, color → a bar painted in it (+ its alpha), event → a
+// button bar; point2D stays an XY pad. This is the simplexité payoff : the
+// shader header IS the control surface.
 
 import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode
 } from 'react'
 import type { ColorChannel, CompositionState, ModAssignment, ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
@@ -26,6 +30,7 @@ import { PinZone } from './Pin'
 import { partOf, withPartTarget } from '../modKey'
 import { COLOR_PARTS, PART_WHERE, PART_WORD } from '../engine/colorParts'
 import { liveColorValues } from '../engine/modulation'
+import { AlphaCell, BarChip, BoolBar, ColorBar, DropBar, EventBar, FloatBar, SegBar, inkFor } from './Bar'
 
 /** The modulation matrix is full : say so (a click that does nothing reads as
  *  broken), and how to make room. */
@@ -113,216 +118,114 @@ export function AutoControls({
   layout = 'wrap',
   dim,
   bare = false,
-  rgbOnly = false
+  rgbOnly = false,
+  cols
 }: {
   inputs: IsfInputDesc[]
   values: Record<string, Value>
   onChange: (name: string, value: Value) => void
   // Inputs to show greyed out (they do nothing right now),
-  // name → the reason (the row's tooltip).
+  // name → the reason (first in the bar's tooltip).
   dim?: Record<string, string>
-  // When provided, float controls grow an "M" button that binds a modulator
-  // to this input (the capped mod-matrix, brief §6).
+  // When provided, every bar grows its M chip, which binds a modulator to this
+  // input (the capped mod-matrix, brief §6).
   modTargetFor?: (inputName: string) => ModTarget
-  // 'wrap' (default): flex-wrap, height follows param count.
-  // 'twoRow': a WIDTH-wrapping grid of fixed 11rem columns : few params sit on one
-  //   row, many wrap DOWN into as many rows as the band's width needs (no
-  //   horizontal scroll; the band scrolls vertically / is drag-resized to show
-  //   the extra rows). Named twoRow for history; it's really auto-rows now.
-  // 'vertical': one full-width control per row, stacked : for narrow tall panels
-  //   (the Finishing Touches finalizers).
+  // 'wrap' (default) and 'twoRow' (the FX band; the name is history) : the bars
+  // in a grid of equal columns, as many as the width holds, row by row (no
+  // horizontal scroll), the XY pads standing at the right.
+  // 'vertical' : a titled column (GroupedControls) or a Finishing section : the
+  // bars in as many columns as ITS width holds (one in a column, two in the
+  // Finishing column), in the order given.
   layout?: 'wrap' | 'twoRow' | 'vertical'
   // Vertical : no padding of its own (it sits in a column that has it).
   bare?: boolean
-  // The shader reads its colors' RGB only (the Finishing stages) : a color row
-  // is its swatch and its hex value, no transparency slider doing nothing.
+  // Vertical : exactly this many columns, filled top to bottom then left to
+  // right (a group spread over two columns of a grouped panel still reads down).
+  cols?: number
+  // The shader reads its colors' RGB only (the Finishing stages) : a color bar
+  // is its color and its hex value, no alpha doing nothing.
   rgbOnly?: boolean
 }): JSX.Element {
   if (inputs.length === 0) {
     return <div className="p-2 text-[11px] text-muted">This shader exposes no controls.</div>
   }
-  // posX + posY collapse into one "POS" cell with the two sliders side by side.
-  // Not in the one-line rows (a column) : there they stay two rows of their own,
-  // aligned with the rest and each with its M.
-  const hasPosPair =
-    layout !== 'vertical' && inputs.some((i) => i.name === 'posX') && inputs.some((i) => i.name === 'posY')
-  // Context's `lightOrder` bool renders as a small PRE/POST toggle beside the
-  // "light" label instead of its own control row.
+  // Context's `lightOrder` bool renders as a small PRE/POST toggle inside the
+  // light's glow bar instead of a bar of its own.
   const hasLightOrder =
     inputs.some((i) => i.name === 'lightOrder') && inputs.some((i) => i.name === 'lightGlow')
-  const visible = (arr: IsfInputDesc[]): IsfInputDesc[] =>
-    arr.filter((i) => !(hasPosPair && i.name === 'posY') && !(hasLightOrder && i.name === 'lightOrder'))
-  const renderControl = (inp: IsfInputDesc, dense = false): JSX.Element =>
-    hasPosPair && inp.name === 'posX' ? (
-      <PosPairControl key="pos" inputs={inputs} values={values} onChange={onChange} modTargetFor={modTargetFor} />
-    ) : (
-      <Control
-        key={inp.name}
-        inp={inp}
-        value={values[inp.name]}
-        onChange={onChange}
-        modTargetFor={modTargetFor}
-        dense={dense}
-        rgbOnly={rgbOnly}
-        labelExtra={
-          hasLightOrder && inp.name === 'lightGlow' ? (
-            <LightOrderToggle values={values} onChange={onChange} />
-          ) : undefined
-        }
-      />
-    )
-  if (layout === 'vertical') {
-    // Full-width controls stacked, one dense single-line row each (label · slider
-    // · M · number) : `[&>*]:w-full` overrides each control's fixed w-44.
-    return (
-      <div className={`flex flex-col gap-0.5 [&>*]:w-full ${bare ? '' : 'px-2 py-1'}`}>
-        {visible(inputs).map((inp) =>
-          dim?.[inp.name] ? (
-            <div key={inp.name} className="opacity-40 [&>*]:w-full" title={dim[inp.name]}>
-              {renderControl(inp, true)}
-            </div>
-          ) : (
-            renderControl(inp, true)
-          )
-        )}
-      </div>
-    )
-  }
-  if (layout === 'twoRow') {
-    // XY pads (point2D) are tall : flowing them through the two-row grid
-    // leaves a ragged column and dead space. Pull them out and stand them to
-    // the RIGHT of the scalar controls, vertically centred.
-    const pads = inputs.filter((i) => i.type === 'point2D')
-    // COMPACT-flagged inputs (small toggles / tiny enums) stack together into
-    // ONE cluster cell instead of a full cell each : tighter panels, no scroll.
-    const compact = inputs.filter((i) => i.type !== 'point2D' && i.compact)
-    const rest = inputs.filter((i) => i.type !== 'point2D' && !i.compact)
-    const compactCell =
-      compact.length > 0 ? (
-        <CompactCluster key="compact" inputs={compact} values={values} onChange={onChange} modTargetFor={modTargetFor} />
-      ) : null
-    // Fixed-width controls (each its own 11rem) that WRAP by width, LEFT-justified so
-    // the parameters stay compact and read left-to-right. They flow DOWN into rows as
-    // the width narrows (never a sideways overflow). Vertical centering inside the band
-    // (and the scroll when the rows overflow it) is the band wrapper's `m-auto`.
-    return (
-      <div className="flex items-center gap-5 p-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">
-          {visible(rest).map((inp) =>
-            dim?.[inp.name] ? (
-              <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
-                {renderControl(inp)}
-              </div>
-            ) : (
-              renderControl(inp)
-            )
-          )}
-          {compactCell}
-        </div>
-        {pads.length > 0 && (
-          <div className="flex shrink-0 items-center gap-5">
-            {pads.map((inp) => (
-              <Control
-                key={inp.name}
-                inp={inp}
-                value={values[inp.name]}
-                onChange={onChange}
-                modTargetFor={modTargetFor}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-  // 'wrap' : items-start so every control's label sits on the same top line
-  // (colours, sliders and enums have different heights; aligning tops keeps the
-  // label row straight). XY pads are tall : in the flow, one stretched its whole
-  // row and left the rest of it blank (Ramps' center). They stand at the RIGHT,
-  // and the other controls wrap beside them (the twoRow rule).
-  const flowPads = inputs.filter((i) => i.type === 'point2D')
-  const flowRest = visible(inputs).filter((i) => i.type !== 'point2D')
+  const visible = (arr: IsfInputDesc[]): IsfInputDesc[] => arr.filter((i) => !(hasLightOrder && i.name === 'lightOrder'))
+  const renderControl = (inp: IsfInputDesc): JSX.Element => (
+    <Control
+      key={inp.name}
+      inp={inp}
+      value={values[inp.name]}
+      onChange={onChange}
+      modTargetFor={modTargetFor}
+      rgbOnly={rgbOnly}
+      dimReason={dim?.[inp.name]}
+      labelExtra={hasLightOrder && inp.name === 'lightGlow' ? <LightOrderToggle values={values} onChange={onChange} /> : undefined}
+    />
+  )
+  // A greyed bar does nothing right now : faded, the reason in its tooltip.
   const cell = (inp: IsfInputDesc): JSX.Element =>
     dim?.[inp.name] ? (
-      <div key={inp.name} className="opacity-40" title={dim[inp.name]}>
+      <div key={inp.name} className="min-w-0 opacity-40" title={dim[inp.name]}>
         {renderControl(inp)}
       </div>
     ) : (
       renderControl(inp)
     )
-  if (!flowPads.length)
-    return <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5 p-2">{flowRest.map(cell)}</div>
+  if (layout === 'vertical') {
+    const list = visible(inputs)
+    return (
+      <div
+        className={`grid gap-x-1.5 gap-y-[2px] ${cols ? 'grid-flow-col' : 'grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]'} ${bare ? '' : 'px-2 py-1'}`}
+        style={cols ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${Math.ceil(list.length / cols)}, auto)` } : undefined}
+      >
+        {list.map(cell)}
+      </div>
+    )
+  }
+  // XY pads (point2D) are tall : in the flow, one stretched its whole row and
+  // left the rest of it blank (Ramps' center). They stand at the RIGHT and the
+  // bars fill the width beside them. COMPACT inputs (small switches and menus)
+  // close the flow, as their cluster did.
+  const pads = inputs.filter((i) => i.type === 'point2D')
+  const flow = visible(inputs).filter((i) => i.type !== 'point2D')
+  const ordered = [...flow.filter((i) => !i.compact), ...flow.filter((i) => i.compact)]
   return (
-    <div className="flex items-start gap-5 p-2">
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-5 gap-y-2.5">{flowRest.map(cell)}</div>
-      <div className="flex shrink-0 items-start gap-5">{flowPads.map(cell)}</div>
+    <div className={`flex gap-4 p-2 ${layout === 'twoRow' ? 'items-center' : 'items-start'}`}>
+      <FlowGrid n={ordered.length}>{ordered.map(cell)}</FlowGrid>
+      {pads.length > 0 && <div className="flex shrink-0 items-start gap-4">{pads.map(cell)}</div>}
     </div>
   )
 }
 
-// posX + posY as two sliders on ONE line (a compact stand-in for an XY pad).
-function PosPairControl({
-  inputs,
-  values,
-  onChange,
-  modTargetFor
-}: {
-  inputs: IsfInputDesc[]
-  values: Record<string, Value>
-  onChange: (name: string, value: Value) => void
-  modTargetFor?: (inputName: string) => ModTarget
-}): JSX.Element {
-  const dx = inputs.find((i) => i.name === 'posX')
-  const dy = inputs.find((i) => i.name === 'posY')
-  const rng = (d?: IsfInputDesc): [number, number, number] => {
-    const mn = typeof d?.min === 'number' ? d.min : -1
-    const mx = typeof d?.max === 'number' ? d.max : 1
-    const df = typeof d?.def === 'number' ? d.def : 0
-    return [mn, mx, df]
-  }
-  const [minx, maxx, defx] = rng(dx)
-  const [miny, maxy, defy] = rng(dy)
-  const vx = typeof values.posX === 'number' ? values.posX : defx
-  const vy = typeof values.posY === 'number' ? values.posY : defy
-  // One row per axis: label · slider · number box (editable, like every float).
-  const axis = (
-    label: string,
-    v: number,
-    min: number,
-    max: number,
-    def: number,
-    name: string
-  ): JSX.Element => (
-    <div className="flex min-w-0 items-center gap-1">
-      <span className="w-3 shrink-0 font-mono text-[9px] text-muted">{label}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={(max - min) / 200 || 0.01}
-        value={v}
-        onChange={(e) => onChange(name, Number(e.target.value))}
-        onDoubleClick={() => onChange(name, def)}
-        className="min-w-0 flex-1 accent-accent"
-        title={`${name} ${v.toFixed(2)} : double-click to reset`}
-      />
-      <div className="w-12 shrink-0">
-        <BoundedNumberInput
-          value={v}
-          min={min}
-          max={max}
-          onChange={(n) => onChange(name, n)}
-          className="input w-full px-1 py-0.5 text-right text-[11px]"
-        />
-      </div>
-    </div>
-  )
-  // (each axis pins on its own : a right-click on its row)
+/** The flow's grid : as many 12rem columns as its width holds; when the bars
+ *  need more than one row, the rows are balanced (five bars : three and two, not
+ *  four and a lone one), the columns widening to fill the row. */
+function FlowGrid({ n, children }: { n: number; children: ReactNode }): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const read = (): void => setWidth((w) => (Math.abs(w - el.clientWidth) > 1 ? el.clientWidth : w))
+    read()
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const fit = Math.max(1, Math.floor((width + 8) / (192 + 8)))
+  const rows = Math.ceil(n / fit)
+  const cols = rows <= 1 ? fit : Math.ceil(n / rows)
   return (
-    <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{dx?.label?.startsWith('shift') ? 'shift' : 'pos'}</span>
-      <PinZone pin={pinOf(modTargetFor, 'posX')} label={dx?.label ?? 'posX'}>{axis('X', vx, minx, maxx, defx, 'posX')}</PinZone>
-      <PinZone pin={pinOf(modTargetFor, 'posY')} label={dy?.label ?? 'posY'}>{axis('Y', vy, miny, maxy, defy, 'posY')}</PinZone>
+    <div
+      ref={ref}
+      className={`grid min-w-0 flex-1 items-start gap-x-2 gap-y-[3px] ${width ? '' : 'grid-cols-[repeat(auto-fill,minmax(12rem,1fr))]'}`}
+      style={width ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+    >
+      {children}
     </div>
   )
 }
@@ -338,23 +241,22 @@ function Control({
   value,
   onChange,
   modTargetFor,
-  dense = false,
   labelExtra,
-  rgbOnly = false
+  rgbOnly = false,
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense?: boolean
   labelExtra?: JSX.Element
   rgbOnly?: boolean
+  dimReason?: string
 }): JSX.Element | null {
-  const el = controlFor({ inp, value, onChange, modTargetFor, dense, labelExtra, rgbOnly })
+  const el = controlFor({ inp, value, onChange, modTargetFor, labelExtra, rgbOnly, dimReason })
   // Every control with a target can be pinned (a color or a pad too : the key is
   // the input's, whether or not the matrix can modulate it).
-  const t = modTargetFor?.(inp.name)
-  return el && t ? <PinZone pin={modTargetKey(t)} label={inp.label}>{el}</PinZone> : el
+  return el ? <PinZone pin={pinOf(modTargetFor, inp.name)} label={inp.label}>{el}</PinZone> : el
 }
 
 function controlFor({
@@ -362,28 +264,29 @@ function controlFor({
   value,
   onChange,
   modTargetFor,
-  dense,
   labelExtra,
-  rgbOnly
+  rgbOnly,
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense: boolean
   labelExtra?: JSX.Element
   rgbOnly: boolean
+  dimReason?: string
 }): JSX.Element | null {
   switch (inp.type) {
     case 'float':
-      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} labelExtra={labelExtra} />
+      return <FloatControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} labelExtra={labelExtra} dimReason={dimReason} />
     case 'bool':
+      return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dimReason={dimReason} />
     case 'event':
-      return <BoolControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
+      return <EventControl inp={inp} onChange={onChange} modTargetFor={modTargetFor} dimReason={dimReason} />
     case 'long':
-      return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
+      return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dimReason={dimReason} />
     case 'color':
-      return <ColorControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} rgbOnly={rgbOnly} />
+      return <ColorControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} rgbOnly={rgbOnly} dimReason={dimReason} />
     case 'point2D':
       return <XYControl inp={inp} value={value} onChange={onChange} />
     default:
@@ -392,9 +295,8 @@ function controlFor({
 }
 
 function labelEl(inp: IsfInputDesc): JSX.Element {
-  // Clamp to ONE line (ellipsis + full text in the tooltip) so a long label like
-  // "manifest (motion reveal)" can't wrap to two lines and shove its slider down
-  // out of alignment with the rest of the row : every control keeps one label line.
+  // Clamp to ONE line (ellipsis + full text in the tooltip) so a long label
+  // can't wrap to two lines and shove its pad down.
   return (
     <span
       className="line-clamp-1 min-w-0 font-mono text-[9px] uppercase tracking-wide text-muted"
@@ -405,6 +307,13 @@ function labelEl(inp: IsfInputDesc): JSX.Element {
   )
 }
 
+/** A bar's tooltip : why it is greyed (first), what it does, how it plays. */
+function tipFor(inp: IsfInputDesc, dimReason: string | undefined, how: string): string {
+  // (a row that shows a shorter name keeps the full one here)
+  const named = inp.display && inp.display !== inp.label ? `${inp.label} : ` : ''
+  return [dimReason, inp.hint ? named + inp.hint : named ? inp.label : '', how].filter(Boolean).join(' · ')
+}
+
 /** Decimals a number box shows for a range this wide : 100 or more none, 10 one,
  *  1 two, 0.1 three, less four. Enough to read a slider, never so many it clips. */
 export function fracFor(span: number): number {
@@ -412,172 +321,96 @@ export function fracFor(span: number): number {
   return s >= 100 ? 0 : s >= 10 ? 1 : s >= 1 ? 2 : s >= 0.1 ? 3 : 4
 }
 
-// The dense (one-line) rows' label : fixed width so every row's control lines up.
-function denseLabel(inp: IsfInputDesc): JSX.Element {
+// ── the M chip at a bar's end ───────────────────────────────────────────
+/** Clear EVERY modulation on one parameter : its M1–8 bindings and every
+ *  Macro knob carrying it as a destination. */
+function clearModulation(target: ModTarget, bound: BoundAssignment[]): void {
+  const st = useStore.getState()
+  for (const b of bound) st.removeAssignment(b.id)
+  const key = modTargetKey(target)
+  st.composition.metaKnobs.forEach((k, i) => {
+    if (k.destinations.some((d) => modTargetKey(d) === key)) st.toggleMetaDest(i, target)
+  })
+}
+
+/** A bar's M : opens the provider's Modulate panel (a click again closes it),
+ *  shows the modulators bound (M6, M1·2), a right-click clears them all. */
+export function ModChip({
+  target,
+  bound,
+  label,
+  small = false
+}: {
+  target: ModTarget
+  bound: BoundAssignment[]
+  label: string
+  small?: boolean
+}): JSX.Element {
+  const { onAssign, activeKey } = useContext(AssignContext)
+  const isBound = bound.length > 0
   return (
-    <span
-      className="w-24 shrink-0 truncate font-mono text-[9px] uppercase tracking-wide text-muted"
-      title={inp.hint ?? inp.label}
-    >
-      {inp.display ?? inp.label}
-    </span>
+    <BarChip
+      text={`M${isBound ? bound.map((b) => b.mod + 1).join('·') : ''}`}
+      bound={isBound}
+      active={activeKey === modTargetKey(target)}
+      label={label}
+      small={small}
+      title={`Modulate ${label} : right-click clears all its modulation`}
+      onClick={() => onAssign?.(target, label)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation() // (the control's own menu, Persistent, is under it)
+        clearModulation(target, bound)
+      }}
+    />
   )
 }
 
-// ── float → slider + number (+ optional mod-assign) ──────────────────
+// ── float → a filled bar ──────────────────────────────────────────────
 function FloatControl({
   inp,
   value,
   onChange,
   modTargetFor,
-  dense = false,
-  labelExtra
+  labelExtra,
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense?: boolean
   labelExtra?: JSX.Element
+  dimReason?: string
 }): JSX.Element {
   const min = typeof inp.min === 'number' ? inp.min : 0
   const max = typeof inp.max === 'number' ? inp.max : 1
   const def = typeof inp.def === 'number' ? inp.def : min
   const raw = typeof value === 'number' ? value : def
-  const v = inp.integer ? Math.round(raw) : raw
-  const step = inp.integer ? 1 : (max - min) / 200 || 0.005
-  // The box shows as many decimals as the range needs (a randomized 4.316481…
-  // clipped in it) : the stored value keeps all of them.
-  const frac = fracFor(max - min)
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
-
-  // A MODULATED slider's thumb shows the live value, not the base. Grabbing it
-  // used to set the base to wherever the modulator happened to be (and, in
-  // Multiply mode, ratchet it down a little with every grab). Now a drag (or an
-  // arrow key) moves the base by how far the thumb moves, from where it was
-  // grabbed; on release the slider lets go of the focus, so the thumb follows
-  // the modulator again (it froze while focused).
-  const grab = useRef<{ base: number; shown: number } | null>(null)
-  const onGrab = (e: { currentTarget: HTMLInputElement }): void => {
-    grab.current = isModulated ? { base: v, shown: Number(e.currentTarget.value) } : null
-  }
-  const onSlide = (e: { currentTarget: HTMLInputElement }): void => {
-    const x = Number(e.currentTarget.value)
-    const g = grab.current
-    let next = g && isModulated ? g.base + (x - g.shown) : x
-    next = Math.max(min, Math.min(max, next))
-    onChange(inp.name, inp.integer ? Math.round(next) : next)
-  }
-  const onLetGo = (e: { currentTarget: HTMLInputElement }): void => {
-    grab.current = null
-    if (isModulated) e.currentTarget.blur()
-  }
-  const slideProps = {
-    onPointerDown: onGrab,
-    onKeyDown: (e: { currentTarget: HTMLInputElement }) => { if (!grab.current) onGrab(e) },
-    onChange: onSlide,
-    onPointerUp: onLetGo,
-    onKeyUp: (e: { currentTarget: HTMLInputElement }) => { grab.current = null; void e }
-  }
-
-  // Modulated sliders MOVE with the live value (dataFLOU behaviour): one rAF
-  // writes the thumb position straight to the DOM : React keeps rendering the
-  // BASE value; the live overlay never causes re-renders. Paused while the
-  // user is dragging this slider.
-  const sliderRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => {
-    const el = sliderRef.current
-    if (!isModulated || !targetKey || !el) return
-    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(x) })
-  }, [isModulated, targetKey])
-
-  // Dense single-line layout (Finishing view): label · slider · M · number,
-  // all on one row so the stack takes minimal vertical space.
-  if (dense) {
-    return (
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {denseLabel(inp)}
-          {labelExtra}
-          <input
-            ref={sliderRef}
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={v}
-            {...slideProps}
-            onDoubleClick={() => onChange(inp.name, def)}
-            className={`min-w-0 flex-1 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
-            title={
-              (inp.hint ? inp.hint + ' · ' : '') +
-              (isModulated
-                ? `${inp.label} : modulated (a drag moves the base by as much as you move it)`
-                : `${inp.label} : double-click to reset (${def})`)
-            }
-          />
-          {target && <ModButton target={target} bound={bound} label={inp.label} />}
-          <div className="w-12 shrink-0">
-            <BoundedNumberInput
-              value={v}
-              min={min}
-              max={max}
-              onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
-              integer={!!inp.integer}
-              maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
-              className="input w-full px-1 py-0.5 text-right text-[11px]"
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // A MODULATED bar's fill plays the live value and its pointer stays on the
+  // stored one; a drag moves the stored value by as much as you move (Bar.tsx).
+  const how = isModulated
+    ? 'modulated : the fill plays the live value, the pointer stays on the stored one; a drag moves the stored value by as much as you move'
+    : `drag (Shift : finer), double-click resets (${fracFor(max - min) === 0 || inp.integer ? Math.round(def) : def}), click the number to type`
   return (
-    <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1">
-          {labelEl(inp)}
-          {labelExtra}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {target && <ModButton target={target} bound={bound} label={inp.label} />}
-          <div className="w-14">
-            <BoundedNumberInput
-              value={v}
-              min={min}
-              max={max}
-              onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
-              integer={!!inp.integer}
-              maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
-              className="input w-full px-1 py-0.5 text-right text-[11px]"
-            />
-          </div>
-        </div>
-      </div>
-      <input
-        ref={sliderRef}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={v}
-        {...slideProps}
-        onDoubleClick={() => onChange(inp.name, def)}
-        className={`min-w-0 ${isModulated ? 'accent-accent2' : 'accent-accent'}`}
-        title={
-          (inp.hint ? inp.hint + ' · ' : '') +
-          (isModulated
-            ? `${inp.label} : modulated (moving with the live value; a drag moves the base by as much as you move it)`
-            : `${inp.label} : double-click to reset (${def})`)
-        }
-      />
-    </div>
+    <FloatBar
+      label={inp.display ?? inp.label}
+      title={tipFor(inp, dimReason, how)}
+      value={raw}
+      min={min}
+      max={max}
+      def={def}
+      integer={!!inp.integer}
+      frac={fracFor(max - min)}
+      onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
+      modulated={isModulated}
+      liveKey={targetKey}
+      chip={target ? <ModChip target={target} bound={bound} label={inp.label} /> : undefined}
+      extra={labelExtra}
+    />
   )
 }
 
@@ -755,79 +588,10 @@ export function AssignRow({
   )
 }
 
-// ── COMPACT cluster : small toggles / tiny enums stacked in one cell ──
-// Inputs flagged "COMPACT": true land here: label left, a tiny control right,
-// one line each. Keeps utility switches (invert · bidir · flow res) from
-// spending a full grid cell apiece.
-function CompactCluster({
-  inputs,
-  values,
-  onChange,
-  modTargetFor
-}: {
-  inputs: IsfInputDesc[]
-  values: Record<string, Value>
-  onChange: (name: string, value: Value) => void
-  modTargetFor?: (inputName: string) => ModTarget
-}): JSX.Element {
-  const row = (inp: IsfInputDesc): JSX.Element => {
-    const def = typeof inp.def === 'number' ? inp.def : 0
-    const raw = values[inp.name]
-    const v = typeof raw === 'number' ? raw : def
-    if (inp.type === 'long') {
-      // As wide as its longest choice (a select with no width of its own takes
-      // that of its widest option, here plus the chevron's room) : a fixed
-      // 48 px cut "smooth" and "brightest channel" (Luma Blur, Gooey...).
-      return (
-        <div className="flex items-center justify-between gap-2">
-          {labelEl(inp)}
-          <select
-            className="input select-compact max-w-full shrink-0 !py-0 !pl-1 !pr-4 text-[10px]"
-            value={v}
-            onChange={(e) => onChange(inp.name, Number(e.target.value))}
-            title={inp.label}
-          >
-            {(inp.values ?? []).map((val, i) => (
-              <option key={val} value={val}>
-                {inp.labels?.[i] ?? val}
-              </option>
-            ))}
-          </select>
-        </div>
-      )
-    }
-    const on = v >= 0.5
-    return (
-      <div className="flex items-center justify-between gap-2">
-        {labelEl(inp)}
-        <button
-          onClick={() => onChange(inp.name, on ? 0 : 1)}
-          className={`shrink-0 rounded px-1.5 py-0 font-mono text-[9px] leading-4 transition-colors ${
-            on ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
-          }`}
-          title={inp.label}
-        >
-          {on ? 'ON' : 'OFF'}
-        </button>
-      </div>
-    )
-  }
-  // (each row pins on its own : a right-click on it)
-  return (
-    <div className="flex w-44 min-w-0 flex-col gap-1">
-      {inputs.map((inp) => (
-        <PinZone key={inp.name} pin={pinOf(modTargetFor, inp.name)} label={inp.label}>
-          {row(inp)}
-        </PinZone>
-      ))}
-    </div>
-  )
-}
-
-// Context's Light PRE/POST toggle : a tiny chip beside the "light" label that
-// flips the `lightOrder` bool. POST (default) adds the key light after haze +
-// vignette (+ any hard master FX below) so it always reads; PRE is the old order
-// (before them, so they can wash / darken it).
+// Context's Light PRE/POST toggle : a tiny chip inside the light's glow bar
+// that flips the `lightOrder` bool. POST (default) adds the key light after
+// haze + vignette (+ any hard master FX below) so it always reads; PRE is the
+// old order (before them, so they can wash / darken it).
 function LightOrderToggle({
   values,
   onChange
@@ -839,7 +603,7 @@ function LightOrderToggle({
   return (
     <button
       onClick={() => onChange('lightOrder', post ? 0 : 1)}
-      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 uppercase transition-colors ${
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-[14px] uppercase transition-colors ${
         post
           ? 'bg-accent/20 text-accent ring-1 ring-accent'
           : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
@@ -855,42 +619,57 @@ function LightOrderToggle({
   )
 }
 
-// A label row with an optional M pill on the right (enum / bool controls).
-function LabelRow({
-  inp,
-  modTargetFor
-}: {
-  inp: IsfInputDesc
-  modTargetFor?: (inputName: string) => ModTarget
-}): JSX.Element {
-  const target = modTargetFor?.(inp.name)
-  const bound = useBound(target ? modTargetKey(target) : null)
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      {labelEl(inp)}
-      {target && <ModButton target={target} bound={bound} label={inp.label} />}
-    </div>
-  )
-}
-
-// ── bool → toggle chip (+ optional mod-assign) ───────────────────────
+// ── bool → the whole bar is the switch ─────────────────────────────────
 function BoolControl({
   inp,
   value,
   onChange,
   modTargetFor,
-  dense = false
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense?: boolean
+  dimReason?: string
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
-  // An `event` input is a MOMENTARY trigger : press pulses it 1 → 0 so the engine
-  // sees a rising edge (fire) then re-arms. Bind M to drive it from a modulator
-  // (a square LFO / sample&hold / audio edge) or fire it over OSC for live use.
+  // A modulated switch fills in accent2 and shows its LIVE state as the
+  // modulator flips it : the shared overlay repaints it each frame (React keeps
+  // rendering the stored state).
+  const target = modTargetFor?.(inp.name)
+  const targetKey = target ? modTargetKey(target) : null
+  const bound = useBound(targetKey)
+  const isModulated = bound.length > 0
+  const on = (typeof value === 'number' ? value : def) >= 0.5
+  return (
+    <BoolBar
+      label={inp.display ?? inp.label}
+      title={tipFor(inp, dimReason, isModulated ? 'modulated : showing the live state; a click sets the stored one' : 'click to switch')}
+      value={on}
+      onChange={(o) => onChange(inp.name, o ? 1 : 0)}
+      modulated={isModulated}
+      liveKey={targetKey}
+      chip={target ? <ModChip target={target} bound={bound} label={inp.label} /> : undefined}
+    />
+  )
+}
+
+// ── event → a button bar ──────────────────────────────────────────────
+function EventControl({
+  inp,
+  onChange,
+  modTargetFor,
+  dimReason
+}: {
+  inp: IsfInputDesc
+  onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
+  dimReason?: string
+}): JSX.Element {
+  // An `event` input is a MOMENTARY trigger : a press pulses it 1 → 0 so the
+  // engine sees a rising edge (fire) then re-arms. Its M binds a modulator to
+  // drive it (a square LFO / sample&hold / audio edge); OSC fires it too.
   // Hold the deferred 1 → 0 reset in a ref and cancel it when this control
   // unmounts or its shader/slot changes : the `inp` descriptor is cached per
   // shader (inputsForShader), so it only changes on a real swap. Without this a
@@ -906,208 +685,79 @@ function BoolControl({
     },
     [inp]
   )
-  // A modulated toggle looks modulated (accent2, like a modulated slider) and
-  // shows its LIVE state as the modulator flips it : the shared overlay repaints
-  // the button each frame (React keeps rendering the stored state).
   const target = modTargetFor?.(inp.name)
-  const targetKey = target ? modTargetKey(target) : null
-  const isModulated = useBound(targetKey).length > 0
-  const btnRef = useRef<HTMLButtonElement | null>(null)
-  useEffect(() => {
-    const el = btnRef.current
-    if (!isModulated || !targetKey || !el) return
-    let last: boolean | null = null
-    return registerLiveOverlay({
-      key: targetKey,
-      apply: (v) => {
-        const live = v >= 0.5
-        if (live === last) return
-        last = live
-        el.textContent = live ? 'ON' : 'OFF'
-        el.classList.toggle('bg-accent2/25', live)
-        el.classList.toggle('text-accent2', live)
-        el.classList.toggle('ring-accent2', live)
-        el.classList.toggle('bg-panel2', !live)
-        el.classList.toggle('text-accent2/70', !live)
-        el.classList.toggle('ring-accent2/40', !live)
-      }
-    })
-  }, [isModulated, targetKey])
-  if (inp.type === 'event' && dense) {
-    return (
-      <div className="flex min-w-0 items-center gap-1.5">
-        {denseLabel(inp)}
-        <button
-          onPointerDown={() => {
-            if (fireTimer.current !== null) window.clearTimeout(fireTimer.current)
-            onChange(inp.name, 1)
-            fireTimer.current = window.setTimeout(() => {
-              onChange(inp.name, 0)
-              fireTimer.current = null
-            }, 140)
-          }}
-          className="rounded bg-panel2 px-2 py-0 font-mono text-[10px] text-accent ring-1 ring-accent/40 transition-colors hover:bg-accent/20 active:bg-accent/50"
-          title={inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`}
-        >
-          FIRE ▸
-        </button>
-        <div className="flex-1" />
-        {target && <DenseMod target={target} label={inp.label} />}
-      </div>
-    )
-  }
-  if (inp.type === 'event') {
-    return (
-      <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
-        <LabelRow inp={inp} modTargetFor={modTargetFor} />
-        <button
-          onPointerDown={() => {
-            if (fireTimer.current !== null) window.clearTimeout(fireTimer.current)
-            onChange(inp.name, 1)
-            fireTimer.current = window.setTimeout(() => {
-              onChange(inp.name, 0)
-              fireTimer.current = null
-            }, 140)
-          }}
-          className="w-full rounded bg-panel2 px-2 py-0.5 font-mono text-[10px] text-accent ring-1 ring-accent/40 transition-colors hover:bg-accent/20 active:bg-accent/50"
-          title={inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`}
-        >
-          FIRE ▸
-        </button>
-      </div>
-    )
-  }
-  const on = (typeof value === 'number' ? value : def) >= 0.5
-  const look = (state: boolean, modulated: boolean): string =>
-    modulated
-      ? state
-        ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
-        : 'bg-panel2 text-accent2/70 ring-1 ring-accent2/40'
-      : state
-        ? 'bg-accent/20 text-accent ring-1 ring-accent'
-        : 'bg-panel2 text-muted hover:text-text'
-  const pad = dense ? 'px-2 py-0' : 'px-2 py-0.5'
-  const title = isModulated
-    ? `${inp.label} : modulated (showing the live state; a click sets the stored one)`
-    : (inp.hint ?? inp.label)
-  const button = (
-    <button
-      ref={btnRef}
-      onClick={() => onChange(inp.name, on ? 0 : 1)}
-      className={`rounded ${pad} font-mono text-[10px] transition-colors ${look(on, isModulated)}`}
-      title={title}
-    >
-      {on ? 'ON' : 'OFF'}
-    </button>
-  )
-  if (dense) {
-    const target = modTargetFor?.(inp.name)
-    return (
-      <div className="flex min-w-0 items-center gap-1.5">
-        {denseLabel(inp)}
-        {button}
-        <div className="flex-1" />
-        {target && <DenseMod target={target} label={inp.label} />}
-      </div>
-    )
-  }
+  const bound = useBound(target ? modTargetKey(target) : null)
   return (
-    <div className="flex w-24 min-w-0 flex-col items-start gap-0.5">
-      <LabelRow inp={inp} modTargetFor={modTargetFor} />
-      {button}
-    </div>
+    <EventBar
+      label={inp.display ?? inp.label}
+      title={[dimReason, inp.hint ?? `${inp.label} : fire (momentary trigger; bind M for rhythmic auto-fire)`].filter(Boolean).join(' · ')}
+      onFire={() => {
+        if (fireTimer.current !== null) window.clearTimeout(fireTimer.current)
+        onChange(inp.name, 1)
+        fireTimer.current = window.setTimeout(() => {
+          onChange(inp.name, 0)
+          fireTimer.current = null
+        }, 140)
+      }}
+      chip={target ? <ModChip target={target} bound={bound} label={inp.label} /> : undefined}
+    />
   )
 }
 
-function DenseMod({ target, label }: { target: ModTarget; label: string }): JSX.Element {
-  const bound = useBound(modTargetKey(target))
-  return <ModButton target={target} bound={bound} label={label} />
+// ── long → segments (up to three choices) or a menu bar ────────────────
+/** Segments only while they read whole in the narrowest bar (12rem, its M
+ *  included : the name at ~7.2 px a letter, each choice at ~6.4 px plus its
+ *  padding); a longer set is a menu bar, never clipped words. */
+function segmentsFit(name: string, options: Array<{ label: string }>): boolean {
+  if (options.length > 3) return false
+  const w = name.length * 7.2 + 16 + options.reduce((s, o) => s + o.label.length * 6.4 + 10, 0) + 26
+  return w <= 192
 }
 
-// ── long → dropdown (+ optional mod-assign) ──────────────────────────
+function enumOptions(inp: IsfInputDesc): Array<{ value: number; label: string }> {
+  const values = inp.values ?? []
+  const labels = inp.labels ?? values.map(String)
+  return values.map((v, i) => ({ value: v, label: labels[i] ?? String(v) }))
+}
+
 function EnumControl({
   inp,
   value,
   onChange,
   modTargetFor,
-  dense = false
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense?: boolean
+  dimReason?: string
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   const v = typeof value === 'number' ? value : def
-  const values = inp.values ?? []
-  const labels = inp.labels ?? values.map(String)
+  const options = useMemo(() => enumOptions(inp), [inp])
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
-  // A modulated dropdown tracks the LIVE selection (the engine snaps enums to
-  // declared values, so the live value always matches an <option>) and turns
-  // accent2 like modulated sliders. React keeps rendering the BASE value; the
-  // shared overlay repaints the DOM selection each rAF, skipped while focused.
-  const selRef = useRef<HTMLSelectElement | null>(null)
-  useEffect(() => {
-    const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
-    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
-  if (dense) {
-    return (
-      <div className="flex min-w-0 items-center gap-1.5">
-        {denseLabel(inp)}
-        <select
-          ref={selRef}
-          className={`input h-[18px] min-w-0 flex-1 !py-0 !pl-1.5 !pr-1 !text-[10px] leading-none ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
-          value={v}
-          onChange={(e) => onChange(inp.name, Number(e.target.value))}
-          title={
-            isModulated
-              ? `${inp.label} : modulated (showing the live selection; picking sets the base)`
-              : (inp.hint ?? inp.label)
-          }
-        >
-          {values.map((val, i) => (
-            <option key={val} value={val}>
-              {labels[i] ?? val}
-            </option>
-          ))}
-        </select>
-        {target && <ModButton target={target} bound={bound} label={inp.label} />}
-      </div>
-    )
+  // A modulated menu shows the LIVE choice (the engine snaps enums to declared
+  // values) in accent2; picking sets the stored one.
+  const props = {
+    label: inp.display ?? inp.label,
+    title: tipFor(inp, dimReason, isModulated ? 'modulated : showing the live choice; picking sets the stored one' : ''),
+    options,
+    value: v,
+    onChange: (n: number) => onChange(inp.name, n),
+    modulated: isModulated,
+    liveKey: targetKey,
+    chip: target ? <ModChip target={target} bound={bound} label={inp.label} /> : undefined
   }
-  return (
-    <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      <LabelRow inp={inp} modTargetFor={modTargetFor} />
-      <select
-        ref={selRef}
-        className={`input text-[11px] ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
-        value={v}
-        onChange={(e) => onChange(inp.name, Number(e.target.value))}
-        title={
-          isModulated
-            ? `${inp.label} : modulated (showing the live selection; picking sets the base)`
-            : (inp.hint ?? inp.label)
-        }
-      >
-        {values.map((val, i) => (
-          <option key={val} value={val}>
-            {labels[i] ?? val}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
+  return segmentsFit(props.label, options) ? <SegBar {...props} /> : <DropBar {...props} />
 }
 
-// ── long → a compact dropdown for a section header (no label row) ─────
+// ── long → a compact menu bar for a section header (no name) ────────────
 // The switch that turns a whole Finishing section on / off or picks its mode
-// (3D stereo, film hold, output shape…) : same live-overlay + M as EnumControl.
+// (3D stereo, film hold, output shape…) : same live overlay + M as EnumControl.
 export function EnumSwitch({
   inp,
   value,
@@ -1121,34 +771,26 @@ export function EnumSwitch({
 }): JSX.Element {
   const def = typeof inp.def === 'number' ? inp.def : 0
   const v = typeof value === 'number' ? value : def
-  const values = inp.values ?? []
-  const labels = inp.labels ?? values.map(String)
+  const options = useMemo(() => enumOptions(inp), [inp])
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
-  const selRef = useRef<HTMLSelectElement | null>(null)
-  useEffect(() => {
-    const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
-    return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
   return (
-    <span className="flex min-w-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-      <select
-        ref={selRef}
-        className={`input h-[18px] max-w-[9rem] !py-0 !pl-1.5 !pr-1 !text-[10px] leading-none ${isModulated ? '!border-accent2 !text-accent2' : ''}`}
+    // (the header folds on a click or Enter : not when it is this switch's)
+    <span className="flex w-[9.5rem] min-w-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <DropBar
+        bare
+        className="w-full"
+        label={inp.label}
+        title={(inp.hint ?? inp.label) + (isModulated ? ' (modulated : picking sets the stored one)' : '')}
+        options={options}
         value={v}
-        onChange={(e) => onChange(inp.name, Number(e.target.value))}
-        title={(inp.hint ?? inp.label) + (isModulated ? ' (modulated : picking sets the base)' : '')}
-      >
-        {values.map((val, i) => (
-          <option key={val} value={val}>
-            {labels[i] ?? val}
-          </option>
-        ))}
-      </select>
-      {target && <ModButton target={target} bound={bound} label={inp.label} />}
+        onChange={(n) => onChange(inp.name, n)}
+        modulated={isModulated}
+        liveKey={targetKey}
+        chip={target ? <ModChip small target={target} bound={bound} label={inp.label} /> : undefined}
+      />
     </span>
   )
 }
@@ -1169,13 +811,14 @@ function fromHex(hex: string, alpha: number): number[] {
   return [r, g, b, alpha]
 }
 
-// ── color → swatch + alpha, its parts modulatable ───────────────────
-// The swatch opens the color picker : its pad (saturation across, brightness
-// up) and its slider (the hue). Those parts, and alpha, are modulated like any
-// float, in the picker's own space (engine/colorParts.ts) : ONE M beside the
-// swatch, the Modulate panel picks the part (ColorPartSwitch). A driven color's
-// swatch paints the color it plays (its border in the modulated color), the
-// alpha thumb its live alpha.
+// ── color → a bar painted in it + its alpha, its parts modulatable ─────
+// The bar opens the color picker : its pad (saturation across, brightness up)
+// and its slider (the hue). Those parts, and alpha, are modulated like any
+// float, in the picker's own space (engine/colorParts.ts) : ONE M at the bar's
+// end, the Modulate panel picks the part (ColorPartSwitch). A driven color's
+// bar is painted in the color it plays (edged in accent2), its alpha cell
+// fills to its live alpha. (The palette strip and the World still use the
+// classic pill, ColorModButton.)
 
 /** The Finishing stages read their colors' RGB only (FinishingSections' rgbOnly) :
  *  no alpha part there. */
@@ -1323,20 +966,67 @@ function setText(el: HTMLElement | null, s: string): void {
   if (n && n.nodeType === 3 && n.nodeValue !== s) n.nodeValue = s
 }
 
+/** A color's M chip : one for all its parts (ColorModButton's rules : a click
+ *  opens the Modulate panel on the part already bound, else the hue; a
+ *  right-click clears them all), the modulators of every part in it. */
+function ColorModChip({
+  targets,
+  bound,
+  label
+}: {
+  targets: ModTarget[]
+  bound: ModAssignment[]
+  label: string
+}): JSX.Element {
+  const { onAssign, activeKey } = useContext(AssignContext)
+  const keys = targets.map(modTargetKey)
+  const open = targets.find((_, i) => keys[i] === activeKey)
+  const first = targets.find((_, i) => bound.some((a) => modTargetKey(a.target) === keys[i]))
+  const mods = [...new Set(bound.map((a) => a.mod + 1))].sort((a, b) => a - b)
+  const now = targets
+    .map((t, i) => {
+      const on = bound.filter((a) => modTargetKey(a.target) === keys[i]).map((a) => `M${a.mod + 1}`)
+      const ch = partOf(t)
+      return on.length && ch ? `${PART_WORD[ch]} ${on.join(' ')}` : ''
+    })
+    .filter(Boolean)
+    .join(', ')
+  return (
+    <BarChip
+      text={`M${mods.length ? mods.join('·') : ''}`}
+      bound={bound.length > 0}
+      active={!!open}
+      label={label}
+      title={`Modulate ${label} : its hue (the picker's color slider), saturation and brightness (its pad, across and up)${targets.length > 3 ? ' or alpha' : ''}${now ? ` (now : ${now})` : ''}. Right-click clears all its modulation`}
+      onClick={() => onAssign?.(open ?? first ?? targets[0], label)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation() // (the control's own menu, Persistent, is under it)
+        const st = useStore.getState()
+        for (const b of bound) st.removeAssignment(b.id)
+        const ks = new Set(keys)
+        st.composition.metaKnobs.forEach((k, i) => {
+          for (const d of k.destinations) if (ks.has(modTargetKey(d))) useStore.getState().toggleMetaDest(i, d)
+        })
+      }}
+    />
+  )
+}
+
 function ColorControl({
   inp,
   value,
   onChange,
   modTargetFor,
-  dense = false,
-  rgbOnly = false
+  rgbOnly = false,
+  dimReason
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
   modTargetFor?: (inputName: string) => ModTarget
-  dense?: boolean
   rgbOnly?: boolean
+  dimReason?: string
 }): JSX.Element {
   const def = Array.isArray(inp.def) ? inp.def : [1, 1, 1, 1]
   const v = Array.isArray(value) && value.length >= 3 ? value : def
@@ -1346,119 +1036,70 @@ function ColorControl({
   const colorKey = base ? modTargetKey(base) : null
   const alphaKey = targets[3] ? modTargetKey(targets[3]) : null
   const alphaBound = !!alphaKey && bound.some((a) => modTargetKey(a.target) === alphaKey)
-  const swatchRef = useRef<HTMLInputElement | null>(null)
+  const zoneRef = useRef<HTMLLabelElement | null>(null)
   const hexRef = useRef<HTMLSpanElement | null>(null)
-  const alphaRef = useRef<HTMLInputElement | null>(null)
-  const alphaTextRef = useRef<HTMLSpanElement | null>(null)
-  // the stored color, for the frames nothing plays it and for the picker
-  const baseRef = useRef({ hex: toHex(v), alpha })
-  baseRef.current = { hex: toHex(v), alpha }
+  const swatchRef = useRef<HTMLInputElement | null>(null)
+  // the stored color, for the frames nothing plays it
+  const baseRef = useRef({ hex: toHex(v), rgb: v })
+  baseRef.current = { hex: toHex(v), rgb: v }
 
-  // A driven color's swatch (and hex, and alpha) shows what it plays, one shared
-  // rAF writing the DOM (never React). Not while the picker or the slider has
-  // the focus : the picker edits the STORED color (the swatch is set back to it
-  // as it opens), the modulation goes on over whatever is picked.
-  useEffect(() => {
-    const sw = swatchRef.current
-    if (!driven || !colorKey || !sw) return
+  // A driven color's bar is painted in what it plays (its ink and its hex too),
+  // one shared rAF writing the DOM (never React). The picker edits the STORED
+  // color; the modulation goes on over whatever is picked.
+  useLayoutEffect(() => {
+    const zone = zoneRef.current
+    if (!driven || !colorKey || !zone) return
+    let last = ''
     const paint = (): void => {
       const live = liveColorValues.get(colorKey)
       const hex = live ? toHex(live) : baseRef.current.hex
-      const doc = sw.ownerDocument
-      if (doc.activeElement !== sw && sw.value !== hex) sw.value = hex
       setText(hexRef.current, hex)
-      const a = live ? live[3] : baseRef.current.alpha
-      const al = alphaRef.current
-      if (al && doc.activeElement !== al && al.value !== String(a)) al.value = String(a)
-      setText(alphaTextRef.current, a.toFixed(2))
+      if (hex === last && zone.style.backgroundColor) return
+      last = hex
+      zone.style.backgroundColor = hex
+      zone.style.color = inkFor(live ?? baseRef.current.rgb)
     }
-    const stop = registerLiveOverlay({ paint, view: sw.ownerDocument.defaultView ?? undefined })
+    paint()
+    const stop = registerLiveOverlay({ paint, view: zone.ownerDocument.defaultView ?? undefined })
     return () => {
       stop()
-      sw.value = baseRef.current.hex
+      zone.style.backgroundColor = baseRef.current.hex
+      zone.style.color = inkFor(baseRef.current.rgb)
       setText(hexRef.current, baseRef.current.hex)
-      if (alphaRef.current) alphaRef.current.value = String(baseRef.current.alpha)
-      setText(alphaTextRef.current, baseRef.current.alpha.toFixed(2))
     }
   }, [driven, colorKey])
 
-  const toBase = (e: { currentTarget: HTMLInputElement }): void => {
-    if (driven) e.currentTarget.value = baseRef.current.hex
-  }
-  const swatchProps = {
-    ref: swatchRef,
-    type: 'color',
-    value: toHex(v),
-    onPointerDown: toBase,
-    onFocus: toBase,
-    onChange: (e: { target: HTMLInputElement }) => onChange(inp.name, fromHex(e.target.value, alpha))
-  }
-  const swatchEdge = driven ? 'border-accent2' : 'border-border'
-  // the alpha slider grabbed while modulated : from the stored alpha, let go after
-  const alphaProps = {
-    ref: alphaRef,
-    type: 'range',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    value: alpha,
-    onPointerDown: (e: { currentTarget: HTMLInputElement }) => {
-      if (driven) e.currentTarget.value = String(baseRef.current.alpha)
-    },
-    onPointerUp: (e: { currentTarget: HTMLInputElement }) => {
-      if (driven) e.currentTarget.blur()
-    },
-    onChange: (e: { target: HTMLInputElement }) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)]),
-    className: `min-w-0 flex-1 ${alphaBound ? 'accent-accent2' : 'accent-accent'}`
-  }
-  const mod = targets.length ? <ColorModButton targets={targets} bound={bound} label={inp.label} /> : null
-  // (laid out as a float's row : its M in the M column, the hex in the value column)
-  if (dense && rgbOnly) {
-    return (
-      <div className="flex min-w-0 items-center gap-1.5">
-        {denseLabel(inp)}
-        <input
-          {...swatchProps}
-          className={`h-4 w-10 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
-          title={`${inp.label} : ${toHex(v)} : click to pick`}
-        />
-        <div className="min-w-0 flex-1" />
-        {mod}
-        <span ref={hexRef} className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{toHex(v)}</span>
-      </div>
-    )
-  }
-  if (dense) {
-    return (
-      <div className="flex min-w-0 items-center gap-1.5">
-        {denseLabel(inp)}
-        <input
-          {...swatchProps}
-          className={`h-4 w-8 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
-          title={`${inp.label} : RGB`}
-        />
-        <input {...alphaProps} title={`${inp.label} : alpha ${alpha.toFixed(2)}`} />
-        {mod}
-        <span ref={alphaTextRef} className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{alpha.toFixed(2)}</span>
-      </div>
-    )
-  }
+  const how = driven
+    ? 'modulated : painted in the color it plays; a click picks the stored one'
+    : 'click to pick (the pad : saturation across, brightness up; the slider : the hue)'
   return (
-    <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        {labelEl(inp)}
-        {mod}
-      </div>
-      <div className="flex min-w-0 items-center gap-2">
-        <input
-          {...swatchProps}
-          // (20 px, not 24 : with its M the label line grew 4, the cell stays a float's height)
-          className={`h-5 w-9 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
-          title={`${inp.label} : RGB`}
-        />
-        <input {...alphaProps} title="Alpha" />
-      </div>
-    </div>
+    <ColorBar
+      label={inp.display ?? inp.label}
+      title={tipFor(inp, dimReason, how)}
+      hex={toHex(v)}
+      rgb={v}
+      painted={!driven}
+      hexRef={hexRef}
+      zoneRef={zoneRef}
+      picker={{
+        ref: swatchRef,
+        value: toHex(v),
+        onChange: (e) => onChange(inp.name, fromHex(e.currentTarget.value, alpha))
+      }}
+      driven={driven}
+      alpha={
+        rgbOnly ? undefined : (
+          <AlphaCell
+            value={alpha}
+            def={typeof def[3] === 'number' ? def[3] : 1}
+            onChange={(a) => onChange(inp.name, [v[0], v[1], v[2], a])}
+            modulated={alphaBound}
+            read={() => (colorKey ? liveColorValues.get(colorKey)?.[3] : undefined)}
+          />
+        )
+      }
+      chip={targets.length ? <ColorModChip targets={targets} bound={bound} label={inp.label} /> : undefined}
+    />
   )
 }
 

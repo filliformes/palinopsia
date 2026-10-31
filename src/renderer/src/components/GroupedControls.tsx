@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ModTarget } from '@shared/types'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { AutoControls } from './AutoControls'
@@ -53,11 +54,13 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light', 'sun', 'sunHeight', 'glow', 'shadow', 'sky', 'light', 'shade'),
     g('paint', 'brush', 'mixing', 'impasto', 'canvas')
   ],
-  // three columns (a fourth wrapped under them at the Inspector's width)
+  // the bath · the drops that land by themselves · what a hand does · the paint
+  // (four columns since the bars : the tallest went from 10 rows to 8)
   'gen-marble': [
-    g('water', 'water', 'evolve', 'currents', 'swirl', 'comb', 'spacing', 'angle', 'budget', 'clear'),
-    g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime', 'drop', 'sprinkle', 'sprinkleN'),
-    g('paint', 'tool', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
+    g('water', 'water', 'evolve', 'currents', 'swirl', 'comb', 'spacing', 'angle', 'budget'),
+    g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime'),
+    g('hand', 'tool', 'drop', 'sprinkle', 'sprinkleN', 'clear'),
+    g('paint', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
   ],
   'gen-lattice': [
     g('points', 'form', 'count', 'size', 'irregular', 'evolve', 'vary', 'jitter', 'ink', 'ground'),
@@ -480,6 +483,27 @@ export function groupDim(
   return Object.keys(out).length ? out : undefined
 }
 
+const COL_W = 192 // 12rem : one bar's least useful width
+
+/** Columns per group : one each, then the spare columns (the band holds
+ *  `fit`) to the tallest group, one at a time, kept only if the tallest
+ *  column ends up shorter (else every group stays one column). */
+function spreadColumns(sizes: number[], fit: number): number[] {
+  const one = sizes.map(() => 1)
+  let spare = fit - sizes.length
+  if (spare <= 0) return one
+  const rows = (n: number, c: number): number => Math.ceil(n / c)
+  const before = Math.max(...sizes)
+  const c = [...one]
+  while (spare-- > 0) {
+    let at = 0
+    for (let i = 1; i < sizes.length; i++) if (rows(sizes[i], c[i]) > rows(sizes[at], c[at])) at = i
+    if (rows(sizes[at], c[at]) <= 1) break
+    c[at]++
+  }
+  return Math.max(...sizes.map((n, i) => rows(n, c[i]))) < before ? c : one
+}
+
 export function GroupedControls({
   groups,
   inputs,
@@ -509,13 +533,36 @@ export function GroupedControls({
     })),
     ...(rest.length ? [{ title: 'more', color: COL.muted, inputs: [], list: rest }] : [])
   ].filter((g) => g.list.length > 0)
-  // Columns at least wide enough for a usable slider beside the label and the
-  // number, sharing the band's width, wrapping two by two when it narrows.
+  // How many 12rem columns the band holds (its own width, the pads' aside) :
+  // with fewer groups than that, the tallest groups spread over a second (third)
+  // column, read top to bottom, while that lowers the tallest one.
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const read = (): void => setWidth((w) => (Math.abs(w - el.clientWidth) > 1 ? el.clientWidth : w))
+    read()
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const spans = spreadColumns(
+    cols.map((g) => g.list.length),
+    Math.floor((width - 16 - (pads.length ? pads.length * 96 + 12 : 0) + 12) / (COL_W + 12))
+  )
+  // Columns at least wide enough for a bar's name, number and M (12rem : four
+  // fit the Inspector at 100 % zoom; a longer name ellipsizes, its tooltip
+  // whole), sharing the band's width, wrapping two by two when it narrows.
   return (
-    <div className="flex flex-wrap items-start gap-x-5 gap-y-2 px-2 py-1.5">
-      {cols.map((g) => (
-        <div key={g.title} className="min-w-[15rem] max-w-[24rem] flex-1">
-          <div className="flex items-center gap-2 pb-0.5">
+    <div ref={boxRef} className="flex flex-wrap items-start gap-x-3 gap-y-2 px-2 py-1.5">
+      {cols.map((g, gi) => (
+        <div
+          key={g.title}
+          className={spans[gi] > 1 ? 'min-w-0' : 'min-w-[12rem] max-w-[22rem] flex-1'}
+          style={spans[gi] > 1 ? { flex: `${spans[gi]} 1 0`, minWidth: spans[gi] * COL_W + (spans[gi] - 1) * 6 } : undefined}
+        >
+          <div className="flex items-center gap-2 pb-1">
             <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: g.color }}>
               {g.title}
             </span>
@@ -529,6 +576,7 @@ export function GroupedControls({
             dim={dim}
             layout="vertical"
             bare
+            cols={spans[gi] > 1 ? spans[gi] : undefined}
           />
         </div>
       ))}

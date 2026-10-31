@@ -762,7 +762,8 @@ const TABS: Array<{ id: RightView; label: string; key: string; hint: string; key
   { id: 'feel', label: 'Feel', key: 'G', hint: 'the global macros', keywords: ['macros', 'density', 'proximity', 'temperament'] },
   { id: 'io', label: 'Connect', key: 'A', hint: 'audio, MIDI, OSC, Resolume, dataflou, Ableton Link, the agent', keywords: ['audio', 'midi', 'osc', 'link', 'dataflou', 'agent', 'eq'] },
   { id: 'perf', label: 'Performance', key: '', hint: 'the load meter and what the picture reports', keywords: ['fps', 'cpu', 'gpu', 'meter', 'picture'] },
-  { id: 'assemble', label: 'Assemble', key: 'E', hint: 'the automatic editor : a folder of films cut into an edit', keywords: ['corpus', 'films', 'edit', 'cut'] }
+  { id: 'assemble', label: 'Assemble', key: 'E', hint: 'the automatic editor : a folder of films cut into an edit', keywords: ['corpus', 'films', 'edit', 'cut'] },
+  { id: 'ui', label: 'UI', key: '', hint: 'how the instrument looks here : the slider pointer, the UI theme', keywords: ['interface', 'look', 'appearance', 'slider', 'pointer', 'theme', 'colors'] }
 ]
 
 function pageItems(): SearchItem[] {
@@ -818,7 +819,31 @@ function pageItems(): SearchItem[] {
         'start'
       )
   }
-  return [...pages, ...tabs, depth]
+  // The UI tab's two settings (the theme moved there from the top bar in
+  // v1.3.2) : the tab, the setting flashed.
+  const uiSetting = (id: string, label: string, keywords: string[], hint: string): SearchItem => ({
+    key: `page:${id}`,
+    kind: 'page',
+    label,
+    group: 'ui',
+    keywords,
+    hint,
+    reveals: true,
+    run: () =>
+      reveal(`ui:${id}`, label, [
+        () => {
+          uncover()
+          useStore.getState().setRightView('ui')
+        }
+      ])
+  })
+  return [
+    ...pages,
+    ...tabs,
+    depth,
+    uiSetting('pointer', 'Slider pointer', ['slider', 'pointer', 'bar', 'marker', 'line', 'notch', 'cap', 'edge', 'ruler'], 'how every bar marks its stored value : line, notch, cap, lit edge, ruler'),
+    uiSetting('theme', 'UI theme', ['theme', 'colors', 'look', 'dark', 'light', 'skin'], 'the colors and type of the whole instrument (the UI tab)')
+  ]
 }
 
 /** The Inspector's ⚄ on the selected unit, folded Inspector or not : its

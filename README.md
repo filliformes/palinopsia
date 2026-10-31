@@ -54,7 +54,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 
 **Play it**
 - [What it looks like](#what-it-looks-like) · [Concept](#concept) · [Getting started](#getting-started) · [Your first five minutes](#your-first-five-minutes)
-- [Keyboard shortcuts](#keyboard-shortcuts) · [search everything](#search-everything-ctrlk) (`Ctrl+K`)
+- [Keyboard shortcuts](#keyboard-shortcuts) · [search everything](#search-everything-ctrlk) (`Ctrl+K`) · [the Inspector's bars](#the-inspectors-bars) · [the UI tab](#the-ui-tab) : slider pointer · UI theme
 - [Clicking the preview](#clicking-the-preview) : play on the picture itself, with the mouse or a pinching hand (Marbling's drops, combs and swirls)
 
 **The instrument**
@@ -194,8 +194,9 @@ first-ever launch pays this once; it persists on disk afterwards.
    **Drift** : these are the instrument's whole-image "feel" macros. Double-click
    any slider to reset it.
 3. **Click a layer's source** (the **A** button) and play with its parameters in the
-   **Inspector** below the preview. Every slider has a dice `⚄`, presets, and an
-   **M** button to bind a modulator. The busiest sources and effects sort their
+   **Inspector** below the preview. Each parameter is a **bar** : drag it anywhere
+   along (Shift : finer), click its number to type one, double-click to reset it; the
+   **M** at its end binds a modulator. Every panel has a dice `⚄` and presets. The busiest sources and effects sort their
    controls into titled columns, and a control that does nothing in the current
    setting (a keyer that is off, the light angle of a flat relief) is greyed out,
    with the reason on hover; it still works. The bar under the preview sizes it (the
@@ -259,7 +260,7 @@ In **Sonify** (also in the cheat-sheet) :
 
 **MIDI:** the **MIDI Learn** toolbar button (top bar), or the `L` key from
 anywhere : maps any controller; see [MIDI](#midi).
-**Everywhere:** double-click a slider/knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
+**Everywhere:** double-click a bar, slider or knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
 video **in / out** trim handles. In a **number box**, what you type takes effect on
 `Enter` or when you leave the box; `Esc` goes back to the value from before the edit and
 changes nothing (leaving a box you emptied does the same). Right-click a control, a layer,
@@ -524,13 +525,13 @@ lands), CPL (the coupling's mode and feature, its meter, amt and tight), then LA
 Source B, so their A·B, HUE and CPL parts are dimmed; a pinned control wears its gold
 bar.*
 
-The right column switches between **seven views** (tabs, or keys `M` / `F` / `G` /
+The right column switches between **eight views** (tabs, or keys `M` / `F` / `G` /
 `E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (the four
 layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
 blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
-Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu) and
-**assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
+Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu),
+**assemble** (the automatic editor) and **ui** (the slider pointer and the UI theme : [the UI tab](#the-ui-tab)). The column is exactly as wide as its eight tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
 The main Inspector's FX-controls band **auto-fits its parameters** : selecting any
@@ -553,6 +554,59 @@ reason on hover (a keyer that is off, the light angle of a flat relief, a palett
 unused stops); it still works. **Every control of every source and effect explains
 itself on hover** : what it does, which way it goes, and whether it restarts a growing
 picture.
+
+### The Inspector's bars
+
+Since v1.3.2 every parameter in the Inspector and the Finishing stages is one **bar**
+(`components/Bar.tsx`) : its name inside on the left, its value inside on the right, its
+**M** at the right end. It replaced the label, slider and number box, so the panels are
+much shorter (all 129 source, node and FX panels together : 31 % shorter at 100 % zoom;
+Interference 102 → 63 px, Luma Blur 109 → 63, Datamosh 361 → 220; the Finalizer
+unfolded 1085 → 757).
+
+- **A number** fills from its start (or from 0 when its range crosses 0) to the value.
+  **Drag anywhere** on the bar : a click jumps there, as a slider did; **Shift** drags at
+  a tenth of the speed from where you are (press or let go of it mid-drag : no jump).
+  **Click the number** to type one (`Enter` keeps it, `Esc` cancels, leaving the field
+  keeps it, out-of-range values are clamped). **Double-click** the bar : its default.
+  With the focus on a bar (`Tab`, or after a drag), `←` `→` step it a 200th of its range
+  (Shift : a 2000th), `Page Up / Down` a tenth, `Home` / `End` its ends, `Enter` types.
+- **Modulated**, its fill turns the modulated color (accent2) and plays the live value
+  while the pointer stays on the stored one; a drag moves the stored value by as much as
+  you drag (it never jumps to where the modulator is).
+- **A menu** of up to three short choices is a row of segments, the one playing filled;
+  a longer one (or three long words) is a bar with the choice on the right and `▾`,
+  opening the usual list (type to jump).
+- **An on / off** : the whole bar is the switch, filled while on.
+- **A color** : the bar is painted in it (name and hex in an ink that reads on it); a
+  click opens the color picker; its small **alpha** bar sits beside it (drag, Shift,
+  double-click). Its **M** shows the modulators on any of its parts (`M2·3`, the tooltip
+  says which part).
+- **A trigger** (`drop ▸`, `clear ▸`) : a button bar; its M binds a modulator to fire it.
+- The **M** : click it for the Modulate panel, right-click clears every modulation on the
+  bar. A greyed bar does nothing in the current setting (the reason first in its
+  tooltip); a long name ellipsizes, never a number. XY pads stay pads, at the right.
+
+A column of a titled panel holds a bar's name, number and M (12rem); when the
+Inspector holds more columns than a panel has groups, its tallest groups spread over a
+second column, read top to bottom.
+
+### The UI tab
+
+The last tab of the right column, **ui** : how the instrument looks on this computer
+(kept per machine, never in a session).
+
+- **Slider pointer** : how every bar marks its stored value, with a bar beside the menu
+  to try it on. **line** (the default : a thin bright line, glowing in the accent),
+  **notch** (two small triangles on the top and bottom edges), **cap** (a small fader cap
+  with a groove), **lit edge** (no marker : the fill fades in from its start and ends in
+  a solid band; a tick marks the stored value while it is modulated) and **ruler** (ticks
+  every tenth along the bottom, a tall tick at the value). On the light themes the
+  pointers take the theme's text color.
+- **UI theme** : the sixteen themes, moved here from the top bar.
+
+`Ctrl+K` → **UI**, **Slider pointer** or **UI theme** opens the tab. The UI zoom stays
+in the top bar (`Ctrl+=` / `Ctrl+-` / `Ctrl+0`).
 
 ## Video sources
 
@@ -722,7 +776,8 @@ session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Ad
 session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
 button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
-zoom, the theme selector, and, at the far right, **⚡ Flush**, the panic
+zoom, and, at the far right, **⚡ Flush** (the UI theme moved to [the UI tab](#the-ui-tab)
+in v1.3.2), the panic
 button (also key `0`) that drops every self-feeding buffer at once: per-layer
 trails, the Feedback / Réponse / Chronoscan frame rings, the Sediment / Scanner
 accumulators, the consume blend's competition field, and the persistent buffers of
@@ -994,7 +1049,9 @@ The two modes differ in what the parameter's own slider means once bound:
   top quarter); stored on, it switches off only near the troughs.
 - A modulated slider's thumb moves with the live value. **Dragging it moves the base
   by as much as you drag** (from wherever the thumb was when you grabbed it); let go
-  and it follows the modulator again. Counts (a Collage's `cuts` and `films`) step in
+  and it follows the modulator again. A modulated **bar** (the Inspector, the Finishing)
+  fills in the modulated color to the live value while its pointer stays on the stored
+  one, and a drag moves the stored value the same way. Counts (a Collage's `cuts` and `films`) step in
   whole numbers. Double-clicking a binding's depth slider puts it back to 0.5. A modulated
   on/off button turns the modulated color too and shows its live ON / OFF.
 

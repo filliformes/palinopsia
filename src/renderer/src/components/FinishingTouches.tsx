@@ -22,6 +22,7 @@ import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { ContextLightPad } from './ContextLightPad'
 import { VibePaletteStrip } from './VibePaletteStrip'
+import { FloatBar } from './Bar'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -208,20 +209,17 @@ function VibeOpacityRow({ inst }: { inst: FxInstance }): JSX.Element {
   const setFxOpacity = useStore((s) => s.setFxOpacity)
   const v = inst.opacity ?? 1
   return (
-    <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-accent2">opacity</span>
-      <input
-        type="range"
+    <div className="border-b border-border bg-panel2/40 px-2 py-1">
+      <FloatBar
+        label="opacity"
+        title="Vibe dry/wet : how much the palette re-colors the picture. Drag (Shift : finer), double-click = full, click the number to type."
+        value={v}
         min={0}
         max={1}
-        step={0.01}
-        value={v}
-        onChange={(e) => setFxOpacity({ kind: 'master' }, inst.id, Number(e.target.value))}
-        onDoubleClick={() => setFxOpacity({ kind: 'master' }, inst.id, 1)}
-        className="min-w-0 flex-1 accent-accent2"
-        title={`Vibe dry/wet ${v.toFixed(2)} : how much the palette re-colors the picture. Double-click = full.`}
+        def={1}
+        frac={2}
+        onChange={(n) => setFxOpacity({ kind: 'master' }, inst.id, n)}
       />
-      <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted">{v.toFixed(2)}</span>
     </div>
   )
 }
