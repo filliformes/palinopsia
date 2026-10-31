@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ModTarget } from '@shared/types'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { modTargetKey, useStore } from '../store'
+import { controlKey } from '../modKey'
 import { frameVals } from '../engine/frameVals'
 import { AutoControls, EnumSwitch } from './AutoControls'
 import { HARMONIES } from './VibePaletteStrip'
@@ -359,8 +360,9 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
 function useDriven(names: string[], modTargetFor: (input: string) => ModTarget): Set<string> {
   const bound = useStore((s) => {
     const keys = new Set<string>()
-    for (const a of s.composition.modMatrix) keys.add(modTargetKey(a.target))
-    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(modTargetKey(d))
+    // (a color's part counts for its color : controlKey)
+    for (const a of s.composition.modMatrix) keys.add(controlKey(a.target))
+    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(controlKey(d))
     return names.filter((n) => keys.has(modTargetKey(modTargetFor(n)))).join(',')
   })
   const [macro, setMacro] = useState('')

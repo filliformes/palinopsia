@@ -103,6 +103,8 @@ import { GLUE_VOICES, defaultEq, normalizeEq, type SoniGlue } from './audio/eqMa
 import { eqPresets, type EqPreset } from './audio/eqPresets'
 import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
+import { colorOf, hsvaOf, PART_INDEX, PART_OF_WORD, PART_WORD, withPart } from './engine/colorParts'
+import type { ColorChannel } from '@shared/types'
 import { useStore } from './store'
 import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
@@ -183,6 +185,23 @@ function resolveInputValue(shaderId: string, name: string, args: Args): number |
   return null
 }
 
+/** A shader input's value from OSC, or one of a color's parts by name
+ *  (/…/tint/hue 0.3) : one normalized number sets that part in the picker's own
+ *  space (hue, saturation, brightness, alpha), the rest of the stored color held.
+ *  Anything else after the input is ignored, as it always was. */
+function resolveOrPart(shaderId: string, name: string, part: string | undefined, stored: unknown, args: Args): number | number[] | null {
+  const ch = part ? PART_OF_WORD[part.toLowerCase()] : undefined
+  const d = ch ? inputsForShader(shaderId).find((x) => x.name === name) : undefined
+  if (!ch || d?.type !== 'color') return resolveInputValue(shaderId, name, args)
+  return withPart(colorOf(stored, d.def), ch, clamp01(firstNum(args)))
+}
+
+/** A layer slot's stored inputs. */
+function sourceInputs(li: number, slot: 'A' | 'B'): Record<string, number | number[]> | undefined {
+  const l = useStore.getState().composition.layers[li]
+  return (slot === 'A' ? l?.sourceA : l?.sourceB)?.inputs
+}
+
 function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
   const l = useStore.getState().composition.layers[li]
   if (!l) return null
@@ -192,7 +211,7 @@ function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
 
 /** The FX unit at `i` (0-based) in a scope's rack : master excludes the locked
  *  finalizers (address those via /master/vibe · /master/context). */
-function fxAt(scope: FxScope, i: number): { id: string; shaderId: string } | null {
+function fxAt(scope: FxScope, i: number): { id: string; shaderId: string; inputs: Record<string, number | number[]> } | null {
   const c = useStore.getState().composition
   let arr
   if (scope.kind === 'master') arr = c.master.filter((f) => !f.locked)
@@ -203,7 +222,7 @@ function fxAt(scope: FxScope, i: number): { id: string; shaderId: string } | nul
     arr = scope.kind === 'layer' ? l.fx : scope.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
   }
   const u = arr[i]
-  return u && u.shaderId ? { id: u.id, shaderId: u.shaderId } : null
+  return u && u.shaderId ? { id: u.id, shaderId: u.shaderId, inputs: u.inputs } : null
 }
 
 function resolveGenerator(str: string): string | null {
@@ -322,7 +341,7 @@ function route(address: string, args: Args): void {
           const scope: FxScope = { kind: slot === 'A' ? 'sourceA' : 'sourceB', layer: li }
           const u = fxAt(scope, fi)
           if (!u) return
-          const v = resolveInputValue(u.shaderId, input, args)
+          const v = resolveOrPart(u.shaderId, input, segs[8], u.inputs[input], args)
           if (v !== null) st.setFxInput(scope, u.id, input, v)
           return
         }
@@ -331,7 +350,7 @@ function route(address: string, args: Args): void {
         if (!sid) return
         // Marbling : a drop at a place (two numbers or more; one number is the plain trigger)
         if (input === 'drop' && args.length >= 2 && sourceEvent({ layer: li, slot }, 'drop', oscNums(args))) return
-        const v = resolveInputValue(sid, input, args)
+        const v = resolveOrPart(sid, input, segs[6], sourceInputs(li, slot)?.[input], args)
         if (v !== null) st.setSourceInput(li, slot, input, v)
         return
       }
@@ -343,7 +362,7 @@ function route(address: string, args: Args): void {
         const scope: FxScope = { kind: 'layer', layer: li }
         const u = fxAt(scope, fi)
         if (!u) return
-        const v = resolveInputValue(u.shaderId, input, args)
+        const v = resolveOrPart(u.shaderId, input, segs[6], u.inputs[input], args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
         return
       }
@@ -456,7 +475,7 @@ function route(address: string, args: Args): void {
         const scope: FxScope = { kind: 'master' }
         const u = fxAt(scope, fi)
         if (!u) return
-        const v = resolveInputValue(u.shaderId, input, args)
+        const v = resolveOrPart(u.shaderId, input, segs[5], u.inputs[input], args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
         return
       }
@@ -467,7 +486,7 @@ function route(address: string, args: Args): void {
         if (!input) return
         const u = st.composition.master.find((f) => f.shaderId === shaderId)
         if (!u) return
-        const v = resolveInputValue(shaderId, input, args)
+        const v = resolveOrPart(shaderId, input, segs[4], u.inputs[input], args)
         if (v !== null) st.setFxInput({ kind: 'master' }, u.id, input, v)
         return
       }
@@ -496,7 +515,7 @@ function route(address: string, args: Args): void {
         const sid = st.composition.background?.source?.shaderId
         if (!sid) return
         if (segs[3] === 'drop' && args.length >= 2 && sourceEvent('bg', 'drop', oscNums(args))) return
-        const v = resolveInputValue(sid, segs[3], args)
+        const v = resolveOrPart(sid, segs[3], segs[4], st.composition.background?.source?.inputs[segs[3]], args)
         if (v !== null) st.setBackgroundInput(segs[3], v)
         return
       }
@@ -507,7 +526,7 @@ function route(address: string, args: Args): void {
         const scope: FxScope = { kind: 'background' }
         const u = fxAt(scope, fi)
         if (!u) return
-        const v = resolveInputValue(u.shaderId, input, args)
+        const v = resolveOrPart(u.shaderId, input, segs[5], u.inputs[input], args)
         if (v !== null) st.setFxInput(scope, u.id, input, v)
         return
       }
@@ -1443,8 +1462,19 @@ function enumerateLeaves(): Leaf[] {
       add(`/opsia/body/${bf}`, 0, 1, bodyBus.feature(bf), `Body ${bf} (0..1) : the room as control`)
     }
   }
+  // A color by its parts, one number each (the picker's space : /…/tint/hue).
+  const addParts = (path: string, raw: unknown, def: unknown, desc: string, parts: ColorChannel[]): void => {
+    const hsva = hsvaOf(colorOf(raw, def))
+    for (const ch of parts) add(`${path}/${PART_WORD[ch]}`, 0, 1, hsva[PART_INDEX[ch]], `${desc} : its ${PART_WORD[ch]}`)
+  }
   for (const [key, sid] of [['vibe', 'fx-vibe'], ['context', 'fx-context'], ['finalizer', 'fx-finalizer']] as const) {
     for (const d of inputsForShader(sid)) {
+      // (the finishing stages read their colors' RGB : no alpha)
+      if (d.type === 'color') {
+        const inst = st.composition.master.find((f) => f.shaderId === sid)
+        addParts(`/opsia/master/${key}/${d.name}`, inst?.inputs?.[d.name], d.def, `${key} · ${d.label}`, ['h', 's', 'v'])
+        continue
+      }
       if (d.type !== 'float') continue
       const min = typeof d.min === 'number' ? d.min : 0
       const max = typeof d.max === 'number' ? d.max : 1
@@ -1460,6 +1490,10 @@ function enumerateLeaves(): Leaf[] {
   if (bg?.source?.shaderId) {
     const sid = bg.source.shaderId
     for (const d of inputsForShader(sid)) {
+      if (d.type === 'color') {
+        addParts(`/opsia/bg/source/${d.name}`, bg.source.inputs?.[d.name], d.def, `Background · ${d.label}`, ['h', 's', 'v', 'a'])
+        continue
+      }
       if (d.type !== 'float') continue
       add(`/opsia/bg/source/${d.name}`, 0, 1, inputNorm(sid, d.name, bg.source.inputs?.[d.name]), `Background · ${d.label}`)
     }

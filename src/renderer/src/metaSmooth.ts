@@ -17,6 +17,7 @@ import type { CompositionState, ModTarget } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { withSonifyParam } from './audio/sonify'
 import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
+import { colorOf, withPart } from './engine/colorParts'
 import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
@@ -144,12 +145,15 @@ function applyDest(target: ModTarget, shaped: number): void {
   }
   const c = st.composition
   let shaderId: string | null = null
+  let inputs: Record<string, number | number[]> | undefined
   if (target.kind === 'source') {
     const layer = c.layers[target.layer]
     const slot = target.slot === 'A' ? layer?.sourceA : layer?.sourceB
     shaderId = slot?.shaderId ?? null
+    inputs = slot?.inputs
   } else if (target.kind === 'bgSource') {
     shaderId = c.background?.source.shaderId ?? null
+    inputs = c.background?.source.inputs
   } else {
     const s = target.scope
     const arr =
@@ -162,12 +166,18 @@ function applyDest(target: ModTarget, shaped: number): void {
             : s.kind === 'sourceA'
               ? c.layers[s.layer]?.sourceAFx
               : c.layers[s.layer]?.sourceBFx
-    shaderId = arr?.find((f) => f.id === target.instId)?.shaderId ?? null
+    const unit = arr?.find((f) => f.id === target.instId)
+    shaderId = unit?.shaderId ?? null
+    inputs = unit?.inputs
   }
   if (!shaderId) return
   const d = inputsForShader(shaderId).find((x) => x.name === target.input)
   if (!d) return
-  const value = inputValueFrom01(d, shaped) // float span · enum snap · bool threshold
+  // A color's part : the stored color with that part where the knob put it, the
+  // others as they are (a hue to black and back keeps it : colorParts.withPart).
+  const value = target.ch
+    ? d.type === 'color' ? withPart(colorOf(inputs?.[target.input], d.def), target.ch, shaped) : null
+    : inputValueFrom01(d, shaped) // float span · enum snap · bool threshold
   if (value === null) return
   if (target.kind === 'source') {
     st.setSourceInput(target.layer, target.slot, target.input, value)

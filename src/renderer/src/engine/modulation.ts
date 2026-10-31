@@ -16,8 +16,10 @@ import { auModBase, setAuMod } from './audioLayerMod'
 import { auBaseOf, auSpan, auValueOf } from '@shared/auMod'
 import { forkShapeGhosts, pruneShapes, shapeValue } from './modShape'
 import { condPlays, defaultSteps, parseStepCond, stepLength, stepsOf, swingLate } from './stepSeq'
-import type { CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
+import type { ColorChannel, CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
+import { colorOf, fitPart, hsvaOf, PART_INDEX, rgbaOf } from './colorParts'
+import { controlKey } from '../modKey'
 import { audioBus } from './audioIn'
 import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
 import { visionBus } from './visionIn'
@@ -1399,8 +1401,8 @@ export function registerKeyEveryBase(fn: () => number): void {
 }
 
 function liveKey(t: import('@shared/types').ModTarget): string {
-  if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
-  if (t.kind === 'bgSource') return `bgsrc:${t.input}`
+  if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}${t.ch ? `#${t.ch}` : ''}`
+  if (t.kind === 'bgSource') return `bgsrc:${t.input}${t.ch ? `#${t.ch}` : ''}`
   if (t.kind === 'meta') return `meta:${t.knob}`
   if (t.kind === 'sonify') return `soni:${t.param}`
   if (t.kind === 'layer') return `lay:${t.layer}:${t.field}`
@@ -1412,7 +1414,83 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
-  return `fx:${scopeKey}:${t.instId}:${t.input}`
+  return `fx:${scopeKey}:${t.instId}:${t.input}${t.ch ? `#${t.ch}` : ''}`
+}
+
+// ── Colors, by their parts (colorParts.ts) ───────────────────────────
+// A color input is modulated by its parts in the picker's own space : its hue
+// (the picker's slider), saturation and brightness (its pad, across and up) and
+// alpha. This frame's colors as their parts stand, by the color's own key : the
+// stored color's HSVA (`base`), then each part a binding or a gliding knob moved
+// (`cur`). Every write lands on the parts the others left, so a hue on one
+// modulator, a brightness on another and a Meta knob on the saturation move one
+// color together, and what nothing moves stays as stored.
+const colorFrame = new Map<string, { base: number[]; cur: number[] }>()
+/** The RGBA each modulated color plays this frame, by its color's key (the
+ *  Inspector's swatch paints it). */
+export const liveColorValues = new Map<string, number[]>()
+
+/** One part of a color, moved by `part` (from that part's stored value); writes
+ *  the whole color and returns the part's value. */
+function writeColorPart(
+  t: import('@shared/types').ModTarget,
+  ch: ColorChannel,
+  stored: unknown,
+  def: unknown,
+  part: (base: number) => number,
+  write: (rgba: number[]) => void
+): number {
+  const key = controlKey(t)
+  let f = colorFrame.get(key)
+  if (!f) {
+    const base = hsvaOf(colorOf(stored, def))
+    f = { base, cur: base.slice() }
+    colorFrame.set(key, f)
+  }
+  const i = PART_INDEX[ch]
+  f.cur[i] = fitPart(ch, part(f.base[i]), f.base[i])
+  const rgba = rgbaOf(f.cur)
+  liveColorValues.set(key, rgba)
+  write(rgba)
+  return f.cur[i]
+}
+
+/** What the composition stores for an input target (undefined : nothing set). */
+function storedInputOf(c: CompositionState, t: import('@shared/types').ModTarget): number | number[] | undefined {
+  if (t.kind === 'source') {
+    const l = c.layers[t.layer]
+    return (t.slot === 'A' ? l?.sourceA : l?.sourceB)?.inputs[t.input]
+  }
+  if (t.kind === 'bgSource') return c.background?.source.inputs[t.input]
+  if (t.kind !== 'fx') return undefined
+  const s = t.scope
+  const arr =
+    s.kind === 'master'
+      ? c.master
+      : s.kind === 'background'
+        ? c.background?.fx
+        : s.kind === 'layer'
+          ? c.layers[s.layer]?.fx
+          : s.kind === 'sourceA'
+            ? c.layers[s.layer]?.sourceAFx
+            : c.layers[s.layer]?.sourceBFx
+  return arr?.find((f) => f.id === t.instId)?.inputs[t.input]
+}
+
+/** A part under a direct modulator : a 0..1 float by the binding's mode, except
+ *  the hue under Replace, which swings round its place and wraps (depth 0.5 :
+ *  once round the wheel) instead of stopping at red. */
+function partFromMod(
+  ch: ColorChannel,
+  base: number,
+  v: number,
+  depth: number,
+  mode: import('@shared/types').ModMode | undefined
+): number {
+  if (ch === 'h' && mode !== 'multiply') return base + (v - 0.5) * 2 * depth
+  const d: ModDesc = { type: 'float', min: 0, max: ch === 'v' ? Math.max(1, base) : 1, def: base }
+  const x = inputValueForMode(d, base, v, depth, mode)
+  return typeof x === 'number' ? x : base
 }
 
 // A modulatable input descriptor (float / long-enum / bool), widened so the
@@ -1582,17 +1660,18 @@ const VIDEO_MOD_DESCS: Record<string, ModDesc> = {
 // The engine surface the overlay passes write into (the Compositor, or the
 // output window's recording proxy). Shared by applyModulation + applyMetaGlides.
 export interface ModComp {
+  // (a number, or a whole color when one of its parts is modulated)
   layers: Array<{
-    setInput: (slot: 'A' | 'B', name: string, value: number) => void
+    setInput: (slot: 'A' | 'B', name: string, value: number | number[]) => void
     setVideoInput?: (slot: 'A' | 'B', name: string, value: number) => void
   } | null>
   setFxInput: (
     scope: import('@shared/types').FxScope,
     instId: string,
     name: string,
-    value: number
+    value: number | number[]
   ) => void
-  setBgSourceInput: (name: string, value: number) => void
+  setBgSourceInput: (name: string, value: number | number[]) => void
   // The Background's opacity / speed / shadow (a final override, like a layer's).
   setBgParam: (field: 'opacity' | 'speed' | 'depth', value: number) => void
   // The fulldome mapping's sliders (a final override; null base while the dome is off).
@@ -1730,6 +1809,19 @@ export function writeModTarget(
   if (!shaderId) return
   const d = descFor(shaderId).find((x) => x.name === t.input)
   if (!d) return
+  // A color's part : absolute over the part (the hue : once round the wheel).
+  if (t.ch) {
+    if (d.type !== 'color') return
+    const x = Math.max(0, Math.min(1, shaped01))
+    const stored = storedInputOf(c, t)
+    const part = writeColorPart(t, t.ch, stored, d.def, () => x, (rgba) => {
+      if (t.kind === 'source') comp.layers[t.layer]?.setInput(t.slot, t.input, rgba)
+      else if (t.kind === 'bgSource') comp.setBgSourceInput(t.input, rgba)
+      else comp.setFxInput(t.scope, t.instId, t.input, rgba)
+    })
+    liveModValues.set(liveKey(t), part)
+    return
+  }
   const value = inputValueFrom01(d, shaped01)
   if (value === null) return
   liveModValues.set(liveKey(t), value)
@@ -1779,6 +1871,8 @@ export function applyModulation(
   // a removed mod-matrix assignment leaves a stale entry that liveOverlay keeps
   // writing into the slider forever, so the control never reverts to its base.
   liveModValues.clear()
+  colorFrame.clear()
+  liveColorValues.clear()
   // Global modulation mute: with the maps cleared and no writes issued, the
   // Compositor keeps this frame's base values (syncFromState already ran) and
   // every slider reverts to its stored position. One flag, whole rig held still.
@@ -1949,6 +2043,16 @@ export function applyModulation(
       const input = a.target.input
       const d = descFor(slot.shaderId).find((x) => x.name === input)
       if (!d) continue
+      const ch = a.target.ch
+      if (ch) {
+        if (d.type !== 'color') continue
+        const { layer: li, slot: sl } = a.target
+        const final = writeColorPart(a.target, ch, slot.inputs[input], d.def,
+          (b) => partFromMod(ch, b, v, a.depth, a.mode),
+          (rgba) => comp.layers[li]?.setInput(sl, input, rgba))
+        liveModValues.set(liveKey(a.target), final)
+        continue
+      }
       const final = inputValueForMode(d, slot.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
@@ -1959,6 +2063,15 @@ export function applyModulation(
       const input = a.target.input
       const d = descFor(src.shaderId).find((x) => x.name === input)
       if (!d) continue
+      const ch = a.target.ch
+      if (ch) {
+        if (d.type !== 'color') continue
+        const final = writeColorPart(a.target, ch, src.inputs[input], d.def,
+          (b) => partFromMod(ch, b, v, a.depth, a.mode),
+          (rgba) => comp.setBgSourceInput(input, rgba))
+        liveModValues.set(liveKey(a.target), final)
+        continue
+      }
       const final = inputValueForMode(d, src.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)
@@ -1991,6 +2104,15 @@ export function applyModulation(
       }
       const d = descFor(inst.shaderId).find((x) => x.name === input)
       if (!d) continue
+      const ch = a.target.ch
+      if (ch) {
+        if (d.type !== 'color') continue
+        const final = writeColorPart(a.target, ch, inst.inputs[input], d.def,
+          (b) => partFromMod(ch, b, v, a.depth, a.mode),
+          (rgba) => comp.setFxInput(scope, instId, input, rgba))
+        liveModValues.set(liveKey(a.target), final)
+        continue
+      }
       const final = inputValueForMode(d, inst.inputs[input], v, a.depth, a.mode)
       if (final === null) continue
       liveModValues.set(liveKey(a.target), final)

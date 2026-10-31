@@ -8,11 +8,12 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
-import type { ModMode, ModTarget } from '@shared/types'
+import type { ColorChannel, CompositionState, ModAssignment, ModMode, ModTarget } from '@shared/types'
 import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
@@ -22,6 +23,9 @@ import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { ModShapeEditor, ShapeToggle } from './ModShapeEditor'
 import { PinZone } from './Pin'
+import { partOf, withPartTarget } from '../modKey'
+import { COLOR_PARTS, PART_WHERE, PART_WORD } from '../engine/colorParts'
+import { liveColorValues } from '../engine/modulation'
 
 /** The modulation matrix is full : say so (a click that does nothing reads as
  *  broken), and how to make room. */
@@ -379,7 +383,7 @@ function controlFor({
     case 'long':
       return <EnumControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} />
     case 'color':
-      return <ColorControl inp={inp} value={value} onChange={onChange} dense={dense} rgbOnly={rgbOnly} />
+      return <ColorControl inp={inp} value={value} onChange={onChange} modTargetFor={modTargetFor} dense={dense} rgbOnly={rgbOnly} />
     case 'point2D':
       return <XYControl inp={inp} value={value} onChange={onChange} />
     default:
@@ -1149,7 +1153,7 @@ export function EnumSwitch({
   )
 }
 
-// ── color → swatch + alpha ───────────────────────────────────────────
+// ── color : hex helpers ──────────────────────────────────────────────
 function toHex(c: number[]): string {
   const h = (x: number): string =>
     Math.round(Math.max(0, Math.min(1, x)) * 255)
@@ -1165,34 +1169,262 @@ function fromHex(hex: string, alpha: number): number[] {
   return [r, g, b, alpha]
 }
 
+// ── color → swatch + alpha, its parts modulatable ───────────────────
+// The swatch opens the color picker : its pad (saturation across, brightness
+// up) and its slider (the hue). Those parts, and alpha, are modulated like any
+// float, in the picker's own space (engine/colorParts.ts) : ONE M beside the
+// swatch, the Modulate panel picks the part (ColorPartSwitch). A driven color's
+// swatch paints the color it plays (its border in the modulated color), the
+// alpha thumb its live alpha.
+
+/** The Finishing stages read their colors' RGB only (FinishingSections' rgbOnly) :
+ *  no alpha part there. */
+const RGB_ONLY_SHADERS = new Set(['fx-vibe', 'fx-context', 'fx-finalizer'])
+const RGB_PARTS: ColorChannel[] = ['h', 's', 'v']
+
+function rgbOnlyTarget(c: CompositionState, t: ModTarget): boolean {
+  if (t.kind !== 'fx' || t.scope.kind !== 'master') return false
+  const sid = c.master.find((f) => f.id === t.instId)?.shaderId
+  return !!sid && RGB_ONLY_SHADERS.has(sid)
+}
+
+/** A color control's part targets, the bindings on them and whether anything
+ *  drives them (a modulator, or a Meta knob carrying one). */
+export function useColorParts(
+  base: ModTarget | undefined,
+  rgbOnly: boolean
+): { targets: ModTarget[]; bound: ModAssignment[]; driven: boolean } {
+  const baseKey = base ? modTargetKey(base) : ''
+  const targets = useMemo(
+    () => (base ? (rgbOnly ? RGB_PARTS : COLOR_PARTS).flatMap((ch) => withPartTarget(base, ch) ?? []) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseKey, rgbOnly]
+  )
+  const keys = useMemo(() => new Set(targets.map(modTargetKey)), [targets])
+  const bound = useStore(
+    useShallow((s) => (keys.size ? s.composition.modMatrix.filter((a) => keys.has(modTargetKey(a.target))) : []))
+  )
+  const knobbed = useStore(
+    (s) => keys.size > 0 && s.composition.metaKnobs.some((k) => k.destinations.some((d) => keys.has(modTargetKey(d))))
+  )
+  return { targets, bound, driven: bound.length > 0 || knobbed }
+}
+
+/** The M of a color : one for all its parts. A click opens the Modulate panel on
+ *  the part already bound (else the hue), and closes it from any of them; lit
+ *  while a part is bound; a right-click clears all of them. */
+export function ColorModButton({
+  targets,
+  bound,
+  label
+}: {
+  targets: ModTarget[]
+  bound: ModAssignment[]
+  label: string
+}): JSX.Element {
+  const { onAssign, activeKey } = useContext(AssignContext)
+  const keys = targets.map(modTargetKey)
+  const open = targets.find((_, i) => keys[i] === activeKey)
+  const first = targets.find((_, i) => bound.some((a) => modTargetKey(a.target) === keys[i]))
+  const isBound = bound.length > 0
+  const mods = [...new Set(bound.map((a) => a.mod + 1))].sort((a, b) => a - b)
+  const now = targets
+    .map((t, i) => {
+      const on = bound.filter((a) => modTargetKey(a.target) === keys[i]).map((a) => `M${a.mod + 1}`)
+      const ch = partOf(t)
+      return on.length && ch ? `${PART_WORD[ch]} ${on.join(' ')}` : ''
+    })
+    .filter(Boolean)
+    .join(', ')
+  function clearAll(): void {
+    const st = useStore.getState()
+    for (const b of bound) st.removeAssignment(b.id)
+    const ks = new Set(keys)
+    st.composition.metaKnobs.forEach((k, i) => {
+      for (const d of k.destinations) if (ks.has(modTargetKey(d))) useStore.getState().toggleMetaDest(i, d)
+    })
+  }
+  return (
+    <button
+      onClick={() => onAssign?.(open ?? first ?? targets[0], label)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation() // (the control's own menu, Persistent, is under it)
+        clearAll()
+      }}
+      className={`shrink-0 rounded px-1 font-mono text-[9px] leading-4 transition-colors ${
+        isBound
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : open
+            ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
+            : 'bg-panel3/60 text-muted hover:text-text'
+      }`}
+      title={`Modulate ${label} : its hue (the picker's color slider), saturation and brightness (its pad, across and up)${targets.length > 3 ? ' or alpha' : ''}${now ? ` (now : ${now})` : ''}. Right-click clears all its modulation`}
+    >
+      M{isBound ? mods.join('·') : ''}
+    </button>
+  )
+}
+
+/** The Modulate panel's part switch, when it modulates a color : hue,
+ *  saturation, brightness (and alpha), each lit while something drives it, and
+ *  where the picker shows the one open. */
+export function ColorPartSwitch({
+  target,
+  onPick
+}: {
+  target: ModTarget
+  onPick: (t: ModTarget) => void
+}): JSX.Element | null {
+  const ch = partOf(target)
+  const noAlpha = useStore((s) => rgbOnlyTarget(s.composition, target))
+  const chs = noAlpha ? RGB_PARTS : COLOR_PARTS
+  const lit = useStore(
+    useShallow((s) =>
+      chs.map((c) => {
+        const t = withPartTarget(target, c)
+        const k = t ? modTargetKey(t) : ''
+        return (
+          s.composition.modMatrix.some((a) => modTargetKey(a.target) === k) ||
+          s.composition.metaKnobs.some((kn) => kn.destinations.some((d) => modTargetKey(d) === k))
+        )
+      })
+    )
+  )
+  if (!ch) return null
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 gap-0.5">
+        {chs.map((c, i) => (
+          <button
+            key={c}
+            onClick={() => {
+              const t = withPartTarget(target, c)
+              if (t && c !== ch) onPick(t)
+            }}
+            className={`min-w-0 flex-auto truncate rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
+              lit[i] ? 'bg-accent/20 text-accent' : c === ch ? 'bg-accent2/25 text-accent2' : 'bg-panel3/60 text-muted hover:text-text'
+            } ${c === ch ? 'ring-1 ring-accent2' : ''}`}
+            title={`${PART_WORD[c]} : ${PART_WHERE[c]}${lit[i] ? ' (modulated)' : ''}`}
+          >
+            {PART_WORD[c]}
+          </button>
+        ))}
+      </div>
+      <span className="truncate font-mono text-[9px] text-muted">{PART_WHERE[ch]}</span>
+    </div>
+  )
+}
+
+/** A readout's text, written into React's own text node (replacing the node
+ *  would leave React updating a detached one). */
+function setText(el: HTMLElement | null, s: string): void {
+  const n = el?.firstChild
+  if (n && n.nodeType === 3 && n.nodeValue !== s) n.nodeValue = s
+}
+
 function ColorControl({
   inp,
   value,
   onChange,
+  modTargetFor,
   dense = false,
   rgbOnly = false
 }: {
   inp: IsfInputDesc
   value: Value | undefined
   onChange: (name: string, value: Value) => void
+  modTargetFor?: (inputName: string) => ModTarget
   dense?: boolean
   rgbOnly?: boolean
 }): JSX.Element {
   const def = Array.isArray(inp.def) ? inp.def : [1, 1, 1, 1]
   const v = Array.isArray(value) && value.length >= 3 ? value : def
   const alpha = v[3] ?? 1
+  const base = modTargetFor?.(inp.name)
+  const { targets, bound, driven } = useColorParts(base, rgbOnly)
+  const colorKey = base ? modTargetKey(base) : null
+  const alphaKey = targets[3] ? modTargetKey(targets[3]) : null
+  const alphaBound = !!alphaKey && bound.some((a) => modTargetKey(a.target) === alphaKey)
+  const swatchRef = useRef<HTMLInputElement | null>(null)
+  const hexRef = useRef<HTMLSpanElement | null>(null)
+  const alphaRef = useRef<HTMLInputElement | null>(null)
+  const alphaTextRef = useRef<HTMLSpanElement | null>(null)
+  // the stored color, for the frames nothing plays it and for the picker
+  const baseRef = useRef({ hex: toHex(v), alpha })
+  baseRef.current = { hex: toHex(v), alpha }
+
+  // A driven color's swatch (and hex, and alpha) shows what it plays, one shared
+  // rAF writing the DOM (never React). Not while the picker or the slider has
+  // the focus : the picker edits the STORED color (the swatch is set back to it
+  // as it opens), the modulation goes on over whatever is picked.
+  useEffect(() => {
+    const sw = swatchRef.current
+    if (!driven || !colorKey || !sw) return
+    const paint = (): void => {
+      const live = liveColorValues.get(colorKey)
+      const hex = live ? toHex(live) : baseRef.current.hex
+      const doc = sw.ownerDocument
+      if (doc.activeElement !== sw && sw.value !== hex) sw.value = hex
+      setText(hexRef.current, hex)
+      const a = live ? live[3] : baseRef.current.alpha
+      const al = alphaRef.current
+      if (al && doc.activeElement !== al && al.value !== String(a)) al.value = String(a)
+      setText(alphaTextRef.current, a.toFixed(2))
+    }
+    const stop = registerLiveOverlay({ paint, view: sw.ownerDocument.defaultView ?? undefined })
+    return () => {
+      stop()
+      sw.value = baseRef.current.hex
+      setText(hexRef.current, baseRef.current.hex)
+      if (alphaRef.current) alphaRef.current.value = String(baseRef.current.alpha)
+      setText(alphaTextRef.current, baseRef.current.alpha.toFixed(2))
+    }
+  }, [driven, colorKey])
+
+  const toBase = (e: { currentTarget: HTMLInputElement }): void => {
+    if (driven) e.currentTarget.value = baseRef.current.hex
+  }
+  const swatchProps = {
+    ref: swatchRef,
+    type: 'color',
+    value: toHex(v),
+    onPointerDown: toBase,
+    onFocus: toBase,
+    onChange: (e: { target: HTMLInputElement }) => onChange(inp.name, fromHex(e.target.value, alpha))
+  }
+  const swatchEdge = driven ? 'border-accent2' : 'border-border'
+  // the alpha slider grabbed while modulated : from the stored alpha, let go after
+  const alphaProps = {
+    ref: alphaRef,
+    type: 'range',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    value: alpha,
+    onPointerDown: (e: { currentTarget: HTMLInputElement }) => {
+      if (driven) e.currentTarget.value = String(baseRef.current.alpha)
+    },
+    onPointerUp: (e: { currentTarget: HTMLInputElement }) => {
+      if (driven) e.currentTarget.blur()
+    },
+    onChange: (e: { target: HTMLInputElement }) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)]),
+    className: `min-w-0 flex-1 ${alphaBound ? 'accent-accent2' : 'accent-accent'}`
+  }
+  const mod = targets.length ? <ColorModButton targets={targets} bound={bound} label={inp.label} /> : null
+  // (laid out as a float's row : its M in the M column, the hex in the value column)
   if (dense && rgbOnly) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">
         {denseLabel(inp)}
         <input
-          type="color"
-          value={toHex(v)}
-          onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
-          className="h-4 w-10 shrink-0 cursor-pointer rounded border border-border bg-panel2"
+          {...swatchProps}
+          className={`h-4 w-10 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
           title={`${inp.label} : ${toHex(v)} : click to pick`}
         />
-        <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted">{toHex(v)}</span>
+        <div className="min-w-0 flex-1" />
+        {mod}
+        <span ref={hexRef} className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{toHex(v)}</span>
       </div>
     )
   }
@@ -1201,47 +1433,30 @@ function ColorControl({
       <div className="flex min-w-0 items-center gap-1.5">
         {denseLabel(inp)}
         <input
-          type="color"
-          value={toHex(v)}
-          onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
-          className="h-4 w-8 shrink-0 cursor-pointer rounded border border-border bg-panel2"
+          {...swatchProps}
+          className={`h-4 w-8 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
           title={`${inp.label} : RGB`}
         />
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={alpha}
-          onChange={(e) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)])}
-          className="min-w-0 flex-1 accent-accent"
-          title={`${inp.label} : alpha ${alpha.toFixed(2)}`}
-        />
-        <span className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{alpha.toFixed(2)}</span>
+        <input {...alphaProps} title={`${inp.label} : alpha ${alpha.toFixed(2)}`} />
+        {mod}
+        <span ref={alphaTextRef} className="w-12 shrink-0 text-right font-mono text-[10px] text-muted">{alpha.toFixed(2)}</span>
       </div>
     )
   }
   return (
     <div className="flex w-44 min-w-0 flex-col gap-0.5">
-      {labelEl(inp)}
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        {labelEl(inp)}
+        {mod}
+      </div>
       <div className="flex min-w-0 items-center gap-2">
         <input
-          type="color"
-          value={toHex(v)}
-          onChange={(e) => onChange(inp.name, fromHex(e.target.value, alpha))}
-          className="h-6 w-9 shrink-0 cursor-pointer rounded border border-border bg-panel2"
+          {...swatchProps}
+          // (20 px, not 24 : with its M the label line grew 4, the cell stays a float's height)
+          className={`h-5 w-9 shrink-0 cursor-pointer rounded border bg-panel2 ${swatchEdge}`}
           title={`${inp.label} : RGB`}
         />
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={alpha}
-          onChange={(e) => onChange(inp.name, [v[0], v[1], v[2], Number(e.target.value)])}
-          className="min-w-0 flex-1 accent-accent"
-          title="Alpha"
-        />
+        <input {...alphaProps} title="Alpha" />
       </div>
     </div>
   )

@@ -4,12 +4,17 @@
 // its stops as swatches at their places along it (click one to recolor it), and
 // how many stops it uses as 2 · 3 · 4 · 5. A chord shows the colors it makes.
 // Each stop and the count can be made persistent (right-click), as every other
-// control.
+// control. Each stop's parts (hue, saturation, brightness) are modulated as any
+// color's : its M under it; a driven stop's swatch and the strip paint the
+// colors it plays.
 
 import { useEffect, useRef } from 'react'
 import type { ModTarget } from '@shared/types'
 import { modTargetKey, useStore } from '../store'
-import { ModButton, useBound } from './AutoControls'
+import { ColorModButton, ModButton, useBound, useColorParts } from './AutoControls'
+import { controlKey } from '../modKey'
+import { liveColorValues } from '../engine/modulation'
+import { registerLiveOverlay } from './liveOverlay'
 import { PinZone } from './Pin'
 
 type Values = Record<string, number | number[]>
@@ -60,6 +65,12 @@ export function vibeStopColor(v: Values, idx: number): RGB {
 const hex = (c: RGB): string =>
   '#' + c.map((x) => Math.round(clamp01(x) * 255).toString(16).padStart(2, '0')).join('')
 
+/** One stop's M : its color's parts (RGB only : the Vibe reads no alpha). */
+function StopMod({ target, label }: { target: ModTarget; label: string }): JSX.Element {
+  const { targets, bound } = useColorParts(target, true)
+  return <ColorModButton targets={targets} bound={bound} label={label} />
+}
+
 export function VibePaletteStrip({
   values,
   onChange,
@@ -79,10 +90,11 @@ export function VibePaletteStrip({
   const uiZoom = useStore((s) => s.uiZoom) // a zoom change redraws it at the new size
 
   // The palette map, one column per pixel : Vibe.fs's (t, i, f, k), luma = x.
+  const drawRef = useRef<(cols: RGB[]) => void>(() => {})
   useEffect(() => {
     const cv = cvRef.current
     if (!cv) return
-    const draw = (): void => {
+    const paintWith = (colors: RGB[]): void => {
       // its width on screen (under the UI zoom, a CSS zoom : clientWidth is unzoomed)
       const w = Math.max(2, Math.round(cv.getBoundingClientRect().width * (window.devicePixelRatio || 1)))
       if (cv.width !== w) { cv.width = w; cv.height = 1 }
@@ -100,6 +112,8 @@ export function VibePaletteStrip({
       }
       g.putImageData(img, 0, 0)
     }
+    drawRef.current = paintWith
+    const draw = (): void => paintWith(colors)
     draw()
     const ro = new ResizeObserver(draw)
     ro.observe(cv)
@@ -109,6 +123,50 @@ export function VibePaletteStrip({
 
   const stopsTarget = modTargetFor('stops')
   const stopsBound = useBound(modTargetKey(stopsTarget))
+
+  // A driven stop (a modulator or a Meta knob on one of its parts) : its swatch
+  // and the strip follow the colors played, one shared rAF (never React).
+  const stopKeys = KEYS.map((k) => modTargetKey(modTargetFor(k))).join()
+  const driven = useStore((s) => {
+    if (chord) return false
+    const keys = new Set(stopKeys.split(','))
+    return (
+      s.composition.modMatrix.some((a) => keys.has(controlKey(a.target))) ||
+      s.composition.metaKnobs.some((k) => k.destinations.some((d) => keys.has(controlKey(d))))
+    )
+  })
+  const swatchRefs = useRef<Array<HTMLLabelElement | null>>([])
+  const baseRef = useRef(colors)
+  baseRef.current = colors
+  useEffect(() => {
+    if (!driven) return
+    const keys = stopKeys.split(',')
+    let drawn = ''
+    const stop = registerLiveOverlay({
+      paint: () => {
+        const cols = baseRef.current.map((c, i) => {
+          const live = liveColorValues.get(keys[i])
+          return live ? ([live[0], live[1], live[2]] as RGB) : c
+        })
+        const sig = cols.map(hex).join()
+        if (sig === drawn) return
+        drawn = sig
+        cols.forEach((c, i) => {
+          const el = swatchRefs.current[i]
+          if (el) el.style.background = hex(c)
+        })
+        drawRef.current(cols)
+      }
+    })
+    return () => {
+      stop()
+      baseRef.current.forEach((c, i) => {
+        const el = swatchRefs.current[i]
+        if (el) el.style.background = hex(c)
+      })
+      drawRef.current(baseRef.current)
+    }
+  }, [driven, stopKeys])
   return (
     <div className="flex flex-col gap-1 px-2 pb-1.5 pt-1.5">
       <canvas
@@ -125,6 +183,7 @@ export function VibePaletteStrip({
           return (
             <PinZone key={i} pin={modTargetKey(modTargetFor(KEYS[i]))} label={`stop ${i + 1}`}>
             <label
+              ref={(el) => { swatchRefs.current[i] = el }}
               className={`absolute top-0 h-[18px] w-[18px] overflow-hidden rounded border ${chord ? 'cursor-default border-border' : 'cursor-pointer border-border hover:border-accent'}`}
               style={{ left: `calc(${pos} * (100% - 18px))`, background: hex(c) }}
               title={chord
@@ -148,6 +207,20 @@ export function VibePaletteStrip({
           )
         })}
       </div>
+      {/* each stop's M, under it (a chord makes the stops : nothing of theirs to move) */}
+      {!chord && (
+        <div className="relative h-4">
+          {colors.map((_, i) => (
+            <div
+              key={i}
+              className="absolute top-0"
+              style={n > 1 && i === n - 1 ? { right: 0 } : { left: `calc(${n > 1 ? i / (n - 1) : 0} * (100% - 18px))` }}
+            >
+              <StopMod target={modTargetFor(KEYS[i])} label={`stop ${i + 1}`} />
+            </div>
+          ))}
+        </div>
+      )}
       {/* how many stops it uses */}
       <PinZone pin={modTargetKey(stopsTarget)} label="color stops">
       <div className="flex items-center gap-1.5">

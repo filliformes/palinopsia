@@ -62,7 +62,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
-- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate
+- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
@@ -935,7 +935,8 @@ loop / grain / the film's volume), the compositor-level **layer** controls (opac
 blend-mode, from the M chips on the layer strip, the A/B **hue** harmony from the
 [Mixer](#the-mixer) (−1 match … 1 clash, the middle leaves B untouched), and the layer's
 **Vary**, a trigger that fires as the modulator crosses its middle going up),
-per-**FX dry/wet opacity**, the **Background**'s opacity, speed and contact shadow, every
+per-**FX dry/wet opacity**, every **color** by its parts (hue, saturation, brightness, alpha :
+see [Colors, by their parts](#colors-by-their-parts)), the **Background**'s opacity, speed and contact shadow, every
 **Fulldome** mapping slider (rotate, spin, feather, the panorama's and the screen's own; see
 [Fulldome](#fulldome)), every [output transform](#output-transform) slider, the
 [World amount](#worlds--diegesis-key-w), the [Audio Layer](#the-audio-layer)'s controls
@@ -986,6 +987,29 @@ Multiply's law is a guaranteed no-op on a zero base, before the auto-pick,
 binding an LFO to a freshly-added effect's `torn`, `contour` or any zeroed slider
 looked like broken modulation. You can still flip the mode per assignment from
 the `mul`/`rep` chip in the Modulate panel.
+
+### Colors, by their parts
+
+Every color picker (in any source, effect or node, the Background, the Vibe's tints and
+palette stops, Context's atmosphere and light, the Finalizer's fill) has its **M**. The
+picker's own controls are what you modulate, in the space it shows them (HSV) : its
+**color slider is the hue**, its **pad is the saturation across and the brightness up**,
+plus the **alpha** beside the swatch (not on the finishing stages, which read RGB). The
+Modulate panel opens on the part already bound (else the hue), with a switch for the
+others; each part binds modulators and Meta knobs like any slider, with its own depth,
+mode and shaping. One part moves, the others hold : a hue swept round keeps the color's
+saturation and brightness, and several parts of one color move together (a hue on M1,
+a brightness on M3, a Meta knob on the saturation). The **hue binds in Replace** and goes
+round the wheel (depth 0.5 : once round) instead of stopping at red; the other parts pick
+their mode like any slider. A Meta knob that takes the brightness or the saturation to 0
+and back finds the color it left (the stored color keeps its hue a hair above black). The
+swatch shows the color played, with the modulated border; the alpha thumb follows its
+part; the chip lists every part's modulators (`M1·3`), and a right-click clears them
+all. A pinned color holds its parts' bindings ([Persistent](#persistent--what-stays-put)).
+Over OSC, any color input's address plus `/hue`, `/saturation`, `/brightness` or `/alpha`
+sets one part (`/opsia/layer1/source/A/tint/hue 0.6`); the finishing stages' and the
+Background source's color parts are advertised in OSCQuery and sent back as feedback.
+Randomize and Generate bind floats only, as before : the colors stay yours to move.
 
 ### Shaping a binding : combine, threshold, integrate
 
@@ -3154,7 +3178,8 @@ directly): `/opsia/audio/{level|flux|transient|centroid|pitch|noisiness}` and
 
 Type resolution: `float` → `min + v·(max−min)`; enum → nearest member;
 `bool`/`event` → `v ≥ 0.5`; `color` → 3–4 raw `0..1` args (or one → grayscale);
-`point2D` → 2 per-axis args.
+a color's part → its address plus `/hue`, `/saturation`, `/brightness` or `/alpha`, one
+`0..1` arg (the rest of the color held); `point2D` → 2 per-axis args.
 
 > For continuous playhead motion, prefer binding a modulator to the transport's
 > `M` targets (an LFO loops, S&H jump-cuts, audio scrubs); `…/video/position`

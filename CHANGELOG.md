@@ -5,6 +5,43 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Every color picker is modulatable : its color slider and both axes of its pad**
+  (`engine/colorParts.ts`, `ModTarget.ch`, `AutoControls.tsx` `ColorModButton` /
+  `ColorPartSwitch`, `VibePaletteStrip.tsx`). A color input (any source, effect or node,
+  the Background, the Vibe's tints and palette stops, Context's atmosphere and light, the
+  Finalizer's fill : 91 inputs in 46 shaders) is modulated by its parts in the picker's
+  own space, HSV : the hue (the picker's slider), the saturation and the brightness (its
+  pad, across and up), and alpha (not on the finishing stages, which read RGB). One **M**
+  per color; the Modulate panel (the Inspector's and the Finishing column's) opens on the
+  part already bound, else the hue, with a switch for the others. Each part takes
+  modulators, Meta knobs (and so MIDI through a knob), depth, Multiply / Replace and
+  shaping like a float. The data is an optional part on an input target (`ch : 'h' | 's' |
+  'v' | 'a'`, key `<input key>#<part>`), so older sessions load unchanged. The engine keeps
+  each color's parts per frame (`colorFrame`) : the stored color's HSVA, then each part a
+  binding or a gliding knob moved, written whole, so several parts of one color (M1 on the
+  hue, M3 on the brightness, a knob on the saturation) move it together. The hue binds in
+  Replace and wraps round the wheel (depth 0.5 : once round); a Meta knob that commits the
+  brightness or the saturation at 0 stores a black that keeps the hue (1/4096 above it),
+  so the color comes back. The swatch paints the color played (`liveColorValues`, the live
+  overlay's new `paint` subscriber) with the modulated border, the alpha thumb its part,
+  the Vibe's stops and strip their played colors; the chip lists every part's modulators
+  and a right-click clears them all. A pinned color holds its parts' rows and Meta
+  destinations (`controlKey` in persist.ts). OSC : any color input's address plus `/hue`,
+  `/saturation`, `/brightness` or `/alpha` sets that part, one `0..1` float (an unknown
+  word after an input reads as before); the finishing stages' and the Background
+  source's color parts are advertised in OSCQuery and fed back. Randomize and Generate
+  still bind floats only. Measured in the test copy (RTX 4070, 61 fps) : an LFO on
+  Interference's tint hue swept it 0.54 → 0.96 → 0.015 round the wheel while the
+  saturation held at 0.889, the brightness at 0.9 and alpha at 1; with M2 on the
+  saturation and M3 on the brightness of the same color, all three moved (s 0.445-0.889
+  = the base x 0.5..1 at depth 0.5); the same held on Shapes' tint, a Colorizer, Fluid (a
+  native source), the Background's Solid Color, the Vibe's shadow tint and a palette stop.
+  Save, New, reopen kept the rows and the knob's part; Ctrl+Z / Ctrl+Y took a part
+  binding off and back; one of the October sessions loaded with its 21 colors and 10
+  rows identical. A color cell keeps a float cell's height (38 px).
+
 ### Fixed
 
 - **The Silhouette source's trail works in Matte mode** (`engine/SilhouetteSource.ts`).

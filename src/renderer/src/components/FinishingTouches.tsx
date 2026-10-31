@@ -16,7 +16,7 @@ import { SHADER_BY_ID } from '../shaders/isf'
 import { defaultInputs } from '../shaders/isf/inputs'
 import { PRESETS_BY_ID } from '../shaders/isf/presets'
 import { makeContext, makeFinalizer, makeVibePalette, modTargetKey, useStore } from '../store'
-import { AssignContext, AssignRow } from './AutoControls'
+import { AssignContext, AssignRow, ColorPartSwitch } from './AutoControls'
 import { SectionedControls } from './FinishingSections'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
@@ -57,7 +57,12 @@ export function FinishingTouches(): JSX.Element {
           <FinalizerSection key={u.id} inst={u} />
         ))}
         {assign && (
-          <FinishingAssign target={assign.target} label={assign.label} onClose={() => setAssign(null)} />
+          <FinishingAssign
+            target={assign.target}
+            label={assign.label}
+            onClose={() => setAssign(null)}
+            onPick={(target) => setAssign({ target, label: assign.label })}
+          />
         )}
       </div>
     </AssignContext.Provider>
@@ -70,11 +75,13 @@ export function FinishingTouches(): JSX.Element {
 function FinishingAssign({
   target,
   label,
-  onClose
+  onClose,
+  onPick
 }: {
   target: ModTarget
   label: string
   onClose: () => void
+  onPick: (target: ModTarget) => void
 }): JSX.Element {
   const key = modTargetKey(target)
   const bound = useStore(
@@ -95,7 +102,8 @@ function FinishingAssign({
           ✕
         </button>
       </div>
-      <div className="min-w-0 p-1.5">
+      <div className="flex min-w-0 flex-col gap-1.5 p-1.5">
+        <ColorPartSwitch target={target} onPick={onPick} />
         <AssignRow target={target} bound={bound} />
       </div>
     </div>

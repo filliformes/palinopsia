@@ -48,7 +48,8 @@ import { SHADER_BY_ID } from './shaders/isf'
 import { PRESETS_BY_ID } from './shaders/isf/presets'
 import { pickLayer, playingLayers, type LayerPick } from './shaders/isf/masterPresets'
 import { canHostFx } from './fxScopes'
-import { modTargetKey } from './modKey'
+import { modTargetKey, partOf } from './modKey'
+import { colorOf, hsvaOf, PART_INDEX } from './engine/colorParts'
 import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
@@ -792,6 +793,13 @@ function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfi
     const d = inputsForShader(r.shaderId).find((x) => x.name === r.input)
     if (!d) return 0.5
     const raw = r.inputs?.[r.input]
+    // A color's part, where the picker shows it. The hue gets Replace : it swings
+    // round its place (a multiple of a hue only pulls it toward red).
+    const ch = partOf(t)
+    if (ch) {
+      if (d.type !== 'color' || ch === 'h') return 0
+      return hsvaOf(colorOf(raw, d.def))[PART_INDEX[ch]]
+    }
     // A toggle : its state. An enum : its place among its values (one sitting on
     // its FIRST value under Multiply could never leave it).
     if (d.type === 'bool' || d.type === 'event') {
