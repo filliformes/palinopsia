@@ -719,13 +719,13 @@ export function AssignRow({
           </div>
         )
       })}
-      {/* Meta knobs : K1..K16; a knob drives this input absolutely through
+      {/* Macro knobs : K1..K16; a knob drives this input absolutely through
           its curve over the input's declared range (up to 8 dests/knob).
           EXACTLY two rows, row-major: K1–K9 then K10–K16 (with the MOD line
           above, the whole panel is the fixed three-row shape). */}
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
-          <span className="w-8 shrink-0 pt-0.5 font-mono text-[9px] uppercase text-muted">meta</span>
+          <span className="w-8 shrink-0 pt-0.5 font-mono text-[9px] uppercase text-muted">macro</span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             {[metaBound.slice(0, 9), metaBound.slice(9)].map((row, r) => (
               <div key={r} className="flex min-w-0 gap-0.5">
@@ -740,7 +740,7 @@ export function AssignRow({
                           ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
                           : 'bg-panel3/60 text-muted hover:text-text'
                       }`}
-                      title={`${on ? 'Unbind' : 'Bind'} Meta knob ${i + 1}`}
+                      title={`${on ? 'Unbind' : 'Bind'} Macro knob ${i + 1}`}
                     >
                       K{i + 1}
                     </button>

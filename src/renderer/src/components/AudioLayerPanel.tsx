@@ -649,7 +649,7 @@ function AuModChip({ target, open, onToggle, what }: { target: ModTarget; open: 
             ? 'bg-accent2/25 text-accent2 ring-1 ring-accent2'
             : 'bg-panel3/60 text-muted hover:text-text'
       }`}
-      title={`Modulate ${what} : a modulator or a Meta knob moves it. Right-click clears its modulation.`}
+      title={`Modulate ${what} : a modulator or a Macro knob moves it. Right-click clears its modulation.`}
     >
       M{bound.length ? bound.map((b) => b.mod + 1).join('·') : ''}
     </button>

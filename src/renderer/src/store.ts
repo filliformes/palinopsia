@@ -1868,6 +1868,11 @@ interface StoreState {
   // Meta: show the last four knobs (13–16) as two XY performance pads (default on).
   metaXYPads: boolean
   toggleMetaXYPads: () => void
+  // The Macro knobs row (the MACRO button at the Modulation row's right end) :
+  // shown or not, per machine (`opsia.macroBar`), hidden by default. Hiding is
+  // a view only : the knobs keep playing (modulation, MIDI, OSC, Generate).
+  macroBar: boolean
+  setMacroBar: (on: boolean) => void
   renderScale: number
   setRenderScale: (v: number) => void
   // The composition's native resolution (machine-local : the output rig's size,
@@ -4563,6 +4568,16 @@ export const useStore = create<StoreState>((set, get) => ({
       const v = !s.metaXYPads
       localStorage.setItem('opsia.metaXYPads', v ? '1' : '0')
       return { metaXYPads: v }
+    }),
+  macroBar: (() => { try { return localStorage.getItem('opsia.macroBar') === '1' } catch { return false } })(),
+  setMacroBar: (on) =>
+    set((s) => {
+      try { localStorage.setItem('opsia.macroBar', on ? '1' : '0') } catch { /* private storage : this run only */ }
+      // Shown means the knobs, not a folded title : showing the row unfolds it.
+      if (!on || !s.collapsed['meta']) return { macroBar: on }
+      const collapsed = { ...s.collapsed, meta: false }
+      localStorage.setItem('opsia.collapsed', JSON.stringify(collapsed))
+      return { macroBar: on, collapsed }
     }),
 
   // Internal render scale: multiplies the 1920×1080 base. <1 = lo-fi (coarser

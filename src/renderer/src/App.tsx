@@ -2254,7 +2254,7 @@ export default function App(): JSX.Element {
           title={
             midiLearnMode
               ? 'MIDI Learn ON : click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
-              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Meta knobs, transport controls, Vary / Randomize / Sonify and scenes.'
+              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Macro knobs, transport controls, Vary / Randomize / Sonify and scenes.'
           }
         >
           MIDI<span className="tb-long"> Learn</span>
@@ -2446,7 +2446,8 @@ export default function App(): JSX.Element {
       {/* ── Modulation: 8-mod bank + capped matrix (brief §10.4) ── */}
       <ModulationPanel />
 
-      {/* ── Meta Controller: 32 macro knobs / 4 banks (brief §6) ── */}
+      {/* ── Macro Controller : 16 knobs (brief §6), shown by the Modulation
+             row's MACRO button (hidden by default; the knobs play either way) ── */}
       <MetaBar />
 
       {/* Audio + MIDI + OSC + Link setup lives in the right column's Connect

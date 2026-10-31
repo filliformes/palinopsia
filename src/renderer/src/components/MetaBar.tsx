@@ -1,4 +1,5 @@
-// Meta Controller (brief §6) : 16 macro knobs, one flat bank. Each tile
+// Macro Controller (brief §6; formerly Meta, the code keeps the meta names :
+// metaKnobs, kind 'meta', `meta:<i>` MIDI ids) : 16 macro knobs, one flat bank. Each tile
 // matches the modulator-card chrome: bordered, aligned rows, everything
 // legible at a glance. A knob shows: dial (destination count under it),
 // name (double-click renames), CC learn, curve, and an M button binding
@@ -38,13 +39,20 @@ const CURVES: ModCurve[] = [
   'sigmoid', 'smoothstep', 'db', 'gamma', 'step', 'invert'
 ]
 
-export function MetaBar(): JSX.Element {
-  const collapsed = useStore((s) => !!s.collapsed['meta'])
+export function MetaBar(): JSX.Element | null {
+  const folded = useStore((s) => !!s.collapsed['meta'])
   const toggleSection = useStore((s) => s.toggleSection)
   const metaXYPads = useStore((s) => s.metaXYPads)
   const toggleMetaXYPads = useStore((s) => s.toggleMetaXYPads)
+  // The row shows only when the MACRO button (Modulation row) says so. In MIDI
+  // Learn mode it shows anyway, unfolded, so its knobs can be learned; it goes
+  // away again with the mode (the per-machine choice is left as it was).
+  const shown = useStore((s) => s.macroBar)
+  const peek = useStore((s) => !s.macroBar && s.midiLearnMode)
+  const collapsed = folded && !peek
   const [flashing, flash] = useFlash()
 
+  if (!shown && !peek) return null
   return (
     <div
       className={`flex min-w-0 flex-col gap-1.5 border-t bg-panel px-3 py-1.5 transition-colors ${
@@ -55,14 +63,14 @@ export function MetaBar(): JSX.Element {
         <button
           onClick={() => toggleSection('meta')}
           className="flex items-center gap-1.5"
-          title={collapsed ? 'Expand Meta Controller' : 'Collapse Meta Controller'}
+          title={collapsed ? 'Expand the Macro knobs' : 'Collapse the Macro knobs'}
         >
           <span
             className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
           >
             ▶
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Meta</span>
+          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Macro</span>
         </button>
         <span className="relative inline-flex">
           <MidiLearnOverlay id="rand:meta" />
@@ -126,7 +134,7 @@ export function MetaBar(): JSX.Element {
   )
 }
 
-// An XY performance pad over two Meta knobs (X = xIndex, Y = yIndex). Pure
+// An XY performance pad over two Macro knobs (X = xIndex, Y = yIndex). Pure
 // view/controller : it writes the same knob values a knob tile does, so the two
 // knobs keep their destinations / bindings / CC / persistence. The handle reflects
 // the LIVE (modulated) value. Configure the underlying knobs in knob mode.
@@ -327,7 +335,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   const learning = midiLearn === index
 
   return (
-    <PinZone pin={targetKey} label={`Meta ${index + 1} (${knob.name})`}>
+    <PinZone pin={targetKey} label={`Macro ${index + 1} (${knob.name})`}>
     <div
       className={`flex min-w-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
         knob.destinations.length > 0 || isModulated
@@ -474,9 +482,9 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
   )
 }
 
-// Compact single-modulator assignment for a Meta knob: two rows of four
+// Compact single-modulator assignment for a Macro knob: two rows of four
 // modulator buttons (only ONE can drive a knob at a time) plus a full-width
-// depth slider. No "mod"/"meta" text labels : the tiles are narrow.
+// depth slider. No "mod"/"macro" text labels : the tiles are narrow.
 function KnobModAssign({
   index,
   bound

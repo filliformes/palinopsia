@@ -253,8 +253,8 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
       )}
 
       {on && (
-        <Shell title="Voices" hint="Where each voice sits. Follow : where it plays in the picture (az then turns it from there). Fixed : at az / el. Width : how far apart its own left and right are. Span : how big a patch of the room it fills. Spin : turns it around the zenith, degrees a second. Drag a number up or down to change it (Shift : finer), click it to type. Click a voice's name (▸) for its sliders, each with an M to bind a modulator or a Meta knob." on open>
-          <div className="font-mono text-[9px] text-muted">▸ a voice : its sliders, each with an <b>M</b> for a modulator or a Meta knob</div>
+        <Shell title="Voices" hint="Where each voice sits. Follow : where it plays in the picture (az then turns it from there). Fixed : at az / el. Width : how far apart its own left and right are. Span : how big a patch of the room it fills. Spin : turns it around the zenith, degrees a second. Drag a number up or down to change it (Shift : finer), click it to type. Click a voice's name (▸) for its sliders, each with an M to bind a modulator or a Macro knob." on open>
+          <div className="font-mono text-[9px] text-muted">▸ a voice : its sliders, each with an <b>M</b> for a modulator or a Macro knob</div>
           <div className="flex items-center gap-1 font-mono text-[8px] uppercase text-muted">
             <span className="w-[54px] shrink-0" />
             <span className="w-[18px] shrink-0 text-center" title="Lit : the voice follows where it plays in the picture. Dark : a fixed place.">fol</span>
@@ -288,7 +288,7 @@ function VoiceRow({ voice, index, setVoice, open, onOpen, modChip, assignBox }: 
   return (
     <>
     <div className={`flex items-center gap-1 ${live ? '' : 'opacity-60'}`}>
-      <button onClick={onOpen} className={`flex w-[54px] shrink-0 items-center gap-0.5 text-left text-[10px] hover:text-accent ${open ? 'text-accent' : ''}`} title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Meta knob${bound ? ' (one is bound now)' : ''}`}>
+      <button onClick={onOpen} className={`flex w-[54px] shrink-0 items-center gap-0.5 text-left text-[10px] hover:text-accent ${open ? 'text-accent' : ''}`} title={`${SPACE_VOICE_LABEL[voice]} : ${live ? 'playing' : 'off'}. Click : its sliders, each with an M to bind a modulator or a Macro knob${bound ? ' (one is bound now)' : ''}`}>
         <span className="w-2 shrink-0 text-[8px] text-muted">{open ? '▾' : '▸'}</span>
         <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: voiceColor(index) }} />
         <span className="min-w-0 truncate">{SPACE_VOICE_LABEL[voice]}</span>

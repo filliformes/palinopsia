@@ -351,7 +351,7 @@ function fireMeta(k: number, v: MetaVerb): void {
   const st = get()
   const knob = st.composition.metaKnobs[k]
   if (!knob) return
-  if (isPinnedTarget({ kind: 'meta', knob: k }, st.pins)) { say(`Meta ${k + 1} is persistent : the action leaves it (unpin it first)`); return }
+  if (isPinnedTarget({ kind: 'meta', knob: k }, st.pins)) { say(`Macro ${k + 1} is persistent : the action leaves it (unpin it first)`); return }
   const cur = knobDisplayValue(k)
   const to = v === 'up' ? cur + META_STEP : v === 'down' ? cur - META_STEP : v === 'rand' ? Math.random() : cur < 0.5 ? 1 : 0
   setKnobTarget(k, Math.max(0, Math.min(1, to)), knob.smoothMs)
@@ -551,7 +551,7 @@ export function fireAction(id: string): void {
 const metaName = (st: St, k: number): string => {
   const n = st.composition.metaKnobs[k]?.name
   // (a knob still on its default name says nothing more than its number)
-  return `META ${k + 1}${n && n !== `Knob ${k + 1}` ? ` (${n})` : ''}`
+  return `MACRO ${k + 1}${n && n !== `Knob ${k + 1}` ? ` (${n})` : ''}`
 }
 const modName = (st: St, n: number): string => {
   const m = st.composition.modulators[n]
@@ -634,10 +634,10 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       const v = p[3] as MetaVerb
       if (!Number.isInteger(k) || k < 0 || !(META_VERBS as readonly string[]).includes(v)) return null
       const words: Record<MetaVerb, [string, string, string]> = {
-        up: ['up', `raises meta ${k + 1}`, 'Up'], down: ['down', `lowers meta ${k + 1}`, 'Down'],
-        rand: ['random', `throws meta ${k + 1}`, 'Rnd'], flip: ['flip 0↔1', `flips meta ${k + 1}`, 'Flip']
+        up: ['up', `raises macro ${k + 1}`, 'Up'], down: ['down', `lowers macro ${k + 1}`, 'Down'],
+        rand: ['random', `throws macro ${k + 1}`, 'Rnd'], flip: ['flip 0↔1', `flips macro ${k + 1}`, 'Flip']
       }
-      return { label: `${metaName(st, k)} ${words[v][0]}`, verb: words[v][1], token: `Meta${k + 1}${words[v][2]}`, group: 'Meta', title: 'Moves the knob over its own smoothing time : up / down a tenth, to a random place, or flips it to the far end', gone: !st.composition.metaKnobs[k] }
+      return { label: `${metaName(st, k)} ${words[v][0]}`, verb: words[v][1], token: `Macro${k + 1}${words[v][2]}`, group: 'Macro', title: 'Moves the knob over its own smoothing time : up / down a tenth, to a random place, or flips it to the far end', gone: !st.composition.metaKnobs[k] }
     }
     case 'mod': {
       const n = Number(p[2])

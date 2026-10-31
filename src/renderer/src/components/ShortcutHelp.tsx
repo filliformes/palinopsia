@@ -100,7 +100,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Right-click a control', 'Persistent · Set in every scene (a whole layer, effect chip, source card or modulator card : right-click it)'],
       ['Right-click an M', 'Clear all the modulation on that control'],
       ['Ctrl / Alt drag an effect', 'Copy it into another rack (a plain drag moves it)'],
-      ['⇧ drag a knob', 'Finer (Meta knobs, the Mixer)'],
+      ['⇧ drag a knob', 'Finer (Macro knobs, the Mixer)'],
       ['Right-click Output', 'Watch the Output in a window · the Output page in a window'],
       ['Right-click Body, Seq or Sonify', 'The page in a window of its own'],
       ['Right-click the Master FX', 'Save the chain as one of yours (my chains) · rename or delete them'],

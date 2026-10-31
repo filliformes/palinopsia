@@ -64,11 +64,11 @@
 //   /opsia/sonify/glue/on|amount                        >= 0.5 | f 0..1 (the output glue, after the EQ)
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
 //   /opsia/sonify/eq/preset                             s name | i n (a saved output EQ, 1-based; 0 / flat)
-//   /opsia/meta/{1..16}                                f 0..1 (drives the knob)
+//   /opsia/macro/{1..16}                               f 0..1 (drives the Macro knob; the old /opsia/meta/{n} still works)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger (at the Transport's intensity)
-//   /opsia/randomize/masterparams|meta|inspector|sonify|resolume|background   trigger (MIDI Learn's own)
+//   /opsia/randomize/masterparams|macro|inspector|sonify|resolume|background  trigger (MIDI Learn's own; meta = macro)
 //   /opsia/output/x|y|scale|rotate|spin|feather         f 0..1 (the output transform; 0.5 = none for x y scale rotate spin)
 //   /opsia/output/flipx|flipy                           >= 0.5
 //   /opsia/output/edge                                  i index | f 0..1 | s black|repeat|mirror
@@ -574,6 +574,9 @@ function route(address: string, args: Args): void {
       return
     }
 
+    // The Macro knobs : /opsia/macro/{n}, and /opsia/meta/{n}, the name they
+    // had before v1.3.2 (controllers mapped then keep working, both ways).
+    case 'macro':
     case 'meta': {
       const k = parseInt(segs[2], 10) - 1
       if (!(k >= 0 && k < st.composition.metaKnobs.length)) return
@@ -948,7 +951,8 @@ function route(address: string, args: Args): void {
       // own triggers, so OSC, dataflou and MIDI fire exactly the same action.
       const other: Record<string, string> = {
         masterparams: 'rand:master',
-        meta: 'rand:meta',
+        macro: 'rand:meta',
+        meta: 'rand:meta', // the Macro knobs' old name
         inspector: 'rand:inspector',
         sonify: 'rand:sonify',
         resolume: 'rand:resolume',
@@ -1193,6 +1197,10 @@ interface Leaf {
   desc: string
   stream: boolean
   int?: boolean // an index : advertised and sent as an OSC int, read raw
+  // An older name of the same control, never advertised : outbound feedback
+  // sends it too, and the Resolume mapper's rows still read it (a controller
+  // laid out on /opsia/meta/{n} keeps its feedback).
+  alias?: string
 }
 
 /** Enumerate every OSC-addressable control with its CURRENT value. Shared by
@@ -1270,7 +1278,9 @@ function enumerateLeaves(): Leaf[] {
   }
   for (let k = 1; k <= st.composition.metaKnobs.length; k++) {
     const knob = st.composition.metaKnobs[k - 1]
-    add(`/opsia/meta/${k}`, 0, 1, knob?.value ?? 0, knob?.name ?? `Meta knob ${k}`)
+    const named = knob?.name && knob.name !== `Knob ${k}` ? ` : ${knob.name}` : ''
+    add(`/opsia/macro/${k}`, 0, 1, knob?.value ?? 0, `Macro knob ${k}${named}`)
+    out[out.length - 1].alias = `/opsia/meta/${k}`
   }
   // Sonify (the S page) : the core streamable set. Probe params normalize over
   // the same spans the mod-matrix uses.
@@ -1517,7 +1527,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
   add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
-  for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'meta', 'inspector', 'sonify', 'resolume', 'background'])
+  for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'macro', 'inspector', 'sonify', 'resolume', 'background'])
     add(`/opsia/randomize/${sc}`, 0, 1, 0, `Randomize ${sc} (trigger)`, false)
   {
     const ox = st.outXform
@@ -1593,7 +1603,11 @@ function enumerateLeaves(): Leaf[] {
  *  "Palinopsia OSC" inputs read these, so they speak exactly what OSC out says). */
 export function oscLeafValues(): Map<string, number> {
   const m = new Map<string, number>()
-  for (const l of enumerateLeaves()) m.set(l.path, l.max > l.min ? (l.value - l.min) / (l.max - l.min) : l.value)
+  for (const l of enumerateLeaves()) {
+    const v = l.max > l.min ? (l.value - l.min) / (l.max - l.min) : l.value
+    m.set(l.path, v)
+    if (l.alias) m.set(l.alias, v)
+  }
   return m
 }
 
@@ -1671,7 +1685,9 @@ function pushFeedback(): void {
     // get cached here and then skipped forever (prev matches value on every later
     // tick), so anything past the cap would never reach Pandore.
     if (prev === undefined && sent > 96) continue
-    void sendOsc(host, port, leaf.path, [leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }])
+    const arg = leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }
+    void sendOsc(host, port, leaf.path, [arg])
+    if (leaf.alias) void sendOsc(host, port, leaf.alias, [arg])
     lastSent.set(leaf.path, leaf.value)
     sent++
   }

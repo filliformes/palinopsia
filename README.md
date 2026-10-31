@@ -62,7 +62,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
-- [Meta Controller](#meta-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
+- [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
@@ -276,7 +276,7 @@ that couldn't start *and why* (permission denied / no device / cancelled).
 **`Ctrl+K`** (`Cmd+K` on a Mac) opens a search over the app : type, and it lists the
 **sources**, **effects** (yours included), **parameters** of what is loaded (every
 control of every source and effect, each effect's dry/wet, the layer and Mixer
-controls, the Background's, the 16 Meta knobs), **presets** (each shader's, yours, the
+controls, the Background's, the 16 Macro knobs), **presets** (each shader's, yours, the
 layer, Mixer and Background ones), **master chains**, **Generate themes**, the
 **pages** and tabs, and **commands** (Randomize, Vary, Panic flush, Freeze, Record,
 MIDI Learn, Fulldome, New, Open, Undo, Redo). Results come in groups, each row saying
@@ -292,7 +292,7 @@ shader (else it loads the shader with it); a layer preset onto the selected laye
 L1); master chains and Mixer or Background presets apply as from their own menus, and a
 Generate theme as from the Generate menu (it asks to save first). A **parameter** is
 shown, not changed : its unit opens in the Inspector (or its layer strip, the Mixer or
-the Meta bar unfolds) and the control flashes twice. **↑ ↓** and **PgUp / PgDn** move,
+the Macro bar shows, unfolded) and the control flashes twice. **↑ ↓** and **PgUp / PgDn** move,
 **Tab** jumps to the next kind, **Esc** (or `Ctrl+K` again, or a click outside) closes
 it. It opens in the Output page's own window too. Bare `K` still opens the Resolume
 mapper.
@@ -448,7 +448,7 @@ color and shows the live value; a drag moves its base. Volumes glide (no clicks)
 still wins. A speed moves by octaves (1/16× to 16×, 1× in the middle) and the in stays
 before the out. **The playhead scrubs** : it jumps where the modulator moves it, then
 plays on from there, so an S&H cuts, a slow sweep grains, a fast one scratches and a held
-value just plays. A live input or an NDI source has volume and pan only. Meta knobs reach
+value just plays. A live input or an NDI source has volume and pan only. Macro knobs reach
 them too (a playhead knob seeks once, like a click on the timeline). Clearing a slot
 clears its modulation, and Randomize leaves these targets alone.
 
@@ -803,7 +803,18 @@ Superimposition) always start at 0, and Proximity stays this computer's.
 **Proximity** (in the Transport bar) is the ninth macro: it pushes the Context
 mood into a near/far depth zone, optionally following audio brightness.
 
-## Meta Controller (16 knobs + XY pads)
+## Macro Controller (16 knobs + XY pads)
+
+*(Called the Meta Controller before v1.3.2; the OSC address `/opsia/meta/n`, sessions and
+MIDI maps made then keep working.)*
+
+The row is **hidden by default** : the **MACRO** button at the right end of the
+Modulation row (next to ACTIVE) shows or hides it, a choice this computer remembers.
+Hidden, the knobs keep playing (modulators, MIDI, OSC, Generate, Body rules and pads all
+still move them, and they still drive their destinations); a small dot on MACRO says
+something is moving one (a modulator, a MIDI CC, a pad or a Body rule), and its tooltip
+says what. MIDI Learn mode shows the row while it is on, so its knobs can be learned; a
+Macro knob picked in `Ctrl+K` shows the row. `Ctrl+K` → **Macro knobs** toggles it too.
 
 A flat bank of 16 macro knobs. Each tile is a 270° dial (drag vertically, Shift =
 fine, double-click resets), with a destination count, a rename, an output **curve**
@@ -813,12 +824,12 @@ the bottom of the dial, what the knob sends **now** through its curve (`0.00` to
 live as you drag, as it glides, from MIDI or a modulator (in the modulated color then). Each knob
 can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
 
-The **`⊞ XY` toggle** (Meta title bar) turns **knobs 13–16 into two XY
+The **`⊞ XY` toggle** (Macro title bar) turns **knobs 13–16 into two XY
 performance pads** (knob 13/14 drive pad 1's X/Y, 15/16 pad 2's) for
 two-finger macro gestures; toggle back to `◎ 16` for the flat bank. Bindings are
 the knobs' own, so a pad is just a faster way to play four of them.
 
-Knob gestures (drag, glide, MIDI CC, OSC `/opsia/meta/n`) fan out to their
+Knob gestures (drag, glide, MIDI CC, OSC `/opsia/macro/n`) fan out to their
 destinations **engine-side at frame rate** : the store only commits once per
 gesture, so gliding a knob costs nothing.
 
@@ -933,7 +944,7 @@ bottom, where it rests until the next one (a pulse rather than a held state; at
 
 The **mod-matrix** holds up to **32** assignments (M# → target param, with a
 bipolar depth and a **Multiply** or **Replace** mode). Bindings are made from each
-parameter's **M** button in the Inspector or Meta tile. In the Modulation strip,
+parameter's **M** button in the Inspector or Macro tile. In the Modulation strip,
 **click an assignment chip to turn it off** (dimmed and struck through : the
 parameter sits at its own value, the depth and binding are kept) and click again to
 turn it back on. Modulation reaches
@@ -948,11 +959,11 @@ see [Colors, by their parts](#colors-by-their-parts)), the **Background**'s opac
 [Fulldome](#fulldome)), every [output transform](#output-transform) slider, the
 [World amount](#worlds--diegesis-key-w), the [Audio Layer](#the-audio-layer)'s controls
 (its volume and mix, each slot's volume and pan, a sound file's playhead, speed and
-in / out), the **Sonify** parameters and the **Meta knobs**
+in / out), the **Sonify** parameters and the **Macro knobs**
 themselves. It is written straight to the compositor (the Audio Layer's to its audio
 engine) at frame rate, never through React re-renders.
 
-The matrix holds **32** bindings (bounded, so a patch stays readable; the Meta
+The matrix holds **32** bindings (bounded, so a patch stays readable; the Macro
 knobs are outside it); how many are in use shows under the Modulation strip's name. Randomize, Generate and a World's audio route use at most 12
 of them, so a randomized session keeps the motion it always had and the rest is
 yours. Binding a new one when it is full first lets go of
@@ -1003,12 +1014,12 @@ picker's own controls are what you modulate, in the space it shows them (HSV) : 
 **color slider is the hue**, its **pad is the saturation across and the brightness up**,
 plus the **alpha** beside the swatch (not on the finishing stages, which read RGB). The
 Modulate panel opens on the part already bound (else the hue), with a switch for the
-others; each part binds modulators and Meta knobs like any slider, with its own depth,
+others; each part binds modulators and Macro knobs like any slider, with its own depth,
 mode and shaping. One part moves, the others hold : a hue swept round keeps the color's
 saturation and brightness, and several parts of one color move together (a hue on M1,
-a brightness on M3, a Meta knob on the saturation). The **hue binds in Replace** and goes
+a brightness on M3, a Macro knob on the saturation). The **hue binds in Replace** and goes
 round the wheel (depth 0.5 : once round) instead of stopping at red; the other parts pick
-their mode like any slider. A Meta knob that takes the brightness or the saturation to 0
+their mode like any slider. A Macro knob that takes the brightness or the saturation to 0
 and back finds the color it left (the stored color keeps its hue a hair above black). The
 swatch shows the color played, with the modulated border; the alpha thumb follows its
 part; the chip lists every part's modulators (`M1·3`), and a right-click clears them
@@ -1044,9 +1055,9 @@ A meter on top shows the modulator as it comes (the tick : the threshold) and wh
 shaping gives. Threshold then integrate makes "only real hits push it" : an audio
 modulator on the kick, gate at 0.6, step 0.125, wrap, bound to a rotation.
 
-![The modulation brain and the Meta knobs](docs/images/interface-modulation.jpg)
+![The modulation brain and the Macro knobs](docs/images/interface-modulation.jpg)
 
-*The eight modulators (`D` toggles the row) over the sixteen Meta knobs and the
+*The eight modulators (`D` toggles the row) over the sixteen Macro knobs and the
 two XY pads. Each modulator card carries its type, clock, shape and live meter;
 each knob its curve, MIDI CC and destination count.*
 
@@ -1227,7 +1238,7 @@ gesture can sweep a whole cluster of parameters.
 
 Learnable targets:
 
-- **Meta knobs** (all 16, CC only) : hardware drives them through the same
+- **Macro knobs** (all 16, CC only) : hardware drives them through the same
   per-knob smoothing as a mouse drag. These bindings live **in the session**
   (the per-knob **CC** button still works as a direct shortcut).
 - **Transport** : BPM (CC → 40–240), SPD, MORPH, PROX (each mirrors its
@@ -1241,17 +1252,17 @@ Learnable targets:
   start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
   **Sonify-sequence** and **key-sequence** transports, the **Master FX chain** on/off,
   session **New / Load / Open**, and the dice (each layer's, the Background's, the
-  master parameters', the Meta knobs', the selected Inspector unit's, the Resolume
+  master parameters', the Macro knobs', the selected Inspector unit's, the Resolume
   pins).
 - **Any action of the shared vocabulary** (the one a [Body](#body--embodied-control-key-b)
   rule fires : the layers' mute / solo / sources / A↔B / punch..., the loaded effects'
-  triggers, Worlds, Generate, Meta, modulators, Feel, tempo, the key, the Audio Layer,
+  triggers, Worlds, Generate, Macro, modulators, Feel, tempo, the key, the Audio Layer,
   the output), most with no control on screen : pick it in the MIDI section's
   **learn** list, then hit a pad.
 - **Scene chips** : a pad recalls that scene *slot* (like the `1`–`9` keys); a
   pad can also step **scene next / prev**.
 
-Everything except the Meta-knob CCs is machine-local (survives restarts,
+Everything except the Macro-knob CCs is machine-local (survives restarts,
 doesn't travel with sessions). The **MIDI** section of the Connect tab
 (key `A`) has the **input dropdown** (all controllers, or just one : hot-plug
 is handled), a **live-activity readout** (last message + how many controls are
@@ -1354,7 +1365,7 @@ MIDI Learn binds, see [MIDI](#midi)), picked from a searchable list (type a laye
 effect, a World, a family...; **nothing** first, for an OSC-only rule) :
 
 - **Randomize** : the scopes (everything / sources / source FX / layer FX / modulators /
-  finishing / background / master / Meta / inspector / Sonify / Resolume pins), Vary,
+  finishing / background / master / Macro / inspector / Sonify / Resolume pins), Vary,
   each layer's dice.
 - **Layer 1 to 4** : mute, solo, **FX on/off** (the layer rack's power), feedback on/off,
   **freeze / run** (the layer's time stops while the others run; again, its speed comes
@@ -1374,7 +1385,7 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
 - **Generate** : a random theme, the **next theme in its family**, or a random theme of
   one family (one entry per family). Like a pad's New, it never stops to ask : unsaved
   work is kept as a recovery copy, and undo brings the session back.
-- **Meta** : each knob up or down a tenth, to a random place, or flipped to the far end,
+- **Macro** : each knob up or down a tenth, to a random place, or flipped to the far end,
   over its own smoothing.
 - **Modulators** : each card's retrigger (its ⟳) and on/off.
 - **Feel** : each of the eight dials up or down a tenth, and a reset to neutral.
@@ -1389,7 +1400,7 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
 - **Session** : New, Load, Open.
 
 An action leaves whatever is **persistent** alone (a pinned layer, blend, source,
-Meta knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
+Macro knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
 its button would. Fired again and again it stays cheap : a second A↔B mid-way turns
 back, a punch restarts. No action opens a camera, a microphone or a network source. A
 rule whose target is gone (an effect no longer loaded, a scene slot past the bank, a
@@ -1665,7 +1676,7 @@ frame jump, ↺ brings it back upright), **feather** (softens the frame's edges 
 black), **flip x / y**, and the **edge** : black, the frame repeated, or mirrored so the
 tiles meet without a seam. The preview, the projector, NDI, Spout, recording and stills
 all show it; the analyses (vision, depth, Sonify) keep reading the unmoved frame, so a
-spinning output is not read as motion. Every slider takes a modulator or a Meta knob
+spinning output is not read as motion. Every slider takes a modulator or a Macro knob
 (its M), and OSC (`/opsia/output/...`) and dataflou (`output/...`) reach them all. It is
 saved with the session; a New session or an older file starts at identity. While the
 fulldome is on, its own mapping moves the frame and these wait. One pass, skipped at
@@ -1752,7 +1763,7 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   on, on the projector window too.)
 - **Every mapping slider can be modulated** : rotate, spin, feather, turns, top, bottom,
   azimuth, elevation, width, roll, surround, scale, offset x / y each have an **M** (a
-  modulator or a Meta knob; right-click clears), and while bound the slider turns the
+  modulator or a Macro knob; right-click clears), and while bound the slider turns the
   modulated color and follows the live value. A screen that drifts around the room, a
   panorama breathing between the horizon and the zenith, a full-dome frame that swells
   on the beat. Aperture and resolution are the venue's and stay put.
@@ -1998,7 +2009,7 @@ note clock and degrees, the picture's hue wheel and moods. On
 each tick of its clock (**rate** : 1 beat … 16 bars of the composition tempo, or free
 time : 250 ms to 5 min, 5 s by default, the default rate), a **chance** decides whether the key changes, and an optional **Euclid** rhythm
 (pulses / steps / rotation) decides which ticks may change it. In free time, **every**
-has its M (a modulator or a Meta knob swings it, along its own log scale, and its
+has its M (a modulator or a Macro knob swings it, along its own log scale, and its
 number moves with it) and **vary** draws each wait at random around it, from a
 quarter of Every to four times it at full (as many shorter waits as longer ones) :
 the changes stop falling at a steady pace. The wait running shows beside the key
@@ -2043,10 +2054,10 @@ decay, raster smooth/tone, SSTV line/transpose, filter resonance/sweep, chord vo
 tone/spread/swell/waves/noise/air, the Collage voice's resonance/ring/width and its Ring bank's
 wet/decay/cutoff/waves/detune, the FX send/reverb/delay, and where every voice sits in
 the room ([Space](#space--the-voices-in-the-room) : az, el, width, span, spin), and the key sequencer's **every** : are **modulation targets**. Bind M1–M8
-or a Meta knob via the M chips on the Sonify strips, and the mod-matrix stirs the
+or a Macro knob via the M chips on the Sonify strips, and the mod-matrix stirs the
 listening the same way it stirs the image (overlays show the modulated probes
 live). The chips are the Inspector's : one shows the modulators bound (M1·3), a click
-opens the same binding row (M1–8 with depth and mode, the Meta knobs) right under its
+opens the same binding row (M1–8 with depth and mode, the Macro knobs) right under its
 parameter, a right-click clears all its modulation; a modulated slider's number moves
 with the modulation. A new binding swings around the value (replace), as Sonify
 always bound them. The sound patch **travels with sessions and scenes** : recalling a scene
@@ -2119,7 +2130,7 @@ The **small pink dots** are the Collage pieces playing, each where it sounds fro
 
 **Played, not only placed.** Click a voice's name (**▸**) : its place opens as five
 sliders (**az**, **el**, **width**, **span**, **spin**), each with Sonify's **M** : click it
-and the box to choose a modulator (or a Meta knob), its depth and its mode opens right
+and the box to choose a modulator (or a Macro knob), its depth and its mode opens right
 under the voice. A voice with something bound shows a small **M** beside its name, and
 the table shows the moving value.
 Azimuth goes round : a modulator or a knob gets two full turns that wrap, so a sweep
@@ -2425,9 +2436,9 @@ again re-rolls a fresh variation within the same theme.
 **Right-click a control** (any parameter in the Inspector or the
 Finishing stages, the pos X/Y sliders and the small toggles included, the Vibe palette's
 color stops and stop count, a layer's opacity, A·B mix, blend or speed, the Mixer's faders,
-crossfader, hue and blend, the Background's opacity, speed and shadow, a Meta knob; not
+crossfader, hue and blend, the Background's opacity, speed and shadow, a Macro knob; not
 yet Sonify's controls) → **Persistent**, and no scene, Randomize, Variation, the sequencer, the scene pad,
-Generate, a World (its amount and the World page's edits included), a dice (the Meta
+Generate, a World (its amount and the World page's edits included), a dice (the Macro
 knobs', an effect's own, the Finishing stages' and their reset), **Init background** or a
 Mixer, layer, background or master preset changes it any more :
 it stays as it plays while everything around it moves (and never moves in a morph).
@@ -2513,10 +2524,10 @@ shader's **curated aesthetic sub-range**; colors stay matte.
 
 Scopes (the `▾` next to the button): **All · Sources · Source Parameters ·
 Source+FX · Source FX · Layers · Layer FX · Master FX · Finishing · Modulators ·
-Meta Knobs · Sonification.** Every scope can also be fired over OSC and the
-[dataflou mesh](#dataflou-mesh), at the intensity set here, except Meta Knobs : there,
-`randomize/meta` shuffles the knobs' values and keeps their destinations, like the Meta
-strip's `⚄`. The randomizes MIDI Learn has (the master FX parameters in place, the
+Macro Knobs · Sonification.** Every scope can also be fired over OSC and the
+[dataflou mesh](#dataflou-mesh), at the intensity set here, except Macro Knobs : there,
+`randomize/macro` (OSC; `randomize/meta` on the mesh, and the old OSC name still works)
+shuffles the knobs' values and keeps their destinations, like the Macro strip's `⚄`. The randomizes MIDI Learn has (the master FX parameters in place, the
 selected Inspector unit, the Resolume pins, the Background's dice) fire the same way :
 see the [OSC table](#inbound-control--instrument).
 
@@ -2886,7 +2897,7 @@ chord's hue, chroma and spread while the chord is off; everything that only shap
 Vibe's palette (the strip, bands↔smooth, dither, auto-levels, gamma, sharpen) at source
 mix 1; haze color while haze is 0; the light's size and color while glow is 0 (its color
 stays live while the surface material uses it); the surface's controls at relief 0. A
-parameter a modulator, a Meta knob or a performance macro is moving is never grayed. A
+parameter a modulator, a Macro knob or a performance macro is moving is never grayed. A
 color row is its swatch and its hex value (the stages read only a color's RGB).
 
 The Vibe's **palette** is one **strip** : the gradient the picture's light is mapped into
@@ -3018,11 +3029,11 @@ It grew out of a Max patch built for the same job (`udpreceive` → per-feature 
   shut; a folded group still shows the columns that carry a connection. **↻** re-reads
   the file after you change the set and save, keeping every connection whose address
   still exists.
-- **Rows** : any modulator, Meta knob, audio / vision / body feature, or **any `/opsia`
+- **Rows** : any modulator, Macro knob, audio / vision / body feature, or **any `/opsia`
   address** (the whole OSC surface). 18 by default, like the patch (8 modulators, 6
   picture features, 4 sound features). Each row has a **smooth** and a **gain**.
 - **Pins** : click a hole to connect, drag to paint several, right-click a pin to set
-  its **amount**. A pin wears its signal family's color (modulators, Meta knobs, audio,
+  its **amount**. A pin wears its signal family's color (modulators, Macro knobs, audio,
   vision, body, OSC), grows with its amount and glows with what it carries; each column
   group has its own color band, rows show how many pins they carry, and the line under
   the board says what is under the cursor. Several rows into one column combine by
@@ -3141,11 +3152,11 @@ unless the slot actually holds a video or a sound file (Import audio).
 · `/opsia/flow` (0.5 = centre) · `/tonicity`, `/shutter`, `/drift`,
 `/superflicker` (temperament; 0 = off).
 
-**Meta / transport / structure**
+**Macro / transport / structure**
 
 | Address | Type | Meaning |
 |---|---|---|
-| `/opsia/meta/{1..16}` | f | Drives meta knob *n* (smoothed) |
+| `/opsia/macro/{1..16}` | f | Drives Macro knob *n* (smoothed). The old `/opsia/meta/{1..16}` still works (in, and in the feedback out) |
 | `/opsia/bpm` | f | Tempo : **raw**, clamped 20..800 |
 | `/opsia/world` | s / i | Select World (name, or 1-based index) |
 | `/opsia/world/amount` | f 0..1 | World amount : how much of the active World's mood is on (0 = the mood it found) |
@@ -3153,7 +3164,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/seq/skip` | trigger | Advance to next scene |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
 | `/opsia/randomize[/{scope}]` | trigger | Fire Randomize at the Transport's intensity (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
-| `/opsia/randomize/masterparams · meta · inspector · sonify · resolume · background` | trigger | The other randomizes, exactly as MIDI Learn fires them : the master FX parameters in place, the Meta knob values, the selected Inspector unit, the Sonify patch, the Resolume pins, the Background's dice |
+| `/opsia/randomize/masterparams · macro · inspector · sonify · resolume · background` | trigger | The other randomizes, exactly as MIDI Learn fires them : the master FX parameters in place, the Macro knob values (`meta`, the old name, still works), the selected Inspector unit, the Sonify patch, the Resolume pins, the Background's dice |
 | `/opsia/output/x · y · scale · rotate · spin · feather` | f 0..1 | The **output transform** (0.5 = none for x, y, scale, rotate, spin; scale runs 0 to 2) |
 | `/opsia/output/flipx · flipy` | bool | Flips (≥ 0.5) |
 | `/opsia/output/edge` | i / f / s | `black` · `repeat` · `mirror` |
@@ -3200,7 +3211,7 @@ When enabled, the instrument diffs its streamable parameters and pushes the chan
 ones to a peer (e.g. Pandore's UI mirrors yours). Same `/opsia/…` addresses
 (layers in the canonical `layer{n}` form), same `0..1` convention; **every
 outbound value is a single float `f`** (enums/bools normalized). Streamed: every
-layer control, meta knobs, BPM (raw), the three master finalizers' float inputs,
+layer control, Macro knobs, BPM (raw), the three master finalizers' float inputs,
 background controls + source inputs, all macros/temperament, world (1-based
 index) and its amount, the coupling switch, the output transform, the Sonify patch and
 Space, the Audio Layer (but not its both-files `audiolayer/play`), and `seq/run` : plus, while a slot holds a video, its transport
@@ -3281,7 +3292,7 @@ left out, as the core's own terse DECLARE does) :
 
 | | Paths | Notes |
 |---|---|---|
-| ↙ destinations | `meta/1..16` (also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
+| ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1
@@ -3390,7 +3401,7 @@ A client that only runs local (stdio) servers can reach it through a bridge such
 | `add_effect` · `edit_effect` | effects on any rack : add (with a position and values), on/off, mix, move, remove |
 | `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work. It rewrites its own shaders freely, but never one of yours unless told to replace it (`replace: true`; the old version stays in `Shaders/.history`) |
 | `scenes` | list, recall, save, rename, delete |
-| `list_controls` · `osc` | every OSC address and what it does, and any of them played : Sonify, the World, the field macros, Meta knobs, the output transform… Numbers go as `0..1` floats, as on the wire (`1` is the top of a menu); an int only to an index address, or as `{"int": n}` |
+| `list_controls` · `osc` | every OSC address and what it does, and any of them played : Sonify, the World, the field macros, Macro knobs, the output transform… Numbers go as `0..1` floats, as on the wire (`1` is the top of a menu); an int only to an index address, or as `{"int": n}` |
 | `undo` | takes back its own last change, never yours (once you changed something after it, or for a change that made no undo step, it says so and undoes nothing) |
 
 Units are addressed as in OSC, counted from 1 : `L1.A`, `L1.B`, `L1.fx.2`, `L1.A.fx.1`,
@@ -3500,7 +3511,7 @@ docs/         specs (convolution · cameraless · sequencer), research notes, an
 
 The store holds one **single write path** : UI edits, session loads, OSC and MIDI all
 reconcile into the engine through `syncFromState`, so nothing races. Per-frame
-overlays (modulation, Feel macros, Meta-knob gestures, the sequencer's long-forms)
+overlays (modulation, Feel macros, Macro-knob gestures, the sequencer's long-forms)
 write **straight into the compositor** through a shared frame-value bus, so
 co-engaged systems stack on the same parameter instead of clobbering each other, and none of it ever re-renders React.
 A layer with nothing in it (no source, no effect switched on, no trail) costs nothing :

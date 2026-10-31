@@ -163,7 +163,7 @@ export interface MidiDevice {
 }
 
 // ── Learnable targets ────────────────────────────────────────────────────
-// meta:<i>          Meta knob i (CC only, stored on the knob itself)
+// meta:<i>          Macro knob i (CC only, stored on the knob itself; the id keeps its old name)
 // scene:<i>         scene slot i (0-based; note or button-CC recalls it)
 // scene:next/prev   note/CC press → step the scene bank (wraps)
 // transport:bpm     CC → 40..240 BPM
@@ -212,7 +212,7 @@ export function midiTargetLabel(id: string): string {
   if (id.startsWith('meta:')) {
     const i = Number(id.slice(5))
     const name = useStore.getState().composition.metaKnobs[i]?.name
-    return `META ${i + 1}${name ? ` · ${name}` : ''}`
+    return `MACRO ${i + 1}${name ? ` · ${name}` : ''}`
   }
   if (id === 'scene:next') return 'SCENE next'
   if (id === 'scene:prev') return 'SCENE prev'
@@ -236,7 +236,7 @@ export function midiTargetLabel(id: string): string {
     case 'rand:master':
       return 'RANDOMIZE master FX'
     case 'rand:meta':
-      return 'RANDOMIZE Meta knobs'
+      return 'RANDOMIZE Macro knobs'
     case 'rand:inspector':
       return 'RANDOMIZE inspector'
     case 'rand:all':

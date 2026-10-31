@@ -110,7 +110,7 @@ export function DataflouSection(): JSX.Element {
                 on the mesh as <span className="text-accent">{st.label}</span> at{' '}
                 <span className="text-text">{st.address}</span>:<span className="text-text">{st.tcpPort}</span> · publishes{' '}
                 <span className="text-text">{DF_SOURCES.length}</span> sources and takes{' '}
-                <span className="text-text">{DF_DESTS.length}</span> destinations (Meta knobs, layers, background, feel, scenes, randomize, output transform, BPM)
+                <span className="text-text">{DF_DESTS.length}</span> destinations (Macro knobs, layers, background, feel, scenes, randomize, output transform, BPM)
               </>
             ) : state === 'error' ? (
               <span className="text-danger">{st.error}</span>

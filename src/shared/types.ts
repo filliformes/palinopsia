@@ -917,7 +917,9 @@ export const PAGE_WINDOW_TITLES: Record<string, string> = {
 // always had and the rest of the room stays for the hand.
 export const AUTO_MOD_BUDGET = 12
 
-// ── Meta Controller (brief §6 : dataFLOU's macro surface) ─────────────
+// ── Macro Controller (brief §6 : dataFLOU's macro surface) ────────────
+// Called Meta before v1.3.2 : the code, the sessions and the ids keep that
+// name (metaKnobs, kind 'meta', META_*, `meta:<i>`, /opsia/meta/{n} as an alias).
 // 16 knobs, one flat bank. Each knob maps its 0..1 position through a curve
 // onto up to 8 destinations (ISF float inputs), with per-knob smoothing and
 // MIDI-CC learn. Modulators can drive knobs (ModTarget kind 'meta').

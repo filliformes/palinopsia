@@ -72,7 +72,7 @@ export function MidiPanel(): JSX.Element {
       on ? 'border-accent bg-accent/15 text-accent' : 'border-border bg-panel2/60 text-muted hover:text-text'
     }`
 
-  // One flat ledger : session-carried Meta-knob CCs first, then the
+  // One flat ledger : session-carried Macro-knob CCs first, then the
   // machine-local map (scenes, transport, fires), in a stable order.
   const rows: Array<{ id: string; binding: MidiBinding; clear: () => void }> = []
   metaKnobs.forEach((k, i) => {
@@ -215,7 +215,7 @@ export function MidiPanel(): JSX.Element {
           </div>
 
           {/* Learn an action : pick any trigger of the shared vocabulary (the
-              layers, the loaded effects' triggers, Worlds, Generate, Meta,
+              layers, the loaded effects' triggers, Worlds, Generate, Macro,
               modulators, Feel, tempo, the output...), then hit a pad. */}
           <div className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 font-mono text-[9px] uppercase text-muted">learn</span>
@@ -231,7 +231,7 @@ export function MidiPanel(): JSX.Element {
                 setLearnTarget(id)
                 showToast(`MIDI Learn : hit a pad or press a button for ${triggerLabel(id)}`, 'ok', 5000)
               }}
-              title="Bind a pad to any action, even one with no control on screen : the same vocabulary a Body rule fires (the layers, the loaded effects' triggers, Worlds, Generate, Meta, modulators, Feel, tempo, the key, the Audio Layer, the output). Pick it, then hit a pad or press a button."
+              title="Bind a pad to any action, even one with no control on screen : the same vocabulary a Body rule fires (the layers, the loaded effects' triggers, Worlds, Generate, Macro, modulators, Feel, tempo, the key, the Audio Layer, the output). Pick it, then hit a pad or press a button."
             />
           </div>
 
@@ -239,7 +239,7 @@ export function MidiPanel(): JSX.Element {
           {rows.length === 0 ? (
             <div className="rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed text-muted">
               No bindings yet. Press <span className="text-text">MIDI LEARN</span> in the bottom
-              toolbar, click a highlighted control (Meta knobs, transport sliders, Vary /
+              toolbar, click a highlighted control (Macro knobs, transport sliders, Vary /
               Randomize / Sonify, scene chips), then move a knob or hit a pad.
             </div>
           ) : (
