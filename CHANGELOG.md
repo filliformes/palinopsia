@@ -7,6 +7,20 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Silhouette source's trail works in Matte mode** (`engine/SilhouetteSource.ts`).
+  The trail keeps its echoes in the picture's alpha (the body now or the faded past,
+  whichever covers more), but the matte is opaque everywhere (white body, black room),
+  so the present always won : the trail knob did nothing at all in Matte (the same
+  picture, to the bit, at trail 0, 0.35, 0.6 and 1). With a trail on, the matte now
+  keeps its echoes as a white shadow does and the copy out draws them back as grey on
+  opaque black : echoes fading from white to black behind the body, at the same speed
+  and over the same range as the other modes, a key that lingers. Trail 0 and the other
+  three modes are unchanged to the bit (master's shader and the new one side by side in
+  one build : 0 bytes differ for cutout, shadow, a translucent shadow and hole at every
+  trail). Measured without a camera in the test copy (RTX 4070, 63 fps) : a synthetic
+  disc mask crossing the frame in 1.5 s; behind it the matte read 0 at every trail
+  before, now 0.39 / 0.68 / 0.86 at trail 0.35 / 0.6 / 1, the same as a white shadow
+  (on the output canvas, 0 → 0.68 at 0.6 and 0 → 0.86 at 1).
 - **Marbling keeps its water fluid on the dome and at 4K** (`engine/marbleModel.ts`,
   `workers/marbleWorker.ts`). Measured first in the test copy under the Satosphère setup
   (4096² master, 210° fill, 2048² composition, Marbling alone, auto 2 drops a second),

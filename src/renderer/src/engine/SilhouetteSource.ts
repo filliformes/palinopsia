@@ -5,7 +5,7 @@
 // background removal), MATTE (white body on black, to key or feed another layer's
 // node), SHADOW (a flat colored silhouette) and HOLE (the room with the body cut
 // out). TRAIL leaves decaying echoes of the body behind it, the silhouette's own
-// afterimage.
+// afterimage (in the matte : fading greys, a key that lingers).
 //
 // It never turns the camera on : a camera is opt-in (Body page, or the Inspector's
 // button). While the camera or the silhouette is off, it draws nothing.
@@ -58,6 +58,10 @@ void main(){
   if (uTrailOn == 1) {
     // Echoes : the body leaves its last look behind, fading. Coverage is kept as
     // the max of now and the faded past; the color follows whichever wins.
+    // The matte is opaque everywhere, so its alpha carries no body and the present
+    // always won (no echoes at all) : it keeps its echoes as a white shadow's, and
+    // the copy out turns that coverage back into grey on opaque black.
+    if (uMode == 1) now = vec4(1.0, 1.0, 1.0, m);
     vec4 past = texture(uTrail, vUV);
     float fa = past.a * uKeep;
     fa = floor(fa * 255.0 + hash13(vec3(floor(gl_FragCoord.xy), mod(uFrame, 4096.0)))) / 255.0;
@@ -71,7 +75,11 @@ const COPY_FS = `#version 300 es
 precision highp float;
 in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
-void main(){ o = texture(uTex, vUV); }`
+uniform int uMatte;
+void main(){
+  vec4 t = texture(uTex, vUV);
+  o = uMatte == 1 ? vec4(vec3(t.a), 1.0) : t; // matte : the kept coverage as grey
+}`
 
 interface Target { fbo: WebGLFramebuffer; tex: WebGLTexture }
 
@@ -81,6 +89,7 @@ export class SilhouetteSource {
   private copy: WebGLProgram
   private u: Record<string, WebGLUniformLocation | null> = {}
   private uCopy: WebGLUniformLocation | null
+  private uCopyMatte: WebGLUniformLocation | null
   private vao: WebGLVertexArrayObject
   private quad: WebGLBuffer
   private camTex: WebGLTexture
@@ -125,6 +134,7 @@ export class SilhouetteSource {
       'uOutAspect', 'uCamAspect', 'uMirror', 'uFit', 'uColor', 'uFrame'])
       this.u[n] = gl.getUniformLocation(this.prog, n)
     this.uCopy = gl.getUniformLocation(this.copy, 'uTex')
+    this.uCopyMatte = gl.getUniformLocation(this.copy, 'uMatte')
     const tex = (): WebGLTexture => {
       const t = gl.createTexture()!
       gl.bindTexture(gl.TEXTURE_2D, t)
@@ -253,13 +263,14 @@ export class SilhouetteSource {
     const color = Array.isArray(this.inputs.color) ? (this.inputs.color as number[]) : [0.95, 0.92, 0.85, 1]
     const camAspect = this.camW > 0 && this.camH > 0 ? this.camW / this.camH : (this.maskW > 0 ? this.maskW / Math.max(1, this.maskH) : 4 / 3)
     const soft = Math.max(0.001, this.num('softness', 0.08))
+    const mode = Math.max(0, Math.min(3, Math.round(this.num('mode', 0))))
     gl.bindVertexArray(this.vao)
     gl.useProgram(this.prog)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.camTex); gl.uniform1i(this.u.uCam, 0)
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.maskTex); gl.uniform1i(this.u.uMask, 1)
     const read = this.trail ? this.trail[1 - this.cur].tex : this.maskTex
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, read); gl.uniform1i(this.u.uTrail, 2)
-    gl.uniform1i(this.u.uMode, Math.max(0, Math.min(3, Math.round(this.num('mode', 0)))))
+    gl.uniform1i(this.u.uMode, mode)
     gl.uniform1i(this.u.uTrailOn, trailOn ? 1 : 0)
     gl.uniform1i(this.u.uHasCam, hasCam ? 1 : 0)
     gl.uniform1f(this.u.uThresh, Math.max(0.02, Math.min(0.98, this.num('threshold', 0.5))))
@@ -279,6 +290,7 @@ export class SilhouetteSource {
       // Copy the new trail state out to the layer.
       gl.useProgram(this.copy)
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, write.tex); gl.uniform1i(this.uCopy, 0)
+      gl.uniform1i(this.uCopyMatte, mode === 1 ? 1 : 0)
       gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo)
       gl.viewport(0, 0, this.w, this.h)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
