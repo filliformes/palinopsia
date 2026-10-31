@@ -1139,7 +1139,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     tint: 'Color of the points and their trails.'
   },
   'node-parallax': {
-    amount: 'Parallax strength : how far near features shift relative to far ones. Needs the Depth engine on (header).',
+    amount: 'Parallax strength : how far near features shift relative to far ones. Needs the Depth engine on (Performance tab, picture section).',
     angle: 'Direction the parallax pushes.',
     sway: 'Animated camera drift : gives constant parallax motion even on a still image.',
     swayRate: 'Speed of the camera sway (1 = the original pace, 0 = holds still). Safe to modulate : it never jumps.',

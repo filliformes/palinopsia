@@ -1,8 +1,8 @@
 # resources/depth : the AI depth engine
 
-The header's **depth: AI** reads depth from the picture with Depth Anything V2
-Small, run by Transformers.js and its WebAssembly / WebGPU runtime
-(onnxruntime-web). All of it ships inside the app, so depth works offline and in
+**depth: AI** (the Performance tab, at the head of its picture section) reads depth
+from the picture with Depth Anything V2 Small, run by Transformers.js and its
+WebAssembly / WebGPU runtime (onnxruntime-web). All of it ships inside the app, so depth works offline and in
 an installation : the renderer loads it from here over `opsia-asset://depth/`
 (`src/main/assets.ts`), never from the network.
 

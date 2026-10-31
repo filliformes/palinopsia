@@ -529,7 +529,7 @@ The right column switches between **seven views** (tabs, or keys `M` / `F` / `G`
 layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
 blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
-Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter) and
+Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu) and
 **assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
@@ -716,13 +716,13 @@ Left → right:
 
 The **top bar** stays on one line in a window narrower than the screen : as it
 narrows it tucks the SESSION / GENERATE labels away, then tightens the session name,
-the menus and the zoom readout, never dropping a button (only the 1024 px minimum
-window still wraps). It carries the session controls, one group (the name, the
+the menus and the zoom readout, never dropping a button, on one line down to the
+1024 px minimum window. It carries the session controls, one group (the name, the
 session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Add a
 session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
 button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
-zoom, the render-depth and theme selectors, and, at the far right, **⚡ Flush**, the panic
+zoom, the theme selector, and, at the far right, **⚡ Flush**, the panic
 button (also key `0`) that drops every self-feeding buffer at once: per-layer
 trails, the Feedback / Réponse / Chronoscan frame rings, the Sediment / Scanner
 accumulators, the consume blend's competition field, and the persistent buffers of
@@ -733,10 +733,17 @@ picture.
 
 ### Depth (2.5D)
 
-The header's **depth** menu fills the one depth map the depth-aware pieces read :
+The **depth** menu fills the one depth map the depth-aware pieces read :
 [Parallax](#native-nodes), [Pulfrich](#native-nodes) and **Luma Blur**'s depth focus,
 and the picture's `depth` / `depthSpread` features (the `vision` modulators, OSC, the
-readout).
+readout). It sits in the **performance** tab, at the head of its **picture** section,
+beside the depth and relief it fills, and stays shown while the section is folded;
+**Ctrl+K** `depth` opens it there. The setting belongs to the computer, not to a
+session : it is kept from one launch to the next, and opening a session leaves it as
+it is. While depth is off, the Inspector of Parallax, Pulfrich (keyed on the depth
+map) and Luma Blur (on depth focus) says what the piece does without a map (Parallax
+lets the picture through, the other two read brightness instead), with a **turn on
+AI** button beside it.
 
 - **off** : no depth. The depth-aware pieces fall back to the picture's brightness.
 - **synth** : a test bowl (near in the middle, far at the edges), no model.
@@ -1191,7 +1198,8 @@ The **Connect** right-column tab (key `A`) holds the control panels
   near zero means the frame rate is simply the display's own pace. The frame-budget
   figures are measured against one frame on that display, not a fixed 60 Hz.
   Fixed layout (no reflow as modulation comes and goes). Under it, the
-  **picture** section reads out every feature the picture reports, live : light and
+  **picture** section, with the [depth](#depth-25d) menu at its head, reads out every
+  feature the picture reports, live : light and
   color (brightness, contrast, saturation, hue, warmth), texture (edges, entropy),
   motion (amount, flow sideways and up/down, spreading or closing, turning, moving as
   one) and where and how deep (the bright mass on a little plane, depth, relief), each
@@ -2839,7 +2847,7 @@ none is picked, so all five run in any rack.
 | **Autocutter** | A cut-up collage : the frame recursively split into pieces, shuffled among their slots (and optionally rotated); the layout holds while live video keeps playing inside every piece, and re-cuts on `cut ▸` or an **auto cut** rate. Four dials shape the cut itself: **contour** bends the straight seams into uneven curves that still tessellate perfectly (past 1 it shreds), **curve length** trades many small wiggles for a few long, simple curves, **torn paper** tears the cuts like a torn-magazine collage (one piece over the other, the white core of the paper showing only along the upper piece's ragged edge, loose fibers, a soft shadow; the frame's own edges stay clean cuts), and **mask** peels pieces away into transparent holes : at full mask a single piece survives, and each new cut elects a different one. **Shape** switches between the rectangles and an irregular **Voronoi mosaic** (denser, more organic : every dial behaves the same in both). Set an **auto rate** and a **crossfade** to dissolve one cut layout into the next instead of snapping. Ships 9 presets from *Clean cut-up* to *Last piece*. |
 | **Chronoscan** | Per-pixel time displacement over a ~32-frame ring : a control field (slit-scan gradient, luminance, noise…) sets how far into the past each pixel reads, so each region lives in a different present. |
 | **Sediment** | Long-term image memory : a decaying long-exposure accumulator (seconds to **minutes**) plus a sparse keyframe store, so the deep past stays recallable and resurfaces through the present. |
-| **Parallax** | Real 2.5D from the shared depth map : near features sway more than far ones, with depth-of-field around a focus plane and aerial fog (needs the Depth engine set in the header). |
+| **Parallax** | Real 2.5D from the shared depth map : near features sway more than far ones, with depth-of-field around a focus plane and aerial fog (needs the depth engine on : the Performance tab's picture section). |
 | **Eternalism** | Persistence-of-vision as a signal path (Ken Jacobs): two temporal taps a gap apart alternate across a black shutter interval at a drawn rate : an unfrozen slice of time, held micro-motion going nowhere. |
 | **Afterimage** | Goethe's complement : where a bright form **departs**, its negative/complementary ghost blooms back and decays; chroma sweeps the ghost from dark subtraction to full complement. |
 | **Pulfrich** | Monocular 3D from a temporal eye-delay : one eye reads a delayed image (per-pixel, keyed by depth or luminance) so lateral motion becomes stereo depth; the disparity is temporal, not spatial. |

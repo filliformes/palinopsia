@@ -323,8 +323,9 @@ function flash(el: HTMLElement): void {
 
 /** Run each step (opening the view the control lives in) until the control is
  *  on screen, then bring it into view and flash it. A step that shows nothing
- *  hands on to the next (the layer strip, then the Mixer). */
-function reveal(key: string, label: string, steps: Array<() => void>): void {
+ *  hands on to the next (the layer strip, then the Mixer). `block` 'start' puts
+ *  it at the top of its column (a section's head, with the section under it). */
+function reveal(key: string, label: string, steps: Array<() => void>, block: ScrollLogicalPosition = 'nearest'): void {
   let i = 0
   const next = (): void => {
     steps[i]()
@@ -333,7 +334,7 @@ function reveal(key: string, label: string, steps: Array<() => void>): void {
     const poll = (): void => {
       const boxes = visibleBoxes(key)
       if (boxes.length) {
-        boxes[0].scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+        boxes[0].scrollIntoView({ block, inline: 'nearest', behavior: 'smooth' })
         for (const b of boxes) flash(b)
         return
       }
@@ -789,7 +790,33 @@ function pageItems(): SearchItem[] {
       useStore.getState().setRightView(t.id)
     }
   }))
-  return [...pages, ...tabs]
+  // The depth engine's menu (it moved from the top bar in v1.3.2) : the
+  // Performance tab, its picture section unfolded and at the column's top, the
+  // menu flashed.
+  const depth: SearchItem = {
+    key: 'page:depth',
+    kind: 'page',
+    label: 'Depth',
+    group: 'performance',
+    keywords: ['depth', 'ai', 'parallax', 'pulfrich', '2.5d', 'luma blur'],
+    hint: 'the depth engine : off, synth or AI, at the head of the picture section',
+    reveals: true,
+    run: () =>
+      reveal(
+        'ui:depth',
+        'The depth menu',
+        [
+          () => {
+            uncover()
+            const st = useStore.getState()
+            st.setRightView('perf')
+            if (st.collapsed['picture']) st.setCollapsed('picture', false)
+          }
+        ],
+        'start'
+      )
+  }
+  return [...pages, ...tabs, depth]
 }
 
 /** The Inspector's ⚄ on the selected unit, folded Inspector or not : its
@@ -933,7 +960,10 @@ export function rankSearch(items: SearchItem[], query: string, recent: string[],
   return [...byKind.entries()]
     .map(([kind, list]) => {
       list.sort((a, b) => a.s - b.s || a.i - b.i)
-      return { kind, t: tier(kind, list[0].s), list }
+      // A page or tab named exactly what was typed comes first : "depth" lands
+      // on the depth menu, not under eight depth parameters and six presets.
+      const named = kind === 'page' && list[0].it.label.toLowerCase() === query
+      return { kind, t: named ? -1 : tier(kind, list[0].s), list }
     })
     .sort((a, b) => a.t - b.t || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
     .map(({ kind, list }) => ({ title: KIND_LABEL[kind], rows: capped(kind, list.map((x) => x.it)) }))
