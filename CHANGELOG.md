@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Silhouette : a trail color for the Matte's echoes** (Vincent : "I thought in Matte mode
+  the trails could be of another color too"). New input `trailColor` (color, default white,
+  modulatable like every color) : in Matte mode with a trail, the echoes are kept in that
+  color (times its alpha) while the present body stays white; the copy out draws the kept
+  coverage as `rgb * a` on opaque black, so white is to the bit the grey key it was. Shadow
+  color greys out unless the mode is shadow; trail color greys out unless the mode is matte
+  with a trail on (`GroupedControls.tsx` DIMS, Silhouette had none). Presets Lingering key,
+  Matte comet, Cold wake. Checked in the test copy with a synthetic moving disc (no camera) :
+  body 255 white in every run; far echo 170 grey (white), 170 / 34 / 16 (red), dimmed blue at
+  alpha 0.5; room black.
+
 - **Every color picker is modulatable : its color slider and both axes of its pad**
   (`engine/colorParts.ts`, `ModTarget.ch`, `AutoControls.tsx` `ColorModButton` /
   `ColorPartSwitch`, `VibePaletteStrip.tsx`). A color input (any source, effect or node,

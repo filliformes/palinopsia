@@ -14,6 +14,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     softness: 'How soft the edge is : 0 is a hard cut, higher feathers it.',
     trail: 'Echoes : the body leaves fading copies of itself behind as it moves. 0 = none, 1 = several seconds.',
     color: 'Color and opacity of the shadow (shadow mode).',
+    trailColor: 'Matte mode : the color the echoes fade in behind the white body (white keeps the plain grey key; its opacity dims them).',
     fit: 'Cover fills the frame with the camera image (cropping its edges); contain shows all of it, with empty bands.'
   },
   // ── Color, tone and geometry rack FX ─────────────────────────────────

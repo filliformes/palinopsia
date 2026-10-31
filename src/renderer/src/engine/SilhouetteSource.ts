@@ -5,7 +5,8 @@
 // background removal), MATTE (white body on black, to key or feed another layer's
 // node), SHADOW (a flat colored silhouette) and HOLE (the room with the body cut
 // out). TRAIL leaves decaying echoes of the body behind it, the silhouette's own
-// afterimage (in the matte : fading greys, a key that lingers).
+// afterimage (in the matte : the white body leaves echoes in TRAIL COLOR, white by
+// default, fading to black : a key that lingers).
 //
 // It never turns the camera on : a camera is opt-in (Body page, or the Inspector's
 // button). While the camera or the silhouette is off, it draws nothing.
@@ -29,6 +30,7 @@ uniform sampler2D uCam, uMask, uTrail;
 uniform int uMode, uTrailOn, uHasCam;
 uniform float uThresh, uSoft, uKeep, uOutAspect, uCamAspect, uMirror, uFit;
 uniform vec4 uColor;
+uniform vec4 uTrailColor;
 uniform float uFrame;
 float hash13(vec3 p3) {
   p3 = fract(p3 * 0.1031);
@@ -60,12 +62,14 @@ void main(){
     // the max of now and the faded past; the color follows whichever wins.
     // The matte is opaque everywhere, so its alpha carries no body and the present
     // always won (no echoes at all) : it keeps its echoes as a white shadow's, and
-    // the copy out turns that coverage back into grey on opaque black.
+    // the copy out turns that coverage back into color on opaque black. Its echoes
+    // take the trail color (white : the plain grey key), the body stays white.
     if (uMode == 1) now = vec4(1.0, 1.0, 1.0, m);
     vec4 past = texture(uTrail, vUV);
     float fa = past.a * uKeep;
     fa = floor(fa * 255.0 + hash13(vec3(floor(gl_FragCoord.xy), mod(uFrame, 4096.0)))) / 255.0;
-    o = now.a >= fa ? now : vec4(past.rgb, fa);
+    vec3 echo = uMode == 1 ? uTrailColor.rgb * uTrailColor.a : past.rgb;
+    o = now.a >= fa ? now : vec4(echo, fa);
   } else {
     o = now;
   }
@@ -78,7 +82,7 @@ uniform sampler2D uTex;
 uniform int uMatte;
 void main(){
   vec4 t = texture(uTex, vUV);
-  o = uMatte == 1 ? vec4(vec3(t.a), 1.0) : t; // matte : the kept coverage as grey
+  o = uMatte == 1 ? vec4(t.rgb * t.a, 1.0) : t; // matte : the kept coverage, white body, echoes in their color
 }`
 
 interface Target { fbo: WebGLFramebuffer; tex: WebGLTexture }
@@ -105,7 +109,7 @@ export class SilhouetteSource {
   private frame = 0
   private last = 0
   private inputs: Record<string, number | number[]> = {
-    mode: 0, threshold: 0.5, softness: 0.08, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0
+    mode: 0, threshold: 0.5, softness: 0.08, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0
   }
   /** Whether it drew a live silhouette last frame (for the Inspector's status). */
   live = false
@@ -131,7 +135,7 @@ export class SilhouetteSource {
     this.prog = link(FS)
     this.copy = link(COPY_FS)
     for (const n of ['uCam', 'uMask', 'uTrail', 'uMode', 'uTrailOn', 'uHasCam', 'uThresh', 'uSoft', 'uKeep',
-      'uOutAspect', 'uCamAspect', 'uMirror', 'uFit', 'uColor', 'uFrame'])
+      'uOutAspect', 'uCamAspect', 'uMirror', 'uFit', 'uColor', 'uTrailColor', 'uFrame'])
       this.u[n] = gl.getUniformLocation(this.prog, n)
     this.uCopy = gl.getUniformLocation(this.copy, 'uTex')
     this.uCopyMatte = gl.getUniformLocation(this.copy, 'uMatte')
@@ -261,6 +265,7 @@ export class SilhouetteSource {
     else this.disposeTrail()
 
     const color = Array.isArray(this.inputs.color) ? (this.inputs.color as number[]) : [0.95, 0.92, 0.85, 1]
+    const trailColor = Array.isArray(this.inputs.trailColor) ? (this.inputs.trailColor as number[]) : [1, 1, 1, 1]
     const camAspect = this.camW > 0 && this.camH > 0 ? this.camW / this.camH : (this.maskW > 0 ? this.maskW / Math.max(1, this.maskH) : 4 / 3)
     const soft = Math.max(0.001, this.num('softness', 0.08))
     const mode = Math.max(0, Math.min(3, Math.round(this.num('mode', 0))))
@@ -281,6 +286,7 @@ export class SilhouetteSource {
     gl.uniform1f(this.u.uMirror, sil.mirror ? 1 : 0)
     gl.uniform1f(this.u.uFit, Math.round(this.num('fit', 0)))
     gl.uniform4f(this.u.uColor, color[0] ?? 1, color[1] ?? 1, color[2] ?? 1, color[3] ?? 1)
+    gl.uniform4f(this.u.uTrailColor, trailColor[0] ?? 1, trailColor[1] ?? 1, trailColor[2] ?? 1, trailColor[3] ?? 1)
     gl.uniform1f(this.u.uFrame, this.frame++)
     if (this.trail) {
       const write = this.trail[this.cur]

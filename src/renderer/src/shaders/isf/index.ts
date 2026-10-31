@@ -1619,6 +1619,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'softness', TYPE: 'float', MIN: 0.0, MAX: 0.5, DEFAULT: 0.08, LABEL: 'softness' },
         { NAME: 'trail', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'trail' },
         { NAME: 'color', TYPE: 'color', DEFAULT: [0.95, 0.92, 0.85, 1.0], LABEL: 'shadow color' },
+        { NAME: 'trailColor', TYPE: 'color', DEFAULT: [1.0, 1.0, 1.0, 1.0], LABEL: 'trail color' },
         { NAME: 'fit', TYPE: 'long', VALUES: [0, 1], LABELS: ['cover', 'contain'], DEFAULT: 0, LABEL: 'fit' }
       ]
     })}*/`,

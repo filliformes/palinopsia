@@ -242,6 +242,15 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     else if (is('gradient', 1)) put(d, ['color'], 'Gradient is on : colA, colB and colC paint it.')
     return d
   },
+  // Silhouette (engine/SilhouetteSource.ts) : the shadow color only colors SHADOW;
+  // the trail color only tints the MATTE's echoes, so it needs a trail.
+  'gen-silhouette': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 2)) d.color = 'Only the shadow mode is drawn in the shadow color.'
+    if (isnt('mode', 1)) d.trailColor = 'Only the matte mode colors its echoes : the other modes keep the look the body had.'
+    else if (zero('trail')) d.trailColor = 'Trail is at 0 : the matte leaves no echoes to color.'
+    return d
+  },
   'gen-collage': ({ zero, isnt }) => {
     const d: Why = {}
     if (!zero('contour')) return d
