@@ -22,7 +22,7 @@ Copyright (c) 2003-2025 Christopher M. Kohlhoff. Boost Software License 1.0
 
 ## The AI depth engine (`resources/depth`)
 
-The header's **depth: AI** runs the works below. They ship inside every build in
+**depth: AI** (the Performance tab's picture section) runs the works below. They ship inside every build in
 `resources/depth`, fetched pinned and hash-checked by `npm run fetch:depth`
 (`scripts/fetch-depth.mjs`); they are not in the git repository. Apache-2.0 and
 MIT works may be conveyed inside a GPL-3.0 work (the Apache License 2.0 is

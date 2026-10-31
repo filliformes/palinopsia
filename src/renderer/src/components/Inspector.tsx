@@ -30,6 +30,7 @@ import { NdiInReadout, NdiPicker } from './NdiPicker'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
+import { DepthOffNote, depthOffText } from './DepthMenu'
 import { VideoTransport } from './VideoTransport'
 import { AudioLayerInspector } from './AudioLayerPanel'
 import { AssembleTransport } from './AssembleTransport'
@@ -357,6 +358,10 @@ export function Inspector(): JSX.Element {
       .join(',')
   })
   const modulated = useMemo(() => new Set(modNames ? modNames.split(',') : []), [modNames])
+  // A piece that reads the shared depth map (Parallax, Pulfrich keyed on depth,
+  // Luma Blur's depth focus) : what it does while the depth engine is off. The
+  // note itself shows only while depth is off (DepthOffNote reads the store).
+  const depthNote = selection?.type === 'fx' && shaderId ? depthOffText(shaderId, values, modulated) : null
   const fxOpaBound = useBound(fxOpaTarget ? modTargetKey(fxOpaTarget) : null)
   // One shared assign-context value : the header's FX-opacity pill and the body's
   // parameter pills both toggle the same side panel (`assign`).
@@ -761,8 +766,12 @@ export function Inspector(): JSX.Element {
               <span className="font-mono text-[9px] text-muted">{sc.hint}</span>
             </div>
           ))}
+          {/* (Luma Blur : the depth-off line joins this row, no row of its own) */}
+          {depthNote && <DepthOffNote text={depthNote} inline />}
         </div>
       )}
+      {/* Parallax, Pulfrich : with depth off, what they do and the turn-on. */}
+      {depthNote && nodeSidechains.length === 0 && <DepthOffNote text={depthNote} />}
       {/* Sources (≤8 params) fit their content : wrap onto as few rows as
           needed (usually one), no fixed height, no horizontal scroll. FX can be
           deep, so they keep the fixed two-row grid that flows into columns. */}

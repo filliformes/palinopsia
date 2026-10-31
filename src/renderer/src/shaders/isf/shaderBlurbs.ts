@@ -161,7 +161,7 @@ export const SHADER_BLURBS: Record<string, string> = {
   'node-sediment':
     'A long memory: the brightest traces of everything that has passed sink slowly back toward black over seconds or minutes. It also stores occasional snapshots that can be brought back to the surface. Built for durational work, where the picture should carry where it has been.',
   'node-parallax':
-    'Gives a flat image real depth: near things shift more than far things as the camera gently sways, with focus falling off and distance sinking into haze. It needs the depth engine switched on in the header to know what is near and what is far. With depth off it passes the picture through untouched.',
+    'Gives a flat image real depth: near things shift more than far things as the camera gently sways, with focus falling off and distance sinking into haze. It needs the depth engine switched on (the Performance tab, at the head of its picture section) to know what is near and what is far. With depth off it passes the picture through untouched.',
   'node-eternalism':
     'Holds two frames a moment apart and alternates them across a black shutter, so a slice of time hangs there moving without ever going anywhere. It is persistence of vision turned into a signal path. Slower rates shimmer; faster ones fuse into a single strange image.',
   'node-afterimage':

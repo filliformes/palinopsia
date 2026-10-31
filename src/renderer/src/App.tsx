@@ -21,7 +21,7 @@ import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTri
 import { onSessionLoaded } from './sessionEvents'
 import { modPin } from './persist'
 import { visionBus } from './engine/visionIn'
-import { depthEngine, DEPTH_RES_STEPS } from './engine/depthEstimate'
+import { depthEngine } from './engine/depthEstimate'
 import { currentFps, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
@@ -60,6 +60,7 @@ import { AudioPanel } from './components/AudioPanel'
 import { MidiPanel } from './components/MidiPanel'
 import { PerformancePanel } from './components/PerformancePanel'
 import { PictureReadout } from './components/PictureReadout'
+import { DepthMenu } from './components/DepthMenu'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
@@ -351,10 +352,6 @@ export default function App(): JSX.Element {
   const surfaceMove = useRef({ x: 0.5, y: 0.5, t: 0, lastFadeT: 0 })
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
-  const depthMode = useStore((s) => s.depthMode)
-  const setDepthMode = useStore((s) => s.setDepthMode)
-  const depthRes = useStore((s) => s.depthRes)
-  const setDepthRes = useStore((s) => s.setDepthRes)
   // MIDI Learn + Flush moved up to the top bar (World moved down to the Transport).
   const midiLearnMode = useStore((s) => s.midiLearnMode)
   const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
@@ -2276,32 +2273,6 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
-        <select
-          className="input select-compact w-24 shrink-0 text-[11px]"
-          style={{ paddingLeft: 6 }}
-          value={depthMode}
-          onChange={(e) => {
-            const v = e.target.value
-            // An AI detail entry sets the inference size and turns AI on.
-            if (v.startsWith('res:')) {
-              setDepthRes(Number(v.slice(4)))
-              setDepthMode('estimate')
-            } else setDepthMode(v as 'off' | 'synth' | 'estimate')
-          }}
-          title={`Depth engine (2.5D) : fills the depth map Parallax, Luma Blur's depth focus and Pulfrich read. off = flat (passthrough) · synth = a test depth bowl · AI = a depth model reading the picture, on the graphics card, offline (it ships with the app). AI detail = the size it reads the picture at : ${DEPTH_RES_STEPS[0]} px costs least, ${DEPTH_RES_STEPS[DEPTH_RES_STEPS.length - 1]} px is the model's own size. Now ${depthRes} px.`}
-        >
-          <option value="off">depth: off</option>
-          <option value="synth">depth: synth</option>
-          <option value="estimate">depth: AI</option>
-          <optgroup label="AI detail">
-            {DEPTH_RES_STEPS.map((px, i) => (
-              <option key={px} value={`res:${px}`}>
-                {px === depthRes ? '● ' : '\u2003'}
-                {px} px{i === 0 ? ' : lightest' : i === DEPTH_RES_STEPS.length - 1 ? ' : finest' : ''}
-              </option>
-            ))}
-          </optgroup>
-        </select>
         {/* Theme : sizes to its widest entry (no fixed width). */}
         <select
           className="input select-compact shrink-0 text-[12px]"
@@ -2443,10 +2414,12 @@ export default function App(): JSX.Element {
             </>
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.
-            // Under it, the Picture readout : every feature the picture reports.
+            // Under it, the Picture readout : every feature the picture reports,
+            // with the depth engine's menu at its head (moved from the top bar in
+            // v1.3.2 : it sits by the depth and relief it fills, and shows folded).
             <>
               <PerformancePanel />
-              <Collapsible sectionKey="picture" title="picture" className="border-t border-border bg-panel px-3 py-1.5" extra={<span className="font-mono text-[9px] normal-case text-muted/70">what the picture reports</span>}>
+              <Collapsible sectionKey="picture" title="picture" className="border-t border-border bg-panel px-3 py-1.5" extra={<span className="min-w-0 truncate font-mono text-[9px] normal-case text-muted/70">what the picture reports</span>} trail={<DepthMenu />}>
                 <PictureReadout />
               </Collapsible>
             </>

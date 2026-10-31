@@ -53,6 +53,32 @@ that CI builds into cross-platform releases.
   binding off and back; one of the October sessions loaded with its 21 colors and 10
   rows identical. A color cell keeps a float cell's height (38 px).
 
+### Changed
+
+- **The depth menu moved from the top bar to the Performance tab's picture section**
+  (`components/DepthMenu.tsx`, `Collapsible.tsx`'s new `trail`, `Inspector.tsx`,
+  `searchIndex.ts`). The same select (off / synth / AI, the AI detail group with its ●,
+  the same tooltip) heads the **picture** section, beside the depth and relief it fills,
+  on the header line but outside its fold button (a `trail` slot : a select inside the
+  button folded the section on every click), so it stays shown while the section is
+  folded. `depthMode` / `depthRes` are untouched : still the computer's setting
+  (localStorage), not the session's, so opening a session leaves it as it is. While depth
+  is off, the Inspector of **Parallax**, **Pulfrich** (key on the depth map) and **Luma
+  Blur** (control on depth focus; a modulated key or control counts) says what the piece
+  does without a map, true to the nodes (Parallax lets the picture through, the other two
+  read brightness), with a **turn on AI** button; Parallax and Pulfrich get a one-line
+  strip (+23.8 px, only while off), Luma Blur's line joins its control-picker row (the
+  panel keeps 193.4 px). **Ctrl+K** `depth` (also `ai`, `parallax`, `pulfrich`, `2.5d`)
+  opens the tab, unfolds the section, scrolls to it and flashes the menu; a page or tab
+  named exactly what was typed now leads the list (`depth` had it under 8 parameters
+  and 6 presets). The picture readout's note and hints, the Performance chip and row,
+  Parallax's hint and blurb point at the new place. The top bar lost ~100 px : it now
+  holds one line down to the 1024 px minimum window (it used to wrap there). Measured in
+  the test copy (RTX 4070), real clicks and keys : off → synth (depth 0.34, relief 0.71) →
+  AI (ready, then 0.43 / 0.82 moving with the picture) → 252 and 518 px (the ● and the
+  engine follow); turn on AI ready in 3.4 s (6.5 s the first time after a build); AI at
+  518 px survived a cold relaunch; console errors 0.
+
 ### Fixed
 
 - **The Silhouette source's trail works in Matte mode** (`engine/SilhouetteSource.ts`).

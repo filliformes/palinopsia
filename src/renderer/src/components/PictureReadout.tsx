@@ -53,8 +53,8 @@ const GROUPS: Array<{ title: string; feats: Feat[] }> = [
     feats: [
       { f: 'centroidX', label: 'mass ←→', kind: 'center', ends: ['left', 'right'], hint: 'Where the bright mass sits, left to right (the dot on the plane)' },
       { f: 'centroidY', label: 'mass ↑↓', kind: 'center', ends: ['top', 'bottom'], hint: 'Where the bright mass sits, top to bottom (the dot on the plane)' },
-      { f: 'depth', label: 'depth', kind: 'level', hint: 'How near the scene is on average (0 far, 1 near). Needs the depth engine (Depth : estimate) on, else it holds' },
-      { f: 'depthSpread', label: 'relief', kind: 'level', hint: 'How much near and far differ in the frame (0 flat). Needs the depth engine on' }
+      { f: 'depth', label: 'depth', kind: 'level', hint: 'How near the scene is on average (0 far, 1 near). Needs depth on (the menu at the head of this section : synth or AI), else it holds' },
+      { f: 'depthSpread', label: 'relief', kind: 'level', hint: 'How much near and far differ in the frame (0 flat). Needs depth on (the menu at the head of this section)' }
     ]
   }
 ]
@@ -162,7 +162,7 @@ export function PictureReadout(): JSX.Element {
         </div>
       ))}
       {depthMode === 'off' && (
-        <span className="font-mono text-[8.5px] text-muted/70">depth and relief rest while the depth engine is off (Depth : estimate reads them off the picture)</span>
+        <span className="font-mono text-[8.5px] text-muted/70">depth and relief rest while depth is off : the depth menu above, set to AI, reads them off the picture</span>
       )}
     </div>
   )

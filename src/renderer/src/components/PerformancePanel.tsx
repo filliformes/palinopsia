@@ -25,7 +25,7 @@ const CPU_ROWS: Array<{ key: string; label: string; desc: string }> = [
   { key: 'capture', label: 'Frame capture', desc: 'Collecting whole finished frames for the recording, NDI, Spout, the projector stream and the dome preview : the wait for the GPU to finish them plus copying each one out (about 33 MB a frame at 4K). Grows with the resolution and with how many of these are on. Taken out of the rows below, like GPU wait.' },
   { key: 'output', label: 'Output stream', desc: 'Reading the finished frame back and posting it to the output / projector window. Only non-zero while an output window is open ; grows with resolution.' },
   { key: 'vision', label: 'Vision return', desc: 'Downsampling the composited image and reducing it to features (brightness, motion, edges…) that drive `vision` / `homeostat` modulators and stream out over OSC. Only runs when something reads them.' },
-  { key: 'depth', label: 'Depth engine', desc: 'Reading a small frame back for the depth model and taking in its map (~11 Hz); the model itself runs on its own thread, on the graphics card. Only with depth : AI (read by Parallax, Pulfrich and the depth focus of Luma Blur).' },
+  { key: 'depth', label: 'Depth engine', desc: 'Reading a small frame back for the depth model and taking in its map (~11 Hz); the model itself runs on its own thread, on the graphics card. Only with depth : AI (read by Parallax, Pulfrich and the depth focus of Luma Blur; its menu heads the picture section below).' },
   { key: 'lights', label: 'Light output', desc: 'Mip-averaging the image into a zone grid and shipping it to the ArtNet/DMX · WLED sender. Only when Lights are on ; throttled to the light fps.' },
   { key: 'mark', label: 'Mark signal', desc: 'Reading one line of the image and sending it over OSC as the drawn optical soundtrack (/opsia/av/mark-*). Only while MARK is on in the OSC OUT box ; about 30 times a second.' },
   { key: 'sonify', label: 'Sonify', desc: 'Sampling the image taps that feed the Sonify sound engine (image → sound). The voices themselves run on the audio thread.' },
@@ -221,7 +221,7 @@ export function PerformancePanel(): JSX.Element {
             {chip(srcCount('capture') > 0, `capture ${srcCount('capture')}`, 'Webcam / screen-capture sources active (a MediaStream → texture each).')}
             {chip(srcCount('hive') > 0, 'HIVE in', 'A HIVE live-in source is active (HEVC network stream decoded into a layer).')}
             {chip(fxCount > 0, `master FX ${fxCount}`, 'Effects in the master FX rack (stacked full-frame passes applied to the whole composition).')}
-            {chip(depthMode !== 'off', 'depth', 'The Depth engine is on (AI = the depth model reads the picture ~11 Hz on its own thread, from files shipped with the app ; feeds Parallax, Pulfrich, Luma Blur).')}
+            {chip(depthMode !== 'off', 'depth', 'The Depth engine is on (synth = a test bowl; AI = the depth model reads the picture ~11 Hz on its own thread, from files shipped with the app ; feeds Parallax, Pulfrich, Luma Blur). Its menu heads the picture section below.')}
             {chip(surfaceActive, 'metasurface', 'The Metasurface is active : it renders a live blend of the placed scenes at the cursor, multiplying render cost by the blended count.')}
             {chip(ndi, 'NDI', 'NDI output is on : the full frame is read back and sent over the network each frame.')}
             {chip(spout, window.api.platform === 'darwin' ? 'Syphon' : 'Spout', 'Texture sharing is on : the frame is shared with other apps on this computer each frame.')}
