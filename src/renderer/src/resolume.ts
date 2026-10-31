@@ -39,7 +39,7 @@ export function resoSourceCatalogue(): ResoSourceDesc[] {
   const st = useStore.getState()
   const r: ResoSourceDesc[] = []
   st.composition.modulators.forEach((m, i) => r.push({ source: `mod:${i + 1}`, label: `Mod ${i + 1} · ${m.type}`, group: 'Modulators' }))
-  st.composition.metaKnobs.forEach((k, i) => r.push({ source: `meta:${i + 1}`, label: `Meta ${i + 1}${k.name ? ` · ${k.name}` : ''}`, group: 'Meta knobs' }))
+  st.composition.metaKnobs.forEach((k, i) => r.push({ source: `meta:${i + 1}`, label: `Macro ${i + 1}${k.name ? ` · ${k.name}` : ''}`, group: 'Macro knobs' }))
   for (const [k, l] of AUDIO_SOURCES) r.push({ source: `audio:${k}`, label: `audio ${l}`, group: 'Audio' })
   for (const v of VISION_FEATURES) r.push({ source: `vision:${v}`, label: `vision ${v}`, group: 'Vision' })
   // the 24 hand-shape ones apart, after the rest of the body
@@ -60,7 +60,7 @@ export function resoSourceLabel(source: string): string {
   }
   if (kind === 'meta') {
     const k = st.composition.metaKnobs[Number(rest) - 1]
-    return `Meta ${rest}${k?.name ? ` · ${k.name}` : ''}`
+    return `Macro ${rest}${k?.name ? ` · ${k.name}` : ''}`
   }
   if (kind === 'audio') return `audio ${rest}`
   if (kind === 'vision') return `vision ${rest}`

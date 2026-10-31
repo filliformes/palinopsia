@@ -87,23 +87,27 @@ export function ModulationPanel(): JSX.Element {
           </span>
         </button>
         <MatrixSummary />
-        {/* Far right of the title row : one click freezes every modulator so all
-            sliders revert to their base. A live "hold everything still". */}
-        <button
-          onClick={toggleModBypass}
-          className={`ml-auto shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
-            modBypass
-              ? 'bg-danger/20 text-danger ring-1 ring-danger'
-              : 'bg-panel3/60 text-muted hover:text-accent'
-          }`}
-          title={
-            modBypass
-              ? 'Modulation muted : every modulator output is frozen and all controls sit at their base values. Click to resume modulation.'
-              : 'Mute all modulation : freeze every modulator in one click (controls revert to their base values).'
-          }
-        >
-          {modBypass ? '⊘ muted' : 'active'}
-        </button>
+        {/* Right end of the title row : ACTIVE, one click freezes every
+            modulator so all sliders revert to their base (a live "hold
+            everything still"), then MACRO, the Macro knobs row shown or not. */}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button
+            onClick={toggleModBypass}
+            className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
+              modBypass
+                ? 'bg-danger/20 text-danger ring-1 ring-danger'
+                : 'bg-panel3/60 text-muted hover:text-accent'
+            }`}
+            title={
+              modBypass
+                ? 'Modulation muted : every modulator output is frozen and all controls sit at their base values. Click to resume modulation.'
+                : 'Mute all modulation : freeze every modulator in one click (controls revert to their base values).'
+            }
+          >
+            {modBypass ? '⊘ muted' : 'active'}
+          </button>
+          <MacroToggle />
+        </div>
       </div>
       {!collapsed && (
         // Eight equal columns across the full width : every card the same
@@ -115,6 +119,60 @@ export function ModulationPanel(): JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+// What moves the Macro knobs on its own : knobs a modulator drives (while
+// modulation is live), knobs on a MIDI CC, pads that fire a knob action and
+// Body rules that do. OSC and dataflou are not counted (nothing to read ahead).
+function macroDrivers(s: ReturnType<typeof useStore.getState>): { mod: number; cc: number; pads: number; rules: number } {
+  const isKnobAction = (id: string): boolean => id.startsWith('act:meta:') || id === 'rand:meta'
+  const modKnobs = new Set<number>()
+  if (!s.modBypass) for (const a of s.composition.modMatrix) if (a.target.kind === 'meta' && !a.muted) modKnobs.add(a.target.knob)
+  const body = s.bodyControl
+  return {
+    mod: modKnobs.size,
+    cc: s.composition.metaKnobs.filter((k) => k.midiCc).length,
+    pads: Object.keys(s.midiMap).filter(isKnobAction).length,
+    rules: body.enabled ? body.rules.filter((r) => r.enabled && isKnobAction(r.action)).length : 0
+  }
+}
+
+// MACRO : shows or hides the Macro knobs row under this one (per machine, off
+// by default : most of the time it is not played). Hidden, the knobs keep
+// playing; a small dot says something moves them, so nothing moves unseen.
+function MacroToggle(): JSX.Element {
+  const shown = useStore((s) => s.macroBar)
+  const setMacroBar = useStore((s) => s.setMacroBar)
+  const d = useStore(useShallow(macroDrivers))
+  const why = [
+    d.mod && `${d.mod} knob${d.mod > 1 ? 's' : ''} on a modulator`,
+    d.cc && `${d.cc} on a MIDI CC`,
+    d.pads && `${d.pads} MIDI pad${d.pads > 1 ? 's' : ''}`,
+    d.rules && `${d.rules} Body rule${d.rules > 1 ? 's' : ''}`
+  ].filter(Boolean)
+  const live = !shown && why.length > 0
+  return (
+    <button
+      onClick={() => setMacroBar(!shown)}
+      className={`relative shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
+        shown
+          ? 'bg-accent/20 text-accent ring-1 ring-accent'
+          : 'bg-panel3/60 text-muted hover:text-accent'
+      }`}
+      title={
+        shown
+          ? 'Macro knobs shown : click to hide the row (the knobs keep playing).'
+          : `Show the Macro knobs : the row of 16 knobs under this one. Hidden, they keep playing${
+              live ? ` (${why.join(', ')})` : ''
+            }.`
+      }
+    >
+      macro
+      {live && (
+        <span className="pointer-events-none absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent2" />
+      )}
+    </button>
   )
 }
 
@@ -285,7 +343,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
         </div>
       )}
 
-      {/* type-specific params (output shaping lives on the Meta knobs, not
+      {/* type-specific params (output shaping lives on the Macro knobs, not
           here : modulators emit their raw signal). Bounded + scrollable so a
           param-heavy type (euclid) can never spill past the card border. */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
@@ -1499,7 +1557,7 @@ function MatrixSummary(): JSX.Element {
     if (t.kind === 'bgSource') return `BG ${t.input}${part}`
     if (t.kind === 'meta') {
       const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
-      return `META K${t.knob + 1} (${name})`
+      return `MACRO K${t.knob + 1} (${name})`
     }
     if (t.kind === 'sonify') return t.param.startsWith('space.') ? `SPACE ${t.param.slice(6).replace('.', ' ')}` : `SONIFY ${t.param}`
     if (t.kind === 'layer') {

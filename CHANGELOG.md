@@ -7,6 +7,34 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **MACRO : the Macro knobs row shows or hides, hidden by default** (Vincent : "I don't
+  use it so often and I think neither will the average user for now; so I think it would
+  save some UI space to be able to not see it all the time"). A **MACRO** button at the
+  far right of the Modulation row, next to ACTIVE, with ACTIVE's look (`ModulationPanel.tsx`
+  `MacroToggle` : off = ACTIVE's resting chip, on = accent fill and ring). The choice is
+  per machine (`store.macroBar` / `setMacroBar`, localStorage `opsia.macroBar`, `'1'` =
+  shown; absent = hidden), not the session's. Off, `MetaBar` renders nothing; showing it
+  unfolds it (`collapsed.meta = false`), its own fold still works. Hiding is a view only :
+  the smoother, the modulation path, MIDI CCs, OSC, Generate, Body rules and pads keep
+  moving the knobs and their destinations. Hidden-but-moving : a small `accent2` dot on
+  MACRO when a knob is driven by a live modulator binding (not muted, modulation not
+  bypassed), has a MIDI CC, or is fired by a MIDI pad or an enabled Body rule
+  (`act:meta:*`, `rand:meta`), the tooltip counting each; OSC and dataflou are not
+  counted (nothing to read ahead). MIDI Learn mode shows the row, unfolded, while it is
+  on (the per-machine choice untouched), so its knobs stay learnable; a Macro knob picked
+  in `Ctrl+K` turns MACRO on; a new `Ctrl+K` command **Macro knobs** toggles it. Measured
+  in the test copy (RTX 4070, emulated viewport) : hiding gives `main` back 174 px at
+  1536×864 (the preview 234 → 408 px tall) and 173 px at 1024×768. At 1024 px ACTIVE and
+  MACRO stay on the title line (same top, no horizontal scroll); the 39 px button plus
+  its 6 px gap leaves the binding chips 45 px less room before they wrap (with this
+  session's 5 bindings they wrapped at 1024 with or without it). Checked with real CDP
+  mouse events : off on a fresh profile, a click shows 16 knobs (12 + the two XY pads),
+  ACTIVE mutes and resumes without touching MACRO, the choice survives a relaunch both
+  ways, a hidden knob still drives its destination (OSC 0.7 then 0.3 → layer opacity 0.7
+  then 0.3 in the store and the compositor; a modulated hidden knob swings the layer's
+  A/B mix over 0.72), the dot appears with a modulator on knob 2 and goes with it, MIDI
+  Learn shows then hides the row; 0 console errors.
+
 - **Silhouette : a trail color for the Matte's echoes** (Vincent : "I thought in Matte mode
   the trails could be of another color too"). New input `trailColor` (color, default white,
   modulatable like every color) : in Matte mode with a trail, the echoes are kept in that
@@ -55,6 +83,38 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Meta Controller → Macro Controller, everywhere it shows** (Vincent : "Change Meta
+  Controller name to Macro Controller (in the app and everywhere)"). Every label, title,
+  hint, toast and list entry : the row's title (MACRO), the knob tiles' persistence
+  label, the Modulate panel's knob-chip row (MACRO, still fits its `w-8` column), the
+  matrix chips (`MACRO K3 (…)`), MIDI Learn's ledger and labels (`MACRO 3 · name`,
+  `RANDOMIZE Macro knobs`), the Transport scope (Randomize Macro Knobs), the shared action
+  vocabulary (`actions.ts` : MACRO k up / down / random / flip, group Macro, toast "Macro k
+  is persistent…"; `triggerCatalog.ts` order), the Body page's verbs and the default OSC
+  token of a NEW rule (`RndMacro`, `Macro3Up`; existing rules keep their stored names),
+  `Ctrl+K` (group Macro, keywords `macro k`, with `meta` kept as a hidden keyword for old
+  habits), the Resolume mapper's row family and picker group, the dataflou section's
+  blurb and the mesh labels (`Macro k`, group Macro knobs), the MCP `list_controls` / `osc`
+  descriptions, the Performance tab, the cheat-sheet, the Space / Sonify / Mixer / Output /
+  Audio Layer modulate hints, the OSC panel's example. OSC : `/opsia/macro/{1..16}` and
+  `/opsia/randomize/macro` route exactly like the old `meta` forms (`oscInput.ts` : one
+  case for both); OSCQuery and `list_controls` advertise the macro form (description
+  `Macro knob k : <name>` when renamed); outbound feedback sends both `/opsia/macro/k`
+  and the old `/opsia/meta/k` (a `Leaf.alias`, never advertised), and the Resolume
+  mapper's old `osc:/opsia/meta/k` rows still read it. Kept on purpose (no migration, no
+  broken session or map) : the store / session fields (`metaKnobs`, `metaXYPads`), the
+  ModTarget kind `'meta'`, `META_*` constants, MIDI-learn ids `meta:<i>` / `rand:meta`,
+  action ids `act:meta:*`, the Randomize scope id `'meta'`, the dataflou paths
+  `meta/1..16` and `randomize/meta`, MCP tool names, `MetaBar.tsx` / `metaSmooth.ts`, and
+  code comments (the headers of `MetaBar.tsx` and the types say "formerly Meta"). Docs :
+  README (section, anchor `#macro-controller-16-knobs--xy-pads`, OSC table, MIDI,
+  Randomize, Resolume, MCP), the site's current sections, the OSC reference (section
+  `#macro`; each row notes the old form). Checked in the test copy : `/opsia/meta/1 0.7`
+  and `/opsia/macro/1 0.3` (UDP to its own port) both move knob 1; `randomize/macro` and
+  `randomize/meta` both re-throw the values, destinations kept; a DOM text scan (text,
+  titles, placeholders, options) of the 7 right-column tabs, the 6 pages, MIDI Learn mode
+  and the cheat-sheet with the row shown and the Modulate panel open found no "Meta"
+  (Metasurface, metadata and the like excepted).
 - **The depth menu moved from the top bar to the Performance tab's picture section**
   (`components/DepthMenu.tsx`, `Collapsible.tsx`'s new `trail`, `Inspector.tsx`,
   `searchIndex.ts`). The same select (off / synth / AI, the AI detail group with its ●,

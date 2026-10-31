@@ -603,7 +603,7 @@ export function describePin(key: string, live: CompositionState): { label: strin
     case 'bg':
       return { label: `Background ${BG_WORDS[p.field]}`, here: !!live.background }
     case 'meta':
-      return { label: `Meta ${p.knob + 1}${live.metaKnobs[p.knob]?.name ? ` (${live.metaKnobs[p.knob].name})` : ''}`, here: !!live.metaKnobs[p.knob] }
+      return { label: `Macro ${p.knob + 1}${live.metaKnobs[p.knob]?.name ? ` (${live.metaKnobs[p.knob].name})` : ''}`, here: !!live.metaKnobs[p.knob] }
     case 'src': {
       const s = live.layers[p.layer]?.[p.slot === 'A' ? 'sourceA' : 'sourceB']
       return { label: `L${p.layer + 1} ${p.slot} · ${slotWords(s)} · ${inputLabel(s?.shaderId, p.input)}`, here: !!s && s.kind !== 'none' && (!s.shaderId || inputsForShader(s.shaderId).some((d) => d.name === p.input)) }

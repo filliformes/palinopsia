@@ -195,7 +195,7 @@ export function OscPanel(): JSX.Element {
                 {oscAddresses.length ? oscAddresses.join(' · ') : 'localhost'}
               </span>
               :<span className={oscListening ? 'text-accent' : 'text-text'}>{oscPort}</span> (UDP) · values{' '}
-              <span className="text-text">0–1</span> · e.g. <span className="text-text">/opsia/meta/1</span> · OSCQuery{' '}
+              <span className="text-text">0–1</span> · e.g. <span className="text-text">/opsia/macro/1</span> · OSCQuery{' '}
               <span className="text-text">:{oscPort + 1}</span>
             </div>
             {last && oscEnabled && (

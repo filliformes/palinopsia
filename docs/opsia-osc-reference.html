@@ -188,7 +188,7 @@
       <li><a href="#background"><span class="n">05</span><span class="t">Background</span></a></li>
       <li><a href="#macros"><span class="n">06</span><span class="t">Field macros &amp; Proximity</span></a></li>
       <li><a href="#transport"><span class="n">07</span><span class="t">World &amp; Sequencer</span></a></li>
-      <li><a href="#meta"><span class="n">08</span><span class="t">Meta knobs &amp; Tempo</span></a></li>
+      <li><a href="#macro"><span class="n">08</span><span class="t">Macro knobs &amp; Tempo</span></a></li>
       <li><a href="#audio"><span class="n">09</span><span class="t">Audio sensors</span></a></li>
       <li><a href="#triggers"><span class="n">10</span><span class="t">Scenes &amp; Randomize</span></a></li>
       <li><a href="#sonify"><span class="n">11</span><span class="t">Sonify</span></a></li>
@@ -217,7 +217,7 @@
       <div><dt>Color</dt><dd>3–4 raw args <code>r g b [a]</code>, or a single value read as grayscale.</dd></div>
       <div><dt>Color part</dt><dd>Any color input's address followed by <code>/hue</code>, <code>/saturation</code>, <code>/brightness</code> or <code>/alpha</code> takes one float <code>0..1</code> : that part, in the color picker's own space, the rest of the color held.</dd></div>
       <div><dt>Point2D</dt><dd>Two normalized args, each scaled to its own axis range.</dd></div>
-      <div><dt>Indices</dt><dd>Layers, Meta knobs, scenes, audio bands, Worlds and FX slots count from <code>1</code>, like the UI. Enum indices count from <code>0</code>.</dd></div>
+      <div><dt>Indices</dt><dd>Layers, Macro knobs, scenes, audio bands, Worlds and FX slots count from <code>1</code>, like the UI. Enum indices count from <code>0</code>.</dd></div>
       <div><dt>Tempo</dt><dd><code>/opsia/bpm</code> is sent in BPM, clamped <code>20..800</code>. The few other raw values (seconds, gains, a pan, a count) say so in their row.</dd></div>
       <div><dt>Outside /opsia</dt><dd>Only <code>/opsia/…</code> plays Opsia. While the Resolume mapper learns, Resolume's own <code>/composition/…</code> messages become its columns; anything else is ignored.</dd></div>
     </dl>
@@ -377,15 +377,15 @@
         </div>
   </section>
 
-  <!-- ── Meta & Tempo ─────────────────────────────────────── -->
-  <section id="meta">
+  <!-- ── Macro & Tempo ────────────────────────────────────── -->
+  <section id="macro">
     <div class="sec-head">
       <span class="sec-num">08</span>
-      <h2>Meta knobs &amp; Tempo</h2>
+      <h2>Macro knobs &amp; Tempo</h2>
       <span class="sec-note">k = 1 … 16</span>
     </div>
     <div class="rows">
-      <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr>meta/<wbr></span><span class="v">{k}</span></code> <span class="args"><span class="a">f 0..1</span></span></div><p class="desc">Drive <b>Meta knob</b> <code>k</code>, a smoothed macro that fans out to whatever you've mapped to it.</p></div>
+      <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr>macro/<wbr></span><span class="v">{k}</span></code> <span class="args"><span class="a">f 0..1</span></span></div><p class="desc">Drive <b>Macro knob</b> <code>k</code>, a smoothed macro that fans out to whatever you've mapped to it. Its old name <code>/opsia/meta/{k}</code> (before v1.3.2, when they were the Meta knobs) still works, in and in the feedback out.</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>bpm</code> <span class="args"><span class="a">f 20..800</span></span></div><p class="desc">Master <b>tempo</b>, raw, in BPM. With <b>Ableton Link</b> on, a tempo sent here counts as your own edit : it goes to every linked app (Link has no address of its own).</p></div>
         </div>
   </section>
@@ -429,7 +429,7 @@
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>randomize/<wbr><span class="v">{scope}</span></code> <span class="args"><span class="tag trig">trigger</span></span></div><p class="desc">Re-roll one scope, at the Transport's intensity : <code>sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators</code>.</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>panic</code> <span class="args"><span class="tag trig">trigger</span></span></div><p class="desc"><b>Panic flush</b> : drop every self-feeding buffer (feedback · trails · frame rings · accumulators) at once. Same as key <code>0</code> / the ⚡ Flush button; advertised over OSCQuery.</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>vary</code> <span class="args"><span class="tag trig">trigger</span></span></div><p class="desc"><b>Vary</b> : a variant of the whole scene at the Transport's spread, like its Vary button.</p></div>
-      <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>randomize/<wbr>masterparams&nbsp;· meta&nbsp;· inspector&nbsp;· sonify&nbsp;· resolume&nbsp;· background</code> <span class="args"><span class="tag trig">trigger</span></span></div><p class="desc">The other randomizes, as MIDI Learn fires them : master FX parameters in place, the Sonify patch, the selected Inspector unit, the Resolume pins, the Background's dice, and <b>meta</b>, new Meta knob <b>values</b> with their destinations kept (not the Transport's Meta Knobs scope, which also re-rolls the destinations; that one has no address).</p></div>
+      <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>randomize/<wbr>masterparams&nbsp;· macro&nbsp;· inspector&nbsp;· sonify&nbsp;· resolume&nbsp;· background</code> <span class="args"><span class="tag trig">trigger</span></span></div><p class="desc">The other randomizes, as MIDI Learn fires them : master FX parameters in place, the Sonify patch, the selected Inspector unit, the Resolume pins, the Background's dice, and <b>macro</b>, new Macro knob <b>values</b> with their destinations kept (not the Transport's Macro Knobs scope, which also re-rolls the destinations; that one has no address). <code>meta</code>, its old name, still works.</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>output/<wbr>x&nbsp;· y&nbsp;· scale&nbsp;· rotate&nbsp;· spin&nbsp;· feather</code> <span class="args"><span class="a">f 0..1</span></span></div><p class="desc">The <b>output transform</b> : the whole finished frame moved as one picture, 0..1 over each range : x and y -1..1 (frame widths and heights), scale 0..2, rotate -180..180°, spin -360..360° a second, feather 0..0.2. <code>0.5</code> = none for x, y, scale, rotate and spin. Skipped while the dome is on (the dome has its own turn, spin and offset).</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>output/<wbr>flipx&nbsp;· flipy</code> <span class="args"><span class="a">≥ 0.5</span></span></div><p class="desc">Flip the output frame.</p></div>
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr></span>output/<wbr>edge</code> <span class="args"><span class="a">i</span><span class="sep"> · </span><span class="a">f</span><span class="sep"> · </span><span class="a">s</span></span></div><p class="desc">What shows past the frame : <code>black · repeat · mirror</code>.</p></div>

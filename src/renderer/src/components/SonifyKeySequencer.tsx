@@ -213,7 +213,7 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
       </Row>
       {ks.rate === 'free' && !onCuts && (
         <>
-          <Row label="every" hint="How often a change may fall, in free time (250 ms to 5 min). Its M binds a modulator or a Meta knob : the time between changes then moves with it">
+          <Row label="every" hint="How often a change may fall, in free time (250 ms to 5 min). Its M binds a modulator or a Macro knob : the time between changes then moves with it">
             <input
               ref={everyRef}
               type="range" min={0} max={1} step={0.002} value={everyToPos(ks.freeMs)}

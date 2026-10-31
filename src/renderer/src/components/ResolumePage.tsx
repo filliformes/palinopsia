@@ -56,7 +56,7 @@ const KIND_GLYPH: Record<ResoKind, string> = { float: '', toggle: '◧ ', trigge
 // deeper shade on the light themes).
 const FAMILY: Record<string, { name: string; dark: string; light: string }> = {
   mod: { name: 'modulator', dark: '#ff9a4d', light: '#c75a12' },
-  meta: { name: 'Meta knob', dark: '#ffd25e', light: '#9a6f00' },
+  meta: { name: 'Macro knob', dark: '#ffd25e', light: '#9a6f00' },
   audio: { name: 'audio', dark: '#52d0f5', light: '#0a7a9e' },
   vision: { name: 'vision', dark: '#b892ff', light: '#6438c0' },
   body: { name: 'body', dark: '#ff79a8', light: '#bb2a63' },
@@ -816,7 +816,7 @@ export function ResolumePage(): JSX.Element {
               placeholder="+ Palinopsia signal…"
               resetAfterPick
               menuWidth={280}
-              title="Any modulator, Meta knob, audio / vision / body feature, or any /opsia address"
+              title="Any modulator, Macro knob, audio / vision / body feature, or any /opsia address"
             />
             <div className="flex flex-wrap gap-x-2.5 gap-y-1">
               {Object.entries(FAMILY).map(([k, f]) => (

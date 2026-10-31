@@ -111,7 +111,7 @@ export interface DfSource {
 const range = (n: number, from = 1): number[] => Array.from({ length: n }, (_, i) => i + from)
 
 export const DF_DESTS: DfDest[] = [
-  ...range(16).map((i) => ({ path: `meta/${i}`, label: `Meta ${i}`, osc: `/opsia/meta/${i}`, type: 'number' as const, bidir: `meta:${i}` })),
+  ...range(16).map((i) => ({ path: `meta/${i}`, label: `Macro ${i}`, osc: `/opsia/meta/${i}`, type: 'number' as const, bidir: `meta:${i}` })),
   ...range(4).flatMap((l) => [
     { path: `layer/${l}/opacity`, label: `L${l} opacity`, osc: `/opsia/layer${l}/opacity`, type: 'number' as const },
     { path: `layer/${l}/speed`, label: `L${l} speed`, osc: `/opsia/layer${l}/speed`, type: 'number' as const },
@@ -162,7 +162,7 @@ export const DF_SOURCES: DfSource[] = [
 ]
 
 const GROUP_LABELS: Record<string, string> = {
-  meta: 'Meta knobs', layer: 'Layers', feel: 'Feel', scene: 'Scenes',
+  meta: 'Macro knobs', layer: 'Layers', feel: 'Feel', scene: 'Scenes',
   bg: 'Background', randomize: 'Randomize', output: 'Output transform',
   audio: 'Audio in', vision: 'Picture', body: 'Body', mod: 'Modulators'
 }

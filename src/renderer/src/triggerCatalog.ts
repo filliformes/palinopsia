@@ -1,7 +1,7 @@
 // The whole trigger vocabulary as one grouped, searchable list : midi.ts's first
 // set (the dice, the transport, scenes, Sonify, sessions) and actions.ts's
 // (the layers, the triggers of what is loaded, the effects, Worlds, Generate,
-// Meta, modulators, Feel, tempo and sound, the output). The Body page's rule
+// Macro, modulators, Feel, tempo and sound, the output). The Body page's rule
 // builder and the MIDI panel's "learn an action" both pick from it, so a body
 // and a pad play the same instrument.
 
@@ -17,7 +17,7 @@ const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Trans
 // The picker's headings, in order (an unknown one goes last)
 const ORDER = [
   'Randomize', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4', 'Triggers (what is loaded)', 'Effects', 'Scenes', 'Worlds',
-  'Generate', 'Meta', 'Modulators', 'Feel', 'Tempo and sound', 'Sonify', 'Transport', 'Output', 'Session'
+  'Generate', 'Macro', 'Modulators', 'Feel', 'Tempo and sound', 'Sonify', 'Transport', 'Output', 'Session'
 ]
 
 /** Every trigger worth offering now, grouped in the picker's order. */

@@ -17,7 +17,7 @@
 //    shader, else onto one already in the composition, else it loads the
 //    shader where a source or an effect would go, with the preset;
 //  · a control : its unit in the Inspector (or its strip, the Mixer, the
-//    Meta bar), scrolled to and flashed.
+//    Macro bar), scrolled to and flashed.
 
 import type { FxInstance, FxScope, ModTarget, SourceSlot } from '@shared/types'
 import { FX_OPACITY_INPUT } from '@shared/types'
@@ -585,7 +585,7 @@ function themeItems(): SearchItem[] {
 }
 
 /** Every control of what is loaded now : each unit's inputs (and an effect's
- *  dry/wet), the layers', the Background's, the Meta knobs. */
+ *  dry/wet), the layers', the Background's, the Macro knobs. */
 function parameterItems(s: St, units: UnitInfo[]): SearchItem[] {
   const out: SearchItem[] = []
   for (const u of units) {
@@ -716,17 +716,18 @@ function parameterItems(s: St, units: UnitInfo[]): SearchItem[] {
     bgRow('speed', 'speed', n2(bg.speed, '×'), "the ground's own clock", ['time', 'clock'])
     bgRow('depth', 'shadow', n2(bg.depth ?? 0), 'the shadow the layers cast on it', ['depth'])
   }
-  // The Meta knobs : the Meta bar, unfolded.
+  // The Macro knobs : the Macro bar, shown (the MACRO button turns on) and unfolded.
   c.metaKnobs.forEach((k, i) => {
     const key = modTargetKey({ kind: 'meta', knob: i })
-    const label = k.name || `Meta ${i + 1}`
+    const label = k.name || `Macro ${i + 1}`
     const dests = k.destinations.length
     out.push({
       key: `param:${key}`,
       kind: 'parameter',
       label,
-      group: 'Meta',
-      keywords: [`meta ${i + 1}`, 'macro', 'knob'],
+      group: 'Macro',
+      // (meta : the name it had before v1.3.2, so old habits still find it)
+      keywords: [`macro ${i + 1}`, 'macro', 'knob', 'meta'],
       hint: withHint(n2(k.value), dests ? `${dests} destination${dests > 1 ? 's' : ''}` : 'no destination yet'),
       reveals: true,
       run: () =>
@@ -734,7 +735,8 @@ function parameterItems(s: St, units: UnitInfo[]): SearchItem[] {
           () => {
             uncover()
             const st = useStore.getState()
-            if (st.collapsed['meta']) st.setCollapsed('meta', false)
+            if (!st.macroBar) st.setMacroBar(true) // shows it unfolded
+            else if (st.collapsed['meta']) st.setCollapsed('meta', false)
           }
         ])
     })
@@ -861,6 +863,10 @@ function commandItems(s: St, units: UnitInfo[]): SearchItem[] {
     }),
     cmd('freeze', 'Freeze / hold', 'H · hold the output (again : let it go)', ['hold', 'pause', 'still'], fireFreeze),
     cmd('record', 'Record', 'start a take, or stop the one rolling', ['rec', 'capture', 'take', 'video'], fireRecordToggle),
+    cmd('macro', 'Macro knobs', `the MACRO button · ${s.macroBar ? 'shown : hide the row (the knobs keep playing)' : 'hidden : show the row of 16 knobs'}`, ['macro', 'knobs', 'bar', 'row', 'show', 'hide', 'meta'], () => {
+      const st = useStore.getState()
+      st.setMacroBar(!st.macroBar)
+    }),
     cmd('learn', 'MIDI Learn', `L · ${s.midiLearnMode ? 'on : turn it off' : 'off : turn it on'}`, ['midi', 'map', 'controller'], () => {
       const st = useStore.getState()
       st.setMidiLearnMode(!st.midiLearnMode)

@@ -37,7 +37,7 @@ const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'master', label: 'Randomize Master FX' },
   { scope: 'finishing', label: 'Randomize Finishing' },
   { scope: 'modulators', label: 'Randomize Modulators' },
-  { scope: 'meta', label: 'Randomize Meta Knobs' },
+  { scope: 'meta', label: 'Randomize Macro Knobs' },
   { scope: 'sonify', label: 'Randomize Sonification' }
 ]
 

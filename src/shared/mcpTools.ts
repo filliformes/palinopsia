@@ -220,7 +220,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'list_controls',
     title: 'List the OSC controls',
     description:
-      'Every control Palinopsia answers over OSC (addresses with what each does) : Sonify, the World, the field macros, the temperament, Meta knobs, the output transform, the sequencer and more. Use a prefix to narrow it (e.g. /opsia/sonify).',
+      'Every control Palinopsia answers over OSC (addresses with what each does) : Sonify, the World, the field macros, the temperament, Macro knobs, the output transform, the sequencer and more. Use a prefix to narrow it (e.g. /opsia/sonify).',
     inputSchema: {
       type: 'object',
       properties: { prefix: { type: 'string', description: 'Only addresses starting with this.' } }
@@ -235,7 +235,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        address: { type: 'string', description: 'e.g. /opsia/world, /opsia/sonify/on, /opsia/meta/3' },
+        address: { type: 'string', description: 'e.g. /opsia/world, /opsia/sonify/on, /opsia/macro/3' },
         args: { type: 'array', description: 'Its arguments : numbers, strings, booleans, or {"int": n} for an explicit OSC int.', items: {} }
       },
       required: ['address']
