@@ -1,6 +1,6 @@
 // Palinopsia : the shell. Mounts the WebGL2 Compositor onto the output-preview
 // canvas and runs the frame loop; hosts the four layer strips, the transport,
-// and the theme picker. The heavy engine lives here in the renderer (brief §3);
+// and the right column's tabs. The heavy engine lives here in the renderer (brief §3);
 // main is pure IO. Panels/regions follow brief §10 : this is the Phase-0
 // skeleton: preview + layers + transport, ready for the ISF runtime (Phase 1),
 // the FX racks (Phase 3), the auto-UI (Phase 4), and modulation (Phase 5).
@@ -54,6 +54,7 @@ import { MixerPanel } from './components/MixerPanel'
 import { FeelPanel } from './components/FeelPanel'
 import { MetaBar } from './components/MetaBar'
 import { MidiLearnOverlay } from './components/MidiLearnOverlay'
+import { UiPanel } from './components/UiPanel'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
@@ -190,7 +191,7 @@ function cycleContextPreset(): void {
   revealFinishing('ft-context')
 }
 import { initUndo, redo, runSilently, undo, useUndoState } from './undo'
-import { THEME_ORDER, useStore, type ThemeName } from './store'
+import { useStore } from './store'
 import { commitKnob, metaGlideComposition, metaGlides, setKnobImmediate } from './metaSmooth'
 import { clipAudio } from './engine/clipAudio'
 import { setMediaSink } from './engine/mediaSink'
@@ -350,8 +351,6 @@ export default function App(): JSX.Element {
   // + speed-aware duration keep boundary crossings smooth and stop jump from
   // machine-gunning 250 ms fades.
   const surfaceMove = useRef({ x: 0.5, y: 0.5, t: 0, lastFadeT: 0 })
-  const theme = useStore((s) => s.theme)
-  const setTheme = useStore((s) => s.setTheme)
   // MIDI Learn + Flush moved up to the top bar (World moved down to the Transport).
   const midiLearnMode = useStore((s) => s.midiLearnMode)
   const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
@@ -368,7 +367,7 @@ export default function App(): JSX.Element {
   const uiZoom = useStore((s) => s.uiZoom)
   const setUiZoom = useStore((s) => s.setUiZoom)
   const rightView = useStore((s) => s.rightView)
-  // The right column : exactly as wide as its seven tabs need on ONE line,
+  // The right column : exactly as wide as its eight tabs need on ONE line,
   // measured from the tab row itself (the system monospace differs per computer :
   // Consolas, Menlo...), unless the handle was dragged : that width is kept
   // (opsia.layersWidthSet). A double-click on the handle goes back to fitting.
@@ -2273,19 +2272,7 @@ export default function App(): JSX.Element {
             +
           </button>
         </div>
-        {/* Theme : sizes to its widest entry (no fixed width). */}
-        <select
-          className="input select-compact shrink-0 text-[12px]"
-          value={theme}
-          onChange={(e) => setTheme(e.target.value as ThemeName)}
-          title="Theme"
-        >
-          {THEME_ORDER.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        {/* (the UI theme lives in the UI tab since v1.3.2, beside the slider pointer) */}
         {/* Panic flush : moved up from the Transport, sits at the far right. */}
         <span className="relative flex shrink-0">
           <MidiLearnOverlay id="fire:flush" />
@@ -2412,6 +2399,10 @@ export default function App(): JSX.Element {
               <LinkSection />
               <McpSection />
             </>
+          ) : rightView === 'ui' ? (
+            // How the instrument looks on this computer : the slider pointer and
+            // the UI theme (moved from the top bar in v1.3.2).
+            <UiPanel />
           ) : rightView === 'perf' ? (
             // The live load meter, on its own tab : it only meters while shown.
             // Under it, the Picture readout : every feature the picture reports,
@@ -2631,7 +2622,7 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     return () => ro.disconnect()
   }, [onNeed])
   const tabs: Array<{
-    id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble'
+    id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble' | 'ui'
     label: string
     title: string
   }> = [
@@ -2650,7 +2641,8 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
       label: 'assemble',
       title:
         'Assemble (E) : the automatic editor. Analyze a folder of video into a descriptor point cloud, then generate an edit from it'
-    }
+    },
+    { id: 'ui', label: 'ui', title: 'UI : how the instrument looks on this computer, the slider pointer and the UI theme' }
   ]
   return (
     <div ref={rowRef} className="flex shrink-0 flex-wrap gap-1">
@@ -2659,7 +2651,8 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
           key={t.id}
           onClick={() => setRightView(t.id)}
           title={t.title}
-          className={`rounded border px-2 py-0.5 font-mono text-[9px] transition-colors ${
+          // (px-1.5 : the eighth tab, ui, joined in v1.3.2 without widening the column)
+          className={`rounded border px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
             rightView === t.id
               ? 'border-accent bg-accent/10 text-accent'
               : 'border-border text-muted hover:text-accent'

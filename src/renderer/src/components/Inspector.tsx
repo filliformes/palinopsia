@@ -21,9 +21,9 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { controlKey } from '../modKey'
-import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound } from './AutoControls'
+import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModChip, useBound } from './AutoControls'
+import { FloatBar } from './Bar'
 import { GroupedControls, CONTROL_GROUPS, groupDim } from './GroupedControls'
-import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { AvfReadout, DevicePicker } from './DevicePicker'
 import { NdiInReadout, NdiPicker } from './NdiPicker'
@@ -116,9 +116,6 @@ export function Inspector(): JSX.Element {
   // The FX-controls band measures its own content so it can auto-fit (see the
   // auto-fit RULE below).
   const fxContentRef = useRef<HTMLDivElement>(null)
-  // The FX dry/wet opacity slider tracks its live modulated value (like every
-  // other modulated control), so a bound opacity visibly moves in the header.
-  const fxOpaRef = useRef<HTMLInputElement | null>(null)
   // Close the panel whenever the selection moves to a different shader/unit.
   const selKey =
     selection?.type === 'source'
@@ -373,12 +370,8 @@ export function Inspector(): JSX.Element {
       )
   }
   const fxOpaKey = fxOpaTarget ? modTargetKey(fxOpaTarget) : null
+  // (the FX dry/wet bar plays its live value while bound, like every bar)
   const fxOpaModulated = fxOpaBound.length > 0
-  useEffect(() => {
-    const el = fxOpaRef.current
-    if (!fxOpaModulated || !fxOpaKey || !el) return
-    return registerLiveOverlay({ el, key: fxOpaKey, format: (x) => String(x) })
-  }, [fxOpaModulated, fxOpaKey])
 
   // A stable identity for the preset picker : distinct per selected FX unit /
   // source slot / background, so it never bleeds an applied name between two
@@ -587,29 +580,24 @@ export function Inspector(): JSX.Element {
         </span>
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">{context}</span>
         <div className="flex-1" />
-        {/* Per-FX dry/wet opacity : centered, sized like a normal control. */}
+        {/* Per-FX dry/wet opacity : centered, a bar like the parameters'. */}
         {fxOpacity && (
-          <div className="flex shrink-0 items-center gap-1.5" title={`FX dry/wet : ${fxOpacity.value.toFixed(2)}`} data-ctl={fxOpaKey ?? undefined}>
-            <span className="font-mono text-[9px] uppercase text-muted">opacity</span>
-            <input
-              ref={fxOpaRef}
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={fxOpacity.value}
-              onChange={(e) => fxOpacity!.set(Number(e.target.value))}
-              onDoubleClick={() => fxOpacity!.set(1)}
-              className={`w-24 ${fxOpaBound.length ? 'accent-accent2' : 'accent-accent'}`}
-            />
-            <span className="w-7 text-right font-mono text-[10px] text-muted">
-              {fxOpacity.value.toFixed(2)}
-            </span>
-            {fxOpaTarget && (
-              <AssignContext.Provider value={assignCtxValue}>
-                <ModButton target={fxOpaTarget} bound={fxOpaBound} label="FX opacity" />
-              </AssignContext.Provider>
-            )}
+          <div className="w-44 shrink-0" data-ctl={fxOpaKey ?? undefined}>
+            <AssignContext.Provider value={assignCtxValue}>
+              <FloatBar
+                label="opacity"
+                title="FX dry/wet : how much of this effect is mixed in. Drag (Shift : finer), double-click = full, click the number to type."
+                value={fxOpacity.value}
+                min={0}
+                max={1}
+                def={1}
+                frac={2}
+                onChange={(v) => fxOpacity!.set(v)}
+                modulated={fxOpaModulated}
+                liveKey={fxOpaKey}
+                chip={fxOpaTarget ? <ModChip target={fxOpaTarget} bound={fxOpaBound} label="FX opacity" /> : undefined}
+              />
+            </AssignContext.Provider>
           </div>
         )}
         <div className="flex-1" />
@@ -781,7 +769,8 @@ export function Inspector(): JSX.Element {
         <div className="flex min-w-0 items-stretch">
           <div className="min-w-0 flex-1">
             {selection?.type === 'source' || selection?.type === 'background' ? (
-              <div className="min-h-[3.25rem]">
+              // (at least one row of bars : the band never jumps to nothing)
+              <div className="min-h-[2.5rem]" data-insp-controls="">
                 {CONTROL_GROUPS[shaderId] ? (
                   // Many parameters : sorted into titled columns.
                   <GroupedControls
@@ -813,7 +802,7 @@ export function Inspector(): JSX.Element {
                   {/* A plain block that tightly wraps the controls : its height is
                       exactly the content, so measuring it (auto-fit RULE) is immune
                       to the parent's flex stretch. */}
-                  <div ref={fxContentRef}>
+                  <div ref={fxContentRef} data-insp-controls="">
                     {CONTROL_GROUPS[shaderId] ? (
                       // Many parameters : sorted into titled columns, like the sources.
                       <GroupedControls
