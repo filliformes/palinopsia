@@ -793,10 +793,17 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'fxSend', 'fxReverb', 'fxDelay', 'keyEvery'
 ]
 
+// One part of a color input, in the color picker's own space (HSV, what the
+// picker shows) : 'h' its hue (the picker's slider), 's' its saturation and 'v'
+// its brightness (the picker's pad, across and up), 'a' its alpha. A target on
+// an input carries one only when it modulates a color by a part; absent, it is
+// the input itself (every older session).
+export type ColorChannel = 'h' | 's' | 'v' | 'a'
+
 export type ModTarget =
-  | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string }
-  | { kind: 'bgSource'; input: string }
-  | { kind: 'fx'; scope: FxScope; instId: string; input: string }
+  | { kind: 'source'; layer: number; slot: 'A' | 'B'; input: string; ch?: ColorChannel }
+  | { kind: 'bgSource'; input: string; ch?: ColorChannel }
+  | { kind: 'fx'; scope: FxScope; instId: string; input: string; ch?: ColorChannel }
   | { kind: 'meta'; knob: number }
   | { kind: 'sonify'; param: SonifyModParam }
   // Compositor-level layer controls (not ISF inputs) : the layer's own opacity,

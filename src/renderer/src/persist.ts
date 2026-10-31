@@ -46,7 +46,7 @@
 
 import type { CompositionState, FxInstance, FxScope, LayerState, MetaKnobState, ModAssignment, ModTarget, SourceSlot } from '@shared/types'
 import { FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_MAX_DESTS } from '@shared/types'
-import { modTargetKey } from './modKey'
+import { controlKey, modTargetKey } from './modKey'
 import { SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 
@@ -463,7 +463,8 @@ export function graftPins(incoming: CompositionState, live: CompositionState, pi
   // with them).
   let cut = 0
   const has = (k: string): boolean => applied.has(k)
-  const held = (t: ModTarget): boolean => applied.has(modTargetKey(t)) || layers.has(layerOf(t)) || (wholes && heldWhole(t, has))
+  // (a color's parts are held by the color's own pin : controlKey)
+  const held = (t: ModTarget): boolean => applied.has(controlKey(t)) || layers.has(layerOf(t)) || (wholes && heldWhole(t, has))
   const kept = c.modMatrix.filter((a) => !held(a.target))
   const carried = live.modMatrix.filter((a) => held(a.target))
   const arrived = c.modMatrix.filter((a) => held(a.target))
@@ -508,7 +509,7 @@ export function keepPersistent(incoming: CompositionState, live: CompositionStat
 /** Does a mod target (a randomized binding's, a control's) sit under a pin ? */
 export function isPinnedTarget(t: ModTarget, pins: readonly string[]): boolean {
   if (!pins.length) return false
-  return pins.includes(modTargetKey(t)) || pins.includes(layerPin(layerOf(t))) || heldWhole(t, (k) => pins.includes(k))
+  return pins.includes(controlKey(t)) || pins.includes(layerPin(layerOf(t))) || heldWhole(t, (k) => pins.includes(k))
 }
 
 /** An effect moved by hand into another rack (same id) : the pins on it go with

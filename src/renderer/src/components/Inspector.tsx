@@ -20,7 +20,8 @@ import { SilhouetteStrip } from './SilhouetteStrip'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
-import { AutoControls, AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
+import { controlKey } from '../modKey'
+import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound } from './AutoControls'
 import { GroupedControls, CONTROL_GROUPS, groupDim } from './GroupedControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
@@ -346,8 +347,9 @@ export function Inspector(): JSX.Element {
     const tf = modTargetFor
     if (!shaderId || !tf) return ''
     const keys = new Set<string>()
-    for (const a of s.composition.modMatrix) keys.add(modTargetKey(a.target))
-    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(modTargetKey(d))
+    // (a color's part counts for its color : controlKey)
+    for (const a of s.composition.modMatrix) keys.add(controlKey(a.target))
+    for (const k of s.composition.metaKnobs) for (const d of k.destinations) keys.add(controlKey(d))
     if (!keys.size) return ''
     return inputsForShader(shaderId)
       .filter((i) => keys.has(modTargetKey(tf(i.name))))
@@ -893,6 +895,7 @@ export function Inspector(): JSX.Element {
                 target={assign.target}
                 label={assign.label}
                 onClose={() => setAssign(null)}
+                onPick={(target) => setAssign({ target, label: assign.label })}
               />
             </>
           )}
@@ -904,16 +907,19 @@ export function Inspector(): JSX.Element {
 
 // The mod-assign side panel : replaces the old floating popover. Sits at the
 // right of the controls band (under the header's dice/presets), names the
-// parameter it modulates, and hosts the M1–8 / Meta binding row.
+// parameter it modulates, and hosts the M1–8 / Meta binding row (a color : which
+// of its parts, above it).
 function AssignPanel({
   target,
   label,
   onClose,
+  onPick,
   width
 }: {
   target: ModTarget
   label: string
   onClose: () => void
+  onPick: (target: ModTarget) => void
   width: number
 }): JSX.Element {
   const key = modTargetKey(target)
@@ -938,7 +944,8 @@ function AssignPanel({
           ✕
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto py-2 pl-3 pr-1.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto py-2 pl-3 pr-1.5">
+        <ColorPartSwitch target={target} onPick={onPick} />
         <AssignRow target={target} bound={bound} />
       </div>
     </div>

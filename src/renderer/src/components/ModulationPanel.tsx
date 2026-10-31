@@ -20,6 +20,8 @@ import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
+import { partOf } from '../modKey'
+import { PART_WORD } from '../engine/colorParts'
 import { useShallow } from 'zustand/react/shallow'
 import type { ClipAudioSrc } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
@@ -1490,8 +1492,11 @@ function MatrixSummary(): JSX.Element {
 
   function describe(a: (typeof matrix)[number]): string {
     const t = a.target
-    if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}`
-    if (t.kind === 'bgSource') return `BG ${t.input}`
+    // a color's part : its word after the color (tint hue)
+    const ch = partOf(t)
+    const part = ch ? ` ${PART_WORD[ch]}` : ''
+    if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}${part}`
+    if (t.kind === 'bgSource') return `BG ${t.input}${part}`
     if (t.kind === 'meta') {
       const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
       return `META K${t.knob + 1} (${name})`
@@ -1523,7 +1528,7 @@ function MatrixSummary(): JSX.Element {
     const where =
       t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}`
     const inputLabel = t.input === FX_OPACITY_INPUT ? 'opacity' : t.input
-    return `${where}·${fxName} ${inputLabel}`
+    return `${where}·${fxName} ${inputLabel}${part}`
   }
 
   return (

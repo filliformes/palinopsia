@@ -17,6 +17,8 @@ type LiveSub =
   // value back once the modulation stops). `view` : the window it paints in, when
   // not the instrument's (the Output page's own).
   | { key: string; apply: (v: number) => void; idle?: () => void; view?: Window }
+  // Painted every frame, whatever it reads (a color swatch and its live color).
+  | { paint: () => void; view?: Window }
 
 type Loop = { subs: Set<LiveSub>; raf: number }
 const loops = new Map<Window, Loop>()
@@ -26,6 +28,10 @@ const viewOf = (s: LiveSub): Window => ('el' in s ? s.el.ownerDocument.defaultVi
 
 function tick(view: Window, loop: Loop): void {
   for (const s of loop.subs) {
+    if ('paint' in s) {
+      s.paint()
+      continue
+    }
     const live = liveModValues.get(s.key)
     if (live === undefined) {
       if ('idle' in s) s.idle?.()
