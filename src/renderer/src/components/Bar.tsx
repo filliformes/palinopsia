@@ -342,7 +342,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
       style={{ ...(style as CSSProperties) }}
     >
       <div
-        className="relative min-w-0 flex-1 cursor-ew-resize touch-none select-none"
+        className="relative min-w-0 flex-1 cursor-default touch-none select-none"
         onPointerDown={draft === null ? onPointerDown : undefined}
         onDoubleClick={() => p.onChange(p.def)}
         title={p.title}
@@ -754,7 +754,7 @@ export function AlphaCell(p: {
     <div
       ref={rootRef}
       data-mod={p.modulated ? '' : undefined}
-      className="bar bar-alpha relative w-[42px] shrink-0 cursor-ew-resize touch-none select-none border-l border-border bg-panel2"
+      className="bar bar-alpha relative w-[42px] shrink-0 cursor-default touch-none select-none border-l border-border bg-panel2"
       style={{ ...(style as CSSProperties), '--fl': 0 } as CSSProperties}
       onPointerDown={onPointerDown}
       onDoubleClick={() => p.onChange(p.def)}
