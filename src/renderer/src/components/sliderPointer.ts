@@ -6,13 +6,14 @@
 
 import { useSyncExternalStore } from 'react'
 
-export type SliderPointer = 'line' | 'notch' | 'cap' | 'edge' | 'ruler'
+export type SliderPointer = 'line' | 'notch' | 'cap' | 'edge' | 'knob' | 'ruler'
 
 export const SLIDER_POINTERS: Array<{ id: SliderPointer; label: string; hint: string }> = [
   { id: 'line', label: 'line', hint: 'A thin bright line across the bar, glowing in the accent color' },
   { id: 'notch', label: 'notch', hint: 'Two small triangles on the top and bottom edges' },
   { id: 'cap', label: 'cap', hint: 'A small fader cap with a groove' },
   { id: 'edge', label: 'lit edge', hint: 'No marker : the fill fades in from its start and ends in a solid band (a tick shows the stored value while it is modulated)' },
+  { id: 'knob', label: 'lit knob', hint: 'The lit edge with a round knob on the value, a little taller than the text : the classic slider’s ball, improved' },
   { id: 'ruler', label: 'ruler', hint: 'Ticks every tenth along the bottom, a tall tick at the value' }
 ]
 

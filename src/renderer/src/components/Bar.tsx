@@ -64,7 +64,7 @@ function setVar(el: HTMLElement, k: string, v: number): void {
   if (el.style.getPropertyValue(k) !== s) el.style.setProperty(k, s)
 }
 
-const NAME = 'min-w-0 truncate text-[10px] uppercase leading-none tracking-[0.12em]'
+const NAME = 'min-w-0 truncate text-[8.5px] uppercase leading-none tracking-[0.12em]'
 
 // ── the frame every bar shares ─────────────────────────────────────────
 function Shell({
@@ -124,7 +124,7 @@ export function BarChip({
       aria-label={`Modulate ${label}`}
       title={title}
       className={`flex shrink-0 items-center justify-center border-l border-border px-[3px] font-mono leading-none transition-[filter] hover:brightness-125 ${
-        small ? 'min-w-[20px] text-[9px]' : 'min-w-[26px] text-[9.5px]'
+        small ? 'min-w-[20px] text-[8px]' : 'min-w-[26px] text-[8.5px]'
       } ${bound ? 'bg-accent2/20 text-accent2' : active ? 'bg-panel text-accent2' : 'bg-panel text-muted hover:text-text'} ${
         active ? 'shadow-[inset_0_0_0_1px_rgb(var(--c-accent2))]' : ''
       }`}
@@ -381,7 +381,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
             if (c !== v) p.onChange(c)
           }}
         />
-        <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-between gap-1.5 pl-2 pr-1">
+        <div className="bar-text pointer-events-none absolute inset-0 z-[2] flex items-center justify-between gap-1.5 pl-2 pr-1">
           <span className="flex min-w-0 items-center gap-1">
             <span data-bar-name="" className={NAME}>
               {p.label}
@@ -395,7 +395,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
           {draft !== null ? (
             <input
               autoFocus
-              className="pointer-events-auto relative z-[3] h-[calc(var(--bar-h)-6px)] w-16 shrink-0 rounded-sm border border-accent bg-bg px-1 text-right font-mono text-[11px] text-text outline-none"
+              className="pointer-events-auto relative z-[3] h-[calc(var(--bar-h)-6px)] w-16 shrink-0 rounded-sm border border-accent bg-bg px-1 text-right font-mono text-[9px] text-text outline-none"
               value={draft}
               inputMode="decimal"
               aria-label={`Type ${p.label}`}
@@ -426,7 +426,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
               ref={valRef}
               type="button"
               data-bar-val=""
-              className="pointer-events-auto shrink-0 cursor-text rounded-sm px-0.5 text-right text-[11px] leading-none tabular-nums hover:bg-black/30"
+              className="pointer-events-auto shrink-0 cursor-text rounded-sm px-0.5 text-right text-[9px] leading-none tabular-nums hover:bg-black/30"
               style={{ minWidth: `${ch}ch` }}
               title="Click to type a value"
               onPointerDown={(e) => e.stopPropagation()}
@@ -506,7 +506,7 @@ export function SegBar(p: EnumBarProps): JSX.Element {
             data-on={!modulated && i === on ? '' : undefined}
             aria-pressed={i === on}
             onClick={() => p.onChange(o.value)}
-            className="bar-seg min-w-0 flex-1 truncate border-r border-border px-0.5 text-[10.5px] last:border-r-0 hover:brightness-125"
+            className="bar-seg min-w-0 flex-1 truncate border-r border-border px-0.5 text-[9px] last:border-r-0 hover:brightness-125"
             title={`${o.label}${modulated ? ' (modulated : a click sets the stored one)' : ''}`}
           >
             {o.label}
@@ -547,11 +547,11 @@ export function DropBar(p: EnumBarProps & { bare?: boolean }): JSX.Element {
             {p.label}
           </span>
         )}
-        <span className={`flex min-w-0 items-center gap-1 leading-none ${p.bare ? 'text-[10px]' : 'text-[11px]'}`}>
+        <span className={`flex min-w-0 items-center gap-1 leading-none ${p.bare ? 'text-[8.5px]' : 'text-[9px]'}`}>
           <span ref={textRef} data-bar-val="" className={`min-w-0 truncate ${modulated ? 'text-accent2' : ''}`}>
             {shown}
           </span>
-          <span className={`shrink-0 text-[9px] ${modulated ? 'text-accent2' : 'text-accent'}`}>▾</span>
+          <span className={`shrink-0 text-[8px] ${modulated ? 'text-accent2' : 'text-accent'}`}>▾</span>
         </span>
         {/* the app's own menu, as before : the native list (type to jump) */}
         <select
@@ -620,7 +620,7 @@ export function BoolBar(p: {
         <span data-bar-name="" className={NAME}>
           {p.label}
         </span>
-        <span ref={stateRef} data-bar-val="" className="shrink-0 text-[11px] leading-none">
+        <span ref={stateRef} data-bar-val="" className="shrink-0 text-[9px] leading-none">
           {p.value ? 'on' : 'off'}
         </span>
       </button>
@@ -704,7 +704,7 @@ export function ColorBar(p: {
         <span data-bar-name="" className={NAME}>
           {p.label}
         </span>
-        <span ref={p.hexRef} data-bar-val="" className="shrink-0 text-[11px] leading-none">
+        <span ref={p.hexRef} data-bar-val="" className="shrink-0 text-[9px] leading-none">
           {p.hex}
         </span>
         <input {...p.picker} type="color" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={p.label} />
@@ -779,7 +779,7 @@ export function AlphaCell(p: {
           p.onChange(Math.max(0, Math.min(1, parseFloat(n.toFixed(4)))))
         }}
       />
-      <span ref={valRef} data-bar-val="" className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-end pr-1 text-[10px] leading-none tabular-nums">
+      <span ref={valRef} data-bar-val="" className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-end pr-1 text-[9px] leading-none tabular-nums">
         {p.value.toFixed(2)}
       </span>
     </div>

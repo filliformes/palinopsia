@@ -12,7 +12,7 @@ that CI builds into cross-platform releases.
   put the 'Slider Pointer' menu to choose them from, and also take the UI Theme dropdown
   from the top toolbar and put it there"). The right column's eighth tab, **ui**
   (`components/UiPanel.tsx`, `rightView: 'ui'`), last. **Slider pointer** : line
-  (default), notch, cap, lit edge, ruler, with a live bar beside the menu to try it on;
+  (default), notch, cap, lit edge, lit knob, ruler, with a live bar beside the menu to try it on;
   per machine (`components/sliderPointer.ts`, localStorage `opsia.sliderPointer`), set
   as the root's `data-pointer` and drawn in CSS (`styles.css` "Bars"), so a switch
   repaints every bar without re-rendering one; page windows copy the attribute
@@ -99,6 +99,25 @@ that CI builds into cross-platform releases.
   rows identical. A color cell keeps a float cell's height (38 px).
 
 ### Changed
+
+- **Bars : the pointers pass behind the text, and a sixth pointer, lit knob** (Vincent :
+  "Make all the slider pointers be behind the slider text, so when we're dragging them
+  over the text we can still read it. And add a new pointer : a new version of lit edge,
+  but with a little circle at the middle of the pointer"). The pointers already sat under
+  the text layer, but a white line or cap showed between the letters' strokes : the name
+  and the number now carry a halo in the bar's own ground (`--c-panel2`, so dark on the
+  dark themes, light on the light ones). **lit knob** (`data-pointer='knob'`) : the lit
+  edge's fading fill and band plus a 13 px round knob on the stored value (the text is
+  10-11 px), accent filled with a light ring and a soft glow; the knob, the band, the
+  fill's end all travel the same path 6.5 px in from each end, so the band runs through
+  the knob's centre at 0 and at 1 too (it ran to the very edge while the knob stopped
+  short : "it looks de-centered at the edges"). The halo is for sliders only (a color bar
+  has its own ink and no pointer).
+- **The text inside the bars is smaller than the category headers** (Vincent : "the text
+  inside the sliders look bigger than the categories text. It should be smaller, for a
+  good and clear visual hierarchy"). Headers (WATER, LIGHT …) stay 9 px; inside a bar the
+  name is now 8.5 px (was 10), the value, a menu's choice, a hex, on / off and the typing
+  field 9 px (were 10-11), the M chip 8.5 px.
 
 - **Bars replace the classic sliders in the Inspector and the Finishing stages**
   (Vincent, approving the mockup : "Yes that feels great"). Every source, node and effect

@@ -600,9 +600,12 @@ The last tab of the right column, **ui** : how the instrument looks on this comp
   to try it on. **line** (the default : a thin bright line, glowing in the accent),
   **notch** (two small triangles on the top and bottom edges), **cap** (a small fader cap
   with a groove), **lit edge** (no marker : the fill fades in from its start and ends in
-  a solid band; a tick marks the stored value while it is modulated) and **ruler** (ticks
+  a solid band; a tick marks the stored value while it is modulated), **lit knob** (the lit
+  edge with a round knob on the value, a little taller than the text : the classic
+  slider's ball, improved) and **ruler** (ticks
   every tenth along the bottom, a tall tick at the value). On the light themes the
-  pointers take the theme's text color.
+  pointers take the theme's text color. Every pointer passes behind the name and the
+  number, which keep a soft halo so they stay readable over it.
 - **UI theme** : the sixteen themes, moved here from the top bar.
 
 `Ctrl+K` → **UI**, **Slider pointer** or **UI theme** opens the tab. The UI zoom stays

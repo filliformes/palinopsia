@@ -1452,6 +1452,12 @@ input[type='range'].live-overlay {
   left: calc(var(--z) * 100%); background: rgb(var(--c-text) / 0.2);
 }
 .bar-ptr, .bar-edge, .bar-tick, .bar-ticks { position: absolute; pointer-events: none; display: none; z-index: 1; }
+/* the pointers pass BEHIND the name and the number : a halo in the bar's own
+   ground keeps every letter readable over a line, a cap or a knob */
+/* (sliders only : a color bar carries its own ink on its own color, no pointer) */
+.bar-text [data-bar-name], .bar-text [data-bar-val], .bar-alpha [data-bar-val] {
+  text-shadow: 0 0 2px rgb(var(--c-panel2)), 0 0 2px rgb(var(--c-panel2)), 0 0 4px rgb(var(--c-panel2) / 0.9);
+}
 /* line : 2 px, full height, a soft glow in the accent */
 :root:not([data-pointer]) .bar-ptr, [data-pointer='line'] .bar-ptr {
   display: block; top: 0; bottom: 0; width: 2px; margin-left: -1px;
@@ -1475,17 +1481,39 @@ input[type='range'].live-overlay {
 [data-pointer='cap'] .bar-ptr::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgb(85 85 85); }
 /* lit edge : no marker; the fill fades in from its start and ends in a solid
    3 px band; a tick marks the stored value while it is modulated */
-[data-pointer='edge'] .bar-fill {
+[data-pointer='edge'] .bar-fill, [data-pointer='knob'] .bar-fill {
   background: linear-gradient(90deg, rgb(var(--bar-c) / calc(var(--bar-a) * 0.2)), rgb(var(--bar-c) / var(--bar-a)));
 }
-[data-pointer='edge'] .bar[data-neg] .bar-fill {
+[data-pointer='edge'] .bar[data-neg] .bar-fill, [data-pointer='knob'] .bar[data-neg] .bar-fill {
   background: linear-gradient(270deg, rgb(var(--bar-c) / calc(var(--bar-a) * 0.2)), rgb(var(--bar-c) / var(--bar-a)));
 }
-[data-pointer='edge'] .bar-edge { display: block; top: 0; bottom: 0; width: 3px; left: calc((100% - 3px) * var(--lf)); background: rgb(var(--c-accent)); }
-[data-pointer='edge'] .bar[data-mod] .bar-edge { background: color-mix(in srgb, rgb(var(--c-accent2)) 55%, white); }
+[data-pointer='edge'] .bar-edge, [data-pointer='knob'] .bar-edge { display: block; top: 0; bottom: 0; width: 3px; left: calc((100% - 3px) * var(--lf)); background: rgb(var(--c-accent)); }
+[data-pointer='edge'] .bar[data-mod] .bar-edge, [data-pointer='knob'] .bar[data-mod] .bar-edge { background: color-mix(in srgb, rgb(var(--c-accent2)) 55%, white); }
 [data-pointer='edge'] .bar[data-mod] .bar-tick {
   display: block; top: 0; bottom: 0; width: 2px; margin-left: -1px;
   left: calc(var(--f) * 100%); background: rgb(var(--bar-ptr) / 0.95);
+}
+/* lit knob : the lit edge, and a round knob on the stored value, a little
+   taller than the text (13 px over 10-11 px type) : the classic ball, improved.
+   The knob never leaves the bar, so everything that marks a value (the fill's
+   end, the band, the modulation tick, the knob) travels the same inset path,
+   6.5 px in from each end : the band runs through the knob's centre at 0, at 1
+   and everywhere between (on the plain mapping it ran to the very edge while
+   the knob stopped short : "de-centered at the edges", Vincent). */
+[data-pointer='knob'] .bar-fill {
+  left: calc(var(--fl, 0) * 100%);
+  width: calc(6.5px + (100% - 13px) * (var(--fl, 0) + var(--fw, 0)) - var(--fl, 0) * 100%);
+}
+[data-pointer='knob'] .bar[data-neg] .bar-fill {
+  left: calc(6.5px + (100% - 13px) * var(--fl, 0));
+  width: calc((var(--fl, 0) + var(--fw, 0)) * 100% - 6.5px - (100% - 13px) * var(--fl, 0));
+}
+[data-pointer='knob'] .bar-edge { left: calc(6.5px + (100% - 13px) * var(--lf) - 1.5px); }
+[data-pointer='knob'] .bar-ptr {
+  display: block; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px;
+  left: calc(6.5px + (100% - 13px) * var(--f)); border-radius: 50%;
+  background: rgb(var(--c-accent));
+  box-shadow: 0 0 0 1.5px rgb(var(--bar-ptr) / 0.85), 0 0 6px 1px rgb(var(--c-accent) / 0.55);
 }
 /* ruler : ticks every tenth along the bottom (taller at 0 and the middle), a
    tall tick at the value */
