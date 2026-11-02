@@ -3,10 +3,12 @@
 //
 // The timeline counts in BARS of the shared beat clock (audio/soniClock.ts :
 // the composition's BPM, or Ableton Link's beats and bar while Link is on), so
-// it keeps the tempo and stays in phase with the Sonify sequencers. While it
-// runs, a rule with a row is ON inside its blocks and OFF outside them; a rule
-// without blocks is left alone. Stopped, it drives nothing (the rules keep the
-// state they are in).
+// it keeps the tempo and stays in phase with the Sonify sequencers; or, its
+// clock switched to TIME, in real seconds from the moment it starts (at once,
+// never waiting for a bar; the tempo and Link never move it). While it runs, a
+// rule with a row is ON inside its blocks and OFF outside them; a rule without
+// blocks is left alone. Stopped, it drives nothing (the rules keep the state
+// they are in).
 //
 // Your hand wins : a rule switched by anything else while the timeline runs (a
 // MIDI note or CC, OSC, an action, its box on the Body page, its dot here)
@@ -24,8 +26,9 @@
 import { useSyncExternalStore } from 'react'
 import { bodyRuleLastChange, useStore } from '../store'
 import { runSilently } from '../undo'
+import type { RuleUnit } from '@shared/types'
 import { soniBar, soniBeats, soniClockAlsoOnBeat, soniClockEpoch, soniClockStart } from '../audio/soniClock'
-import { blockEdges, edgeCrossed, insideBlocks, playedBlocks, saveRuleTimeline } from './ruleSeqModel'
+import { blockEdges, edgeCrossed, insideBlocks, playedBlocks, ruleUnit, saveRuleTimeline } from './ruleSeqModel'
 
 /** The one door the timeline drives a rule through : the rule on / off action,
  *  tagged as the timeline's own. */
@@ -41,15 +44,20 @@ export function setRuleByHand(id: string, on: boolean): void {
 
 const rt = {
   started: false,
-  /** the clock's beat the run's bar 1 starts on */
+  /** the clock the run counts on (the timeline's unit) : every position below
+   *  is in it, bars or seconds */
+  unit: 'bars' as RuleUnit,
+  /** bars : the clock's beat the run's bar 1 starts on */
   startBeat: 0,
+  /** time : when the run's 0:00 was (performance.now()) */
+  startAt: 0,
   epoch: 0,
-  /** bars since bar 1 at the last frame (unwrapped; -1 before the first) */
+  /** since bar 1 / 0:00 at the last frame (unwrapped; -1 before the first) */
   last: -1,
-  /** where this pass through the loop began (bars since bar 1) : with the
+  /** where this pass through the loop began (since bar 1 / 0:00) : with the
    *  loop off, the run ends at the end of the pass it is in */
   passStart: 0,
-  /** where the playhead is, in the loop's bars */
+  /** where the playhead is, in the loop's bars or seconds */
   pos: 0,
   waiting: false,
   /** what the timeline last set each rule with a row to */
@@ -60,8 +68,9 @@ const rt = {
   held: new Set<string>()
 }
 
-// While it plays, a sequencer starting on the beat keeps to its bars.
-soniClockAlsoOnBeat(() => rt.started)
+// While it plays in bars, a sequencer starting on the beat keeps to its bars
+// (in time it has no bars : the beat clock is free to start a new count).
+soniClockAlsoOnBeat(() => rt.started && rt.unit === 'bars')
 
 // ── the held mark (rare changes : the rows re-render on them, never per frame)
 let heldSnap: ReadonlySet<string> = new Set()
@@ -80,9 +89,9 @@ export function useRuleSeqHeld(): ReadonlySet<string> {
   )
 }
 
-/** The playhead as the lane draws it (read from its own frames). */
-export function ruleSeqPlayhead(): { pos: number; started: boolean; waiting: boolean } {
-  return { pos: rt.pos, started: rt.started, waiting: rt.waiting }
+/** The playhead as the lane draws it (read from its own frames), in `unit`. */
+export function ruleSeqPlayhead(): { pos: number; started: boolean; waiting: boolean; unit: RuleUnit } {
+  return { pos: rt.pos, started: rt.started, waiting: rt.waiting, unit: rt.unit }
 }
 
 /** The sequencers on the beat besides this one (they keep a start in phase). */
@@ -92,11 +101,17 @@ function othersOnBeat(): boolean {
   return (ks.on && ks.rate !== 'free') || (sq.on && (sq.rate ?? 'free') !== 'free')
 }
 
-function begin(): void {
-  // (asked before it counts itself as playing : else it waited a bar for itself)
-  rt.startBeat = soniClockStart(othersOnBeat())
+function begin(unit: RuleUnit, now: number): void {
+  rt.unit = unit
+  if (unit === 'time') {
+    // real seconds : from now, whatever the beat clock does
+    rt.startAt = now
+  } else {
+    // (asked before it counts itself as playing : else it waited a bar for itself)
+    rt.startBeat = soniClockStart(othersOnBeat())
+    rt.epoch = soniClockEpoch()
+  }
   rt.started = true
-  rt.epoch = soniClockEpoch()
   rt.last = -1
   rt.passStart = 0
   rt.pos = 0
@@ -104,6 +119,23 @@ function begin(): void {
   const hadHeld = rt.held.size > 0
   rt.held.clear()
   if (hadHeld) emitHeld()
+}
+
+/** The clock switched while it runs (the lane converts the blocks at the
+ *  tempo, bars x beats a bar x 60 / BPM seconds) : the run keeps its place in
+ *  time, counted on the new clock from here. */
+function recount(unit: RuleUnit, now: number, bpm: number): void {
+  const secPerBar = (soniBar() * 60) / (Number.isFinite(bpm) && bpm > 0 ? bpm : 120)
+  const f = unit === 'time' ? secPerBar : 1 / secPerBar
+  const at = Math.max(0, rt.last) * f
+  rt.unit = unit
+  rt.passStart *= f
+  if (rt.last >= 0) rt.last = at
+  if (unit === 'time') rt.startAt = now - at * 1000
+  else {
+    rt.startBeat = soniBeats() - at * soniBar()
+    rt.epoch = soniClockEpoch()
+  }
 }
 
 function halt(): void {
@@ -117,26 +149,36 @@ function halt(): void {
 }
 
 /** Once a frame from App's loop (after soniClockTick). */
-export function tickRuleSeq(): void {
+export function tickRuleSeq(now = performance.now()): void {
   const st = useStore.getState()
   if (!st.ruleSeqOn) {
     if (rt.started) halt()
     return
   }
-  if (!rt.started) begin()
   const t = st.ruleSeq
+  const unit = ruleUnit(t)
+  if (!rt.started) begin(unit, now)
+  else if (rt.unit !== unit) recount(unit, now, st.composition.bpm)
   const L = Math.max(1, t.length)
-  const bar = soniBar()
-  const beats = soniBeats()
-  // re-counted onto new bars (Link on or off, its bar resized) : the run keeps
-  // its place, on the new bars
-  if (rt.epoch !== soniClockEpoch()) {
-    rt.epoch = soniClockEpoch()
-    rt.startBeat = Math.round((beats - Math.max(0, rt.last) * bar) / bar) * bar
+  let p0: number
+  if (unit === 'time') {
+    // the wall clock : a stalled window catches up (an installation's timeline
+    // keeps to the minute)
+    p0 = Math.max(0, (now - rt.startAt) / 1000)
+    rt.waiting = false
+  } else {
+    const bar = soniBar()
+    const beats = soniBeats()
+    // re-counted onto new bars (Link on or off, its bar resized) : the run keeps
+    // its place, on the new bars
+    if (rt.epoch !== soniClockEpoch()) {
+      rt.epoch = soniClockEpoch()
+      rt.startBeat = Math.round((beats - Math.max(0, rt.last) * bar) / bar) * bar
+    }
+    p0 = (beats - rt.startBeat) / bar
+    rt.waiting = p0 < 0
+    if (rt.waiting) return // waiting for its bar (the next one, or Link's)
   }
-  const p0 = (beats - rt.startBeat) / bar
-  rt.waiting = p0 < 0
-  if (rt.waiting) return // waiting for its bar (the next one, or Link's)
   if (t.loop) rt.passStart = Math.floor(p0 / L) * L
   const rel = p0 - rt.passStart
   const end = !t.loop && rel >= L
@@ -212,7 +254,8 @@ export function seqTransportReady(): { scenes: boolean; keys: boolean; rules: bo
 }
 
 /** Play : every lane the transport starts (each on its own time : the scenes
- *  on their dwell, the keys and the rules on the beat, together on bar 1). */
+ *  on their dwell, the keys and the rules on the beat, together on bar 1; the
+ *  rules in time at once). */
 export function seqTransportPlay(): void {
   const st = useStore.getState()
   const r = seqTransportReady()

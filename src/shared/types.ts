@@ -1075,18 +1075,25 @@ export interface SequenceState {
 
 // ── The Seq page's lanes (one transport over every sequencer) ─────────
 // The Body rule timeline : "this rule is on from bar a to bar b", on the shared
-// beat clock (the Sonify sequencers' : BPM, or Ableton Link's bars). Kept on the
+// beat clock (the Sonify sequencers' : BPM, or Ableton Link's bars), or "from
+// 1:30 to 2:15" in real seconds (unit 'time' : the tempo never moves it). A
+// timeline holds one unit : its length and every block are in it. Kept on the
 // machine beside the rules it plays (the rules are the machine's : a webcam is),
 // each block naming its rule by the rule's id, so a renamed rule keeps its
 // blocks and a deleted one takes them along.
 export interface RuleBlock {
   id: string
   rule: string // GestureRule.id
-  start: number // bars from the top of the timeline (0 = bar 1); beats are fractions
-  len: number // bars
+  start: number // from the top of the timeline (0 = bar 1 / 0:00) : bars (beats are fractions) or seconds
+  len: number // bars or seconds
 }
+/** The clock a rule timeline counts on : bars of the tempo, or real seconds. */
+export type RuleUnit = 'bars' | 'time'
 export interface RuleTimeline {
-  length: number // bars : the loop (4 / 8 / 16 / 32 / 64)
+  /** absent : bars (every timeline from before the clock switch); kept only
+   *  when 'time', so a timeline in bars saves as it always did */
+  unit?: RuleUnit
+  length: number // the loop : bars (1 to 256) or seconds (5 s to 120 min)
   loop: boolean // off : it plays the length once, then stops
   blocks: RuleBlock[]
 }

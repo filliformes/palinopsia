@@ -1,9 +1,10 @@
 // SequencePage : the home of everything the instrument sequences (key Q, the
-// Seq button; also in a window of its own, PageWindow.tsx). One transport over
-// LANES, each sequencer keeping its own time :
+// Seq button; also in a window of its own, PageWindow.tsx). One transport, the
+// live picture under it (always there, over every lane), then LANES, each
+// sequencer keeping its own time :
 // - Scenes : the macro-form "auto-pilot" over the scene bank (S1-S4). Left :
-//   the scene rail as tagged cards + a tag editor + the live mirror. Right :
-//   pacing, selection and the macro-form overlays (Breathe, Climate arc...).
+//   the scene rail as tagged cards + a tag editor. Right : pacing, selection
+//   and the macro-form overlays (Breathe, Climate arc...).
 //   See docs/opsia-sequencer-spec.md.
 // - Sonify keys : the Sonify key sequencer, the same card (one store) as on
 //   the Sonify page, in three columns (SonifyKeySequencer lane).
@@ -79,6 +80,7 @@ export function SequencePage({
   const ruleOn = useStore((s) => s.ruleSeqOn)
   const setRuleOn = useStore((s) => s.setRuleSeqOn)
   const hasBlocks = useStore((s) => s.ruleSeq.blocks.length > 0)
+  const ruleTime = useStore((s) => s.ruleSeq.unit === 'time')
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg" data-seq-page>
@@ -109,6 +111,9 @@ export function SequencePage({
           {inWindow ? 'close' : '← back to instrument'}
         </button>
       </header>
+
+      {/* the whole picture, over every lane (never scrolled away) */}
+      <SeqPreview canvasRef={canvasRef} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
         <Lane
@@ -141,11 +146,15 @@ export function SequencePage({
         <Lane
           id="rules"
           title="Body rules"
-          hint="A timeline of your Body rules, in bars of the tempo (Ableton Link's bar while Link is on) : each block switches its rule on from its first bar to its last. While it runs, a rule with blocks is on inside them and off outside them; a rule without blocks is left alone, and stopping leaves every rule as it is. A rule you switch by hand (MIDI, OSC, an action, its box) keeps what you set until the next block edge on its row."
+          hint="A timeline of your Body rules : each block switches its rule on from its start to its end. Its clock : bars of the tempo (Ableton Link's bar while Link is on), or time, real minutes and seconds that the tempo never moves (a loop of 5 seconds to 120 minutes; it starts at once on play). Switching the clock converts the blocks at the tempo, so they keep their place. Double-click a block to type its start and length exactly. While it runs, a rule with blocks is on inside them and off outside them; a rule without blocks is left alone, and stopping leaves every rule as it is. A rule you switch by hand (MIDI, OSC, an action, its box) keeps what you set until the next block edge on its row."
           on={ruleOn}
           onToggle={() => setRuleOn(!ruleOn)}
           toggleDisabled={!ruleOn && !hasBlocks}
-          toggleTitle={!hasBlocks ? 'Put a block on the timeline first' : ruleOn ? 'Stop the rule timeline : every rule stays as it is' : 'Run the rule timeline : it starts on the next bar when another sequencer plays on the beat'}
+          toggleTitle={!hasBlocks
+            ? 'Put a block on the timeline first'
+            : ruleOn
+              ? 'Stop the rule timeline : every rule stays as it is'
+              : ruleTime ? 'Run the rule timeline : in time, it starts at once' : 'Run the rule timeline : it starts on the next bar when another sequencer plays on the beat'}
           midiId="fire:ruleseq"
           status={<RulePosition />}
         >
@@ -340,9 +349,10 @@ function KeyLane(): JSX.Element {
   )
 }
 
-/** The scene lane : the scene rail as tagged cards + a tag editor + the live
- *  mirror on the left, the auto-pilot's pacing and macro-form overlays on the
- *  right (as the whole page was before the lanes). Its height : drag its foot. */
+/** The scene lane : the scene rail as tagged cards + a tag editor on the left,
+ *  the auto-pilot's pacing and macro-form overlays on the right (as the whole
+ *  page was before the lanes; the live mirror is the page's own now, over every
+ *  lane). Its height : drag its foot. */
 function SceneLane({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const scenes = useStore(useShallow((s) => s.scenes))
   const activeSceneId = useStore((s) => s.activeSceneId)
@@ -402,7 +412,7 @@ function SceneLane({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nul
   return (
     <div className="flex flex-col">
       <div className="flex min-h-0" style={{ height: laneH }}>
-        {/* Scene column: scrolling rail + a live preview pinned at the bottom. */}
+        {/* Scene column : the scrolling rail and the tag editor. */}
         <div className="flex min-w-0 flex-1 flex-col">
          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -575,8 +585,6 @@ function SceneLane({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nul
             </div>
           )}
          </div>
-         {/* Live composition mirror : pinned at the bottom so you SEE the run. */}
-         <SeqPreview canvasRef={canvasRef} />
         </div>
 
         {/* Transport + macro-form : crammed to fit without scrolling. */}
@@ -884,15 +892,57 @@ function SceneLane({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nul
   )
 }
 
-// Live mirror of the main composite canvas (via captureStream). Height is
-// resizable (drag the top edge); the scene rail above flexes to what's left.
+// The live picture over every lane (Vincent : "the LIVE preview should always be
+// there, on top of the 3 lanes, so we can monitor how the sequencers are
+// affecting the whole picture") : a mirror of the main composite canvas (via
+// captureStream), between the transport and the lanes, never scrolled away. Its
+// height : drag its foot (remembered; at most half the page, so the lanes keep
+// their room). The picture keeps its own shape (a dome's square too), centered;
+// a corner says which lanes are playing.
 function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const statusRef = useRef<HTMLSpanElement | null>(null)
   const [height, setHeight] = useState<number>(() => {
     const v = Number(localStorage.getItem('opsia.seqPreviewH'))
     return Number.isFinite(v) && v >= 100 ? v : 150
   })
+  const [maxH, setMaxH] = useState(560)
   const drag = useRef<{ startY: number; startH: number; last: number; z: number } | null>(null)
+
+  // never past half the page (in the page's own pixels : the UI zoom applies)
+  useEffect(() => {
+    const view = ownerWindow(boxRef.current)
+    const fit = (): void => setMaxH(Math.max(100, Math.min(560, Math.round((view.innerHeight / effectiveZoom(boxRef.current)) * 0.5))))
+    fit()
+    view.addEventListener('resize', fit)
+    return () => view.removeEventListener('resize', fit)
+  }, [])
+
+  // which lanes play (written from the window's own frames, only when it changes)
+  useEffect(() => {
+    const view = ownerWindow(statusRef.current)
+    let id = 0
+    let shown = ''
+    const f = (): void => {
+      id = view.requestAnimationFrame(f)
+      if (view.document.hidden || !statusRef.current) return
+      const st = useStore.getState()
+      const on = [
+        st.sequence.enabled && st.sequence.running ? 'scenes' : '',
+        st.soniKeySeq.on ? 'keys' : '',
+        st.ruleSeqOn ? 'rules' : ''
+      ].filter(Boolean)
+      const txt = on.length ? `▶ ${on.join(' · ')}` : 'stopped'
+      if (txt !== shown) {
+        shown = txt
+        statusRef.current.textContent = txt
+        statusRef.current.style.color = on.length ? 'rgb(var(--c-accent))' : ''
+      }
+    }
+    id = view.requestAnimationFrame(f)
+    return () => view.cancelAnimationFrame(id)
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -912,23 +962,41 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
     }
   }, [canvasRef])
 
+  const h = Math.min(height, maxH)
   return (
-    <div className="flex shrink-0 flex-col border-t border-border bg-black/40">
-      {/* Drag the top edge to resize (up = taller). */}
+    <div ref={boxRef} data-seq-live className="flex shrink-0 flex-col border-b border-border bg-black/40">
+      <div className="relative flex min-h-0 items-center justify-center p-2" style={{ height: h }}>
+        <span className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[9px] uppercase tracking-wide text-muted">
+          live
+        </span>
+        <span
+          ref={statusRef}
+          data-seq-live-status
+          className="pointer-events-none absolute right-3 top-2 z-10 font-mono text-[9px] text-muted"
+        />
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="h-full max-w-full rounded border border-border bg-black object-contain"
+        />
+      </div>
+      {/* Drag the foot to resize (down = taller). */}
       <div
         className="h-1.5 shrink-0 cursor-row-resize bg-border/60 transition-colors hover:bg-accent/60"
         style={{ touchAction: 'none' }}
         onPointerDown={(e) => {
           // (screen pixels to the zoomed page's own, as the column's edge)
-          drag.current = { startY: e.clientY, startH: height, last: height, z: effectiveZoom(e.currentTarget) }
+          drag.current = { startY: e.clientY, startH: h, last: h, z: effectiveZoom(e.currentTarget) }
           ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
         }}
         onPointerMove={(e) => {
           const d = drag.current
           if (!d) return
-          const h = Math.max(100, Math.min(560, d.startH + (d.startY - e.clientY) / d.z))
-          d.last = h
-          setHeight(h)
+          const nh = Math.max(100, Math.min(maxH, d.startH + (e.clientY - d.startY) / d.z))
+          d.last = nh
+          setHeight(nh)
         }}
         onPointerUp={(e) => {
           if (drag.current) {
@@ -944,21 +1012,8 @@ function SeqPreview({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | nu
             ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
           }
         }}
-        title="Drag to resize the live monitor"
+        title="Drag to make the live picture taller or shorter"
       />
-      <div className="relative flex min-h-0 items-center justify-center p-2" style={{ height }}>
-        <span className="pointer-events-none absolute left-2 top-2 z-10 font-mono text-[9px] uppercase tracking-wide text-muted">
-          live
-        </span>
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="h-full max-w-full rounded border border-border bg-black object-contain"
-          style={{ aspectRatio: '16 / 9' }}
-        />
-      </div>
     </div>
   )
 }
