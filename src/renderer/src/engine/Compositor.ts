@@ -47,6 +47,7 @@ import { StrobeLimiter } from './strobeLimit';
 import { PbrLib } from './pbrTextures';
 import type { SidechainRef } from '@shared/types';
 import { VideoSource } from './VideoSource';
+import { glGeneration } from './glGeneration';
 import { AudioSource } from './AudioSource';
 import { AssembleSource, type AssembleSoundInfo } from './AssembleSource';
 import { CaptureSource } from './CaptureSource';
@@ -77,6 +78,38 @@ export type { BlendMode };
 // an engine rebuilt starts the same file there (the visual source jumped back to
 // its top while the Audio Layer resumed).
 const audioWasAt = new Map<string, { url: string; time: number }>();
+
+// Each layer's film outlives an engine rebuild (the composition's size, the
+// render scale, the dome's square) : the old engine parks its VideoSource here
+// and the new one takes it back for the same clip, so the film plays on, never
+// reloaded nor sought (it used to start again from its top, blank while it
+// loaded). One built before a GPU reset holds dead textures : the new engine
+// starts a fresh one where it was. One nobody takes back is let go.
+const parkedVideos = new Map<string, { url: string; src: VideoSource; timer: number }>();
+const PARK_MS = 5000;
+function parkVideo(key: string, url: string, src: VideoSource): void {
+  const old = parkedVideos.get(key);
+  if (old) {
+    window.clearTimeout(old.timer);
+    try { old.src.dispose(); } catch { /* already gone */ }
+  }
+  const timer = window.setTimeout(() => {
+    if (parkedVideos.get(key)?.src !== src) return;
+    parkedVideos.delete(key);
+    try { src.dispose(); } catch (e) { console.warn('[video] dispose failed:', e); }
+  }, PARK_MS);
+  parkedVideos.set(key, { url, src, timer });
+}
+/** The parked film of this slot, if it plays this clip (else it is let go). */
+function takeParkedVideo(key: string, url: string): VideoSource | null {
+  const p = parkedVideos.get(key);
+  if (!p) return null;
+  parkedVideos.delete(key);
+  window.clearTimeout(p.timer);
+  if (p.url === url) return p.src;
+  try { p.src.dispose(); } catch { /* already gone */ }
+  return null;
+}
 
 const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 uv;
@@ -1109,7 +1142,7 @@ export class ISFLayer {
   /** Load/swap/clear a VIDEO source. Passing null (or a new mediaId) disposes
    *  the current clip. Cheap when the id is unchanged (the common per-frame
    *  case), so syncFromState can call it every frame. */
-  setVideo(slot: 'A' | 'B', mediaId: string | null): void {
+  setVideo(slot: 'A' | 'B', mediaId: string | null, layerIndex = -1): void {
     const curId = slot === 'A' ? this.mediaIdA : this.mediaIdB;
     if (mediaId === curId) return; // no change
     const cur = slot === 'A' ? this.videoA : this.videoB;
@@ -1118,8 +1151,14 @@ export class ISFLayer {
     try { cur?.dispose(); } catch (e) { console.warn('[video] dispose failed:', e); }
     let next: VideoSource | null = null;
     if (mediaId) {
-      next = new VideoSource(this.shared.gl);
-      next.load(mediaId);
+      // the engine rebuilt : the same film, still playing (parkVideo)
+      const was = layerIndex >= 0 ? takeParkedVideo(videoKey(layerIndex, slot), mediaId) : null;
+      if (was && was.gen === glGeneration()) next = was;
+      else {
+        next = new VideoSource(this.shared.gl);
+        next.load(mediaId, was ? was.time() : 0);
+        try { was?.dispose(); } catch { /* its context is gone */ }
+      }
     }
     if (slot === 'A') { this.videoA = next; this.mediaIdA = mediaId; }
     else { this.videoB = next; this.mediaIdB = mediaId; }
@@ -1652,8 +1691,10 @@ export class ISFLayer {
     if (slot === 'A') this.personA = null; else this.personB = null;
   }
 
-  /** Release every GL resource this layer owns (renderers, racks, buffers). */
-  dispose(): void {
+  /** Release every GL resource this layer owns (renderers, racks, buffers).
+   *  `parkAs` : this layer's index when the whole engine is rebuilt, its films
+   *  then parked for the next engine (parkVideo) instead of let go. */
+  dispose(parkAs = -1): void {
     const gl = this.shared.gl;
     this.personA?.dispose();
     this.personB?.dispose();
@@ -1661,8 +1702,12 @@ export class ISFLayer {
     this.personB = null;
     this.isfA?.cleanup();
     this.isfB?.cleanup();
-    this.videoA?.dispose();
-    this.videoB?.dispose();
+    if (parkAs >= 0 && this.videoA && this.mediaIdA) parkVideo(videoKey(parkAs, 'A'), this.mediaIdA, this.videoA);
+    else this.videoA?.dispose();
+    if (parkAs >= 0 && this.videoB && this.mediaIdB) parkVideo(videoKey(parkAs, 'B'), this.mediaIdB, this.videoB);
+    else this.videoB?.dispose();
+    this.videoA = null;
+    this.videoB = null;
     this.audioA?.dispose();
     this.audioB?.dispose();
     this.assembleA?.dispose();
@@ -2982,7 +3027,7 @@ export class Compositor {
       const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
       const wantAsmA = l.sourceA.kind === 'assemble' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
-      L.setVideo('A', wantVidA);
+      L.setVideo('A', wantVidA, i);
       L.setCapture('A', wantCapA, l.sourceA.mediaName);
       L.setHive('A', wantHiveA);
       L.setAssemble('A', wantAsmA, l.sourceA.edl, l.sourceA.videoLoop ?? true, l.sourceA.mediaPath ?? null);
@@ -3005,7 +3050,7 @@ export class Compositor {
       const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
       const wantAsmB = l.sourceB && l.sourceB.kind === 'assemble' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
-      L.setVideo('B', wantVidB);
+      L.setVideo('B', wantVidB, i);
       L.setCapture('B', wantCapB, l.sourceB?.mediaName);
       L.setHive('B', wantHiveB);
       L.setAssemble('B', wantAsmB, l.sourceB?.edl, l.sourceB?.videoLoop ?? true, l.sourceB?.mediaPath ?? null);
@@ -3852,7 +3897,7 @@ export class Compositor {
    *  compositor's worth of programs and RGBA16F targets. */
   dispose(): void {
     const gl = this.gl;
-    for (const L of this.layers) L.dispose();
+    this.layers.forEach((L, i) => L.dispose(i)); // films parked for the next engine
     this.layers = [];
     this.masterRack.dispose();
     this.bgIsf?.cleanup();

@@ -1508,7 +1508,8 @@ bottom:
   **7680×2160** for a wide wall or a stack of projectors). The whole engine renders
   at that shape; the output window can then **span separate displays**, so several
   projectors show one continuous picture. The size lives on the machine, not in the
-  session, so a show file stays resolution-independent.
+  session, so a show file stays resolution-independent. A new size rebuilds the engine;
+  the films on the layers play on through it, where they were.
 - **Render scale** : a quality multiplier (0.1–2×) on the composition size (½ lo-fi /
   ¾ / 1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
   **Sharp enlargement** (off by default) : the projector window enlarges a frame rendered

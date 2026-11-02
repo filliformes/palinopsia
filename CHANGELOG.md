@@ -149,6 +149,40 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Fixed
 
+- **A film keeps playing when the composition size changes** (Vincent : "when changing
+  from let's say 1080p to 4K UHD in composition size, a video that is playing (Imported
+  video) on a layer gets replaced with another shader-based source (like Drift Field)").
+  Two causes, both in the engine rebuild a new size triggers (so the render scale, the
+  dome's armed square and a GPU reset did it too). (1) `App.tsx`'s launch safety net
+  ("layer 1 empty : drop the first generator in") ran on EVERY engine build and tested
+  `sourceA.shaderId`, which is null for a film, a camera, NDI, HIVE and an Assemble edit :
+  layer 1's slot A became `GENERATORS[0]`, Drift Field. It now runs once per window, and
+  only into a slot that holds nothing (`kind 'none'`, or a generator without a shader).
+  (2) Every other layer's film was rebuilt from scratch : a new `<video>`, back to the
+  top, transparent while it loaded (audio slots already went on where they were,
+  `audioWasAt`). Now the old engine PARKS each film's `VideoSource` (`Compositor.ts`
+  `parkVideo`, keyed by layer and slot, given up after 5 s) and the new engine takes it
+  back for the same clip : the same element, never reloaded nor sought, its sound
+  uninterrupted. After a GPU reset its textures are dead (`VideoSource.gen` ≠
+  `glGeneration()`), so a fresh one starts where it was (`VideoSource.load(src,
+  startAt)`). Measured in the test copy (RTX 4070), a 60 s film on L1 A (a real desktop
+  drop) and on L2 A, real clicks on the Output page's size buttons. Before : 1080p → 4K
+  UHD turned L1 into `generator drift-field` (the film was at 4.90 s) and restarted L2 on
+  a new element (7.75 → 0.05 s); 4K → 1080p and the dome going on with its 2048² square
+  armed, the same. A camera (synthetic device), HIVE and an Assemble edit on L1 A were
+  replaced by Drift Field too; Collage was kept (it has a shader id). After : 1080p → 4K
+  → 1080p → 1440p → dome 2048² → 1080p, the dome on (square) and off : both films the
+  same element, sampled every 50 ms, never without a frame (readyState 4 throughout),
+  the playhead running on (4.81 → 8.15 s across the 4K rebuild); the film's texture in
+  the new engine complete and live (glError 0, the same mean color); speed 0.5, loop off,
+  in / out 0.1-0.9 and fit contain kept; a render scale change, the same element; a
+  simulated GPU reset, a fresh element on at 11.21 → 12.63 s (not from the top); camera,
+  HIVE, Collage and Assemble on L1 A all kept through a size change. Collage's 9-path
+  probe : 6 / 6 decks advancing on every path. Console errors 0 on every run without a
+  simulated GPU reset. Two of four simulated resets logged one `[ISF] threw while
+  loading` each, naming shaders that were in no layer (`fx-hue-rotate`, `shapes`) : the
+  warm-up queue (restarted by every rebuild) compiling in the instant the context is
+  gone, a path this change does not touch; left as it is.
 - **The Silhouette source's trail works in Matte mode** (`engine/SilhouetteSource.ts`).
   The trail keeps its echoes in the picture's alpha (the body now or the faded past,
   whichever covers more), but the matte is opaque everywhere (white body, black room),
