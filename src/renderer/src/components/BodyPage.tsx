@@ -13,6 +13,7 @@ import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, Gestur
 import { BODY_FEATURE_GROUPS } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
 import { bodyBus } from '../engine/bodyIn'
+import { CLUTCH_AT_DEFAULT } from '../engine/bodyClutch'
 import { fireTrigger, midiTargetLabel } from '../midi'
 import { actionInfo } from '../actions'
 import { triggerLabel, triggerOptions } from '../triggerCatalog'
@@ -107,6 +108,10 @@ function featureLabel(k: BodyFeature): string {
   const what = m[2].toLowerCase()
   return `${side} ${what}${m[3] ? ' ' + m[3].toLowerCase() : ''}`
 }
+
+// The modulator slot the → last routed a feature into (this run) : Alt+click
+// on a → makes that feature its clutch.
+let lastRouted = -1
 
 function Toggle({ on, label, onClick, title }: { on: boolean; label: string; onClick: () => void; title?: string }): JSX.Element {
   return (
@@ -272,7 +277,22 @@ export function BodyPage({
     const free = mods.findIndex((m) => !m.enabled)
     if (free < 0) { showToast('All 8 modulator slots are in use', 'warn'); return }
     st.updateModulator(free, { enabled: true, type: 'body', body: { feature, smooth: 0.3 } })
+    lastRouted = free
     showToast(`Modulator ${free + 1} now follows ${feature}. Bind it with a param’s M button (Modulation : D)`, 'ok', 6000)
+  }
+  // Alt+click on a → : the feature becomes the CLUTCH of the body modulator
+  // routed last (else the last body card in the bank) : it then follows only
+  // while this feature is past its threshold, and holds otherwise.
+  const toClutch = (feature: BodyFeature): void => {
+    const st = useStore.getState()
+    const mods = st.composition.modulators
+    const isBody = (i: number): boolean => i >= 0 && !!mods[i]?.enabled && mods[i].type === 'body'
+    const n = isBody(lastRouted) ? lastRouted : mods.reduce((at, m, i) => (isBody(i) ? i : at), -1)
+    if (n < 0) { showToast('No body modulator to clutch yet : route a feature with → first', 'warn'); return }
+    const bc = mods[n].body
+    st.updateModulator(n, { body: { ...bc, clutch: feature } })
+    const at = (bc.clutchAt ?? CLUTCH_AT_DEFAULT).toFixed(2)
+    showToast(`Modulator ${n + 1} (${bc.feature}) now follows only while ${feature} is ${bc.clutchInvert ? 'below' : 'above'} ${at}, and holds otherwise`, 'ok', 6000)
   }
 
   // Rule builder actions. Rules live in bodyControl.rules (machine-local).
@@ -543,9 +563,9 @@ export function BodyPage({
                         </div>
                         <span className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">{v.toFixed(2)}</span>
                         <button
-                          onClick={() => toSlot(k)}
+                          onClick={(e) => (e.altKey ? toClutch(k) : toSlot(k))}
                           className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                          title={`Route ${k} into the first free modulator slot`}
+                          title={`Route ${k} into the first free modulator slot. Alt+click : make it the clutch of the body modulator routed last (it then follows only while ${k} is past its threshold, and holds otherwise)`}
                         >→</button>
                       </div>
                     )
@@ -554,7 +574,7 @@ export function BodyPage({
               </SectionRow>
             ))}
             <p className="px-1 text-[10px] leading-snug text-muted">
-              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
+              Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button); <span className="text-text">Alt+click</span> it to make that feature the clutch of the modulator routed last (it follows only while the clutch is past its threshold, else holds). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
             </p>
           </div>
         </div>

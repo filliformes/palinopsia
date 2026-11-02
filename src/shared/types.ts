@@ -725,7 +725,11 @@ export interface ModulatorConfig {
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour
   vision: { feature: VisionFeature; smooth: number } // follows the picture (return path)
-  body: { feature: BodyFeature; smooth: number } // follows the body bus (embodied control)
+  // follows the body bus (embodied control). The CLUTCH (engine/bodyClutch.ts,
+  // optional, absent = off) : it follows only while `clutch` reads above
+  // `clutchAt` (below with `clutchInvert`), else holds its last value; it holds
+  // too while the clutch's or its own body part is out of view.
+  body: { feature: BodyFeature; smooth: number; clutch?: BodyFeature; clutchAt?: number; clutchInvert?: boolean }
   // Negative-feedback controller : watches a picture feature and integrates a
   // corrective output that (bound in `replace` mode) nudges the param to hold the
   // feature at `setpoint` — AGC-as-modulator, parks the rig at edge-of-chaos.

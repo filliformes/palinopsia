@@ -923,6 +923,26 @@ One type follows the **live performer** instead of the picture:
   flatness) : bind a sound's noise to a layer's tint saturation and the *sound
   colours the picture* (the other direction of the same crossmodal table).
 
+**The body modulator's clutch.** A `body` card can take a second body feature, its
+**CLUTCH** (any feature, the same menu) : it then follows its own feature only while the
+clutch reads above a threshold (**ABOVE**, 0.5 to start; **BELOW** follows while it
+reads under), and otherwise **holds** the last value it had, so every parameter it drives
+holds with it. It grabs past the threshold + 0.05 and lets go past the threshold − 0.05,
+a dead band, so a reading wobbling around it never flickers; a grab glides in from the
+held value to where the hand is (about 0.3 s) instead of cutting. Out of view (that
+hand, the face or the body gone, or the camera off) it holds too, so losing the hand
+never moves anything, and a hand coming back must cross the band again to grab. The
+card's dot shows it : filled while it follows, a ring while it holds, a faint ring while
+it holds because its part of the body is out of view; the meter dims while it holds.
+Clutch **off** (the default) is the body modulator exactly as before. On the Body page,
+**Alt+click** a feature's **→** to make it the clutch of the body modulator routed last.
+Your open left hand as a fader on a layer's opacity :
+
+1. Body page (`B`) : **→** on `handLeftX` (a free modulator now follows it).
+2. **Alt+click** the **→** on `handLeftOpen` : it becomes that card's clutch (above 0.5).
+3. Layer 2's opacity at full, its **M** : bind that modulator, Multiply, depth 1.
+4. Open the hand and sweep from left to right; close it to leave the opacity where it is.
+
 The **`audio`** follower listens **FROM** the audio input (the audio tab), from the
 [Audio Layer](#the-audio-layer) (`AU A`, `AU B`, or `AU all` : its whole sound, live
 inputs included), or from a **layer's clip** : the soundtrack of an imported film or an
@@ -1356,7 +1376,10 @@ them live, one row per body region, its name in the margin in the region's color
 Hand shape · Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
 the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
-any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
+any parameter with a param's **M** button (exactly like an LFO); **Alt+click** a **→**
+to make that feature the **clutch** of the body modulator routed last (it then follows
+only while the clutch is past its threshold, and holds otherwise : see the body
+modulator's clutch under the modulators). So a raised hand can
 open a filter, or the body's motion drive feedback, continuously. A layer's opacity
 (its **M** in the layer panel) and the Background's take one too : a hand's height
 fades a layer in and out.

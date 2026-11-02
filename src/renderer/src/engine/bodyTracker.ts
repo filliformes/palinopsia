@@ -848,6 +848,7 @@ class BodyTracker {
     const slots = this.handSlots.assign(handsLm.map((lm) => lm[WRIST]), handed, mirror, aspect, ts)
     const left = slots.left >= 0 ? handsLm[slots.left] : null
     const right = slots.right >= 0 ? handsLm[slots.right] : null
+    bodyBus.setHandSides(!!left, !!right) // (a body modulator's clutch holds while its hand is away)
     this.deriveShapes(left, right, mirror, aspect, out, cfg, ts)
 
     const openness = (lm: NormalizedLandmark[]): number => {

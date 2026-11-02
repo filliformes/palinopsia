@@ -24,6 +24,7 @@ import { audioBus } from './audioIn'
 import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
+import { CLUTCH_AT_DEFAULT, CLUTCH_CATCH_EPS, CLUTCH_CATCH_MAX_MS, clutchEngaged, clutchStepK } from './bodyClutch'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
@@ -239,6 +240,10 @@ interface SlotState {
   clipRead: ClipReadState // a clip's playhead as last read (audio type, from a clip)
   visionValue: number // one-pole smoothed picture feature (vision type)
   bodyValue: number // one-pole smoothed body feature (body type)
+  bodySeeded: boolean // the body type has written bodyValue (a clutch holds that; never written : it starts from the feature)
+  clutchOn: boolean // the clutch is engaged (body type with a clutch)
+  clutchCatchAt: number // when the grab's glide began (0 : not gliding)
+  clutchShow: number // for the card : 0 no clutch, 1 following, 2 held (let go), 3 held (out of view)
   homeoFeat: number // one-pole smoothed feature (homeostat type)
   homeoBase: number // slow-adapting baseline the controller regulates around
   homeoInt: number // homeostat integrator (accumulated correction, ±0.5)
@@ -334,6 +339,10 @@ function makeSlot(now: number): SlotState {
     clipRead: newClipReadState(),
     visionValue: 0,
     bodyValue: 0,
+    bodySeeded: false,
+    clutchOn: false,
+    clutchCatchAt: 0,
+    clutchShow: 0,
     homeoFeat: 0.5,
     homeoBase: 0.5,
     homeoInt: 0,
@@ -545,6 +554,12 @@ export class ModEngine {
     for (const fn of this.fillSubs) fn()
   }
 
+  /** A body card's clutch, for its dot and meter : 0 no clutch (or off), 1
+   *  following, 2 held (let go), 3 held (its hand, face or body out of view). */
+  clutchState(i: number): number {
+    return this.slots[i]?.clutchShow ?? 0
+  }
+
   /** The steps card's view of a slot (null : no such slot yet). */
   stepView(i: number): StepView | null {
     const s = this.slots[i]
@@ -587,9 +602,12 @@ export class ModEngine {
       if (!cfg || !cfg.enabled) {
         this.values[i] = 0
         coldSteps(s) // (turned back on : a new run)
+        s.clutchShow = 0
+        s.clutchOn = false // (turned back on : a clutch grabs again, gliding in)
         continue
       }
       if (cfg.type !== 'steps') coldSteps(s)
+      s.clutchShow = 0 // (the body case sets it when it has a clutch)
       const hz = effectiveHz(cfg, bpm)
       let v01 = 0
       // Ableton Link : how many of this clock's cycles the shared beats say
@@ -1043,7 +1061,32 @@ export class ModEngine {
           if (bc) {
             const raw = bodyBus.feature(bc.feature)
             const sm = Math.max(0, Math.min(0.99, bc.smooth ?? 0))
-            s.bodyValue += (raw - s.bodyValue) * (1 - Math.pow(sm, dtMs / FR_MS))
+            if (!bc.clutch) {
+              s.bodyValue += (raw - s.bodyValue) * (1 - Math.pow(sm, dtMs / FR_MS))
+              s.clutchOn = false
+            } else {
+              // The CLUTCH (engine/bodyClutch.ts) : follow only while the clutch
+              // feature is past its threshold (hysteresis : it never chatters),
+              // else hold the last value. Out of view (the clutch's body part
+              // or this feature's own) holds too and lets go, so a lost hand
+              // never moves the parameter and a returning one grabs again only
+              // by crossing the band. The grab glides in (~0.3 s) from the held
+              // value to the hand rather than cutting.
+              if (!s.bodySeeded) s.bodyValue = raw // nothing held yet : start where the feature is
+              const seen = bodyBus.inView(bc.clutch) && bodyBus.inView(bc.feature)
+              const was = s.clutchOn
+              s.clutchOn = seen && clutchEngaged(was, bodyBus.feature(bc.clutch), bc.clutchAt ?? CLUTCH_AT_DEFAULT, !!bc.clutchInvert)
+              if (s.clutchOn && !was) s.clutchCatchAt = now || 1
+              if (s.clutchOn) {
+                const catching = s.clutchCatchAt > 0
+                s.bodyValue += (raw - s.bodyValue) * clutchStepK(sm, dtMs, catching, FR_MS)
+                if (catching && (Math.abs(raw - s.bodyValue) < CLUTCH_CATCH_EPS || now - s.clutchCatchAt > CLUTCH_CATCH_MAX_MS)) s.clutchCatchAt = 0
+              } else {
+                s.clutchCatchAt = 0
+              }
+              s.clutchShow = s.clutchOn ? 1 : seen ? 2 : 3
+            }
+            s.bodySeeded = true
             v01 = s.bodyValue
           }
           break
