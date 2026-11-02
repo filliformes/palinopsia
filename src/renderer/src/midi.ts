@@ -189,6 +189,8 @@ export interface MidiDevice {
 // fire:seq          note/CC press → toggle the scene sequencer
 // fire:soniseq      note/CC press → toggle the Sonify step sequencer
 // fire:keyseq       note/CC press → toggle the Sonify key sequencer
+// rule:<id>         a Body rule's box (by its id, never its place) : a note
+//                   turns it on or off, a CC sets it (64 and up on, below off)
 
 /** Continuous targets take knobs/faders only : notes are ignored while one
  *  of these is the armed learn target (keep twisting until it takes). */
@@ -213,6 +215,10 @@ export function midiTargetLabel(id: string): string {
     const i = Number(id.slice(5))
     const name = useStore.getState().composition.metaKnobs[i]?.name
     return `MACRO ${i + 1}${name ? ` · ${name}` : ''}`
+  }
+  if (id.startsWith('rule:')) {
+    const r = useStore.getState().bodyControl.rules.find((x) => x.id === id.slice(5))
+    return r ? `RULE ${r.name} : on/off` : 'RULE (gone)'
   }
   if (id === 'scene:next') return 'SCENE next'
   if (id === 'scene:prev') return 'SCENE prev'
@@ -685,6 +691,11 @@ class MidiManager {
         ccHandled = true
       }
       if (matches(map['sonify:master'], binding)) { st.setSonify({ ...st.sonify, master: t }); ccHandled = true }
+      // A Body rule's box on a knob or a latching button : on from 64, off below
+      // (the release of a momentary button turns it off again)
+      for (const r of st.bodyControl.rules) {
+        if (matches(map[`rule:${r.id}`], binding)) { st.setBodyRuleActive(r.id, value >= 64, 'midi'); ccHandled = true }
+      }
       // A CC used as a continuous control never also fires a trigger bound to
       // the same number.
       if (ccHandled) return
@@ -702,7 +713,10 @@ class MidiManager {
     // without being listed here.
     for (const id in map) {
       if (isContinuousTarget(id)) continue
-      if (matches(map[id], binding)) fireTrigger(id)
+      if (!matches(map[id], binding)) continue
+      // a Body rule's box on a pad : each hit turns it on or off (its CC above)
+      if (id.startsWith('rule:')) { if (binding.kind === 'note') st.setBodyRuleActive(id.slice(5), 'toggle', 'midi'); continue }
+      fireTrigger(id)
     }
   }
 }

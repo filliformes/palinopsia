@@ -922,6 +922,18 @@ function route(address: string, args: Args): void {
       }
       return
     }
+    // A Body rule on or off, by its place in the Body page's list (1-based) :
+    //   /opsia/body/rule/{n}/active   >= 0.5 on, below off (float, int or bool)
+    //   /opsia/body/rule/{n}/toggle   trigger : on, or off when it is on
+    case 'body': {
+      if (segs[2] !== 'rule') return
+      const r = st.bodyControl.rules[parseInt(segs[3], 10) - 1]
+      if (!r) return // validate BEFORE rising() so unknown addresses can't grow the edge map
+      if (segs[4] === 'active') st.setBodyRuleActive(r.id, n >= 0.5, 'osc')
+      else if (segs[4] === 'toggle' && rising(address, n)) st.setBodyRuleActive(r.id, 'toggle', 'osc')
+      return
+    }
+
     case 'scene': {
       const idx = segs[2] !== undefined ? parseInt(segs[2], 10) - 1 : Math.round(n) - 1
       if (idx < 0) return
@@ -1472,6 +1484,12 @@ function enumerateLeaves(): Leaf[] {
       add(`/opsia/body/${bf}`, 0, 1, bodyBus.feature(bf), `Body ${bf} (0..1) : the room as control`)
     }
   }
+  // Each Body rule on or off, by its place in the list (camera on or not : a
+  // controller arms the rules before anyone walks in); fed back when it changes.
+  st.bodyControl.rules.forEach((r, i) => {
+    add(`/opsia/body/rule/${i + 1}/active`, 0, 1, r.enabled ? 1 : 0, `Body rule ${i + 1} (${r.name}) on (>= 0.5)`)
+    add(`/opsia/body/rule/${i + 1}/toggle`, 0, 1, 0, `Body rule ${i + 1} on, or off when it is on (trigger)`, false)
+  })
   // A color by its parts, one number each (the picker's space : /…/tint/hue).
   const addParts = (path: string, raw: unknown, def: unknown, desc: string, parts: ColorChannel[]): void => {
     const hsva = hsvaOf(colorOf(raw, def))

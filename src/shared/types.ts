@@ -576,6 +576,12 @@ export interface GestureRule {
   exclusive: boolean
 }
 
+// Who turned a Body rule on or off (the store's setBodyRuleActive, the one
+// write every route takes) : its box in the rules list, MIDI, an action (a
+// gesture, a pad, Ctrl+K), OSC (the Agent's osc tool too), and later the rule
+// sequencer, which tells its own block edges from a hand's override by it.
+export type BodyRuleSource = 'ui' | 'midi' | 'action' | 'osc' | 'seq'
+
 // Machine-local embodied-control config (a webcam is machine-bound, like warp).
 // NOT part of a session : it lives in the store's `bodyControl` slice + localStorage.
 export interface BodyControlConfig {

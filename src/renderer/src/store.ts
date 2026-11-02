@@ -31,7 +31,7 @@ import type {
   SidechainRef,
   SourceSlot,
   World, LightPath } from '@shared/types'
-import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
+import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
@@ -686,10 +686,51 @@ function loadMidiMap(): Record<string, MidiBinding> {
         out[id] = { kind: b.kind, channel: b.channel, number: b.number }
       }
     }
-    return out
+    // (the Body rules load from their own key : read their ids from it)
+    let rules: Array<{ id: string }> = []
+    try {
+      const saved = JSON.parse(localStorage.getItem('opsia.bodyControl') || '{}')
+      if (Array.isArray(saved.rules)) rules = saved.rules
+    } catch { /* no rules : their mappings go */ }
+    return dropRuleBindings(out, rules, false)
   } catch {
     return {}
   }
+}
+
+// The MIDI mappings of Body rules that are not there any more (a rule box's
+// `rule:<id>`, an action's `act:rule:<id>:…`) : dropped, the map saved again
+// (`save`). The same map when nothing goes. Rules are keyed by their id, never
+// their place, so deleting or moving another rule never re-targets one.
+function dropRuleBindings(
+  map: Record<string, MidiBinding>,
+  rules: ReadonlyArray<{ id: string }>,
+  save = true
+): Record<string, MidiBinding> {
+  const ids = new Set(rules.map((r) => r.id))
+  const stale = Object.keys(map).filter((k) => {
+    const m = /^(?:rule|act:rule):([^:]+)/.exec(k)
+    return !!m && !ids.has(m[1])
+  })
+  if (!stale.length) return map
+  const out = { ...map }
+  for (const k of stale) delete out[k]
+  if (save) {
+    try {
+      localStorage.setItem('opsia.midiMap', JSON.stringify(out))
+    } catch {
+      /* quota : the next binding saves it */
+    }
+  }
+  return out
+}
+
+// The last on / off of each Body rule and who made it (setBodyRuleActive) :
+// not saved, not reactive. The rule sequencer to come reads it to show a hand's
+// override until its next block edge.
+const bodyRuleChanges = new Map<string, { on: boolean; source: BodyRuleSource; at: number }>()
+export function bodyRuleLastChange(id: string): { on: boolean; source: BodyRuleSource; at: number } | null {
+  return bodyRuleChanges.get(id) ?? null
 }
 
 /** The FX chain an FX scope names. */
@@ -1710,6 +1751,11 @@ interface StoreState {
   // (engine/bodyTracker.ts) follows this; a `body` modulator reads the bus.
   bodyControl: BodyControlConfig
   setBodyControl: (partial: Partial<BodyControlConfig>) => void
+  /** One Body rule on or off ('toggle' : flipped). The ONE write every route
+   *  takes : its box, MIDI (a note toggles, a CC sets), the act:rule:* actions,
+   *  OSC, later the rule sequencer. A rule not there (deleted) is left alone;
+   *  it fires nothing (an inactive rule's gestures still show in the monitor). */
+  setBodyRuleActive: (id: string, on: boolean | 'toggle', source: BodyRuleSource) => void
   // The full-page Body view (B). Transient.
   bodyPageOpen: boolean
   setBodyPageOpen: (on: boolean) => void
@@ -4319,8 +4365,21 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const bodyControl = { ...s.bodyControl, ...partial }
       localStorage.setItem('opsia.bodyControl', JSON.stringify(bodyControl))
-      return { bodyControl } // pushed to the tracker by an App effect watching it
+      // a deleted rule takes its MIDI mappings with it
+      const midiMap = partial.rules ? dropRuleBindings(s.midiMap, bodyControl.rules) : s.midiMap
+      // pushed to the tracker by an App effect watching it
+      return midiMap === s.midiMap ? { bodyControl } : { bodyControl, midiMap }
     }),
+  setBodyRuleActive: (id, on, source) => {
+    const rules = get().bodyControl.rules
+    const r = rules.find((x) => x.id === id)
+    if (!r) return
+    const next = on === 'toggle' ? !r.enabled : on
+    // (a knob held above half keeps sending : no write when nothing changes)
+    if (next === r.enabled) return
+    bodyRuleChanges.set(id, { on: next, source, at: performance.now() })
+    get().setBodyControl({ rules: rules.map((x) => (x.id === id ? { ...x, enabled: next } : x)) })
+  },
   bodyPageOpen: false,
   setBodyPageOpen: (on) => {
     // Already open in its window : bring that window up instead.

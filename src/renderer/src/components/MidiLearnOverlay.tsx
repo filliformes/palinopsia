@@ -33,7 +33,11 @@ export function MidiLearnOverlay({ id }: { id: string }): JSX.Element | null {
   if (!mode) return null
 
   const cls = selected ? 'midi-learn-selected' : bound ? 'midi-learn-green' : 'midi-learn-blue'
-  const hint = isContinuousTarget(id) ? 'move a knob/fader' : 'hit a pad / press a button'
+  const hint = isContinuousTarget(id)
+    ? 'move a knob/fader'
+    : id.startsWith('rule:')
+      ? 'hit a pad (each hit : on or off) or move a knob (on from half way)'
+      : 'hit a pad / press a button'
   return (
     <div
       className={`midi-learn-overlay ${cls}`}

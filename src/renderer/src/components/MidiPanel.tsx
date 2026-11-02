@@ -35,10 +35,11 @@ export function MidiPanel(): JSX.Element {
   const composition = useStore((s) => s.composition)
   const scenes = useStore((s) => s.scenes)
   const worlds = useStore((s) => s.worlds)
+  const rules = useStore((s) => s.bodyControl.rules) // (their on / off actions)
   const learnOptions = useMemo(
     () => triggerOptions(useStore.getState()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [composition, scenes, worlds]
+    [composition, scenes, worlds, rules]
   )
 
   const [devices, setDevices] = useState<MidiDevice[]>(() => midi.listDevices())
