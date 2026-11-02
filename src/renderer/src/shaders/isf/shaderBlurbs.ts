@@ -178,6 +178,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'A blur whose strength changes across the picture, following the brightness of another layer or of the image itself. Set how blurred the dark parts and the bright parts get. In depth focus it reads the depth map instead, so one plane stays sharp and the rest melts like a camera lens.',
   'node-gooey':
     'The blur-then-threshold trick : the picture is blurred and cut at a brightness level, so shapes near each other flow together into soft blobs, like metaballs or a lava lamp. Blur sets how far they reach, level where the edge sits.',
+  'node-silhouette':
+    'Finds the people in whatever it is dropped on, a film, a camera or a stream, and cuts them out of their surroundings : the picture where they are and nothing elsewhere, a white matte to key another layer, a flat colored figure, or the picture with them taken away. A trail leaves fading echoes as they move. The body model runs beside the picture, so the mask follows a few frames behind a fast move.',
   'node-matte':
     'Composites with three pictures, like a classic three-input matte : this layer shows where the matte is bright, a second layer where it is dark. Pick the second layer and the matte in the Inspector. With no matte, this layer keys itself by its own brightness.',
   'node-lookup':

@@ -69,12 +69,12 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (121 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (125 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
 - [Sources](#sources-47) (47 : 46 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (56 FX) ·
-  [Native nodes](#native-nodes) (27) · [Master finalizers](#master-finalizers--pinned-always-last)
+  [Native nodes](#native-nodes) (28) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (20)
 - [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
 
@@ -207,7 +207,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 121 themed recipes that build a coherent
+   **Generate** in the toolbar : 125 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet, and **`Ctrl+K`** to
@@ -661,6 +661,29 @@ takes them out of the room, **matte** draws them white on black to key another l
 or feed a Matte node. **edge** goes from a hard to a soft outline, and the readout
 says how many people it finds. It never turns a camera on : it reads the picture the
 slot already shows.
+
+**Silhouette, the effect** finds the people in any picture, wherever it sits : drop it in
+a layer's effects (or a source's, the Background's, the Master's) over an imported film,
+a camera layer, an NDI input or a generator, and it draws the Silhouette source's four
+looks on that picture : **cutout** (the picture where the people are, transparent
+elsewhere), **matte** (white people on black, to key another layer or feed a Matte
+node), **shadow** (a flat figure in the shadow color) or **hole** (the picture with the
+people taken out), with the source's **trail** and **trail color**, **over the picture**
+(the result laid over its input : a shadow painted onto the film, echoes left over it)
+and a **mix**. **people** (1 to 4, united), **detail** (the picture read at 384, 512 or
+768 px on its long side), **smooth** (how the mask follows over time : 0 steps from look
+to look), **hold to the mask** (the picture held back by the mask's delay, a few frames,
+so the cut fits a fast move; off, the picture is live and the mask trails it),
+**threshold** and **softness** (the edge). The mask is found in the picture's
+own frame (no mirror, no camera aspect), by the same body model as People, beside the
+picture : every Silhouette effect shares ONE model and takes its turn (one effect alone :
+the model follows the bodies from frame to frame; several : it looks at each frame on
+its own), each at up to 30 looks a second; a paused film gets three looks, then rests.
+Measured on a 1080p dance film : about 17 to 30 looks a second,
+the performer found in 94 % of the frames she is in (91 % on the dome's 2048² square),
+nothing in the credits, 60 fps held flat and on the dome. A frame with nobody in it is left alone (cutout : nothing, hole : the picture
+whole). Bypassed, or on a muted layer nobody reads, it costs nothing : no read, no look,
+and the model is let go after 30 s unused. The Inspector line says what it finds.
 
 **An iPhone or iPad by USB (macOS).** Plug it in, unlock it, accept *Trust This
 Computer*, open its **Camera** app : the Live Input picker lists it with a `📱` and
@@ -1468,7 +1491,9 @@ The same mask is also a picture : the **Silhouette** source (listed with the liv
 inputs in the source picker) draws it as a **cutout** of the camera (background
 removal, no green screen), a white **matte**, a colored **shadow**, or a **hole** in the
 room, with a `trail` of fading echoes. It only reads the camera : its Inspector line
-says whether the camera is live and offers the one click that turns it on.
+says whether the camera is live and offers the one click that turns it on. The
+**Silhouette** effect draws the same looks on the people found in any picture (a film,
+an NDI input), no camera needed (see [Video sources](#video-sources)).
 
 **Motion** reads the camera's **motion field** (dense optical flow on a small copy of
 each frame, no body model), so it follows anything that moves in front of the camera :
@@ -2400,7 +2425,7 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **121 visual themes** in 18 families
+**Generate** (toolbar) : a dropdown of **125 visual themes** in 18 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
@@ -2412,7 +2437,10 @@ Compression (Codec Rot : a real video codec starved of keyframes, through Codec 
 paint on water from Marbling : Marbled Paper and Night Bath),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
 overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
-out and piled at different heights in **Paste-Up** : it plays
+out and piled at different heights in **Paste-Up**, or the people in them treated apart
+through the Silhouette effect : **Cut Out** sets them over a painted ground, **Shadow
+Theatre** blacks them out, **Absent** takes them out of their rooms, **Afterimages**
+leaves their ghosts over the picture : it plays
 the session's Collage folder, or the last one picked on this computer, and with none yet
 stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
 node per theme, on the layer that reads the others), **Space** (points in space and line
@@ -2632,7 +2660,7 @@ Randomize sub-ranges and its own preset bank. Your own generators from the
 | **Parametric** *(native)* | A literal audio → image reading : the audio bus as a hard raster, waveform trace, spectrum bars, or scrolling spectrogram (needs Audio ingest for real sound). |
 | **Collage** *(native)* | A wall of films cut up by the Autocutter partition : a folder of clips, or your saved Assemble edits, one per piece (see [Collage](#collage--a-wall-of-films-key-source-gen-collage)). |
 | **Grown** *(native)* | A texture that grows itself : a tiny neural network trained on a real scan (lava, mossy rock, bark) runs in every cell of a grid. From nothing the texture of the photo emerges, stays alive and heals where you damage it. |
-| **Silhouette** *(native)* | The body in front of the Body camera, cut out of the room : **cutout** (the camera where you are, nothing elsewhere), **matte** (white on black, to key another layer or feed a Matte node), **shadow** (a flat colored silhouette) or **hole** (the room with you taken out). `trail` leaves fading echoes of the body (in the matte, the white body leaves echoes in `trail color`, white by default : greys fading to black, the plain key). Listed with the live inputs; needs the Body camera with Silhouette on and never turns the camera on by itself (see [Body](#body--embodied-control-key-b)). |
+| **Silhouette** *(native)* | The body in front of the Body camera, cut out of the room : **cutout** (the camera where you are, nothing elsewhere), **matte** (white on black, to key another layer or feed a Matte node), **shadow** (a flat colored silhouette) or **hole** (the room with you taken out). `trail` leaves fading echoes of the body (in the matte, the white body leaves echoes in `trail color`, white by default : greys fading to black, the plain key). Listed with the live inputs; needs the Body camera with Silhouette on and never turns the camera on by itself (see [Body](#body--embodied-control-key-b)). To find the people in a film or any other picture instead, drop the **Silhouette** effect on it ([Native nodes](#native-nodes)). |
 | **Audio** *(native)* | A sound file played in the layer like a film (**Import audio…**, the video transport), the layer drawing its **waveform** : **view** whole, loop or scrolling past the playhead, **style** filled, outline or bars, the played part lit. Seven presets and the three **Sound** master chains (see [Audio sources](#audio-sources)). |
 
 </details>
@@ -2697,8 +2725,8 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   finishing units at its end; the chain's effects run underneath across the whole width,
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **129** designed chains and sets the Vibe to match (the
-  finalizers stay). The newer ones sit in seven groups : **Time & memory** (Réponse,
+  whole master chain with one of **134** designed chains and sets the Vibe to match (the
+  finalizers stay). The newer ones sit in eight groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Frame Store** (Field Store : Hard Memory, Sixteen Levels, Strobe Ghost; then
   Shatter, Crawl and Store Zoom, alone or in pairs), **Node recipes** (a node that reads another
@@ -2709,7 +2737,10 @@ source slot), **Layer FX**, **Master FX**, and **Background FX**.
   **Sound** (made for a waveform : Phosphor, Tape Floor, Relief) and **Marbled paper**
   (made for Marbling's flat paint, its colors kept : Endpaper, a fine paper grain; Inked
   Edges, the outlines inked; Rippled Bath, the water still rippling; Riso Print, a coarse
-  dithered print); they keep the scene's palette mix. The `chain on/off` pill beside
+  dithered print) and **People** (the Silhouette effect on the whole picture : Shadow
+  Play, its people blacked out like shadow puppets; Ghost Dancer, echoes of them left over
+  the picture; Absence, the people taken out; Glass Bodies, translucent blue figures;
+  Outline, their contour drawn on black); they keep the scene's palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
 - **Your own chains (my chains)** : right-click the Master FX strip (its empty space, or
   any effect's chip : its menu ends with the same entry) and choose **Save chain as
@@ -2843,7 +2874,7 @@ labelled picker in the Inspector (**map**, **control**, **palette**; the three-i
 none is picked, so all five run in any rack.
 
 <details>
-<summary><b>The full node catalogue (27)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (28)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -2869,6 +2900,7 @@ none is picked, so all five run in any rack.
 | **Faultline** | A dirty vision-mixer : a **rate** clock and a **dirt** probability fire momentary **structural faults** at the output and the picture is completely clean between them (the SLIP skip-law moved to the blend stage). Each fire is one discrete fault : **dropout** (the signal loses lock and cuts out in sweeping streaks), **cut** (a hard cut to the frame frozen at the fire instant), **timebase** (a head-switch knock : scanline-block shear + field roll + a torn switch band), **noise** (a sweeping switching-static band), or **roulette** (a fresh pick each fire). **Depth** severity, **hold** length, **fire ▸** by hand / OSC / a modulator. Best on the Master rack. |
 | **Sillage** | Advected-noise feedback (IBFV, van Wijk 2002) : a dye buffer is dragged each frame along a **flow field** and topped up with fresh filtered noise, so the noise smears into flow-aligned filaments (a line-integral / LIC look) and **decays into structure** instead of glowing : a wake of dye trailing the motion, reading as material, not neon. The field is a divergence-free **curl-noise** base (**field** : always flowing, so even a still image streams) plus the image's own **optical flow** (**motion** : its movement advects the dye); steer the wake anywhere with **wind** (a drift of strength *push* in any *angle*) and **swirl** (a spiral about the centre). **dye** tints the wake by the picture so it reads as its own substance, **flow** the streak length, **injection** the decay rate, **grain** the noise frequency. |
 | **Toile** | Reworks the picture as a **painting that follows its own structure** : a structure tensor finds each contour's orientation, and the image is smoothed into strokes running **along** it (anisotropic Kuwahara), so forms flatten into coherent paint (steady frame-to-frame, not speckling) while the **edges are preserved**, not washed out. **line** adds flow-XDoG ink : clean outlines measured across each contour and smoothed along it, following the image's own structure. **brush** size, **flatten** hardness, **paint** amount, **line edge** threshold. The real *Peint* + *Griffé* as a rack effect. |
+| **Silhouette** | The Silhouette source's looks on **any picture** : the people in whatever enters (a film, a camera layer, an NDI input) are found by the body model beside the picture and drawn as a **cutout** (background removal), a white **matte**, a flat **shadow** or a **hole**, with **trail**, **trail color**, **over the picture** and **mix**; **people** 1-4, **detail**, **smooth**, **hold to the mask**, **threshold**, **softness** (see [Video sources](#video-sources)). One body model for every Silhouette effect, taking turns; resting when bypassed or unseen. 15 presets (Cutout … Fitted cutout), the **People** master chains, the **Cut Out**, **Shadow Theatre**, **Absent** and **Afterimages** Generate themes (Film Wall). |
 | **Remap** | TouchDesigner's **Remap TOP** : another layer's red and green channels become the coordinates each pixel of this layer reads from (red = x, green = y). A gradient layer bends the picture smoothly, a noisy one shatters it. **absolute** is TD's behaviour, **offset** displaces around mid-grey instead; **scale** / **offset x·y** reshape the map, **extend** picks hold / repeat / mirror past the edge, **swap roles** makes this layer the map. |
 | **Luma Blur** | TouchDesigner's **Luma Blur TOP** : a blur whose width follows a control image's brightness : **black width** where the control is dark, **white width** where it is bright (pixels at 1080p). The control is another layer, or this layer's own brightness. **control = depth focus** reads the shared depth map around a **focus** plane instead : one depth stays sharp and the rest melts, a real **depth-of-field** blur (Resolume 7.28's Depth Blur, from a node you already have). |
 | **Gooey** | The **blur-then-threshold** recipe : the picture is blurred (at half resolution) and cut at a brightness **level**, so shapes that sit close together melt into soft single blobs, the metaball / lava-lamp look. **blur** sets how far shapes reach for each other, **softness** the edge; **fill** shows the crisp source, the blurred colour pushed to full strength, or a white matte; **outside** keeps some of the source around the blobs. |

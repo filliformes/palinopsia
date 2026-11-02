@@ -16,7 +16,7 @@ import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
-import { SilhouetteStrip } from './SilhouetteStrip'
+import { SilhouetteFxStrip, SilhouetteStrip } from './SilhouetteStrip'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
@@ -668,6 +668,7 @@ export function Inspector(): JSX.Element {
       </div>
       {/* Native Silhouette source : camera status + the explicit turn-on. */}
       {shaderId === 'gen-silhouette' && <SilhouetteStrip />}
+      {shaderId === 'node-silhouette' && <SilhouetteFxStrip />}
       {audioCfg && <VideoTransport layer={audioCfg.layer} slot={audioCfg.slot} state={audioCfg.state} audio />}
       {/* Native Collage source : the folder / assemblage picker strip. */}
       {collageCfg && (

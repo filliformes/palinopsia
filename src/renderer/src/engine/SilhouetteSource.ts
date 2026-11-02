@@ -15,9 +15,11 @@
 // compositor's context (MediaPipe runs in its own), with UNPACK_FLIP_Y cleared
 // before every upload (the ISF runtime leaves it on); both arrive top-down and
 // the shader flips them. The trail is an RGBA8 ping-pong at output size, faded
-// with stochastic rounding so its echoes fade all the way out.
+// with stochastic rounding so its echoes fade all the way out. The four looks
+// and the trail are shared with the Silhouette effect (silhouetteLook.ts).
 
 import { bodyTracker } from './bodyTracker'
+import { SIL_LOOK_GLSL, SilTrail, trailKeep } from './silhouetteLook'
 
 const VS = `#version 300 es
 in vec2 p; out vec2 vUV;
@@ -32,11 +34,7 @@ uniform float uThresh, uSoft, uKeep, uOutAspect, uCamAspect, uMirror, uFit;
 uniform vec4 uColor;
 uniform vec4 uTrailColor;
 uniform float uFrame;
-float hash13(vec3 p3) {
-  p3 = fract(p3 * 0.1031);
-  p3 += dot(p3, p3.zyx + 31.32);
-  return fract((p3.x + p3.y) * p3.z);
-}
+${SIL_LOOK_GLSL}
 void main(){
   // The camera image fitted into the frame : cover crops, contain letterboxes.
   // r < 1 when the frame is wider than the camera.
@@ -52,27 +50,11 @@ void main(){
   float raw = inside ? texture(uMask, tc).r : 0.0;
   float m = smoothstep(uThresh - uSoft, uThresh + uSoft, raw);
   vec3 cam = uHasCam == 1 && inside ? texture(uCam, tc).rgb : vec3(0.0);
-  vec4 now;
-  if (uMode == 0) now = vec4(cam, m);                  // cutout
-  else if (uMode == 1) now = vec4(vec3(m), 1.0);       // matte
-  else if (uMode == 2) now = vec4(uColor.rgb, m * uColor.a); // shadow
-  else now = vec4(cam, inside ? 1.0 - m : 0.0);         // hole
-  if (uTrailOn == 1) {
-    // Echoes : the body leaves its last look behind, fading. Coverage is kept as
-    // the max of now and the faded past; the color follows whichever wins.
-    // The matte is opaque everywhere, so its alpha carries no body and the present
-    // always won (no echoes at all) : it keeps its echoes as a white shadow's, and
-    // the copy out turns that coverage back into color on opaque black. Its echoes
-    // take the trail color (white : the plain grey key), the body stays white.
-    if (uMode == 1) now = vec4(1.0, 1.0, 1.0, m);
-    vec4 past = texture(uTrail, vUV);
-    float fa = past.a * uKeep;
-    fa = floor(fa * 255.0 + hash13(vec3(floor(gl_FragCoord.xy), mod(uFrame, 4096.0)))) / 255.0;
-    vec3 echo = uMode == 1 ? uTrailColor.rgb * uTrailColor.a : past.rgb;
-    o = now.a >= fa ? now : vec4(echo, fa);
-  } else {
-    o = now;
-  }
+  // cutout · matte · shadow · hole (the camera is there only inside its frame)
+  vec4 now = silLook(uMode, vec4(cam, inside ? 1.0 : 0.0), m, uColor);
+  // Echoes : the body leaves its last look behind, fading (the matte's in the
+  // trail color, white : the plain grey key; the body stays white).
+  o = uTrailOn == 1 ? silTrail(uMode, now, m, texture(uTrail, vUV), uKeep, uTrailColor, gl_FragCoord.xy, uFrame) : now;
 }`
 
 const COPY_FS = `#version 300 es
@@ -80,12 +62,10 @@ precision highp float;
 in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
 uniform int uMatte;
+${SIL_LOOK_GLSL}
 void main(){
-  vec4 t = texture(uTex, vUV);
-  o = uMatte == 1 ? vec4(t.rgb * t.a, 1.0) : t; // matte : the kept coverage, white body, echoes in their color
+  o = silOut(uMatte == 1 ? 1 : 0, texture(uTex, vUV)); // matte : the kept coverage, white body, echoes in their color
 }`
-
-interface Target { fbo: WebGLFramebuffer; tex: WebGLTexture }
 
 export class SilhouetteSource {
   private gl: WebGL2RenderingContext
@@ -104,8 +84,7 @@ export class SilhouetteSource {
   private camW = 0
   private camH = 0
   private lastCamTime = -1
-  private trail: [Target, Target] | null = null
-  private cur = 0
+  private trail: SilTrail
   private frame = 0
   private last = 0
   private inputs: Record<string, number | number[]> = {
@@ -160,6 +139,7 @@ export class SilhouetteSource {
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     gl.bindVertexArray(null)
+    this.trail = new SilTrail(gl)
   }
 
   update(inputs: Record<string, number | number[]>): void {
@@ -175,41 +155,9 @@ export class SilhouetteSource {
     return typeof v === 'number' && Number.isFinite(v) ? v : d
   }
 
-  private ensureTrail(): void {
-    if (this.trail) return
-    const gl = this.gl
-    const mk = (): Target => {
-      const tex = gl.createTexture()!
-      gl.bindTexture(gl.TEXTURE_2D, tex)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, this.w, this.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      const fbo = gl.createFramebuffer()!
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0)
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      return { fbo, tex }
-    }
-    this.trail = [mk(), mk()]
-    gl.bindTexture(gl.TEXTURE_2D, null)
-  }
-
-  private disposeTrail(): void {
-    if (!this.trail) return
-    const gl = this.gl
-    for (const t of this.trail) {
-      gl.deleteFramebuffer(t.fbo)
-      gl.deleteTexture(t.tex)
-    }
-    this.trail = null
-  }
-
   /** Clear the echoes (PANIC). */
   flush(): void {
-    this.disposeTrail()
+    this.trail.dispose()
   }
 
   render(targetFbo: WebGLFramebuffer, clockSec?: number): void {
@@ -222,7 +170,7 @@ export class SilhouetteSource {
       gl.clearColor(0, 0, 0, 0)
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-      this.disposeTrail()
+      this.trail.dispose()
       return
     }
     // Uploads : top-down rows, no flip (the ISF runtime may have left it on).
@@ -260,9 +208,9 @@ export class SilhouetteSource {
     this.last = now
     const trail = Math.max(0, Math.min(1, this.num('trail', 0)))
     const trailOn = trail > 0.001
-    const keep = trailOn ? Math.pow(0.5, dt / (0.05 + trail * trail * 3)) : 0
-    if (trailOn) this.ensureTrail()
-    else this.disposeTrail()
+    const keep = trailKeep(trail, dt)
+    if (trailOn) this.trail.ensure(this.w, this.h)
+    else this.trail.dispose()
 
     const color = Array.isArray(this.inputs.color) ? (this.inputs.color as number[]) : [0.95, 0.92, 0.85, 1]
     const trailColor = Array.isArray(this.inputs.trailColor) ? (this.inputs.trailColor as number[]) : [1, 1, 1, 1]
@@ -273,7 +221,7 @@ export class SilhouetteSource {
     gl.useProgram(this.prog)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.camTex); gl.uniform1i(this.u.uCam, 0)
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.maskTex); gl.uniform1i(this.u.uMask, 1)
-    const read = this.trail ? this.trail[1 - this.cur].tex : this.maskTex
+    const read = this.trail.read() ?? this.maskTex
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, read); gl.uniform1i(this.u.uTrail, 2)
     gl.uniform1i(this.u.uMode, mode)
     gl.uniform1i(this.u.uTrailOn, trailOn ? 1 : 0)
@@ -288,8 +236,8 @@ export class SilhouetteSource {
     gl.uniform4f(this.u.uColor, color[0] ?? 1, color[1] ?? 1, color[2] ?? 1, color[3] ?? 1)
     gl.uniform4f(this.u.uTrailColor, trailColor[0] ?? 1, trailColor[1] ?? 1, trailColor[2] ?? 1, trailColor[3] ?? 1)
     gl.uniform1f(this.u.uFrame, this.frame++)
-    if (this.trail) {
-      const write = this.trail[this.cur]
+    const write = this.trail.write()
+    if (write) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo)
       gl.viewport(0, 0, this.w, this.h)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
@@ -300,7 +248,7 @@ export class SilhouetteSource {
       gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo)
       gl.viewport(0, 0, this.w, this.h)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
-      this.cur = 1 - this.cur
+      this.trail.swap()
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo)
       gl.viewport(0, 0, this.w, this.h)
@@ -317,7 +265,7 @@ export class SilhouetteSource {
 
   dispose(): void {
     const gl = this.gl
-    this.disposeTrail()
+    this.trail.dispose()
     gl.deleteProgram(this.prog)
     gl.deleteProgram(this.copy)
     gl.deleteTexture(this.camTex)

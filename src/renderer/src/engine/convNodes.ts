@@ -12,6 +12,7 @@
 
 import { glGeneration } from './glGeneration'
 import { CodecMoshNode } from './codecMosh'
+import { SilhouetteNode } from './silhouetteNode'
 import { FieldStoreNode } from './fieldStore'
 import { domeFill } from './domeSignal'
 // The dome's disc helpers, shared with the ISF shaders' "// @dome" (Feedback).
@@ -35,6 +36,7 @@ export interface NodeContext {
   audioTex?: WebGLTexture | null // the shared 128x2 R8 audio texture (row 0 waveform at v .25, row 1 log spectrum at v .75)
   frame?: number // engine frame counter : a node that sees a gap (frame !== last + 1) was just (re)enabled
   bpm?: number // the transport tempo, for beat-synced nodes
+  live?: boolean // false : this rack's picture is seen by nobody (a muted layer no other unit reads)
 }
 
 export interface ConvNode {
@@ -5224,9 +5226,10 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-autocutter') return new AutocutterNode(gl)
   if (shaderId === 'node-chronoscan') return new ChronoscanNode(gl)
   if (shaderId === 'node-sediment') return new SedimentNode(gl)
+  if (shaderId === 'node-silhouette') return new SilhouetteNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup']
+export const NATIVE_NODE_IDS = ['node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

@@ -1261,6 +1261,70 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 0.75 },
     finalizer: { filmDust: 0.3, filmScratch: 0.25, filmGauge: 1 }
   }),
+  // The people in your films : the Silhouette effect closes the film layer's
+  // rack (stackFx), so it reads the films as graded. Big pieces (2-4 cuts) keep
+  // the figures whole; the mask's edge and the deal never move (motion skip).
+  mk({
+    id: 'cut-out', name: 'Cut Out', family: 'Film Wall',
+    blurb: 'The people in your films cut out of their rooms and set over a painted ground.',
+    world: 'monomedia',
+    palette: [K, [0.16, 0.12, 0.2, 1], [0.86, 0.8, 0.72, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    stack: [['dye-field', 'drift-field', 'oil-cloud', 'swell'], ['gen-collage']],
+    stackFx: [[], ['node-silhouette']],
+    presets: { 'node-silhouette': ['Cutout', 'Feathered', 'Echoes', 'Fitted cutout'] },
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3], shape: [0, 1], stack: [0], gap: [0], mask: [0] }, 'node-silhouette': { sync: [1] } },
+    layerFx: ['fx-grade'],
+    bgSources: ['drift-field'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.6 },
+    motion: { skip: '^(threshold|smooth|cuts|films)$' }
+  }),
+  mk({
+    id: 'shadow-theatre', name: 'Shadow Theatre', family: 'Film Wall',
+    blurb: 'Your films with their people blacked out into flat shadows, like figures behind a lit screen.',
+    world: 'monomedia',
+    palette: [K, [0.3, 0.22, 0.14, 1], [0.95, 0.88, 0.72, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    stackFx: [['node-silhouette']],
+    presets: { 'node-silhouette': ['Shadow puppet'] },
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3, 4], shape: [0, 1], stack: [0], mask: [0] }, 'node-silhouette': { trail: [0, 0.25, 0.45] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.7 },
+    finalizer: { grain: 0.1 },
+    motion: { skip: '^(threshold|smooth|cuts|films)$' }
+  }),
+  mk({
+    id: 'absent', name: 'Absent', family: 'Film Wall',
+    blurb: 'Your films with the people taken out : rooms that remember who passed through, the echoes fading.',
+    world: 'monomedia',
+    palette: [INK, [0.2, 0.2, 0.22, 1], [0.82, 0.82, 0.8, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    stackFx: [['node-silhouette']],
+    presets: { 'node-silhouette': ['Absence', 'Slow vanish'] },
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3], shape: [0, 1], stack: [0], mask: [0] } },
+    layerFx: ['fx-grade', 'fx-grain'],
+    bgOpacity: 0.5,
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.8, saturation: 0.7 },
+    motion: { skip: '^(threshold|smooth|cuts|films)$' }
+  }),
+  mk({
+    id: 'afterimages', name: 'Afterimages', family: 'Film Wall',
+    blurb: 'Every move the people in your films make leaves a ghost of them over the picture.',
+    world: 'monomedia',
+    palette: [K, [0.12, 0.16, 0.24, 1], [0.8, 0.88, 0.95, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    stackFx: [['node-silhouette']],
+    presets: { 'node-silhouette': ['Ghosts over', 'Glass figure'] },
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3, 4], shape: [0, 1], stack: [0], mask: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.75 },
+    context: { bloom: 0.15 },
+    motion: { skip: '^(threshold|smooth|cuts|films)$' }
+  }),
 
   // ── Node Workshop : one recipe node per theme, placed where it reads the
   // layers it needs ──

@@ -686,6 +686,7 @@ export interface NodeApplyCtx {
   audioTex?: WebGLTexture | null; // shared audio texture (waveform / log spectrum rows)
   frame?: number; // engine frame counter
   bpm?: number; // transport tempo
+  live?: boolean; // false : a muted layer no other unit reads (its nodes may rest)
 }
 
 /**
@@ -848,7 +849,8 @@ class FxRack {
           depth: nodeCtx.depth ?? null,
           audioTex: nodeCtx.audioTex ?? null,
           frame: nodeCtx.frame,
-          bpm: nodeCtx.bpm
+          bpm: nodeCtx.bpm,
+          live: nodeCtx.live
         });
         // Nodes draw with their own VAO : hand the default one back, which every
         // ISF draw (and the dry/wet blend) relies on.
@@ -2534,6 +2536,7 @@ export class Compositor {
       const key = t.kind === 'master' ? 'master' : `layer:${t.layer}`;
       let c = keys.indexOf(key);
       if (c < 0) {
+        if (t.kind === 'layer') this.sideReading.add(t.layer);
         const src = t.kind === 'master' ? this.lastPresent : this.layers[t.layer]?.texture() ?? null;
         if (!src) return;
         c = keys.length;
@@ -2578,6 +2581,9 @@ export class Compositor {
   //    later Context / anaglyph). Filled synthetically or by the depth estimator. ──
   private depthTex: WebGLTexture | null = null;
   private frameNo = 0; // engine frame counter (native nodes spot a re-enable by a gap)
+  // Layers read by another unit this frame / last frame (see render : their racks stay live while muted).
+  private sideReading = new Set<number>();
+  private sideReadLast = new Set<number>();
   private depthAcc: Float32Array | null = null;
   private depthRGBA: Uint8Array | null = null;
   private depthW = 0;
@@ -3466,6 +3472,12 @@ export class Compositor {
     // texture: another layer's persisted output (previous frame for layers not
     // yet rendered : fine, the node keeps its own history). Assets land later.
     this.frameNo++;
+    // The layers another unit read last frame (a sidechain, a Matte's matte, a
+    // Text's fill, a Sonify tap) : a muted one still feeds them, so its racks stay live.
+    const readNow = this.sideReadLast;
+    this.sideReadLast = this.sideReading;
+    this.sideReading = readNow;
+    readNow.clear();
     // One node context per rack clock : native nodes step by THEIR rack's time
     // (layer Speed and freeze, global speed, the background's slow clock), not
     // the wall clock. Reverse runs time forward for decays (|dt|).
@@ -3477,10 +3489,14 @@ export class Compositor {
       bpm: this.bpm,
       sidechainTex: (ref) => {
         if (!ref) return null;
-        if (ref.kind === 'layer') return this.layers[ref.layer]?.texture() ?? null;
+        if (ref.kind === 'layer') {
+          this.sideReading.add(ref.layer);
+          return this.layers[ref.layer]?.texture() ?? null;
+        }
         return null; // imported assets : Commit C
       }
     };
+    const soloing = this.layers.some((l) => l.solo);
 
     // Per layer: sources → per-source racks → mix → layer rack → persist.
     // The result of each stage lives in shared buffers only until persist
@@ -3501,7 +3517,8 @@ export class Compositor {
         L.tickAssemble(li, rawDt, this.globalSpeed * L.speed);
         if (L.skipBlank()) continue;
         gl.bindVertexArray(null); // ISF draws own the default VAO
-        const layerCtx: NodeApplyCtx = { ...nodeCtx, dt: Math.abs(dtSec * L.speed) };
+        const seen = (soloing ? L.solo : !L.mute) && L.opacity > 0.001;
+        const layerCtx: NodeApplyCtx = { ...nodeCtx, dt: Math.abs(dtSec * L.speed), live: seen || this.sideReadLast.has(li) };
         L.renderSource('A', nodeCtx.sidechainTex);
         let sig = L.rackA.apply(L.scratchA.tex, this.chain, layerCtx); // native nodes on source A, on the layer clock
         sig = L.collageShapes('A', sig, this.chain, (fbo, tex) => this.copyInto(fbo, tex));
