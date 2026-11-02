@@ -125,6 +125,8 @@ let contextPresetIndex = -1
 // Tracks the last-applied depth mode so the render loop only re-fills the depth
 // map on a change (synth bowl / clear), rather than every frame.
 let depthModePrev = ''
+// The first engine of this window was built (its layer-1 safety net is spent).
+let firstEngineBuilt = false
 let lastDomePreview = 0
 let lastStreamOn = false
 // what the output window was last sent (compared value by value : a string
@@ -1333,12 +1335,18 @@ export default function App(): JSX.Element {
 
     // A blank open is seeded random (store.seedRandomStart); point the Inspector
     // at layer 1's source so its controls are up. Safety net: if somehow empty
-    // (no seed, no loaded session), drop the first generator in.
+    // (no seed, no loaded session), drop the first generator in. At the first
+    // engine only, and into a slot that holds nothing : a film, a camera, NDI,
+    // HIVE or an edit has no shader id either, and every rebuild (the
+    // composition's size, the render scale, the dome's square, a GPU reset)
+    // swapped layer 1's film for Drift Field.
     {
       const st0 = useStore.getState()
-      if (!st0.composition.layers[0].sourceA.shaderId) {
+      const a0 = st0.composition.layers[0].sourceA
+      if (!firstEngineBuilt && (a0.kind === 'none' || (a0.kind === 'generator' && !a0.shaderId))) {
         st0.setSourceShader(0, 'A', GENERATORS[0].id)
       }
+      firstEngineBuilt = true
       if (!st0.selection) st0.setSelection({ type: 'source', layer: 0, slot: 'A' })
     }
 

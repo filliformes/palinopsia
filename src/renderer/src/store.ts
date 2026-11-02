@@ -2874,7 +2874,12 @@ export const useStore = create<StoreState>((set, get) => ({
               videoDirection: 'forward' as const,
               videoLoop: true,
               videoIn: 0,
-              videoOut: 1
+              videoOut: 1,
+              // A film plays at its own speed (× its layer's) whatever the global
+              // speed, unless asked. Written on the slot, so a session saved
+              // before, where the field is missing, still follows the global
+              // speed as it always did.
+              ignoreGlobalSpeed: true
             }
             // Clear the slot's inherited source FX : a freshly imported clip must
             // not land under a random-scene's hold/freeze/key rack (which would

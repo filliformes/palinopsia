@@ -7,6 +7,7 @@
 // this texture : it lives in the FX rack, not here. No Hap dependency.
 
 import { trackMediaSink, untrackMediaSink } from './mediaSink'
+import { glGeneration } from './glGeneration'
 
 /** Upload the current frame of a <video> into a GL texture (creating it on
  *  first use), matching the engine's bottom-left orientation. Returns the
@@ -48,6 +49,9 @@ export interface VideoPlayback {
 
 export class VideoSource {
   readonly video: HTMLVideoElement
+  /** The GL generation its textures belong to : a rebuilt engine takes this
+   *  source back only while it is the same (Compositor parkVideo). */
+  readonly gen = glGeneration()
   private tex: WebGLTexture | null = null
   private pos = -1 // internal playhead (seconds) for manual/reverse stepping
   private pendDir = 1 // pendulum instantaneous direction (1 fwd, -1 rev)
@@ -390,7 +394,9 @@ void main(){
     this.rvfcId = v.requestVideoFrameCallback(cb)
   }
 
-  load(src: string): void {
+  /** `startAt` (seconds) : where the film goes on, for an engine rebuilt after a
+   *  GPU reset (it would otherwise start again from its top). */
+  load(src: string, startAt = 0): void {
     this.disposeVoices() // grain voices re-create lazily on the new src
     // Reset every per-clip transient : a stale playhead (beyond the new clip's
     // duration), a stuck seek gate, or a pending rVFC chain from a previous load
@@ -422,6 +428,17 @@ void main(){
     const kick = (): void => void this.video.play().catch(() => {})
     kick()
     this.video.addEventListener('canplay', kick, { once: true })
+    if (startAt > 0) {
+      // Once the length is known : the element and the intended playhead both
+      // (a tick may already have taken the top as its playhead).
+      this.video.addEventListener('loadedmetadata', () => {
+        const d = this.duration()
+        if (this.loadedSrc !== src || d <= 0) return
+        const t = Math.min(startAt, Math.max(0, d - 0.05))
+        this.pos = t
+        try { this.video.currentTime = t } catch { /* a seek can race a reload */ }
+      }, { once: true })
+    }
     this.startFrameLoop()
   }
 

@@ -572,7 +572,9 @@ The selected video slot shows a full **transport** in the Inspector:
   **forward → reverse → pendulum** · **loop** (or play-once-and-hold) · **speed**
   1/64×–128× (log slider), and **global** : lit (`⊘ global`), the clip ignores the
   global speed and plays at its own speed × its layer's, so a sound keeps its pitch and
-  tempo while the composition slows or rushes (OSC `…/video/{A|B}/ignoreglobal`). The browser plays a clip natively from 1/16× up to 8×;
+  tempo while the composition slows or rushes (OSC `…/video/{A|B}/ignoreglobal`). A film
+  you import starts lit (its own speed); click it to follow the global speed. A session
+  saved before v1.3.2 keeps its films following the global speed, as they played. The browser plays a clip natively from 1/16× up to 8×;
   slower and faster speeds step the frames by seeking, and a clip whose decoder
   stalls at speed drops to that path on its own instead of freezing. On an ordinary
   clip a seek decodes from the last keyframe (seconds on heavy footage), so when its
@@ -1513,7 +1515,8 @@ bottom:
   **7680×2160** for a wide wall or a stack of projectors). The whole engine renders
   at that shape; the output window can then **span separate displays**, so several
   projectors show one continuous picture. The size lives on the machine, not in the
-  session, so a show file stays resolution-independent.
+  session, so a show file stays resolution-independent. A new size rebuilds the engine;
+  the films on the layers play on through it, where they were.
 - **Render scale** : a quality multiplier (0.1–2×) on the composition size (½ lo-fi /
   ¾ / 1× / 1⅓× / 2×; the readout shows the real render resolution; rebuilds the engine).
   **Sharp enlargement** (off by default) : the projector window enlarges a frame rendered
