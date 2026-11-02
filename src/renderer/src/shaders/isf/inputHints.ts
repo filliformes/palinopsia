@@ -750,6 +750,20 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     noise: 'A faint grain injected every pass so the loop never settles into a dead flat image.',
     clear: 'Restarts the loop from the live frame (the rising edge), for this node only.'
   },
+  'node-silhouette': {
+    mode: 'Cutout : the picture where the people are, nothing elsewhere (background removal). Matte : white people on black, to key another layer or feed a Matte node. Shadow : a flat colored figure. Hole : the picture with the people taken out.',
+    people: 'How many people it looks for, united into one mask. More finds a crowd but may take in a face on a poster or a screen; 1 is the quickest.',
+    detail: 'The size the picture is read at (384, 512 or 768 px on the long side) : high helps a small figure far away, low costs the least.',
+    smooth: 'How the mask follows over time : 0 jumps from look to look (stepping), higher glides between them and calms the edge, at the cost of trailing a fast move.',
+    sync: 'Hold the picture back to the frame its mask was found in (a few frames late), so the cut fits a fast move. Off : the picture is live and the mask trails a fast move by a few frames (the immediate choice for a camera).',
+    threshold: 'Where the edge falls on the mask : lower takes in more (hair, loose clothes, a halo), higher keeps only the certain body.',
+    softness: 'How soft the edge is : 0 is a hard cut, higher feathers it.',
+    color: 'Color and opacity of the shadow (shadow mode).',
+    trail: 'Echoes : the people leave fading copies of themselves behind as they move. 0 = none, 1 = several seconds.',
+    trailColor: 'Matte mode : the color the echoes fade in behind the white figures (white keeps the plain grey key; its opacity dims them).',
+    over: 'Lay the result over the picture instead of on nothing : a shadow paints the figure onto the film, a cutout or a hole leaves its echoes over it.',
+    mix: 'Dry/wet against the picture.'
+  },
   'node-codecmosh': {
     mosh: 'Withhold the next keyframe : the encoder starts over from the picture as it is now, the decoder keeps the old one, and the motion from here on drags the old picture around. Press it, send OSC, or bind a modulator (a square LFO, an audio onset) with M to mosh on the beat.',
     clean: 'Send a clean keyframe now : the picture comes back whole.',

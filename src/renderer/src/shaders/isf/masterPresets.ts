@@ -1156,5 +1156,52 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 0.95, lift: 0 } }
     ],
     vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
+  },
+  // ── People : the Silhouette effect finds the people in the whole picture (a
+  // film, a camera, a stream) and treats them apart from where they stand.
+  // The picture stays (over / hole) : these leave Vibe's palette map alone. ──
+  {
+    name: 'Shadow Play', group: 'People',
+    fx: [
+      { shaderId: 'node-silhouette', inputs: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.05, color: [0.04, 0.035, 0.04, 1], trail: 0.2, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.6, chroma: 0, parasites: 0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.12, saturation: 0.85, lift: 0.02, gamma: 1 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 0.95, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Ghost Dancer', group: 'People',
+    fx: [
+      { shaderId: 'node-silhouette', inputs: { mode: 0, people: 2, detail: 1, smooth: 0.3, sync: 0, threshold: 0.5, softness: 0.1, color: [0.95, 0.92, 0.85, 1], trail: 0.8, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 0.9, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { contrast: 1.04, saturation: 0.95, gamma: 1, autoLevel: 0.15 },
+    context: { bloom: 0.15 }
+  },
+  {
+    name: 'Absence', group: 'People',
+    fx: [
+      { shaderId: 'node-silhouette', inputs: { mode: 3, people: 2, detail: 1, smooth: 0.3, sync: 0, threshold: 0.45, softness: 0.12, color: [0.95, 0.92, 0.85, 1], trail: 0.45, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.05, saturation: 0.8, lift: 0.03, gamma: 1 } }
+    ],
+    vibe: { contrast: 1.02, saturation: 0.9, gamma: 1, autoLevel: 0.1 }
+  },
+  {
+    name: 'Glass Bodies', group: 'People',
+    fx: [
+      { shaderId: 'node-silhouette', inputs: { mode: 2, people: 2, detail: 1, smooth: 0.35, sync: 0, threshold: 0.5, softness: 0.18, color: [0.45, 0.7, 0.95, 0.55], trail: 0.35, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.06, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0.1 },
+    context: { bloom: 0.2 }
+  },
+  {
+    name: 'Outline', group: 'People',
+    fx: [
+      { shaderId: 'node-silhouette', inputs: { mode: 1, people: 2, detail: 1, smooth: 0.2, sync: 0, threshold: 0.5, softness: 0.03, color: [0.95, 0.92, 0.85, 1], trail: 0.3, trailColor: [0.9, 0.45, 0.2, 1], over: 0, mix: 1 } },
+      { shaderId: 'fx-edge', inputs: { gain: 2, blend: 1, ink: 0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.2, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0 }
   }
 ]

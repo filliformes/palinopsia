@@ -136,6 +136,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('trails', 'blur', 'hue', 'hueCurve', 'sat', 'delayMix', 'delay', 'rgbDelay', 'route'),
     g('key', 'keyMode', 'keyThresh', 'keySoft', 'border', 'borderHue')
   ],
+  // Silhouette (effect) : how the people are found · how they look · how it lands
+  'node-silhouette': [
+    g('find', 'people', 'detail', 'smooth', 'sync'),
+    g('look', 'mode', 'threshold', 'softness', 'color'),
+    g('out', 'trail', 'trailColor', 'over', 'mix')
+  ],
   'node-codecmosh': [
     g('mosh', 'mosh', 'clean', 'cuts', 'pulse', 'refresh'),
     g('damage', 'bloom', 'drop', 'motionFrom'),
@@ -249,6 +255,14 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (isnt('mode', 2)) d.color = 'Only the shadow mode is drawn in the shadow color.'
     if (isnt('mode', 1)) d.trailColor = 'Only the matte mode colors its echoes : the other modes keep the look the body had.'
     else if (zero('trail')) d.trailColor = 'Trail is at 0 : the matte leaves no echoes to color.'
+    return d
+  },
+  'node-silhouette': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 2)) d.color = 'Only the shadow mode is drawn in the shadow color.'
+    if (isnt('mode', 1)) d.trailColor = 'Only the matte mode colors its echoes : the other modes keep the look the people had.'
+    else if (zero('trail')) d.trailColor = 'Trail is at 0 : the matte leaves no echoes to color.'
+    if (is('mode', 1)) d.over = 'The matte is opaque : nothing of the picture shows under it.'
     return d
   },
   'gen-collage': ({ zero, isnt }) => {

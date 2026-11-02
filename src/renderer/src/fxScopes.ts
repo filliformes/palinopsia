@@ -29,6 +29,7 @@ const SELF_CONTAINED = new Set([
   'node-faultline',
   'node-ibfv',
   'node-toile',
+  'node-silhouette', // finds the people in whatever picture enters
   // The sidechain recipes read an optional sidechain but fall back to the
   // host itself, so they run anywhere too.
   'node-remap',

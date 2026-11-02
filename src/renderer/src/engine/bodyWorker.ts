@@ -20,7 +20,12 @@
 //
 // cfg.people (default 1) : how many bodies Pose looks for; with several, the
 // silhouette is every one of them, merged (a layer's People, personMask.ts).
+// cfg.image : Pose looks at each frame on its own (IMAGE mode) instead of
+// following the bodies from frame to frame (VIDEO) : for frames that come from
+// several pictures in turn (the Silhouette effects, silhouetteNode.ts).
 // frame.full : the mask at the size it was computed, not halved.
+// frame.people : merge only the first n bodies found (a worker shared by
+// effects that ask for different counts looks for the most of them).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function workerMain(): void {
@@ -32,6 +37,7 @@ function workerMain(): void {
   let face: any = null
   let poseSeg = false
   let posePeople = 1
+  let poseImage = false
   let urls: any = null
   let cfg: any = { hands: false, pose: false, face: false, silhouette: false, people: 1 }
   let chain: Promise<void> = Promise.resolve()
@@ -39,11 +45,11 @@ function workerMain(): void {
   const fail = (e: any): void => g.postMessage({ t: 'error', msg: String((e && e.message) || e) })
 
   // GPU first (WebGL in the worker's own OffscreenCanvas), the CPU when it can't.
-  const make = async (Kind: any, model: string, extra: any): Promise<any> => {
+  const make = async (Kind: any, model: string, extra: any, runningMode = 'VIDEO'): Promise<any> => {
     try {
-      return await Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'GPU' }, runningMode: 'VIDEO', ...extra })
+      return await Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'GPU' }, runningMode, ...extra })
     } catch {
-      return Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'CPU' }, runningMode: 'VIDEO', ...extra })
+      return Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'CPU' }, runningMode, ...extra })
     }
   }
   const close = (x: any): void => { try { if (x) x.close() } catch { /* gone */ } }
@@ -57,11 +63,13 @@ function workerMain(): void {
     const poseNeeded = cfg.pose || cfg.silhouette
     const wantSeg = !!cfg.silhouette
     const people = Math.max(1, Math.min(4, (cfg.people | 0) || 1))
-    if (poseNeeded && (!pose || poseSeg !== wantSeg || posePeople !== people)) {
+    const wantImage = !!cfg.image
+    if (poseNeeded && (!pose || poseSeg !== wantSeg || posePeople !== people || poseImage !== wantImage)) {
       close(pose); pose = null
-      pose = await make(mp.PoseLandmarker, urls.pose, { numPoses: people, outputSegmentationMasks: wantSeg })
+      pose = await make(mp.PoseLandmarker, urls.pose, { numPoses: people, outputSegmentationMasks: wantSeg }, wantImage ? 'IMAGE' : 'VIDEO')
       poseSeg = wantSeg
       posePeople = people
+      poseImage = wantImage
     } else if (!poseNeeded && pose) { close(pose); pose = null; poseSeg = false }
     if (cfg.face && !face) face = await make(mp.FaceLandmarker, urls.face, { numFaces: 1, outputFaceBlendshapes: true })
     else if (!cfg.face && face) { close(face); face = null }
@@ -134,11 +142,13 @@ function workerMain(): void {
         })
       }
       if (pose) {
-        const pr = pose.detectForVideo(bmp, m.ts)
+        const pr = poseImage ? pose.detect(bmp) : pose.detectForVideo(bmp, m.ts)
         out.pose = (pr.landmarks && pr.landmarks[0]) || null
         out.people = (pr.landmarks && pr.landmarks.length) || 0
         const masks = pr.segmentationMasks ?? []
-        if (m.silhouette) out.sil = masks.length ? maskOut(masks, m.mirror, !!m.full) : { empty: true }
+        const use = m.people > 0 ? masks.slice(0, m.people) : masks
+        if (m.people > 0) out.people = Math.min(out.people, m.people)
+        if (m.silhouette) out.sil = use.length ? maskOut(use, m.mirror, !!m.full) : { empty: true }
         // Every mask holds a GPU buffer until closed.
         for (const mk of masks) close(mk)
       }
@@ -182,6 +192,7 @@ function workerMain(): void {
         hands = pose = face = null
         poseSeg = false
         posePeople = 1
+        poseImage = false
       }).catch(fail)
     }
   }

@@ -92,6 +92,61 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   window reload and fires by its gesture after (0.35 → 0 → 0.35); MIDI learn lists the
   25 and arms `act:bg:optoggle`. A `body` modulator on a synthetic hand height bound to
   L2 and Background opacity : the compositor follows 0.2 / 0.5 / 0.9. Console errors 0.
+- **Silhouette, the effect** (`node-silhouette`, Vincent : "Can the Silhouette source
+  (created by a webcam with recognition) be re-created as an effect ? I want to be able to
+  recognize silhouettes inside an imported video by dropping this effect on it"). A native
+  node (`engine/silhouetteNode.ts`) in the FX picker's **Utility** group beside Matte, in
+  any rack : it finds the people in whatever picture enters it (an imported film, a camera
+  layer, an NDI input, a generator) and draws the Silhouette source's four looks on that
+  picture : **cutout**, **matte**, **shadow**, **hole**, with **trail** and **trail
+  color**, plus **over the picture** (the result over its input, premultiplied), **mix**,
+  **people** (1-4, their masks united), **detail** (read at 384 / 512 / 768 px on the long
+  side), **smooth** (the mask's time constant, 0.8·s² s) and **hold to the mask** (sync).
+  The looks and the trail are ONE copy shared with the source (`engine/silhouetteLook.ts` :
+  `silLook` / `silTrail` / `silOut` GLSL, the `SilTrail` ping-pong, `trailKeep`; the
+  source's arithmetic is unchanged). How it finds them : its input is read back small,
+  upright and over black, through an async `GridReadback` ring (pixel-pack buffers +
+  fences, a 2x2 box of bilinear taps per texel), and the newest frame goes to the body
+  model (MediaPipe Pose lite with segmentation masks, `bodyWorker.ts`, the model People
+  and the Body page use; nothing downloaded, no camera opened) in ONE worker shared by
+  every Silhouette effect (`silhouetteFinder`) : one frame in flight, the effect served
+  longest ago goes next, at most 30 looks a second each, a picture that does not change (the same
+  fingerprint : a paused film) looked at three times (VIDEO mode loses the bodies on a
+  seek and finds them on the next look), then rested. One effect alone : VIDEO mode (the bodies followed);
+  several : IMAGE mode (frames from several pictures in turn), back to VIDEO after 3 s
+  alone; `numPoses` = the most any effect asks for, each merging only its own first n
+  masks (`bodyWorker.ts` gained `cfg.image` and `frame.people`). The mask comes back in
+  the picture's own frame (no mirror, no camera aspect), is uploaded (R8) and followed
+  over time on the GPU (an R16F state), then cut with threshold / softness like the
+  source. **hold to the mask** keeps a ring of RGBA8 copies of the input (as many frames
+  as the measured delay + 0.7 tau needs, at most 8) and shows the one the mask was found
+  in. Bypassed, or on a muted layer no other unit reads, it does nothing at all (the
+  Compositor passes `live` to the nodes : a layer seen, or read last frame as a sidechain,
+  a Matte's matte, a Text fill or a Sonify tap); the worker is let go after 30 s unused.
+  The Inspector line says what it finds (people, looks a second, ms). 15 presets, a
+  **People** group of master chains (Shadow Play, Ghost Dancer, Absence, Glass Bodies,
+  Outline), four Film Wall Generate themes (Cut Out, Shadow Theatre, Absent, Afterimages),
+  grouped columns (find / look / out) and grey-outs (shadow color outside shadow, trail
+  color outside a matte with a trail, over in the matte), hints, keywords, a blurb.
+  Measured in the test copy (RTX 4070 Laptop, a 1080p 30 fps dance film : one performer
+  before a projection screen) : 13-29 ms a look in the worker (121 ms the first, the model
+  warming up), 17-30 looks a second while she moves (24 on the dome's 2048² square); she
+  is found in 94.3 % of the samples over the 36 s she is on stage (90.9 % on the
+  Satosphère setup), the mask covering 5.2 % of the frame on average, and in 0 % over the
+  title and credits (1.2 looks a second there : the still picture rests); the matte's
+  centroid follows her bend (y 0.27 → 0.47 → 0.27 over 2 s). 60 fps held at 1080p (frame
+  mean 16.7 ms; p95 22 ms on, 19.5 ms bypassed) and on the dome (4096 master, 59.6 fps).
+  Bypassed, or its layer muted : 0 looks a second, no client. Two effects : IMAGE mode,
+  8.5 looks a second each, 59.8 fps. With people at 2 a face on the film's projection
+  screen counts as a person too (the hint says so). The source's four modes measured the
+  same on a synthetic mask after the refactor; on held frames (6 to 38 s) she is found
+  on all 8 with three looks (16 s and 30 s were missed with one). Fulldome gate
+  (`domegate.sh --ids node-silhouette`, over Shapes : nobody to find, the picture stays
+  empty, 0 updates a second both ways) : PASS, flat 60 fps, dome 59.8 fps p95 23.5 ms,
+  heaviest settings 60 / 59.7 fps. A first run read 1 fps in every stage : the test window
+  was not painting (rAF at 1 Hz while the engine drew on its fallback timer, the effect
+  drawn 16 ms before); a control run (Grade, then Silhouette) and the rerun passed, and
+  the same sequence re-measured held 60 fps.
 - **MACRO : the Macro knobs row shows or hides, hidden by default** (Vincent : "I don't
   use it so often and I think neither will the average user for now; so I think it would
   save some UI space to be able to not see it all the time"). A **MACRO** button at the

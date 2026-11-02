@@ -32,6 +32,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'node-lumablur': ['blur', 'variable blur', 'depth of field', 'dof', 'bokeh', 'lens'],
   'node-gooey': ['gooey', 'metaball', 'blob', 'threshold', 'liquid', 'lava'],
   'node-matte': ['matte', 'key', 'composite', 'mask', 'three inputs', 'cut-out', 'sidechain'],
+  'node-silhouette': ['silhouette', 'people', 'person', 'body', 'background removal', 'cutout', 'matte', 'key', 'segmentation', 'rotoscope', 'dancer', 'green screen'],
   'node-lookup': ['lookup', 'lut', 'palette', 'gradient map', 'recolor', 'color table', 'sidechain'],
   'node-toile': ['paint', 'painterly', 'oil', 'ink', 'stylize'],
   'node-pulfrich': ['3d', 'stereo', 'depth', 'delay', 'anaglyph'],
