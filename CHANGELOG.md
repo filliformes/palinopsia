@@ -15,6 +15,52 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The Seq page is the home of every sequencer : lanes under one transport, and a Body
+  rule timeline** (Vincent : "a complete Body rule sequencer ... drag and drop rules on a
+  timeline and make them active or not active for a pre-determined amount of time", then
+  "what if the whole SEQ window was home to all the things that can be sequenced in the
+  app"; his calls : blocks in BARS, and a toggle by hand wins until the next block edge).
+  `SequencePage.tsx` is now three collapsible lanes (`collapsed['seq-lane-<id>']`) under
+  one transport, each sequencer keeping its own time : **Scenes** (the macro-form
+  auto-pilot exactly as it was, its play / skip / score in the lane header, its height
+  dragged at its foot : `opsia.seqLaneH.scenes`), **Sonify keys** (the key sequencer's
+  own component, `SonifyKeySequencer lane` : the same store, the rows in three columns,
+  its M on every; edits show in both pages at once) and **Body rules** (`RuleLane.tsx`).
+  The **transport** plays every lane marked "with transport" (`seqLanes.arm`, in the
+  session; an older file : all) and stops them all; it shows the shared beat clock's bar
+  and beat, the tempo and the LINK badge. The rule timeline (`engine/ruleSeq.ts`, model
+  `engine/ruleSeqModel.ts`) counts in bars of the Sonify beat clock (`soniClock.ts` : the
+  BPM, or Ableton Link's beats and bar), so it starts with the key sequencer on bar 1, or
+  on Link's next bar; a new `soniClockAlsoOnBeat` hook keeps a sequencer started while
+  it runs on its bars (and never zeroes the count under it). Blocks are `{ id, rule,
+  start, len }` in bars on a 1/48-bar grid, melted when they overlap (touching blocks
+  stay two : each edge is a moment the hand gives way); loop 4 / 8 / 16 / 32 / 64,
+  loop or once (once ends at the end of the pass it is in, and stops by itself without
+  telling Link). While it runs, a rule with blocks is on inside them and off outside,
+  every write through `setBodyRuleActive(id, on, 'seq')`; a rule without blocks is left
+  alone; stopped, it drives nothing. **The hand wins** until the next block edge on that
+  rule's row : a hand is a change since the last frame from any source but 'seq'
+  (`bodyRuleLastChange`), or the rule found in another state than the timeline last set
+  (a write that took another road); a `held` mark shows on the row. Editing : drag a
+  rule's name onto the timeline (its own row, a quarter of the loop up to 4 bars), draw
+  on a row, move / resize with bar snapping (Shift : beats), Alt-drag copies, Delete or
+  the right-click menu removes, double-click adds; every edit is one store write, so one
+  undo step (`ruleSeq` and `seqLanes` joined the undo snapshot). The timeline is kept on
+  this machine beside the rules (`opsia.ruleSeq`; the rules are `bodyControl`'s, not the
+  session's), blocks naming their rule by id : a renamed rule keeps them, a deleted one
+  takes them along (pruned silently, after the change that made them orphans). The
+  session carries `ruleSeqOn` (an installation starts it again). Link start / stop knows
+  the new lane (`PlayThing 'rules'`; a first play starts it when it has blocks and goes
+  with the transport). MIDI learn `fire:transport` and `fire:ruleseq`; OSC
+  `/opsia/seq/play` and `/opsia/seq/rules`. The playhead, the live blocks' glow and the
+  readouts are written from the window's own frames (no React render per frame), in the
+  page's own window too. Measured in the test copy at 240 BPM (a bar a second) over 3
+  passes of an 8-bar loop : 355 samples of four rules, 0 off their blocks away from an
+  edge; a MIDI-sourced off inside a block held to the next edge then the block took it
+  back, a click outside held on to the next edge; a row-less rule untouched; play once
+  stopped itself after 8.1 s; 60 fps (frame p50 16.7 ms, p95 16.8 ms) with the page open
+  and the three lanes running.
+
 - **The body modulator's clutch : a hand as a fader** (Vincent : "use my left hand,
   open, to control the opacity value in real time, like a swipe of my hand that swipes
   through the opacity fader from min to max"; then "follow only while [feature] is above

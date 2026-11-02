@@ -63,7 +63,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
-- [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
+- [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
@@ -1109,7 +1109,47 @@ each knob its curve, MIDI CC and destination count.*
 
 ## Sequencer (key `Q`)
 
-An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
+The home of everything the instrument sequences : one **lane** per sequencer, under
+**one transport**. Each lane keeps its own time (the scenes their dwell in seconds, the
+Sonify keys their rate, the Body rules their bars), and each folds to its header (it
+keeps playing folded).
+
+- **The transport** (top of the page) : **▶ play** starts every lane marked **● with
+  transport**, **■ stop** stops them all. The lanes on the beat start together on bar 1,
+  or on Ableton Link's next bar while Link is on; beside it, the shared beat clock's bar
+  and beat (the clock the Sonify sequencers count on), the tempo and the **LINK** badge.
+  A lane set to **○ on its own** plays only from its own **▶ play** (the transport's stop
+  still stops it). Which lanes go with the transport is the session's. MIDI learnable
+  (`SEQ transport`), and `/opsia/seq/play` over OSC.
+- **Scenes** : the auto-pilot over the scene bank, as below.
+- **Sonify keys** : the [key sequencer](#sonify--image-to-sound-key-s) itself, the same
+  one as on the Sonify page (seq view) : an edit in either shows in the other at once. Its
+  rows sit in three columns here (the key now and its mode, the clock, the keys it chooses
+  from), with its M on **every**.
+- **Body rules** : a timeline of your [Body rules](#body--embodied-control-key-b), in
+  **bars** of the tempo (of Ableton Link's bar while Link is on), one row per rule as the
+  Body page lists them. A **block** switches its rule on from its first bar to its last.
+  **Drag a rule's name** onto the timeline (it lands on its own row, 4 bars long), or
+  **draw** on its row; drag a block to move it, its ends to resize it, all snapped to
+  bars (**Shift** : to beats); **Alt-drag** copies it; **Delete** or a **right-click**
+  removes it (the right-click also copies a block right after itself, fills a rule's
+  whole loop or clears its row; double-click a row for a block there). The loop is **4,
+  8, 16, 32 or 64** bars, **⟳ loop** or **→ once** (it plays the length once, then stops),
+  and **zoom** (or Ctrl + wheel over it) for fine work on a long loop. Each edit is one
+  undo step (a drag is one, on release).
+  While it runs, a rule with blocks is **on inside them and off outside them**; a rule
+  without blocks is left alone, and stopping leaves every rule as it is. **Your hand
+  wins** : a rule you switch while it runs (a MIDI note or knob, OSC, an action, its box
+  on the Body page, its dot here) keeps what you set until the **next block edge on its
+  row**, then the timeline takes it back; a small **held** mark shows on its row
+  meanwhile. The dot at the left of each row is the rule's state now (click it to switch
+  the rule by hand). The timeline lives on this computer beside the rules (the rules are
+  the computer's, like the camera that fires them), each block naming its rule by its
+  id : renaming a rule keeps its blocks, deleting a rule takes them along. A session
+  remembers whether it was running, and an installation starts it again. Its play is
+  MIDI learnable (`RULE timeline run`), and `/opsia/seq/rules` over OSC.
+
+**Scenes : the auto-pilot.** An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
 (world) · **Synchrèse** (coupling) · **Espace-temps** · **Climat** (set in the tag
 editor : click a scene card ; **Climat** also takes a **◔ from picture** suggestion
 that reads the live composite's palette : warm + saturated → tension / expectation,
@@ -1123,8 +1163,8 @@ exports a Markdown **relation-score** (`⤓ score`). Needs ≥2 scenes to play.
 **In a window of its own.** Right-click the **Seq** button, **Sequencer in a window** :
 the whole page opens in its own window (titled *Palinopsia · Sequencer*), to steer the
 run on one screen while the picture plays full size on the other. The same rules as the
-[Output page's window](#output--mapping-key-o) : the scene cards, the tag editor, the
-transport and the long-forms are live there, its live monitor mirrors the picture, the
+[Output page's window](#output--mapping-key-o) : every lane, the scene cards, the tag
+editor, the transport and the long-forms are live there, its live monitor mirrors the picture, the
 monitor's top edge and the inspector column's edge still resize under your hand (at any
 UI zoom), `Q` brings the window forward instead of closing it, your other keys still play
 the instrument, **⇲ back into the app** puts the page back over the instrument and
@@ -1139,8 +1179,8 @@ Three **durational long-forms** run underneath the scene clock (minutes-scale):
 | **Long-Take / Veil** | A slowness governor: **forbids** auto-cuts for the cycle and drives one slow veil (Context haze) across it : the sequencer holds a single take. |
 | **Frame-Weave** | Rose Lowder's temporal interlace: instead of blending, show **one layer per frame**, stepping through a **paintable cell lattice** (each cell = a layer 1–4 or blank) at a set rate : persistence of vision fuses the layers into one woven image. |
 
-The Sequence page has its own live monitor (resizable) and a resizable
-inspector column.
+The scene lane has its own live monitor (resizable), a resizable inspector column, and
+its own height (drag its foot).
 
 ![The macro-form sequencer](docs/images/interface-sequencer.jpg)
 
@@ -1296,7 +1336,8 @@ Learnable targets:
 - **Fires** (pad/note or button-CC, press edge only) : **Vary**, **Randomize**
   (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Record**
   start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
-  **Sonify-sequence** and **key-sequence** transports, the **Master FX chain** on/off,
+  **Sonify-sequence** and **key-sequence** transports, the Seq page's **transport** and
+  its **rule timeline**, the **Master FX chain** on/off,
   session **New / Load / Open**, and the dice (each layer's, the Background's, the
   master parameters', the Macro knobs', the selected Inspector unit's, the Resolume
   pins).
@@ -2080,7 +2121,9 @@ edge handle works too). Each folds to its header with the chevron left of its pl
 button, and keeps playing folded. Remembered on this machine.
 
 **Key sequencer** : under it, a second sequencer composes the **root, scale and
-octave** of the whole instrument over time, so a piece can modulate on its own. Each
+octave** of the whole instrument over time, so a piece can modulate on its own. The
+[Seq page](#sequencer-key-q) shows the same sequencer as one of its lanes : an edit in
+either shows in the other at once. Each
 mode is drawn as it thinks, under its mode strip (a key's color is its place on the
 circle of fifths) : the list's tiles, the circle of fifths with the walk's lean and leap,
 the affinity constellation (closer = more shared notes, bigger = likelier), the pivot's
@@ -3248,6 +3291,8 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/world/amount` | f 0..1 | World amount : how much of the active World's mood is on (0 = the mood it found) |
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
+| `/opsia/seq/play` | level | The Seq page's transport : ≥ 0.5 plays every lane marked "with transport", below stops them all |
+| `/opsia/seq/rules` | level | Run (≥ 0.5) / stop the Body rule timeline |
 | `/opsia/body/rule/{n}/active` | level | Body rule *n* (its place in the Body page's list, 1-based) on (≥ 0.5) or off : float, int or bool; fed back when it changes |
 | `/opsia/body/rule/{n}/toggle` | trigger | Body rule *n* on, or off when it is on |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
@@ -3439,7 +3484,8 @@ With **start / stop sync** on, Palinopsia shares Link's play too :
   session (every linked app). The **LINK** badge beside the BPM fills while it plays.
 - **A play starts the clocked things on its bar** : the [MIDI clock out](#midi) sends
   Start (an Ableton Move it drives starts with Live), the scene sequencer runs if the
-  session uses it, and the Sonify step and key sequencers start again if a Link stop had
+  session uses it, the Body rule timeline when it has blocks and goes with the Seq
+  transport, and the Sonify step and key sequencers start again if a Link stop had
   stopped them (on the very first play they wait for you : start them once). A stop
   sends MIDI Stop at once and stops the sequencers.
 - **Starting one here plays everyone** : starting a sequencer, or the MIDI clock, while

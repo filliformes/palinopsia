@@ -51,6 +51,9 @@ export function sonifyCovered(el?: Element | null): boolean {
   const doc = el?.ownerDocument
   if (doc && doc !== document) return doc.hidden
   const s = useStore.getState()
+  // a Sonify card on the Seq page (its keys lane) : covered only by what opens
+  // over that page
+  if (el?.closest('[data-seq-page]')) return document.hidden || (s.bodyPageOpen && !s.bodyPageWindow) || s.resolumePageOpen
   return document.hidden || s.worldPageOpen || (s.sequencePageOpen && !s.sequencePageWindow) || (s.bodyPageOpen && !s.bodyPageWindow) || s.resolumePageOpen || s.sourceEditorOpen
 }
 

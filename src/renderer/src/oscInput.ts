@@ -52,6 +52,8 @@
 //   /opsia/world                                        s id | name | i (1-based index)
 //   /opsia/seq/run                                      >= 0.5 toggles the sequencer
 //   /opsia/seq/skip                                     trigger (advance to next scene)
+//   /opsia/seq/play                                     >= 0.5 the Seq transport plays its lanes, < 0.5 stops them all
+//   /opsia/seq/rules                                    >= 0.5 runs the Body rule timeline, < 0.5 stops it
 //   /opsia/sonify/on|master                             >= 0.5 | f 0..1
 //   /opsia/sonify/root|scale                            i index | s name
 //   /opsia/sonify/keyseq/on|next                        >= 0.5 (run · a key change now)
@@ -118,6 +120,7 @@ import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_PIECES, SPACE_VOICES, placeField
 import { audioBus, type AudioFeatureName } from './engine/audioIn'
 import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
+import { seqTransportPlay, seqTransportPlaying, seqTransportStop } from './engine/ruleSeq'
 import { sourceEvent } from './pointerInput'
 
 type Args = OscInEvent['args']
@@ -569,6 +572,16 @@ function route(address: string, args: Args): void {
       if (segs[2] === 'skip') {
         if (!rising(address, n)) return
         sequencerSkip() // advance now (respects transition + variation)
+        return
+      }
+      // the Seq page's transport (every lane it starts) and the rule timeline
+      if (segs[2] === 'play') {
+        if (n >= 0.5) { if (!seqTransportPlaying()) seqTransportPlay() }
+        else seqTransportStop()
+        return
+      }
+      if (segs[2] === 'rules') {
+        if ((n >= 0.5) !== st.ruleSeqOn) st.setRuleSeqOn(n >= 0.5)
         return
       }
       return
@@ -1543,6 +1556,8 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/world/amount', 0, 1, st.worldAmount, "World amount : how much of the active World's mood is on (0 = the mood it found)")
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
+  add('/opsia/seq/play', 0, 1, seqTransportPlaying() ? 1 : 0, 'The Seq transport : >= 0.5 plays every lane it starts, < 0.5 stops them all')
+  add('/opsia/seq/rules', 0, 1, st.ruleSeqOn ? 1 : 0, 'The Body rule timeline running (>= 0.5)')
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
   add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
   for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'macro', 'inspector', 'sonify', 'resolume', 'background'])

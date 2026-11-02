@@ -41,6 +41,7 @@ import { GRID } from '@shared/assemble'
 import { tickSequencer } from './engine/sequencer'
 import { tickSonifySeq } from './audio/soniSeq'
 import { tickKeySeq } from './audio/soniKeySeq'
+import { ruleSeqPlayhead, seqTransportPlay, seqTransportStop, tickRuleSeq } from './engine/ruleSeq'
 import { soniBeats, soniClockTick } from './audio/soniClock'
 import { linkBeats, linkPlay, linkQuantum, linkSettings, linkShared, setLinkPlaying, setLinkSettings, tickLink } from './link'
 import { applyWorldAmount } from './engine/worldAmount'
@@ -761,6 +762,7 @@ export default function App(): JSX.Element {
             if (s.sonifyOn) st.setSonify({ ...useStore.getState().sonify, on: true })
             if (s.soniSeqOn) st.setSoniSeqOn(true)
             if (s.soniKeySeqOn) st.setSoniKeySeqOn(true)
+            if (s.ruleSeqOn) st.setRuleSeqOn(true)
             // and its Audio Layer's live inputs open : an installation runs
             // unattended (a session opened by hand leaves them closed)
             st.armAudioLayer()
@@ -1257,7 +1259,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1582,6 +1584,8 @@ export default function App(): JSX.Element {
           const beats = soniClockTick(now, c.bpm, linkBeats(now, false), linkQuantum())
           tickSonifySeq(now, beats)
           tickKeySeq(now, beats)
+          // and the Seq page's Body rule timeline, on the same bars
+          tickRuleSeq()
         }
         // 2e. Field macros: Density / Gesture⇄Texture / Coalesce (post-mod, 0.5 deadzone).
         applyFieldMacros(comp!, c, st.density, st.gestureTexture, st.coalesce)

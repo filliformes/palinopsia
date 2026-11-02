@@ -1,8 +1,9 @@
 // The Sonify beat clock : one beat counter, from the composition's tempo, that
 // both Sonify sequencers (the effects sequencer and the key sequencer) read when
-// they run on beats or bars. Sharing it keeps them phase-locked : a sequencer
-// started while the other runs on the beat waits for the next bar; alone, it
-// starts the bar where it starts. Ticked once per frame from App's loop.
+// they run on beats or bars, and the Seq page's Body rule timeline. Sharing it
+// keeps them phase-locked : a sequencer started while another runs on the beat
+// waits for the next bar; alone, it starts the bar where it starts. Ticked once
+// per frame from App's loop.
 
 import type { SoniSeqRate } from '@shared/types'
 
@@ -117,14 +118,22 @@ export function soniNextBar(): number {
   return Math.ceil(beats / bar - 1e-6) * bar
 }
 
-/** Where a sequencer starting now on the beat begins : the next bar when the
- *  other one already runs on the beat (they stay in phase), else right now,
+// Clocked by this count beside the two Sonify sequencers (the Body rule
+// timeline, engine/ruleSeq.ts) : while it plays, a start keeps to its bars too
+// (and never puts the count back to 0 under it).
+let alsoOnBeat: () => boolean = () => false
+export function soniClockAlsoOnBeat(fn: () => boolean): void {
+  alsoOnBeat = fn
+}
+
+/** Where a sequencer starting now on the beat begins : the next bar when
+ *  another one already runs on the beat (they stay in phase), else right now,
  *  which becomes the top of a bar. */
 export function soniClockStart(otherOnBeat: boolean): number {
   // Ableton Link : always the next Link bar (the count is shared, never reset),
   // or the one its play starts on
   if (linkOffset != null) return soniNextBar()
-  if (otherOnBeat) return Math.ceil(beats / 4 - 1e-6) * 4
+  if (otherOnBeat || alsoOnBeat()) return Math.ceil(beats / 4 - 1e-6) * 4
   beats = 0
   return 0
 }

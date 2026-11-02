@@ -324,8 +324,9 @@ function Slider({
 }
 
 /** The binding row under a Sonify parameter, the Inspector's own (M1-8 with
- *  depth and mode, the Meta knobs) : it opens where the parameter is. */
-function SonifyAssign({ param }: { param: SonifyModParam }): JSX.Element {
+ *  depth and mode, the Meta knobs) : it opens where the parameter is (the Seq
+ *  page's keys lane too). */
+export function SonifyAssign({ param }: { param: SonifyModParam }): JSX.Element {
   const target = { kind: 'sonify', param } as const
   const bound = useBound(modTargetKey(target))
   return (

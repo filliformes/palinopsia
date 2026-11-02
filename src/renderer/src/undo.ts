@@ -52,6 +52,11 @@ interface Snapshot {
   audioLayer: FullState['audioLayer']
   // What is persistent : New clears it, Open replaces it.
   pins: string[]
+  // The Seq page : the Body rule timeline (each block added, moved, resized or
+  // deleted is a step : a drag writes once, on release) and what its transport
+  // starts.
+  ruleSeq: FullState['ruleSeq']
+  seqLanes: FullState['seqLanes']
 }
 
 function snap(): Snapshot {
@@ -76,7 +81,9 @@ function snap(): Snapshot {
     flow: s.flow,
     superFlicker: s.superFlicker,
     audioLayer: s.audioLayer,
-    pins: s.pins
+    pins: s.pins,
+    ruleSeq: s.ruleSeq,
+    seqLanes: s.seqLanes
   }
 }
 
@@ -113,7 +120,9 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.flow !== b.flow ||
     a.superFlicker !== b.superFlicker ||
     a.audioLayer !== b.audioLayer ||
-    a.pins !== b.pins
+    a.pins !== b.pins ||
+    a.ruleSeq !== b.ruleSeq ||
+    a.seqLanes !== b.seqLanes
   )
 }
 
@@ -158,7 +167,9 @@ function apply(s: Snapshot): void {
     superFlicker: s.superFlicker,
     audioLayer: s.audioLayer,
     audioLayerArmed: armed,
-    pins: s.pins
+    pins: s.pins,
+    ruleSeq: s.ruleSeq, // (saved on this machine by engine/ruleSeq.ts as it changes)
+    seqLanes: s.seqLanes
   })
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
@@ -318,6 +329,8 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   }
   if (a.scenes !== b.scenes || a.activeSceneId !== b.activeSceneId) return 'scenes'
   if (a.sequence !== b.sequence) return 'sequencer'
+  if (a.ruleSeq !== b.ruleSeq) return 'rule timeline'
+  if (a.seqLanes !== b.seqLanes) return 'Seq transport'
   if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
   if (a.sonify !== b.sonify) return 'sonify'
   if (a.audioLayer !== b.audioLayer) return 'audio layer'

@@ -4,6 +4,9 @@
 // rhythm, the pool of keys the generative modes choose from and the chosen
 // mode's own rows (List's keys, Picture's own keys). Folds to its header. Built
 // from the Voices view's parts (sonifyUi.tsx). Engine : audio/soniKeySeq.ts.
+// The Seq page shows the same sequencer as one of its lanes (`lane`) : the
+// same rows in three columns (now, the clock, the keys), its header the lane's.
+// One store : an edit in either shows in the other at once.
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { SoniKeyMode, SoniKeySeq, SoniKeyStep, SonifyModParam } from '@shared/types'
@@ -12,7 +15,7 @@ import { SCALE_ABBR, SCALE_LABEL, SCALE_ORDER } from '../audio/sonify'
 import { NOTE_NAMES, KEY_MODES, euclidHit, everyToPos, isScale, posToEvery } from '../audio/soniKeyModel'
 import { SONI_RATES, RATE_LABEL, soniBeats } from '../audio/soniClock'
 import { keySeqNext, keySeqPhase, keySeqWaitMs } from '../audio/soniKeySeq'
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered, LiveNum } from './sonifyUi'
+import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, Toggle, CardGrip, useCardSpace, chipBig, sonifyCovered, LiveNum, spaceGap } from './sonifyUi'
 import { ownerWindow } from './ownerWindow'
 import { KeySeqVisual } from './KeySeqVisual'
 import { registerLiveOverlay } from './liveOverlay'
@@ -83,16 +86,36 @@ const MODE_INFO: Record<SoniKeyMode, { name: string; hint: string; icon: ReactNo
   }
 }
 
+/** The card's dice and reset (its header; the Seq page's keys lane too). */
+export function KeySeqDice(): JSX.Element {
+  const mode = useStore((s) => s.soniKeySeq.mode)
+  const picList = useStore((s) => s.soniKeySeq.mode === 'picture' && s.soniKeySeq.picKeys === 'list')
+  const randomizeSteps = useStore((s) => s.randomizeSoniKeySteps)
+  const reset = useStore((s) => s.resetSoniKeySeq)
+  return (
+    <>
+      <IconBtn
+        onClick={() => (mode === 'list' ? randomizeSteps('steps') : picList ? randomizeSteps('picSteps') : keySeqNext(true))}
+        title={mode === 'list' ? 'New keys for the list, drawn from the pool' : picList ? "New keys for the picture's list, drawn from the pool" : 'A fresh key from the pool now, and the walk forgets where it has been'}
+      >🎲</IconBtn>
+      <IconBtn onClick={reset} title="Reset the key sequencer to its defaults">↺</IconBtn>
+    </>
+  )
+}
+
 /** The key sequencer : composes the root, scale and octave of the whole Sonify
  *  instrument over time. */
-export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
-  onWidth: (dx: number, done: boolean) => void
+export function SonifyKeySequencer({ onWidth, chip, assignBox, lane = false }: {
+  onWidth?: (dx: number, done: boolean) => void
   /** Sonify's M chip for a parameter, and the binding row it opens (SonifyPage). */
   chip?: (p: SonifyModParam) => JSX.Element
   assignBox?: (...ps: SonifyModParam[]) => JSX.Element | null
+  /** Drawn as the Seq page's keys lane : three columns, no header of its own. */
+  lane?: boolean
 }): JSX.Element {
   const [space, setSpace, resetSpace] = useCardSpace('key')
-  const folded = useStore((s) => !!s.collapsed['soni-keyseq'])
+  // (the lane folds with its lane, never with the card)
+  const folded = useStore((s) => !lane && !!s.collapsed['soni-keyseq'])
   const toggleSection = useStore((s) => s.toggleSection)
   // EVERY swung by a modulator : its thumb follows (its readout too, LiveNum)
   const everyModulated = useStore((s) => s.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param === 'keyEvery'))
@@ -104,8 +127,6 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
   const ks = useStore((s) => s.soniKeySeq)
   const set = useStore((s) => s.setSoniKeySeq)
   const setOn = useStore((s) => s.setSoniKeySeqOn)
-  const randomizeSteps = useStore((s) => s.randomizeSoniKeySteps)
-  const reset = useStore((s) => s.resetSoniKeySeq)
   const curStep = useStore((s) => s.soniKeyCur)
   const root = useStore((s) => s.sonify.root)
   const scale = useStore((s) => s.sonify.scale)
@@ -150,31 +171,9 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
     p({ poolRoots: roots })
   }
 
-  return (
-    <Shell
-      collapsed={folded}
-      onCollapse={() => toggleSection('soni-keyseq')}
-      title="Key sequencer"
-      hint="Composes the root, scale and octave of every Sonify voice over time, on the composition tempo (in phase with the effects sequencer) or free time."
-      on={ks.on}
-      onToggle={() => setOn(!ks.on)}
-      toggleText={['■ stop', '▶ play']}
-      toggleTitle="Play / stop the key sequencer : it changes the root, scale and octave of every Sonify voice over time"
-      midiId="fire:keyseq"
-      open
-      roomy
-      space={space}
-      foot={<CardGrip space={space} onSpace={setSpace} onReset={resetSpace} onWidth={onWidth} />}
-      right={(
-        <>
-          <IconBtn
-            onClick={() => (ks.mode === 'list' ? randomizeSteps('steps') : picList ? randomizeSteps('picSteps') : keySeqNext(true))}
-            title={ks.mode === 'list' ? 'New keys for the list, drawn from the pool' : picList ? "New keys for the picture's list, drawn from the pool" : 'A fresh key from the pool now, and the walk forgets where it has been'}
-          >🎲</IconBtn>
-          <IconBtn onClick={reset} title="Reset the key sequencer to its defaults">↺</IconBtn>
-        </>
-      )}
-    >
+  // now : the key, the mode, the mode as it thinks
+  const nowRows = (
+    <>
       <Row label="key" hint="The key every Sonify voice plays in now (root, scale, octave). The thin bar fills toward the next change.">
         {/* the scale's name (not its id), cut short before the bar is squeezed */}
         <span className="min-w-0 shrink truncate font-mono text-[10px] text-accent" title={`${NOTE_NAMES[root]} ${isScale(scale) ? SCALE_LABEL[scale] : scale}, octave ${oct}`}>{NOTE_NAMES[root]} {isScale(scale) ? SCALE_LABEL[scale] : scale} <span className="text-muted">· oct {oct}</span></span>
@@ -198,10 +197,20 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
         ))}
       </div>
 
-      {/* each mode drawn as it thinks */}
-      <KeySeqVisual />
-      <Divider />
-      {/* the clock */}
+      {/* each mode drawn as it thinks (in the Seq page's lane, kept low : the
+          lane's column is wider than the card) */}
+      {lane ? (
+        <div className="[&_svg]:max-h-[170px]">
+          <KeySeqVisual />
+        </div>
+      ) : (
+        <KeySeqVisual />
+      )}
+    </>
+  )
+  // the clock
+  const clockRows = (
+    <>
       <Row label="rate" hint={onCuts ? 'Picture on cuts : the scene cuts set the time, not a clock' : 'How often a change may fall : beats or bars of the composition tempo (in phase with the effects sequencer), or free time'}>
         <select
           className="input select-compact min-w-0 flex-1 text-[10px]" value={ks.rate} disabled={onCuts}
@@ -264,31 +273,32 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
         </Row>
       )}
 
-      {/* the pool : the keys the generative modes may choose */}
-      {generative && (
-        <>
-          <Divider />
-          <Row label="roots" hint="The roots the sequencer may choose (List plays its own keys)">
-            <div className="grid min-w-0 flex-1 grid-cols-6 gap-1">
-              {NOTE_NAMES.map((n, i) => (
-                <button key={n} onClick={() => toggleRoot(i)} className={`${chipBig(ks.poolRoots[i])} px-0`}>{n}</button>
-              ))}
-            </div>
-          </Row>
-          <Row label="scales" hint="The scales the sequencer may choose">
-            {/* as many columns as keep a name whole ("dimWH" spilled past a 25 px chip) */}
-            <div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fill,minmax(32px,1fr))] gap-1">
-              {SCALE_ORDER.map((sc) => (
-                <button key={sc} onClick={() => toggleScale(sc)} title={SCALE_LABEL[sc]} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
-              ))}
-            </div>
-          </Row>
-        </>
-      )}
-
-      <Divider />
-
-      {/* the mode's own rows */}
+    </>
+  )
+  // the pool : the keys the generative modes may choose (List plays its own,
+  // Picture its own when it reads a list)
+  const poolRows = generative ? (
+    <>
+      <Row label="roots" hint="The roots the sequencer may choose (List plays its own keys)">
+        <div className="grid min-w-0 flex-1 grid-cols-6 gap-1">
+          {NOTE_NAMES.map((n, i) => (
+            <button key={n} onClick={() => toggleRoot(i)} className={`${chipBig(ks.poolRoots[i])} px-0`}>{n}</button>
+          ))}
+        </div>
+      </Row>
+      <Row label="scales" hint="The scales the sequencer may choose">
+        {/* as many columns as keep a name whole ("dimWH" spilled past a 25 px chip) */}
+        <div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fill,minmax(32px,1fr))] gap-1">
+          {SCALE_ORDER.map((sc) => (
+            <button key={sc} onClick={() => toggleScale(sc)} title={SCALE_LABEL[sc]} className={`${chipBig(ks.poolScales.includes(sc))} px-0`}>{SCALE_ABBR[sc]}</button>
+          ))}
+        </div>
+      </Row>
+    </>
+  ) : null
+  // the mode's own rows
+  const modeRows = (
+    <>
       {ks.mode === 'list' && (
         <>
           <Row label="order" hint="How the list is played">
@@ -378,13 +388,65 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox }: {
           />
         </>
       )}
+    </>
+  )
+  const homeRow = (
+    <Row label="home" hint="On stop, go back to the key it started from (or the last key you set by hand while it ran). Off : it stays where it is. A key set by hand while it runs becomes its home.">
+      <Toggle on={ks.returnHome} onClick={() => p({ returnHome: !ks.returnHome })}>
+        {ks.returnHome ? '↩ back home on stop' : 'stays on stop'}
+      </Toggle>
+    </Row>
+  )
 
+  // The Seq page's keys lane : the same rows in three columns (now, the clock,
+  // the keys), the header the lane's own
+  if (lane) {
+    const gap = spaceGap(space)
+    return (
+      <div className="grid grid-cols-3 gap-x-6">
+        <div className="flex min-w-0 flex-col" style={{ gap }}>{nowRows}</div>
+        <div className="flex min-w-0 flex-col" style={{ gap }}>{clockRows}</div>
+        <div className="flex min-w-0 flex-col" style={{ gap }}>
+          {poolRows}
+          {poolRows && <Divider />}
+          {modeRows}
+          <Divider />
+          {homeRow}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <Shell
+      collapsed={folded}
+      onCollapse={() => toggleSection('soni-keyseq')}
+      title="Key sequencer"
+      hint="Composes the root, scale and octave of every Sonify voice over time, on the composition tempo (in phase with the effects sequencer) or free time. The Seq page shows it too, as a lane : an edit in either shows in both."
+      on={ks.on}
+      onToggle={() => setOn(!ks.on)}
+      toggleText={['■ stop', '▶ play']}
+      toggleTitle="Play / stop the key sequencer : it changes the root, scale and octave of every Sonify voice over time"
+      midiId="fire:keyseq"
+      open
+      roomy
+      space={space}
+      foot={onWidth ? <CardGrip space={space} onSpace={setSpace} onReset={resetSpace} onWidth={onWidth} /> : undefined}
+      right={<KeySeqDice />}
+    >
+      {nowRows}
       <Divider />
-      <Row label="home" hint="On stop, go back to the key it started from (or the last key you set by hand while it ran). Off : it stays where it is. A key set by hand while it runs becomes its home.">
-        <Toggle on={ks.returnHome} onClick={() => p({ returnHome: !ks.returnHome })}>
-          {ks.returnHome ? '↩ back home on stop' : 'stays on stop'}
-        </Toggle>
-      </Row>
+      {clockRows}
+      {poolRows && (
+        <>
+          <Divider />
+          {poolRows}
+        </>
+      )}
+      <Divider />
+      {modeRows}
+      <Divider />
+      {homeRow}
     </Shell>
   )
 }

@@ -11,7 +11,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     rows: [
       ['O', 'Output / mapping (in its own window : brings it up)'],
       ['W', 'World editor'],
-      ['Q', 'Sequence (macro-form; in its own window : brings it up)'],
+      ['Q', 'Sequence : the scenes, the Sonify keys and the Body rule timeline (in its own window : brings it up)'],
       ['S', 'Sonify (image → sound; in its own window : brings it up)'],
       ['B', 'Body (embodied control; in its own window : brings it up)'],
       ['K', 'Resolume OSC mapper'],
