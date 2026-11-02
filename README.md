@@ -1354,7 +1354,9 @@ Hand shape · Pose · Face · Silhouette · Motion field · Movement qualities �
 the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO). So a raised hand can
-open a filter, or the body's motion drive feedback, continuously.
+open a filter, or the body's motion drive feedback, continuously. A layer's opacity
+(its **M** in the layer panel) and the Background's take one too : a hand's height
+fades a layer in and out.
 
 **Gestures → actions (the rule builder).** The **NEW RULE** line authors rules:
 **one gesture, or two combined**, fires an action and/or an OSC bang. Combos trigger
@@ -1374,6 +1376,9 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
   settings as the dice do), **A↔B** (a crossfade to the other source over the Morph time;
   again mid-way, it turns back), **next blend**, the layer's **vary**, and **punch** (its
   opacity up and back in half a second, a dip when it is already full : no undo step).
+  Its **opacity** : **off** (0), **full** (1), **off / back** (to 0; again, back to where
+  it was), **up** and **down** a tenth (type `L2 opacity` in the list to find them).
+- **Background** : the same five for its opacity (at 0 the Background is off).
 - **Triggers (what is loaded)** : every trigger (`▸`) of every effect and source loaded
   now, found by itself : `L2 FX · Field Store · grab`, `L1 A · Ten Print · reseed`,
   `Master · Finalizer · dirt burst`... A trigger fires every unit of that effect in that
@@ -1399,8 +1404,8 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
   transform **turned 90°**, **spinning** or not, **flipped** X or Y, reset.
 - **Session** : New, Load, Open.
 
-An action leaves whatever is **persistent** alone (a pinned layer, blend, source,
-Macro knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
+An action leaves whatever is **persistent** alone (a pinned layer, opacity, blend,
+source, Macro knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
 its button would. Fired again and again it stays cheap : a second A↔B mid-way turns
 back, a punch restarts. No action opens a camera, a microphone or a network source. A
 rule whose target is gone (an effect no longer loaded, a scene slot past the bank, a

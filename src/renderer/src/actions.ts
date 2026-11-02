@@ -20,6 +20,7 @@
 //
 // Ids :
 //   act:layer:<i>:<mute|solo|fx|fb|freeze|next|prev|rand|ab|blend|vary|punch>
+//   act:layer:<i>:<opoff|opfull|optoggle|opup|opdown> · act:bg:<the same five>   opacity
 //   act:fx:<rack>:<shader>:<input>   an effect's trigger (rack : master,
 //                                     background, layer:<i>, sourceA:<i>, sourceB:<i>)
 //   act:src:<i>:<A|B>:<shader>:<input> · act:bgsrc:<shader>:<input>   a source's trigger
@@ -98,9 +99,42 @@ const hasB = (l: LayerState | undefined): boolean => !!l?.sourceB && l.sourceB.k
 
 // ── Layers ──────────────────────────────────────────────────────────────────
 
-const LAYER_VERBS = ['mute', 'solo', 'fx', 'fb', 'freeze', 'next', 'prev', 'rand', 'ab', 'blend', 'vary', 'punch'] as const
+// The opacity actions a layer and the Background share
+const OP_VERBS = ['opoff', 'opfull', 'optoggle', 'opup', 'opdown'] as const
+type OpVerb = (typeof OP_VERBS)[number]
+const isOp = (v: string): v is OpVerb => (OP_VERBS as readonly string[]).includes(v)
+const OP_WORDS: Record<OpVerb, { label: string; verb: (whose: string) => string; token: string; title: string }> = {
+  opoff: { label: 'opacity off', verb: (w) => `sets ${w} opacity to 0`, token: 'OpOff', title: 'Its opacity to 0, at once (a modulated opacity keeps moving around it)' },
+  opfull: { label: 'opacity full', verb: (w) => `sets ${w} opacity to full`, token: 'OpFull', title: 'Its opacity to 1, at once' },
+  optoggle: { label: 'opacity off / back', verb: (w) => `takes ${w} opacity off and back`, token: 'OpBack', title: 'Its opacity to 0; again, back to where it was (full when no action took it down)' },
+  opup: { label: 'opacity up', verb: (w) => `raises ${w} opacity`, token: 'OpUp', title: 'Its opacity a tenth up' },
+  opdown: { label: 'opacity down', verb: (w) => `lowers ${w} opacity`, token: 'OpDown', title: 'Its opacity a tenth down' }
+}
+const OP_STEP = 0.1
+// The opacity an action took to 0 ('L<i>' or 'bg'), given back by "off / back"
+const opacityAt = new Map<string, number>()
+function opacityTo(key: string, cur: number, v: OpVerb): number {
+  const to = ((): number => {
+    switch (v) {
+      case 'opoff': if (cur > 0) opacityAt.set(key, cur); return 0
+      case 'opfull': return 1
+      case 'optoggle': {
+        if (cur > 0) { opacityAt.set(key, cur); return 0 }
+        const back = opacityAt.get(key) ?? 1
+        opacityAt.delete(key)
+        return back
+      }
+      case 'opup': return Math.round((cur + OP_STEP) * 100) / 100
+      case 'opdown': return Math.round((cur - OP_STEP) * 100) / 100
+    }
+  })()
+  return Math.max(0, Math.min(1, to))
+}
+
+const LAYER_VERBS = ['mute', 'solo', 'fx', 'fb', 'freeze', 'next', 'prev', 'rand', 'ab', 'blend', 'vary', 'punch', ...OP_VERBS] as const
 type LayerVerb = (typeof LAYER_VERBS)[number]
-const LAYER_WORDS: Record<LayerVerb, { label: string; verb: (n: number) => string; token: string; title: string }> = {
+type PlainLayerVerb = Exclude<LayerVerb, OpVerb>
+const LAYER_WORDS: Record<PlainLayerVerb, { label: string; verb: (n: number) => string; token: string; title: string }> = {
   mute: { label: 'mute on/off', verb: (n) => `mutes layer ${n}`, token: 'Mute', title: 'Mutes the layer, or brings it back' },
   solo: { label: 'solo on/off', verb: (n) => `solos layer ${n}`, token: 'Solo', title: 'Solos the layer, or lets the others back' },
   fx: { label: 'FX on/off', verb: (n) => `switches layer ${n}’s FX`, token: 'Fx', title: 'Turns all the layer’s effects off, or all back on (its rack’s power switch)' },
@@ -121,7 +155,7 @@ function layerPins(i: number, v: LayerVerb, l: LayerState | undefined): string[]
   if (v === 'freeze') keys.push(layerSpeedPin(i))
   if (v === 'ab') keys.push(`lay:${i}:mix`)
   if (v === 'blend') keys.push(`lay:${i}:blend`)
-  if (v === 'punch') keys.push(`lay:${i}:opacity`)
+  if (v === 'punch' || isOp(v)) keys.push(`lay:${i}:opacity`)
   if ((v === 'next' || v === 'prev' || v === 'rand') && l) keys.push(slotPin(i, onAir(l)))
   return keys
 }
@@ -216,7 +250,7 @@ function fireLayer(i: number, v: LayerVerb): void {
   const l = st.composition.layers[i]
   if (!l) return
   if (v === 'vary') { st.varyLayer(i); return } // (it keeps its own pins)
-  if (held(st, layerPins(i, v, l), `L${i + 1}${v === 'next' || v === 'prev' || v === 'rand' ? ` ${onAir(l)}` : ''}`)) return
+  if (held(st, layerPins(i, v, l), `L${i + 1}${v === 'next' || v === 'prev' || v === 'rand' ? ` ${onAir(l)}` : isOp(v) ? ' opacity' : ''}`)) return
   switch (v) {
     case 'mute': st.toggleMute(i); return
     case 'solo': st.toggleSolo(i); return
@@ -240,7 +274,19 @@ function fireLayer(i: number, v: LayerVerb): void {
       return
     }
     case 'punch': punch(i, l); return
+    default:
+      // (one store write : one undo step, steps fired in a row coalesce)
+      if (isOp(v)) st.setOpacity(i, opacityTo(`L${i}`, l.opacity, v))
   }
+}
+
+// The Background's opacity (0 : off). Its pin is the control's own.
+function fireBgOpacity(v: OpVerb): void {
+  const st = get()
+  const bg = st.composition.background
+  if (!bg) return // (no Background in this session : the store would make one)
+  if (held(st, ['bg:opacity'], 'The Background opacity')) return
+  st.setBackgroundOpacity(opacityTo('bg', bg.opacity, v))
 }
 
 // ── Triggers : every event input loaded (an effect's grab / clear, a source's reseed) ──
@@ -407,6 +453,9 @@ export function fireAction(id: string): void {
       if (Number.isInteger(i) && (LAYER_VERBS as readonly string[]).includes(p[3])) fireLayer(i, p[3] as LayerVerb)
       return
     }
+    case 'bg':
+      if (isOp(p[2])) fireBgOpacity(p[2])
+      return
     case 'fx': {
       // rack is one word (master / background) or two (layer:1)
       const two = p[2] !== 'master' && p[2] !== 'background'
@@ -566,9 +615,21 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
   switch (p[1]) {
     case 'layer': {
       const i = Number(p[2])
-      const w = LAYER_WORDS[p[3] as LayerVerb]
-      if (!Number.isInteger(i) || i < 0 || !w) return null
-      return { label: `LAYER ${i + 1} ${w.label}`, verb: w.verb(i + 1), token: `L${i + 1}${w.token}`, group: `Layer ${i + 1}`, title: w.title, gone: !st.composition.layers[i] }
+      if (!Number.isInteger(i) || i < 0) return null
+      const gone = !st.composition.layers[i]
+      if (isOp(p[3])) {
+        const o = OP_WORDS[p[3]]
+        return { label: `LAYER ${i + 1} ${o.label}`, verb: o.verb(`layer ${i + 1}’s`), token: `L${i + 1}${o.token}`, group: `Layer ${i + 1}`, title: o.title.replace('Its', 'The layer’s'), gone }
+      }
+      const w = LAYER_WORDS[p[3] as PlainLayerVerb]
+      if (!w) return null
+      return { label: `LAYER ${i + 1} ${w.label}`, verb: w.verb(i + 1), token: `L${i + 1}${w.token}`, group: `Layer ${i + 1}`, title: w.title, gone }
+    }
+    case 'bg': {
+      if (!isOp(p[2])) return null
+      const o = OP_WORDS[p[2]]
+      const gone = !st.composition.background
+      return { label: `BACKGROUND ${o.label}${gone ? ' (gone)' : ''}`, verb: o.verb('the Background’s'), token: `Bg${o.token}`, group: 'Background', title: `${o.title.replace('Its', 'The Background’s')}. At 0 the Background is off`, gone }
     }
     case 'fx': {
       const two = p[2] !== 'master' && p[2] !== 'background'
@@ -699,11 +760,13 @@ export function actionLabel(id: string): string {
 }
 
 /** Every `act:` id worth offering now, in the picker's order : the layers, the
- *  triggers of what is loaded, the effects, the scenes, the Worlds, Generate,
- *  the Meta knobs, the modulators, the Feel, tempo and sound, the output. */
+ *  Background's opacity, the triggers of what is loaded, the effects, the
+ *  scenes, the Worlds, Generate, the Meta knobs, the modulators, the Feel,
+ *  tempo and sound, the output. */
 export function actionIds(st: St = get()): string[] {
   const out: string[] = []
   st.composition.layers.forEach((_, i) => { for (const v of LAYER_VERBS) out.push(`act:layer:${i}:${v}`) })
+  if (st.composition.background) for (const v of OP_VERBS) out.push(`act:bg:${v}`)
   // triggers : every event input of every effect and source loaded now
   const seen = new Set<string>()
   const add = (id: string): void => { if (!seen.has(id)) { seen.add(id); out.push(id) } }
