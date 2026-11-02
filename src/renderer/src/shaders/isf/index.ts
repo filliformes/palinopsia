@@ -903,7 +903,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Silhouette : finds the people in whatever picture it is dropped on (a film, a camera layer, an NDI input) and cuts them out, the Silhouette source's looks on any picture. CUTOUT shows the picture where the people are and nothing elsewhere, MATTE white people on black (to key another layer, or feed a Matte node), SHADOW a flat colored figure, HOLE the picture with the people taken out. PEOPLE is how many it looks for (up to 4, united), DETAIL the size the picture is read at, SMOOTH how the mask follows over time, THRESHOLD and SOFTNESS shape the edge, TRAIL leaves fading echoes, OVER lays the result over the picture. The body model runs beside the picture (up to 30 looks a second), so the mask trails a fast move by a few frames; HOLD TO THE MASK holds the picture back by that much instead, so the cut fits. On a frame with nobody it does nothing.",
+      "DESCRIPTION": "Silhouette : finds the people in whatever picture it is dropped on (a film, a camera layer, an NDI input) and cuts them out, the Silhouette source's looks on any picture. CUTOUT shows the picture where the people are and nothing elsewhere, MATTE white people on black (to key another layer, or feed a Matte node), SHADOW a flat colored figure, HOLE the picture with the people taken out. FILL (picked in the Inspector) puts another layer's picture where the people are, seen through a window shaped like them : CUTOUT the fill alone, HOLE the picture around and the fill inside, SHADOW the fill tinted by the shadow color; SHADE lays the figure's own light and shadow over it so the body stays readable (mute the fill layer to see it only in the people). PEOPLE is how many it looks for (up to 4, united), DETAIL the size the picture is read at, SMOOTH how the mask follows over time, THRESHOLD and SOFTNESS shape the edge, TRAIL leaves fading echoes, OVER lays the result over the picture. The body model runs beside the picture (up to 30 looks a second), so the mask trails a fast move by a few frames; HOLD TO THE MASK holds the picture back by that much instead, so the cut fits. On a frame with nobody it does nothing.",
       "CATEGORIES": ["FX", "Utility", "Key", "Live"],
       "INPUTS": [
         { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["cutout", "matte", "shadow", "hole"], "DEFAULT": 0, "LABEL": "mode" },
@@ -914,6 +914,7 @@ export const NATIVE_NODES: IsfShader[] = [
         { "NAME": "threshold", "TYPE": "float", "MIN": 0.05, "MAX": 0.95, "DEFAULT": 0.5, "LABEL": "threshold" },
         { "NAME": "softness", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.08, "LABEL": "softness" },
         { "NAME": "color", "TYPE": "color", "DEFAULT": [0.95, 0.92, 0.85, 1.0], "LABEL": "shadow color" },
+        { "NAME": "shade", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "shade" },
         { "NAME": "trail", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "trail" },
         { "NAME": "trailColor", "TYPE": "color", "DEFAULT": [1.0, 1.0, 1.0, 1.0], "LABEL": "trail color" },
         { "NAME": "over", "TYPE": "bool", "DEFAULT": false, "LABEL": "over the picture", "COMPACT": true },
@@ -921,7 +922,7 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     // the dice never touch the model's own settings (people, detail : a rebuild)
-    curated: { people: [2, 2], detail: [1, 1], smooth: [0.1, 0.5], threshold: [0.4, 0.6], softness: [0.04, 0.2], trail: [0, 0.6], mix: [0.8, 1] }
+    curated: { people: [2, 2], detail: [1, 1], smooth: [0.1, 0.5], threshold: [0.4, 0.6], softness: [0.04, 0.2], shade: [0.3, 0.8], trail: [0, 0.6], mix: [0.8, 1] }
   }
 ]
 

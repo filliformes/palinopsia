@@ -139,7 +139,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   // Silhouette (effect) : how the people are found · how they look · how it lands
   'node-silhouette': [
     g('find', 'people', 'detail', 'smooth', 'sync'),
-    g('look', 'mode', 'threshold', 'softness', 'color'),
+    g('look', 'mode', 'threshold', 'softness', 'color', 'shade'),
     g('out', 'trail', 'trailColor', 'over', 'mix')
   ],
   'node-codecmosh': [
@@ -226,6 +226,8 @@ interface Dim {
   isnt: (name: string, ...vals: number[]) => boolean
   /** at this value and not modulated */
   at: (name: string, x: number) => boolean
+  /** a layer is picked in the node's first input (its sidechain : Silhouette's fill) */
+  side: boolean
 }
 type Why = Record<string, string>
 const put = (d: Why, names: string[], why: string): void => {
@@ -257,9 +259,11 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     else if (zero('trail')) d.trailColor = 'Trail is at 0 : the matte leaves no echoes to color.'
     return d
   },
-  'node-silhouette': ({ zero, is, isnt }) => {
+  'node-silhouette': ({ zero, is, isnt, side }) => {
     const d: Why = {}
-    if (isnt('mode', 2)) d.color = 'Only the shadow mode is drawn in the shadow color.'
+    if (!side) d.shade = 'No fill is picked : shade lights the fill, there is none.'
+    else if (is('mode', 1)) d.shade = 'The matte is white people on black : the fill is not drawn.'
+    if (isnt('mode', 2)) d.color = side ? 'Only the shadow mode tints the fill with the shadow color.' : 'Only the shadow mode is drawn in the shadow color.'
     if (isnt('mode', 1)) d.trailColor = 'Only the matte mode colors its echoes : the other modes keep the look the people had.'
     else if (zero('trail')) d.trailColor = 'Trail is at 0 : the matte leaves no echoes to color.'
     if (is('mode', 1)) d.over = 'The matte is opaque : nothing of the picture shows under it.'
@@ -472,7 +476,8 @@ const DIMS: Record<string, (q: Dim) => Why> = {
 export function groupDim(
   shaderId: string,
   values: Record<string, Value>,
-  modulated: ReadonlySet<string> = new Set()
+  modulated: ReadonlySet<string> = new Set(),
+  slot: { side?: boolean } = {}
 ): Record<string, string> | undefined {
   const f = DIMS[shaderId]
   if (!f) return undefined
@@ -489,7 +494,8 @@ export function groupDim(
     zero: (k) => free(k) && Math.abs(v(k)) < 0.001,
     is: (k, ...vals) => free(k) && vals.includes(Math.round(v(k))),
     isnt: (k, ...vals) => free(k) && !vals.includes(Math.round(v(k))),
-    at: (k, x) => free(k) && Math.abs(v(k) - x) < 0.001
+    at: (k, x) => free(k) && Math.abs(v(k) - x) < 0.001,
+    side: !!slot.side
   })
   return Object.keys(out).length ? out : undefined
 }

@@ -751,15 +751,16 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     clear: 'Restarts the loop from the live frame (the rising edge), for this node only.'
   },
   'node-silhouette': {
-    mode: 'Cutout : the picture where the people are, nothing elsewhere (background removal). Matte : white people on black, to key another layer or feed a Matte node. Shadow : a flat colored figure. Hole : the picture with the people taken out.',
+    mode: 'Cutout : the picture where the people are, nothing elsewhere (background removal). Matte : white people on black, to key another layer or feed a Matte node. Shadow : a flat colored figure. Hole : the picture with the people taken out. With a FILL picked (the row above) : cutout = the fill in their shape, hole = the picture around them and the fill inside, shadow = the fill tinted by the shadow color.',
     people: 'How many people it looks for, united into one mask. More finds a crowd but may take in a face on a poster or a screen; 1 is the quickest.',
     detail: 'The size the picture is read at (384, 512 or 768 px on the long side) : high helps a small figure far away, low costs the least.',
     smooth: 'How the mask follows over time : 0 jumps from look to look (stepping), higher glides between them and calms the edge, at the cost of trailing a fast move.',
     sync: 'Hold the picture back to the frame its mask was found in (a few frames late), so the cut fits a fast move. Off : the picture is live and the mask trails a fast move by a few frames (the immediate choice for a camera).',
     threshold: 'Where the edge falls on the mask : lower takes in more (hair, loose clothes, a halo), higher keeps only the certain body.',
     softness: 'How soft the edge is : 0 is a hard cut, higher feathers it.',
-    color: 'Color and opacity of the shadow (shadow mode).',
-    trail: 'Echoes : the people leave fading copies of themselves behind as they move. 0 = none, 1 = several seconds.',
+    color: 'Color and opacity of the shadow (shadow mode). With a fill, the fill is multiplied by it : white leaves the fill as it is, a color tints it like glass.',
+    shade: "With a fill : how much of the figure's own light and shadow is laid over it, so the body stays readable. 0 = a flat fill in the people's shape, 1 = the fill lit like the person (their mean brightness keeps the fill as it is, brighter and darker parts lift and deepen it).",
+    trail: 'Echoes : the people leave fading copies of themselves behind as they move. 0 = none, 1 = several seconds. With a fill, each echo keeps the fill as it was (in hole mode the fill lingers in the picture where they passed).',
     trailColor: 'Matte mode : the color the echoes fade in behind the white figures (white keeps the plain grey key; its opacity dims them).',
     over: 'Lay the result over the picture instead of on nothing : a shadow paints the figure onto the film, a cutout or a hole leaves its echoes over it.',
     mix: 'Dry/wet against the picture.'

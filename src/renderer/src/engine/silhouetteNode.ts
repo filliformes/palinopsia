@@ -27,6 +27,18 @@
 // The mask trails the picture by its detection (a few frames); SYNC holds the
 // picture back by that much instead (a ring of copies of the input, as many as
 // the measured delay needs, at most SYNC_MAX), so the cut fits a fast move.
+// FILL (the sidechain : another layer, picked in the Inspector) is what is drawn
+// WHERE THE PEOPLE ARE, screen-aligned (that layer seen through a window shaped
+// like them) : CUTOUT the fill inside them and nothing elsewhere, HOLE the
+// picture around them and the fill inside, SHADOW the fill tinted by the shadow
+// color (multiplied : white leaves it as it is) at the color's opacity; MATTE
+// ignores it. SHADE lays the figure's own light and shadow over the fill (hard
+// light, measured against the figure's own mean and spread so a dim film and a
+// bright one both read), so the body stays readable. The trail keeps the fill
+// as it was, each echo a remembered pose made of it (in HOLE too : the fill
+// lingers in the picture where they passed). A muted fill layer still renders
+// while this reads it (the Compositor's sideReading), so it shows only in the
+// people. No fill picked = the old programs, untouched (the same pixels).
 // Bypassed, or on a muted layer nobody reads (ctx.live false), it does nothing
 // at all : no readback, no look; the shared worker is let go after 30 s unused.
 // It never opens a camera and never downloads anything : the model ships in
@@ -402,6 +414,67 @@ ${SIL_LOOK_GLSL}
 ${GLSL_FINISH}
 void main(){ o = finish(silOut(uMode, texture(uState, vUV)), texture(uHost, vUV)); }`
 
+// ── FILL : another layer drawn where the people are (programs of their own, so
+// the look without a fill keeps its exact pixels). The mask cut is the look's.
+const GLSL_FILL = `
+uniform sampler2D uMask;
+uniform float uThresh, uSoft, uShade;
+uniform vec2 uLight; // the figure's mean luminance, and the gain that spreads +-2 sd over 0..1
+uniform vec4 uColor;
+float silMask(){
+  float raw = texture(uMask, vec2(vUV.x, 1.0 - vUV.y)).r;
+  return smoothstep(uThresh - uSoft, uThresh + uSoft, raw);
+}
+// What is drawn where the people are (straight alpha) : the fill lit by the
+// figure's own light (hard light, mid grey at the figure's mean = the fill as it
+// is), tinted by the shadow color in SHADOW.
+vec4 silBody(int mode, vec4 fill, vec4 pic, float m){
+  float L = dot(clamp(pic.rgb, 0.0, 1.0), vec3(0.2126, 0.7152, 0.0722));
+  float b = clamp(0.5 + (L - uLight.x) * uLight.y, 0.0, 1.0);
+  vec3 f = clamp(fill.rgb, 0.0, 1.0);
+  vec3 lit = b < 0.5 ? 2.0 * f * b : 1.0 - 2.0 * (1.0 - f) * (1.0 - b);
+  vec3 c = mix(fill.rgb, lit, uShade);
+  if (mode == 2) return vec4(c * uColor.rgb, fill.a * m * uColor.a);
+  return vec4(c, fill.a * m);
+}
+// The body (or its trail) laid on what is around it : HOLE the picture with the
+// people taken out, the others nothing.
+vec4 silAround(int mode, vec4 body, vec4 pic, float m){
+  if (mode != 3) return body;
+  vec4 b = vec4(body.rgb * body.a, body.a);
+  vec4 a = vec4(pic.rgb * pic.a * (1.0 - m), pic.a * (1.0 - m));
+  vec4 c = b + a * (1.0 - b.a);
+  return vec4(c.a > 1e-5 ? c.rgb / c.a : vec3(0.0), c.a);
+}`
+
+// The fill's look : with a trail it writes the body's trail state (silTrail as
+// the cutout keeps it : each echo the color it had), F_OUT_FILL lays it down.
+const F_LOOK_FILL = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uTrail, uFill;
+uniform int uMode, uTrailOn;
+uniform float uKeep, uFrame;
+${SIL_LOOK_GLSL}
+${GLSL_FINISH}
+${GLSL_FILL}
+void main(){
+  vec4 pic = texture(uHost, vUV);
+  float m = silMask();
+  vec4 body = silBody(uMode, texture(uFill, vUV), pic, m);
+  if (uTrailOn == 1) o = silTrail(0, body, m, texture(uTrail, vUV), uKeep, vec4(1.0), gl_FragCoord.xy, uFrame);
+  else o = finish(silAround(uMode, body, pic, m), pic);
+}`
+
+const F_OUT_FILL = `#version 300 es
+precision highp float; in vec2 vUV; out vec4 o;
+uniform sampler2D uHost, uState; uniform int uMode;
+${GLSL_FINISH}
+${GLSL_FILL}
+void main(){
+  vec4 pic = texture(uHost, vUV);
+  o = finish(silAround(uMode, texture(uState, vUV), pic, silMask()), pic);
+}`
+
 interface Prog {
   p: WebGLProgram
   u: Record<string, WebGLUniformLocation | null>
@@ -460,6 +533,18 @@ export class SilhouetteNode implements ConvNode {
   private tick = 0 // frames drawn live
   private postedTick = -1 // the frame the look in flight was read from
   private latency = 0 // frames from a frame read to its mask drawn (smoothed)
+  // FILL : its two programs (made the first time a fill is drawn) and the
+  // figure's light for SHADE : the luminance of the frame in flight (every 4th
+  // pixel), measured inside its mask when that comes back.
+  private lookFill: Prog | null = null
+  private outFill: Prog | null = null
+  private fillOn = false
+  private postedLuma: Uint8Array | null = null
+  private postedW = 0 // the posted frame's size
+  private postedH = 0
+  private lightMean = 0.5
+  private lightGain = 2
+  private lightSeen = false
 
   constructor(private gl: WebGL2RenderingContext) {
     this.trail = new SilTrail(gl)
@@ -505,6 +590,7 @@ export class SilhouetteNode implements ConvNode {
       this.zero = null; this.raw = null; this.rawW = 0; this.rawH = 0; this.state = null; this.stateW = 0; this.stateH = 0
       this.read = null; this.hasState = false; this.fresh = true
       this.copy = null; this.ring = []; this.ringTick = []; this.ringW = 0; this.ringH = 0
+      this.lookFill = null; this.outFill = null
       this.trail = new SilTrail(gl)
       this.gen = glGeneration()
     }
@@ -534,6 +620,47 @@ export class SilhouetteNode implements ConvNode {
     this.ema = this.program(F_EMA, ['uRaw', 'uPrev', 'uK', 'uHas'])
     this.out = this.program(F_OUT, ['uHost', 'uState', 'uMode', 'uOver', 'uMix'])
     this.read = new GridReadback(this.gl, 3)
+  }
+
+  /** The fill's programs (the prewarm draws them once : it hands every node a sidechain). */
+  private ensureFill(): void {
+    if (this.lookFill) return
+    const fillU = ['uMask', 'uThresh', 'uSoft', 'uShade', 'uLight', 'uColor', 'uOver', 'uMix']
+    this.lookFill = this.program(F_LOOK_FILL, ['uHost', 'uTrail', 'uFill', 'uMode', 'uTrailOn', 'uKeep', 'uFrame', ...fillU])
+    this.outFill = this.program(F_OUT_FILL, ['uHost', 'uState', 'uMode', ...fillU])
+  }
+
+  /** The figure's light inside the mask of the frame it was found in : its mean
+   *  luminance and spread, followed over a few looks (SHADE centers the fill's
+   *  light on the mean, so a dim film does not just darken the fill). */
+  private measureLight(r: FinderResult): void {
+    const lum = this.postedLuma
+    if (!lum || !r.mask || !this.postedW) return
+    const lw = Math.ceil(this.postedW / 4)
+    const lh = Math.ceil(this.postedH / 4)
+    const sx = r.w / this.postedW
+    const sy = r.h / this.postedH
+    let n = 0
+    let s = 0
+    let s2 = 0
+    for (let y = 0; y < lh; y++) {
+      const my = Math.min(r.h - 1, Math.floor((y * 4 + 2) * sy)) * r.w
+      for (let x = 0; x < lw; x++) {
+        if (r.mask[my + Math.min(r.w - 1, Math.floor((x * 4 + 2) * sx))] < 128) continue
+        const l = lum[y * lw + x] / 255
+        s += l
+        s2 += l * l
+        n++
+      }
+    }
+    if (n < 24) return // too little of anyone to measure : keep the last
+    const mean = s / n
+    const sd = Math.sqrt(Math.max(0, s2 / n - mean * mean))
+    const gain = 0.25 / Math.max(sd, 0.06)
+    const k = this.lightSeen ? 0.3 : 1
+    this.lightMean += (mean - this.lightMean) * k
+    this.lightGain += (gain - this.lightGain) * k
+    this.lightSeen = true
   }
 
   private ensureState(w: number, h: number): void {
@@ -593,6 +720,23 @@ export class SilhouetteNode implements ConvNode {
           c.served = now
         } else {
           this.lastHash = h
+          if (this.fillOn) {
+            // SHADE's light : the luminance of this frame, every 4th pixel (~0.03 ms)
+            const lw = Math.ceil(fw / 4)
+            const lh = Math.ceil(fh / 4)
+            if (!this.postedLuma || this.postedLuma.length !== lw * lh) this.postedLuma = new Uint8Array(lw * lh)
+            const lum = this.postedLuma
+            const px = g.grid
+            for (let y = 0; y < lh; y++) {
+              const row = (y * 4 + 2 < fh ? y * 4 + 2 : fh - 1) * fw
+              for (let x = 0; x < lw; x++) {
+                const i = (row + (x * 4 + 2 < fw ? x * 4 + 2 : fw - 1)) * 4
+                lum[y * lw + x] = (54 * px[i] + 183 * px[i + 1] + 19 * px[i + 2]) >> 8
+              }
+            }
+            this.postedW = fw
+            this.postedH = fh
+          } else this.postedW = 0
           finder.post(c, new ImageData(new Uint8ClampedArray(g.grid), fw, fh), now)
           this.postedTick = this.tick - 1
           // a frame early : at 60 fps the rate lands on every other frame
@@ -623,6 +767,7 @@ export class SilhouetteNode implements ConvNode {
       this.rawHas = false
       return true
     }
+    if (this.fillOn) this.measureLight(r)
     const gl = this.gl
     if (!this.raw) this.raw = this.texture(gl.LINEAR)
     gl.bindTexture(gl.TEXTURE_2D, this.raw)
@@ -736,6 +881,11 @@ export class SilhouetteNode implements ConvNode {
     const now = performance.now()
     const wallDt = this.lastAt > 0 ? clamp((now - this.lastAt) / 1000, 0, 0.1) : 1 / 60
     this.lastAt = now
+    const mode = Math.round(clamp(num(inp.mode, 0), 0, 3))
+    // the fill : another layer, drawn where the people are (the matte ignores it)
+    const fill = mode !== 1 ? ctx.sidechain : null
+    if (fill && !this.fillOn) this.lightSeen = false // measure this picture's light afresh
+    this.fillOn = !!fill
 
     let pic = ctx.host
     if (!warm) {
@@ -758,7 +908,6 @@ export class SilhouetteNode implements ConvNode {
     }
 
     // ── the look ──
-    const mode = Math.round(clamp(num(inp.mode, 0), 0, 3))
     const trail = warm ? 0 : clamp(num(inp.trail, 0), 0, 1)
     const keep = trailKeep(trail, Math.abs(ctx.dt))
     if (keep > 0) this.trail.ensure(cw, ch)
@@ -768,6 +917,7 @@ export class SilhouetteNode implements ConvNode {
     const over = num(inp.over, 0) >= 0.5 ? 1 : 0
     const mix = clamp(num(inp.mix, 1), 0, 1)
     const mask = this.hasState && this.state ? this.state[1 - this.stateCur].tex : this.zero!
+    if (fill) return this.renderFill(ctx, pic, mask, fill, mode, keep, color, over, mix, warm)
     const p = this.look!
     gl.useProgram(p.p)
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pic); gl.uniform1i(p.u.uHost, 0)
@@ -812,6 +962,72 @@ export class SilhouetteNode implements ConvNode {
     return dst.tex
   }
 
+  /** The look with a FILL : the other layer where the people are (cutout, hole,
+   *  shadow), lit by the figure's own light (SHADE), with or without a trail. */
+  private renderFill(
+    ctx: NodeContext, pic: WebGLTexture, mask: WebGLTexture, fill: WebGLTexture, mode: number,
+    keep: number, color: number[], over: number, mix: number, warm: boolean
+  ): WebGLTexture {
+    const gl = this.gl
+    const cw = ctx.chain.w
+    const ch = ctx.chain.h
+    const inp = ctx.inputs
+    this.ensureFill()
+    const setCommon = (q: Prog): void => {
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, mask); gl.uniform1i(q.u.uMask, 1)
+      gl.uniform1i(q.u.uMode, mode)
+      gl.uniform1f(q.u.uThresh, clamp(num(inp.threshold, 0.5), 0.02, 0.98))
+      gl.uniform1f(q.u.uSoft, Math.max(0.001, num(inp.softness, 0.08)))
+      gl.uniform1f(q.u.uShade, clamp(num(inp.shade, 0.5), 0, 1))
+      gl.uniform2f(q.u.uLight, this.lightMean, this.lightGain)
+      gl.uniform4f(q.u.uColor, color[0] ?? 1, color[1] ?? 1, color[2] ?? 1, color[3] ?? 1)
+      gl.uniform1i(q.u.uOver, over)
+      gl.uniform1f(q.u.uMix, mix)
+    }
+    const p = this.lookFill!
+    gl.useProgram(p.p)
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pic); gl.uniform1i(p.u.uHost, 0)
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.trail.read() ?? mask); gl.uniform1i(p.u.uTrail, 2)
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, fill); gl.uniform1i(p.u.uFill, 3)
+    setCommon(p)
+    gl.uniform1i(p.u.uTrailOn, this.trail.on ? 1 : 0)
+    gl.uniform1f(p.u.uKeep, keep)
+    gl.uniform1f(p.u.uFrame, this.frameNo++ % 4096)
+    const dst = ctx.chain.next()
+    const write = this.trail.write()
+    gl.bindVertexArray(this.vao) // the readback ring unbinds it
+    if (write) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo)
+      gl.viewport(0, 0, cw, ch)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+    }
+    if (write || warm) {
+      // the trail state laid down (the warm-up draws this program once too)
+      if (!write) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo)
+        gl.viewport(0, 0, cw, ch)
+        gl.drawArrays(gl.TRIANGLES, 0, 3)
+      }
+      const q = this.outFill!
+      gl.useProgram(q.p)
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, pic); gl.uniform1i(q.u.uHost, 0)
+      gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, write ? write.tex : mask); gl.uniform1i(q.u.uState, 2)
+      setCommon(q)
+      if (write) this.trail.swap()
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo)
+    gl.viewport(0, 0, cw, ch)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    for (let i = 0; i < 4; i++) {
+      gl.activeTexture(gl.TEXTURE0 + i)
+      gl.bindTexture(gl.TEXTURE_2D, null)
+    }
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    gl.bindVertexArray(null)
+    return dst.tex
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
@@ -823,7 +1039,7 @@ export class SilhouetteNode implements ConvNode {
     this.disposeState()
     this.disposeRing()
     this.read?.dispose()
-    for (const pr of [this.pack, this.ema, this.look, this.out, this.copy]) if (pr) gl.deleteProgram(pr.p)
+    for (const pr of [this.pack, this.ema, this.look, this.out, this.copy, this.lookFill, this.outFill]) if (pr) gl.deleteProgram(pr.p)
     for (const t of [this.zero, this.raw]) if (t) gl.deleteTexture(t)
     if (this.vao) {
       gl.bindVertexArray(this.vao)

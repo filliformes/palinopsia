@@ -1224,9 +1224,14 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
   }
   // A node that reads another layer is handed one, or dropped when the scene has
   // no other layer (Lookup alone falls back to reading itself, its own palette).
+  // A theme may name the layer (`reads` : the Silhouette's fill), never its own.
   const themeFx = (id: string, layerIdx: number): FxInstance | null => {
     const fx: FxInstance = { id: uid(), shaderId: id, enabled: true, inputs: pickedInputs(id) }
-    if (THEME_READS_LAYER.has(id)) {
+    const named = theme.reads?.[id]
+    if (named !== undefined) {
+      if (named !== layerIdx && named >= 0 && named < nActive) fx.sidechain = { kind: 'layer', layer: named }
+      else if (THEME_READS_LAYER.has(id)) return null
+    } else if (THEME_READS_LAYER.has(id)) {
       const j = otherLayer(layerIdx)
       if (j === null) return id === 'node-lookup' ? fx : null
       fx.sidechain = { kind: 'layer', layer: j }
@@ -1310,6 +1315,7 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     }
     l.blend = i === 0 ? 'normal' : pickOf(theme.blends)
     l.opacity = i === 0 ? 1 : rr(0.65, 1)
+    if (theme.muted?.includes(i)) l.mute = true // seen only through what reads it
     l.feedback = R() < theme.feedback
     l.feedbackAmount = rr(0.4, 0.75)
     l.speed = rr(0.6, 1.6)
