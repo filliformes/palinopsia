@@ -68,6 +68,12 @@ export interface Theme {
    *  Perspective that lays a line field on a plane. Kept out of `layerFx`, whose
    *  draws are by chance. */
   stackFx?: string[][]
+  /** Per node id : the layer it reads (bottom first, its sidechain), instead of
+   *  a random other active one (or none : the Silhouette's FILL is that layer). */
+  reads?: Record<string, number>
+  /** Layers that land muted (bottom first) : seen only through a node that reads
+   *  them (a muted layer still renders while another unit reads it). */
+  muted?: number[]
   /** Value draws per source, effect or node : one of the listed values (a single
    *  value is fixed). */
   pickInputs?: Record<string, Record<string, number[]>>
@@ -1308,6 +1314,33 @@ export const THEMES: Theme[] = [
     bgOpacity: 0.5,
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0,
     vibe: { mixSrc: 0.8, saturation: 0.7 },
+    motion: { skip: '^(threshold|smooth|cuts|films)$' }
+  }),
+  // The people in your films made of another picture : the films on the bottom
+  // layer (opaque), a luminous field on the layer above, MUTED (seen only through
+  // them), as the Silhouette's FILL (reads). Hole presets keep their rooms, the
+  // cutout sets them on the ground, the shade keeps their own light on the field.
+  mk({
+    id: 'inhabited', name: 'Inhabited', family: 'Film Wall',
+    blurb: 'The people in your films made of a moving painted field, their own light still on them.',
+    world: 'monomedia',
+    palette: [K, [0.08, 0.15, 0.2, 1], [0.92, 0.86, 0.76, 1]],
+    sources: ['gen-collage'], needsClips: true,
+    // luminous, moving fills that read inside a body (caustics, fire, dye, sea, stripes)
+    stack: [['gen-collage'], ['organic', 'organic', 'dye-field', 'swell', 'op-art']],
+    stackFx: [['node-silhouette'], []],
+    reads: { 'node-silhouette': 1 },
+    muted: [1],
+    presets: {
+      'node-silhouette': ['Bodies of light', 'Made of film', 'Stained figure', 'Wake'],
+      organic: ['Caustic pool', 'Lagoon', 'Wildfire', 'Hearth', 'Embers']
+    },
+    pickInputs: { 'gen-collage': { feed: [0], cuts: [2, 3], shape: [0, 1], stack: [0], gap: [0], mask: [0] } },
+    layerFx: ['fx-grade'],
+    bgSources: ['drift-field'],
+    bgOpacity: 0.45, // a dark floor : the cutout's bodies of light stand on it
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 0.8 },
     motion: { skip: '^(threshold|smooth|cuts|films)$' }
   }),
   mk({

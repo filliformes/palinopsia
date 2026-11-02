@@ -15,6 +15,52 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Silhouette's fill : another layer drawn where the people are** (Vincent : "Can the
+  silhouette effect be used to use another layer's visuals INSIDE the silhouette?", then
+  "yes add the fill option to the Silhouette effect!" : one step, where a HOLE on a layer
+  above or a MATTE into a Matte node took two). The effect's sidechain is the fill
+  (`node-silhouette` joins Inspector's `NODE_INPUTS` : the same picker row and
+  `setFxSidechain` path as Matte's inputs, any rack, the four layers; the Background is
+  no sidechain kind, so it is not offered). New `NodeInput.noSelf` leaves the effect's own
+  layer out of the menu (kept and marked when a paste put it there) and `off` greys the
+  row with its reason (the matte draws no fill). With a fill and any mode but matte,
+  `silhouetteNode.ts` draws through two programs of its own (`F_LOOK_FILL`,
+  `F_OUT_FILL`, compiled on first use and by the prewarm, which hands every node a
+  sidechain) : the fill is sampled screen-aligned; `silBody` lights it by the figure
+  (hard light with b = 0.5 + (L - mean) x gain, mixed in by **shade**) and tints it
+  in SHADOW (fill x shadow color, alpha x the color's alpha); `silAround` lays it on the
+  picture with the people taken out in HOLE. The trail runs on the body as the cutout's
+  does (`silTrail` mode 0 : each echo keeps the fill as it was, in hole the fill lingers
+  where they passed; the trail color stays the matte's). SHADE's light : the frame posted
+  to the model is sampled every 4th pixel (luma, ~0.03 ms) and measured inside its mask
+  when it comes back (`measureLight` : mean and spread, gain 0.25 / max(sd, 0.06), followed
+  at 0.3 a look), so a dim film and a bright one both read. One new input, **shade**
+  (0..1, default 0.5, curated 0.3..0.8, in the LOOK column; greyed with no fill or in the
+  matte : `groupDim` takes a slot context `{ side }`, the first slot-aware grey-out). No
+  fill = the old programs, untouched : the 15 old presets render the SAME pixels as master
+  (a fixed synthetic mask on a paused frame of the dance film, the whole 1920x1080 canvas
+  hashed : 15 / 15 identical across a master build and this one; a master composition
+  loaded here : identical; shade 0 and 1 with no fill : identical). A muted fill layer
+  still plays (the Compositor's `sideReading`) and shows only in the people : mask 4.8 %
+  of the frame, the composite lit on 5.2 % with the fill layer muted against 100 %
+  unmuted, the lit pixels the fill's teal (47, 72, 78) where the film's dancer is
+  (57, 44, 51). Measured on the RTX 4070 (dance film playing, caustics fill on a muted
+  layer) : 1080p 60 fps in every case (p95 22.5 ms no fill, 21.8 cutout, 22.8 hole +
+  trail, 22.3 shadow + trail + over; 19.5-21 looks a second either way); the Satosphère
+  setup (2048² composition, 4096 master, 210° fill) 60 fps (p95 24.4 no fill, 24.1 /
+  24.6 / 25.0 with; 17.5-20 looks a second). Ships with four presets for a fill (Bodies
+  of light, Made of film, Stained figure, Wake; every older preset now sets shade 0.5, a
+  preset never picks the layer) and the **Inhabited** Generate theme (Film Wall : the
+  films on L1, a luminous field on L2 muted, the Silhouette's fill reading it, the
+  Background at 0.45). Themes gained two small fields for it : `reads` (per node id, the
+  layer it reads, never its own) and `muted` (layers that land muted). Generated 6
+  times : the effect on L1 with its fill on the muted L2 every time, people found 6 / 6,
+  caustics, fire, dye, sea or stripes inside them. No master chain : a fill needs a
+  layer. Inspector panel : 128 px at 933 px wide (the look column 5 rows), 0 clipped
+  numbers, 0 collisions. Fulldome gate (`domegate.sh --ids node-silhouette`, over
+  Shapes : nobody to find, so it measures the effect at rest) : PASS, flat 60 fps, dome
+  60 fps p95 20 ms, heaviest 60 / 60. Not built, offered : a **follow** switch (the fill
+  riding the figure's bounding box instead of the screen).
 - **The Seq page is the home of every sequencer : lanes under one transport, and a Body
   rule timeline** (Vincent : "a complete Body rule sequencer ... drag and drop rules on a
   timeline and make them active or not active for a pre-determined amount of time", then

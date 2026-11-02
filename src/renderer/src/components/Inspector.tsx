@@ -66,8 +66,18 @@ const SCOPE_LABEL: Record<FxScope['kind'], string> = {
 
 // The native nodes that read OTHER layers, and how each input is labelled. The
 // three-input Matte has two. `none` says what the node does with nothing picked;
-// `layerOnly` nodes can't sit outside a layer rack at all (canHostFx).
-const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; layerOnly?: boolean }[]> = {
+// `layerOnly` nodes can't sit outside a layer rack at all (canHostFx); `noSelf`
+// leaves the node's own layer out of the menu (its last frame means nothing
+// there); `off` says why the pick does nothing in the current state (greyed).
+type NodeInput = {
+  label: string
+  hint: string
+  none: string
+  layerOnly?: boolean
+  noSelf?: boolean
+  off?: (v: Record<string, number | number[]>, modulated: ReadonlySet<string>) => string | undefined
+}
+const NODE_INPUTS: Record<string, NodeInput[]> = {
   'node-transfert': [{ label: 'sidechain', hint: 'its motion → this layer', none: 'none', layerOnly: true }],
   'node-convolve': [{ label: 'kernel', hint: 'its shape is stamped by bright pixels', none: 'none', layerOnly: true }],
   'node-mosaique': [{ label: 'corpus', hint: 'its tiles rebuild this layer', none: 'none', layerOnly: true }],
@@ -79,7 +89,17 @@ const NODE_INPUTS: Record<string, { label: string; hint: string; none: string; l
   ],
   'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }],
   'node-fieldstore': [{ label: 'key from', hint: 'its brightness decides where the store is written (with key : sidechain)', none: 'self' }],
-  'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }]
+  'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }],
+  'node-silhouette': [
+    {
+      label: 'fill',
+      hint: 'its picture is drawn where the people are (mute it to see it only there)',
+      none: 'none',
+      noSelf: true,
+      off: (v, mod) =>
+        !mod.has('mode') && Math.round(Number(v.mode ?? 0)) === 1 ? 'The matte is white people on black : the fill is not drawn.' : undefined
+    }
+  ]
 }
 
 export function Inspector(): JSX.Element {
@@ -162,14 +182,11 @@ export function Inspector(): JSX.Element {
   // For a video source (no ISF controls) : the clip name shown in a small panel.
   let videoName: string | null = null
   // For a native node that reads other layers : one picker per input (Matte has two).
-  let nodeSidechains: {
+  let nodeSidechains: (NodeInput & {
     ref: SidechainRef | null
     hostLayer: number
     set: (r: SidechainRef | null) => void
-    label: string
-    hint: string
-    none: string
-  }[] = []
+  })[] = []
   // For the native Text source: the string field + the glyph-fill sidechain.
   // A plain sidechain row for a SOURCE that reads another layer but has nothing
   // else to configure. Text cannot be reused for this : its strip carries a text
@@ -743,30 +760,35 @@ export function Inspector(): JSX.Element {
       {/* Native node inputs : the other layer(s) this node reads. */}
       {nodeSidechains.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-panel2/40 px-2 py-1">
-          {nodeSidechains.map((sc) => (
-            <div key={sc.label} className="flex items-center gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-wide text-accent2" title={sc.hint}>
-                {sc.label}
-              </span>
-              <select
-                className="input select-compact text-[11px]"
-                value={sc.ref?.kind === 'layer' ? `layer:${sc.ref.layer}` : ''}
-                onChange={(e) => {
-                  const v = e.target.value
-                  sc.set(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
-                }}
-              >
-                <option value="">{sc.none}</option>
-                {[0, 1, 2, 3].map((li) => (
-                  <option key={li} value={`layer:${li}`}>
-                    Layer {li + 1}
-                    {li === sc.hostLayer ? ' (self)' : ''}
-                  </option>
-                ))}
-              </select>
-              <span className="font-mono text-[9px] text-muted">{sc.hint}</span>
-            </div>
-          ))}
+          {nodeSidechains.map((sc) => {
+            const off = sc.off?.(values, modulated)
+            return (
+              <div key={sc.label} className={`flex items-center gap-2${off ? ' opacity-50' : ''}`} title={off}>
+                <span className="font-mono text-[9px] uppercase tracking-wide text-accent2" title={off ?? sc.hint}>
+                  {sc.label}
+                </span>
+                <select
+                  className="input select-compact text-[11px]"
+                  value={sc.ref?.kind === 'layer' ? `layer:${sc.ref.layer}` : ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    sc.set(v.startsWith('layer:') ? { kind: 'layer', layer: Number(v.slice(6)) } : null)
+                  }}
+                >
+                  <option value="">{sc.none}</option>
+                  {[0, 1, 2, 3]
+                    .filter((li) => !sc.noSelf || li !== sc.hostLayer || (sc.ref?.kind === 'layer' && sc.ref.layer === li))
+                    .map((li) => (
+                      <option key={li} value={`layer:${li}`}>
+                        Layer {li + 1}
+                        {li === sc.hostLayer ? ' (self)' : ''}
+                      </option>
+                    ))}
+                </select>
+                <span className="font-mono text-[9px] text-muted">{off ?? sc.hint}</span>
+              </div>
+            )
+          })}
           {/* (Luma Blur : the depth-off line joins this row, no row of its own) */}
           {depthNote && <DepthOffNote text={depthNote} inline />}
         </div>
@@ -823,7 +845,7 @@ export function Inspector(): JSX.Element {
                         values={values}
                         onChange={onChange}
                         modTargetFor={modTargetFor}
-                        dim={groupDim(shaderId, values, modulated)}
+                        dim={groupDim(shaderId, values, modulated, { side: !!nodeSidechains[0]?.ref })}
                       />
                     ) : (
                       <AutoControls
@@ -831,7 +853,7 @@ export function Inspector(): JSX.Element {
                         values={values}
                         onChange={onChange}
                         modTargetFor={modTargetFor}
-                        dim={groupDim(shaderId, values, modulated)}
+                        dim={groupDim(shaderId, values, modulated, { side: !!nodeSidechains[0]?.ref })}
                         layout="twoRow"
                       />
                     )}

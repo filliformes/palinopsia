@@ -242,21 +242,27 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   // ── Datamosh (real-time faux-codec mosh) ──
   'node-silhouette': [
     // Every preset sets every input (presets are partial merges).
-    { name: 'Cutout', values: { mode: 0, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Feathered', values: { mode: 0, people: 2, detail: 1, smooth: 0.35, sync: 0, threshold: 0.42, softness: 0.22, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Echoes', values: { mode: 0, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.1, color: [0.95, 0.92, 0.85, 1], trail: 0.6, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Ghosts over', values: { mode: 0, people: 2, detail: 1, smooth: 0.3, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], trail: 0.75, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
-    { name: 'Crowd', values: { mode: 0, people: 4, detail: 2, smooth: 0.25, sync: 0, threshold: 0.45, softness: 0.1, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Key matte', values: { mode: 1, people: 2, detail: 1, smooth: 0.2, sync: 0, threshold: 0.5, softness: 0.04, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Lingering key', values: { mode: 1, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.06, color: [0.95, 0.92, 0.85, 1], trail: 0.6, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Matte comet', values: { mode: 1, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], trail: 0.75, trailColor: [1, 0.35, 0.12, 1], over: 0, mix: 1 } },
-    { name: 'Paper figure', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.55, softness: 0.03, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Shadow puppet', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.05, color: [0.04, 0.035, 0.04, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
-    { name: 'Rotoscope', values: { mode: 2, people: 2, detail: 1, smooth: 0, sync: 0, threshold: 0.5, softness: 0.02, color: [1, 1, 1, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Glass figure', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.18, color: [0.45, 0.7, 0.95, 0.55], trail: 0.35, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
-    { name: 'Absence', values: { mode: 3, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.45, softness: 0.1, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Slow vanish', values: { mode: 3, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.15, color: [0.95, 0.92, 0.85, 1], trail: 0.7, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
-    { name: 'Fitted cutout', values: { mode: 0, people: 2, detail: 2, smooth: 0.15, sync: 1, threshold: 0.5, softness: 0.06, color: [0.95, 0.92, 0.85, 1], trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } }
+    { name: 'Cutout', values: { mode: 0, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Feathered', values: { mode: 0, people: 2, detail: 1, smooth: 0.35, sync: 0, threshold: 0.42, softness: 0.22, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Echoes', values: { mode: 0, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.1, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.6, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Ghosts over', values: { mode: 0, people: 2, detail: 1, smooth: 0.3, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.75, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+    { name: 'Crowd', values: { mode: 0, people: 4, detail: 2, smooth: 0.25, sync: 0, threshold: 0.45, softness: 0.1, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Key matte', values: { mode: 1, people: 2, detail: 1, smooth: 0.2, sync: 0, threshold: 0.5, softness: 0.04, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Lingering key', values: { mode: 1, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.06, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.6, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Matte comet', values: { mode: 1, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.08, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.75, trailColor: [1, 0.35, 0.12, 1], over: 0, mix: 1 } },
+    { name: 'Paper figure', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.55, softness: 0.03, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Shadow puppet', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.05, color: [0.04, 0.035, 0.04, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+    { name: 'Rotoscope', values: { mode: 2, people: 2, detail: 1, smooth: 0, sync: 0, threshold: 0.5, softness: 0.02, color: [1, 1, 1, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Glass figure', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.18, color: [0.45, 0.7, 0.95, 0.55], shade: 0.5, trail: 0.35, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+    { name: 'Absence', values: { mode: 3, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.45, softness: 0.1, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Slow vanish', values: { mode: 3, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.15, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.7, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Fitted cutout', values: { mode: 0, people: 2, detail: 2, smooth: 0.15, sync: 1, threshold: 0.5, softness: 0.06, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    // With a FILL picked (the Inspector's fill row : another layer, often muted) :
+    // what is drawn where the people are. A preset never picks the layer.
+    { name: 'Bodies of light', values: { mode: 0, people: 2, detail: 1, smooth: 0.3, sync: 0, threshold: 0.45, softness: 0.14, color: [0.95, 0.92, 0.85, 1], shade: 0.35, trail: 0.3, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Made of film', values: { mode: 3, people: 2, detail: 1, smooth: 0.2, sync: 1, threshold: 0.5, softness: 0.06, color: [0.95, 0.92, 0.85, 1], shade: 0.65, trail: 0, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } },
+    { name: 'Stained figure', values: { mode: 2, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.1, color: [1, 0.78, 0.55, 0.85], shade: 0.5, trail: 0, trailColor: [1, 1, 1, 1], over: 1, mix: 1 } },
+    { name: 'Wake', values: { mode: 3, people: 2, detail: 1, smooth: 0.25, sync: 0, threshold: 0.5, softness: 0.1, color: [0.95, 0.92, 0.85, 1], shade: 0.5, trail: 0.65, trailColor: [1, 1, 1, 1], over: 0, mix: 1 } }
   ],
   'node-codecmosh': [
     // Every preset sets every input (presets are partial merges).

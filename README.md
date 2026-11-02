@@ -69,7 +69,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : eleven voices (Spectra · Orbit · Flow · Events · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (125 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (126 themes) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
@@ -207,7 +207,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 125 themed recipes that build a coherent
+   **Generate** in the toolbar : 126 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click.
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet, and **`Ctrl+K`** to
@@ -687,6 +687,26 @@ the performer found in 94 % of the frames she is in (91 % on the dome's 2048² s
 nothing in the credits, 60 fps held flat and on the dome. A frame with nobody in it is left alone (cutout : nothing, hole : the picture
 whole). Bypassed, or on a muted layer nobody reads, it costs nothing : no read, no look,
 and the model is let go after 30 s unused. The Inspector line says what it finds.
+
+**Fill : another layer inside the people.** The **fill** row at the top of its
+Inspector picks a layer (none by default; its own layer is not offered) whose picture is
+drawn where the people are, seen through a window shaped like them (screen-aligned : the
+layer stays put, the people move through it). **cutout** shows the fill in their shape and
+nothing elsewhere, **hole** keeps the picture around them and puts the fill inside,
+**shadow** tints the fill with the shadow color (multiplied : white leaves it as it is, a
+color is colored glass) at that color's opacity; **matte** ignores it (the row greys out).
+**shade** (0 to 1, 0.5 by default) lays the figure's own light and shadow over the fill, so
+the body stays readable : 0 is a flat fill in their shape, 1 the fill lit like the person,
+measured against the figure's own mean brightness and spread, so a dim film lifts and
+deepens the fill the same way a bright one does. With a **trail**, each echo keeps the
+fill as it was, a remembered pose made of it; in **hole** the fill lingers in the picture
+where they passed. **Mute the fill layer** to see it only inside the people : a muted layer
+another effect reads still plays. A painted field, a fire or water source, another film,
+a camera : people made of it. Four presets for it (Bodies of light, Made of film, Stained
+figure, Wake; a preset never picks the layer) and the **Inhabited** Generate theme. With
+no fill picked the effect draws exactly what it drew before (the same pixels). Measured
+on the dance film with a caustics fill : 60 fps flat (p95 21-23 ms, as without a fill)
+and on the Satosphère setup (p95 24-25 ms, as without), the looks a second unchanged.
 
 **An iPhone or iPad by USB (macOS).** Plug it in, unlock it, accept *Trust This
 Computer*, open its **Camera** app : the Live Input picker lists it with a `📱` and
@@ -2522,7 +2542,7 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **125 visual themes** in 18 families
+**Generate** (toolbar) : a dropdown of **126 visual themes** in 18 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
@@ -2537,7 +2557,8 @@ overhead), **Film Wall** (your own films through a Collage, graded and damaged, 
 out and piled at different heights in **Paste-Up**, or the people in them treated apart
 through the Silhouette effect : **Cut Out** sets them over a painted ground, **Shadow
 Theatre** blacks them out, **Absent** takes them out of their rooms, **Afterimages**
-leaves their ghosts over the picture : it plays
+leaves their ghosts over the picture, **Inhabited** makes them of a moving field
+(caustics, fire, dye, sea or stripes on a muted layer, the Silhouette's fill) : it plays
 the session's Collage folder, or the last one picked on this computer, and with none yet
 stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
 node per theme, on the layer that reads the others), **Space** (points in space and line
@@ -2997,7 +3018,7 @@ none is picked, so all five run in any rack.
 | **Faultline** | A dirty vision-mixer : a **rate** clock and a **dirt** probability fire momentary **structural faults** at the output and the picture is completely clean between them (the SLIP skip-law moved to the blend stage). Each fire is one discrete fault : **dropout** (the signal loses lock and cuts out in sweeping streaks), **cut** (a hard cut to the frame frozen at the fire instant), **timebase** (a head-switch knock : scanline-block shear + field roll + a torn switch band), **noise** (a sweeping switching-static band), or **roulette** (a fresh pick each fire). **Depth** severity, **hold** length, **fire ▸** by hand / OSC / a modulator. Best on the Master rack. |
 | **Sillage** | Advected-noise feedback (IBFV, van Wijk 2002) : a dye buffer is dragged each frame along a **flow field** and topped up with fresh filtered noise, so the noise smears into flow-aligned filaments (a line-integral / LIC look) and **decays into structure** instead of glowing : a wake of dye trailing the motion, reading as material, not neon. The field is a divergence-free **curl-noise** base (**field** : always flowing, so even a still image streams) plus the image's own **optical flow** (**motion** : its movement advects the dye); steer the wake anywhere with **wind** (a drift of strength *push* in any *angle*) and **swirl** (a spiral about the centre). **dye** tints the wake by the picture so it reads as its own substance, **flow** the streak length, **injection** the decay rate, **grain** the noise frequency. |
 | **Toile** | Reworks the picture as a **painting that follows its own structure** : a structure tensor finds each contour's orientation, and the image is smoothed into strokes running **along** it (anisotropic Kuwahara), so forms flatten into coherent paint (steady frame-to-frame, not speckling) while the **edges are preserved**, not washed out. **line** adds flow-XDoG ink : clean outlines measured across each contour and smoothed along it, following the image's own structure. **brush** size, **flatten** hardness, **paint** amount, **line edge** threshold. The real *Peint* + *Griffé* as a rack effect. |
-| **Silhouette** | The Silhouette source's looks on **any picture** : the people in whatever enters (a film, a camera layer, an NDI input) are found by the body model beside the picture and drawn as a **cutout** (background removal), a white **matte**, a flat **shadow** or a **hole**, with **trail**, **trail color**, **over the picture** and **mix**; **people** 1-4, **detail**, **smooth**, **hold to the mask**, **threshold**, **softness** (see [Video sources](#video-sources)). One body model for every Silhouette effect, taking turns; resting when bypassed or unseen. 15 presets (Cutout … Fitted cutout), the **People** master chains, the **Cut Out**, **Shadow Theatre**, **Absent** and **Afterimages** Generate themes (Film Wall). |
+| **Silhouette** | The Silhouette source's looks on **any picture** : the people in whatever enters (a film, a camera layer, an NDI input) are found by the body model beside the picture and drawn as a **cutout** (background removal), a white **matte**, a flat **shadow** or a **hole**, with **trail**, **trail color**, **over the picture** and **mix**; **people** 1-4, **detail**, **smooth**, **hold to the mask**, **threshold**, **softness** (see [Video sources](#video-sources)). **fill** (picked in its Inspector) draws another layer where the people are, with **shade** keeping their own light on it. One body model for every Silhouette effect, taking turns; resting when bypassed or unseen. 19 presets (Cutout … Fitted cutout, and Bodies of light, Made of film, Stained figure, Wake for a fill), the **People** master chains, the **Cut Out**, **Shadow Theatre**, **Absent**, **Afterimages** and **Inhabited** Generate themes (Film Wall). |
 | **Remap** | TouchDesigner's **Remap TOP** : another layer's red and green channels become the coordinates each pixel of this layer reads from (red = x, green = y). A gradient layer bends the picture smoothly, a noisy one shatters it. **absolute** is TD's behaviour, **offset** displaces around mid-grey instead; **scale** / **offset x·y** reshape the map, **extend** picks hold / repeat / mirror past the edge, **swap roles** makes this layer the map. |
 | **Luma Blur** | TouchDesigner's **Luma Blur TOP** : a blur whose width follows a control image's brightness : **black width** where the control is dark, **white width** where it is bright (pixels at 1080p). The control is another layer, or this layer's own brightness. **control = depth focus** reads the shared depth map around a **focus** plane instead : one depth stays sharp and the rest melts, a real **depth-of-field** blur (Resolume 7.28's Depth Blur, from a node you already have). |
 | **Gooey** | The **blur-then-threshold** recipe : the picture is blurred (at half resolution) and cut at a brightness **level**, so shapes that sit close together melt into soft single blobs, the metaball / lava-lamp look. **blur** sets how far shapes reach for each other, **softness** the edge; **fill** shows the crisp source, the blurred colour pushed to full strength, or a white matte; **outside** keeps some of the source around the blobs. |
