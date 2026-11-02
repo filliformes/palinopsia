@@ -91,6 +91,22 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **An imported film plays at its own speed by default** (Vincent : "by default, all
+  imported videos should be toggled to use their own speed, not the global speed").
+  `store.setSourceVideo` (the one door every film comes through : the source menu's
+  import, a desktop drop on a layer's A or B row, a dropped film converted first) writes
+  `ignoreGlobalSpeed: true` on the new slot, so the transport's **global** button starts
+  lit (`⊘ global`) and the film runs at its speed × its layer's whatever SPD does; one
+  click hands it back to the global speed. Old sessions are left as they play : the
+  field is written on the slot, and a slot without it (every film saved before) still
+  reads as following the global speed, so nothing that was saved changes tempo. Another
+  clip swapped into the same slot (the clip picker, the smooth copy, a relink) keeps the
+  slot's choice. Import Audio, Collage, Assemble and the Audio Layer are not films in a
+  slot and keep their defaults. Measured in the test copy (RTX 4070) : a film dropped on
+  L1 with the code before carried no field and showed `global` unlit; now `true`, `⊘
+  global` lit. With SPD at 0.25 for 2 s, a session saved by the code before (its film on
+  L1, no field) advanced 0.50 s (follows the global speed, as it did), a fresh import
+  beside it 2.03 s (its own speed); clicking its button gave `false` and 0.25×.
 - **Meta Controller → Macro Controller, everywhere it shows** (Vincent : "Change Meta
   Controller name to Macro Controller (in the app and everywhere)"). Every label, title,
   hint, toast and list entry : the row's title (MACRO), the knob tiles' persistence

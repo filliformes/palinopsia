@@ -102,7 +102,9 @@ export interface SourceSlot extends ShaderInstance {
   videoOut?: number // normalized stop point 0..1, default 1
   videoVolume?: number // the film's own sound, 0..1, default 0 (silent : films always were)
   // The clip plays at its own speed (× its layer's) whatever the global speed :
-  // a sound kept at pitch and tempo while the composition slows or rushes.
+  // a sound kept at pitch and tempo while the composition slows or rushes. A
+  // film imported since v1.3.2 carries true; missing = follows the global speed
+  // (the sessions saved before, which play as they did).
   ignoreGlobalSpeed?: boolean
   // Video granulation (multi-voice) : 3 seek-head voices scattering grains
   // around the (modulatable) playhead, crossfaded with raised-cosine envelopes.
