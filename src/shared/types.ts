@@ -790,6 +790,12 @@ export type SonifyModParam =
   | 'fxSend' | 'fxReverb' | 'fxDelay'
   // The key sequencer's Every (free time), log-mapped 0..1 like its slider
   | 'keyEvery'
+  // The Synth : its sound, its gain, the PICTURE amount and the sense (read by
+  // the play side), and each picture patchbay row's depth (-1..1)
+  | 'synthTimbre' | 'synthHarmonics' | 'synthMorph' | 'synthCutoff' | 'synthReso' | 'synthDrive'
+  | 'synthEnvAmt' | 'synthGlide' | 'synthDrift' | 'synthLevel' | 'synthGain' | 'synthPicture' | 'synthSens'
+  | 'synthDVel' | 'synthDTimbre' | 'synthDHarm' | 'synthDMorph' | 'synthDCutoff'
+  | 'synthDReso' | 'synthDDrive' | 'synthDEnv' | 'synthDPan' | 'synthDBend'
   // Space : where each voice sits in the room (shared/spatial.ts)
   | import('./spatial').SpaceModParam
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
@@ -802,7 +808,11 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'chordTone', 'chordSpread', 'chordAttack', 'chordVoices', 'collageReso', 'collageRing', 'collageWidth',
   'collageBank', 'collageDecay', 'collageCutoff', 'collageWaves', 'collageDetune', 'chordWaves', 'chordNoise', 'chordAir',
   'asmReso', 'asmRing', 'asmWidth', 'asmAccent', 'asmBank',
-  'fxSend', 'fxReverb', 'fxDelay', 'keyEvery'
+  'fxSend', 'fxReverb', 'fxDelay', 'keyEvery',
+  'synthTimbre', 'synthHarmonics', 'synthMorph', 'synthCutoff', 'synthReso', 'synthDrive',
+  'synthEnvAmt', 'synthGlide', 'synthDrift', 'synthLevel', 'synthGain', 'synthPicture', 'synthSens',
+  'synthDVel', 'synthDTimbre', 'synthDHarm', 'synthDMorph', 'synthDCutoff',
+  'synthDReso', 'synthDDrive', 'synthDEnv', 'synthDPan', 'synthDBend'
 ]
 
 // One part of a color input, in the color picker's own space (HSV, what the

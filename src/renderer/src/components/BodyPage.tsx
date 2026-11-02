@@ -57,7 +57,7 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   thumbDownLeft: 'thumb down L', thumbDownRight: 'thumb down R', okLeft: 'ok L', okRight: 'ok R',
   hornsLeft: 'horns L', hornsRight: 'horns R', callLeft: 'call L', callRight: 'call R', gunLeft: 'gun L', gunRight: 'gun R'
 }
-const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage']
+const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage', 'Synth']
 
 // Conjugated verb phrases for auto-naming a rule ("<gesture> <verb>"). Only the
 // static ids ; layers / scenes / voices are handled by index in actionVerb().

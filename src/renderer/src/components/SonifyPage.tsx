@@ -29,19 +29,24 @@ function spaceLabel(param: string): string {
 import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered, LiveNum } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { AssignRow, useBound } from './AutoControls'
+import { SynthCard } from './SonifySynth'
+import { SYNTH_PARAM_LABEL, SYNTH_SLOT_COLORS } from '../audio/synthPlay'
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+/** A MIDI note's name (C4 = 60). */
+const fmtNoteName = (n: number): string => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`
 // Voice order matches the worklet's render/filter order (mixFilter indices).
 // BY INDEX. A voice's index is what a session saves : its mixer channel, its DJ
 // filter, its sequencer mask, its MIDI on/off binding (`sonify:voice:i`). So a
 // new voice is APPENDED, and VOICE_ORDER below is where the page SHOWS it.
-const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
-const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage']
+const VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage', 'synth'] as const
+const VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage', 'Synth']
 // The order the mixer and the sequencer list the voices in : Signal (9) before
-// Chord (7), as its card sits, without moving anything a session stored.
-const VOICE_ORDER = [0, 1, 2, 3, 4, 5, 6, 9, 7, 8, 10]
+// Chord (7), as its card sits, and the Synth (11) after Events, with the other
+// voices the movement plays, without moving anything a session stored.
+const VOICE_ORDER = [0, 1, 2, 3, 11, 4, 5, 6, 9, 7, 8, 10]
 // Two letters each : one letter made Flow/Filter and Chord/Collage twins.
-const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg', 'As']
+const VOICE_ABBR = ['Sp', 'Or', 'Fl', 'Ev', 'Ra', 'Tr', 'Fi', 'Ch', 'Co', 'Sg', 'As', 'Sy']
 // Each voice's mark on the mirror, as a coloured GLYPH that hints its SHAPE as
 // well as its hue (matches the overlay painter below), so a strip tells you
 // which mark is yours even when two share a color (Spectra's line vs Flow's
@@ -57,7 +62,8 @@ const PROBE_MARK: Record<string, { glyph: string; color: string; hint: string }>
   Chord: { glyph: '≡', color: 'rgb(160,160,175)', hint: 'horizontal bands, no spatial probe' },
   Collage: { glyph: '▦', color: 'rgb(220,190,255)', hint: 'the Collage\'s own pieces : center low, edges high' },
   Signal: { glyph: '▪', color: 'rgb(40,255,215)', hint: 'cyan read bars, and a square at every mark it fires' },
-  Assemblage: { glyph: '▶', color: 'rgb(255,190,140)', hint: 'not drawn : it hears the edit on screen, each cut its own film' }
+  Assemblage: { glyph: '▶', color: 'rgb(255,190,140)', hint: 'not drawn : it hears the edit on screen, each cut its own film' },
+  Synth: { glyph: '◎', color: 'rgb(255,200,80)', hint: 'a ring on each thing that plays (its size the velocity, its color the voice, its note beside it), a dot on each thing found, and the score playhead' }
 }
 const filterTag = (x: number): string => (x < 0.49 ? 'LP' : x > 0.51 ? 'HP' : 'off')
 
@@ -207,9 +213,7 @@ function hzLabel(f: number): string {
 }
 
 
-function Slider({
-  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse, lead
-}: {
+export interface SliderProps {
   label: string; value: number; min: number; max: number; step?: number
   neutral?: number; fmt?: (v: number) => string; onChange: (v: number) => void; title?: string
   mod?: ReactNode
@@ -217,7 +221,12 @@ function Slider({
   lead?: ReactNode
   /** The readout can be typed into : the text → the slider's value (null : not understood). */
   parse?: (text: string) => number | null
-}): JSX.Element {
+  /** MIDI Learn : the track takes a knob (a learn target id). */
+  midiId?: string
+}
+function Slider({
+  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse, lead, midiId
+}: SliderProps): JSX.Element {
   // The `mod` node (when present) is a <ModChip param=… inactive=…/>, so read its
   // param straight off the element : no call-site needs to repeat it. A slider
   // whose param has a live mod assignment turns accent2 + its thumb tracks the
@@ -285,15 +294,18 @@ function Slider({
         <span className="min-w-0 truncate">{label}</span>
         {lead}
       </span>
-      <input
-        ref={ref}
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onPointerDown={onPointerDown}
-        onDoubleClick={() => neutral !== undefined && onChange(neutral)}
-        className={`min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
-        title={`${title ?? `${label} ${shown}`}${live ? ' : modulated (drag sets the base)' : ''} · Shift-drag : finer${parse ? ' · click the value to type it' : ''}`}
-      />
+      <span className="relative flex min-w-0 flex-1">
+        {midiId && <MidiLearnOverlay id={midiId} />}
+        <input
+          ref={ref}
+          type="range" min={min} max={max} step={step} value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          onPointerDown={onPointerDown}
+          onDoubleClick={() => neutral !== undefined && onChange(neutral)}
+          className={`min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
+          title={`${title ?? `${label} ${shown}`}${live ? ' : modulated (drag sets the base)' : ''} · Shift-drag : finer${parse ? ' · click the value to type it' : ''}`}
+        />
+      </span>
       {typing !== null ? (
         <input
           autoFocus
@@ -415,7 +427,8 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   collageWaves: 'Collage ring bank waves', collageDetune: 'Collage ring bank detune', chordWaves: 'Chord waves',
   chordNoise: 'Chord noise', chordAir: 'Chord air',
   fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix',
-  keyEvery: 'Key sequencer every'
+  keyEvery: 'Key sequencer every',
+  ...(SYNTH_PARAM_LABEL as Partial<Record<SonifyModParam, string>>)
 }
 
 function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
@@ -721,7 +734,7 @@ export function SonifyPage({
     mf[i] = v
     patch({ mixFilter: mf })
   }
-  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage'>(k: K, p: Partial<SoniConfig[K]>): void =>
+  const pv = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage' | 'synth'>(k: K, p: Partial<SoniConfig[K]>): void =>
     { const c = now(); set({ ...c, [k]: { ...c[k], ...p } }) }
   const pfx = (p: Partial<SoniConfig['fx']>): void => { const c = now(); set({ ...c, fx: { ...c.fx, ...p } }) }
 
@@ -840,6 +853,46 @@ export function SonifyPage({
           for (let i = 0; i + 2 < marks.length; i += 3) {
             const r = 2 + marks[i + 2] * 4
             g.fillRect(marks[i] * w - r, marks[i + 1] * h - r, r * 2, r * 2)
+          }
+        }
+        // Synth : a ring on each thing that plays (its size the velocity, its
+        // color its voice, its note beside it), a dot on each thing found but
+        // not playing, and the score playhead
+        if (st.on && st.synth?.on) {
+          const v = sonifyEngine.synthView()
+          if (v.scoreX >= 0) {
+            g.strokeStyle = 'rgba(255,200,80,0.55)'
+            g.lineWidth = 1.5
+            g.beginPath()
+            g.moveTo(v.scoreX * w, 0)
+            g.lineTo(v.scoreX * w, h)
+            g.stroke()
+          }
+          const k = Math.max(0.6, Math.min(w, h) / 360)
+          g.font = `${Math.round(10 * k)}px ui-monospace, monospace`
+          g.textBaseline = 'middle'
+          for (let i = 0; i < v.n; i++) {
+            const o = i * 6
+            const x = v.dots[o] * w, y = v.dots[o + 1] * h
+            if (!v.dots[o + 5]) {
+              g.fillStyle = 'rgba(200,200,200,0.55)'
+              g.beginPath()
+              g.arc(x, y, 2.5 * k, 0, 6.2832)
+              g.fill()
+              continue
+            }
+            const col = SYNTH_SLOT_COLORS[v.dots[o + 3] | 0] ?? SYNTH_SLOT_COLORS[0]
+            const r = (5 + v.dots[o + 2] * 16) * k
+            g.strokeStyle = col
+            g.lineWidth = 2
+            g.beginPath()
+            g.arc(x, y, r, 0, 6.2832)
+            g.stroke()
+            const n = Math.round(v.dots[o + 4])
+            if (n >= 0) {
+              g.fillStyle = col
+              g.fillText(fmtNoteName(n), x + r + 3 * k, y)
+            }
           }
         }
         // Spectra reading path (the worklet's position, pace + path)
@@ -1472,6 +1525,22 @@ export function SonifyPage({
             </Row>
             <Slider label="gain" value={cfg.events.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('events', { gain: v })} title="How loud the Events voice is (before its mixer channel)" />
             <Slider label="pan" value={cfg.events.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('events', { pan: v })} title="Places the Events voice left (-1) or right (+1)" />
+          </VoiceShell>
+
+          <VoiceShell
+            title="Synth" on={cfg.synth.on}
+            hint="The moving things in the picture play a synthesizer : each thing that starts moving takes a voice (in poly the 8 strongest), its place picks the note on the key and scale, and how it looks (its speed, size, color, texture, where it goes) shapes its sound through the picture patchbay. A thing that stops, or leaves the frame, lets its note go. On the mirror : a ring on each thing that plays, its note beside it."
+            onToggle={() => pv('synth', { on: !cfg.synth.on })}
+            onDice={() => diceVoice('synth')}
+          >
+            <SynthCard
+              cfg={cfg}
+              set={(p) => pv('synth', p)}
+              chip={chip}
+              assignBox={assignBox}
+              Slider={Slider}
+              tap={<TapSelect cfg={cfg} voice={cfg.synth} onChange={(tap) => pv('synth', { tap })} />}
+            />
           </VoiceShell>
 
           <VoiceShell
