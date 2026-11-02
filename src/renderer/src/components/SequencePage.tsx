@@ -1,14 +1,31 @@
-// SequencePage : the macro-form "auto-pilot" over the scene bank (S1 + S2).
-// A full page (peer of World / Output). Left: the scene rail as tagged cards +
-// a tag editor. Right: the sequencer transport + the macro-form overlays
-// (Breathe, Climate arc) with a live arc/countdown meter. See
-// docs/opsia-sequencer-spec.md.
+// SequencePage : the home of everything the instrument sequences (key Q, the
+// Seq button; also in a window of its own, PageWindow.tsx). One transport over
+// LANES, each sequencer keeping its own time :
+// - Scenes : the macro-form "auto-pilot" over the scene bank (S1-S4). Left :
+//   the scene rail as tagged cards + a tag editor + the live mirror. Right :
+//   pacing, selection and the macro-form overlays (Breathe, Climate arc...).
+//   See docs/opsia-sequencer-spec.md.
+// - Sonify keys : the Sonify key sequencer, the same card (one store) as on
+//   the Sonify page, in three columns (SonifyKeySequencer lane).
+// - Body rules : the rule timeline in bars (RuleLane.tsx, engine/ruleSeq.ts).
+// The transport plays every lane marked "with transport" and stops them all,
+// on the shared beat clock (audio/soniClock.ts : the tempo, or Ableton Link's).
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { CouplingMode, SceneClimate } from '@shared/types'
+import type { CouplingMode, SceneClimate, SeqLaneId, SonifyModParam } from '@shared/types'
 import { SCENE_CLIMATES } from '@shared/types'
 import { useStore } from '../store'
+import { seqClockPosition, seqTransportPlaying, seqTransportToggle } from '../engine/ruleSeq'
+import { NOTE_NAMES, isScale } from '../audio/soniKeyModel'
+import { SCALE_LABEL } from '../audio/sonify'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { LinkBadge } from './LinkSection'
+import { chip, pill } from './sonifyUi'
+import { ownerWindow } from './ownerWindow'
+import { KeySeqDice, SonifyKeySequencer } from './SonifyKeySequencer'
+import { ModChip, SonifyAssign } from './SonifyPage'
+import { RuleLane, RulePosition } from './RuleLane'
 import {
   sequencerArcIntensity,
   sequencerArmed,
@@ -54,6 +71,279 @@ export function SequencePage({
 }): JSX.Element {
   const setOpen = useStore((s) => s.setSequencePageOpen)
   const setInWindow = useStore((s) => s.setSequencePageWindow)
+  const sceneCount = useStore((s) => s.scenes.length)
+  const seqRunning = useStore((s) => s.sequence.running)
+  const toggleRunning = useStore((s) => s.toggleSequenceRunning)
+  const keyOn = useStore((s) => s.soniKeySeq.on)
+  const setKeyOn = useStore((s) => s.setSoniKeySeqOn)
+  const ruleOn = useStore((s) => s.ruleSeqOn)
+  const setRuleOn = useStore((s) => s.setRuleSeqOn)
+  const hasBlocks = useStore((s) => s.ruleSeq.blocks.length > 0)
+
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col bg-bg" data-seq-page>
+      <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
+        <span
+          className="cursor-help font-mono text-[13px] font-semibold uppercase tracking-[0.2em]"
+          title="Everything the instrument sequences, one lane each, under one transport : the scene auto-pilot, the Sonify key sequencer (the same one as on the Sonify page) and the Body rule timeline. Play starts every lane marked 'with transport', stop stops them all; each lane also plays on its own. Q from the instrument opens this page."
+        >
+          Sequence
+        </span>
+        <SeqTransport />
+        <div className="flex-1" />
+        {/* In its own window (from the Seq button's right-click menu) : back in
+            over the instrument. */}
+        {inWindow && (
+          <button
+            onClick={() => setInWindow(false)}
+            className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+            title="Put the Sequencer back over the instrument"
+          >
+            ⇲ back into the app
+          </button>
+        )}
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+        >
+          {inWindow ? 'close' : '← back to instrument'}
+        </button>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+        <Lane
+          id="scenes"
+          title="Scenes"
+          hint="The macro-form auto-pilot over your saved scenes : tag the scenes on the left to give it a world to wander, then set its pacing, selection and slow overlays on the right. Its own time : the dwell of each scene, in seconds."
+          on={seqRunning}
+          onToggle={toggleRunning}
+          toggleDisabled={sceneCount < 2}
+          toggleTitle={sceneCount < 2 ? 'Need at least 2 scenes' : seqRunning ? 'Stop the auto-pilot' : 'Start the auto-pilot'}
+          midiId="fire:seq"
+          status={<NowMeter running={seqRunning} />}
+          right={<SceneButtons disabled={sceneCount < 2} />}
+        >
+          <SceneLane canvasRef={canvasRef} />
+        </Lane>
+        <Lane
+          id="keys"
+          title="Sonify keys"
+          hint="The Sonify key sequencer : the root, scale and octave of every Sonify voice over time. The same one as on the Sonify page (S, seq view) : an edit here shows there at once, and back. Its own time : its rate, on the shared beat clock or free time."
+          on={keyOn}
+          onToggle={() => setKeyOn(!keyOn)}
+          toggleTitle="Play / stop the key sequencer : it changes the root, scale and octave of every Sonify voice over time"
+          midiId="fire:keyseq"
+          status={<KeyNow />}
+          right={<KeySeqDice />}
+        >
+          <KeyLane />
+        </Lane>
+        <Lane
+          id="rules"
+          title="Body rules"
+          hint="A timeline of your Body rules, in bars of the tempo (Ableton Link's bar while Link is on) : each block switches its rule on from its first bar to its last. While it runs, a rule with blocks is on inside them and off outside them; a rule without blocks is left alone, and stopping leaves every rule as it is. A rule you switch by hand (MIDI, OSC, an action, its box) keeps what you set until the next block edge on its row."
+          on={ruleOn}
+          onToggle={() => setRuleOn(!ruleOn)}
+          toggleDisabled={!ruleOn && !hasBlocks}
+          toggleTitle={!hasBlocks ? 'Put a block on the timeline first' : ruleOn ? 'Stop the rule timeline : every rule stays as it is' : 'Run the rule timeline : it starts on the next bar when another sequencer plays on the beat'}
+          midiId="fire:ruleseq"
+          status={<RulePosition />}
+        >
+          <div className="px-3 py-2">
+            <RuleLane />
+          </div>
+        </Lane>
+      </div>
+    </div>
+  )
+}
+
+/** The page's one transport : play every lane marked "with transport" (each on
+ *  its own time, the beat lanes together on bar 1, or on Ableton Link's next
+ *  bar), stop them all; the shared clock's bar and beat; the tempo. */
+function SeqTransport(): JSX.Element {
+  const playing = useStore((s) => s.ruleSeqOn || s.soniKeySeq.on || (s.sequence.enabled && s.sequence.running))
+  const canPlay = useStore((s) => {
+    const a = s.seqLanes.arm
+    return (a.scenes && s.scenes.length > 1) || a.keys || (a.rules && s.ruleSeq.blocks.length > 0)
+  })
+  const bpm = useStore((s) => s.composition.bpm)
+  const posRef = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    const view = ownerWindow(posRef.current)
+    let id = 0
+    let shown = ''
+    const f = (): void => {
+      id = view.requestAnimationFrame(f)
+      if (view.document.hidden || !posRef.current) return
+      let txt = 'stopped'
+      if (seqTransportPlaying()) {
+        const p = seqClockPosition()
+        txt = `bar ${p.bar} · ${p.beat}`
+      }
+      if (txt !== shown) {
+        shown = txt
+        posRef.current.textContent = txt
+      }
+    }
+    id = view.requestAnimationFrame(f)
+    return () => view.cancelAnimationFrame(id)
+  }, [])
+  return (
+    <div className="flex items-center gap-2.5 rounded border border-border/70 bg-panel2/40 px-2 py-1">
+      <span className="relative flex shrink-0">
+        <MidiLearnOverlay id="fire:transport" />
+        <button
+          data-seq-transport
+          onClick={seqTransportToggle}
+          disabled={!playing && !canPlay}
+          className={`rounded border px-3 py-0.5 font-mono text-[11px] transition-colors disabled:opacity-40 ${
+            playing
+              ? 'border-danger bg-danger/20 text-danger hover:bg-danger/30'
+              : 'border-accent bg-accent/15 text-accent hover:bg-accent/25'
+          }`}
+          title={playing
+            ? 'Stop every lane'
+            : canPlay ? "Play every lane marked 'with transport' : the beat lanes start together, on bar 1 (or on Ableton Link's next bar)" : "Nothing to play : no lane marked 'with transport' has anything to play yet"}
+        >
+          {playing ? '■ stop' : '▶ play'}
+        </button>
+      </span>
+      <span
+        ref={posRef}
+        className="w-[78px] shrink-0 font-mono text-[11px] tabular-nums text-text"
+        title="The shared beat clock : bar and beat (the composition tempo, or Ableton Link's bar while Link is on). The Sonify key sequencer and the rule timeline count on it"
+      />
+      <span className="shrink-0 font-mono text-[10px] text-muted" title="The composition tempo (the Transport's BPM; while other apps are linked, Ableton Link's)">
+        {Math.round(bpm * 10) / 10} BPM
+      </span>
+      <LinkBadge />
+    </div>
+  )
+}
+
+/** One sequencer of the page : its header (fold, play, name, with the
+ *  transport or not, where it is) and, unfolded, its own controls. */
+function Lane({
+  id, title, hint, on, onToggle, toggleTitle, toggleDisabled = false, midiId, status, right, children
+}: {
+  id: SeqLaneId
+  title: string
+  hint: string
+  on: boolean
+  onToggle: () => void
+  toggleTitle: string
+  toggleDisabled?: boolean
+  midiId: string
+  status?: ReactNode
+  right?: ReactNode
+  children: ReactNode
+}): JSX.Element {
+  const key = `seq-lane-${id}`
+  const folded = useStore((s) => !!s.collapsed[key])
+  const toggleSection = useStore((s) => s.toggleSection)
+  const arm = useStore((s) => s.seqLanes.arm[id])
+  const setArm = useStore((s) => s.setSeqLaneArm)
+  return (
+    <section data-lane={id} className={`flex shrink-0 flex-col rounded-md border bg-panel transition-colors ${on ? 'border-accent/50' : 'border-border'}`}>
+      <div className={`flex min-w-0 items-center gap-2.5 px-3 py-1.5 ${folded ? '' : 'border-b border-border/60'}`}>
+        <button
+          onClick={() => toggleSection(key)}
+          className="-mr-1 shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-accent"
+          title={folded ? `Show the ${title} lane` : `Fold the ${title} lane to its header (it keeps playing)`}
+        >
+          <span className={`inline-block transition-transform ${folded ? '' : 'rotate-90'}`}>▶</span>
+        </button>
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id={midiId} />
+          <button data-lane-play={id} onClick={onToggle} disabled={toggleDisabled} className={`${pill(on)} disabled:opacity-40`} title={toggleTitle}>
+            {on ? '■ stop' : '▶ play'}
+          </button>
+        </span>
+        <span className="shrink-0 cursor-help font-mono text-[11px] font-semibold uppercase tracking-[0.16em]" title={hint}>{title}</span>
+        <span className="shrink-0 cursor-help text-[10px] text-muted/70 hover:text-accent" title={hint}>ⓘ</span>
+        <button
+          data-lane-arm={id}
+          onClick={() => setArm(id, !arm)}
+          className={`${chip(arm)} shrink-0`}
+          title={arm
+            ? "Started and stopped by the transport's play and stop (top of the page). Click : only by its own play"
+            : "Plays only from its own play (the transport's play leaves it alone; its stop still stops it). Click : with the transport"}
+        >
+          {arm ? '● with transport' : '○ on its own'}
+        </button>
+        {status}
+        <span className="min-w-0 flex-1" />
+        {right}
+      </div>
+      {!folded && children}
+    </section>
+  )
+}
+
+/** The scene lane's buttons : skip, and the relation score. */
+function SceneButtons({ disabled }: { disabled: boolean }): JSX.Element {
+  return (
+    <>
+      <button
+        onClick={() => sequencerSkip()}
+        disabled={disabled}
+        className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:text-accent disabled:opacity-40"
+        title="Advance to the next scene now"
+      >
+        skip →
+      </button>
+      <button
+        onClick={() => {
+          const md = sequencerScoreMarkdown()
+          if (!md) return
+          const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'opsia-relation-score.md'
+          a.click()
+          URL.revokeObjectURL(url)
+        }}
+        className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted hover:text-accent"
+        title="Export the run as a relation-score (ordered AVUs, Markdown)"
+      >
+        ⤓ score
+      </button>
+    </>
+  )
+}
+
+/** The key the Sonify voices play in now (the keys lane's header). */
+function KeyNow(): JSX.Element {
+  const root = useStore((s) => s.sonify.root)
+  const scale = useStore((s) => s.sonify.scale)
+  const oct = useStore((s) => s.sonify.rootOct ?? 3)
+  return (
+    <span className="min-w-0 shrink truncate font-mono text-[10px] text-accent" title="The key every Sonify voice plays in now">
+      {NOTE_NAMES[root]} {isScale(scale) ? SCALE_LABEL[scale] : scale} <span className="text-muted">· oct {oct}</span>
+    </span>
+  )
+}
+
+/** The Sonify key sequencer, as a lane : the same card as on the Sonify page
+ *  (one store), in three columns, with its M chip on Every. */
+function KeyLane(): JSX.Element {
+  const [assign, setAssign] = useState<SonifyModParam | null>(null)
+  const modChip = (p: SonifyModParam): JSX.Element => (
+    <ModChip param={p} open={assign === p} onOpen={(x) => setAssign(assign === x ? null : x)} />
+  )
+  const assignBox = (...ps: SonifyModParam[]): JSX.Element | null => (assign && ps.includes(assign) ? <SonifyAssign param={assign} /> : null)
+  return (
+    <div className="px-3 py-2.5">
+      <SonifyKeySequencer lane chip={modChip} assignBox={assignBox} />
+    </div>
+  )
+}
+
+/** The scene lane : the scene rail as tagged cards + a tag editor + the live
+ *  mirror on the left, the auto-pilot's pacing and macro-form overlays on the
+ *  right (as the whole page was before the lanes). Its height : drag its foot. */
+function SceneLane({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const scenes = useStore(useShallow((s) => s.scenes))
   const activeSceneId = useStore((s) => s.activeSceneId)
   const worlds = useStore(useShallow((s) => s.worlds))
@@ -63,8 +353,13 @@ export function SequencePage({
     const n = Number(localStorage.getItem('opsia.seqAsideW'))
     return Number.isFinite(n) && n >= 240 ? n : 320
   })
+  // The lane's height (drag its foot; persisted).
+  const [laneH, setLaneH] = useState(() => {
+    const n = Number(localStorage.getItem('opsia.seqLaneH.scenes'))
+    return Number.isFinite(n) && n >= 220 ? Math.min(1200, n) : 440
+  })
+  const hDrag = useRef<{ y: number; h: number; last: number; z: number } | null>(null)
   const setSequence = useStore((s) => s.setSequence)
-  const toggleRunning = useStore((s) => s.toggleSequenceRunning)
   const ensureSceneTags = useStore((s) => s.ensureSceneTags)
   const setSceneTags = useStore((s) => s.setSceneTags)
   const recallScene = useStore((s) => s.recallScene)
@@ -105,72 +400,8 @@ export function SequencePage({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg">
-      <header className="flex items-center gap-4 border-b border-border bg-panel px-4 py-2">
-        <span
-          className="cursor-help font-mono text-[13px] font-semibold uppercase tracking-[0.2em]"
-          title="Auto-pilot over your saved scenes : tag the scenes on the left to give it a world to wander, then set its pacing, selection and slow macro-form overlays on the right. Play (or Q from the instrument) hands the show to it; skip steps now; score exports the run."
-        >
-          Sequence · Macro-form
-        </span>
-        <button
-          onClick={toggleRunning}
-          className={`rounded border px-3 py-1 font-mono text-[11px] transition-colors ${
-            seq.running
-              ? 'border-danger bg-danger/20 text-danger hover:bg-danger/30'
-              : 'border-accent bg-accent/15 text-accent hover:bg-accent/25'
-          }`}
-          disabled={scenes.length < 2}
-          title={scenes.length < 2 ? 'Need at least 2 scenes' : seq.running ? 'Stop the auto-pilot' : 'Start the auto-pilot'}
-        >
-          {seq.running ? '■ stop' : '▶ play'}
-        </button>
-        <button
-          onClick={() => sequencerSkip()}
-          disabled={scenes.length < 2}
-          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent disabled:opacity-40"
-          title="Advance to the next scene now"
-        >
-          skip →
-        </button>
-        <button
-          onClick={() => {
-            const md = sequencerScoreMarkdown()
-            if (!md) return
-            const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
-            const a = document.createElement('a')
-            a.href = url
-            a.download = 'opsia-relation-score.md'
-            a.click()
-            URL.revokeObjectURL(url)
-          }}
-          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
-          title="Export the run as a relation-score (ordered AVUs, Markdown)"
-        >
-          ⤓ score
-        </button>
-        <NowMeter running={seq.running} />
-        <div className="flex-1" />
-        {/* In its own window (from the Seq button's right-click menu) : back in
-            over the instrument. */}
-        {inWindow && (
-          <button
-            onClick={() => setInWindow(false)}
-            className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
-            title="Put the Sequencer back over the instrument"
-          >
-            ⇲ back into the app
-          </button>
-        )}
-        <button
-          onClick={() => setOpen(false)}
-          className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
-        >
-          {inWindow ? 'close' : '← back to instrument'}
-        </button>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
+    <div className="flex flex-col">
+      <div className="flex min-h-0" style={{ height: laneH }}>
         {/* Scene column: scrolling rail + a live preview pinned at the bottom. */}
         <div className="flex min-w-0 flex-1 flex-col">
          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-4">
@@ -625,6 +856,30 @@ export function SequencePage({
           </Section>
         </aside>
       </div>
+      {/* Drag the foot to resize the lane (down = taller). */}
+      <div
+        className="h-1.5 shrink-0 cursor-row-resize rounded-b-md bg-border/40 transition-colors hover:bg-accent/60"
+        style={{ touchAction: 'none' }}
+        onPointerDown={(e) => {
+          hDrag.current = { y: e.clientY, h: laneH, last: laneH, z: effectiveZoom(e.currentTarget) }
+          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          const d = hDrag.current
+          if (!d) return
+          const h = Math.max(220, Math.min(1200, d.h + (e.clientY - d.y) / d.z))
+          d.last = h
+          setLaneH(h)
+        }}
+        onPointerUp={(e) => {
+          if (!hDrag.current) return
+          localStorage.setItem('opsia.seqLaneH.scenes', String(Math.round(hDrag.current.last)))
+          hDrag.current = null
+          ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+        }}
+        onPointerCancel={() => { hDrag.current = null }}
+        title="Drag to make the scene lane taller or shorter"
+      />
     </div>
   )
 }

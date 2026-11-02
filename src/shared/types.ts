@@ -1073,6 +1073,29 @@ export interface SequenceState {
   audioAdvance: 'off' | 'transient' | 'onset' | 'chaos'
 }
 
+// ── The Seq page's lanes (one transport over every sequencer) ─────────
+// The Body rule timeline : "this rule is on from bar a to bar b", on the shared
+// beat clock (the Sonify sequencers' : BPM, or Ableton Link's bars). Kept on the
+// machine beside the rules it plays (the rules are the machine's : a webcam is),
+// each block naming its rule by the rule's id, so a renamed rule keeps its
+// blocks and a deleted one takes them along.
+export interface RuleBlock {
+  id: string
+  rule: string // GestureRule.id
+  start: number // bars from the top of the timeline (0 = bar 1); beats are fractions
+  len: number // bars
+}
+export interface RuleTimeline {
+  length: number // bars : the loop (4 / 8 / 16 / 32 / 64)
+  loop: boolean // off : it plays the length once, then stops
+  blocks: RuleBlock[]
+}
+export type SeqLaneId = 'scenes' | 'keys' | 'rules'
+/** What the Seq transport starts (session-scoped; an older file : all of them). */
+export interface SeqLanes {
+  arm: Record<SeqLaneId, boolean>
+}
+
 // ── Session persistence (brief §7) ───────────────────────────────────
 // ── Metasurface draw sequencer ───────────────────────────────────────
 // A drawn gesture over the 2D scene-space plane, auto-played by the render
@@ -1214,6 +1237,11 @@ export interface Session {
   // The key sequencer (root / scale over time) : travels like the step sequence.
   soniKeySeq?: SoniKeySeq
   soniKeySeqOn?: boolean
+  // The Seq page : which lanes its transport starts (absent : all of them), and
+  // whether the Body rule timeline was running (an installation starts it
+  // again; the timeline itself is the machine's, beside its rules).
+  seqLanes?: SeqLanes
+  ruleSeqOn?: boolean
   // Performance dials : the global clock multiplier + the scene-morph duration.
   // Optional for back-compat with sessions saved before they were persisted.
   globalSpeed?: number

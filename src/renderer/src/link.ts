@@ -188,8 +188,9 @@ let wroteAt = 0
 // and stop are Palinopsia's : one transport for every linked app.
 // - A play (from any app) starts, on the bar it starts on : the MIDI clock's
 //   Start (./midi.ts reads linkPlay), and the sequencers the last stop stopped
-//   (the Sonify step and key sequences, the scene sequencer; before any stop,
-//   the scene sequencer when the session uses it). A stop stops them all, and
+//   (the Sonify step and key sequences, the scene sequencer, the Body rule
+//   timeline; before any stop, the scene sequencer when the session uses it and
+//   the rule timeline when the Seq transport starts it). A stop stops them all, and
 //   sends the MIDI Stop.
 // - Here, starting one of them, or the MIDI clock, while the session is stopped
 //   plays it for every app; stopping the last one still going stops it (and the
@@ -236,8 +237,14 @@ export function setLinkPlaying(on: boolean): void {
 }
 
 /** What a play starts before any stop : the scene sequencer, when the session
- *  uses it. */
-const firstPlay = (): Seq[] => (useStore.getState().sequence.enabled ? ['scenes'] : [])
+ *  uses it, and the Body rule timeline when it has blocks and the Seq
+ *  transport starts it. */
+const firstPlay = (): Seq[] => {
+  const st = useStore.getState()
+  const r: Seq[] = st.sequence.enabled ? ['scenes'] : []
+  if (st.seqLanes.arm.rules && st.ruleSeq.blocks.length) r.push('rules')
+  return r
+}
 
 function runningSeqs(): Seq[] {
   const st = useStore.getState()
@@ -245,6 +252,7 @@ function runningSeqs(): Seq[] {
   if (st.soniSeq.on) r.push('soniSeq')
   if (st.soniKeySeq.on) r.push('keySeq')
   if (st.sequence.enabled && st.sequence.running) r.push('scenes')
+  if (st.ruleSeqOn) r.push('rules')
   return r
 }
 
@@ -258,6 +266,7 @@ function setSeqs(on: boolean, which: Seq[]): void {
       const st = useStore.getState()
       if (which.includes('soniSeq') && st.soniSeq.on !== on) st.setSoniSeqOn(on)
       if (which.includes('keySeq') && st.soniKeySeq.on !== on) st.setSoniKeySeqOn(on)
+      if (which.includes('rules') && st.ruleSeqOn !== on && (!on || st.ruleSeq.blocks.length)) st.setRuleSeqOn(on)
       const sq = useStore.getState().sequence
       // the scene sequencer needs scenes to go between (as its play button)
       if (which.includes('scenes') && sq.running !== on && (!on || (sq.enabled && useStore.getState().scenes.length > 1))) {

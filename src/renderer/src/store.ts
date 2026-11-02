@@ -33,6 +33,8 @@ import type {
   World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
+import type { RuleTimeline, SeqLanes } from '@shared/types'
+import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
@@ -2158,6 +2160,17 @@ interface StoreState {
   // right-click menu. Only while it is open, as the Output page's.
   sequencePageWindow: boolean
   setSequencePageWindow: (on: boolean) => void
+  // The Seq page's lanes : which ones its transport starts (session-scoped),
+  // and the Body rule timeline (kept on this machine beside the rules it plays,
+  // engine/ruleSeqModel.ts; runs on the shared beat clock, engine/ruleSeq.ts).
+  seqLanes: SeqLanes
+  setSeqLaneArm: (lane: keyof SeqLanes['arm'], on: boolean) => void
+  ruleSeq: RuleTimeline
+  /** Every edit of the timeline (one undo step each : a drag writes once, on release). */
+  setRuleSeq: (patch: Partial<RuleTimeline>) => void
+  ruleSeqOn: boolean
+  /** Run / stop the rule timeline on purpose (its play, the transport, MIDI, OSC). */
+  setRuleSeqOn: (on: boolean) => void
 
   // Session round-tripping
   newSession: () => void
@@ -5557,6 +5570,17 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   sequencePageWindow: false,
   setSequencePageWindow: (on) => set({ sequencePageWindow: on }),
+  seqLanes: makeDefaultSeqLanes(),
+  setSeqLaneArm: (lane, on) => set((s) => ({ seqLanes: { ...s.seqLanes, arm: { ...s.seqLanes.arm, [lane]: on } } })),
+  // (saved by engine/ruleSeq.ts whenever it changes : an edit, an undo, a rule gone)
+  ruleSeq: loadRuleTimeline(),
+  setRuleSeq: (patch) => set((s) => ({ ruleSeq: sanitizeRuleTimeline({ ...s.ruleSeq, ...patch }) })),
+  ruleSeqOn: false,
+  setRuleSeqOn: (on) => {
+    if (on === get().ruleSeqOn) return
+    set({ ruleSeqOn: on })
+    playEdited('rules', on)
+  },
 
   newSession: () => {
     // A blank slate. Goes through the normal composition write path, so it
@@ -5597,6 +5621,7 @@ export const useStore = create<StoreState>((set, get) => ({
         vibePresetName: null,
         variationBaseline: null,
         sequence: makeDefaultSequence(), // empty bank → stop the auto-pilot
+        seqLanes: makeDefaultSeqLanes(),
         sessionPath: null, // New = no file yet; next Save prompts for one.
         // A fresh slate : the frame where it belongs, the voices where they start.
         outXform: OUT_IDENTITY,
@@ -5751,6 +5776,11 @@ export const useStore = create<StoreState>((set, get) => ({
       vibePresetName: null,
       // Sequencer travels with the session; auto-resumes if it was running.
       sequence: { ...makeDefaultSequence(), ...(s.sequence ?? {}) },
+      // which lanes the Seq transport starts (an older file : all of them); the
+      // rule timeline stops, like the key sequence (an installation starts it
+      // again), and stays the machine's
+      seqLanes: sanitizeSeqLanes(s.seqLanes),
+      ruleSeqOn: false,
       // Performance dials travel with the session; an older file without them
       // keeps the current (localStorage-restored) values rather than resetting.
       globalSpeed: typeof s.globalSpeed === 'number' ? Math.max(1 / 64, Math.min(64, s.globalSpeed)) : cur.globalSpeed,
@@ -5856,6 +5886,8 @@ export const useStore = create<StoreState>((set, get) => ({
       soniSeqOn: s.soniSeq.on,
       soniKeySeq: { ...s.soniKeySeq, on: false },
       soniKeySeqOn: s.soniKeySeq.on,
+      seqLanes: s.seqLanes,
+      ruleSeqOn: s.ruleSeqOn,
       globalSpeed: s.globalSpeed,
       morphMs: s.morphMs,
       // The drawn gesture + its timing travel with the session; the live cursor,

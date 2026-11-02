@@ -31,6 +31,7 @@ import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum } from './link'
 import type { SoniConfig } from './audio/sonify'
 import { actionLabel, fireAction } from './actions'
+import { seqTransportToggle } from './engine/ruleSeq'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
 // Field-macro CC targets → their store setters. These "feel" dials aren't
@@ -95,7 +96,7 @@ function toggleSoniVoice(i: number): void {
 // below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
   'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
-  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo',
+  'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:transport', 'fire:ruleseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
 
@@ -120,6 +121,8 @@ export function fireTrigger(id: string): void {
     case 'fire:seq': st.toggleSequenceRunning(); return
     case 'fire:soniseq': st.setSoniSeqOn(!st.soniSeq.on); return
     case 'fire:keyseq': st.setSoniKeySeqOn(!st.soniKeySeq.on); return
+    case 'fire:transport': seqTransportToggle(); return
+    case 'fire:ruleseq': st.setRuleSeqOn(!st.ruleSeqOn); return
     case 'fire:undo': undo(); return
     case 'fire:redo': redo(); return
     case 'scene:next': recallRelativeScene(1); return
@@ -191,6 +194,8 @@ export interface MidiDevice {
 // fire:keyseq       note/CC press → toggle the Sonify key sequencer
 // rule:<id>         a Body rule's box (by its id, never its place) : a note
 //                   turns it on or off, a CC sets it (64 and up on, below off)
+// fire:transport    note/CC press → the Seq transport : play its lanes / stop them all
+// fire:ruleseq      note/CC press → toggle the Body rule timeline
 
 /** Continuous targets take knobs/faders only : notes are ignored while one
  *  of these is the armed learn target (keep twisting until it takes). */
@@ -305,6 +310,10 @@ export function midiTargetLabel(id: string): string {
       return 'SONIFY seq run'
     case 'fire:keyseq':
       return 'KEY seq run'
+    case 'fire:transport':
+      return 'SEQ transport'
+    case 'fire:ruleseq':
+      return 'RULE timeline run'
     case 'fire:undo':
       return 'UNDO'
     case 'fire:redo':
