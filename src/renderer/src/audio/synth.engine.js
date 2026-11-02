@@ -59,12 +59,19 @@
 //
 // ── What is behind it ──────────────────────────────────────────────────────
 //
-// Eight voices, each : an engine (its three macros) → a DC blocker → drive →
-// the tone filter → the VCA (one ADSR for amp and filter) → pan. The voices sum
-// into one bus : the non-resonant HPF, the BBD chorus, the level, a soft knee.
+// Eight voices, each : an engine (its three macros) → a DC blocker → drive (2x
+// oversampled, with the FM bite in it) → the tone filter → the VCA (one ADSR
+// for amp and filter) → pan. The voices sum into one bus : the non-resonant
+// HPF, the BBD chorus, the level, a soft knee (transparent under 0.8).
 // Everything that moves is updated every CTL (16) samples and ramped linearly
 // sample by sample in between (the control-rate pattern of schwung-quark), so
-// nothing steps and the per-sample loops stay small.
+// nothing steps and the per-sample loops stay small. No per-sample path
+// allocates : numbers that cross a call too big to inline go through typed
+// arrays (a boxed double per call would fill the heap).
+//
+// Poly steals the quietest released voice first, then the oldest held one,
+// each over a 5 ms fade. Every engine sits within 1.5 dB of the others on the
+// standard phrase (tools/synth-render.cjs : about -20 LUFS at level 0.7).
 //
 // Sources, each credited again above its block (full notices in
 // THIRD_PARTY_NOTICES.md) :
@@ -191,7 +198,7 @@ function sclipF(u) {
 // ── 2x oversampling for the drive ──────────────────────────────────────────
 // A 31-tap halfband (Kaiser-windowed sinc, beta 8 : flat to ~0.33 fs, -80 dB
 // from ~0.67 fs), the same taps for up and down. Up : the even output is the
-// input 8 samples late, the odd one the 16 odd taps (x2). Down : the centre
+// input 8 samples late, the odd one the 16 odd taps (x2). Down : the center
 // tap plus the 16 odd taps over the last 31 samples at 2x. 15.5 samples late
 // in all.
 const HB = new Float64Array(16)
@@ -1328,6 +1335,11 @@ const ENGINE_IDS = ['dco', 'ms', 'swarm', 'fm', 'modal', 'voice', 'fold', 'pluck
 // Loudness trims, measured (tools/synth-render.cjs : the standard phrase, LUFS).
 const ENGINE_TRIM = [0.628, 0.639, 0.534, 0.535, 0.748, 0.851, 0.398, 1.88]
 const FILTER_IDS = ['ladder', 'ms', 'morph']
+// engines whose note is a strike (a legato change still plucks them)
+const STRUCK = [false, false, false, false, true, false, true, true]
+// the per-id mods table : MT_N ids, MT_F fields each
+const MT_N = 32, MT_F = 10
+const MT_KEYS = ['timbre', 'harmonics', 'morph', 'cutoff', 'reso', 'drive', 'env', 'pan', 'bend', 'vel']
 
 // ═══ the tone filters ═══════════════════════════════════════════════════════
 // ladder : after jx-move (Vincent Fillion, MIT) : the IR3109-style 4-pole OTA
@@ -1484,7 +1496,7 @@ class Voice {
     this.i = i
     this.rs = new Int32Array(1)
     this.rs[0] = ((0x9e3779b9 * (i + 1)) ^ 0x2545f491) | 0 || 1
-    this.id = -1; this.gate = false; this.age = 0
+    this.id = -1; this.gate = false; this.age = 0; this.modId = -1
     this.stage = 0; this.env = 0
     this.vel = 0.8; this.velG = 0.8
     this.p = 69; this.pT = 69; this.slide = false
@@ -1551,6 +1563,12 @@ class OpsiaSynth {
     // mono / unison note stack
     this.stId = new Int32Array(32); this.stP = new Float64Array(32); this.stVel = new Float64Array(32); this.stN = 0
     this.topId = -1
+    this.handFrom = -1; this.handTo = -1
+    this.mtId = new Int32Array(MT_N).fill(-1)
+    this.mtAge = new Float64Array(MT_N)
+    this.mtV = new Float64Array(MT_N * MT_F)
+    this.mtSet = new Uint8Array(MT_N * MT_F)
+    this.mtClock = 0
     // buffers
     this.bufA = new Float64Array(CTL); this.bufB = new Float64Array(CTL)
     this.busL = new Float64Array(BLOCK); this.busR = new Float64Array(BLOCK)
@@ -1642,9 +1660,13 @@ class OpsiaSynth {
       best.id = id
       return
     }
-    // mono / unison
+    // mono / unison : a note over a held one is legato (no new attack), but
+    // the play side hands over with the new id's noteOn BEFORE the old id's
+    // noteOff : when that noteOff follows before anything is rendered, it was
+    // a handover, and the new note strikes after all (see noteOff)
     const legato = this.stN > 0
     const same = this.topId === id
+    if (legato && !same) { this.handFrom = this.topId; this.handTo = id }
     this.stackRemove(id)
     if (this.stN === 32) { this.stId.copyWithin(0, 1); this.stP.copyWithin(0, 1); this.stVel.copyWithin(0, 1); this.stN = 31 }
     this.stId[this.stN] = id; this.stP[this.stN] = p; this.stVel[this.stN] = vel; this.stN++
@@ -1672,19 +1694,18 @@ class OpsiaSynth {
         // engines strike anyway (a new note on a string is a new pluck)
         v.pT = p; v.slide = false
         if (this.cs.glide <= 0) v.p = p
+        if (v.modId !== v.id) this.loadMods(v, false)
         const e = this.eng
-        if (e === 4 || e === 6 || e === 7) ENGINES[e].start(v, this, false)
+        if (STRUCK[e]) { this.prepVoice(v); ENGINES[e].start(v, this, false) }
       }
     }
   }
-  strike(v, p, vel, fresh, legatoOnly) {
+  strike(v, p, vel, fresh, legatoOnly, skipStruck) {
     const s = this
     if (fresh) {
       v.fresh = true
       v.p = p
       v.env = 0
-      v.mT = v.tT; v.mH = v.tH; v.mM = v.tM; v.mC = v.tC; v.mR = v.tR; v.mD = v.tD
-      v.mBend = v.tBend; v.mPan = v.tPan; v.mExp = 0; v.tExp = 0
       v.dcx = 0; v.dcy = 0; v.dvx = 0; v.dvF = 0; v.dvLp = 0
       v.osU.fill(0); v.osD.fill(0); v.osX = 0; v.osXi = 0; v.osHold = 0
       v.bx = 0; v.bF = 0; v.bdx = 0; v.bdy = 0
@@ -1697,6 +1718,8 @@ class OpsiaSynth {
     if (!legatoOnly) v.stage = 1
     else if (v.stage === 0 || v.stage === 4) v.stage = 1
     v.age = ++s.clock
+    // a new id brings its own mods (sent before its note, or none)
+    if (fresh || v.modId !== v.id) this.loadMods(v, fresh)
     // the envelope's times, scaled by the picture's env at the strike
     const ef = clamp(v.tEnv, -1, 1)
     const cs = s.cfg
@@ -1706,8 +1729,10 @@ class OpsiaSynth {
     v.noteC = (rnd01(v) * 2 - 1) * 2
     // the engine(s)
     this.prepVoice(v)
-    ENGINES[s.eng].start(v, s, fresh)
-    if (s.engPrev >= 0) ENGINES[s.engPrev].start(v, s, fresh)
+    // (a mono handover re-strikes without plucking a struck engine twice : the
+    // legato change already did)
+    if (!skipStruck || !STRUCK[s.eng]) ENGINES[s.eng].start(v, s, fresh)
+    if (s.engPrev >= 0 && (!skipStruck || !STRUCK[s.engPrev])) ENGINES[s.engPrev].start(v, s, fresh)
     for (const f of v.filts) f.kick = 1
     if (fresh) this.voiceCtl(v, true)
   }
@@ -1724,7 +1749,20 @@ class OpsiaSynth {
     }
     const wasTop = this.topId === id
     this.stackRemove(id)
-    if (!wasTop) return
+    if (!wasTop) {
+      // an id that no longer sounds only leaves the stack; if it is the one
+      // just handed over (no render since), the new note strikes
+      if (id === this.handFrom && this.topId === this.handTo) {
+        this.handFrom = -1
+        const n = this.voiceMode === 1 ? NV : 1
+        const k = this.stN - 1
+        for (let i = 0; i < n; i++) {
+          const v = this.v[i]
+          if (v.stage !== 0 && v.gate && !v.stealing) this.strike(v, this.stP[k], this.stVel[k], false, false, true)
+        }
+      }
+      return
+    }
     if (this.stN > 0) {
       const k = this.stN - 1
       this.topId = this.stId[k]
@@ -1746,23 +1784,48 @@ class OpsiaSynth {
     for (let i = 0; i < this.stN; i++) if (this.stId[i] === id) this.stP[i] = p
     if (this.topId === id) for (const v of this.v) if (v.id === id && v.stage !== 0) { v.pT = p; v.slide = true }
   }
+  // The mods arrive by id, before a note as well as during it : they are kept
+  // per id (MT_N slots, the oldest given up), and a voice takes its id's at
+  // the strike (so the env shape of a first strike is the picture's).
   setMods(id, m) {
     if (!m || typeof m !== 'object') return
     id = id | 0
-    for (const v of this.v) {
-      if (v.id !== id) continue
-      const g = (k, lo, hi) => { const x = m[k]; return typeof x === 'number' && isFinite(x) ? clamp(x, lo, hi) : null }
-      let x
-      if ((x = g('timbre', -1, 1)) !== null) v.tT = x
-      if ((x = g('harmonics', -1, 1)) !== null) v.tH = x
-      if ((x = g('morph', -1, 1)) !== null) v.tM = x
-      if ((x = g('cutoff', -1, 1)) !== null) v.tC = x
-      if ((x = g('reso', -1, 1)) !== null) v.tR = x
-      if ((x = g('drive', -1, 1)) !== null) v.tD = x
-      if ((x = g('env', -1, 1)) !== null) v.tEnv = x
-      if ((x = g('pan', -1, 1)) !== null) v.tPan = x
-      if ((x = g('bend', -1, 1)) !== null) v.tBend = x
-      if ((x = g('vel', 0, 1)) !== null) v.tExp = clamp(12 * (x - v.vel), -6, 6)
+    let sl = -1
+    for (let i = 0; i < MT_N; i++) if (this.mtId[i] === id) { sl = i; break }
+    if (sl < 0) {
+      sl = 0
+      for (let i = 1; i < MT_N; i++) if (this.mtAge[i] < this.mtAge[sl]) sl = i
+      this.mtId[sl] = id
+      for (let k = 0; k < MT_F; k++) { this.mtV[sl * MT_F + k] = 0; this.mtSet[sl * MT_F + k] = 0 }
+    }
+    this.mtAge[sl] = ++this.mtClock
+    for (let k = 0; k < MT_F; k++) {
+      const x = m[MT_KEYS[k]]
+      if (typeof x === 'number' && isFinite(x)) {
+        this.mtV[sl * MT_F + k] = clamp(x, k === 9 ? 0 : -1, 1)
+        this.mtSet[sl * MT_F + k] = 1
+      }
+    }
+    for (const v of this.v) if (v.id === id && v.modId === id) this.loadMods(v, false)
+  }
+  /** The voice takes its id's mods (zero where none were sent); snap on a
+   *  fresh note, else they glide in through the voice's smoothing. */
+  loadMods(v, snap) {
+    const id = v.id
+    let sl = -1
+    for (let i = 0; i < MT_N; i++) if (this.mtId[i] === id) { sl = i; break }
+    const V = this.mtV, o = sl * MT_F
+    if (sl < 0) {
+      v.tT = v.tH = v.tM = v.tC = v.tR = v.tD = v.tEnv = v.tPan = v.tBend = v.tExp = 0
+    } else {
+      v.tT = V[o]; v.tH = V[o + 1]; v.tM = V[o + 2]; v.tC = V[o + 3]; v.tR = V[o + 4]; v.tD = V[o + 5]
+      v.tEnv = V[o + 6]; v.tPan = V[o + 7]; v.tBend = V[o + 8]
+      v.tExp = this.mtSet[o + 9] ? clamp(12 * (V[o + 9] - v.vel), -6, 6) : 0
+    }
+    v.modId = id
+    if (snap) {
+      v.mT = v.tT; v.mH = v.tH; v.mM = v.tM; v.mC = v.tC; v.mR = v.tR; v.mD = v.tD
+      v.mBend = v.tBend; v.mPan = v.tPan; v.mExp = v.tExp
     }
   }
   allOff() {
@@ -1995,7 +2058,7 @@ class OpsiaSynth {
         xp = u; Fp = F
         lp += ((y - off) * comp - lp) * lpc
         Dn[dp] = uo + (lp - uo) * wet
-        // back down : the centre tap and the odd ones (the latest sample is dp)
+        // back down : the center tap and the odd ones (the latest sample is dp)
         let z = 0.5 * Dn[(dp - 15) & 31]
         for (let k = 0; k < 16; k++) z += HB[k] * Dn[(dp - 2 * k) & 31]
         dp = (dp + 1) & 31
@@ -2064,6 +2127,8 @@ class OpsiaSynth {
       this.drvLpC = 1 - Math.exp((-TAU * 12000) / (2 * this.sr))
       this.biteR = 1 - (TAU * 20) / (2 * this.sr)
     }
+    // a noteOff after this is an overlap ending, not a handover
+    this.handFrom = -1
     const bl = this.busL, br = this.busR
     for (let i = 0; i < n; i++) { bl[i] = 0; br[i] = 0 }
     let pos = 0

@@ -6,7 +6,7 @@
 //
 //   node tools/synth-render.cjs check [--sr 48000] [--quick] [--only aliasing,clicks,...]
 //       the automatic checks, per engine : aliasing, clicks, DC, stability,
-//       loudness, CPU, tuning; prints a table, exits 1 on a failure
+//       loudness, CPU, tuning, and the contract with the play side; prints a table, exits 1 on a failure
 //   node tools/synth-render.cjs pack <dir>
 //       the listening pack : a phrase per engine, per filter, per factory patch,
 //       a picture-like demo, a spectrogram per engine sweep, README.txt
@@ -649,6 +649,73 @@ function checkTuning(sr) {
   return out
 }
 
+// ── the contract with the play side ────────────────────────────────────────
+/** Level (dBFS RMS) of a mono mix over [t0, t1). */
+function levelAt(r, t0, t1) {
+  const a = Math.round(t0 * r.sr), b = Math.round(t1 * r.sr)
+  let e = 0
+  for (let i = a; i < b; i++) { const x = 0.5 * (r.L[i] + r.R[i]); e += x * x }
+  return 10 * Math.log10(e / Math.max(1, b - a) + 1e-30)
+}
+/** Time for a note's level to first reach 90 % of its peak (ms). */
+function riseMs(r, t0, span) {
+  const a = Math.round(t0 * r.sr), b = Math.round((t0 + span) * r.sr), w = Math.round(0.002 * r.sr)
+  const env = []
+  for (let i = a; i + w < b; i += w) { let e = 0; for (let j = i; j < i + w; j++) e += r.L[j] * r.L[j]; env.push(Math.sqrt(e / w)) }
+  const pk = Math.max(...env)
+  return env.findIndex((x) => x >= 0.9 * pk) * 2
+}
+function checkContract(sr) {
+  const rows = []
+  const ok = (name, pass, detail) => rows.push({ name, pass, detail })
+  const base = { engine: 'dco', timbre: 0.67, harmonics: 0, morph: 0, chorus: 0, drift: 0, cutoff: 0.7, reso: 0, envAmt: 0, drive: 0 }
+  // 1 · mods sent BEFORE a noteOn shape its first strike (env : the attack)
+  {
+    const cfg = cfgOf({ ...base, attack: 0.45, decay: 0.7, sustain: 1, release: 0.3 })
+    const slow = render({ sr, seconds: 1.2, cfg, events: [{ t: 0.05, mods: [7, { env: 1 }] }, { t: 0.05, on: [7, midi(57), 0.8] }] })
+    const fast = render({ sr, seconds: 1.2, cfg, events: [{ t: 0.05, mods: [7, { env: -1 }] }, { t: 0.05, on: [7, midi(57), 0.8] }] })
+    const none = render({ sr, seconds: 1.2, cfg, events: [{ t: 0.05, on: [7, midi(57), 0.8] }] })
+    const s = riseMs(slow, 0.05, 1.1), f = riseMs(fast, 0.05, 1.1), n0 = riseMs(none, 0.05, 1.1)
+    ok('mods before noteOn : env shapes the first strike', s > 4 * n0 && f < n0 / 2, `attack to 90 % : env +1 ${s} ms, none ${n0} ms, env -1 ${f} ms`)
+  }
+  // 1b · pan sent before the noteOn is there from the first sample
+  {
+    const r = render({ sr, seconds: 0.4, cfg: cfgOf({ ...base, attack: 0 }), events: [{ t: 0.05, mods: [3, { pan: -1 }] }, { t: 0.05, on: [3, midi(57), 0.8] }] })
+    const a = Math.round(0.06 * sr), b = Math.round(0.3 * sr)
+    let l = 0, rr = 0
+    for (let i = a; i < b; i++) { l += r.L[i] * r.L[i]; rr += r.R[i] * r.R[i] }
+    ok('mods before noteOn : pan from the first strike', rr < l * 1e-4, `right / left over the note : ${(10 * Math.log10(rr / l + 1e-30)).toFixed(0)} dB`)
+  }
+  // 1c · a voice reused for a new id does not keep the old id's mods
+  {
+    const ev = [{ t: 0.02, on: [1, midi(57), 0.8] }, { t: 0.03, mods: [1, { pan: -1 }] }, { t: 0.2, off: 1 }, { t: 0.6, on: [2, midi(57), 0.8] }]
+    const r = render({ sr, seconds: 1.0, cfg: cfgOf({ ...base, attack: 0, release: 0.2, voices: 'mono' }), events: ev })
+    const a = Math.round(0.7 * sr), b = Math.round(0.95 * sr)
+    let l = 0, rr = 0
+    for (let i = a; i < b; i++) { l += r.L[i] * r.L[i]; rr += r.R[i] * r.R[i] }
+    ok('a new id starts from its own mods (none : centered)', Math.abs(10 * Math.log10(rr / l)) < 0.5, `right / left of the second id : ${(10 * Math.log10(rr / l)).toFixed(2)} dB`)
+  }
+  // 2 · mono / unison : the handover (new noteOn, then the old noteOff, no
+  // render between) strikes; an overlap stays legato; a stale noteOff never
+  // releases the sounding note
+  for (const mode of ['mono', 'unison']) {
+    const cfg = cfgOf({ ...base, voices: mode, attack: 0.05, decay: 0.4, sustain: 0.15, release: 0.3 })
+    const hand = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 0.6, off: 1 }, { t: 1.2, off: 2 }] })
+    const over = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 1.2, off: 2 }, { t: 1.2, off: 1 }] })
+    const late = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 0.7, off: 1 }, { t: 1.2, off: 2 }] })
+    // (sustain 0.15 : a new attack peaks ~16 dB over it; windows long enough
+    // to average the unison's beating)
+    // an attack is a bump : the first 35 ms after the change over the level
+    // the new note then holds (the pitch's own level change cancels out)
+    const bump = (r) => levelAt(r, 0.605, 0.64) - levelAt(r, 0.8, 1.15)
+    ok(`${mode} : a handover strikes`, bump(hand) > 6, `the new note's first 35 ms over its held level : ${fmt(bump(hand))} dB`)
+    ok(`${mode} : an overlap stays legato`, bump(over) < 2, `the same after an overlapping note : ${fmt(bump(over))} dB`)
+    const l1 = levelAt(late, 0.66, 0.69), l2 = levelAt(late, 0.75, 1.15)
+    ok(`${mode} : a noteOff for an id no longer sounding never releases`, l2 > l1 - 3 && l2 > -60, `the sounding note after the old id's noteOff : ${fmt(l2 - l1)} dB`)
+  }
+  return rows
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 function argOf(name, def) {
   const i = process.argv.indexOf('--' + name)
@@ -708,6 +775,12 @@ function runChecks() {
     if (!okj) fail = true
     console.log(`sine canvas, 24 notes on 8 voices : max step ${j.jump.toExponential(2)} vs band-limited bound ${j.bound.toExponential(2)}  ${okj ? 'ok' : 'FAIL'}`)
   }
+  if (want('contract')) {
+    res.contract = checkContract(sr)
+    console.log(`
+# the contract with the play side @ ${sr}`)
+    for (const q of res.contract) { if (!q.pass) fail = true; console.log(`${q.pass ? 'ok  ' : 'FAIL'} ${q.name} : ${q.detail}`) }
+  }
   if (want('dc')) {
     res.dc = checkDC(sr)
     console.log(`\n# DC @ ${sr} (dBFS : phrase mean, held-note mean)`)
@@ -726,9 +799,17 @@ function runChecks() {
     }
   }
   if (want('cpu')) {
+    if (only.length !== 1) {
+      // timed in a fresh process : the other checks' big buffers leave the heap
+      // busy and the numbers noisy
+      const o = execFileSync(process.execPath, [__filename, 'check', '--only', 'cpu', '--sr', String(sr), ...(quick ? ['--quick'] : [])], { encoding: 'utf8' })
+      process.stdout.write(o.replace(/\n(all checks pass|FAIL)[^\n]*\n?$/, '\n'))
+      res.cpu = 'see the child run'
+    } else {
     res.cpu = checkCPU(sr, quick ? 2 : 6)
     console.log(`\n# CPU @ ${sr} (ms per 128-frame block, % of one core in real time; 8 voices, chorus II, drive)`)
     for (const [k, q] of Object.entries(res.cpu)) console.log(`${k.padEnd(14)} ${q.msPerBlock.toFixed(3)} ms  ${q.pctRT.toFixed(1)} %  (${q.voices} voices)`)
+    }
   }
   if (want('stability')) {
     const minutes = Number(argOf('minutes', quick ? 0.5 : 10))
