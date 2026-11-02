@@ -15,6 +15,49 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The body modulator's clutch : a hand as a fader** (Vincent : "use my left hand,
+  open, to control the opacity value in real time, like a swipe of my hand that swipes
+  through the opacity fader from min to max"; then "follow only while [feature] is above
+  a threshold, otherwise hold", for any feature and any parameter). `cfg.body` takes
+  three optional fields : `clutch` (any body feature), `clutchAt` (0..1, 0.5 to start)
+  and `clutchInvert` (follow while BELOW). While the clutch is engaged the modulator
+  follows its feature with its own smoothing; let go, it holds the last value, and every
+  binding of it holds (it lives in the modulator). The gate and its numbers are in
+  `engine/bodyClutch.ts` (pure, tested under node) : a fixed dead band of ±0.05 around
+  the threshold (engage at ≥ at + 0.05, let go at ≤ at − 0.05, clipped to 0..1; an
+  open hand reads ~0.95 and a fist ~0.2, a still hand wobbles ~±0.03); a grab glides
+  from the held value to the hand with a 70 ms time constant (or the card's smoothing
+  if slower), ending within 0.005 of the hand or after 500 ms. Out of view holds and
+  lets go : the body bus now knows which hand slots hold a hand (`setHandSides`, one
+  line in the tracker's `deriveHands`) and `bodyBus.inView(feature)` asks for the
+  feature's own part (its hand, both hands for handsApart, the face, the pose for the
+  pose and the movement qualities; the silhouette zones, the motion field and the
+  presence gates read the whole frame, never absent), so a hand that leaves while the
+  other stays (its values frozen on the bus) or a frame with nobody in it (the values
+  relaxing to rest) never moves the parameter; the clutch's part and the main
+  feature's are both asked. Before any value is held it starts from the feature.
+  No clutch = the old law, bit for bit (master's engine side by side, 5000 uneven
+  frames, 3 body cards, hands in and out, a card off and on : max difference 0).
+  **Card** : a CLUTCH row (feature menu with **off**, the state dot : filled following,
+  a ring held, a faint ring held out of view) and, with a clutch, an ABOVE / BELOW chip
+  with the threshold slider and box; the meter dims to 35 % while it holds. All 19
+  types still fit the 160 px card (20 / 20 with the clutch rows, sliders 81 and 87 px
+  of track at 1536 px). **Body page** : Alt+click a feature's → makes it the clutch of
+  the body modulator routed last (else the last body card; a warning when there is
+  none). Sanitized on every load (sessions, scenes : `normalizeComposition`); a pinned
+  card, the dice and scenes carry the whole block. No card copy / paste exists, Generate
+  and the dice never make body modulators, and OSC / dataflou / the agent do not expose
+  modulator settings, so nothing else needed it. **Measured in the test copy** (synthetic
+  body bus, no camera; M1 = handLeftX clutched by handLeftOpen > 0.5 on L2 opacity and
+  the Background's, Multiply, depth 1) : the open-hand sweep lands at 0.600 on both (max
+  lag 0.014); the hand closed at 0.6 holds with drift 0 while X travels to 1 and back to
+  0.2; reopened at 0.2 it glides 0.600 → 0.516 → 0.450 … and is within 0.02 in 230 ms;
+  nobody in frame, or only the right hand, drift 0; openness jittering ±0.03 around 0.5
+  for 5 s : 0 state changes from open and from closed; BELOW follows a closed hand and
+  holds open or gone; faceJawOpen clutched by handRightPinchIndex on L1 Fluid's flow :
+  0.516 (expected 0.516), held through release and the face leaving, regrab 0.295
+  (expected 0.295); save and reopen from disk, and a scene recall, keep the clutch; a
+  v1.3.1 body block loads byte-identical and follows as before; console errors 0.
 - **Body rules : each layer's opacity, and the Background's** (Vincent : "in Body, I
   should be able to select each Layer's opacity as options for creating a rule"). Five
   new actions per layer in the shared vocabulary (`actions.ts`, so the Body rule picker,

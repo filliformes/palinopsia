@@ -5,9 +5,10 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, VisionFeature } from '@shared/types'
+import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorConfig, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, VisionFeature } from '@shared/types'
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
+import { CLUTCH_AT_DEFAULT, CLUTCH_BAND } from '../engine/bodyClutch'
 import { condLabel, parseStepCond, randomStepPattern, STEP_MAX, STEP_PROBS, stepLength, stepsOf, SWING_MAX, SWING_MIN, type ParsedCond } from '../engine/stepSeq'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { ownerWindow } from './ownerWindow'
@@ -690,6 +691,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
           <SliderRow label="SMOOTH" value={bc.smooth} min={0} max={0.99}
             title="One-pole smoothing of the body feature : 0 snaps, →1 glides"
             onChange={(v) => update(index, { body: { ...bc, smooth: v } })} />
+          <BodyClutchRows index={index} bc={bc} onChange={(body) => update(index, { body })} />
         </>
       )
     }
@@ -1340,6 +1342,127 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
   )
 }
 
+// ── Body : the clutch (engine/bodyClutch.ts) ──────────────────────────
+const CLUTCH_HELP =
+  'CLUTCH : a second body feature that decides when this modulator follows its own. While the ' +
+  'clutch reads past its threshold, it follows; otherwise it holds the last value it had, and ' +
+  'every parameter it drives holds with it. Out of view (that hand, the face or the body gone, ' +
+  'or the camera off) it holds too, so losing the hand never moves anything. A grab glides in ' +
+  'from the held value to the hand. Say it follows handLeftX with the clutch on handLeftOpen : ' +
+  'open the hand to grab the fader and sweep, close it to let go. Off : it always follows.'
+const clutchAtHelp = (inv: boolean, at: number): string =>
+  `Threshold : it follows while the clutch reads ${inv ? 'below' : 'above'} ${at.toFixed(2)}. ` +
+  `It grabs past ${inv ? Math.max(0, at - CLUTCH_BAND).toFixed(2) : Math.min(1, at + CLUTCH_BAND).toFixed(2)} ` +
+  `and lets go past ${inv ? Math.min(1, at + CLUTCH_BAND).toFixed(2) : Math.max(0, at - CLUTCH_BAND).toFixed(2)} ` +
+  `(a dead band of ${CLUTCH_BAND.toFixed(2)} each side), so a reading wobbling around it never flickers.`
+
+function BodyClutchRows({ index, bc, onChange }: {
+  index: number
+  bc: ModulatorConfig['body']
+  onChange: (b: ModulatorConfig['body']) => void
+}): JSX.Element {
+  const at = bc.clutchAt ?? CLUTCH_AT_DEFAULT
+  const inv = !!bc.clutchInvert
+  const atHelp = clutchAtHelp(inv, at)
+  return (
+    <>
+      <Row label="CLUTCH" title={CLUTCH_HELP}>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={bc.clutch ?? ''}
+          title={`${CLUTCH_HELP} Alt+click a feature's → on the Body page (B) to set it here.`}
+          onChange={(e) => {
+            const v = e.target.value as BodyFeature | ''
+            const { clutch: _old, ...rest } = bc
+            onChange(v ? { ...rest, clutch: v } : rest)
+          }}
+        >
+          <option value="">off</option>
+          {BODY_FEATURE_GROUPS.map((g) => (
+            <optgroup key={g.title} label={g.title}>
+              {g.keys.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        {bc.clutch && <ClutchDot index={index} />}
+      </Row>
+      {bc.clutch && (
+        <div className="flex min-w-0 items-center gap-1" title={atHelp}>
+          <button
+            onClick={() => onChange({ ...bc, clutchInvert: !inv })}
+            className={`w-10 shrink-0 rounded px-0.5 py-0.5 font-mono text-[9px] ${
+              inv ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted hover:text-accent'
+            }`}
+            title={
+              inv
+                ? 'BELOW : it follows while the clutch reads under the threshold (say while the hand is closed). Click : follow while above.'
+                : 'ABOVE : it follows while the clutch reads over the threshold (say while the hand is open). Click : follow while below.'
+            }
+          >
+            {inv ? 'BELOW' : 'ABOVE'}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={at}
+            onChange={(e) => onChange({ ...bc, clutchAt: Number(e.target.value) })}
+            className="min-w-0 flex-1 accent-accent"
+            title={atHelp}
+          />
+          <BoundedNumberInput
+            value={at}
+            min={0}
+            max={1}
+            maxFrac={2}
+            onChange={(v) => onChange({ ...bc, clutchAt: v })}
+            className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+            title={atHelp}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+// The clutch's state, painted from the engine each frame (no React render) :
+// filled = following (grabbed), a ring = held, a faint ring = held because its
+// part of the body is out of view. The card's meter dims while it holds.
+const CLUTCH_DOT = [
+  { bg: 'transparent', ring: 'rgb(var(--c-muted) / 0.4)', title: 'Clutch : the card is off' },
+  { bg: 'rgb(var(--c-accent))', ring: 'rgb(var(--c-accent))', title: 'Following : the clutch is engaged, the value follows the feature' },
+  { bg: 'transparent', ring: 'rgb(var(--c-text) / 0.75)', title: 'Held : the clutch is let go, the value stays where it was' },
+  { bg: 'transparent', ring: 'rgb(var(--c-muted) / 0.45)', title: 'Held : the clutch’s hand (or face, or body) is out of view, or the body camera is off' }
+]
+function ClutchDot({ index }: { index: number }): JSX.Element {
+  const ref = useRef<HTMLSpanElement | null>(null)
+  useEffect(() => {
+    let raf = 0
+    let shown = -1
+    const paint = (): void => {
+      const el = ref.current
+      const st = modEngine.clutchState(index)
+      if (el && st !== shown) {
+        shown = st
+        const d = CLUTCH_DOT[st] ?? CLUTCH_DOT[0]
+        el.style.background = d.bg
+        el.style.boxShadow = `inset 0 0 0 1.5px ${d.ring}`
+        el.title = d.title
+        el.dataset.clutch = String(st)
+      }
+      raf = requestAnimationFrame(paint)
+    }
+    raf = requestAnimationFrame(paint)
+    return () => cancelAnimationFrame(raf)
+  }, [index])
+  return <span ref={ref} className="h-2 w-2 shrink-0 rounded-full" />
+}
+
 function Row({
   label,
   title,
@@ -1516,9 +1639,18 @@ function Meter({ index }: { index: number }): JSX.Element {
   const barRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     let raf = 0
+    let dim = false
     const paint = (): void => {
       const el = barRef.current
-      if (el) el.style.width = `${Math.round(modEngine.values[index] * 100)}%`
+      if (el) {
+        el.style.width = `${Math.round(modEngine.values[index] * 100)}%`
+        // a body card's clutch let go : the bar dims while the value holds
+        const held = modEngine.clutchState(index) >= 2
+        if (held !== dim) {
+          dim = held
+          el.style.opacity = held ? '0.35' : ''
+        }
+      }
       raf = requestAnimationFrame(paint)
     }
     raf = requestAnimationFrame(paint)

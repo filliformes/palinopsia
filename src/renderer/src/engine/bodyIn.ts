@@ -12,7 +12,7 @@
 // (so `smooth` behaves exactly like the audio / vision cases).
 
 import type { BodyFeature, BodyGesture } from '@shared/types'
-import { BODY_FEATURES } from '@shared/types'
+import { BODY_FEATURE_GROUPS, BODY_FEATURES } from '@shared/types'
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
 
@@ -35,6 +35,25 @@ const REST: Record<BodyFeature, number> = {
   flowCenterX: 0.5, flowCenterY: 0.5, flowArea: 0,
   moveEnergy: 0, moveExpansion: 0, moveFluidity: 0.5, moveSuddenness: 0, moveDirectness: 0.5, moveSymmetry: 0.5,
   bodyPresent: 0, handsPresent: 0, facePresent: 0
+}
+
+// The part of the performer each feature reads (BodyBus.inView) : a hand's own
+// features and hand shape by their side, the two-hand relations, the face, the
+// pose (and the movement qualities drawn from it); 'frame' for what reads the
+// whole picture (silhouette zones, motion field, the presence gates).
+type Part = 'left' | 'right' | 'both' | 'hands' | 'face' | 'pose' | 'frame'
+const PART = {} as Record<BodyFeature, Part>
+for (const g of BODY_FEATURE_GROUPS) {
+  for (const k of g.keys) {
+    PART[k] =
+      k.startsWith('handLeft') ? 'left'
+      : k.startsWith('handRight') ? 'right'
+      : k === 'handsApart' ? 'both'
+      : k === 'handsHeight' ? 'hands'
+      : g.title === 'Face' ? 'face'
+      : g.title === 'Pose' || g.title === 'Movement qualities' ? 'pose'
+      : 'frame'
+  }
 }
 
 class BodyBus {
@@ -92,6 +111,33 @@ class BodyBus {
 
   setLive(hands: boolean, pose: boolean, face: boolean): void {
     this.live = { hands, pose, face, at: performance.now() }
+    if (!hands) this.sides = { left: false, right: false }
+  }
+  // Which hand slots hold a hand this frame (the tracker's deriveHands). A hand
+  // that leaves keeps its last values on the bus while the other stays (only a
+  // frame with nobody in it relaxes them), so a feature's own hand must be
+  // asked for directly.
+  private sides = { left: false, right: false }
+  setHandSides(left: boolean, right: boolean): void {
+    this.sides = { left, right }
+  }
+  /** Is the part this feature reads in view now (fresh detections) : its own
+   *  hand for a hand's features, both for hands apart, either for their
+   *  height; the face; the body for the pose and the movement qualities. The
+   *  silhouette zones, the motion field and the presence gates read the whole
+   *  frame : an empty zone or a still room is a reading, never absent. */
+  inView(name: BodyFeature): boolean {
+    const part = PART[name]
+    if (part === 'frame') return true
+    if (performance.now() - this.live.at >= 500) return false
+    switch (part) {
+      case 'left': return this.live.hands && this.sides.left
+      case 'right': return this.live.hands && this.sides.right
+      case 'both': return this.live.hands && this.sides.left && this.sides.right
+      case 'hands': return this.live.hands
+      case 'face': return this.live.face
+      default: return this.live.pose
+    }
   }
   /** For the status pip : are detections fresh (within ~500ms)? */
   status(): { hands: boolean; pose: boolean; face: boolean } {
