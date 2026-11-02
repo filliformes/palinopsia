@@ -647,9 +647,10 @@ class SwarmSt {
     this.nAct = 2
   }
 }
-function swEnv(ph) {
-  // a blip : 2 % attack, then an exponential fall to e^-5 at the cycle's end
-  return ph < 0.02 ? ph * 50 : Math.exp(-5.1 * (ph - 0.02))
+function swEnv(ph, a) {
+  // a blip : a rise over the fraction a of its cycle, then an exponential fall
+  // to e^-5 at the cycle's end
+  return ph < a ? ph / a : Math.exp((-5.1 * (ph - a)) / (1 - a))
 }
 /** One swarm member for n samples, added into buf (its own function : the
  *  shape helpers stay inlined, no number is boxed). */
@@ -742,7 +743,8 @@ const swarm = {
       let lph = st.lph[k] + tick * rate * st.lrate[k]
       if (lph >= 1) lph -= Math.floor(lph)
       st.lph[k] = lph
-      const env = depth > 0 ? swEnv(lph) : 0
+      // 2 % of the cycle, never under 1.5 ms (a faster rise clicks at 40 Hz)
+      const env = depth > 0 ? swEnv(lph, Math.min(0.3, Math.max(0.02, 0.0015 * rate * st.lrate[k]))) : 0
       // the blips average far under a drone : give back most of it
       const amp = lv * (1 - depth + depth * env) * (1 + 1.3 * depth)
       const semis = (k >= 4 ? st.oct[k] : 0) + st.det[k] * (k >= 2 ? 1.6 : 1) * spread * 1200 / 100 + fmSemis * env
@@ -798,8 +800,9 @@ function fmRoll(hz, sr) {
 function fmCap(f, r, sr) { return Math.max(0, (0.42 * sr - f) / Math.max(1, f * r) - 2) }
 // The self-feedback makes the modulator saw-like and unbounded in band : it is
 // rolled off as the modulator climbs (no change under ~500 Hz, a third left at
-// 2 kHz), so the top of the keyboard keeps its grit without the whistle.
-function fbRoll(hz) { const x = hz / 1500; return 1 / (1 + x * x) }
+// 2 kHz, at 48 kHz; it scales with the rate), so the top of the keyboard keeps
+// its grit without the whistle.
+function fbRoll(hz, sr) { const x = hz / (0.0275 * sr); return 1 / (1 + x * x) }
 const FM_RATIOS = [0.5, 1, 1.5, 2, 2.5, 3, 3.7, 4, 5, 5.4, 6, 7, 8, 9.2, 11, 14]
 class FmSt {
   constructor() {
@@ -863,8 +866,8 @@ const fm = {
     setR(R, 3, w1, snap)
     setR(R, 4, I_0 / TAU, snap)
     setR(R, 5, I_1 / TAU, snap)
-    setR(R, 6, (fbk * fmRoll(f * rS0, sr) * fbRoll(f * rS0)) / TAU, snap)
-    setR(R, 7, (fbk * fmRoll(f * rS1, sr) * fbRoll(f * rS1)) / TAU, snap)
+    setR(R, 6, (fbk * fmRoll(f * rS0, sr) * fbRoll(f * rS0, sr)) / TAU, snap)
+    setR(R, 7, (fbk * fmRoll(f * rS1, sr) * fbRoll(f * rS1, sr)) / TAU, snap)
     st.bite = d
   },
   run(v, s, buf, n) {
@@ -1333,7 +1336,7 @@ const pluck = {
 const ENGINES = [dco, ms, swarm, fm, modal, voice, fold, pluck]
 const ENGINE_IDS = ['dco', 'ms', 'swarm', 'fm', 'modal', 'voice', 'fold', 'pluck']
 // Loudness trims, measured (tools/synth-render.cjs : the standard phrase, LUFS).
-const ENGINE_TRIM = [0.628, 0.639, 0.534, 0.535, 0.748, 0.851, 0.398, 1.88]
+const ENGINE_TRIM = [0.652, 0.541, 0.502, 0.515, 0.752, 0.911, 0.356, 2.2]
 const FILTER_IDS = ['ladder', 'ms', 'morph']
 // engines whose note is a strike (a legato change still plucks them)
 const STRUCK = [false, false, false, false, true, false, true, true]

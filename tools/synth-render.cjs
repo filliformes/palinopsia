@@ -112,25 +112,28 @@ function musicalPhrase(sweep = true) {
   const mel = [57, 60, 64, 67, 69, 67, 64, 72, 71, 67]
   mel.forEach((n, i) => { const t = t0 + i * 0.22; ev.push({ t, on: [id, midi(n), 0.6 + 0.3 * ((i * 7) % 5) / 4] }, { t: t + 0.18, off: id }); id++ })
   const tc = t0 + 2.4
-  for (const n of [45, 52, 60, 64, 67]) { ev.push({ t: tc, on: [id, midi(n), 0.7] }, { t: tc + 1.6, off: id }); id++ }
-  let end = tc + 2.4
+  for (const n of [45, 52, 60, 64, 67]) { ev.push({ t: tc, on: [id, midi(n), 0.7] }, { t: tc + 1.3, off: id }); id++ }
+  let end = tc + 2.0
   const sweeps = []
   if (sweep) {
     const ts = end
-    ev.push({ t: ts, on: [999, midi(48), 0.75] }, { t: ts + 6.0, off: 999 })
-    for (const [k, i] of [['timbre', 0], ['harmonics', 1], ['morph', 2]]) sweeps.push({ k, t0: ts + i * 2, t1: ts + i * 2 + 2 })
-    end = ts + 6.8
+    ev.push({ t: ts, on: [999, midi(48), 0.75] }, { t: ts + 4.8, off: 999 })
+    for (const [k, i] of [['timbre', 0], ['harmonics', 1], ['morph', 2]]) sweeps.push({ k, t0: ts + i * 1.6, t1: ts + i * 1.6 + 1.6 })
+    end = ts + 5.5
   }
   return { events: ev, seconds: end, sweeps }
 }
-/** Mods sweeping one macro offset -1 → 1 → back over [t0, t1] on id 999. */
+/** Mods sweeping one macro around its setting on id 999 : up 0.6, down 0.6
+ *  under it, back (the offset is 0 before and after its span). */
 function sweepBlock(sweeps) {
+  const m = {}
   return (s, t) => {
     for (const w of sweeps) {
-      if (t < w.t0 || t > w.t1) continue
-      const x = (t - w.t0) / (w.t1 - w.t0)
-      const o = -Math.cos(x * 2 * Math.PI)
-      s.setMods(999, { [w.k]: o * 0.5 })
+      if (t < w.t0 - 0.05 || t > w.t1 + 0.05) continue
+      const x = Math.min(1, Math.max(0, (t - w.t0) / (w.t1 - w.t0)))
+      m.timbre = m.harmonics = m.morph = undefined
+      m[w.k] = 0.6 * Math.sin(x * 2 * Math.PI)
+      s.setMods(999, m)
     }
   }
 }
@@ -866,7 +869,7 @@ const ENGINE_DEFAULT = {
 function encodeMp3(ff, wav) { try { execFileSync(ff, ['-y', '-loglevel', 'error', '-i', wav, '-codec:a', 'libmp3lame', '-q:a', '0', wav.replace(/\.wav$/, '.mp3')]) } catch (e) { console.warn('mp3 failed', e.message) } }
 function spectrogram(ff, wav, png) {
   try {
-    execFileSync(ff, ['-y', '-loglevel', 'error', '-i', wav, '-lavfi', 'showspectrumpic=s=1200x500:mode=combined:scale=log:fscale=log:legend=1:color=intensity', png])
+    execFileSync(ff, ['-y', '-loglevel', 'error', '-i', wav, '-lavfi', 'showspectrumpic=s=1000x420:mode=combined:scale=log:fscale=log:legend=1:color=intensity', png])
   } catch (e) { console.warn('spectrogram failed', e.message) }
 }
 function pack(dir) {
@@ -883,13 +886,13 @@ function pack(dir) {
     const f = `engine-${i + 1}-${e}.wav`
     wav24(path.join(dir, f), r.L, r.R, sr)
     if (ff && withMp3) encodeMp3(ff, path.join(dir, f))
-    add(f, `${e} : melody, a 5-note chord, then one held C3 with timbre, harmonics, morph each swept low → high → low (2 s each)`)
+    add(f, `${e} : melody, a 5-note chord, then one held C3 with timbre, harmonics, morph each swept up and down around its setting (1.6 s each)`)
     // the sweep alone for the spectrogram
     const sw = { events: [{ t: 0.05, on: [999, midi(48), 0.75] }, { t: 6.0, off: 999 }], sweeps: ['timbre', 'harmonics', 'morph'].map((k, j) => ({ k, t0: 0.05 + j * 2, t1: 0.05 + j * 2 + 2 })) }
-    const rs = render({ sr, seconds: 6.4, cfg: cfgOf({ engine: e, ...ENGINE_DEFAULT[e], cutoff: 1, reso: 0, chorus: 0 }), events: sw.events, onBlock: sweepBlock(sw.sweeps) })
+    const rs = render({ sr, seconds: 6.2, cfg: cfgOf({ engine: e, ...ENGINE_DEFAULT[e], cutoff: 1, reso: 0, chorus: 0 }), events: sw.events, onBlock: sweepBlock(sw.sweeps) })
     const tmp = path.join(dir, `_sweep-${e}.wav`)
     wav24(tmp, rs.L, rs.R, sr)
-    if (ff) { spectrogram(ff, tmp, path.join(dir, `spectrogram-${i + 1}-${e}.png`)); add(`spectrogram-${i + 1}-${e}.png`, `${e} : the three macro sweeps on a C3, filter open (log frequency)`) }
+    if (ff) { spectrogram(ff, tmp, path.join(dir, `spectrogram-${i + 1}-${e}.png`)); add(`spectrogram-${i + 1}-${e}.png`, `${e} : timbre, harmonics, morph swept in turn (2 s each, up and down around the setting) on a C3, filter open, log frequency`) }
     fs.unlinkSync(tmp)
   }
   // filters
@@ -898,13 +901,13 @@ function pack(dir) {
     let id = 1
     for (const [k, n] of [36, 43, 48, 55, 60, 48].entries()) { const t = 0.1 + k * 0.6; ev.push({ t, on: [id, midi(n), 0.8] }, { t: t + 0.45, off: id }); id++ }
     const r = render({
-      sr, seconds: 4.4, cfg: cfgOf({ engine: 'dco', timbre: 0.67, harmonics: 0.2, morph: 0, filter: f, cutoff: 0.3, reso: 0.75, envAmt: 0.55, attack: 0, decay: 0.42, sustain: 0.2, release: 0.25, chorus: 0, hpf: f === 'ms' ? 0.25 : 0.05, fmode: 0 }), events: ev,
-      onBlock: (s, t) => { s.setConfig({ cutoff: 0.18 + 0.32 * (t / 4.4), fmode: f === 'morph' ? Math.min(1, t / 3.6) : 0 }) },
+      sr, seconds: 4.4, cfg: cfgOf({ engine: 'dco', timbre: 0.67, harmonics: 0.2, morph: 0, filter: f, cutoff: 0.3, reso: 0.75, envAmt: 0.55, attack: 0, decay: 0.42, sustain: 0.2, release: 0.25, chorus: 0, hpf: f === 'ms' ? 0.25 : 0.05, fmode: 0, level: 1 }), events: ev,
+      onBlock: (s, t) => { s.setConfig({ cutoff: 0.26 + 0.34 * (t / 4.4), fmode: f === 'morph' ? Math.min(1, t / 3.6) : 0 }) },
     })
     const fl = `filter-${i + 1}-${f}.wav`
     wav24(path.join(dir, fl), r.L, r.R, sr)
     if (ff && withMp3) encodeMp3(ff, path.join(dir, fl))
-    add(fl, `the ${f} filter on a saw bass line : reso 0.75, envelope 0.55, the cutoff rising${f === 'morph' ? ', the mode sweeping LP → BP → HP' : f === 'ms' ? ', the HP stage at hpf 0.25' : ''}`)
+    add(fl, `the ${f} filter on a saw bass line : reso 0.75, envelope 0.55, the cutoff rising${f === 'morph' ? ', the mode sweeping LP → BP → HP' : f === 'ms' ? ', the HP stage at hpf 0.25' : ''} (quieter than the rest : resonance thins the bass)`)
   }
   // patches
   const P = loadPatches()
@@ -918,16 +921,24 @@ function pack(dir) {
   }
   // the picture-like demo : four things moving, their speed / size / hue
   {
-    const r = pictureDemo(sr, 24)
+    const r = pictureDemo(sr, 20)
     wav24(path.join(dir, 'picture-demo.wav'), r.L, r.R, sr)
     if (ff && withMp3) encodeMp3(ff, path.join(dir, 'picture-demo.wav'))
-    add('picture-demo.wav', 'four things moving in a picture : notes come and go, their speed, size and hue wander as random walks into vel, cutoff, timbre, morph, pan, bend (the play side will send these ~30 times a second); dco, then swarm, then fm, then modal, 6 s each')
+    add('picture-demo.wav', 'four things moving in a picture : notes come and go, their speed, size and hue wander as random walks into vel, cutoff, timbre, morph, pan, bend (the play side will send these ~30 times a second); dco, then swarm, then fm, then modal, 5 s each')
   }
   fs.writeFileSync(path.join(dir, 'README.txt'), [
     'The Sonify Synth : listening pack (rendered by tools/synth-render.cjs pack, 48 kHz, 24-bit)',
     'Every file is the engine itself, no mastering. MP3 V0 copies sit beside the WAVs.',
     '',
     ...lines,
+    '',
+    'Listen for (what the numbers cannot judge) :',
+    '- the ladder : how much bass it loses at high resonance (kept from jx-move, a little given back);',
+    '- the drive at full on bright high notes (the top two octaves get less gain so it does not whistle);',
+    '- the fold engine with morph high : the gate only opens on a strike, so a held note fades out;',
+    '- the swarm pulses at full morph (each pulse rises over at least 1.5 ms) and its pitch chirps;',
+    '- the release, linear in level (aphex-move) : does it end too abruptly on long pads?',
+    '- unison : 8 voices at ±15 cents, about +2 dB over one voice.',
     '',
   ].join('\n'))
   console.log('pack written to', dir, `(${lines.length} items)`)
@@ -941,13 +952,13 @@ function patchPhrase(p) {
   const base = bassy ? 36 : 57
   if (pad) {
     for (const n of [0, 7, 12, 16]) { ev.push({ t: 0.05, on: [id, midi(base - 12 + n), 0.75] }, { t: 2.6, off: id }); id++ }
-    return { events: ev, seconds: 3.8 }
+    return { events: ev, seconds: 3.4 }
   }
   const mel = bassy ? [0, 0, 12, 7, 10, 0] : [0, 3, 7, 12, 10, 7, 3, 5]
-  mel.forEach((n, i) => { const t = 0.05 + i * 0.25; ev.push({ t, on: [id, midi(base + n), 0.65 + 0.3 * (i % 3) / 2] }, { t: t + 0.2, off: id }); id++ })
-  const tc = 0.05 + mel.length * 0.25
-  if (!bassy && e !== 'swarm') for (const n of [0, 7, 15]) { ev.push({ t: tc, on: [id, midi(base - 12 + n), 0.7] }, { t: tc + 0.9, off: id }); id++ }
-  return { events: ev, seconds: tc + 1.6 }
+  mel.forEach((n, i) => { const t = 0.05 + i * 0.22; ev.push({ t, on: [id, midi(base + n), 0.65 + 0.3 * (i % 3) / 2] }, { t: t + 0.18, off: id }); id++ })
+  const tc = 0.05 + mel.length * 0.22
+  if (!bassy && e !== 'swarm') for (const n of [0, 7, 15]) { ev.push({ t: tc, on: [id, midi(base - 12 + n), 0.7] }, { t: tc + 0.8, off: id }); id++ }
+  return { events: ev, seconds: tc + 1.35 }
 }
 function pictureDemo(sr, seconds) {
   const rand = mulberry(77)
