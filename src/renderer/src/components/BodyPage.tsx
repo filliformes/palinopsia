@@ -20,6 +20,7 @@ import { SearchSelect, type SearchOption } from './SearchSelect'
 import { useStore } from '../store'
 import { showToast } from './Toast'
 import { MarginLabel } from './MarginLabel'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { ownerWindow } from './ownerWindow'
 
 // Standard MediaPipe hand connections (21 landmarks).
@@ -318,8 +319,10 @@ export function BodyPage({
     const name = rName.trim() || namePreview
     const typed = rOsc.trim().replace(/^\/*(?:body\/)?/i, '') // accept "/body/Foo", "body/Foo" or "Foo"
     const osc = typed.replace(/[^A-Za-z0-9_]/g, '') || oscPreview
+    const id = `r${Date.now().toString(36)}`
     const rule: GestureRule = {
-      id: `r${Date.now().toString(36)}`, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction, osc, enabled: true,
+      // ("this rule : off" is saved as the rule's own id)
+      id, name, g1: rG1, g2: rG2, combo: rCombo, action: rAction === 'act:rule:self:off' ? `act:rule:${id}:off` : rAction, osc, enabled: true,
       exclusive: rG2 ? rExcl : false
     }
     patch({ rules: [...cfg.rules, rule] })
@@ -328,6 +331,8 @@ export function BodyPage({
   const updateRule = (id: string, part: Partial<GestureRule>): void =>
     patch({ rules: cfg.rules.map((r) => (r.id === id ? { ...r, ...part } : r)) })
   const deleteRule = (id: string): void => patch({ rules: cfg.rules.filter((r) => r.id !== id) })
+  // on / off : the one write MIDI, OSC and the actions take too (the box follows them)
+  const setRuleActive = useStore((s) => s.setBodyRuleActive)
   // Per-gesture sensitivity : a single-gesture rule tunes how easily its gesture
   // fires, overriding the global slider (shared by any rule using that gesture).
   const gestureSens = (g: BodyGesture): number => cfg.gestureSensitivity[g] ?? cfg.sensitivity
@@ -347,9 +352,9 @@ export function BodyPage({
   const scenes = useStore((s) => s.scenes)
   const worlds = useStore((s) => s.worlds)
   const actionOptions = useMemo<SearchOption[]>(
-    () => [{ value: 'none', label: 'nothing (OSC only)', title: 'An OSC-only rule : it fires nothing in the picture, only its /body/ bang' }, ...triggerOptions(useStore.getState())],
+    () => [{ value: 'none', label: 'nothing (OSC only)', title: 'An OSC-only rule : it fires nothing in the picture, only its /body/ bang' }, ...triggerOptions(useStore.getState(), { self: true })],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [composition, scenes, worlds]
+    [composition, scenes, worlds, cfg.rules]
   )
   // (a rule whose target is gone says so : triggerLabel)
   const labelForAction = (id: GestureAction): string => triggerLabel(id)
@@ -646,7 +651,7 @@ export function BodyPage({
           color={SEC}
           tint={SEC_TINT}
           top="mt-[5px]"
-          title="The saved rules : the box turns one on or off, test fires its action now, × deletes it. A single-gesture rule carries that gesture's own sensitivity; a combo its exclusive switch. A rule lights while it fires."
+          title="The saved rules : the box turns one on or off (in MIDI Learn, a pad or a knob learns it), test fires its action now, × deletes it. A single-gesture rule carries that gesture's own sensitivity; a combo its exclusive switch. A rule lights while it fires."
         >
           {cfg.rules.length === 0 ? (
             <p className="py-1 text-[10px] text-muted">No rules yet : make one on the line above.</p>
@@ -659,12 +664,18 @@ export function BodyPage({
                     key={r.id}
                     className={`flex items-center gap-1.5 rounded border px-1.5 py-1 font-mono text-[10px] transition-colors ${lit ? 'border-accent bg-accent/15' : 'border-border bg-panel3/30'}`}
                   >
-                    <button
-                      onClick={() => updateRule(r.id, { enabled: !r.enabled })}
-                      className={`h-3.5 w-3.5 shrink-0 rounded-sm border ${r.enabled ? 'border-accent bg-accent/40' : 'border-border'}`}
-                      title={r.enabled ? 'Enabled : click to disable' : 'Disabled : click to enable'}
-                    />
-                    <span className="w-20 shrink-0 truncate text-text" title={r.name}>{r.name}</span>
+                    {/* the box and the name : one MIDI Learn target (a note turns
+                        the rule on or off, a CC sets it, on from half way) */}
+                    <span className="relative flex shrink-0 items-center gap-1.5">
+                      <button
+                        onClick={() => setRuleActive(r.id, 'toggle', 'ui')}
+                        // (border-solid : the global button reset has no border style, an off box drew nothing)
+                        className={`h-3.5 w-3.5 shrink-0 rounded-sm border border-solid ${r.enabled ? 'border-accent bg-accent/40' : 'border-muted/70'}`}
+                        title={r.enabled ? 'On : its gesture fires. Click to turn it off' : 'Off : its gesture fires nothing. Click to turn it on'}
+                      />
+                      <span className={`w-20 shrink-0 truncate ${r.enabled ? 'text-text' : 'text-muted'}`} title={r.name}>{r.name}</span>
+                      <MidiLearnOverlay id={`rule:${r.id}`} />
+                    </span>
                     <span className="min-w-0 flex-1 truncate text-muted">
                       {ruleTrigger(r)} <span className="text-muted/60">→</span> <span className="text-accent2">{labelForAction(r.action)}</span>
                     </span>

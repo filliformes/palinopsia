@@ -520,15 +520,17 @@
     <div class="sec-head">
       <span class="sec-num">13</span>
       <h2>Embodied · Body</h2>
-      <span class="sec-note">outbound only · under <b>/body/</b>, not /opsia</span>
+      <span class="sec-note">rule bangs out under <b>/body/</b> · rules on / off in</span>
     </div>
     <p class="blurb">The Body page's gesture rules can fire their own OSC. When a rule fires and its
       <b>OSC out</b> is on, Opsia sends a bang to the OSC-out target, so a body gesture (a pinch, a hand shape
       such as a fist, a peace sign or horns, a pose, a shadow covering a screen zone, someone walking
       into frame) can play the sound side. These live
-      under <code>/body/…</code>, outside the <code>/opsia</code> namespace, with the name you gave the rule.</p>
+      under <code>/body/…</code>, outside the <code>/opsia</code> namespace, with the name you gave the rule.
+      Coming in, each rule can be turned on or off while you play, under <code>/opsia/body/rule</code>.</p>
     <div class="rows">
       <div class="row"><div class="ad"><code class="addr"><span class="lit">/body/<wbr></span><span class="v">{name}</span></code> <span class="args"><span class="a">i 1</span></span></div><p class="desc">A gesture <b>rule</b> fired : the custom OSC name, or a truncated default like <code>/body/HandsUpRndMod</code>.</p></div>
+      <div class="row"><div class="ad"><code class="addr"><span class="lit">/opsia/<wbr>body/<wbr>rule/<wbr></span><span class="v">{n}</span>/<wbr>active&nbsp;· toggle</code> <span class="args"><span class="a">≥ 0.5</span><span class="sep"> · </span><span class="tag trig">trigger</span></span></div><p class="desc">A <b>rule</b> on or off, <code>n</code> its place in the Body page's list (1-based) : <code>active</code> ≥ 0.5 turns it on, below off (float, int or bool; fed back when it changes, camera on or not); <code>toggle</code> turns it on, or off when it is on. An inactive rule's gesture still shows in the monitor and fires nothing.</p></div>
         </div>
   </section>
 

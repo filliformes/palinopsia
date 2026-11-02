@@ -1,9 +1,10 @@
 // The whole trigger vocabulary as one grouped, searchable list : midi.ts's first
 // set (the dice, the transport, scenes, Sonify, sessions) and actions.ts's
 // (the layers and the Background's opacity, the triggers of what is loaded,
-// the effects, Worlds, Generate, Macro, modulators, Feel, tempo and sound, the
-// output). The Body page's rule builder and the MIDI panel's "learn an action"
-// both pick from it, so a body and a pad play the same instrument.
+// the effects, Worlds, Generate, Macro, modulators, the Body rules on / off,
+// Feel, tempo and sound, the output). The Body page's rule builder and the MIDI
+// panel's "learn an action" both pick from it, so a body and a pad play the
+// same instrument.
 
 import type { SearchOption } from './components/SearchSelect'
 import { actionIds, actionInfo } from './actions'
@@ -17,11 +18,13 @@ const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Trans
 // The picker's headings, in order (an unknown one goes last)
 const ORDER = [
   'Randomize', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4', 'Background', 'Triggers (what is loaded)', 'Effects', 'Scenes', 'Worlds',
-  'Generate', 'Macro', 'Modulators', 'Feel', 'Tempo and sound', 'Sonify', 'Transport', 'Output', 'Session'
+  'Generate', 'Macro', 'Modulators', 'Body rules', 'Feel', 'Tempo and sound', 'Sonify', 'Transport', 'Output', 'Session'
 ]
 
-/** Every trigger worth offering now, grouped in the picker's order. */
-export function triggerOptions(st: St = useStore.getState()): SearchOption[] {
+/** Every trigger worth offering now, grouped in the picker's order. `self` :
+ *  the rule builder's "this rule : off" too (the rule being made, saved as its
+ *  own id). */
+export function triggerOptions(st: St = useStore.getState(), opts: { self?: boolean } = {}): SearchOption[] {
   const groups = new Map<string, SearchOption[]>()
   const put = (o: SearchOption): void => {
     const g = o.group ?? ''
@@ -38,6 +41,10 @@ export function triggerOptions(st: St = useStore.getState()): SearchOption[] {
   core('Effects', ['master:chain'])
   core('Scenes', ['scene:next', 'scene:prev'])
   core('Tempo and sound', ['fire:tap'])
+  if (opts.self) {
+    const a = actionInfo('act:rule:self:off', st)
+    if (a) put({ value: 'act:rule:self:off', label: a.label, group: a.group, title: a.title, keywords: ['rule', 'once', 'self'] })
+  }
   for (const id of actionIds(st)) {
     const a = actionInfo(id, st)
     if (!a) continue
@@ -45,7 +52,8 @@ export function triggerOptions(st: St = useStore.getState()): SearchOption[] {
     // ("L2 opacity", "bg opacity" : the opacity entries first)
     const keywords = layer
       ? [`L${Number(layer[1]) + 1}`, ...(layer[2] ? [`L${Number(layer[1]) + 1} opacity`] : [])]
-      : id.startsWith('act:bg:') ? ['bg', 'bg opacity'] : undefined
+      : id.startsWith('act:bg:') ? ['bg', 'bg opacity']
+      : id.startsWith('act:rule:') ? ['rule', 'body rule'] : undefined
     put({ value: id, label: a.label, group: a.group, title: a.title, keywords })
   }
   st.scenes.forEach((s, i) => put({ value: `scene:${i}`, label: `SCENE ${i + 1}${s.name ? ' · ' + s.name : ''}`, group: 'Scenes' }))

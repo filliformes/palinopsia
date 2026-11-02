@@ -1264,6 +1264,10 @@ Learnable targets:
   **learn** list, then hit a pad.
 - **Scene chips** : a pad recalls that scene *slot* (like the `1`–`9` keys); a
   pad can also step **scene next / prev**.
+- **Body rules** : each rule's box (and its name) in the Body page's RULES list : a pad
+  turns the rule on or off, a knob or a latching button sets it (on from 64). The
+  binding follows the rule, not its place in the list, and goes with it when it is
+  deleted.
 
 Everything except the Macro-knob CCs is machine-local (survives restarts,
 doesn't travel with sessions). The **MIDI** section of the Connect tab
@@ -1396,6 +1400,10 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
 - **Macro** : each knob up or down a tenth, to a random place, or flipped to the far end,
   over its own smoothing.
 - **Modulators** : each card's retrigger (its ⟳) and on/off.
+- **Body rules** : each rule **on**, **off** or **toggle** (`RULE <name> : on`), so a
+  gesture can arm another (a fist that turns on the rule a pinch plays), and, in the
+  builder only, **this rule : off** : a rule that fires once (its OSC) and waits to be
+  turned on again.
 - **Feel** : each of the eight dials up or down a tenth, and a reset to neutral.
 - **Tempo and sound** : tap, **BPM ×2 / ÷2**, **Ableton Link play / stop** (with start /
   stop sync on), the **key** (a change now the key sequencer's way, up or down a fifth, up
@@ -1418,6 +1426,20 @@ to a truncated `/body/HandsUpRndMod`. With **OSC out** on, a firing rule also se
 `/body/<name>` bang to the OSC-out target, so the body plays the sound side too. A
 **single-gesture** rule carries its own **sensitivity** slider (double-click resets it
 to the global), so one gesture can be tuned to fire eagerly or reluctantly on its own.
+
+**Toggling rules live.** The box at the left of each saved rule turns it on or off. An
+inactive rule fires nothing (no action, no OSC bang) while its gesture still shows in the
+monitor, so in a performance you choose by hand which rules are playing. Four ways reach
+the same box, and it follows each of them at once : **MIDI** (in [MIDI Learn](#midi),
+click the rule's box or name and hit a pad : each hit turns it on or off; move a knob
+instead : on from half way, off below), **another rule** or a pad's action (`RULE <name> :
+on / off / toggle` above), and **OSC** (`/opsia/body/rule/{n}/active`, `≥ 0.5` on, and
+`/opsia/body/rule/{n}/toggle`, `n` the rule's place in the list, fed back when it changes,
+see [OSC](#osc-implementation)). The mappings follow the rule, not its place : deleting or
+moving another rule never re-targets one, and deleting a rule drops its MIDI mappings (a
+rule that turned it on or off then says **(gone)**). A rule changing itself or another
+only changes what the next gesture does : nothing loops. The rules and their on / off
+stay on this computer with the rest of the Body page.
 
 The gesture vocabulary spans **hands** (pinch L/R, clap, cross), **hand shapes** (fist,
 open, point, peace, thumb up / down, ok, horns, call, gun, each L and R : below), **pose** (hands-up,
@@ -3171,6 +3193,8 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/world/amount` | f 0..1 | World amount : how much of the active World's mood is on (0 = the mood it found) |
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
+| `/opsia/body/rule/{n}/active` | level | Body rule *n* (its place in the Body page's list, 1-based) on (≥ 0.5) or off : float, int or bool; fed back when it changes |
+| `/opsia/body/rule/{n}/toggle` | trigger | Body rule *n* on, or off when it is on |
 | `/opsia/scene/{n}` | trigger | Recall scene *n* (1-based) |
 | `/opsia/randomize[/{scope}]` | trigger | Fire Randomize at the Transport's intensity (scope defaults to `all`; `sources`, `sourceparams`, `sourcefx`, `sourcefxonly`, `layer`, `layerfxonly`, `master`, `finishing`, `modulators`) |
 | `/opsia/randomize/masterparams · macro · inspector · sonify · resolume · background` | trigger | The other randomizes, exactly as MIDI Learn fires them : the master FX parameters in place, the Macro knob values (`meta`, the old name, still works), the selected Inspector unit, the Sonify patch, the Resolume pins, the Background's dice |
@@ -3223,7 +3247,7 @@ outbound value is a single float `f`** (enums/bools normalized). Streamed: every
 layer control, Macro knobs, BPM (raw), the three master finalizers' float inputs,
 background controls + source inputs, all macros/temperament, world (1-based
 index) and its amount, the coupling switch, the output transform, the Sonify patch and
-Space, the Audio Layer (but not its both-files `audiolayer/play`), and `seq/run` : plus, while a slot holds a video, its transport
+Space, the Audio Layer (but not its both-files `audiolayer/play`), the Body rules' on / off (`body/rule/{n}/active`), and `seq/run` : plus, while a slot holds a video, its transport
 (`video/{A|B}/play·direction·loop·speed·in·out·grain·grain*`). **Not** streamed:
 `/opsia/audio/*`, `/opsia/seq/skip`, and `video/…/position` (the playhead flies
 at frame rate; it's advertised for discovery but never echoed).

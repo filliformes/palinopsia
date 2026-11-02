@@ -30,6 +30,9 @@
 //   act:gen:<rand|next> · act:gen:family:<family>
 //   act:meta:<k>:<up|down|rand|flip>
 //   act:mod:<n>:<trig|onoff|fill>   (fill : a steps card's FILL, kept on / let go)
+//   act:rule:<id>:<on|off|toggle>   a Body rule on or off, by its id (never its
+//                                   place); act:rule:self:off, the rule builder's
+//                                   "this rule", is saved as the new rule's own id
 //   act:feel:<macro>:<up|down> · act:feel:reset
 //   act:bpm:<double|half> · act:link:play
 //   act:key:<next|fifthup|fifthdown|up|down>
@@ -440,6 +443,18 @@ async function screenshot(): Promise<void> {
 
 const SPIN_DEG = 20 // degrees a second : a slow turn
 
+// ── Body rules : one on or off (a gesture arming another, a pad, Ctrl+K) ──────
+// Through the store's setBodyRuleActive, the write MIDI, OSC and the rules
+// list take too. Nothing here fires a rule : a rule turning itself (or another)
+// off or on only changes what the NEXT gesture does, so nothing can loop.
+const RULE_VERBS = ['on', 'off', 'toggle'] as const
+type RuleVerb = (typeof RULE_VERBS)[number]
+const RULE_WORDS: Record<RuleVerb, { verb: (name: string) => string; token: string; title: string }> = {
+  on: { verb: (n) => `turns “${n}” on`, token: 'On', title: 'Turns the Body rule on : its gesture fires its action again' },
+  off: { verb: (n) => `turns “${n}” off`, token: 'Off', title: 'Turns the Body rule off : its gesture still shows in the monitor, and fires nothing' },
+  toggle: { verb: (n) => `turns “${n}” on or off`, token: 'Tog', title: 'Turns the Body rule on, or off when it is on' }
+}
+
 // ── The executor ────────────────────────────────────────────────────────────
 
 /** Fire an `act:` id. Unknown or gone : nothing. */
@@ -534,6 +549,11 @@ export function fireAction(id: string): void {
         if (m.type === 'steps') modEngine.setFillLatch(n, !modEngine.fillLatched(n))
       }
       else if (p[3] === 'onoff' && !held(st, [modPin(n)], `M${n + 1}`)) st.updateModulator(n, { enabled: !m.enabled })
+      return
+    }
+    case 'rule': {
+      const v = p[3] as RuleVerb
+      if ((RULE_VERBS as readonly string[]).includes(v)) st.setBodyRuleActive(p[2], v === 'toggle' ? 'toggle' : v === 'on', 'action')
       return
     }
     case 'feel': {
@@ -708,6 +728,19 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       if (p[3] === 'fill') return { label: `${modName(st, n)} fill on/off`, verb: `fills mod ${n + 1}`, token: `Mod${n + 1}Fill`, group: 'Modulators', title: 'A steps card’s FILL, kept on or let go : the steps set to play only in a fill come in, those set to play only outside one fall silent. Does nothing on another type', gone: st.composition.modulators[n]?.type !== 'steps' }
       return null
     }
+    case 'rule': {
+      const v = p[3] as RuleVerb
+      const w = RULE_WORDS[v]
+      if (!w || !p[2]) return null
+      if (p[2] === 'self') {
+        return v === 'off'
+          ? { label: 'RULE this one : off (fires once)', verb: 'fires once, then turns itself off', token: 'Once', group: 'Body rules', title: 'The rule fires once (its OSC), then turns itself off until you turn it on again (its box, MIDI, OSC, another rule)' }
+          : null
+      }
+      const r = st.bodyControl.rules.find((x) => x.id === p[2])
+      const name = r?.name ?? 'a deleted rule'
+      return { label: `RULE ${name} : ${v}${r ? '' : ' (gone)'}`, verb: w.verb(name), token: `Rule${camel(name).slice(0, 10)}${w.token}`, group: 'Body rules', title: w.title, gone: !r }
+    }
     case 'feel': {
       if (p[2] === 'reset') return { label: 'FEEL reset', verb: 'resets the Feel', token: 'FeelReset', group: 'Feel', title: 'All eight Feel macros back to neutral' }
       const f = FEEL.find((x) => x.key === p[2])
@@ -761,8 +794,8 @@ export function actionLabel(id: string): string {
 
 /** Every `act:` id worth offering now, in the picker's order : the layers, the
  *  Background's opacity, the triggers of what is loaded, the effects, the
- *  scenes, the Worlds, Generate, the Meta knobs, the modulators, the Feel,
- *  tempo and sound, the output. */
+ *  scenes, the Worlds, Generate, the Meta knobs, the modulators, the Body
+ *  rules, the Feel, tempo and sound, the output. */
 export function actionIds(st: St = get()): string[] {
   const out: string[] = []
   st.composition.layers.forEach((_, i) => { for (const v of LAYER_VERBS) out.push(`act:layer:${i}:${v}`) })
@@ -794,6 +827,7 @@ export function actionIds(st: St = get()): string[] {
     out.push(`act:mod:${n}:trig`, `act:mod:${n}:onoff`)
     if (m.type === 'steps') out.push(`act:mod:${n}:fill`)
   })
+  for (const r of st.bodyControl.rules) for (const v of RULE_VERBS) out.push(`act:rule:${r.id}:${v}`)
   for (const f of FEEL) out.push(`act:feel:${f.key}:up`, `act:feel:${f.key}:down`)
   out.push('act:feel:reset', 'act:bpm:double', 'act:bpm:half', 'act:link:play')
   out.push('act:key:next', 'act:key:fifthup', 'act:key:fifthdown', 'act:key:up', 'act:key:down')

@@ -15,6 +15,52 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Body rules : each rule's on / off, played live by MIDI, actions and OSC** (Vincent :
+  "I should be able to map any Body Rules' active toggle to a MIDI note, so I can toggle
+  ON or OFF a rule; so inside a performance I can choose manually if a rule can be active
+  or not."). ONE store write, `setBodyRuleActive(id, on | 'toggle', source)` (source
+  `ui` / `midi` / `action` / `osc`, and `seq` for the rule sequencer to come;
+  `bodyRuleLastChange(id)` keeps the last change and who made it, not saved), taken by the
+  rule's box, MIDI, the actions and OSC; no write when nothing changes; it fires nothing.
+  **MIDI learn** : each rule's box and name in the RULES list is a learn target
+  (`rule:<id>`); a note turns the rule on or off on each note-on (velocity > 0; a note-off
+  does nothing), a CC sets it (64 and up on, below off; counted as a continuous control,
+  so that CC never also fires a trigger); its label "RULE <name> : on/off" follows a
+  rename. **Actions** : `act:rule:<id>:on|off|toggle`, "RULE <name> : on / off / toggle"
+  under a new **Body rules** heading after Modulators (the rule builder, MIDI learn's
+  action list, any pad), following the rules as they are made, renamed and deleted
+  ("(gone)" after); the builder alone offers **RULE this one : off (fires once)**
+  (`act:rule:self:off`, saved as the new rule's own id). A rule changing itself or
+  another only changes what the NEXT gesture does (the dispatcher reads the rules once a
+  frame) : a rule armed by a gesture does not fire on that same onset, a self-off rule
+  fires once, nothing loops. **OSC** : `/opsia/body/rule/{n}/active` (≥ 0.5 on; float,
+  int or bool) and `/opsia/body/rule/{n}/toggle` (rising edge), `n` the rule's place in
+  the list as numbered items are everywhere else, advertised in OSCQuery camera on or
+  not, `active` fed back (the toggle not). Mappings are keyed by the rule's id : deleting
+  or moving another rule never re-targets one, and deleting a rule drops its `rule:<id>`
+  and `act:rule:<id>:*` MIDI mappings (in `setBodyControl`; stale ones on load too). The
+  on / off stays where the rules live : machine-local, `opsia.bodyControl` in
+  localStorage, not in the session. The box now draws its off state (a grey outline : the
+  global button reset left an off box blank) and an off rule's name dims. Test builds
+  expose `window.__midi` so probes drive the MIDI manager's own `onMessage`. Checked in
+  the test copy (RTX 4070, camera never opened) with real CDP clicks and keys : `L` arms
+  learn on the Body page, the box overlays learn note 60 (rule A) and CC 20 (rule D),
+  blue then green; notes on / on / note-off / velocity 0 / on : A off, on, on, on, off;
+  CC 0 / 127 / 63 / 64 / 64 / 1 : off, on, off, on, on, off; the box followed every step.
+  An inactive rule fires nothing on its gesture (L1 mute unchanged, no fire) while the
+  monitor still shows the gesture; fist R's rule turns A on and off; a rule arming
+  another on the same gesture : the armed one did not fire on that onset, once on the
+  next; a rule turning itself off fired once, stayed off 500 ms later and through two
+  more gestures, once more when turned on by hand; the builder's "this one" saved as
+  `act:rule:<own id>:off`; the picker listed the 21 rule actions + this one; rename (the
+  list and the MIDI label follow), reversed order (note 60 still plays A), delete by its
+  × (its CC and a pad action gone from the map and localStorage, A's kept; the rule
+  targeting it says "(gone)" and fires harmlessly) : 43/43. After a cold relaunch : rules
+  and mappings back, note 60 still plays A; OSC over UDP f 0 / 1 / 0.4, i 1, F, T, then
+  toggle 1 / 1 held / 0 / 1 : off, on, off, on, off, on, off, off, off, on, the box
+  following; rule 99 ignored, rule 2 reached its rule; OSCQuery advertised 7 rules
+  (active + toggle); a MIDI change echoed `/opsia/body/rule/1/active 0` on the feedback
+  port, no toggle echoed : 10/10. Console errors 0.
 - **Body rules : each layer's opacity, and the Background's** (Vincent : "in Body, I
   should be able to select each Layer's opacity as options for creating a rule"). Five
   new actions per layer in the shared vocabulary (`actions.ts`, so the Body rule picker,
