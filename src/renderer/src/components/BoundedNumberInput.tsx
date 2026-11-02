@@ -7,13 +7,20 @@
 //  - in rich themes (Nature), gets a "console readout"
 //    look : accent-tinted mono on a dark embedded card : until focused,
 //    then reverts to the standard input chrome for editing
+//  - is as wide as the longest number its range and decimals can show
+//    (numberBox.ts), never wider, and widens while you type a longer one
 //
 // Use this anywhere a typical <input type="number"> would otherwise hijack
 // the user's keystrokes (delete-everything snaps to 0, etc.).
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isRichTheme, useStore } from '../store'
 import { registerLiveOverlay } from './liveOverlay'
+import { defaultFrac, formatNumber, numberBoxChars, NUMBER_BOX_SLACK_PX, type FracRule } from './numberBox'
+
+// A caller's side padding, as the !important class that beats .input's (spelled
+// out whole : Tailwind only builds the classes it finds written).
+const SIDE_PAD: Record<string, string> = { '0': '!px-0', '0.5': '!px-0.5', '1': '!px-1' }
 
 interface Props {
   value: number
@@ -28,10 +35,13 @@ interface Props {
   max?: number
   integer?: boolean
   // Cap the number of DECIMAL places SHOWN (display only : the stored value
-  // and what the user can type are untouched). Without it the box renders
-  // String(v), so a slider that lands on 0.079577… clips in a narrow box.
-  // Trailing zeros are trimmed, so 0.5 stays "0.5", not "0.500".
-  maxFrac?: number
+  // and what the user can type are untouched). Trailing zeros are trimmed, so
+  // 0.5 stays "0.5", not "0.500". A function sets them per value (fewer from 10
+  // up). Left out : the range's own (fracFor), so the text never outgrows the box.
+  maxFrac?: FracRule
+  // The caller's class sets the width (a table of equal cells) : the box does
+  // not size itself to its range.
+  fixedWidth?: boolean
   placeholder?: string
   className?: string
   title?: string
@@ -57,9 +67,15 @@ export function BoundedNumberInput({
   className,
   title,
   disabled,
-  liveKey
+  liveKey,
+  fixedWidth = false
 }: Props): JSX.Element {
-  const [str, setStr] = useState(formatValue(value, integer, maxFrac))
+  const frac = maxFrac ?? defaultFrac(min, max, integer)
+  const fmt = (v: number): string => formatNumber(v, integer, frac)
+  // the live overlay's format, current (a per-value rule changes with the render)
+  const fmtRef = useRef(fmt)
+  fmtRef.current = fmt
+  const [str, setStr] = useState(fmt(value))
   const focused = useRef(false)
   // "dirty" = the user has actually typed something since gaining
   // focus. Without this we can't tell "focused but idle" (where
@@ -106,7 +122,7 @@ export function BoundedNumberInput({
       const clamped = Math.max(min, Math.min(max, parsed))
       if (clamped === value) return
     }
-    setStr(formatValue(value, integer, maxFrac))
+    setStr(fmt(value))
   }, [value, integer, min, max])
 
   // Live modulation readout: while idle, mirror the modulated value straight to
@@ -116,8 +132,8 @@ export function BoundedNumberInput({
   useEffect(() => {
     const el = inputRef.current
     if (!liveKey || !el) return
-    return registerLiveOverlay({ el, key: liveKey, format: (v) => formatValue(v, integer, maxFrac) })
-  }, [liveKey, integer])
+    return registerLiveOverlay({ el, key: liveKey, format: (v) => fmtRef.current(v) })
+  }, [liveKey])
 
   const re = integer ? /^-?\d*$/ : /^-?\d*\.?\d*([eE][-+]?\d*)?$/
 
@@ -126,7 +142,7 @@ export function BoundedNumberInput({
     const was = before.current ?? value
     if (before.current !== null && before.current !== value) onChange?.(before.current)
     before.current = null
-    setStr(formatValue(was, integer, maxFrac))
+    setStr(fmt(was))
   }
 
   function commit(raw: string): void {
@@ -143,7 +159,7 @@ export function BoundedNumberInput({
     const clamped = Math.max(min, Math.min(max, n))
     if (clamped !== value) onChange?.(clamped)
     onCommit?.(clamped)
-    setStr(formatValue(clamped, integer, maxFrac))
+    setStr(fmt(clamped))
   }
 
   // Rich theme overlays the .rich-readout class onto whatever class
@@ -156,10 +172,39 @@ export function BoundedNumberInput({
   // (~a 9–10px label line box), even if that shrinks the digits : the box should
   // never tower over the label it sits beside. Forced (!) so per-call padding /
   // font classes can't reinflate it.
+  // Tabular figures : every digit as wide as the "0" the ch unit measures, so
+  // the width below holds and a moving number doesn't jitter.
+  // The caller's side padding, made to hold : the unlayered .input padding (8 px
+  // a side) beat a plain px-1 / px-0.5, so every box carried 16 px of empty
+  // black whatever its caller asked for. 4 px a side when none is given.
+  const base = (className ?? 'input').replace(/(^|\s)!?px-(0\.5|0|1)(?=\s|$)/g, (_m, s: string, n: string) => s + SIDE_PAD[n])
   const cls =
-    (className ?? 'input') +
-    ' !h-[15px] !py-0 !leading-none !text-[10px]' +
+    base +
+    (/(^|\s)!px-/.test(base) ? '' : ' !px-1') +
+    ' !h-[15px] !py-0 !leading-none !text-[10px] tabular-nums' +
+    (fixedWidth ? '' : ' shrink-0') +
     (rich ? ' rich-readout' : '')
+
+  // The width : the longest number this box's range and decimals can show
+  // (numberBox.ts), never the current one, so it holds still under a drag or a
+  // modulator; while typing, as wide as what is typed, back on leaving it. In
+  // ch of the box's own font, plus its padding and border, read off the box
+  // (callers and the rich readout differ). Written before paint, no re-render.
+  const fit = numberBoxChars(min, max, integer, frac)
+  const chars = focused.current && dirty.current ? Math.max(fit, Math.min(str.length, fit + 12)) : fit
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    if (fixedWidth) {
+      el.style.width = ''
+      return
+    }
+    const cs = (el.ownerDocument.defaultView ?? window).getComputedStyle(el)
+    const chrome =
+      (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) +
+      (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0)
+    el.style.width = `calc(${chars}ch + ${chrome + NUMBER_BOX_SLACK_PX}px)`
+  }, [chars, cls, fixedWidth])
 
   return (
     <input
@@ -211,7 +256,7 @@ export function BoundedNumberInput({
         // snapshot they had on focus. Reset str to the current
         // value so the displayed text matches the source of truth.
         if (!dirty.current) {
-          setStr(formatValue(value, integer, maxFrac))
+          setStr(fmt(value))
           return
         }
         dirty.current = false
@@ -235,13 +280,4 @@ export function BoundedNumberInput({
       }}
     />
   )
-}
-
-function formatValue(v: number, integer: boolean, maxFrac?: number): string {
-  if (!Number.isFinite(v)) return ''
-  if (integer) return String(Math.round(v))
-  if (maxFrac === undefined) return String(v)
-  // Round to maxFrac places, then drop trailing zeros (parseFloat) so a clean
-  // value doesn't gain padding : 0.5 → '0.5', 0.079577 → '0.08' at maxFrac 2.
-  return String(parseFloat(v.toFixed(maxFrac)))
 }

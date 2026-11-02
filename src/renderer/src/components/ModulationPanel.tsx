@@ -306,7 +306,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
                 max={50}
                 maxFrac={2}
                 onChange={(v) => update(index, { rateHz: v })}
-                className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+                className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
               />
             </>
           )}
@@ -463,7 +463,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
               min={0}
               max={1}
               onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })}
-              className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+              className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
             />
             <button
               onClick={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })}
@@ -803,9 +803,9 @@ function StepsParams({ index }: { index: number }): JSX.Element {
   return (
     <>
       <StepStrip index={index} />
-      {/* length and swing share a row (two-digit boxes : the input's own side
-          padding leaves w-7 room for "16", w-8 for "75") so the swing slider
-          keeps ~58 px of travel at zoom 1; glide has the full row under it */}
+      {/* length and swing share a row (two-digit boxes, each as wide as its own
+          range : numberBox.ts) so the swing slider keeps its travel at zoom 1;
+          glide has the full row under it */}
       <div className="flex min-w-0 shrink-0 items-center gap-1">
         <span className={label} title={STEPS_LEN_HELP}>
           LEN
@@ -816,7 +816,7 @@ function StepsParams({ index }: { index: number }): JSX.Element {
           max={STEP_MAX}
           integer
           onChange={(v) => set({ length: Math.round(v) })}
-          className="input w-7 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+          className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
           title={STEPS_LEN_HELP}
         />
         <span className={`${label} ml-0.5`} title={STEPS_SWING_HELP}>
@@ -838,7 +838,7 @@ function StepsParams({ index }: { index: number }): JSX.Element {
           max={SWING_MAX}
           integer
           onChange={(v) => set({ swing: v })}
-          className="input w-8 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+          className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
           title={`${STEPS_SWING_HELP} Now ${swing} %.`}
         />
       </div>
@@ -1378,7 +1378,7 @@ function NumRow({
         max={max}
         integer={integer}
         onChange={onChange}
-        className="input w-full min-w-0 px-1 py-0.5 text-right text-[10px]"
+        className="input ml-auto px-1 py-0.5 text-right text-[10px]"
       />
     </Row>
   )
@@ -1412,22 +1412,24 @@ function MiniSlider({
         className="min-w-0 flex-1 accent-accent"
         title={help}
       />
-      {/* Four characters at most, in a box as wide as SUS's beside it (w-9 cut
-          "0.96" and "3.45") : two decimals under 10 s (maxFrac drops trailing
-          zeros, so 0.55 s reads "0.55", not "0.6"), one from 10 s ("12.5"). A raw
-          ms/1000 would read "1.073" and clip; the row's tooltip keeps the exact
-          figure. */}
+      {/* Four characters at most (the box is as wide as that) : two decimals
+          under 10 s (maxFrac drops trailing zeros, so 0.55 s reads "0.55", not
+          "0.6"), one from 10 s ("12.5"), read per value. A raw ms/1000 would read
+          "1.073"; the row's tooltip keeps the exact figure. */}
       <BoundedNumberInput
         value={value / 1000}
         min={min / 1000}
         max={max / 1000}
-        maxFrac={value >= 10000 ? 1 : 2}
+        maxFrac={secondsFrac}
         onChange={(v) => onChange(Math.round(v * 1000))}
-        className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+        className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </div>
   )
 }
+
+// An envelope time's decimals, in seconds : two under 10 s, one from 10 s.
+const secondsFrac = (s: number): number => (s >= 10 ? 1 : 2)
 
 // Spastic's HOLD : 0 (the far left) = off, it stays up until the next throw;
 // else a log track over 5 ms … 10 s.
@@ -1459,7 +1461,7 @@ function SpasticHoldRow({ index }: { index: number }): JSX.Element {
         max={HOLD_MAX}
         integer
         onChange={(v) => update(index, { spasticHold: v })}
-        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+        className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </Row>
   )
@@ -1502,7 +1504,7 @@ function SliderRow({
         integer={integer}
         maxFrac={3}
         onChange={onChange}
-        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+        className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
       />
     </Row>
   )

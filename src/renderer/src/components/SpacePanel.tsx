@@ -195,7 +195,7 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
                 onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                 placeholder="10.0.0.20"
               />
-              <BoundedNumberInput className="input w-[56px] text-[10px]" value={space.port} min={1} max={65535} integer onChange={(v) => setSpace({ port: v })} title="OSC port" />
+              <BoundedNumberInput className="input text-[10px]" value={space.port} min={1} max={65535} integer onChange={(v) => setSpace({ port: v })} title="OSC port" />
             </Row>
             <Row label="sources" hint="The first source (SpatGRIS) or object (ADM) number : each channel is its own source, in order. SpatGRIS plays source n from its input n, so patch channel n to input n.">
               <Stepper value={space.firstSource} min={1} max={128 - SPACE_SOURCES * per + 1} onChange={(v) => setSpace({ firstSource: v })} title="The first source number" />
@@ -390,7 +390,7 @@ function ScrubBox({ value, min, max, perPx, wrap, dim, liveKey, onChange, title 
   // dimmed box lets the pointer through to the span, whose title then shows)
   return (
     <span ref={ref} onPointerDown={onPointerDown} className={`min-w-0 flex-1 ${dim ? 'opacity-40' : 'cursor-ns-resize'}`} title={hint}>
-      <BoundedNumberInput className={`input w-full !px-0 text-center !text-[9px] ${dim ? 'pointer-events-none' : ''}`} value={Math.round(value)} min={min} max={max} integer liveKey={liveKey} onChange={onChange} title={hint} />
+      <BoundedNumberInput fixedWidth className={`input w-full !px-0 text-center !text-[9px] ${dim ? 'pointer-events-none' : ''}`} value={Math.round(value)} min={min} max={max} integer liveKey={liveKey} onChange={onChange} title={hint} />
     </span>
   )
 }

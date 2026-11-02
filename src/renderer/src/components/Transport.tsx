@@ -273,7 +273,7 @@ export function Transport(): JSX.Element {
             BPM
           </button>
         </span>
-        <div className="relative w-10">
+        <div className="relative shrink-0">
           <MidiLearnOverlay id="transport:bpm" />
           <BoundedNumberInput
             value={bpm}
@@ -281,7 +281,7 @@ export function Transport(): JSX.Element {
             max={800}
             integer
             onCommit={commitBpm}
-            className="input w-full px-1 py-0.5 text-right text-[11px]"
+            className="input px-1 py-0.5 text-right text-[11px]"
           />
         </div>
         <LinkBadge />

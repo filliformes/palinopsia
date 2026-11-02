@@ -19,6 +19,7 @@ import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { fracFor } from './numberBox'
 import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { ModShapeEditor, ShapeToggle } from './ModShapeEditor'
@@ -306,13 +307,13 @@ function PosPairControl({
         className="min-w-0 flex-1 accent-accent"
         title={`${name} ${v.toFixed(2)} : double-click to reset`}
       />
-      <div className="w-12 shrink-0">
+      <div className="shrink-0">
         <BoundedNumberInput
           value={v}
           min={min}
           max={max}
           onChange={(n) => onChange(name, n)}
-          className="input w-full px-1 py-0.5 text-right text-[11px]"
+          className="input px-1 py-0.5 text-right text-[11px]"
         />
       </div>
     </div>
@@ -405,12 +406,8 @@ function labelEl(inp: IsfInputDesc): JSX.Element {
   )
 }
 
-/** Decimals a number box shows for a range this wide : 100 or more none, 10 one,
- *  1 two, 0.1 three, less four. Enough to read a slider, never so many it clips. */
-export function fracFor(span: number): number {
-  const s = Math.abs(span)
-  return s >= 100 ? 0 : s >= 10 ? 1 : s >= 1 ? 2 : s >= 0.1 ? 3 : 4
-}
+// (the decimals a box shows for its range : numberBox.ts, read from here too)
+export { fracFor }
 
 // The dense (one-line) rows' label : fixed width so every row's control lines up.
 function denseLabel(inp: IsfInputDesc): JSX.Element {
@@ -520,7 +517,7 @@ function FloatControl({
             }
           />
           {target && <ModButton target={target} bound={bound} label={inp.label} />}
-          <div className="w-12 shrink-0">
+          <div className="shrink-0">
             <BoundedNumberInput
               value={v}
               min={min}
@@ -529,7 +526,7 @@ function FloatControl({
               integer={!!inp.integer}
               maxFrac={frac}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
-              className="input w-full px-1 py-0.5 text-right text-[11px]"
+              className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
         </div>
@@ -546,7 +543,7 @@ function FloatControl({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {target && <ModButton target={target} bound={bound} label={inp.label} />}
-          <div className="w-14">
+          <div className="shrink-0">
             <BoundedNumberInput
               value={v}
               min={min}
@@ -555,7 +552,7 @@ function FloatControl({
               integer={!!inp.integer}
               maxFrac={frac}
               liveKey={isModulated ? (targetKey ?? undefined) : undefined}
-              className="input w-full px-1 py-0.5 text-right text-[11px]"
+              className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
         </div>
@@ -701,16 +698,16 @@ export function AssignRow({
                   : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value. Double-click : 0.5`
               }
             />
-            {/* The slider gave no readout of the depth : a bipolar ±1 box, so
-                you can see and set it exactly. The box's fixed width shrinks the
-                flex-1 slider to fit, keeping the row its current size. */}
+            {/* The slider gave no readout of the depth : a bipolar ±10 box, so
+                you can see and set it exactly. As wide as "-9.99" : the flex-1
+                slider keeps the rest, the row its current size. */}
             <BoundedNumberInput
               value={b.depth}
               min={-10}
               max={10}
               maxFrac={2}
               onChange={(v) => setAssignmentDepth(b.id, v)}
-              className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
+              className="input shrink-0 px-1 py-0.5 text-right text-[9px]"
             />
             {/* the binding's shaping : combine, threshold, integrate */}
             <ShapeToggle id={b.id} open={shapeOpen === b.id} onToggle={() => setShapeOpen(shapeOpen === b.id ? null : b.id)} />

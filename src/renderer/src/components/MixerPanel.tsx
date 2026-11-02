@@ -638,6 +638,10 @@ function MiniKnob({ label, value, def, onChange, title }: { label: string; value
   )
 }
 
+// A fader's decimals : two under 10, one from 10 up (per value : the live number
+// follows the same rule, and the box is as wide as "19.9").
+const faderFrac = (v: number): number => (Math.abs(v) >= 10 ? 1 : 2)
+
 // One vertical fader : label on top, the fader filling the column, an editable
 // readout at the bottom (rounded : a long float clipped in the box; from 10 up,
 // one decimal, so "12.4" fits where "12.35" was cut). With a liveKey (it is
@@ -696,11 +700,11 @@ function VFader({
         value={Math.round(value * 100) / 100}
         min={min}
         max={max}
-        maxFrac={Math.abs(value) >= 10 ? 1 : 2}
+        maxFrac={faderFrac}
         liveKey={liveKey}
         onChange={onChange}
         // ! overrides the unlayered .input padding/font so the full number fits.
-        className="input w-full shrink-0 !px-0.5 !py-0.5 text-center !text-[9px]"
+        className="input shrink-0 !px-0.5 !py-0.5 text-center !text-[9px]"
       />
     </div>
   )

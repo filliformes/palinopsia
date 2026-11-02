@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { setAgentSettings, useAgent } from '../mcp/agent'
 import { showToast } from './Toast'
+import { numberBoxCh, numberBoxChars } from './numberBox'
 
 function ago(ms: number): string {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000))
@@ -85,7 +86,8 @@ export function McpSection(): JSX.Element {
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="font-mono text-[9px] uppercase text-muted">port</span>
             <input
-              className="input w-16 px-1 py-0.5 font-mono text-[10px]"
+              className="input box-content px-1 py-0.5 font-mono text-[10px]"
+              style={{ width: numberBoxCh(numberBoxChars(1, 65535, true)) }}
               value={port}
               onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ''))}
               onBlur={commitPort}

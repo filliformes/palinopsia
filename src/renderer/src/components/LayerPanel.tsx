@@ -399,7 +399,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       max={100}
                       maxFrac={1}
                       onChange={(v) => setSourceMix(index, v / 100)}
-                      className={`input w-[calc(4ch+7px)] !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
+                      className={`input !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums ${mixBound ? 'text-accent2' : ''}`}
                     />
                     <span className="font-mono text-[9px] text-muted">%</span>
                   </span>
@@ -531,13 +531,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                         className={`min-w-0 flex-1 accent-accent ${layer.feedback ? '' : 'opacity-40'}`}
                         title={layer.feedback ? 'Feedback persistence : decay trails (capped below infinite bloom)' : 'Feedback is off : the trail it will have when on'}
                       />
-                      <div className={`w-11 shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
+                      <div className={`shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
                         <BoundedNumberInput
                           value={Math.round(layer.feedbackAmount * 100) / 100}
                           min={0}
                           max={1}
                           onChange={(v) => setFeedbackAmount(index, v)}
-                          className="input w-full px-1 py-0.5 text-right text-[11px]"
+                          className="input px-1 py-0.5 text-right text-[11px]"
                         />
                       </div>
                     </Row>
@@ -570,8 +570,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               value={Math.round(layer.speed * 100) / 100}
               min={0}
               max={20}
+              maxFrac={2}
               onChange={(v) => setLayerSpeed(index, v)}
-              className="input w-[calc(5ch+7px)] shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
+              className="input shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
             />
             </PinZone>
             {/* VARY : the global Vary, aimed at this layer alone; a modulation
@@ -602,7 +603,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               max={1}
               maxFrac={2}
               onChange={(v) => setLayerVary(index, v)}
-              className="input w-[calc(4ch+7px)] shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
+              className="input shrink-0 !px-0.5 !py-0.5 text-right !text-[10px] tabular-nums"
             />
           </div>
           {/* The binding row this chip opens. Without it the M toggled state
