@@ -548,7 +548,8 @@ columns, balanced so the panel is as short as it can be; the organic family alwa
 ends on the same LIGHT column. An XY pad stands at the right with the other controls
 beside it, an x / y pair inside a column is two aligned rows, each with its M, and a
 number box shows only the decimals its range needs (the stored value keeps every
-digit). A control that does nothing in the current setting is greyed out, with the
+digit) and is only as wide as the longest number its range can show, so the label
+and the slider beside it get the rest (it widens while you type a longer one). A control that does nothing in the current setting is greyed out, with the
 reason on hover (a keyer that is off, the light angle of a flat relief, a palette's
 unused stops); it still works. **Every control of every source and effect explains
 itself on hover** : what it does, which way it goes, and whether it restarts a growing

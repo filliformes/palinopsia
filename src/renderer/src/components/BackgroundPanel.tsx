@@ -278,8 +278,8 @@ export function BackgroundPanel(): JSX.Element {
                 title={`Background clock ${speed.toFixed(2)}× · double-click : 0.25×`}
               />
             </span>
-            <div className="w-11 shrink-0">
-              <BoundedNumberInput value={Math.round(speed * 100) / 100} min={0} max={BG_SPEED_MAX} onChange={setBackgroundSpeed} className="input w-full px-1 py-0.5 text-right text-[11px]" />
+            <div className="shrink-0">
+              <BoundedNumberInput value={Math.round(speed * 100) / 100} min={0} max={BG_SPEED_MAX} maxFrac={2} onChange={setBackgroundSpeed} className="input px-1 py-0.5 text-right text-[11px]" />
             </div>
             </PinZone>
             {modChip('speed')}
@@ -300,8 +300,8 @@ export function BackgroundPanel(): JSX.Element {
                 title={`Shadow ${depth.toFixed(2)} · double-click : 0`}
               />
             </span>
-            <div className="w-11 shrink-0">
-              <BoundedNumberInput value={Math.round(depth * 100) / 100} min={0} max={1} onChange={setBackgroundDepth} className="input w-full px-1 py-0.5 text-right text-[11px]" />
+            <div className="shrink-0">
+              <BoundedNumberInput value={Math.round(depth * 100) / 100} min={0} max={1} maxFrac={2} onChange={setBackgroundDepth} className="input px-1 py-0.5 text-right text-[11px]" />
             </div>
             </PinZone>
             {modChip('depth')}

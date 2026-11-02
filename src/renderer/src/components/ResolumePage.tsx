@@ -34,6 +34,7 @@ import { showToast } from './Toast'
 import { effectiveZoom } from './uiZoom'
 import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { numberBoxCh, numberBoxChars } from './numberBox'
 
 const CELL = 20
 const LABEL_W = 224
@@ -687,7 +688,7 @@ export function ResolumePage(): JSX.Element {
         <div className="flex items-center gap-1.5">
           <Btn on={r.enabled} label={r.enabled ? '● sending' : '○ send'} onClick={() => setR({ enabled: !r.enabled })} title="Stream the connected columns to Resolume over OSC" />
           <input className="input w-28 text-[11px]" value={r.host} onChange={(e) => setR({ host: e.target.value.trim() })} title="Resolume's machine (127.0.0.1 when it runs here)" />
-          <input className="input w-16 text-[11px]" type="number" value={r.port} onChange={(e) => setR({ port: Number(e.target.value) || 7000 })} title="Resolume's OSC INPUT port (Preferences › OSC, 7000 by default)" />
+          <input className="input box-content text-[11px] tabular-nums" style={{ width: numberBoxCh(numberBoxChars(1, 65535, true)) }} type="number" value={r.port} onChange={(e) => setR({ port: Number(e.target.value) || 7000 })} title="Resolume's OSC INPUT port (Preferences › OSC, 7000 by default)" />
         </div>
         <label className="flex items-center gap-1.5 font-mono text-[10px] text-muted" title="How many times a second the matrix sends (the patch's speedlim)">
           rate
@@ -710,7 +711,7 @@ export function ResolumePage(): JSX.Element {
         <div className="flex items-center gap-1.5" title="Recalling Palinopsia scene N connects Resolume column N (+ offset) : the patch's scene trigger">
           <Btn on={r.sceneColumns} label="scene → column" onClick={() => setR({ sceneColumns: !r.sceneColumns })} />
           {r.sceneColumns && (
-            <input className="input w-12 text-[11px]" type="number" value={r.columnOffset} onChange={(e) => setR({ columnOffset: Number(e.target.value) || 0 })} title="Column offset (scene 1 → column 1 + offset)" />
+            <input className="input box-content text-[11px] tabular-nums" style={{ width: numberBoxCh(numberBoxChars(-99, 999, true)) }} type="number" value={r.columnOffset} onChange={(e) => setR({ columnOffset: Number(e.target.value) || 0 })} title="Column offset (scene 1 → column 1 + offset)" />
           )}
         </div>
         <div className="flex items-center gap-1" title="Connection snapshots : click recalls, shift+click stores the current connections">

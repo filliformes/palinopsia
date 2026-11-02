@@ -18,6 +18,7 @@ import type { AutostartStatus, DisplayInfo, KioskLaunchConfig, ModTarget, PerfSt
 import { modTargetKey, useStore } from '../store'
 import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
+import { numberBoxCh, numberBoxChars } from './numberBox'
 import { showToast } from './Toast'
 import { currentFps, formatHz } from '../perf'
 import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DXV_MAX_EDGE, type RecordingFormat } from '../recorder'
@@ -546,7 +547,8 @@ export function OutputPage({
                 onChange={(e) => setDraftW(e.target.value)}
                 onBlur={applyCompSize}
                 onKeyDown={(e) => { if (e.key === 'Enter') applyCompSize() }}
-                className="input w-20 text-right text-[11px]"
+                className="input box-content text-right text-[11px] tabular-nums"
+                style={{ width: numberBoxCh(numberBoxChars(320, 15360, true)) }}
                 title="Composition width in pixels"
               />
               <span className="font-mono text-[11px] text-muted">×</span>
@@ -555,7 +557,8 @@ export function OutputPage({
                 onChange={(e) => setDraftH(e.target.value)}
                 onBlur={applyCompSize}
                 onKeyDown={(e) => { if (e.key === 'Enter') applyCompSize() }}
-                className="input w-20 text-right text-[11px]"
+                className="input box-content text-right text-[11px] tabular-nums"
+                style={{ width: numberBoxCh(numberBoxChars(240, 8640, true)) }}
                 title="Composition height in pixels"
               />
               <button onClick={applyCompSize} className={btn(false)} title="Apply the custom size (rebuilds the engine)">apply</button>
@@ -886,7 +889,8 @@ export function OutputPage({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur()
                   }}
-                  className="w-16 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
+                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg disabled:opacity-50"
+                  style={{ width: numberBoxCh(numberBoxChars(1, 65535, true)) }}
                 />
               </label>
             </div>
@@ -961,17 +965,17 @@ export function OutputPage({
               <label className="flex items-center gap-1">cols
                 <input type="number" min={1} max={64} value={lights.cols}
                   onChange={(e) => setLights({ cols: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
-                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 64, true)) }} />
               </label>
               <label className="flex items-center gap-1">rows
                 <input type="number" min={1} max={64} value={lights.rows}
                   onChange={(e) => setLights({ rows: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
-                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 64, true)) }} />
               </label>
               <label className="flex items-center gap-1">fps
                 <input type="number" min={1} max={60} value={lights.fps}
                   onChange={(e) => setLights({ fps: Math.max(1, Math.min(60, Number(e.target.value) || 40)) })}
-                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 60, true)) }} />
               </label>
             </div>
             <label className="flex items-center gap-2 text-[11px] text-muted">
@@ -984,7 +988,7 @@ export function OutputPage({
               <label className="flex items-center gap-1">gamma
                 <input type="number" min={0.5} max={3} step={0.1} value={lights.gamma}
                   onChange={(e) => setLights({ gamma: Math.max(0.5, Math.min(3, Number(e.target.value) || 1)) })}
-                  className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(0.5, 3, false, 2)) }} />
               </label>
               <label className="flex items-center gap-1">
                 <input type="checkbox" checked={lights.serpentine}
@@ -997,12 +1001,12 @@ export function OutputPage({
                 <label className="flex items-center gap-1">universe
                   <input type="number" min={0} max={32767} value={lights.universe}
                     onChange={(e) => setLights({ universe: Math.max(0, Number(e.target.value) || 0) })}
-                    className="w-14 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                    className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(0, 32767, true)) }} />
                 </label>
                 <label className="flex items-center gap-1">ch
                   <input type="number" min={1} max={512} value={lights.startChannel}
                     onChange={(e) => setLights({ startChannel: Math.max(1, Math.min(512, Number(e.target.value) || 1)) })}
-                    className="w-12 rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" />
+                    className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 512, true)) }} />
                 </label>
                 <label className="flex items-center gap-1">order
                   <select value={lights.order}

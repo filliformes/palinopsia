@@ -141,6 +141,39 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   global` lit. With SPD at 0.25 for 2 s, a session saved by the code before (its film on
   L1, no field) advanced 0.50 s (follows the global speed, as it did), a fresh import
   beside it 2.03 s (its own speed); clicking its button gave `false` and 0.25×.
+- **Number boxes are only as wide as their numbers** (Vincent, 11-02 : "why are ALL the
+  float number edit boxes so wide ? Could they be a bit tighter, to not have so much blank
+  black space inside ?"). Two causes : every box got a fixed width from its caller (`w-14`
+  in the Inspector, `w-12` in the Finishing rows and the modulator cards, `w-16` in the
+  Output EQ, `w-full` in a fixed column ...), sized for the longest value any box might
+  show; and the unlayered `.input` padding (8 px a side) beat the callers' `px-1` /
+  `px-0.5`, so every box also carried 16 px of empty black. Now `numberBox.ts` works out
+  each box's widest text from ITS OWN range and decimals (per side of zero and per decade :
+  the sign, the integer digits, the point, the decimals; a per-value rule for the Mixer
+  faders and the envelope times; exact against a brute-force count over 39 ranges and 400
+  random ones), and `BoundedNumberInput` writes `calc(Nch + padding + border + 2px)` before
+  paint, with tabular figures and the caller's own side padding made to hold (4 px a side
+  when none is given). The width never follows the current value, so it holds still under
+  a drag or a modulator; while typing it widens to fit and goes back on leaving the box;
+  three characters at least. A box without `maxFrac` now shows the decimals its range needs
+  (`fracFor`, moved to `numberBox.ts`), so its text can never outgrow it (the layer speed
+  and the Background keep their two decimals). Every caller lost its fixed width : the
+  Inspector rows (and the Finishing rows, the x / y pairs, a binding's depth), the
+  modulator cards (Hz, SUS, LEN, SWG, BAND, the envelope times, HOLD, every slider row),
+  the shaping editor, the layer strip, the Mixer faders, the Background, the BPM, the
+  Space port. The plain number fields size the same way (`numberBoxCh` + `box-content`) :
+  the Output EQ's freq / gain / Q, the Output page's size, HIVE port and lights, the OSC,
+  Resolume and Agent ports. Kept fixed : the Space voices' scrub boxes (a table of five
+  equal cells, `fixedWidth`). Measured in the test copy (RTX 4070, 1536×890, studio
+  theme) : the Inspector's 890 number boxes over all 129 panels 52.9 → 38.3 px on average
+  (RATIO 56 → 37.2, THICKNESS 56 → 43.6), names cut 13 → 10, 0 clipped with every box
+  stressed at its widest text, panel heights unchanged (the columns are a fixed `w-44`);
+  the modulator cards' boxes 48 → 27 to 46 px and their sliders 7 to 22 px longer (the
+  Hz row 94 → 102), all 19 types still 160 px; the EQ's freq and Q 64 → 43.6, the BPM
+  40 → 30.8, the Mixer 35.6 → 31.6 (the layer strip was already sized in ch : unchanged).
+  0 clipped too in the analog (Georgia), nature and cream (the mono readout), graphite,
+  paper and pastel themes, under live modulation (the width constant over 30 frames) and
+  in the Sonify page's own window.
 - **Meta Controller → Macro Controller, everywhere it shows** (Vincent : "Change Meta
   Controller name to Macro Controller (in the app and everywhere)"). Every label, title,
   hint, toast and list entry : the row's title (MACRO), the knob tiles' persistence

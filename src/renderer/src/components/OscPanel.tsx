@@ -12,6 +12,10 @@ import { useStore } from '../store'
 import { applyOscListen, applyOscOutput } from '../oscInput'
 import { oscCounts, oscRates } from '../oscMonitor'
 import { OscMonitor } from './OscMonitor'
+import { numberBoxCh, numberBoxChars } from './numberBox'
+
+// a UDP port's box : as wide as "65535"
+const PORT_W = numberBoxCh(numberBoxChars(1, 65535, true))
 
 export function OscPanel(): JSX.Element {
   const oscEnabled = useStore((s) => s.oscEnabled)
@@ -183,7 +187,8 @@ export function OscPanel(): JSX.Element {
                 onChange={(e) => setPortStr(e.target.value.replace(/[^0-9]/g, ''))}
                 onBlur={commitPort}
                 onKeyDown={enterBlurs}
-                className={`input w-16 px-1 py-0.5 text-right text-[11px] ${invalid === 'port' ? 'ring-1 ring-danger' : ''}`}
+                className={`input box-content px-1 py-0.5 text-right text-[11px] tabular-nums ${invalid === 'port' ? 'ring-1 ring-danger' : ''}`}
+                style={{ width: PORT_W }}
                 title="Local UDP port to listen on (Pandore sends here) : 1–65535"
               />
               <div className="flex-1" />
@@ -229,7 +234,8 @@ export function OscPanel(): JSX.Element {
                 onChange={(e) => setOutPortStr(e.target.value.replace(/[^0-9]/g, ''))}
                 onBlur={commitOutPort}
                 onKeyDown={enterBlurs}
-                className={`input w-14 px-1 py-0.5 text-right text-[11px] ${invalid === 'outPort' ? 'ring-1 ring-danger' : ''}`}
+                className={`input box-content px-1 py-0.5 text-right text-[11px] tabular-nums ${invalid === 'outPort' ? 'ring-1 ring-danger' : ''}`}
+                style={{ width: PORT_W }}
                 title="Destination UDP port : 1–65535"
               />
               <div className="flex-1" />

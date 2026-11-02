@@ -138,7 +138,7 @@ export function ModShapeEditor({ id }: { id: string }): JSX.Element | null {
           max={0.95}
           maxFrac={2}
           onChange={(v) => setShape(id, { threshold: v > 0 ? v : undefined })}
-          className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+          className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
         />
         <button
           className={chip(t > 0 && s.thresholdMode === 'gate', t <= 0)}
@@ -190,7 +190,7 @@ export function ModShapeEditor({ id }: { id: string }): JSX.Element | null {
               max={flow ? 4 : 0.5}
               maxFrac={2}
               onChange={(v) => setShape(id, flow ? { rate: v } : { step: v })}
-              className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
+              className="input shrink-0 px-0.5 py-0.5 text-right text-[9px]"
             />
             <button
               className={chip(s.ends === 'wrap')}

@@ -20,6 +20,7 @@ import {
 } from '../audio/eqMath'
 import { GrMeter, RangeRow, Row, Seg, Shell, parseHz, sonifyCovered, themeVar } from './sonifyUi'
 import { eqPresets } from '../audio/eqPresets'
+import { numberBoxCh, numberBoxChars } from './numberBox'
 import { ConfirmModal, PromptModal } from './PromptModal'
 
 const LABEL = ['LC', 'LS', '1', '2', '3', '4', '5', '6', '7', '8', 'HS', 'HC']
@@ -731,6 +732,9 @@ function NumField({ label, unit, value, min, max, step, onChange, parse }: {
   parse?: (t: string) => number | null
 }): JSX.Element {
   const show = (v: number): string => (step >= 1 ? String(Math.round(v)) : String(+v.toFixed(2)))
+  // as wide as the longest number it shows ("20000", "-23.99", "17.99"), and no wider
+  // (!px-1 : the unlayered .input padding, 8 px a side, beat a plain px-1)
+  const width = numberBoxCh(numberBoxChars(min, max, step >= 1, 2))
   const [text, setText] = useState(show(value))
   useEffect(() => { setText(show(value)) }, [value, step]) // eslint-disable-line react-hooks/exhaustive-deps
   const commit = (t: string): void => {
@@ -746,7 +750,8 @@ function NumField({ label, unit, value, min, max, step, onChange, parse }: {
     <label className="flex items-center gap-1 font-mono text-[10px] text-muted">
       {label}
       <input
-        className="input w-16 px-1 py-0.5 text-right text-[11px]"
+        className="input box-content !px-1 py-0.5 text-right text-[11px] tabular-nums"
+        style={{ width }}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={(e) => commit(e.target.value)}
