@@ -15,6 +15,82 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The Body rule timeline counts in minutes and seconds too, and takes exact values**
+  (Vincent : "I also need it to not only be tied to bars and beats; I want to be able to
+  choose an amount of seconds and minutes each rule will play. make it more precise").
+  A **clock** switch on the rules lane, `bars | time` : `RuleTimeline.unit` (absent =
+  bars, so a timeline in bars is stored byte for byte as before; `'time'` is the only
+  value ever written), the length and every block in the timeline's own unit, never
+  mixed. In time the run counts real seconds from `performance.now()` at its start
+  (`engine/ruleSeq.ts` : `rt.unit`, `rt.startAt`; the wall clock, so a stalled window
+  catches up), starts at once on play (never `soniClockStart`, and it no longer counts
+  as "on the beat" for `soniClockAlsoOnBeat`, so the other sequencers keep their own
+  bar 1), and neither the tempo nor Ableton Link moves it; bars mode is untouched (bar 1,
+  Link's next bar, the epoch re-count). The switch converts the timeline at the tempo now
+  (`convertRuleTimeline` in `engine/ruleSeqModel.ts`, one store write, so one undo step) :
+  bars to time, seconds = bars x beats a bar x 60 / BPM on a 1/100 s grid (`q100`); time
+  to bars, each start and end to the nearest beat (touching blocks still touch, a block
+  under half a beat keeps one, overlaps melt as a drag would), the loop to whole bars,
+  blocks that would start past bar 256 left out with a toast. A switch while it runs
+  recounts the run onto the new clock in place (`recount` : the playhead keeps its place
+  in time). Lengths : bars 4 / 8 / 16 / 32 / 64 or any whole number typed from 1 to 256
+  (`RULE_MAX_BARS`, was 64); time 30 s, 1, 2, 5, 10, 30 min or typed `m:ss` from 5 s to
+  120 min (`RULE_MIN_SEC` / `RULE_MAX_SEC` : a gesture study up to an installation's
+  evening). Snapping : whole seconds, Shift tenths (`RULE_MIN_LEN_SEC` 0.1). A **block
+  editor** (double-click a block, Enter on a selected one, or its right-click "Start and
+  length…") : start and length typed exactly, `parseClock` (`90`, `1:30`, `1:30.5`,
+  `1:02:30`, a comma for the point, `5m`) or `parseBarBeat` / `parseBarsBeats`
+  (`5.3` = bar 5 beat 3, `2.1` = two bars and a beat, `3 beats`), read back live, kept
+  inside the loop, Enter applies (one undo step, overlaps melted), Esc or a press
+  elsewhere cancels. Each block's label is its length in the lane's unit (`fmtClock` :
+  `1:30`, `0:00.5`; `4 bars`). Zoom is continuous : **fit** (the loop in the lane),
+  ×2 / ÷2, Ctrl + wheel by √2 around the pointer, up to a bar 160 px or a second 200 px
+  (`MAX_PX`), so an hour is workable to the second; the ruler picks its step from what
+  fits (bars 1 to 128 a label, 22 px; time 0.1 s to 1 h, 46 px, tenths when zoomed in),
+  thins its lines and draws only the labels in view. The header reads `1:23 of 5:00` in
+  time (`bar 2.3 of 16` in bars). OSC `/opsia/seq/rules`, MIDI `fire:ruleseq`, Link
+  start / stop, the hand that wins until the next edge, play once, sessions and the
+  pruning work the same on both clocks. Ctrl + wheel now keeps the point under the
+  pointer for real (the scroll was set in a frame callback that could run before the
+  wider timeline was laid out, so it stayed at 0 : now a layout effect on the zoom).
+  Measured in the test copy (RTX 4070, real CDP mouse and keys) : an old timeline loads
+  and stays byte for byte; bars to time at 120 BPM (16 bars = 32 s, 3 blocks x 2 s a
+  bar) and at 133 BPM (28.87 s), back to the same bars exactly, Ctrl+Z / Ctrl+Y on the
+  switch exact; typed `10:00`, `1:30.5`, `3` (to 5 s), `130:00` (to 120 min), junk
+  refused; the editor's `1:30` / `45.5`, `90` / `1:30.5`, `9.3` / `2.1` (bar 9 beat 3,
+  two bars and a beat), a block cut at the loop's end, Esc and a press elsewhere cancel;
+  drags snap to 13 s and Shift to 14.5 s. 10 min loop : fits at 1x (30 s labels), 8x
+  keeps 5:00.1 under the pointer (5 s labels), full zoom tenths with 16 labels drawn; an
+  hour at full zoom = 719,888 px wide, 16 labels, 1199.7 s under the pointer, frames p50
+  16.7 / p95 16.8 ms. Running a 20 s loop for 64 s (3 passes) : 4,973 rule samples at
+  20 Hz, 0 off their blocks (away from 0.12 s of an edge), started at 0.017 s 46 ms after
+  the click, the playhead within 5 to 20 ms of the wall clock (p1 to p99) and a tempo
+  change 120 to 90 BPM mid-run moving it by 1.1 ms on average (one 94 ms stall in the
+  first 0.14 s); a dot click held its rule on from 10.55 s to the edge at 12 s (held mark
+  23 / 23 samples, gone 292 / 292 after), a MIDI-sourced switch held to the loop's end.
+  Play once of 6 s stopped after 6.015 s. The transport started scenes, keys and rules
+  (the rules at once : 0.699 s in at 0.716 s) and stopped all three. A session round
+  trip kept the timeline (the machine's), brought back the lane arms, loaded stopped and
+  started at once from the file (0.496 s in after 0.506 s). A restart (after 90 s) kept
+  the time timeline exactly. All lanes running on a zoomed 10 min loop : frames p50
+  16.7, p95 16.8 to 16.9, p99 17.2 to 17.6 ms; 0 console errors.
+- **The Seq page's live picture sits over every lane** (Vincent : "the LIVE preview
+  should always be there, on top of the 3 lanes, so we can monitor how the sequencers
+  are affecting the whole picture. Take it out of the Scenes lane and make it its own
+  thing"). `SeqPreview` (the `captureStream` mirror of the main canvas) moved out of the
+  Scenes lane's scene column to the page itself, between the transport and the
+  scrolling lanes : a fixed region, never scrolled away, folded lanes or not. Its height
+  is still `opsia.seqPreviewH`, dragged at its foot now (down = taller), at most half the
+  page in the page's own pixels (UI zoom and its own window included) so the lanes keep
+  their room; the video sizes from the stream's own aspect (it was forced to 16:9, a
+  dome's square sat letterboxed), centered. A corner reads which lanes are playing
+  (`▶ scenes · keys · rules`, written from the window's own frames). The stream stops
+  when the page closes, as before; the Climat suggestion still samples the main canvas.
+  Measured : above the lanes (bottom 204 = lanes top 204) and out of the Scenes lane, a
+  1920x1080 stream drawn 237x134 (no stretch), unmoved while the lanes scroll and with
+  every lane folded, its foot dragged 157 to 237 px and remembered, the Climat
+  suggestion still reading the picture, no horizontal scroll at 1536x864, 1280x720 and
+  1100x680 nor in its own window (1348x825), the stream's track ended on closing.
 - **The Seq page is the home of every sequencer : lanes under one transport, and a Body
   rule timeline** (Vincent : "a complete Body rule sequencer ... drag and drop rules on a
   timeline and make them active or not active for a pre-determined amount of time", then

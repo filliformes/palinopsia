@@ -1111,9 +1111,14 @@ each knob its curve, MIDI CC and destination count.*
 
 The home of everything the instrument sequences : one **lane** per sequencer, under
 **one transport**. Each lane keeps its own time (the scenes their dwell in seconds, the
-Sonify keys their rate, the Body rules their bars), and each folds to its header (it
-keeps playing folded).
+Sonify keys their rate, the Body rules their bars or minutes and seconds), and each
+folds to its header (it keeps playing folded).
 
+- **The live picture** sits under the transport, over every lane, and never scrolls
+  away : the whole composition as it plays, so you watch what the sequencers do to it
+  (folded lanes or not). It keeps the picture's own shape, centered (a dome's square
+  too); drag its foot for a taller or shorter one (remembered, at most half the page);
+  its corner says which lanes are playing.
 - **The transport** (top of the page) : **▶ play** starts every lane marked **● with
   transport**, **■ stop** stops them all. The lanes on the beat start together on bar 1,
   or on Ableton Link's next bar while Link is on; beside it, the shared beat clock's bar
@@ -1126,17 +1131,32 @@ keeps playing folded).
   one as on the Sonify page (seq view) : an edit in either shows in the other at once. Its
   rows sit in three columns here (the key now and its mode, the clock, the keys it chooses
   from), with its M on **every**.
-- **Body rules** : a timeline of your [Body rules](#body--embodied-control-key-b), in
-  **bars** of the tempo (of Ableton Link's bar while Link is on), one row per rule as the
-  Body page lists them. A **block** switches its rule on from its first bar to its last.
-  **Drag a rule's name** onto the timeline (it lands on its own row, 4 bars long), or
-  **draw** on its row; drag a block to move it, its ends to resize it, all snapped to
-  bars (**Shift** : to beats); **Alt-drag** copies it; **Delete** or a **right-click**
-  removes it (the right-click also copies a block right after itself, fills a rule's
-  whole loop or clears its row; double-click a row for a block there). The loop is **4,
-  8, 16, 32 or 64** bars, **⟳ loop** or **→ once** (it plays the length once, then stops),
-  and **zoom** (or Ctrl + wheel over it) for fine work on a long loop. Each edit is one
-  undo step (a drag is one, on release).
+- **Body rules** : a timeline of your [Body rules](#body--embodied-control-key-b), one
+  row per rule as the Body page lists them. A **block** switches its rule on from its
+  start to its end. Its **clock** is **bars** of the tempo (of Ableton Link's bar while
+  Link is on) or **time** : real minutes and seconds that the tempo and Link never move,
+  and that start at once on play (bars wait for bar 1, or Link's next bar). Switching the
+  clock converts every block at the tempo now, so it keeps its place in time (seconds =
+  bars × beats a bar × 60 / BPM; back into bars, to the nearest beat), as one undo step.
+  **Drag a rule's name** onto the timeline (it lands on its own row : a quarter of the
+  loop up to 4 bars, or an eighth of it in time, rounded down to a round figure), or
+  **draw** on its row; drag a block to move it, its ends to resize it, snapped to bars or
+  whole seconds (**Shift** : to beats or tenths); **Alt-drag** copies it; **Delete** or a
+  **right-click** removes it (the right-click also copies a block right after itself,
+  fills a rule's whole loop or clears its row; double-click a row for a block there).
+  **Double-click a block** (or select it and press Enter, or right-click → **Start and
+  length…**) to type both exactly : in time `m:ss` with tenths (`90`, `1:30`, `1:30.5`,
+  `5m`), in bars `bar.beat` for the start (`5.3` : bar 5, its third beat) and
+  `bars.beats` for the length (`4`, `2.1` = two bars and a beat, `3 beats`); it reads
+  back what it understood as you type, Enter applies (kept inside the loop), Esc cancels.
+  Each block shows its length in the lane's unit (`4 bars`, `1:30`). The loop is **4, 8,
+  16, 32 or 64** bars or any whole number typed from **1 to 256**; in time **30 s, 1, 2,
+  5, 10 or 30 min**, or any length typed in `m:ss` from **5 seconds to 120 minutes** (an
+  installation's evening). **⟳ loop** or **→ once** (it plays the length once, then
+  stops). **zoom** : **fit** shows the whole loop, **−** / **+** and Ctrl + wheel (around
+  the pointer) go in as far as a beat 40 px wide or a second 200 px wide, so a 60-minute
+  loop is workable to the second; the ruler thins its labels to what fits (`m:ss`, tenths
+  when zoomed in). Each edit is one undo step (a drag is one, on release).
   While it runs, a rule with blocks is **on inside them and off outside them**; a rule
   without blocks is left alone, and stopping leaves every rule as it is. **Your hand
   wins** : a rule you switch while it runs (a MIDI note or knob, OSC, an action, its box
@@ -1145,8 +1165,10 @@ keeps playing folded).
   meanwhile. The dot at the left of each row is the rule's state now (click it to switch
   the rule by hand). The timeline lives on this computer beside the rules (the rules are
   the computer's, like the camera that fires them), each block naming its rule by its
-  id : renaming a rule keeps its blocks, deleting a rule takes them along. A session
-  remembers whether it was running, and an installation starts it again. Its play is
+  id : renaming a rule keeps its blocks, deleting a rule takes them along; the clock and
+  the length are the timeline's too. The header reads where it is (`bar 2.3 of 16`, or
+  `1:23 of 5:00`). A session remembers whether it was running, and an installation starts
+  it again. Its play is
   MIDI learnable (`RULE timeline run`), and `/opsia/seq/rules` over OSC.
 
 **Scenes : the auto-pilot.** An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
@@ -1164,9 +1186,9 @@ exports a Markdown **relation-score** (`⤓ score`). Needs ≥2 scenes to play.
 the whole page opens in its own window (titled *Palinopsia · Sequencer*), to steer the
 run on one screen while the picture plays full size on the other. The same rules as the
 [Output page's window](#output--mapping-key-o) : every lane, the scene cards, the tag
-editor, the transport and the long-forms are live there, its live monitor mirrors the picture, the
-monitor's top edge and the inspector column's edge still resize under your hand (at any
-UI zoom), `Q` brings the window forward instead of closing it, your other keys still play
+editor, the transport and the long-forms are live there, the live picture mirrors the
+instrument's, its foot and the inspector column's edge still resize under your hand (at
+any UI zoom), `Q` brings the window forward instead of closing it, your other keys still play
 the instrument, **⇲ back into the app** puts the page back over the instrument and
 closing the window closes the page. It is never remembered : the next time, the
 Sequencer opens in the app.
@@ -1179,13 +1201,14 @@ Three **durational long-forms** run underneath the scene clock (minutes-scale):
 | **Long-Take / Veil** | A slowness governor: **forbids** auto-cuts for the cycle and drives one slow veil (Context haze) across it : the sequencer holds a single take. |
 | **Frame-Weave** | Rose Lowder's temporal interlace: instead of blending, show **one layer per frame**, stepping through a **paintable cell lattice** (each cell = a layer 1–4 or blank) at a set rate : persistence of vision fuses the layers into one woven image. |
 
-The scene lane has its own live monitor (resizable), a resizable inspector column, and
-its own height (drag its foot).
+The scene lane has a resizable inspector column and its own height (drag its foot); the
+live picture is the page's own, over every lane.
 
 ![The macro-form sequencer](docs/images/interface-sequencer.jpg)
 
 *Tagged scenes across the top with the tag editor for the selected one, the live
-monitor at the bottom, and the column on the right: dwell clock, transition style,
+monitor at the bottom (an earlier layout : it now sits at the top of the page, over
+every lane), and the column on the right: dwell clock, transition style,
 selection strategy, the Breathe and Repose–Disturbance–Repose climate-arc overlays,
 and the slow long-forms below them.*
 
