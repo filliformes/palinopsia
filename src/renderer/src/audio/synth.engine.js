@@ -188,6 +188,26 @@ function sclipF(u) {
   return 0.75 * u2 - 0.125 * u2 * u2
 }
 
+// ── 2x oversampling for the drive ──────────────────────────────────────────
+// A 31-tap halfband (Kaiser-windowed sinc, beta 8 : flat to ~0.33 fs, -80 dB
+// from ~0.67 fs), the same taps for up and down. Up : the even output is the
+// input 8 samples late, the odd one the 16 odd taps (x2). Down : the centre
+// tap plus the 16 odd taps over the last 31 samples at 2x. 15.5 samples late
+// in all.
+const HB = new Float64Array(16)
+{
+  const bes = (x) => { let s = 1, t = 1; for (let k = 1; k < 30; k++) { t *= (x / (2 * k)) * (x / (2 * k)); s += t } return s }
+  const beta = 8
+  let sum = 0
+  for (let i = 0; i < 16; i++) {
+    const j = 2 * i - 15
+    const w = bes(beta * Math.sqrt(1 - (j / 16) * (j / 16))) / bes(beta)
+    HB[i] = (0.5 * Math.sin((Math.PI * j) / 2)) / ((Math.PI * j) / 2) * w
+    sum += HB[i]
+  }
+  for (let i = 0; i < 16; i++) HB[i] *= 0.5 / sum
+}
+
 // ── the jx-move DCO ────────────────────────────────────────────────────────
 // After jx-move (Vincent Fillion, MIT) : one DCO = a counter phase c (the
 // rectangular) + an integrator r (the ramp), every discontinuity (wrap, the
@@ -199,82 +219,108 @@ function sclipF(u) {
 //   P : the fixed-time pulse (the ramp reaches the rail in 0.18 ms, holds)
 //   Q : the square     S : the saw     N : a 25 % pulse (for the pulse-saw)
 const PULSE_T = 0.00018
-class DcoUnit {
-  constructor() { this.c = 0; this.r = 0; this.y1 = 0; this.y2 = 0; this.carry = 0 }
-}
-let gAP = 0, gAQ = 0, gAS = 0, gAN = 0, gW = 1, gPdc = 0
-let A0 = 0, A1 = 0, A2 = 0, A3 = 0
+// a unit : [c, r, y1, y2, carry] in a Float64Array (written every sample)
+function DcoUnit() { return new Float64Array(5) }
+// The shape weights of the unit being ticked, and the four residuals it owes
+// (typed arrays : a module-level number reassigned per sample would be boxed
+// anew each time and fill the heap).
+const G = new Float64Array(6)
+const AP = 0, AQ = 1, AS = 2, AN = 3, GW = 4, PDC = 5
+const ACC = new Float64Array(4)
 function accStep(h, f) {
-  A0 += h * blep4(f - 2); A1 += h * blep4(f - 1); A2 += h * blep4(f); A3 += h * blep4(f + 1)
+  ACC[0] += h * blep4(f - 2); ACC[1] += h * blep4(f - 1); ACC[2] += h * blep4(f); ACC[3] += h * blep4(f + 1)
 }
 function accKink(dm, f) {
-  A0 += dm * blamp4(f - 2); A1 += dm * blamp4(f - 1); A2 += dm * blamp4(f); A3 += dm * blamp4(f + 1)
+  ACC[0] += dm * blamp4(f - 2); ACC[1] += dm * blamp4(f - 1); ACC[2] += dm * blamp4(f); ACC[3] += dm * blamp4(f + 1)
 }
 function dNaive(c, r) {
-  let y = gAS * (2 * r - 1)
-  if (gAP !== 0) { const x = r / gW; y += gAP * ((x < 1 ? 2 * x - 1 : 1) - gPdc) }
-  if (gAQ !== 0) y += c < 0.5 ? -gAQ : gAQ
-  if (gAN !== 0) y += gAN * (c < 0.75 ? -0.5 : 1.5)
+  let y = G[AS] * (2 * r - 1)
+  const aP = G[AP], aQ = G[AQ], aN = G[AN]
+  if (aP !== 0) { const x = r / G[GW]; y += aP * ((x < 1 ? 2 * x - 1 : 1) - G[PDC]) }
+  if (aQ !== 0) y += c < 0.5 ? -aQ : aQ
+  if (aN !== 0) y += aN * (c < 0.75 ? -0.5 : 1.5)
   return y
 }
 function dSlope(r, dt) {
-  let m = gAS * 2 * dt
-  if (gAP !== 0 && (gW >= 1 || r < gW)) m += (gAP * 2 * dt) / gW
+  let m = G[AS] * 2 * dt
+  const aP = G[AP], w = G[GW]
+  if (aP !== 0 && (w >= 1 || r < w)) m += (aP * 2 * dt) / w
   return m
 }
 function dReset(d, dt, resetCounter, f) {
-  const v0 = dNaive(d.c, d.r), m0 = dSlope(d.r, dt)
-  if (resetCounter) d.c = 0
-  d.r = 0
-  accStep(dNaive(d.c, d.r) - v0, f)
-  accKink(dSlope(d.r, dt) - m0, f)
+  const v0 = dNaive(d[0], d[1]), m0 = dSlope(d[1], dt)
+  if (resetCounter) d[0] = 0
+  d[1] = 0
+  accStep(dNaive(d[0], d[1]) - v0, f)
+  accKink(dSlope(d[1], dt) - m0, f)
 }
 function dAdvance(d, dt, len, t0) {
   let t = 0
+  const aP = G[AP], aQ = G[AQ], aN = G[AN], w = G[GW]
   for (let guard = 0; guard < 8; guard++) {
     const rem = len - t
-    const c = d.c, r = d.r
+    const c = d[0], r = d[1]
     let thr = 1
-    if (gAQ !== 0 && c < 0.5) thr = 0.5
-    else if (gAN !== 0 && c < 0.75) thr = 0.75
-    const kink = gAP !== 0 && gW < 1 && r < gW
+    if (aQ !== 0 && c < 0.5) thr = 0.5
+    else if (aN !== 0 && c < 0.75) thr = 0.75
+    const kink = aP !== 0 && w < 1 && r < w
     const adv = dt * rem
-    if (c + adv < thr && (!kink || r + adv < gW)) { d.c = c + adv; d.r = r + adv; return }
+    if (c + adv < thr && (!kink || r + adv < w)) { d[0] = c + adv; d[1] = r + adv; return }
     const idt = 1 / dt
     let tn = (1 - c) * idt, ev = 0
-    if (gAQ !== 0 && c < 0.5) { const te = (0.5 - c) * idt; if (te < tn) { tn = te; ev = 1 } }
-    if (gAN !== 0 && c < 0.75) { const te = (0.75 - c) * idt; if (te < tn) { tn = te; ev = 3 } }
-    if (kink) { const tk = (gW - r) * idt; if (tk < tn) { tn = tk; ev = 2 } }
-    if (tn > rem) { d.c = c + adv; d.r = r + adv; return }
-    d.c = c + dt * tn
-    d.r = r + dt * tn
+    if (aQ !== 0 && c < 0.5) { const te = (0.5 - c) * idt; if (te < tn) { tn = te; ev = 1 } }
+    if (aN !== 0 && c < 0.75) { const te = (0.75 - c) * idt; if (te < tn) { tn = te; ev = 3 } }
+    if (kink) { const tk = (w - r) * idt; if (tk < tn) { tn = tk; ev = 2 } }
+    if (tn > rem) { d[0] = c + adv; d[1] = r + adv; return }
+    d[0] = c + dt * tn
+    d[1] = r + dt * tn
     t += tn
     const f = clamp(1 - (t0 + t), 0, 1)
-    if (ev === 0) { d.c = 1; dReset(d, dt, true, f) }
-    else if (ev === 1) { d.c = 0.5; accStep(2 * gAQ, f) }
-    else if (ev === 3) { d.c = 0.75; accStep(2 * gAN, f) }
-    else { d.r = gW; accKink((-gAP * 2 * dt) / gW, f) }
+    if (ev === 0) { d[0] = 1; dReset(d, dt, true, f) }
+    else if (ev === 1) { d[0] = 0.5; accStep(2 * aQ, f) }
+    else if (ev === 3) { d[0] = 0.75; accStep(2 * aN, f) }
+    else { d[1] = w; accKink((-aP * 2 * dt) / w, f) }
   }
 }
-/** One sample (two late). ext in [0,1] : an external reset this sample (the
- *  master's wrap), else -1; resetCounter : sync (counter + ramp) or metal
- *  (ramp only). */
-function dTick(d, dt, ext, resetCounter) {
-  A0 = 0; A1 = 0; A2 = 0; A3 = 0
+/** One sample (two late). DP[0] = dt; DP[1] = ext in [0,1], an external
+ *  reset this sample (the master's wrap), else -1; resetCounter : sync
+ *  (counter + ramp) or metal (ramp only). The sample comes back in DP[2]
+ *  (dTick is too big to inline : a number passed or returned would be boxed
+ *  on every call). */
+const DP = new Float64Array(3)
+function dTick(d, resetCounter) {
+  const dt = DP[0], ext = DP[1]
+  if (ext < 0) {
+    // most samples cross no event : no residuals to place
+    const c = d[0], r = d[1], cn = c + dt, rn = r + dt
+    const w = G[GW]
+    let thr = 1
+    if (G[AQ] !== 0 && c < 0.5) thr = 0.5
+    else if (G[AN] !== 0 && c < 0.75) thr = 0.75
+    if (cn < thr && (G[AP] === 0 || w >= 1 || r >= w || rn < w)) {
+      d[0] = cn; d[1] = rn
+      DP[2] = d[3]
+      d[3] = d[2]
+      d[2] = dNaive(cn, rn) + d[4]
+      d[4] = 0
+      return
+    }
+  }
+  ACC[0] = 0; ACC[1] = 0; ACC[2] = 0; ACC[3] = 0
   if (ext >= 0) {
     dAdvance(d, dt, ext, 0)
     dReset(d, dt, resetCounter, 1 - ext)
     dAdvance(d, dt, 1 - ext, ext)
   } else dAdvance(d, dt, 1, 0)
-  const out = d.y2 + A0
-  d.y2 = d.y1 + A1
-  d.y1 = dNaive(d.c, d.r) + d.carry + A2
-  d.carry = A3
-  return out
+  DP[2] = d[3] + ACC[0]
+  d[3] = d[2] + ACC[1]
+  d[2] = dNaive(d[0], d[1]) + d[4] + ACC[2]
+  d[4] = ACC[3]
 }
 function setPulse(dt, kW) {
-  gW = dt * kW
-  gPdc = gW < 1 ? 1 - gW : 1 / gW - 1
+  const w = dt * kW
+  G[GW] = w
+  G[PDC] = w < 1 ? 1 - w : 1 / w - 1
 }
 
 // Ramps live in a Float64Array : [cur, inc] pairs. A control tick sets the
@@ -291,10 +337,13 @@ function stair(steps, x) {
   const s = sstep((y - i - 0.3) / 0.4)
   return steps[i] + (steps[i + 1] - steps[i]) * s
 }
+// Each voice's xorshift state lives in an Int32Array : under pointer
+// compression (the worklet's) a full 32-bit integer in a field is boxed.
 function rnd01(v) {
-  let r = v.rng
+  const st = v.rs
+  let r = st[0]
   r ^= r << 13; r ^= r >>> 17; r ^= r << 5
-  v.rng = r
+  st[0] = r
   return (r >>> 0) * 2.3283064365386963e-10
 }
 
@@ -308,15 +357,15 @@ function rnd01(v) {
 const DCO_STEPS = [0, 7, 12, 19, 24]
 class DcoSt {
   constructor() {
-    this.d1 = new DcoUnit()
-    this.k1 = new DcoUnit(); this.k2 = new DcoUnit(); this.k3 = new DcoUnit()
-    this.uf = new DcoUnit(); this.us = new DcoUnit(); this.um = new DcoUnit()
+    this.d1 = DcoUnit()
+    this.k1 = DcoUnit(); this.k2 = DcoUnit(); this.k3 = DcoUnit()
+    this.uf = DcoUnit(); this.us = DcoUnit(); this.um = DcoUnit()
     this.R = new Float64Array(2 * 16)
     this.r1 = 1; this.r2 = 1; this.r3 = 1
     this.copies = false; this.fOn = false; this.sOn = false; this.mOn = false
   }
 }
-function unitSeed(dst, src) { dst.c = src.c; dst.r = src.r; dst.y1 = src.y1; dst.y2 = src.y2; dst.carry = src.carry }
+function unitSeed(dst, src) { dst.set(src) }
 const dco = {
   start(v, s, fresh) {
     const st = v.dco
@@ -324,8 +373,8 @@ const dco = {
       const us = [st.d1, st.k1, st.k2, st.k3, st.uf, st.us, st.um]
       for (let i = 0; i < us.length; i++) {
         const u = us[i]
-        u.c = u.r = rnd01(v) * 0.999
-        u.y1 = u.y2 = u.carry = 0
+        u[0] = u[1] = rnd01(v) * 0.999
+        u[2] = u[3] = u[4] = 0
       }
     }
   },
@@ -396,28 +445,30 @@ const dco = {
     for (let i = 0; i < n; i++) {
       dt1 += dt1i; dtf += dtfi; dts += dtsi; dtm += dtmi
       aP += aPi; aQ += aQi; aS += aSi; aN += aNi
-      gAP = aP; gAQ = aQ; gAS = aS; gAN = aN
+      G[AP] = aP; G[AQ] = aQ; G[AS] = aS; G[AN] = aN
       setPulse(dt1, kW)
-      const t1 = (1 - d1.c) / dt1
+      const t1 = (1 - d1[0]) / dt1
       const ext = t1 <= 1 ? t1 : -1
-      let o1 = dTick(d1, dt1, -1, false)
+      DP[0] = dt1; DP[1] = -1; dTick(d1, false)
+      let o1 = DP[2]
       if (copies) {
         l1 += l1i; l2 += l2i; l3 += l3i
         let nrm = 1
-        if (l1 > 1e-6) { const d = dt1 * r1; setPulse(d, kW); o1 += l1 * dTick(k1, d, -1, false); nrm += l1 * l1 }
-        if (l2 > 1e-6) { const d = dt1 * r2; setPulse(d, kW); o1 += l2 * dTick(k2, d, -1, false); nrm += l2 * l2 }
-        if (l3 > 1e-6) { const d = dt1 * r3; setPulse(d, kW); o1 += l3 * dTick(k3, d, -1, false); nrm += l3 * l3 }
+        if (l1 > 1e-6) { const d = dt1 * r1; setPulse(d, kW); DP[0] = d; dTick(k1, false); o1 += l1 * DP[2]; nrm += l1 * l1 }
+        if (l2 > 1e-6) { const d = dt1 * r2; setPulse(d, kW); DP[0] = d; dTick(k2, false); o1 += l2 * DP[2]; nrm += l2 * l2 }
+        if (l3 > 1e-6) { const d = dt1 * r3; setPulse(d, kW); DP[0] = d; dTick(k3, false); o1 += l3 * DP[2]; nrm += l3 * l3 }
         o1 /= Math.sqrt(nrm)
       }
       let o2 = 0
       wf += wfi; ws += wsi; wm += wmi
-      if (fOn && wf > 1e-6) { setPulse(dtf, kW); o2 += wf * dTick(uf, dtf, -1, false) }
-      if (sOn && ws > 1e-6) { setPulse(dts, kW); o2 += ws * dTick(us, dts, ext, true) }
+      if (fOn && wf > 1e-6) { setPulse(dtf, kW); DP[0] = dtf; DP[1] = -1; dTick(uf, false); o2 += wf * DP[2] }
+      if (sOn && ws > 1e-6) { setPulse(dts, kW); DP[0] = dts; DP[1] = ext; dTick(us, true); o2 += ws * DP[2] }
       if (mOn && wm > 1e-6) {
         // metal : the rectangular path is gated off, DCO-2 speaks through its ramp
-        gAQ = 0; gAN = 0; gAS = aS + aQ + aN
+        G[AQ] = 0; G[AN] = 0; G[AS] = aS + aQ + aN
         setPulse(dtm, kW)
-        o2 += wm * dTick(um, dtm, ext, false)
+        DP[0] = dtm; DP[1] = ext; dTick(um, false)
+        o2 += wm * DP[2]
       }
       g1 += g1i; g2 += g2i
       buf[i] = o1 * g1 + o2 * g2
@@ -448,25 +499,39 @@ class MsSt {
     this.xp = 0; this.Fp = 0
   }
 }
-function msWave(t, dt, wT, wS, wP, pw, pg) {
-  if (dt > 0.2) return sin1(t)
-  let y = 0
-  if (wT > 1e-6) y += wT * triBL(t, dt)
-  if (wS > 1e-6) y += wS * sawBL(t, dt)
+// One ms oscillator : MSW holds [phase, dt, wT, wS, wP, pw, pg, out, tri]
+// (a helper too big to inline : numbers through a typed array, never as
+// arguments). The triangle comes back too (the ring modulator's partner).
+const MSW = new Float64Array(9)
+function msOsc() {
+  const t = MSW[0], dt = MSW[1]
+  if (dt > 0.2) { const y = sin1(t); MSW[7] = y; MSW[8] = y; return }
+  const wT = MSW[2], wS = MSW[3], wP = MSW[4]
+  // the shared residuals : the edge at 0, the triangle's two corners
+  const r0 = pblep(t, dt)
+  let tri = t < 0.5 ? 4 * t - 1 : 3 - 4 * t
+  const D = 8 * dt
+  if (t < 2 * dt) tri += D * blamp4(t / dt)
+  else if (t > 1 - 2 * dt) tri += D * blamp4((t - 1) / dt)
+  const dm = t - 0.5
+  if (dm > -2 * dt && dm < 2 * dt) tri -= D * blamp4(dm / dt)
+  let y = wT * tri + wS * (2 * t - 1 - 2 * r0)
   if (wP > 1e-6) {
     // the pulse is high for its last pw of the cycle (in phase with the saw)
-    const p = Math.max(pw, 3 * dt)
-    let u = t < 1 - p ? -1 : 1
-    u -= 2 * pblep(t, dt)
-    let tp = t - (1 - p)
+    const pq = Math.max(MSW[5], 3 * dt)
+    let u = t < 1 - pq ? -1 : 1
+    u -= 2 * r0
+    let tp = t - (1 - pq)
     if (tp < 0) tp += 1
     u += 2 * pblep(tp, dt)
-    y += wP * pg * (u - (2 * p - 1))
+    y += wP * MSW[6] * (u - (2 * pq - 1))
   }
   const sm = (dt - 0.12) * 12.5
-  if (sm > 0) y += sm * (sin1(t) - y)
-  return y
+  if (sm > 0) { const sn = sin1(t); y += sm * (sn - y); tri += sm * (sn - tri) }
+  MSW[7] = y
+  MSW[8] = tri
 }
+const OpsiaSynthTest = { noNoise: false, noBite: false }
 const ms = {
   start(v, s, fresh) {
     const st = v.ms
@@ -497,13 +562,12 @@ const ms = {
     setR(R, 1, Math.min(0.4, v.dt * exp2(semis2 / 12)), snap)
     setR(R, 7, ring, snap)
     setR(R, 8, 0.55, snap)
-    // morph : noise + drive (Aphex's pre-gain law, then a makeup that keeps
-    // the level while the colour grows)
-    const nz = 0.55 * Math.pow(M, 1.6)
-    const dg = 0.9 + 8 * Math.pow(M, 1.3)
+    // morph : pink noise here, the drive in the voice's drive stage (the
+    // voice adds 0.8 M^1.2 to it while this engine plays)
+    const nz = OpsiaSynthTest.noNoise ? 0 : 0.55 * Math.pow(M, 1.6)
     setR(R, 9, nz, snap)
-    setR(R, 10, dg, snap)
-    setR(R, 11, (0.95 + 0.5 * M) / Math.sqrt(dg), snap)
+    setR(R, 10, 1, snap)
+    setR(R, 11, 1, snap)
   },
   run(v, s, buf, n) {
     const st = v.ms, R = st.R, pk = st.pk
@@ -516,9 +580,12 @@ const ms = {
     for (let i = 0; i < n; i++) {
       dt1 += dt1i; dt2 += dt2i; wT += wTi; wS += wSi; wP += wPi; pw += pwi; pg += pgi
       ring += ringi; g2 += g2i; nz += nzi; dg += dgi; mk += mki
-      const o1 = msWave(ph1, dt1, wT, wS, wP, pw, pg)
-      let o2 = msWave(ph2, dt2, wT, wS, wP, pw, pg)
-      if (ring > 1e-6) o2 += ring * (o1 * triBL(ph2, dt2) * 1.5 - o2)
+      MSW[2] = wT; MSW[3] = wS; MSW[4] = wP; MSW[5] = pw; MSW[6] = pg
+      MSW[0] = ph1; MSW[1] = dt1; msOsc()
+      const o1 = MSW[7]
+      MSW[0] = ph2; MSW[1] = dt2; msOsc()
+      let o2 = MSW[7]
+      if (ring > 1e-6) o2 += ring * (o1 * MSW[8] * 1.5 - o2)
       ph1 += dt1; if (ph1 >= 1) ph1 -= 1
       ph2 += dt2; if (ph2 >= 1) ph2 -= 1
       let x = o1 * 0.62 + o2 * g2
@@ -535,13 +602,7 @@ const ms = {
         pk[6] = wht * 0.115926
         x += pink * 0.11 * nz * 2.4
       }
-      // ADAA of the algebraic sigmoid u/sqrt(1+u²) (antiderivative sqrt(1+u²))
-      const u = x * dg
-      const F = Math.sqrt(1 + u * u)
-      const du = u - xp
-      const y = du > 1e-5 || du < -1e-5 ? (F - Fp) / du : (0.5 * (u + xp)) / Math.sqrt(1 + 0.25 * (u + xp) * (u + xp))
-      xp = u; Fp = F
-      buf[i] = y * mk
+      buf[i] = x * 0.8
     }
     st.ph1 = ph1; st.ph2 = ph2; st.xp = xp; st.Fp = Fp
     R[0] = dt1; R[2] = dt2; R[4] = wT; R[6] = wS; R[8] = wP; R[10] = pw; R[12] = pg
@@ -582,6 +643,50 @@ class SwarmSt {
 function swEnv(ph) {
   // a blip : 2 % attack, then an exponential fall to e^-5 at the cycle's end
   return ph < 0.02 ? ph * 50 : Math.exp(-5.1 * (ph - 0.02))
+}
+/** One swarm member for n samples, added into buf (its own function : the
+ *  shape helpers stay inlined, no number is boxed). */
+function swMember(st, k, buf, n) {
+  const R = st.R
+  const ph = st.ph, dtA = st.dt, am = st.am, ga = st.ga, ic1 = st.ic1, ic2 = st.ic2
+  let p = ph[k], dt = dtA[k], a = am[k], g = ga[k], z1 = ic1[k], z2 = ic2[k]
+  const dti = st.dti[k], ai = st.ami[k], gi = st.gai[k], kq = st.k[k], md = st.mode[k]
+  let w0 = R[0], w1 = R[2], w2 = R[4], w3 = R[6]
+  const w0i = R[1], w1i = R[3], w2i = R[5], w3i = R[7]
+  for (let i = 0; i < n; i++) {
+    dt += dti; a += ai; g += gi
+    w0 += w0i; w1 += w1i; w2 += w2i; w3 += w3i
+    let y
+    if (dt > 0.2) y = sin1(p)
+    else {
+      // sine, triangle, saw, square from one phase : two step residuals (the
+      // edges at 0 and 0.5) and the triangle's two corners
+      const r0 = pblep(p, dt)
+      let t5 = p - 0.5
+      if (t5 < 0) t5 += 1
+      const r5 = pblep(t5, dt)
+      let tri = p < 0.5 ? 4 * p - 1 : 3 - 4 * p
+      const D = 8 * dt
+      if (p < 2 * dt) tri += D * blamp4(p / dt)
+      else if (p > 1 - 2 * dt) tri += D * blamp4((p - 1) / dt)
+      const dm = p - 0.5
+      if (dm > -2 * dt && dm < 2 * dt) tri -= D * blamp4(dm / dt)
+      const sn = sin1(p)
+      y = w0 * sn + w1 * tri + w2 * (2 * p - 1 - 2 * r0) + w3 * ((p < 0.5 ? -1 : 1) - 2 * r0 + 2 * r5)
+      const sm = (dt - 0.12) * 12.5
+      if (sm > 0) y += sm * (sn - y)
+    }
+    p += dt; if (p >= 1) p -= 1
+    // the member's own SVF (TPT, Simper's form)
+    const a1 = 1 / (1 + g * (g + kq)), a2 = g * a1, a3 = g * a2
+    const v3 = y - z2, v1 = a1 * z1 + a2 * v3, v2 = z2 + a2 * z1 + a3 * v3
+    z1 = 2 * v1 - z1; z2 = 2 * v2 - z2
+    const f = md === 0 ? v2 : md === 1 ? kq * v1 * 1.4 : y - kq * v1 - v2
+    buf[i] += f * a
+  }
+  if (z1 < 1e-25 && z1 > -1e-25) z1 = 0
+  if (z2 < 1e-25 && z2 > -1e-25) z2 = 0
+  ph[k] = p; dtA[k] = dt; am[k] = a; ga[k] = g; ic1[k] = z1; ic2[k] = z2
 }
 const swarm = {
   start(v, s, fresh) {
@@ -653,33 +758,7 @@ const swarm = {
     for (let i = 0; i < n; i++) buf[i] = 0
     const w0s = R[0], w1s = R[2], w2s = R[4], w3s = R[6]
     const w0i = R[1], w1i = R[3], w2i = R[5], w3i = R[7]
-    for (let k = 0; k < st.nAct; k++) {
-      let p = ph[k], dt = dtA[k], a = am[k], g = ga[k], z1 = ic1[k], z2 = ic2[k]
-      const dti = dtI[k], ai = amI[k], gi = gaI[k], kq = kk[k], md = mode[k]
-      let w0 = w0s, w1 = w1s, w2 = w2s, w3 = w3s
-      for (let i = 0; i < n; i++) {
-        dt += dti; a += ai; g += gi
-        w0 += w0i; w1 += w1i; w2 += w2i; w3 += w3i
-        let y = 0
-        if (dt > 0.2) y = sin1(p)
-        else {
-          if (w0 > 1e-6) y += w0 * sin1(p)
-          if (w1 > 1e-6) y += w1 * triBL(p, dt)
-          if (w2 > 1e-6) y += w2 * sawBL(p, dt)
-          if (w3 > 1e-6) y += w3 * sqrBL(p, dt)
-          const sm = (dt - 0.12) * 12.5
-          if (sm > 0) y += sm * (sin1(p) - y)
-        }
-        p += dt; if (p >= 1) p -= 1
-        // the member's own SVF (TPT, Simper's form)
-        const a1 = 1 / (1 + g * (g + kq)), a2 = g * a1, a3 = g * a2
-        const v3 = y - z2, v1 = a1 * z1 + a2 * v3, v2 = z2 + a2 * z1 + a3 * v3
-        z1 = 2 * v1 - z1; z2 = 2 * v2 - z2
-        const f = md === 0 ? v2 : md === 1 ? kq * v1 * 1.4 : y - kq * v1 - v2
-        buf[i] += f * a
-      }
-      ph[k] = p; dtA[k] = dt; am[k] = a; ga[k] = g; ic1[k] = z1; ic2[k] = z2
-    }
+    for (let k = 0; k < st.nAct; k++) swMember(st, k, buf, n)
     let nr = R[8]
     const nri = R[9]
     for (let i = 0; i < n; i++) { nr += nri; buf[i] *= nr }
@@ -698,7 +777,8 @@ const swarm = {
 // timbre : brightness (the index)
 // harmonics : the ratio, in its listed steps; between two steps the two
 //   modulators crossfade (never a sweep through the dissonant ratios between)
-// morph : bite : self-feedback first, then the shaper
+// morph : bite : self-feedback first, then the shaper (the shaper runs in the
+//   voice's oversampled drive stage, ahead of the filter)
 // The index fades out as the modulator climbs past 7 kHz (Hank's raised
 // cosine, here to the real Nyquist), and is capped so the sidebands stay under
 // it (Carson's rule).
@@ -709,6 +789,10 @@ function fmRoll(hz, sr) {
   return 0.5 * (1 + Math.cos((Math.PI * (hz - 7000)) / (ny - 7000)))
 }
 function fmCap(f, r, sr) { return Math.max(0, (0.42 * sr - f) / Math.max(1, f * r) - 2) }
+// The self-feedback makes the modulator saw-like and unbounded in band : it is
+// rolled off as the modulator climbs (no change under ~500 Hz, a third left at
+// 2 kHz), so the top of the keyboard keeps its grit without the whistle.
+function fbRoll(hz) { const x = hz / 1500; return 1 / (1 + x * x) }
 const FM_RATIOS = [0.5, 1, 1.5, 2, 2.5, 3, 3.7, 4, 5, 5.4, 6, 7, 8, 9.2, 11, 14]
 class FmSt {
   constructor() {
@@ -717,6 +801,7 @@ class FmSt {
     this.R = new Float64Array(2 * 10)
     this.xp = 0; this.Fp = 0; this.dcx = 0; this.dcy = 0
     this.slotA = 0
+    this.bite = 0
   }
 }
 const fm = {
@@ -771,20 +856,17 @@ const fm = {
     setR(R, 3, w1, snap)
     setR(R, 4, I_0 / TAU, snap)
     setR(R, 5, I_1 / TAU, snap)
-    setR(R, 6, (fbk * fmRoll(f * rS0, sr)) / TAU, snap)
-    setR(R, 7, (fbk * fmRoll(f * rS1, sr)) / TAU, snap)
-    setR(R, 8, d, snap)
-    setR(R, 9, 1 / (1 + 0.6 * d), snap)
+    setR(R, 6, (fbk * fmRoll(f * rS0, sr) * fbRoll(f * rS0)) / TAU, snap)
+    setR(R, 7, (fbk * fmRoll(f * rS1, sr) * fbRoll(f * rS1)) / TAU, snap)
+    st.bite = d
   },
   run(v, s, buf, n) {
     const st = v.fm, R = st.R
     let pc = st.pc, pa = st.pa, pb = st.pb, fa = st.fa, fb = st.fb
-    let dtc = R[0], dta = R[2], dtb = R[4], w1 = R[6], ia = R[8], ib = R[10], fka = R[12], fkb = R[14], d = R[16], bn = R[18]
-    const dtci = R[1], dtai = R[3], dtbi = R[5], w1i = R[7], iai = R[9], ibi = R[11], fkai = R[13], fkbi = R[15], di = R[17], bni = R[19]
-    let xp = st.xp, Fp = st.Fp, dcx = st.dcx, dcy = st.dcy
-    const dcR = 1 - (TAU * 20) / s.sr
+    let dtc = R[0], dta = R[2], dtb = R[4], w1 = R[6], ia = R[8], ib = R[10], fka = R[12], fkb = R[14]
+    const dtci = R[1], dtai = R[3], dtbi = R[5], w1i = R[7], iai = R[9], ibi = R[11], fkai = R[13], fkbi = R[15]
     for (let i = 0; i < n; i++) {
-      dtc += dtci; dta += dtai; dtb += dtbi; w1 += w1i; ia += iai; ib += ibi; fka += fkai; fkb += fkbi; d += di; bn += bni
+      dtc += dtci; dta += dtai; dtb += dtbi; w1 += w1i; ia += iai; ib += ibi; fka += fkai; fkb += fkbi
       pc += dtc; if (pc >= 1) pc -= 1
       pa += dta; if (pa >= 1) pa -= 1
       pb += dtb; if (pb >= 1) pb -= 1
@@ -799,27 +881,10 @@ const fm = {
         fb = 0.5 * (fb + m)
         y += w1 * sin1(pc + ib * m)
       }
-      if (d > 1e-5) {
-        // the bite : an octave (2x² - 1, the exact frequency doubler, where
-        // Hank uses |x|) into an asymmetric soft clip, first-order ADAA
-        const o = 0.42 * d, g = 1 + 5 * d
-        const u = g * ((1 - o) * y + o * (2 * y * y - 1))
-        const q = Math.sqrt(1 + u * u) - 1
-        const F = u >= 0 ? q : 0.62 * q
-        const du = u - xp
-        let sh
-        if (du > 1e-5 || du < -1e-5) sh = (F - Fp) / du
-        else { const um = 0.5 * (u + xp); sh = (um / Math.sqrt(1 + um * um)) * (um < 0 ? 0.62 : 1) }
-        xp = u; Fp = F
-        const b = sh - dcx + dcR * dcy
-        dcx = sh; dcy = b
-        y += d * (b * bn * 1.6 - y)
-      }
       buf[i] = y
     }
     st.pc = pc; st.pa = pa; st.pb = pb; st.fa = fa; st.fb = fb
-    st.xp = xp; st.Fp = Fp; st.dcx = dcx; st.dcy = dcy
-    R[0] = dtc; R[2] = dta; R[4] = dtb; R[6] = w1; R[8] = ia; R[10] = ib; R[12] = fka; R[14] = fkb; R[16] = d; R[18] = bn
+    R[0] = dtc; R[2] = dta; R[4] = dtb; R[6] = w1; R[8] = ia; R[10] = ib; R[12] = fka; R[14] = fkb
   },
 }
 
@@ -931,20 +996,21 @@ const modal = {
     let bow = st.bow, blp = st.blp
     const bowi = st.bowi
     let excited = false
+    let exn = st.ex
+    const exL = st.exL, exA = st.exA, exH = st.exH
     for (let i = 0; i < n; i++) {
       let x = 0
-      if (st.ex < st.exL) {
-        const ph = st.ex / st.exL
-        x = st.exA * (0.5 - 0.5 * Math.cos(TAU * ph))
-        if (st.exH > 0) x += st.exH * st.exA * (rnd01(v) * 2 - 1) * 2
-        st.ex++
+      if (exn < exL) {
+        x = exA * (0.5 - 0.5 * Math.cos((TAU * exn) / exL))
+        if (exH > 0) x += exH * exA * (rnd01(v) * 2 - 1) * 2
+        exn++
       }
       bow += bowi
       if (bow > 1e-9) { blp += 0.5 * (rnd01(v) * 2 - 1 - blp); x += bow * blp * 2.4 }
       ex[i] = x
       if (x !== 0) excited = true
     }
-    st.bow = bow; st.blp = blp
+    st.bow = bow; st.blp = blp; st.ex = exn
     for (let i = 0; i < n; i++) buf[i] = 0
     for (let k = 0; k < N; k++) {
       let yr = re[k], yi = im[k], c = cr[k], d = ci[k], a = ak[k]
@@ -1065,6 +1131,7 @@ const voice = {
       buf[i] = y
     }
     st.ph = ph; st.lp = lp; st.lp2 = lp2
+    for (let j = 0; j < 5; j++) { if (z1[j] < 1e-25 && z1[j] > -1e-25) z1[j] = 0; if (z2[j] < 1e-25 && z2[j] > -1e-25) z2[j] = 0 }
     R[0] = dt; R[2] = ga; R[4] = av; R[6] = an
   },
 }
@@ -1220,6 +1287,8 @@ const pluck = {
     let w = st.w, lp = st.lp, a0 = ap[0], a1 = ap[1], a2 = ap[2], a3 = ap[3]
     let D = R[0], g = R[2], a = R[4], c = R[6]
     const Di = R[1], gi = R[3], ai = R[5], ci = R[7]
+    let exn = st.ex, exLp = st.exLp
+    const exL = st.exL, exSeed = st.exSeed, exTap = st.exTap, exC = st.exC, exA = st.exA
     for (let i = 0; i < n; i++) {
       D += Di; g += gi; a += ai; c += ci
       // Lagrange, 3rd order : taps at delays iD-1 .. iD+2, position t in [1, 2)
@@ -1235,17 +1304,18 @@ const pluck = {
       o = c * u + a2; a2 = u - c * o; u = o
       o = c * u + a3; a3 = u - c * o; u = o
       let x = u * g
-      if (st.ex < st.exL) {
-        const k = st.ex + st.exSeed
-        const raw = hashN(k) - hashN(k - st.exTap)
-        st.exLp += st.exC * (raw - st.exLp)
-        x += st.exLp * st.exA
-        st.ex++
+      if (exn < exL) {
+        const k = exn + exSeed
+        const raw = hashN(k) - hashN(k - exTap)
+        exLp += exC * (raw - exLp)
+        x += exLp * exA
+        exn++
       }
-      b[w] = x
+      b[w] = x < 1e-30 && x > -1e-30 ? 0 : x
       w = (w + 1) & mask
       buf[i] = y
     }
+    st.ex = exn; st.exLp = exLp
     if (st.damp > 0) st.damp = Math.max(0, st.damp - n)
     if (lp < 1e-18 && lp > -1e-18) lp = 0
     st.w = w; st.lp = lp; ap[0] = a0; ap[1] = a1; ap[2] = a2; ap[3] = a3
@@ -1284,7 +1354,15 @@ class FiltSt {
     this.hz1 = this.hz2 = this.hz3 = this.lz1 = this.lz2 = this.lz3 = 0
     this.ic1 = this.ic2 = 0
   }
+  /** Tiny states go to 0 (a long silence never reaches subnormals). */
+  flush() {
+    this.s0 = flz(this.s0); this.s1 = flz(this.s1); this.s2 = flz(this.s2); this.s3 = flz(this.s3)
+    this.hz1 = flz(this.hz1); this.hz2 = flz(this.hz2); this.hz3 = flz(this.hz3)
+    this.lz1 = flz(this.lz1); this.lz2 = flz(this.lz2); this.lz3 = flz(this.lz3)
+    this.ic1 = flz(this.ic1); this.ic2 = flz(this.ic2)
+  }
 }
+function flz(x) { return x < 1e-25 && x > -1e-25 ? 0 : x }
 function k35t(x) { const xs = x * 0.7, x2 = xs * xs; return ((xs * (27 + x2)) / (27 + 9 * x2)) / 0.7 }
 function filterCtl(type, f, v, s, snap) {
   const R = f.R, sr = s.sr
@@ -1320,6 +1398,8 @@ function filterCtl(type, f, v, s, snap) {
 function filterRun(type, f, v, buf, n) {
   const R = f.R
   const seed = f.seed
+  let kick = f.kick > 0 && seed > 0
+  if (seed > 0 || f.kick > 0) f.kick = 0
   if (type === 0) {
     let a = R[0], k = R[2], cp = R[4]
     const ai = R[1], ki = R[3], cpi = R[5]
@@ -1327,7 +1407,7 @@ function filterRun(type, f, v, buf, n) {
     for (let i = 0; i < n; i++) {
       a += ai; k += ki; cp += cpi
       let x = buf[i] * cp
-      if (seed > 0) { x += seed * (rnd01(v) * 2 - 1); if (f.kick > 0) { x += 0.012 * f.kick; f.kick = 0 } }
+      if (seed > 0) { x += seed * (rnd01(v) * 2 - 1); if (kick) { x += 0.012; kick = false } }
       const b = 1 - a, a2 = a * a, a4 = a2 * a2
       const S = b * (a2 * a * s0 + a2 * s1 + a * s2 + s3)
       const y4 = (a4 * x + S) / (1 + k * a4)
@@ -1347,7 +1427,7 @@ function filterRun(type, f, v, buf, n) {
     for (let i = 0; i < n; i++) {
       G += Gi; K += Ki; Gh += Ghi; Kh += Khi
       let x = buf[i]
-      if (seed > 0) { x += seed * (rnd01(v) * 2 - 1); if (f.kick > 0) { x += 0.012 * f.kick; f.kick = 0 } }
+      if (seed > 0) { x += seed * (rnd01(v) * 2 - 1); if (kick) { x += 0.012; kick = false } }
       // K35 HP (predictor-corrector, saturation in the feedback)
       let H = 1 - Gh
       let u = (x + Kh * H * (H * hz2 - hz3 - H * Gh * hz1)) / (1 - Kh * H * H * Gh)
@@ -1402,8 +1482,8 @@ class Voice {
   constructor(s, i) {
     this.s = s
     this.i = i
-    this.rng = (0x9e3779b9 * (i + 1)) ^ 0x2545f491 | 0
-    if (this.rng === 0) this.rng = 1
+    this.rs = new Int32Array(1)
+    this.rs[0] = ((0x9e3779b9 * (i + 1)) ^ 0x2545f491) | 0 || 1
     this.id = -1; this.gate = false; this.age = 0
     this.stage = 0; this.env = 0
     this.vel = 0.8; this.velG = 0.8
@@ -1424,9 +1504,14 @@ class Voice {
     this.dr0 = 0; this.dr1 = 0; this.dr2 = 0
     this.tolC = 0; this.tolC2 = 0; this.tolF = 0; this.noteC = 0
     // output
-    this.R = new Float64Array(2 * 6) // gL, gR, drive pre, bias/off, comp, wet
+    this.R = new Float64Array(2 * 7) // gL, gR, drive pre, bias, comp, wet, bite
+    this.bx = 0; this.bF = 0; this.bdx = 0; this.bdy = 0
     this.dcx = 0; this.dcy = 0
     this.dvx = 0; this.dvF = 0; this.dvLp = 0
+    this.osU = new Float64Array(16); this.osUp = 0
+    this.osD = new Float64Array(32); this.osDp = 0
+    this.osX = 0; this.osXi = 0; this.osHold = 0
+    this.drvAdd = 0
     // engines and filters
     this.dco = new DcoSt(); this.ms = new MsSt(); this.sw = new SwarmSt(); this.fm = new FmSt()
     this.mo = new ModalSt(); this.vo = new VoxSt(); this.fo = new FoldSt(); this.ks = new PluckSt(s.ksSize)
@@ -1479,7 +1564,8 @@ class OpsiaSynth {
     this.cpre = [this.bq(9690, 0.549), this.bq(10380, 1.29)]
     this.cpost = [[this.bq(9690, 0.549), this.bq(10380, 1.29)], [this.bq(9690, 0.549), this.bq(10380, 1.29)]]
     this.choLpC = 1 - Math.exp((-TAU * 7200) / sr)
-    this.grng = 0x1234567
+    this.grs = new Int32Array(1)
+    this.grs[0] = 0x1234567
     this.diag = { resets: 0 }
     // smoothing coefficients (per control tick)
     this.cfgC = 1 - Math.exp(-CTL / (0.015 * sr))
@@ -1600,6 +1686,8 @@ class OpsiaSynth {
       v.mT = v.tT; v.mH = v.tH; v.mM = v.tM; v.mC = v.tC; v.mR = v.tR; v.mD = v.tD
       v.mBend = v.tBend; v.mPan = v.tPan; v.mExp = 0; v.tExp = 0
       v.dcx = 0; v.dcy = 0; v.dvx = 0; v.dvF = 0; v.dvLp = 0
+      v.osU.fill(0); v.osD.fill(0); v.osX = 0; v.osXi = 0; v.osHold = 0
+      v.bx = 0; v.bF = 0; v.bdx = 0; v.bdy = 0
       for (const f of v.filts) f.reset()
     } else if (s.cs.glide <= 0) v.p = p
     v.pT = p; v.slide = false
@@ -1758,9 +1846,15 @@ class OpsiaSynth {
     if (this.engPrev >= 0) ENGINES[this.engPrev].ctl(v, s, snap)
     filterCtl(this.flt, v.filts[this.flt], v, s, snap)
     if (this.fltPrev >= 0) filterCtl(this.fltPrev, v.filts[this.fltPrev], v, s, snap)
-    // drive (schwung-quark's law)
-    const D = clamp(cs.drive + v.mD, 0, 1)
-    const pre = (1 + 24 * D * D) * 1.0
+    // drive (schwung-quark's law); the ms engine's morph drives into the
+    // filter through this same stage
+    const xw = this.engPrev >= 0 ? this.exf : 1
+    const add = (this.eng === 1 ? 0.8 * Math.pow(v.M, 1.2) * xw : 0) + (this.engPrev === 1 ? 0.8 * Math.pow(v.M, 1.2) * (1 - xw) : 0)
+    const D = clamp(cs.drive + v.mD + add, 0, 1)
+    // the top two octaves get a little less gain (a coupling capacitor's
+    // way), so the clipper's harmonics there stay under the oversampled band
+    const fx = (v.dt * sr) / 1700
+    const pre = 1 + (16 * D * D) / (1 + fx * fx)
     const bias = 0.15 * D
     const ref = 0.6
     const pk = sclip(ref * pre + bias) - sclip(bias)
@@ -1770,6 +1864,15 @@ class OpsiaSynth {
     setR(R, 3, bias, snap)
     setR(R, 4, comp, snap)
     setR(R, 5, Math.min(1, D * 6), snap)
+    // the oversampled path runs while any drive is asked, and a second after;
+    // it fades in and out over 10 ms (it is 15.5 samples late)
+    // the FM bite (schwung-hank's shaper) shares the stage
+    const bite = OpsiaSynthTest.noBite ? 0 : (this.eng === 3 ? v.fm.bite * xw : 0) + (this.engPrev === 3 ? v.fm.bite * (1 - xw) : 0)
+    setR(R, 6, bite, snap)
+    if (D > 0 || bite > 0) v.osHold = Math.ceil((1 * sr) / CTL)
+    else if (v.osHold > 0) v.osHold--
+    const osT = v.osHold > 0 ? 1 : 0
+    if (snap) { v.osX = osT; v.osXi = 0 } else v.osXi = osT > v.osX ? 1 / (0.01 * sr) : osT < v.osX ? -1 / (0.01 * sr) : 0
     // the VCA and the place
     let fade = 1
     if (v.stealing) { v.fade = Math.max(0, v.fade + v.fadeI); fade = v.fade }
@@ -1833,25 +1936,78 @@ class OpsiaSynth {
     const dcR = this.dcR
     for (let i = 0; i < n; i++) { const x = a[i]; const y = x - dcx + dcR * dcy; dcx = x; dcy = y; a[i] = y }
     v.dcx = dcx; v.dcy = dcy < 1e-20 && dcy > -1e-20 ? 0 : dcy
-    // drive (first-order ADAA cubic clip, schwung-quark)
+    // drive : first-order ADAA cubic clip (schwung-quark), run at 2x
     const R = v.R
     let pre = R[4], bias = R[6], comp = R[8], wet = R[10]
     const prei = R[5], biasi = R[7], compi = R[9], weti = R[11]
-    if (wet > 1e-6 || weti > 0) {
+    let osX = v.osX, bd = R[12]
+    const osXi = v.osXi, bdi = R[13]
+    if (osX > 0 || osXi > 0) {
       let xp = v.dvx, Fp = v.dvF, lp = v.dvLp
+      let bx = v.bx, bF = v.bF, bdx = v.bdx, bdy = v.bdy
+      const bR = this.biteR
       const lpc = this.drvLpC
+      const U = v.osU, Dn = v.osD
+      let up = v.osUp, dp = v.osDp
       for (let i = 0; i < n; i++) {
-        pre += prei; bias += biasi; comp += compi; wet += weti
-        const u = a[i] * pre + bias
-        const F = sclipF(u), dd = u - xp
-        const y = dd > 1e-3 || dd < -1e-3 ? (F - Fp) / dd : sclip(0.5 * (u + xp))
+        pre += prei; bias += biasi; comp += compi; wet += weti; bd += bdi
+        osX = clamp(osX + osXi, 0, 1)
+        const x = a[i]
+        U[up] = x
+        let ue = U[(up - 8) & 15]
+        let uo = 0
+        for (let k = 0; k < 16; k++) uo += HB[k] * U[(up - k) & 15]
+        uo *= 2
+        up = (up + 1) & 15
+        if (bd > 1e-5) {
+          // the bite : an octave (2x² - 1, the exact frequency doubler, where
+          // Hank uses |x|) into an asymmetric soft clip (rails 1 and 0.62),
+          // first-order ADAA, its DC removed, mixed in by its own amount
+          const o = 0.42 * bd, g = 1 + 5 * bd, bn = 1.6 / (1 + 0.6 * bd)
+          for (let h = 0; h < 2; h++) {
+            const sx = h === 0 ? ue : uo
+            const q0 = g * ((1 - o) * sx + o * (2 * sx * sx - 1))
+            const q = Math.sqrt(1 + q0 * q0) - 1
+            const F = q0 >= 0 ? q : 0.62 * q
+            const du = q0 - bx
+            let sh
+            if (du > 1e-5 || du < -1e-5) sh = (F - bF) / du
+            else { const um = 0.5 * (q0 + bx); sh = (um / Math.sqrt(1 + um * um)) * (um < 0 ? 0.62 : 1) }
+            bx = q0; bF = F
+            const bb = sh - bdx + bR * bdy
+            bdx = sh; bdy = bb
+            const yb = sx + bd * (bb * bn - sx)
+            if (h === 0) ue = yb; else uo = yb
+          }
+        }
+        const off = sclip(bias)
+        // the two samples at 2x
+        let u = ue * pre + bias
+        let F = sclipF(u), dd = u - xp
+        let y = dd > 1e-3 || dd < -1e-3 ? (F - Fp) / dd : sclip(0.5 * (u + xp))
         xp = u; Fp = F
-        lp += ((y - sclip(bias)) * comp - lp) * lpc
-        a[i] += (lp - a[i]) * wet
+        lp += ((y - off) * comp - lp) * lpc
+        Dn[dp] = ue + (lp - ue) * wet
+        dp = (dp + 1) & 31
+        u = uo * pre + bias
+        F = sclipF(u); dd = u - xp
+        y = dd > 1e-3 || dd < -1e-3 ? (F - Fp) / dd : sclip(0.5 * (u + xp))
+        xp = u; Fp = F
+        lp += ((y - off) * comp - lp) * lpc
+        Dn[dp] = uo + (lp - uo) * wet
+        // back down : the centre tap and the odd ones (the latest sample is dp)
+        let z = 0.5 * Dn[(dp - 15) & 31]
+        for (let k = 0; k < 16; k++) z += HB[k] * Dn[(dp - 2 * k) & 31]
+        dp = (dp + 1) & 31
+        a[i] = x + (z - x) * osX
       }
-      v.dvx = xp; v.dvF = Fp; v.dvLp = lp
-    } else { pre += prei * n; bias += biasi * n; comp += compi * n; wet += weti * n }
-    R[4] = pre; R[6] = bias; R[8] = comp; R[10] = wet
+      v.dvx = xp; v.dvF = Fp; v.dvLp = lp < 1e-20 && lp > -1e-20 ? 0 : lp
+      v.bx = bx; v.bF = bF; v.bdx = bdx; v.bdy = bdy < 1e-20 && bdy > -1e-20 ? 0 : bdy
+      v.osUp = up; v.osDp = dp
+      if (osX <= 0 && osXi <= 0) { U.fill(0); Dn.fill(0); v.dvx = 0; v.dvF = 0; v.dvLp = 0; v.bx = 0; v.bF = 0; v.bdx = 0; v.bdy = 0 }
+    } else { pre += prei * n; bias += biasi * n; comp += compi * n; wet += weti * n; bd += bdi * n }
+    v.osX = osX
+    R[4] = pre; R[6] = bias; R[8] = comp; R[10] = wet; R[12] = bd
     // the filter(s)
     if (this.fltPrev >= 0) {
       for (let i = 0; i < n; i++) b[i] = a[i]
@@ -1889,6 +2045,7 @@ class OpsiaSynth {
       v.R[0] = v.R[1] = v.R[2] = v.R[3] = 0
     }
     // safety net : a filter state gone bad is reset (counted : tests assert 0)
+    for (const g of v.filts) g.flush()
     const f = v.filts[this.flt]
     if (!(Math.abs(f.s3) < 1e3 && Math.abs(f.lz2) < 1e3 && Math.abs(f.ic2) < 1e3)) { f.reset(); this.diag.resets++ }
   }
@@ -1904,7 +2061,8 @@ class OpsiaSynth {
   renderBlock(outL, outR, off, n) {
     if (!this.dcR) {
       this.dcR = 1 - (TAU * 8) / this.sr
-      this.drvLpC = 1 - Math.exp((-TAU * 12000) / this.sr)
+      this.drvLpC = 1 - Math.exp((-TAU * 12000) / (2 * this.sr))
+      this.biteR = 1 - (TAU * 20) / (2 * this.sr)
     }
     const bl = this.busL, br = this.busR
     for (let i = 0; i < n; i++) { bl[i] = 0; br[i] = 0 }
@@ -1937,12 +2095,16 @@ class OpsiaSynth {
     const rateT = cmode === 2 ? 0.83 : 0.41, cT = cmode === 2 ? 45000 : 50500, devT = cmode === 2 ? 30000 : 26600
     const wetT = cmode === 0 ? 0 : 1
     const csm = 1 - Math.exp(-1 / (0.05 * sr))
+    // the line is always written (as the hardware's : switching on reads a
+    // line that already holds the sound, never a step out of silence); the
+    // taps and their post-filters run while the chorus is heard
     const choOn = wetT > 0 || this.cwet > 1e-5
-    if (choOn && this.cwet <= 1e-5 && wetT > 0) { this.choBuf.fill(0); this.choLp = 0 }
+    if (choOn && this.cwet <= 1e-5) for (const c of this.cpost) for (const q of c) { q.z1 = 0; q.z2 = 0 }
     const lvlT = cs.level * OUT_GAIN
     let hg = this.hpG || hgT, hpL = this.hpL, hpR = this.hpR, lvl = this.lvl, cw = this.cwet
     let rate = this.choRate, cc = this.choC, dev = this.choDev, ph = this.choPh
-    const cb = this.choBuf, cmask = this.choN - 1
+    const cb = this.choBuf, cmask = this.choN - 1, grs = this.grs, choN = this.choN, choLpC = this.choLpC
+    let choLp = this.choLp, choW = this.choW
     const p0 = this.cpre[0], p1 = this.cpre[1], q00 = this.cpost[0][0], q01 = this.cpost[0][1], q10 = this.cpost[1][0], q11 = this.cpost[1][1]
     for (let i = 0; i < n; i++) {
       hg += (hgT - hg) * sm
@@ -1950,39 +2112,43 @@ class OpsiaSynth {
       let L = bl[i], R = br[i]
       hpL += hg * (L - hpL); L -= hpL
       hpR += hg * (R - hpR); R -= hpR
+      const mono = 0.5 * (L + R)
+      let x = bqRun(p0, mono); x = bqRun(p1, x)
+      choLp += choLpC * (x - choLp)
+      let gr = grs[0]
+      gr ^= gr << 13; gr ^= gr >>> 17; gr ^= gr << 5
+      grs[0] = gr
+      cb[choW] = 2 * ftanh(0.5 * choLp) + 0.00008 * (gr * 4.656612873077393e-10)
+      rate += (rateT - rate) * csm; cc += (cT - cc) * csm; dev += (devT - dev) * csm
+      ph += rate / sr
+      if (ph >= 1) ph -= 1
       if (choOn) {
         cw += (wetT - cw) * csm
-        rate += (rateT - rate) * csm; cc += (cT - cc) * csm; dev += (devT - dev) * csm
-        const mono = 0.5 * (L + R)
-        let x = bqRun(p0, mono); x = bqRun(p1, x)
-        this.choLp += this.choLpC * (x - this.choLp)
-        this.grng ^= this.grng << 13; this.grng ^= this.grng >>> 17; this.grng ^= this.grng << 5
-        cb[this.choW] = 2 * ftanh(0.5 * this.choLp) + 0.00008 * (this.grng * 4.656612873077393e-10)
-        ph += rate / sr
-        if (ph >= 1) ph -= 1
         const tri = 2 * Math.abs(2 * ph - 1) - 1
         // channel 2's clock runs ~15 % slower (the once-per-sweep swell)
         const f1 = cc + dev * tri, f2 = (cc - dev * tri) * 0.85
         const d1 = (sr * 128) / f1, d2 = (sr * 128) / f2
-        let r1 = this.choW - d1; if (r1 < 0) r1 += this.choN
-        let r2 = this.choW - d2; if (r2 < 0) r2 += this.choN
+        let r1 = choW - d1; if (r1 < 0) r1 += choN
+        let r2 = choW - d2; if (r2 < 0) r2 += choN
         const i1 = r1 | 0, i2 = r2 | 0, fr1 = r1 - i1, fr2 = r2 - i2
         const t1 = cb[i1] + (cb[(i1 + 1) & cmask] - cb[i1]) * fr1
         const t2 = cb[i2] + (cb[(i2 + 1) & cmask] - cb[i2]) * fr2
         const w1 = bqRun(q01, bqRun(q00, t1)), w2 = bqRun(q11, bqRun(q10, t2))
-        this.choW = (this.choW + 1) & cmask
         // dry 0.6 + wet 0.723 at full (the jx-move output mixer)
         L = L * (1 - 0.4 * cw) + w1 * 0.723 * cw
         R = R * (1 - 0.4 * cw) + w2 * 0.723 * cw
       }
+      choW = (choW + 1) & cmask
       L *= lvl; R *= lvl
-      outL[off + i] += softlim(L)
-      outR[off + i] += softlim(R)
+      // nothing under 1e-30 leaves (a float32 subnormal costs whoever reads it)
+      outL[off + i] += L < 1e-30 && L > -1e-30 ? 0 : softlim(L)
+      outR[off + i] += R < 1e-30 && R > -1e-30 ? 0 : softlim(R)
     }
     if (Math.abs(hpL) < 1e-20) hpL = 0
     if (Math.abs(hpR) < 1e-20) hpR = 0
     this.hpG = hg; this.hpL = hpL; this.hpR = hpR; this.lvl = lvl; this.cwet = cw
     this.choRate = rate; this.choC = cc; this.choDev = dev; this.choPh = ph
+    this.choLp = Math.abs(choLp) < 1e-20 ? 0 : choLp; this.choW = choW
   }
 }
 const OUT_GAIN = 1.0
@@ -2001,5 +2167,7 @@ function softlim(x) {
 }
 
 OpsiaSynth.ENGINES = ENGINE_IDS
+// test hooks for tools/synth-render.cjs (never used by the app)
+OpsiaSynth.test = OpsiaSynthTest
 globalThis.OpsiaSynth = OpsiaSynth
 })()

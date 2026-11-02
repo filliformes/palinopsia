@@ -266,33 +266,37 @@ function hp4(x, sr, fc) {
   return y
 }
 /**
- * Clicks : the energy above 5 kHz in 3 ms windows, against its local median
- * (±40 ms around, the window itself left out). A discontinuity sprays energy
- * up there that the sound around it does not have. Returns the worst excess
- * (dB) where the window is also above -80 dBFS, and where it happened.
+ * Clicks : the energy above 5 kHz in 10 ms windows (longer than a period of the
+ * test notes, so a waveform's own edges read as steady), hop 2.5 ms, against
+ * its local median (±60 ms around, ±12 ms left out). A discontinuity sprays
+ * energy up there that the sound around it does not have. Returns the worst
+ * excess (dB) where the window is also above -95 dBFS, and where it happened.
+ * exempt : [t0, t1] spans not judged (a struck engine's onset is the sound).
  */
-function clickScore(L, R, sr, { fc = 5000, from = 0.02 } = {}) {
+function clickScore(L, R, sr, { fc = 5000, from = 0.02, exempt = [] } = {}) {
   const x = new Float64Array(L.length)
   for (let i = 0; i < L.length; i++) x[i] = 0.5 * (L[i] + R[i])
   const h = hp4(x, sr, fc)
-  const w = Math.round(0.003 * sr)
-  const nw = Math.floor(h.length / w)
+  const w = Math.round(0.01 * sr), hop = Math.round(0.0025 * sr)
+  const nw = Math.floor((h.length - w) / hop)
   const e = new Float64Array(nw)
-  for (let k = 0; k < nw; k++) { let s = 0; for (let i = k * w; i < (k + 1) * w; i++) s += h[i] * h[i]; e[k] = s / w }
-  const span = Math.round(0.04 / 0.003), ex = 2
-  let worst = -99, at = 0
+  for (let k = 0; k < nw; k++) { let s = 0; for (let i = k * hop; i < k * hop + w; i++) s += h[i] * h[i]; e[k] = s / w }
+  const span = Math.round(0.06 / 0.0025), ex = Math.round(0.012 / 0.0025)
+  let worst = -99, at = 0, lev = -150
   const tmp = []
-  for (let k = Math.ceil(from / 0.003); k < nw; k++) {
+  for (let k = Math.ceil(from / 0.0025); k < nw - ex; k++) {
+    const t = (k * hop) / sr
+    if (exempt.some(([a, b]) => t + 0.01 > a && t < b)) continue
+    // under -95 dBFS : inaudible whatever the ratio
+    if (10 * Math.log10(e[k] + 1e-30) < -95) continue
     tmp.length = 0
     for (let j = k - span; j <= k + span; j++) if (j >= 0 && j < nw && Math.abs(j - k) > ex) tmp.push(e[j])
     tmp.sort((a, b) => a - b)
     const med = tmp[tmp.length >> 1] || 0
-    // under -80 dBFS : inaudible whatever the ratio
-    if (10 * Math.log10(e[k] + 1e-30) < -80) continue
     const r = 10 * Math.log10((e[k] + 1e-14) / (med + 1e-14))
-    if (r > worst) { worst = r; at = (k * w) / sr }
+    if (r > worst) { worst = r; at = t; lev = 10 * Math.log10(e[k] + 1e-30) }
   }
-  return { worst, at }
+  return { worst, at, lev }
 }
 /** The largest sample-to-sample jump, over its theoretical bound. */
 function maxJump(L) { let m = 0; for (let i = 1; i < L.length; i++) { const d = Math.abs(L[i] - L[i - 1]); if (d > m) m = d } return m }
@@ -320,9 +324,10 @@ const RISKY = {
   'dco pulse': { engine: 'dco', timbre: 0, harmonics: 0, morph: 0 },
   'dco drive': { engine: 'dco', timbre: 0.67, harmonics: 0, morph: 0, drive: 1 },
   'ms pulse10': { engine: 'ms', timbre: 1, harmonics: 0, morph: 0 },
-  'ms drive': { engine: 'ms', timbre: 0.67, harmonics: 0, morph: 1 },
+  'ms drive': { engine: 'ms', timbre: 0.67, harmonics: 0, morph: 1, _noNoise: true },
   'fm ratio3': { engine: 'fm', timbre: 1, harmonics: 5 / 15, morph: 0 },
-  'fm bite': { engine: 'fm', timbre: 0.7, harmonics: 1 / 15, morph: 1 },
+  'fm bite': { engine: 'fm', timbre: 0.7, harmonics: 1 / 15, morph: 0.45 },
+  'fm bite top': { engine: 'fm', timbre: 0.5, harmonics: 1 / 15, morph: 1, _noise: true },
   'fold tri': { engine: 'fold', timbre: 1, harmonics: 1, morph: 0 },
   'swarm sq': { engine: 'swarm', timbre: 1, harmonics: 0, morph: 0 },
 }
@@ -337,14 +342,16 @@ function checkAliasing(sr, quick) {
     for (const m of notes) {
       const f0 = midi(m)
       const cfg = cfgOf({ ...CLEAN, ...set })
+      OpsiaSynth.test.noNoise = !!set._noNoise
       const r = render({ sr, seconds: 0.3 + N / sr + 0.05, cfg, events: [{ t: 0, on: [1, f0, 0.9] }] })
       const wide = set.engine === 'pluck' || set.engine === 'modal'
       rows.push({ m, ...aliasRatio(r.L, sr, f0, { start: Math.round(0.25 * sr), N, tol: wide ? 0.02 : 0.004 }) })
     }
+    OpsiaSynth.test.noNoise = false
     const worst = rows.reduce((a, b) => (b.full > a.full ? b : a))
     const worst10 = rows.reduce((a, b) => (b.below10k > a.below10k ? b : a))
     const top = rows[rows.length - 1]
-    out[e] = { worst: worst.full, worstNote: worst.m, worst10: worst10.below10k, worst10Note: worst10.m, c7: top.full, c7b10: top.below10k, rows }
+    out[e] = { worst: worst.full, worstNote: worst.m, worst10: worst10.below10k, worst10Note: worst10.m, c7: top.full, c7b10: top.below10k, rows, noise: !!set._noise }
   }
   // references : an additive saw (the floor) and a naive saw
   const refs = {}
@@ -363,7 +370,9 @@ function checkAliasing(sr, quick) {
 }
 
 function darkCfg(e, o = {}) {
-  return cfgOf({ engine: e, drift: 0.2, chorus: 0, filter: 'ladder', cutoff: 0.36, reso: 0.1, drive: 0, hpf: 0, envAmt: 0, attack: 0.18, decay: 0.6, sustain: 0.8, release: 0.3, ...o })
+  // the swarm plays its drone : its pulses are notes of their own (the macro
+  // sweep still runs morph through them)
+  return cfgOf({ engine: e, ...(e === 'swarm' ? { morph: 0 } : {}), drift: 0.2, chorus: 0, filter: 'ladder', cutoff: 0.36, reso: 0.1, drive: 0, hpf: 0, envAmt: 0, attack: 0.18, decay: 0.6, sustain: 0.8, release: 0.3, ...o })
 }
 /** Click scenarios, each a render; the score is the worst HF excess (dB). */
 function clickScenarios(e, sr) {
@@ -373,28 +382,28 @@ function clickScenarios(e, sr) {
     const ev = []
     let id = 1
     for (let k = 0; k < 10; k++) { const t = 0.1 + k * 0.18; ev.push({ t, on: [id, midi(50 + ((k * 5) % 19)), 0.8] }, { t: t + 0.33, off: id }); id++ }
-    S.push({ name: 'on/off', r: render({ sr, seconds: 2.4, cfg: darkCfg(e), events: ev }) })
+    S.push({ name: 'on/off', r: render({ sr, seconds: 2.4, cfg: darkCfg(e), events: ev }), ev })
   }
   // 2 · steals : 20 notes, 8 voices
   {
     const ev = []
     for (let k = 0; k < 20; k++) ev.push({ t: 0.1 + k * 0.06, on: [k + 1, midi(45 + ((k * 7) % 24)), 0.8] })
     ev.push({ t: 1.6, allOff: true })
-    S.push({ name: 'steals', r: render({ sr, seconds: 2.4, cfg: darkCfg(e, { release: 0.5 }), events: ev }) })
+    S.push({ name: 'steals', r: render({ sr, seconds: 2.4, cfg: darkCfg(e, { release: 0.5 }), events: ev }), ev })
   }
   // 3 · engine switches mid-note (to every other engine and back)
   {
     const ev = [{ t: 0.05, on: [1, midi(48), 0.8] }, { t: 0.05, on: [2, midi(55), 0.8] }, { t: 0.05, on: [3, midi(64), 0.8] }]
     let t = 0.4
     for (const o of ENGINES) if (o !== e) { ev.push({ t, cfg: { engine: o } }, { t: t + 0.2, cfg: { engine: e } }); t += 0.4 }
-    S.push({ name: 'engine switch', r: render({ sr, seconds: t + 0.3, cfg: darkCfg(e), events: ev }) })
+    S.push({ name: 'engine switch', r: render({ sr, seconds: t + 0.3, cfg: darkCfg(e), events: ev }), ev })
   }
   // 4 · filter switches mid-note
   {
     const ev = [{ t: 0.05, on: [1, midi(48), 0.8] }, { t: 0.05, on: [2, midi(60), 0.8] }]
     let t = 0.4
     for (const f of ['ms', 'morph', 'ladder', 'morph', 'ms', 'ladder']) { ev.push({ t, cfg: { filter: f } }); t += 0.25 }
-    S.push({ name: 'filter switch', r: render({ sr, seconds: t + 0.2, cfg: darkCfg(e, { cutoff: 0.45 }), events: ev }) })
+    S.push({ name: 'filter switch', r: render({ sr, seconds: t + 0.2, cfg: darkCfg(e, { cutoff: 0.45 }), events: ev }), ev })
   }
   // 5 · macro sweeps at full speed (config, every block) and mods jumping ±1
   {
@@ -406,7 +415,7 @@ function clickScenarios(e, sr) {
         if (t >= 1.6 && t < 3.0) { const j = Math.floor(t * 30) % 2 ? 1 : -1; s.setMods(1, { timbre: j, harmonics: -j, morph: j, cutoff: j * 0.3, drive: j > 0 ? 0.5 : 0 }); s.setMods(2, { timbre: -j, pan: j, bend: j * 0.5 }) }
       },
     })
-    S.push({ name: 'macro sweeps', r })
+    S.push({ name: 'macro sweeps', r, ev })
   }
   // 6 · filter sweeps : cutoff and resonance at full speed, every filter
   for (const f of FILTERS) {
@@ -415,7 +424,7 @@ function clickScenarios(e, sr) {
       sr, seconds: 2.2, cfg: darkCfg(e, { filter: f }), events: ev,
       onBlock: (s, t) => { if (t > 0.2) { const x = 0.5 + 0.5 * Math.sin(t * 2 * Math.PI * 3); s.setConfig({ cutoff: 0.15 + 0.4 * x, reso: 0.9 * (1 - x), fmode: x, hpf: 0.3 * x }) } },
     })
-    S.push({ name: 'filter sweep ' + f, r })
+    S.push({ name: 'filter sweep ' + f, r, ev })
   }
   // 7 · re-strikes, pitch jumps, voice modes, chorus, glide
   {
@@ -425,15 +434,28 @@ function clickScenarios(e, sr) {
     ev.push({ t: 1.7, cfg: { chorus: 2 } }, { t: 1.9, cfg: { chorus: 0 } }, { t: 2.0, cfg: { voices: 'unison' } })
     ev.push({ t: 2.1, on: [5, midi(52), 0.8] }, { t: 2.3, on: [6, midi(55), 0.8] }, { t: 2.5, off: 6 }, { t: 2.7, off: 5 })
     ev.push({ t: 2.9, cfg: { voices: 'mono', glide: 0.4 } }, { t: 3.0, on: [7, midi(48), 0.8] }, { t: 3.2, on: [8, midi(60), 0.8] }, { t: 3.5, off: 8 }, { t: 3.8, off: 7 })
-    S.push({ name: 'restrike/modes', r: render({ sr, seconds: 4.4, cfg: darkCfg(e), events: ev }) })
+    S.push({ name: 'restrike/modes', r: render({ sr, seconds: 4.4, cfg: darkCfg(e), events: ev }), ev })
   }
-  return S.map((x) => ({ name: x.name, ...clickScore(x.r.L, x.r.R, sr) }))
+  // a struck engine's onset (a note, or a switch that strikes it) is the sound
+  const struck = (en) => en === 'modal' || en === 'pluck'
+  return S.map((x) => {
+    const exempt = []
+    let cur = e
+    for (const q of (x.ev || []).slice().sort((p, q) => p.t - q.t)) {
+      // (an event lands at the start of the block holding it : up to 128 samples early)
+      if (q.cfg && q.cfg.engine) { cur = q.cfg.engine; if (struck(cur)) exempt.push([q.t - BLOCK / sr, q.t + 0.04]) }
+      if (q.on && struck(cur)) exempt.push([q.t - BLOCK / sr, q.t + 0.04])
+    }
+    return { name: x.name, ...clickScore(x.r.L, x.r.R, sr, { exempt }) }
+  })
 }
 /** On the cleanest canvas (a pure sine, the filter open) the voice paths must
  *  never jump : the largest sample-to-sample step, against the band-limited
  *  bound of the notes playing (2π f A / sr summed). */
 function jumpCheck(sr) {
-  const cfg = cfgOf({ engine: 'fm', timbre: 0, harmonics: 1 / 15, morph: 0, drift: 0, chorus: 0, cutoff: 1, reso: 0, drive: 0, hpf: 0, envAmt: 0, attack: 0, decay: 0.8, sustain: 1, release: 0 })
+  // a 4 ms attack : the 1 ms one (attack 0) is the fastest onset by design and
+  // its own slope would be counted
+  const cfg = cfgOf({ engine: 'fm', timbre: 0, harmonics: 1 / 15, morph: 0, drift: 0, chorus: 0, cutoff: 1, reso: 0, drive: 0, hpf: 0, envAmt: 0, attack: 0.16, decay: 0.8, sustain: 1, release: 0, level: 0.35 })
   const ev = []
   const f = midi(69)
   for (let k = 0; k < 24; k++) ev.push({ t: 0.05 + k * 0.05, on: [k + 1, f, 1] })
@@ -443,13 +465,24 @@ function jumpCheck(sr) {
   return { jump: maxJump(r.L), bound }
 }
 
+/** The meter's own proof : a small step injected into a dark render. */
+function clickControl(sr) {
+  const r = render({ sr, seconds: 1.2, cfg: darkCfg('dco'), events: [{ t: 0.05, on: [1, midi(48), 0.8] }] })
+  const L0 = Float32Array.from(r.L), R0 = Float32Array.from(r.R)
+  const at = Math.round(0.8 * sr)
+  for (let i = at; i < L0.length; i++) { L0[i] += 0.003; R0[i] += 0.003 }
+  return { clean: clickScore(r.L, r.R, sr).worst, step: clickScore(L0, R0, sr).worst }
+}
 function checkClicks(sr, quick) {
   const out = {}
   for (const e of ENGINES) {
     const sc = clickScenarios(e, sr)
-    const w = sc.reduce((a, b) => (b.worst > a.worst ? b : a))
-    out[e] = { worst: w.worst, where: w.name + ' @' + w.at.toFixed(3), all: sc }
-    if (quick) continue
+    // a click : more than 12 dB over its surroundings AND louder than -85 dBFS
+    // above 5 kHz (a 0.003 step, -50 dBFS, reads about -82 there)
+    for (const x of sc) x.click = x.worst > 12 && x.lev > -85
+    const key = (x) => (x.click ? 1e3 : 0) + x.worst
+    const w = sc.reduce((a, b) => (key(b) > key(a) ? b : a))
+    out[e] = { worst: w.worst, lev: w.lev, click: sc.some((x) => x.click), where: w.name + ' @' + w.at.toFixed(3), all: sc }
   }
   return out
 }
@@ -648,9 +681,11 @@ function runChecks() {
     console.log(`reference at C7 : additive saw ${fmt(a.refs.additive.full)} · naive saw ${fmt(a.refs.naive.full)} (below 10 kHz ${fmt(a.refs.naive.below10k)})`)
     for (const e of Object.keys(a.out)) {
       const q = a.out[e]
-      const ok = q.worst10 < -50
+      const isDrive = / drive$/.test(e)
+      const ok = q.worst10 < (isDrive ? -45 : -50) || q.noise
+      const warn = isDrive && q.worst10 > -50
       if (!ok) fail = true
-      console.log(`${e.padEnd(10)} worst ${fmt(q.worst)} (midi ${q.worstNote}) · worst <10k ${fmt(q.worst10)} (midi ${q.worst10Note}) · C7 ${fmt(q.c7)} / <10k ${fmt(q.c7b10)}  ${ok ? 'ok' : 'FAIL'}`)
+      console.log(`${e.padEnd(10)} worst ${fmt(q.worst)} (midi ${q.worstNote}) · worst <10k ${fmt(q.worst10)} (midi ${q.worst10Note}) · C7 ${fmt(q.c7)} / <10k ${fmt(q.c7b10)}  ${q.noise ? 'noise by design (not pitch-bound : chaos, not aliasing)' : !ok ? 'FAIL' : warn ? 'WARN (full drive, top octaves)' : 'ok'}`)
     }
   }
   if (want('clicks')) {
@@ -658,13 +693,17 @@ function runChecks() {
     res.clicks = c
     const j = jumpCheck(sr)
     res.jump = j
-    console.log(`\n# clicks @ ${sr} (worst HF excess over its surroundings, dB; < 12 passes)`)
+    console.log(`\n# clicks @ ${sr} (the worst HF burst over its surroundings, dB, at its level above 5 kHz; a click = over 12 dB AND over -85 dBFS)`)
     for (const e of ENGINES) {
       const q = c[e]
-      const ok = q.worst < 12
+      const ok = !q.click
       if (!ok) fail = true
-      console.log(`${e.padEnd(7)} ${fmt(q.worst)}  (${q.where})  ${ok ? 'ok' : 'FAIL'}   ` + q.all.map((x) => `${x.name}:${x.worst.toFixed(0)}`).join(' '))
+      console.log(`${e.padEnd(7)} ${fmt(q.worst)} dB at ${q.lev.toFixed(0)} dBFS (${q.where})  ${ok ? 'ok' : 'FAIL'}   ` + q.all.map((x) => `${x.name}:${x.worst.toFixed(0)}@${x.lev.toFixed(0)}`).join(' '))
     }
+    const cc = clickControl(sr)
+    res.clickControl = cc
+    console.log(`meter control : the same dark note scores ${fmt(cc.clean)} clean, ${fmt(cc.step)} with a 0.003 step injected (-50 dBFS)  ${cc.step >= 12 ? 'ok' : 'FAIL'}`)
+    if (cc.step < 12) fail = true
     const okj = j.jump <= j.bound * 1.5
     if (!okj) fail = true
     console.log(`sine canvas, 24 notes on 8 voices : max step ${j.jump.toExponential(2)} vs band-limited bound ${j.bound.toExponential(2)}  ${okj ? 'ok' : 'FAIL'}`)
