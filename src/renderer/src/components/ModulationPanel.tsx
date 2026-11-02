@@ -4,7 +4,7 @@
 // painted by ONE rAF loop writing DOM styles directly from modEngine.values :
 // modulation never re-renders React at 60 Hz.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, VisionFeature } from '@shared/types'
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DIVISIONS, modEngine } from '../engine/modulation'
@@ -24,7 +24,8 @@ import { partOf } from '../modKey'
 import { PART_WORD } from '../engine/colorParts'
 import { useShallow } from 'zustand/react/shallow'
 import type { ClipAudioSrc } from '@shared/types'
-import { BoundedNumberInput } from './BoundedNumberInput'
+import { BarCell, DropBar, FloatBar, fmtBar, logScale, SegBar, type BarScale } from './Bar'
+import { fracFor } from './AutoControls'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { usePin } from './Pin'
 import { modPin, PIN_WORDS } from '../persist'
@@ -196,7 +197,8 @@ function ModCard({ index }: { index: number }): JSX.Element {
       className={`flex h-40 min-w-0 flex-col gap-1 rounded border p-1.5 transition-colors ${
         m.enabled ? 'border-accent/60 bg-panel2' : 'border-border bg-panel2/40'
       }`}
-      style={pin.pinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)' } : undefined}
+      // its bars are 18 px (the Inspector's 22 would not fit four rows under a clock)
+      style={{ '--bar-h': '18px', ...(pin.pinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)' } : {}) } as CSSProperties}
       onContextMenu={pin.onContextMenu}
     >
       {pin.menu}
@@ -265,82 +267,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
       {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'body' && m.type !== 'homeostat' && (
-        <div className="flex min-w-0 shrink-0 items-center gap-1">
-          <button
-            onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
-            className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-              m.sync === 'bpm' ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
-            }`}
-            title="Clock: free Hz or BPM-synced division"
-          >
-            {m.sync === 'bpm' ? 'BPM' : 'HZ'}
-          </button>
-          {m.sync === 'bpm' ? (
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={m.divisionIdx}
-              onChange={(e) => update(index, { divisionIdx: Number(e.target.value) })}
-              title="Note division : the modulator's rate as a fraction of the beat (locked to BPM)."
-            >
-              {DIVISIONS.map((d, i) => (
-                <option key={d.label} value={i}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <input
-                type="range"
-                min={-2}
-                max={1.699}
-                step={0.01}
-                value={Math.log10(Math.max(0.01, m.rateHz))}
-                onChange={(e) => update(index, { rateHz: Math.pow(10, Number(e.target.value)) })}
-                className="min-w-0 flex-1 accent-accent"
-                title={`Rate: ${m.rateHz.toFixed(2)} Hz (log)`}
-              />
-              <BoundedNumberInput
-                value={m.rateHz}
-                min={0.01}
-                max={50}
-                maxFrac={2}
-                onChange={(v) => update(index, { rateHz: v })}
-                className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-              />
-            </>
-          )}
-          {/* Slew's target-pick mode rides the rate line to save a row. */}
-          {m.type === 'slew' && (
-            <button
-              onClick={() => update(index, { slew: { ...m.slew, randomTarget: !m.slew.randomTarget } })}
-              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-                m.slew.randomTarget
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : 'bg-panel3/60 text-muted'
-              }`}
-              title="Random target : slew toward a fresh random value each step (vs. alternating)"
-            >
-              RND
-            </button>
-          )}
-          {/* S&H's smooth flag rides the rate line too, for the same reason. */}
-          {m.type === 'sh' && (
-            <button
-              onClick={() => update(index, { sh: { ...m.sh, smooth: !m.sh.smooth } })}
-              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-                m.sh.smooth
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : 'bg-panel3/60 text-muted'
-              }`}
-              title="Smooth : glide between held samples instead of stepping"
-            >
-              SMTH
-            </button>
-          )}
-          {/* Steps' FILL rides the rate line too : the card's one performance button. */}
-          {m.type === 'steps' && <FillButton index={index} />}
-        </div>
+        <ClockBar index={index} />
       )}
 
       {/* type-specific params (output shaping lives on the Macro knobs, not
@@ -353,164 +280,279 @@ function ModCard({ index }: { index: number }): JSX.Element {
   )
 }
 
+// The clock row : one bar, its HZ / BPM cell at the left, the rate (a log track
+// over 0.01 … 50 Hz) or the note division, and the type's own switch at the
+// right end (Slew's RND, S&H's SMTH, Steps' FILL : each rides the rate line to
+// save a row).
+const RATE_SCALE = logScale(0.01, 50)
+const DIVISION_ITEMS = DIVISIONS.map((d, i) => ({ v: i, label: d.label }))
+
+function ClockBar({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+  const bpm = m.sync === 'bpm'
+  const sync = (
+    <BarCell
+      side="l"
+      tone={bpm ? 'on' : 'off'}
+      onClick={() => update(index, { sync: bpm ? 'free' : 'bpm' })}
+      title="Clock: free Hz or BPM-synced division"
+    >
+      {bpm ? 'BPM' : 'HZ'}
+    </BarCell>
+  )
+  const end =
+    m.type === 'slew' ? (
+      <BarCell
+        tone={m.slew.randomTarget ? 'on' : 'off'}
+        onClick={() => update(index, { slew: { ...m.slew, randomTarget: !m.slew.randomTarget } })}
+        title="Random target : slew toward a fresh random value each step (vs. alternating)"
+      >
+        RND
+      </BarCell>
+    ) : m.type === 'sh' ? (
+      <BarCell
+        tone={m.sh.smooth ? 'on' : 'off'}
+        onClick={() => update(index, { sh: { ...m.sh, smooth: !m.sh.smooth } })}
+        title="Smooth : glide between held samples instead of stepping"
+      >
+        SMTH
+      </BarCell>
+    ) : m.type === 'steps' ? (
+      <FillButton index={index} />
+    ) : undefined
+  return bpm ? (
+    <PickBar
+      label="RATE"
+      title="Note division : the modulator's rate as a fraction of the beat (locked to BPM)."
+      items={DIVISION_ITEMS}
+      value={m.divisionIdx}
+      onChange={(i) => update(index, { divisionIdx: i })}
+      lead={sync}
+      chip={end}
+    />
+  ) : (
+    <ParamBar
+      label="RATE"
+      title={`Rate : ${m.rateHz.toFixed(2)} Hz (log track)`}
+      value={m.rateHz}
+      min={0.01}
+      max={50}
+      def={0.2}
+      frac={2}
+      scale={RATE_SCALE}
+      onChange={(v) => update(index, { rateHz: v })}
+      lead={sync}
+      chip={end}
+    />
+  )
+}
+
+// ── the card's bars ───────────────────────────────────────────────────
+// A number : its name and value inside (click the number to type, double-click
+// resets to the factory value, Shift drags finer), as in the Inspector. The card's
+// params are no modulation targets : no M chip.
+function howTo(def: string): string {
+  return `drag (Shift : finer), double-click resets (${def}), click the number to type`
+}
+
+function ParamBar({
+  label, title, value, min, max, def, integer, frac, scale, format, unit, lead, chip, onChange, className
+}: {
+  label: string; title?: string; value: number; min: number; max: number; def: number
+  integer?: boolean; frac?: number
+  // a log track for wide ms / Hz ranges : the number stays linear
+  scale?: BarScale
+  format?: (v: number) => string
+  unit?: string | ((v: number) => string)
+  lead?: ReactNode; chip?: ReactNode
+  onChange: (v: number) => void
+  className?: string
+}): JSX.Element {
+  const fr = frac ?? (integer ? 0 : fracFor(max - min))
+  const u = typeof unit === 'function' ? unit(def) : unit
+  const d = (format ? format(def) : fmtBar(def, !!integer, fr)) + (u ? ` ${u}` : '')
+  return (
+    <FloatBar
+      label={label}
+      title={[title, howTo(d)].filter(Boolean).join(' · ')}
+      value={value}
+      min={min}
+      max={max}
+      def={def}
+      integer={integer}
+      frac={fr}
+      scale={scale}
+      format={format}
+      unit={unit}
+      lead={lead}
+      chip={chip}
+      onChange={(v) => onChange(integer ? Math.round(v) : v)}
+      className={className}
+    />
+  )
+}
+
+// A menu : the choice on the right and ▾, the usual list (type to jump).
+type PickItem<T> = { v: T; label: string; group?: string; title?: string }
+function PickBar<T>({
+  label, title, items, value, onChange, lead, chip
+}: {
+  label: string; title?: string; items: Array<PickItem<T>>; value: T
+  onChange: (v: T) => void; lead?: ReactNode; chip?: ReactNode
+}): JSX.Element {
+  const at = Math.max(0, items.findIndex((x) => x.v === value))
+  return (
+    <DropBar
+      label={label}
+      title={title}
+      options={items.map((x, j) => ({ value: j, label: x.label, group: x.group, title: x.title }))}
+      value={at}
+      onChange={(j) => {
+        const it = items[j]
+        if (it) onChange(it.v)
+      }}
+      lead={lead}
+      chip={chip}
+    />
+  )
+}
+const each = <T extends string | number>(xs: readonly T[]): Array<PickItem<T>> => xs.map((x) => ({ v: x, label: String(x) }))
+
+const SLIP_BAR = (value: number, onChange: (v: number) => void): JSX.Element => (
+  <ParamBar label="SLIP" value={value} min={0} max={1} def={0} title={SLIP_HELP} onChange={onChange} />
+)
+
+// ADSR durations are STORED in ms and shown in SECONDS (five digits of ms
+// clip; seconds is the envelope's readable unit) : two decimals under 10 s,
+// one from 10 s ("12.5"), trailing zeros off; the tooltip keeps the exact ms.
+const secs = (s: number): string => String(parseFloat(s.toFixed(s >= 10 ? 1 : 2)))
+
+function EnvBar({
+  label, name, ms, max, def, onChange
+}: {
+  label: string; name: string; ms: number; max: number; def: number; onChange: (ms: number) => void
+}): JSX.Element {
+  return (
+    <ParamBar
+      label={label}
+      title={`${name} : ${(ms / 1000).toFixed(3)} s (${Math.round(ms)} ms)`}
+      value={ms / 1000}
+      min={0}
+      max={max / 1000}
+      def={def / 1000}
+      frac={2}
+      format={secs}
+      unit="s"
+      onChange={(v) => onChange(Math.round(v * 1000))}
+    />
+  )
+}
+
+// Spastic's HOLD : 0 (the far left) = off, it stays up until the next throw;
+// else a log track over 5 ms … 10 s.
+const HOLD_MIN = 5
+const HOLD_MAX = 10000
+const HOLD_SCALE: BarScale = {
+  to: (ms) => (ms <= 0 ? 0 : Math.max(0.001, Math.min(1, Math.log(Math.max(HOLD_MIN, ms) / HOLD_MIN) / Math.log(HOLD_MAX / HOLD_MIN)))),
+  from: (p) => (p <= 0 ? 0 : Math.round(HOLD_MIN * Math.pow(HOLD_MAX / HOLD_MIN, p)))
+}
+const HOLD_HELP =
+  'HOLD : how long each throw stays up before it drops straight back to the bottom, in ' +
+  'milliseconds. The rate then only sets WHEN it may rise (once in a while, as the coin ' +
+  'decides); the time up is this. 0 (far left) = off : it stays up until the next throw.'
+
 function TypeParams({ index }: { index: number }): JSX.Element | null {
   const m = useStore((s) => s.composition.modulators[index])
   const update = useStore((s) => s.updateModulator)
+  const slip = (): JSX.Element => SLIP_BAR(m.slip ?? 0, (v) => update(index, { slip: v }))
 
   switch (m.type) {
     case 'lfo':
       return (
         <>
-          <Row label="SHAPE">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={m.shape}
-              title="LFO waveform : the shape of the repeating wave."
-              onChange={(e) => update(index, { shape: e.target.value as LfoShape })}
-            >
-              {LFO_SHAPES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </Row>
-          {(m.shape === 'rndStep' || m.shape === 'rndSmooth') && (
-            <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-              title={SLIP_HELP}
-              onChange={(v) => update(index, { slip: v })} />
+          <PickBar label="SHAPE" title="LFO waveform : the shape of the repeating wave." items={each(LFO_SHAPES)} value={m.shape}
+            onChange={(v) => update(index, { shape: v })} />
+          {(m.shape === 'rndStep' || m.shape === 'rndSmooth') && slip()}
+          {m.shape === 'spastic' && (
+            <SegBar
+              label="THROW"
+              title="What Spastic throws each cycle : binary snaps between the two extremes; float lands anywhere in between."
+              options={[{ value: 0, label: 'binary' }, { value: 1, label: 'float' }]}
+              value={m.spasticMode === 'float' ? 1 : 0}
+              onChange={(v) => update(index, { spasticMode: v ? 'float' : 'binary' })}
+            />
           )}
           {m.shape === 'spastic' && (
-            <Row label="THROW">
-              <select
-                className="input select-compact min-w-0 flex-1 text-[10px]"
-                value={m.spasticMode ?? 'binary'}
-                title="What Spastic throws each cycle : binary snaps between the two extremes; float lands anywhere in between."
-                onChange={(e) =>
-                  update(index, { spasticMode: e.target.value as 'binary' | 'float' })
-                }
-              >
-                <option value="binary">binary</option>
-                <option value="float">float</option>
-              </select>
-            </Row>
+            <ParamBar label="HOLD" title={HOLD_HELP} value={Math.max(0, m.spasticHold ?? 0)} min={0} max={HOLD_MAX} def={0} integer
+              scale={HOLD_SCALE} format={(ms) => (ms <= 0 ? 'off' : String(Math.round(ms)))} unit={(ms) => (ms > 0 ? 'ms' : '')}
+              onChange={(v) => update(index, { spasticHold: v })} />
           )}
-          {m.shape === 'spastic' && <SpasticHoldRow index={index} />}
         </>
       )
     case 'ramp':
       return (
         <>
-          <SliderRow label="MS" value={m.ramp.rampMs} min={50} max={120000} log integer
+          <ParamBar label="TIME" value={m.ramp.rampMs} min={50} max={120000} def={4000} integer unit="ms" scale={logScale(50, 120000)}
             title="Ramp time : how long the sweep takes, in milliseconds (log track)."
-
             onChange={(v) => update(index, { ramp: { ...m.ramp, rampMs: v } })} />
-          <SliderRow label="CURVE%" value={m.ramp.curvePct} min={-100} max={100} step={1} integer
+          <ParamBar label="CURVE" value={m.ramp.curvePct} min={-100} max={100} def={0} integer unit="%"
             title="Ramp shape : negative eases in, positive eases out, 0 is linear."
-
             onChange={(v) => update(index, { ramp: { ...m.ramp, curvePct: v } })} />
-          <Row label="MODE">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={m.ramp.mode}
-              title="Ramp direction : normal (rise once), inverted (fall once), or loop (repeat)."
-              onChange={(e) =>
-                update(index, { ramp: { ...m.ramp, mode: e.target.value as 'normal' | 'inverted' | 'loop' } })
-              }
-            >
-              <option value="loop">loop</option>
-              <option value="normal">one-shot</option>
-              <option value="inverted">inverted</option>
-            </select>
-          </Row>
+          <PickBar
+            label="MODE"
+            title="Ramp direction : normal (rise once), inverted (fall once), or loop (repeat)."
+            items={[{ v: 'loop', label: 'loop' }, { v: 'normal', label: 'one-shot' }, { v: 'inverted', label: 'inverted' }]}
+            value={m.ramp.mode}
+            onChange={(v) => update(index, { ramp: { ...m.ramp, mode: v as 'normal' | 'inverted' | 'loop' } })}
+          />
         </>
       )
     case 'adsr':
-      // a/d/s/r are little duration sliders (2×2); SUS level + LOOP share a row.
+      // the four durations one per row (an envelope has no clock row), then the
+      // sustain LEVEL with LOOP at its end
       return (
         <>
-          {/* Tighter than the card's own gap-1 : four rows plus SUS have to
-              live inside the fixed h-36 silhouette. */}
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <MiniSlider label="A" name="Attack time" value={m.adsr.attackMs} min={0} max={30000}
-              onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
-            <MiniSlider label="D" name="Decay time" value={m.adsr.decayMs} min={0} max={30000}
-              onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
-            <MiniSlider label="S" name="Sustain time" value={m.adsr.sustainMs} min={0} max={60000}
-              onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
-            <MiniSlider label="R" name="Release time" value={m.adsr.releaseMs} min={0} max={30000}
-              onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
-          </div>
-          <div className="flex min-w-0 items-center gap-1" title="Sustain level : the height the envelope holds at, not a duration.">
-            <span
-              className="w-10 shrink-0 cursor-help font-mono text-[9px] text-muted underline decoration-dotted underline-offset-2"
-              title="Sustain level : the height the envelope holds at, not a duration."
-            >
-              SUS
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={m.adsr.sustainLevel}
-              onChange={(e) => update(index, { adsr: { ...m.adsr, sustainLevel: Number(e.target.value) } })}
-              className="min-w-0 flex-1 accent-accent"
-              title={'Sustain level : the height the envelope holds at, not a duration.'}
-            />
-            <BoundedNumberInput
-              value={Math.round(m.adsr.sustainLevel * 100) / 100}
-              min={0}
-              max={1}
-              onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })}
-              className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-            />
-            <button
-              onClick={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })}
-              className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-                m.adsr.loop
-                  ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                  : 'bg-panel3/60 text-muted'
-              }`}
-              title="Loop the envelope"
-            >
-              LOOP
-            </button>
-          </div>
+          <EnvBar label="ATTACK" name="Attack time" ms={m.adsr.attackMs} max={30000} def={500}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, attackMs: v } })} />
+          <EnvBar label="DECAY" name="Decay time" ms={m.adsr.decayMs} max={30000} def={1000}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, decayMs: v } })} />
+          <EnvBar label="SUSTAIN" name="Sustain time (how long it holds at the level)" ms={m.adsr.sustainMs} max={60000} def={2000}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, sustainMs: v } })} />
+          <EnvBar label="RELEASE" name="Release time" ms={m.adsr.releaseMs} max={30000} def={1000}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, releaseMs: v } })} />
+          <ParamBar
+            label="LEVEL"
+            title="Sustain level : the height the envelope holds at, not a duration."
+            value={m.adsr.sustainLevel}
+            min={0}
+            max={1}
+            def={0.7}
+            onChange={(v) => update(index, { adsr: { ...m.adsr, sustainLevel: v } })}
+            chip={
+              <BarCell tone={m.adsr.loop ? 'on' : 'off'} onClick={() => update(index, { adsr: { ...m.adsr, loop: !m.adsr.loop } })} title="Loop the envelope">
+                LOOP
+              </BarCell>
+            }
+          />
         </>
       )
     case 'arp':
       return (
         <>
-          <SliderRow label="STEPS" value={m.arp.steps} min={2} max={16} step={1} integer
+          <ParamBar label="STEPS" value={m.arp.steps} min={2} max={16} def={8} integer
             title="How many evenly spaced levels the register walks."
-            onChange={(v) => update(index, { arp: { ...m.arp, steps: Math.round(v) } })} />
-          <Row label="MODE">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={m.arp.mode}
-              title="Step order : how the arpeggiator walks its steps (up / down / up-down / random / drunk)."
-              onChange={(e) => update(index, { arp: { ...m.arp, mode: e.target.value as ArpMode } })}
-            >
-              {ARP_MODES.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </Row>
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
+            onChange={(v) => update(index, { arp: { ...m.arp, steps: v } })} />
+          <PickBar label="MODE" title="Step order : how the arpeggiator walks its steps (up / down / up-down / random / drunk)."
+            items={each(ARP_MODES)} value={m.arp.mode} onChange={(v) => update(index, { arp: { ...m.arp, mode: v } })} />
+          {slip()}
         </>
       )
     case 'random':
       return (
         <>
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
-          <SliderRow label="DIST" value={m.random.distribution} min={0} max={1}
+          {slip()}
+          <ParamBar label="DIST" value={m.random.distribution} min={0} max={1} def={0.5}
             title="Distribution : 0.5 uniform · >0.5 center-hug · <0.5 edge-weight"
             onChange={(v) => update(index, { random: { distribution: v } })} />
         </>
@@ -519,10 +561,10 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       // SMTH lives on the rate line (see the clock row) : only PROB/DIST here.
       return (
         <>
-          <SliderRow label="PROB" value={m.sh.probability} min={0} max={1}
+          <ParamBar label="PROB" value={m.sh.probability} min={0} max={1} def={1}
             title="Chance a clock draws a fresh sample : below 1 locks patterns"
             onChange={(v) => update(index, { sh: { ...m.sh, probability: v } })} />
-          <SliderRow label="DIST" value={m.sh.distribution} min={0} max={1}
+          <ParamBar label="DIST" value={m.sh.distribution} min={0} max={1} def={0.5}
             title="Distribution : 0.5 = uniform random · <0.5 favors the extremes · >0.5 hugs the center"
             onChange={(v) => update(index, { sh: { ...m.sh, distribution: v } })} />
         </>
@@ -531,83 +573,59 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       // RND lives on the rate line (see the clock row) : only RISE/FALL here.
       return (
         <>
-          <SliderRow label="RISE" value={m.slew.riseMs} min={1} max={10000} log integer
+          <ParamBar label="RISE" value={m.slew.riseMs} min={1} max={10000} def={200} integer unit="ms" scale={SLEW_SCALE}
             title="Rise time : how long it takes to climb to a new target (log track)."
-
             onChange={(v) => update(index, { slew: { ...m.slew, riseMs: v } })} />
-          <SliderRow label="FALL" value={m.slew.fallMs} min={1} max={10000} log integer
+          <ParamBar label="FALL" value={m.slew.fallMs} min={1} max={10000} def={400} integer unit="ms" scale={SLEW_SCALE}
             title="Fall time : how long it takes to drop to a new target (log track)."
-
             onChange={(v) => update(index, { slew: { ...m.slew, fallMs: v } })} />
         </>
       )
     case 'chaos':
       return (
         <>
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
-          <SliderRow label="R" value={m.chaos.r} min={3.4} max={4} step={0.005}
+          {slip()}
+          <ParamBar label="R" value={m.chaos.r} min={3.4} max={4} def={3.8} frac={3}
             title="Logistic-map r : toward 4 = wilder"
             onChange={(v) => update(index, { chaos: { r: v } })} />
         </>
       )
     case 'euclid':
       return (
-        // Tighter than the card's own gap-1 (as ADSR) : four rows under the
-        // BPM division select overflowed the fixed card by 1 px.
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <SliderRow label="STEPS" value={m.euclid.steps} min={2} max={32} step={1} integer
+        <>
+          <ParamBar label="STEPS" value={m.euclid.steps} min={2} max={32} def={16} integer
             title="Euclidean : total steps the pattern spans."
-            onChange={(v) => update(index, { euclid: { ...m.euclid, steps: Math.round(v), pulses: Math.min(m.euclid.pulses, Math.round(v)) } })} />
-          <SliderRow label="PULSES" value={m.euclid.pulses} min={0} max={m.euclid.steps} step={1} integer
+            onChange={(v) => update(index, { euclid: { ...m.euclid, steps: v, pulses: Math.min(m.euclid.pulses, v) } })} />
+          <ParamBar label="PULSES" value={m.euclid.pulses} min={0} max={m.euclid.steps} def={Math.min(5, m.euclid.steps)} integer
             title="How many onsets, spread as evenly as possible across the steps (a gate on each)."
-            onChange={(v) => update(index, { euclid: { ...m.euclid, pulses: Math.round(v) } })} />
-          <SliderRow label="DECAY" value={m.euclid.decay ?? 0.35} min={0} max={1}
+            onChange={(v) => update(index, { euclid: { ...m.euclid, pulses: v } })} />
+          <ParamBar label="DECAY" value={m.euclid.decay ?? 0.35} min={0} max={1} def={0.35}
             title="Release each pulse fades over : 0 = a hard on/off gate · up = a soft pluck/swell that rides between beats."
             onChange={(v) => update(index, { euclid: { ...m.euclid, decay: v } })} />
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
-        </div>
+          {slip()}
+        </>
       )
     case 'turing':
       return (
         <>
-          <SliderRow label="LENGTH" value={m.turing.length} min={2} max={16} step={1} integer
+          <ParamBar label="LENGTH" value={m.turing.length} min={2} max={16} def={8} integer
             title="Shift-register length : how many steps before the sequence loops."
-            onChange={(v) => update(index, { turing: { ...m.turing, length: Math.round(v) } })} />
-          <SliderRow label="MUTATE" value={m.turing.mutate} min={0} max={1}
+            onChange={(v) => update(index, { turing: { ...m.turing, length: v } })} />
+          <ParamBar label="MUTATE" value={m.turing.mutate} min={0} max={1} def={0.15}
             title="Chance a step rewrites the loop : 0 = locked forever · 1 = never repeats."
             onChange={(v) => update(index, { turing: { ...m.turing, mutate: v } })} />
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
+          {slip()}
         </>
       )
     case 'cellular':
       return (
         <>
-          <Row label="RULE">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={m.cellular.rule}
-              title="Wolfram rule : 30 chaotic · 90 fractal (Sierpiński) · 110 complex · 150 additive."
-              onChange={(e) => update(index, { cellular: { ...m.cellular, rule: Number(e.target.value) } })}
-            >
-              {CELL_RULES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </Row>
-          <SliderRow label="CELLS" value={m.cellular.cells} min={8} max={48} step={1} integer
+          <PickBar label="RULE" title="Wolfram rule : 30 chaotic · 90 fractal (Sierpiński) · 110 complex · 150 additive."
+            items={each(CELL_RULES)} value={m.cellular.rule} onChange={(v) => update(index, { cellular: { ...m.cellular, rule: v } })} />
+          <ParamBar label="CELLS" value={m.cellular.cells} min={8} max={48} def={24} integer
             title="Automaton width : the output is the fraction of live cells."
-            onChange={(v) => update(index, { cellular: { ...m.cellular, cells: Math.round(v) } })} />
-          <SliderRow label="SLIP" value={m.slip ?? 0} min={0} max={1}
-            title={SLIP_HELP}
-            onChange={(v) => update(index, { slip: v })} />
+            onChange={(v) => update(index, { cellular: { ...m.cellular, cells: v } })} />
+          {slip()}
         </>
       )
     case 'steps':
@@ -616,25 +634,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const a = m.audio ?? { feature: 'level' as AudioFeature, band: 0, smooth: 0.2 }
       return (
         <>
-          <Row label="FEAT">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={a.feature}
-              title="Which audio feature this modulator follows (level, flux, transient, centroid, band, pitch)."
-              onChange={(e) => update(index, { audio: { ...a, feature: e.target.value as AudioFeature } })}
-            >
-              {AUDIO_FEATURES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </Row>
+          <PickBar label="FEAT" title="Which audio feature this modulator follows (level, flux, transient, centroid, band, pitch)."
+            items={each(AUDIO_FEATURES)} value={a.feature} onChange={(v) => update(index, { audio: { ...a, feature: v } })} />
           {a.feature === 'band' && (
-            <NumRow label="BAND" value={a.band + 1} min={1} max={AUDIO_BANDS} integer
-              onChange={(v) => update(index, { audio: { ...a, band: Math.round(v) - 1 } })} />
+            <ParamBar label="BAND" value={a.band + 1} min={1} max={AUDIO_BANDS} def={1} integer
+              title="Which band of the analyser it follows, low to high."
+              onChange={(v) => update(index, { audio: { ...a, band: v - 1 } })} />
           )}
-          <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
+          <ParamBar label="SMOOTH" value={a.smooth} min={0} max={0.99} def={0.2}
             title="One-pole smoothing : 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
           <ClipFromRow value={a.src} onChange={(src) => update(index, { audio: { ...a, src } })} />
@@ -645,21 +652,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const vc = m.vision ?? { feature: 'brightness' as VisionFeature, smooth: 0.3 }
       return (
         <>
-          <Row label="READ">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={vc.feature}
-              title="Which picture feature this modulator follows : the composited image played back as control (brightness, contrast, motion, edge-density, entropy, bright-mass X/Y, warmth). The return path : the picture drives parameters, and streams to Pandore over /opsia/vision/*."
-              onChange={(e) => update(index, { vision: { ...vc, feature: e.target.value as VisionFeature } })}
-            >
-              {VISION_FEATURES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </Row>
-          <SliderRow label="SMOOTH" value={vc.smooth} min={0} max={0.99}
+          <PickBar
+            label="READ"
+            title="Which picture feature this modulator follows : the composited image played back as control (brightness, contrast, motion, edge-density, entropy, bright-mass X/Y, warmth). The return path : the picture drives parameters, and streams to Pandore over /opsia/vision/*."
+            items={each(VISION_FEATURES)}
+            value={vc.feature}
+            onChange={(v) => update(index, { vision: { ...vc, feature: v as VisionFeature } })}
+          />
+          <ParamBar label="SMOOTH" value={vc.smooth} min={0} max={0.99} def={0.3}
             title="One-pole smoothing of the picture feature : 0 snaps, →1 glides"
             onChange={(v) => update(index, { vision: { ...vc, smooth: v } })} />
         </>
@@ -669,25 +669,14 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const bc = m.body ?? { feature: 'handRightHeight' as BodyFeature, smooth: 0.3 }
       return (
         <>
-          <div className="flex min-w-0 items-center gap-1">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={bc.feature}
-              title="Which body feature this modulator follows : the live camera of the performer (hand height / side / openness, a hand's shape : finger curls, pinches, roll, facing, span; hands apart, whole-body motion, lean, arm span, stance, hands-up, the face, the silhouette zones, the motion field). Turn embodied control on and pick a camera on the Body page (B)."
-              onChange={(e) => update(index, { body: { ...bc, feature: e.target.value as BodyFeature } })}
-            >
-              {BODY_FEATURE_GROUPS.map((g) => (
-                <optgroup key={g.title} label={g.title}>
-                  {g.keys.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-          <SliderRow label="SMOOTH" value={bc.smooth} min={0} max={0.99}
+          <PickBar
+            label="FEAT"
+            title="Which body feature this modulator follows : the live camera of the performer (hand height / side / openness, a hand's shape : finger curls, pinches, roll, facing, span; hands apart, whole-body motion, lean, arm span, stance, hands-up, the face, the silhouette zones, the motion field). Turn embodied control on and pick a camera on the Body page (B)."
+            items={BODY_ITEMS}
+            value={bc.feature}
+            onChange={(v) => update(index, { body: { ...bc, feature: v } })}
+          />
+          <ParamBar label="SMOOTH" value={bc.smooth} min={0} max={0.99} def={0.3}
             title="One-pole smoothing of the body feature : 0 snaps, →1 glides"
             onChange={(v) => update(index, { body: { ...bc, smooth: v } })} />
         </>
@@ -697,27 +686,20 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const h = m.homeostat ?? { feature: 'edges' as VisionFeature, setpoint: 0.5, gain: 0.4, adapt: 0.3 }
       return (
         <>
-          <Row label="WATCH">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={h.feature}
-              title="Which picture feature the controller regulates : it watches this and pushes the bound param to hold it steady. edges/motion/contrast ≈ energy. A negative-feedback loop → parks the rig at edge-of-chaos. It regulates around a self-adapting baseline, so features that sit high or low still give full range."
-              onChange={(e) => update(index, { homeostat: { ...h, feature: e.target.value as VisionFeature } })}
-            >
-              {VISION_FEATURES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-          </Row>
-          <SliderRow label="SET" value={h.setpoint} min={0} max={1}
+          <PickBar
+            label="WATCH"
+            title="Which picture feature the controller regulates : it watches this and pushes the bound param to hold it steady. edges/motion/contrast ≈ energy. A negative-feedback loop → parks the rig at edge-of-chaos. It regulates around a self-adapting baseline, so features that sit high or low still give full range."
+            items={each(VISION_FEATURES)}
+            value={h.feature}
+            onChange={(v) => update(index, { homeostat: { ...h, feature: v as VisionFeature } })}
+          />
+          <ParamBar label="SET" value={h.setpoint} min={0} max={1} def={0.5}
             title="Setpoint, relative to the baseline : 0.5 = hold the feature where it's been; above/below biases it higher/lower. Bind in REPLACE mode; the depth's sign sets which way it pushes (flip it if the loop runs to a rail)."
             onChange={(v) => update(index, { homeostat: { ...h, setpoint: v } })} />
-          <SliderRow label="GAIN" value={h.gain} min={0} max={1}
+          <ParamBar label="GAIN" value={h.gain} min={0} max={1} def={0.4}
             title="Grip : how tightly it holds the feature. One knob for both sensitivity (how much a small swing fills the range) and drive strength. Turn UP when the feature barely moves (e.g. edges stays near the top); too high hunts/oscillates."
             onChange={(v) => update(index, { homeostat: { ...h, gain: v } })} />
-          <SliderRow label="ADAPT" value={h.adapt} min={0} max={1}
+          <ParamBar label="ADAPT" value={h.adapt} min={0} max={1} def={0.3}
             title="How fast the baseline re-centers : LOW holds a fixed level (absolute-ish); HIGH only fights quick swings and lets slow drift through. Raise it if the loop keeps pinning a rail."
             onChange={(v) => update(index, { homeostat: { ...h, adapt: v } })} />
         </>
@@ -726,7 +708,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'organic': {
       const o = m.organic ?? { variation: 0.5 }
       return (
-        <SliderRow label="VARY" value={o.variation} min={0} max={1}
+        <ParamBar label="VARY" value={o.variation} min={0} max={1} def={0.5}
           title="Irregularity : 0 near-periodic · →1 wanders (never repeats)"
           onChange={(v) => update(index, { organic: { variation: v } })} />
       )
@@ -735,21 +717,9 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
       const p = m.physics ?? { motion: 'bounce' as PhysicsMotion, damping: 0.5 }
       return (
         <>
-          <Row label="MOTION">
-            <select
-              className="input select-compact min-w-0 flex-1 text-[10px]"
-              value={p.motion}
-              title="Physics model : bounce (a ball), spring (damped oscillation), or riser (accelerating ramp)."
-              onChange={(e) => update(index, { physics: { ...p, motion: e.target.value as PhysicsMotion } })}
-            >
-              {PHYSICS_MOTIONS.map((mo) => (
-                <option key={mo} value={mo}>
-                  {mo}
-                </option>
-              ))}
-            </select>
-          </Row>
-          <SliderRow label="DAMP" value={p.damping} min={0} max={1}
+          <PickBar label="MOTION" title="Physics model : bounce (a ball), spring (damped oscillation), or riser (accelerating ramp)."
+            items={each(PHYSICS_MOTIONS)} value={p.motion} onChange={(v) => update(index, { physics: { ...p, motion: v } })} />
+          <ParamBar label="DAMP" value={p.damping} min={0} max={1} def={0.5}
             title="Damping : bounce restitution / spring settle"
             onChange={(v) => update(index, { physics: { ...p, damping: v } })} />
         </>
@@ -758,26 +728,18 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
     case 'motion': {
       const mt = m.motion ?? { shape: 'oscillation' as MotionShape }
       return (
-        <Row label="SHAPE">
-          <select
-            className="input select-compact min-w-0 flex-1 text-[10px]"
-            value={mt.shape}
-            onChange={(e) => update(index, { motion: { shape: e.target.value as MotionShape } })}
-            title="Named motion archetype / force behavior : a characteristic trajectory"
-          >
-            {MOTION_SHAPES.map((sh) => (
-              <option key={sh} value={sh}>
-                {sh}
-              </option>
-            ))}
-          </select>
-        </Row>
+        <PickBar label="SHAPE" title="Named motion archetype / force behavior : a characteristic trajectory"
+          items={each(MOTION_SHAPES)} value={mt.shape} onChange={(v) => update(index, { motion: { shape: v } })} />
       )
     }
     default:
       return null
   }
 }
+
+const SLEW_SCALE = logScale(1, 10000)
+// the body features, grouped by region as the menu always was
+const BODY_ITEMS: Array<PickItem<BodyFeature>> = BODY_FEATURE_GROUPS.flatMap((g) => g.keys.map((f) => ({ v: f, label: f, group: g.title })))
 
 // ── Steps : the 16-step strip, its condition menu, FILL ───────────────
 const STEPS_LEN_HELP =
@@ -799,50 +761,18 @@ function StepsParams({ index }: { index: number }): JSX.Element {
   const set = (patch: Partial<StepsConfig>): void => update(index, { steps: { ...sc, ...patch } })
   const len = stepLength(sc)
   const swing = Math.round(sc.swing)
-  const label = 'shrink-0 cursor-help font-mono text-[9px] text-muted underline decoration-dotted underline-offset-2'
   return (
     <>
       <StepStrip index={index} />
-      {/* length and swing share a row (two-digit boxes : the input's own side
-          padding leaves w-7 room for "16", w-8 for "75") so the swing slider
-          keeps ~58 px of travel at zoom 1; glide has the full row under it */}
-      <div className="flex min-w-0 shrink-0 items-center gap-1">
-        <span className={label} title={STEPS_LEN_HELP}>
-          LEN
-        </span>
-        <BoundedNumberInput
-          value={len}
-          min={1}
-          max={STEP_MAX}
-          integer
-          onChange={(v) => set({ length: Math.round(v) })}
-          className="input w-7 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-          title={STEPS_LEN_HELP}
-        />
-        <span className={`${label} ml-0.5`} title={STEPS_SWING_HELP}>
-          SWG
-        </span>
-        <input
-          type="range"
-          min={SWING_MIN}
-          max={SWING_MAX}
-          step={1}
-          value={swing}
-          onChange={(e) => set({ swing: Number(e.target.value) })}
-          className="min-w-0 flex-1 accent-accent"
-          title={`${STEPS_SWING_HELP} Now ${swing} %.`}
-        />
-        <BoundedNumberInput
-          value={swing}
-          min={SWING_MIN}
-          max={SWING_MAX}
-          integer
-          onChange={(v) => set({ swing: v })}
-          className="input w-8 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-          title={`${STEPS_SWING_HELP} Now ${swing} %.`}
-        />
+      {/* length and swing share a row (each bar keeps ~100 px of travel at zoom
+          1 in a 1920 px window); glide has the full row under it */}
+      <div className="flex min-w-0 shrink-0 gap-1">
+        <ParamBar className="flex-1" label="LEN" title={STEPS_LEN_HELP} value={len} min={1} max={STEP_MAX} def={8} integer
+          onChange={(v) => set({ length: v })} />
+        <ParamBar className="flex-1" label="SWING" title={`${STEPS_SWING_HELP} Now ${swing} %.`} value={swing} min={SWING_MIN} max={SWING_MAX}
+          def={50} integer unit="%" onChange={(v) => set({ swing: v })} />
       </div>
-      <SliderRow label="GLIDE" value={sc.glide} min={0} max={1}
+      <ParamBar label="GLIDE" value={sc.glide} min={0} max={1} def={0}
         title={STEPS_GLIDE_HELP}
         onChange={(v) => set({ glide: v })} />
     </>
@@ -1260,8 +1190,8 @@ function FillButton({ index }: { index: number }): JSX.Element {
     }
   }, [index])
   return (
-    <button
-      ref={ref}
+    <BarCell
+      cellRef={ref}
       onPointerDown={(e) => {
         if (e.button !== 0) return
         if (e.shiftKey) return modEngine.setFillLatch(index, !modEngine.fillLatched(index))
@@ -1271,13 +1201,8 @@ function FillButton({ index }: { index: number }): JSX.Element {
       onPointerUp={release}
       onPointerCancel={release}
       onLostPointerCapture={release}
-      className={`shrink-0 touch-none rounded px-1 py-0.5 font-mono text-[9px] ${
-        latched
-          ? 'bg-accent text-bg ring-1 ring-accent'
-          : on
-            ? 'bg-accent/20 text-accent ring-1 ring-accent'
-            : 'bg-panel3/60 text-muted hover:text-accent'
-      }`}
+      tone={latched ? 'solid' : on ? 'on' : 'off'}
+      className="touch-none"
       title={
         'FILL : hold it down and the steps set to play only in a fill come in, while those set to ' +
         'play only outside one fall silent. Shift-click keeps it on (Shift-click again to let it go). ' +
@@ -1285,7 +1210,7 @@ function FillButton({ index }: { index: number }): JSX.Element {
       }
     >
       FILL
-    </button>
+    </BarCell>
   )
 }
 
@@ -1313,201 +1238,28 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
   const where = (l: number, s: string): string => (l < 0 ? `AU ${s}` : `L${l + 1}${s}`)
   const cur = value ? `${value.layer}:${value.slot}` : ''
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
+  const items: Array<PickItem<string>> = [
+    { v: '', label: 'audio input' },
+    ...slots.map((k) => {
+      const [l, s, kind, ...name] = k.split(':')
+      return { v: `${l}:${s}`, label: `${where(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}` }
+    }),
+    ...(!known && value ? [{ v: cur, label: `${where(value.layer, value.slot)} (no clip there now)` }] : [])
+  ]
   return (
-    <Row label="FROM" title="Where it listens : the audio input (the audio tab); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
-      <select
-        className="input select-compact min-w-0 flex-1 text-[10px]"
-        value={cur}
-        onChange={(e) => {
-          const v = e.target.value
-          if (!v) return onChange(undefined)
-          const [l, s] = v.split(':')
-          onChange({ layer: Number(l), slot: s === 'B' ? 'B' : s === 'all' ? 'all' : 'A' })
-        }}
-      >
-        <option value="">audio input</option>
-        {slots.map((k) => {
-          const [l, s, kind, ...name] = k.split(':')
-          return (
-            <option key={k} value={`${l}:${s}`}>
-              {`${where(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
-            </option>
-          )
-        })}
-        {!known && value && <option value={cur}>{`${where(value.layer, value.slot)} (no clip there now)`}</option>}
-      </select>
-    </Row>
+    <PickBar
+      label="FROM"
+      title="Where it listens : the audio input (the audio tab); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)"
+      items={items}
+      value={cur}
+      onChange={(v) => {
+        if (!v) return onChange(undefined)
+        const [l, s] = v.split(':')
+        onChange({ layer: Number(l), slot: s === 'B' ? 'B' : s === 'all' ? 'all' : 'A' })
+      }}
+    />
   )
 }
-
-function Row({
-  label,
-  title,
-  children
-}: {
-  label: string
-  title?: string
-  children: ReactNode
-}): JSX.Element {
-  return (
-    <div className="flex min-w-0 items-center gap-1" title={title}>
-      <span
-        className={`w-10 shrink-0 font-mono text-[9px] text-muted ${
-          title ? 'cursor-help underline decoration-dotted underline-offset-2' : ''
-        }`}
-        title={title}
-      >
-        {label}
-      </span>
-      {children}
-    </div>
-  )
-}
-
-function NumRow({
-  label, value, min, max, integer, onChange
-}: {
-  label: string; value: number; min: number; max: number; integer?: boolean
-  onChange: (v: number) => void
-}): JSX.Element {
-  return (
-    <Row label={label}>
-      <BoundedNumberInput
-        value={value}
-        min={min}
-        max={max}
-        integer={integer}
-        onChange={onChange}
-        className="input w-full min-w-0 px-1 py-0.5 text-right text-[10px]"
-      />
-    </Row>
-  )
-}
-
-// One ADSR segment : hair-thin label, slider, editable readout. These used to
-// sit TWO-UP, which left the slider narrower than its own thumb and effectively
-// undraggable. One per row gives it real travel, and four rows fit because an
-// envelope card carries no clock row. The value is STORED in ms and shown in
-// SECONDS: five digits of milliseconds will not fit beside a slider, and
-// seconds is the readable unit for an envelope anyway.
-function MiniSlider({
-  label, name, value, min, max, onChange
-}: {
-  label: string; name: string; value: number; min: number; max: number
-  onChange: (v: number) => void
-}): JSX.Element {
-  const help = name + ' : ' + (value / 1000).toFixed(2) + ' s'
-  return (
-    <div className="flex min-w-0 items-center gap-1" title={help}>
-      <span className="w-2.5 shrink-0 cursor-help font-mono text-[9px] text-muted" title={help}>
-        {label}
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="min-w-0 flex-1 accent-accent"
-        title={help}
-      />
-      {/* Four characters at most, in a box as wide as SUS's beside it (w-9 cut
-          "0.96" and "3.45") : two decimals under 10 s (maxFrac drops trailing
-          zeros, so 0.55 s reads "0.55", not "0.6"), one from 10 s ("12.5"). A raw
-          ms/1000 would read "1.073" and clip; the row's tooltip keeps the exact
-          figure. */}
-      <BoundedNumberInput
-        value={value / 1000}
-        min={min / 1000}
-        max={max / 1000}
-        maxFrac={value >= 10000 ? 1 : 2}
-        onChange={(v) => onChange(Math.round(v * 1000))}
-        className="input w-10 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-      />
-    </div>
-  )
-}
-
-// Spastic's HOLD : 0 (the far left) = off, it stays up until the next throw;
-// else a log track over 5 ms … 10 s.
-const HOLD_MIN = 5
-const HOLD_MAX = 10000
-function SpasticHoldRow({ index }: { index: number }): JSX.Element {
-  const m = useStore((s) => s.composition.modulators[index])
-  const update = useStore((s) => s.updateModulator)
-  const ms = Math.max(0, m.spasticHold ?? 0)
-  const pos = ms <= 0 ? 0 : Math.max(0.001, Math.min(1, Math.log(Math.max(HOLD_MIN, ms) / HOLD_MIN) / Math.log(HOLD_MAX / HOLD_MIN)))
-  const title =
-    'HOLD : how long each throw stays up before it drops straight back to the bottom, in ' +
-    'milliseconds. The rate then only sets WHEN it may rise (once in a while, as the coin ' +
-    'decides); the time up is this. 0 (far left) = off : it stays up until the next throw.'
-  return (
-    <Row label="HOLD" title={title}>
-      <input
-        type="range" min={0} max={1} step={0.001} value={pos}
-        onChange={(e) => {
-          const p = Number(e.target.value)
-          update(index, { spasticHold: p <= 0 ? 0 : Math.round(HOLD_MIN * Math.pow(HOLD_MAX / HOLD_MIN, p)) })
-        }}
-        className="min-w-0 flex-1 accent-accent"
-        title={title}
-      />
-      <BoundedNumberInput
-        value={ms}
-        min={0}
-        max={HOLD_MAX}
-        integer
-        onChange={(v) => update(index, { spasticHold: v })}
-        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-      />
-    </Row>
-  )
-}
-
-function SliderRow({
-  label, value, min, max, step = 0.01, title, integer, log, onChange
-}: {
-  label: string; value: number; min: number; max: number; step?: number; title?: string
-  integer?: boolean
-  // Log track : a linear slider over 50…120000 ms puts everything usable in the
-  // first 2% of its travel. The readout box stays linear either way.
-  log?: boolean
-  onChange: (v: number) => void
-}): JSX.Element {
-  const useLog = !!log && min > 0
-  const toPos = (v: number): number => (useLog ? Math.log10(Math.max(min, v)) : v)
-  const emit = (p: number): void => {
-    const v = useLog ? Math.pow(10, p) : p
-    onChange(integer ? Math.round(v) : v)
-  }
-  return (
-    <Row label={label} title={title}>
-      <input
-        type="range"
-        min={toPos(min)}
-        max={toPos(max)}
-        step={useLog ? 0.001 : step}
-        value={toPos(value)}
-        onChange={(e) => emit(Number(e.target.value))}
-        className="min-w-0 flex-1 accent-accent"
-        title={title}
-      />
-      {/* Every slider carries an editable numeric readout, shown to at most
-          three decimals so a slider landing on 0.079577… doesn't clip. */}
-      <BoundedNumberInput
-        value={value}
-        min={min}
-        max={max}
-        integer={integer}
-        maxFrac={3}
-        onChange={onChange}
-        className="input w-12 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-      />
-    </Row>
-  )
-}
-
 
 // ── Live meter : one rAF per meter, direct style writes ───────────────
 function Meter({ index }: { index: number }): JSX.Element {
@@ -1547,6 +1299,10 @@ function MatrixSummary(): JSX.Element {
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
   const toggleAssignmentMuted = useStore((s) => s.toggleAssignmentMuted)
+  // where the last press began : a press on a chip's depth bar (its number, its
+  // typing field) let go outside it makes the browser click the CHIP (their
+  // common parent), which must not turn the binding off
+  const pressedOn = useRef<EventTarget | null>(null)
 
   function describe(a: (typeof matrix)[number]): string {
     const t = a.target
@@ -1594,7 +1350,15 @@ function MatrixSummary(): JSX.Element {
       {matrix.map((a) => (
         <span
           key={a.id}
-          onClick={() => toggleAssignmentMuted(a.id)}
+          onPointerDownCapture={(e) => {
+            pressedOn.current = e.target
+          }}
+          onClick={() => {
+            const d = pressedOn.current as Element | null
+            pressedOn.current = null
+            if (d && typeof d.closest === 'function' && d.closest('[data-bar]')) return
+            toggleAssignmentMuted(a.id)
+          }}
           className={`flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] transition-opacity ${
             a.muted ? 'border-border/50 bg-panel2/40 opacity-50' : 'border-border bg-panel2 hover:border-accent/50'
           }`}
@@ -1607,21 +1371,29 @@ function MatrixSummary(): JSX.Element {
           <span className={`max-w-[160px] truncate text-muted ${a.muted ? 'line-through' : ''}`}>
             {describe(a)}
           </span>
-          <input
-            type="range"
-            min={-10}
-            max={10}
-            step={0.05}
-            value={a.depth}
+          {/* the depth : a small bar, its number inside (a click types it, a
+              double-click puts it back to 0.5); 72 px leaves ~46 px of track
+              left of the number to drag; its clicks never reach the chip's
+              on / off */}
+          <span
+            className="flex shrink-0"
+            style={{ '--bar-h': '14px' } as CSSProperties}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => setAssignmentDepth(a.id, Number(e.target.value))}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              setAssignmentDepth(a.id, 0.5)
-            }}
-            className="w-14 accent-accent"
-            title={`Depth ${a.depth.toFixed(2)} (bipolar). Double-click : 0.5`}
-          />
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <FloatBar
+              bare
+              label={`${describe(a)} depth`}
+              title={`Depth ${a.depth.toFixed(2)} (bipolar, −10 … 10) : drag (Shift : finer), double-click : 0.5, click the number to type`}
+              value={a.depth}
+              min={-10}
+              max={10}
+              def={0.5}
+              frac={2}
+              onChange={(v) => setAssignmentDepth(a.id, v)}
+              className="w-[72px]"
+            />
+          </span>
           <button
             onClick={(e) => {
               e.stopPropagation()

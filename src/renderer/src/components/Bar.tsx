@@ -15,9 +15,13 @@
 // CSS variables and the value's text node : a modulated bar never re-renders.
 //
 // Presentational only : AutoControls.tsx maps the shader inputs onto these and
-// builds their M chips.
+// builds their M chips; the Modulation section (ModulationPanel.tsx, the
+// Modulate panel's binding rows, ModShapeEditor.tsx) builds its own from them :
+// a log or custom track (`scale`), a shown form and a unit, cells at either end
+// (`lead`, BarCell), a nameless mini bar (`bare`) and the accent2 tone.
 
 import {
+  type ButtonHTMLAttributes,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -134,6 +138,57 @@ export function BarChip({
   )
 }
 
+// ── a cell inside a bar's end (a mode, a switch, a button) ─────────────
+export type BarCellTone = 'off' | 'on' | 'alt' | 'open' | 'solid' | 'dim'
+
+/** A cell's look : on = the accent, alt = accent2, solid = filled (kept on). */
+export function barCellClass(tone: BarCellTone = 'off', side: 'l' | 'r' = 'r'): string {
+  const t =
+    tone === 'on'
+      ? 'bg-accent/20 text-accent'
+      : tone === 'alt'
+        ? 'bg-accent2/20 text-accent2'
+        : tone === 'solid'
+          ? 'bg-accent text-bg'
+          : tone === 'open'
+            ? 'bg-panel3 text-text'
+            : tone === 'dim'
+              ? 'bg-panel text-muted/50'
+              : 'bg-panel text-muted hover:text-text'
+  return `flex min-w-[22px] shrink-0 items-center justify-center ${side === 'l' ? 'border-r' : 'border-l'} border-border px-[4px] font-mono text-[8.5px] uppercase leading-none tracking-[0.06em] transition-[filter] hover:brightness-125 ${t}`
+}
+
+/** A button cell at a bar's end : the clock's HZ / BPM, a binding's mul / rep,
+ *  LOOP, FILL, gate / cut, ⌇. Never part of the drag (it is beside the track). */
+export function BarCell({
+  tone = 'off',
+  side = 'r',
+  cellRef,
+  className = '',
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: BarCellTone; side?: 'l' | 'r'; cellRef?: Ref<HTMLButtonElement> }): JSX.Element {
+  return <button ref={cellRef} type="button" {...rest} className={`${barCellClass(tone, side)} ${className}`} />
+}
+
+// ── a track's scale : linear by default, log for wide ms / Hz ranges ───
+export interface BarScale {
+  /** a value → its place along the bar, 0..1 */
+  to: (v: number) => number
+  /** a place along the bar, 0..1 → the value */
+  from: (p: number) => number
+}
+
+/** A log track (min > 0) : a linear one over 50…120000 ms puts everything
+ *  usable in the first 2 % of its travel. */
+export function logScale(min: number, max: number): BarScale {
+  const lo = Math.log(Math.max(1e-9, min))
+  const k = Math.log(Math.max(min, max)) - lo || 1
+  return {
+    to: (v) => clamp01((Math.log(Math.max(min, v)) - lo) / k),
+    from: (p) => Math.exp(lo + clamp01(p) * k)
+  }
+}
+
 // ── the drag, shared by the float bars and a color's alpha ─────────────
 interface DragOpts {
   min: number
@@ -143,7 +198,12 @@ interface DragOpts {
   modulated: boolean
   value: number
   onChange: (v: number) => void
+  scale?: BarScale
 }
+
+/** Where a value sits along the bar (0..1) and back, through its scale. */
+const placeOf = (o: DragOpts, v: number): number => (o.scale ? o.scale.to(v) : clamp01((v - o.min) / (o.max - o.min || 1)))
+const valueAt = (o: DragOpts, p: number): number => (o.scale ? o.scale.from(clamp01(p)) : o.min + clamp01(p) * (o.max - o.min))
 
 /** Pointer-down handler of a bar track : absolute, relative while modulated,
  *  a tenth of the speed with Shift (from where the pointer is when Shift goes
@@ -161,7 +221,8 @@ function useBarDrag(opts: DragOpts, focusRef: RefObject<HTMLElement>): (e: RPoin
     let shift = e.shiftKey
     let rel = o0.modulated || shift
     let x0 = e.clientX
-    let v0 = o0.value
+    // a relative drag moves the PLACE along the bar (a log track stays log)
+    let p0 = placeOf(o0, o0.value)
     let last = o0.value
     const put = (x: number, fine: boolean): void => {
       const o = cur.current
@@ -175,8 +236,7 @@ function useBarDrag(opts: DragOpts, focusRef: RefObject<HTMLElement>): (e: RPoin
     }
     const at = (cx: number): number => {
       const r = el.getBoundingClientRect()
-      const o = cur.current
-      return o.min + clamp01((cx - r.left) / Math.max(1, r.width)) * (o.max - o.min)
+      return valueAt(cur.current, (cx - r.left) / Math.max(1, r.width))
     }
     if (!rel) put(at(e.clientX), false)
     const move = (ev: PointerEvent): void => {
@@ -189,15 +249,14 @@ function useBarDrag(opts: DragOpts, focusRef: RefObject<HTMLElement>): (e: RPoin
         shift = ev.shiftKey
         rel = true
         x0 = ev.clientX
-        v0 = last
+        p0 = placeOf(cur.current, last)
       }
       if (!rel) {
         put(at(ev.clientX), false)
         return
       }
-      const o = cur.current
       const w = Math.max(1, el.getBoundingClientRect().width)
-      put(v0 + ((ev.clientX - x0) / w) * (o.max - o.min) * (shift ? 0.1 : 1), shift)
+      put(valueAt(cur.current, p0 + ((ev.clientX - x0) / w) * (shift ? 0.1 : 1)), shift)
     }
     const up = (): void => {
       el.removeEventListener('pointermove', move)
@@ -215,6 +274,34 @@ function useBarDrag(opts: DragOpts, focusRef: RefObject<HTMLElement>): (e: RPoin
 /** Arrow keys step a 200th of the range (1 for a count), Shift a tenth of that;
  *  Page Up / Down a tenth of the range, Home / End its ends. */
 function keyStep(e: RKeyboardEvent, o: DragOpts): number | null {
+  if (o.scale) {
+    // along the track : a 200th of its travel (a log bar steps evenly in its log)
+    const p = o.scale.to(o.value)
+    const d = (e.shiftKey ? 0.1 : 1) / 200
+    const at = (q: number, dir: number): number => {
+      const n = o.scale!.from(clamp01(q))
+      // a count that would round back to where it was moves by one
+      return o.integer && Math.round(n) === Math.round(o.value) ? o.value + dir : n
+    }
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowUp':
+        return at(p + d, 1)
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        return at(p - d, -1)
+      case 'PageUp':
+        return at(p + 0.1, 1)
+      case 'PageDown':
+        return at(p - 0.1, -1)
+      case 'Home':
+        return o.min
+      case 'End':
+        return o.max
+      default:
+        return null
+    }
+  }
   const span = o.max - o.min
   const step = o.integer ? 1 : (span / 200) * (e.shiftKey ? 0.1 : 1)
   const v = o.value
@@ -258,6 +345,18 @@ export interface FloatBarProps {
   /** a small control inside the bar, after its name (Context's PRE / POST) */
   extra?: ReactNode
   className?: string
+  /** a log or custom track (the value still shows and types as itself) */
+  scale?: BarScale
+  /** the number as shown (seconds kept to their two decimals, 0 as "off") */
+  format?: (v: number) => string
+  /** after the number, quieter (ms, s, %) : a function hides it on some values */
+  unit?: string | ((v: number) => string)
+  /** cells at the bar's left end, before its name (the clock's HZ / BPM) */
+  lead?: ReactNode
+  /** no name shown (a binding chip's depth : the chip names it); smaller text */
+  bare?: boolean
+  /** 'alt' : the fill in accent2 (a Replace binding's depth) */
+  tone?: 'alt'
 }
 
 export function FloatBar(p: FloatBarProps): JSX.Element {
@@ -266,10 +365,15 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
   const integer = !!p.integer
   const modulated = !!p.modulated && !!p.liveKey
   const span = max - min || 1
-  const fr = (x: number): number => clamp01((x - min) / span)
-  const zf = min < 0 && max > 0 ? fr(0) : 0
+  const scaleRef = useRef(p.scale)
+  scaleRef.current = p.scale
+  const fr = (x: number): number => (scaleRef.current ? clamp01(scaleRef.current.to(x)) : clamp01((x - min) / span))
+  const zf = !p.scale && min < 0 && max > 0 ? fr(0) : 0
   const v = integer ? Math.round(p.value) : p.value
   const f = fr(v)
+  const formatRef = useRef(p.format)
+  formatRef.current = p.format
+  const show = (x: number): string => (formatRef.current ? formatRef.current(x) : fmtBar(x, integer, frac))
   const rootRef = useRef<HTMLDivElement>(null)
   const keyRef = useRef<HTMLInputElement>(null)
   const valRef = useRef<HTMLButtonElement>(null)
@@ -283,7 +387,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
     settled.current = false
     setDraft(shownRef.current)
   }
-  const drag: DragOpts = { min, max, integer, frac, modulated, value: v, onChange: p.onChange }
+  const drag: DragOpts = { min, max, integer, frac, modulated, value: v, onChange: p.onChange, scale: p.scale }
   const onPointerDown = useBarDrag(drag, keyRef)
 
   // The live value, painted by the shared rAF : the fill's three variables, the
@@ -300,7 +404,7 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
       setVar(root, '--fw', Math.abs(lf - zf))
       if (lf < zf) root.setAttribute('data-neg', '')
       else root.removeAttribute('data-neg')
-      setText(valRef.current, fmtBar(x, integer, frac))
+      setText(valRef.current, show(x))
     }
     paint(liveModValues.get(key) ?? baseRef.current)
     const stop = registerLiveOverlay({
@@ -319,11 +423,13 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
   const style: Record<string, string | number> = { '--f': f, '--z': zf }
   // (while modulated the live fill is the overlay's alone : a render never puts it back to the stored value)
   if (!modulated) Object.assign(style, { '--lf': f, '--fl': Math.min(f, zf), '--fw': Math.abs(f - zf) })
-  const shown = fmtBar(v, integer, frac)
+  const shown = show(v)
   const shownRef = useRef(shown)
   shownRef.current = shown
   // the number's room : its widest form, so a moving value never jostles the name
-  const ch = Math.max(fmtBar(min, integer, frac).length, fmtBar(max, integer, frac).length, shown.length, integer ? 1 : frac + 2 + (min < 0 ? 1 : 0))
+  const ch = Math.max(show(min).length, show(max).length, shown.length, p.format ? 1 : integer ? 1 : frac + 2 + (min < 0 ? 1 : 0))
+  const unit = typeof p.unit === 'function' ? p.unit(v) : p.unit
+  const valText = p.bare ? 'text-[8.5px]' : 'text-[9px]'
 
   const commit = (s: string | null): void => {
     setDraft(null)
@@ -338,9 +444,10 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
     <Shell
       mod={modulated}
       rootRef={rootRef}
-      className={p.className}
+      className={`${p.tone === 'alt' ? 'bar-alt' : ''} ${p.className ?? ''}`}
       style={{ ...(style as CSSProperties) }}
     >
+      {p.lead}
       <div
         className="relative min-w-0 flex-1 cursor-default touch-none select-none"
         onPointerDown={draft === null ? onPointerDown : undefined}
@@ -381,21 +488,23 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
             if (c !== v) p.onChange(c)
           }}
         />
-        <div className="bar-text pointer-events-none absolute inset-0 z-[2] flex items-center justify-between gap-1.5 pl-2 pr-1">
-          <span className="flex min-w-0 items-center gap-1">
-            <span data-bar-name="" className={NAME}>
-              {p.label}
-            </span>
-            {p.extra && (
-              <span className="pointer-events-auto flex shrink-0" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-                {p.extra}
+        <div className={`bar-text pointer-events-none absolute inset-0 z-[2] flex items-center gap-1.5 ${p.bare ? 'justify-end px-0.5' : 'justify-between pl-2 pr-1'}`}>
+          {!p.bare && (
+            <span className="flex min-w-0 items-center gap-1">
+              <span data-bar-name="" className={NAME}>
+                {p.label}
               </span>
-            )}
-          </span>
+              {p.extra && (
+                <span className="pointer-events-auto flex shrink-0" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                  {p.extra}
+                </span>
+              )}
+            </span>
+          )}
           {draft !== null ? (
             <input
               autoFocus
-              className="pointer-events-auto relative z-[3] h-[calc(var(--bar-h)-6px)] w-16 shrink-0 rounded-sm border border-accent bg-bg px-1 text-right font-mono text-[9px] text-text outline-none"
+              className={`pointer-events-auto relative z-[3] h-[calc(var(--bar-h)-6px)] min-h-[11px] shrink-0 rounded-sm border border-accent bg-bg px-1 text-right font-mono text-text outline-none ${p.bare ? 'w-full min-w-0 text-[8.5px]' : 'w-16 text-[9px]'}`}
               value={draft}
               inputMode="decimal"
               aria-label={`Type ${p.label}`}
@@ -422,19 +531,26 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
               }}
             />
           ) : (
-            <button
-              ref={valRef}
-              type="button"
-              data-bar-val=""
-              className="pointer-events-auto shrink-0 cursor-text rounded-sm px-0.5 text-right text-[9px] leading-none tabular-nums hover:bg-black/30"
-              style={{ minWidth: `${ch}ch` }}
-              title="Click to type a value"
-              onPointerDown={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => e.stopPropagation()}
-              onClick={edit}
-            >
-              {shown}
-            </button>
+            <span className="flex shrink-0 items-baseline">
+              <button
+                ref={valRef}
+                type="button"
+                data-bar-val=""
+                className={`pointer-events-auto shrink-0 cursor-text rounded-sm px-0.5 text-right leading-none tabular-nums hover:bg-black/30 ${valText}`}
+                style={{ minWidth: `${ch}ch` }}
+                title="Click to type a value"
+                onPointerDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onClick={edit}
+              >
+                {shown}
+              </button>
+              {unit && (
+                <span data-bar-unit="" className="shrink-0 pr-0.5 text-[8px] leading-none text-muted">
+                  {unit}
+                </span>
+              )}
+            </span>
           )}
         </div>
       </div>
@@ -444,16 +560,56 @@ export function FloatBar(p: FloatBarProps): JSX.Element {
 }
 
 // ── enum : a few options as segments ───────────────────────────────────
+export interface BarOption {
+  value: number
+  label: string
+  /** a DropBar's list : consecutive options of one group sit under its heading */
+  group?: string
+  title?: string
+}
+
 export interface EnumBarProps {
   label: string
   title?: string
-  options: Array<{ value: number; label: string }>
+  options: BarOption[]
   value: number
   onChange: (v: number) => void
   modulated?: boolean
   liveKey?: string | null
   chip?: ReactNode
   className?: string
+  /** cells at the bar's left end, before its name (DropBar) */
+  lead?: ReactNode
+}
+
+/** A DropBar's list : runs of one group under an <optgroup>, the rest as they come. */
+function optionList(options: BarOption[]): ReactNode[] {
+  const out: ReactNode[] = []
+  let i = 0
+  while (i < options.length) {
+    const g = options[i].group
+    if (!g) {
+      const o = options[i++]
+      out.push(
+        <option key={`o${o.value}`} value={o.value} title={o.title}>
+          {o.label}
+        </option>
+      )
+      continue
+    }
+    const run: BarOption[] = []
+    while (i < options.length && options[i].group === g) run.push(options[i++])
+    out.push(
+      <optgroup key={`g${out.length}:${g}`} label={g}>
+        {run.map((o) => (
+          <option key={o.value} value={o.value} title={o.title}>
+            {o.label}
+          </option>
+        ))}
+      </optgroup>
+    )
+  }
+  return out
 }
 
 /** The option a live value plays (the engine snaps enums to their values). */
@@ -541,6 +697,7 @@ export function DropBar(p: EnumBarProps & { bare?: boolean }): JSX.Element {
   }, [modulated, p.liveKey, p.value, p.options.length])
   return (
     <Shell mod={modulated} rootRef={rootRef} className={`${p.bare ? '!h-[18px]' : ''} ${p.className ?? ''}`}>
+      {p.lead}
       <label className={`relative flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-1.5 hover:brightness-125 ${p.bare ? 'pl-1.5 pr-1' : 'pl-2 pr-1.5'}`}>
         {!p.bare && (
           <span data-bar-name="" className={`text-muted ${NAME}`}>
@@ -561,11 +718,7 @@ export function DropBar(p: EnumBarProps & { bare?: boolean }): JSX.Element {
           title={p.title}
           onChange={(e) => p.onChange(Number(e.target.value))}
         >
-          {p.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
+          {optionList(p.options)}
         </select>
       </label>
       {p.chip}

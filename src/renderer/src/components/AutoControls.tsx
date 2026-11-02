@@ -22,7 +22,6 @@ import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
-import { BoundedNumberInput } from './BoundedNumberInput'
 import { showToast } from './Toast'
 import { MAX_MOD_ASSIGNMENTS } from '@shared/types'
 import { ModShapeEditor, ShapeToggle } from './ModShapeEditor'
@@ -30,7 +29,7 @@ import { PinZone } from './Pin'
 import { partOf, withPartTarget } from '../modKey'
 import { COLOR_PARTS, PART_WHERE, PART_WORD } from '../engine/colorParts'
 import { liveColorValues } from '../engine/modulation'
-import { AlphaCell, BarChip, BoolBar, ColorBar, DropBar, EventBar, FloatBar, SegBar, inkFor } from './Bar'
+import { AlphaCell, BarCell, BarChip, BoolBar, ColorBar, DropBar, EventBar, FloatBar, SegBar, barCellClass, inkFor } from './Bar'
 
 /** The modulation matrix is full : say so (a click that does nothing reads as
  *  broken), and how to make room. */
@@ -492,61 +491,53 @@ export function AssignRow({
           <div key={b.id} className="flex flex-col gap-1">
           <div className="flex items-center gap-1">
             <span className="w-8 shrink-0 font-mono text-[9px] text-accent">M{b.mod + 1}</span>
-            {/* Mode: Multiply (scale the base : default) ↔ Replace (swing over it).
-                A toggle has one law, so it shows a fixed label instead. */}
-            {toggle ? (
-              <span
-                className="shrink-0 cursor-help rounded bg-panel3/60 px-1 py-0.5 font-mono text-[9px] uppercase text-muted"
-                title="Toggle : at depth 1 it follows the modulator (on while it is in its upper half). Less depth leans toward the stored state : stored off, it switches on only near the peaks; stored on, it switches off only near the troughs. Negative depth inverts the modulator."
-              >
-                tgl
-              </span>
-            ) : (
-              <button
-                onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
-                className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] uppercase transition-colors ${
-                  mult
-                    ? 'bg-accent/20 text-accent ring-1 ring-accent'
-                    : 'bg-accent2/20 text-accent2 ring-1 ring-accent2'
-                }`}
-                title={
-                  mult
-                    ? 'Multiply : the modulator scales the base value (|depth| = amount). Click for Replace.'
-                    : 'Replace : the modulator swings the value around the base. Click for Multiply.'
-                }
-              >
-                {mult ? 'mul' : 'rep'}
-              </button>
-            )}
-            <input
-              type="range"
-              min={-10}
-              max={10}
-              step={0.01}
-              value={b.depth}
-              onChange={(e) => setAssignmentDepth(b.id, Number(e.target.value))}
-              // Back to 0.5, the depth a new binding starts at (like every slider's double-click).
-              onDoubleClick={() => setAssignmentDepth(b.id, 0.5)}
-              className={`min-w-0 flex-1 ${mult ? 'accent-accent' : 'accent-accent2'}`}
-              title={
-                mult
-                  ? `Amount ${b.depth.toFixed(2)} : how deeply the modulator scales the base (− inverts). Double-click : 0.5`
-                  : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value. Double-click : 0.5`
-              }
-            />
-            {/* The slider gave no readout of the depth : a bipolar ±1 box, so
-                you can see and set it exactly. The box's fixed width shrinks the
-                flex-1 slider to fit, keeping the row its current size. */}
-            <BoundedNumberInput
+            {/* One bar : the mode cell at its left end (Multiply scales the
+                base, Replace swings over it; a toggle has one law, a fixed
+                tgl), the depth inside (−10 … 10, click the number to type,
+                double-click : 0.5, the depth a new binding starts at), the
+                shaping's ⌇ at its right end. Replace fills in accent2. */}
+            <FloatBar
+              className="flex-1"
+              label={mult && !toggle ? 'amount' : 'depth'}
+              tone={!toggle && !mult ? 'alt' : undefined}
+              title={`${
+                toggle
+                  ? `Depth ${b.depth.toFixed(2)} : how far the toggle follows the modulator (1 : fully).`
+                  : mult
+                    ? `Amount ${b.depth.toFixed(2)} : how deeply the modulator scales the base (− inverts).`
+                    : `Depth ${b.depth.toFixed(2)} : bipolar swing around the base value.`
+              } Drag (Shift : finer), double-click : 0.5, click the number to type`}
               value={b.depth}
               min={-10}
               max={10}
-              maxFrac={2}
+              def={0.5}
+              frac={2}
               onChange={(v) => setAssignmentDepth(b.id, v)}
-              className="input w-12 shrink-0 px-1 py-0.5 text-right text-[9px]"
+              lead={
+                toggle ? (
+                  <span
+                    className={`${barCellClass('off', 'l')} cursor-help`}
+                    title="Toggle : at depth 1 it follows the modulator (on while it is in its upper half). Less depth leans toward the stored state : stored off, it switches on only near the peaks; stored on, it switches off only near the troughs. Negative depth inverts the modulator."
+                  >
+                    tgl
+                  </span>
+                ) : (
+                  <BarCell
+                    side="l"
+                    tone={mult ? 'on' : 'alt'}
+                    onClick={() => setAssignmentMode(b.id, mult ? 'replace' : 'multiply')}
+                    title={
+                      mult
+                        ? 'Multiply : the modulator scales the base value (|depth| = amount). Click for Replace.'
+                        : 'Replace : the modulator swings the value around the base. Click for Multiply.'
+                    }
+                  >
+                    {mult ? 'mul' : 'rep'}
+                  </BarCell>
+                )
+              }
+              chip={<ShapeToggle id={b.id} open={shapeOpen === b.id} onToggle={() => setShapeOpen(shapeOpen === b.id ? null : b.id)} />}
             />
-            {/* the binding's shaping : combine, threshold, integrate */}
-            <ShapeToggle id={b.id} open={shapeOpen === b.id} onToggle={() => setShapeOpen(shapeOpen === b.id ? null : b.id)} />
           </div>
           {shapeOpen === b.id && <ModShapeEditor id={b.id} />}
           </div>

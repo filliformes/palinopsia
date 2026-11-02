@@ -2,13 +2,15 @@
 // Modulate panel : COMBINE it with one or two other modulators, a THRESHOLD
 // line, INTEGRATE into a position that holds. A live meter shows what the
 // modulator gives and what comes out of the shaping (before depth and mode).
+// On bars (Bar.tsx) since v1.3.2 : names and numbers inside, a click on the
+// number types it, a double-click resets, the switches ride the bars' ends.
 
 import { useEffect, useRef } from 'react'
 import type { ModCombineOp, ModShape } from '@shared/types'
 import { useStore } from '../store'
 import { MOD_SLOTS, resetIntegrator, shapeActive, shapedLive } from '../engine/modShape'
 import { modEngine } from '../engine/modulation'
-import { BoundedNumberInput } from './BoundedNumberInput'
+import { BarCell, DropBar, FloatBar, SegBar } from './Bar'
 
 const OPS: Array<{ v: ModCombineOp | ''; label: string; title: string }> = [
   { v: '', label: 'off', title: 'Only this modulator' },
@@ -20,9 +22,7 @@ const OPS: Array<{ v: ModCombineOp | ''; label: string; title: string }> = [
 ]
 
 const LABEL = 'w-[52px] shrink-0 font-mono text-[9px] uppercase text-muted'
-const CHIP = 'shrink-0 rounded px-1 py-0.5 font-mono text-[9px] transition-colors'
-const chip = (on: boolean, dim = false): string =>
-  `${CHIP} ${on ? 'bg-accent/20 text-accent ring-1 ring-accent' : dim ? 'bg-panel3/30 text-muted/50' : 'bg-panel3/60 text-muted hover:text-text'}`
+const INTEGRATE = ['off', 'flow', 'step'] as const
 
 /** Two bars : the modulator as it comes (with the threshold's line) and what the
  *  shaping gives. One rAF, direct style writes, only while the editor is open. */
@@ -79,147 +79,122 @@ export function ModShapeEditor({ id }: { id: string }): JSX.Element | null {
         <span className={LABEL}>shape</span>
         <ShapeMeter id={id} mod={a.mod} threshold={t} />
       </div>
-      {/* combine */}
-      <div className="flex min-w-0 items-center gap-1">
-        <span className={LABEL} title="Combine this modulator with one or two others">combine</span>
-        <div className="flex shrink-0 gap-0.5">
-          {OPS.map((o) => (
-            <button key={o.label} className={chip((s.op ?? '') === o.v)} onClick={() => setOp(o.v)} title={o.title}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* combine : six choices, a menu bar */}
+      <DropBar
+        label="combine"
+        title="Combine this modulator with one or two others"
+        options={OPS.map((o, i) => ({ value: i, label: o.label, title: o.title }))}
+        value={Math.max(0, OPS.findIndex((o) => o.v === (s.op ?? '')))}
+        onChange={(i) => setOp(OPS[i]?.v ?? '')}
+      />
       {s.op && (
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="w-3 shrink-0" />
-          <span className="shrink-0 font-mono text-[9px] text-muted">M{a.mod + 1} {OPS.find((o) => o.v === s.op)?.label}</span>
-            <select
-              className="input select-compact min-w-0 flex-1 px-1 py-0"
-              style={{ fontSize: 9, height: 18, paddingTop: 0, paddingBottom: 0, lineHeight: '16px' }}
-              value={w0 ?? others[0]}
-              onChange={(e) => setShape(id, { with: [Number(e.target.value), ...(w1 !== undefined && w1 !== Number(e.target.value) ? [w1] : [])] })}
-              title="The second modulator"
-            >
-              {others.map((i) => <option key={i} value={i}>M{i + 1}</option>)}
-            </select>
-            <select
-              className="input select-compact min-w-0 flex-1 px-1 py-0"
-              style={{ fontSize: 9, height: 18, paddingTop: 0, paddingBottom: 0, lineHeight: '16px' }}
-              value={w1 ?? -1}
-              onChange={(e) => {
-                const v = Number(e.target.value)
-                setShape(id, { with: v < 0 ? [w0 ?? others[0]] : [w0 ?? others[0], v] })
-              }}
-              title="A third modulator, or none"
-            >
-              <option value={-1}>none</option>
-              {others.filter((i) => i !== (w0 ?? others[0])).map((i) => <option key={i} value={i}>M{i + 1}</option>)}
-            </select>
+        <div className="flex min-w-0 gap-1">
+          <DropBar
+            className="min-w-0 flex-1"
+            label={`M${a.mod + 1} ${OPS.find((o) => o.v === s.op)?.label ?? ''}`}
+            title="The second modulator"
+            options={others.map((i) => ({ value: i, label: `M${i + 1}` }))}
+            value={w0 ?? others[0]}
+            onChange={(v) => setShape(id, { with: [v, ...(w1 !== undefined && w1 !== v ? [w1] : [])] })}
+          />
+          <DropBar
+            className="min-w-0 flex-1"
+            label={OPS.find((o) => o.v === s.op)?.label ?? ''}
+            title="A third modulator, or none"
+            options={[{ value: -1, label: 'none' }, ...others.filter((i) => i !== (w0 ?? others[0])).map((i) => ({ value: i, label: `M${i + 1}` }))]}
+            value={w1 ?? -1}
+            onChange={(v) => setShape(id, { with: v < 0 ? [w0 ?? others[0]] : [w0 ?? others[0], v] })}
+          />
         </div>
       )}
-      {/* threshold */}
-      <div className="flex min-w-0 items-center gap-1">
-        <span className={LABEL} title="Only what passes the line moves the parameter">threshold</span>
-        <input
-          type="range"
-          min={0}
-          max={0.95}
-          step={0.01}
-          value={t}
-          onChange={(e) => setShape(id, { threshold: Number(e.target.value) || undefined })}
-          onDoubleClick={() => setShape(id, { threshold: undefined })}
-          className="min-w-0 flex-1 accent-accent"
-          title={t > 0 ? `Line at ${t.toFixed(2)} : under it, nothing moves. Double-click : off` : 'Off. Drag right : only what passes the line moves the parameter (room noise, a quiet passage do nothing)'}
-        />
-        <BoundedNumberInput
-          value={t}
-          min={0}
-          max={0.95}
-          maxFrac={2}
-          onChange={(v) => setShape(id, { threshold: v > 0 ? v : undefined })}
-          className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-        />
-        <button
-          className={chip(t > 0 && s.thresholdMode === 'gate', t <= 0)}
-          onClick={() => setShape(id, { thresholdMode: s.thresholdMode === 'gate' ? undefined : 'gate' })}
-          title={s.thresholdMode === 'gate' ? 'Gate : fully on above the line, off under it. Click : cut' : 'Cut : the part above the line, opened back to the whole range. Click : gate (on or off)'}
-        >
-          {s.thresholdMode === 'gate' ? 'gate' : 'cut'}
-        </button>
-      </div>
-      {/* integrate */}
-      <div className="flex min-w-0 items-center gap-1">
-        <span className={LABEL} title="The value pushes a position that stays where it got to">integrate</span>
-        <div className="flex shrink-0 gap-0.5">
-          {(['off', 'flow', 'step'] as const).map((m) => (
-            <button
-              key={m}
-              className={chip(integ === m)}
-              onClick={() => setShape(id, { integrate: m === 'off' ? undefined : m })}
-              title={
-                m === 'off'
-                  ? 'The value as it is : it falls back to the base when the modulator does'
-                  : m === 'flow'
-                    ? 'Flow : the value drives the position, louder = faster, nothing = it holds where it got to'
-                    : 'Step : each hit pushes the position one notch (the kick turning a rotation or a hue per beat)'
-              }
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* threshold : its line, gate / cut at its end */}
+      <FloatBar
+        label="threshold"
+        title={
+          (t > 0
+            ? `Line at ${t.toFixed(2)} : under it, nothing moves.`
+            : 'Off. Drag right : only what passes the line moves the parameter (room noise, a quiet passage do nothing).') +
+          ' Drag (Shift : finer), double-click : off, click the number to type'
+        }
+        value={t}
+        min={0}
+        max={0.95}
+        def={0}
+        frac={2}
+        format={(v) => (v > 0 ? String(parseFloat(v.toFixed(2))) : 'off')}
+        onChange={(v) => setShape(id, { threshold: v > 0 ? v : undefined })}
+        chip={
+          <BarCell
+            tone={t <= 0 ? 'dim' : s.thresholdMode === 'gate' ? 'on' : 'off'}
+            onClick={() => setShape(id, { thresholdMode: s.thresholdMode === 'gate' ? undefined : 'gate' })}
+            title={
+              s.thresholdMode === 'gate'
+                ? 'Gate : fully on above the line, off under it. Click : cut'
+                : 'Cut : the part above the line, opened back to the whole range. Click : gate (on or off)'
+            }
+          >
+            {s.thresholdMode === 'gate' ? 'gate' : 'cut'}
+          </BarCell>
+        }
+      />
+      {/* integrate : three choices, segments */}
+      <SegBar
+        label="integrate"
+        title="The value pushes a position that stays where it got to. Off : the value as it is (it falls back to the base when the modulator does). Flow : the value drives the position, louder = faster, nothing = it holds where it got to. Step : each hit pushes the position one notch (the kick turning a rotation or a hue per beat)"
+        options={INTEGRATE.map((m, i) => ({ value: i, label: m }))}
+        value={INTEGRATE.indexOf(integ)}
+        onChange={(i) => setShape(id, { integrate: i === 0 ? undefined : INTEGRATE[i] })}
+      />
       {integ !== 'off' && (
-        <div className="flex min-w-0 items-center gap-1">
-          <span className="w-3 shrink-0" />
-            <input
-              type="range"
-              min={flow ? 0.01 : 0.01}
-              max={flow ? 4 : 0.5}
-              step={0.01}
-              value={amount}
-              onChange={(e) => setShape(id, flow ? { rate: Number(e.target.value) } : { step: Number(e.target.value) })}
-              onDoubleClick={() => setShape(id, flow ? { rate: 0.25 } : { step: 0.125 })}
-              className="min-w-0 flex-1 accent-accent"
-              title={flow ? `${amount.toFixed(2)} turns a second at full value (a turn = the whole swing). Double-click : 0.25` : `One notch = ${amount.toFixed(2)} of a turn (${Math.round(amount * 360)}° on an angle). Double-click : 0.125`}
-            />
-            <BoundedNumberInput
-              value={amount}
-              min={0.01}
-              max={flow ? 4 : 0.5}
-              maxFrac={2}
-              onChange={(v) => setShape(id, flow ? { rate: v } : { step: v })}
-              className="input w-9 shrink-0 px-0.5 py-0.5 text-right text-[9px]"
-            />
-            <button
-              className={chip(s.ends === 'wrap')}
-              onClick={() => setShape(id, { ends: s.ends === 'wrap' ? undefined : 'wrap' })}
-              title={s.ends === 'wrap' ? 'Wrap : past the end it comes round again (an angle, a hue). Click : bounce' : 'Bounce : at an end it comes back (anything that is not round). Click : wrap'}
-            >
-              {s.ends === 'wrap' ? 'wrap' : 'bounce'}
-            </button>
-            <button className={chip(false)} onClick={() => resetIntegrator(id)} title="Back to the middle : the parameter at its base">
-              ⟲
-            </button>
-        </div>
+        <FloatBar
+          label={flow ? 'rate' : 'notch'}
+          title={
+            (flow
+              ? `${amount.toFixed(2)} turns a second at full value (a turn = the whole swing).`
+              : `One notch = ${amount.toFixed(2)} of a turn (${Math.round(amount * 360)}° on an angle).`) +
+            ` Drag (Shift : finer), double-click : ${flow ? '0.25' : '0.125'}, click the number to type`
+          }
+          value={amount}
+          min={0.01}
+          max={flow ? 4 : 0.5}
+          def={flow ? 0.25 : 0.125}
+          frac={flow ? 2 : 3}
+          onChange={(v) => setShape(id, flow ? { rate: v } : { step: v })}
+          chip={
+            <>
+              <BarCell
+                tone={s.ends === 'wrap' ? 'on' : 'off'}
+                onClick={() => setShape(id, { ends: s.ends === 'wrap' ? undefined : 'wrap' })}
+                title={
+                  s.ends === 'wrap'
+                    ? 'Wrap : past the end it comes round again (an angle, a hue). Click : bounce'
+                    : 'Bounce : at an end it comes back (anything that is not round). Click : wrap'
+                }
+              >
+                {s.ends === 'wrap' ? 'wrap' : 'bounce'}
+              </BarCell>
+              <BarCell onClick={() => resetIntegrator(id)} title="Back to the middle : the parameter at its base">
+                ⟲
+              </BarCell>
+            </>
+          }
+        />
       )}
     </div>
   )
 }
 
-/** The row's button : lit while its binding is shaped. */
+/** The binding bar's end cell : lit while its binding is shaped. */
 export function ShapeToggle({ id, open, onToggle }: { id: string; open: boolean; onToggle: () => void }): JSX.Element {
   const active = useStore((s) => shapeActive(s.composition.modMatrix.find((x) => x.id === id)?.shape))
   return (
-    <button
+    <BarCell
       onClick={onToggle}
-      className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] transition-colors ${
-        active ? 'bg-accent/20 text-accent ring-1 ring-accent' : open ? 'bg-panel3 text-text' : 'bg-panel3/60 text-muted hover:text-text'
-      }`}
+      tone={active ? 'on' : open ? 'open' : 'off'}
+      className="text-[10px]"
       title={active ? 'Shaped (combine, threshold or integrate) : click to see it' : 'Shape : combine with other modulators, a threshold, integrate'}
     >
       ⌇
-    </button>
+    </BarCell>
   )
 }
