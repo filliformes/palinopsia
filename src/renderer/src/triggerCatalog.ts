@@ -1,9 +1,9 @@
 // The whole trigger vocabulary as one grouped, searchable list : midi.ts's first
 // set (the dice, the transport, scenes, Sonify, sessions) and actions.ts's
-// (the layers, the triggers of what is loaded, the effects, Worlds, Generate,
-// Macro, modulators, Feel, tempo and sound, the output). The Body page's rule
-// builder and the MIDI panel's "learn an action" both pick from it, so a body
-// and a pad play the same instrument.
+// (the layers and the Background's opacity, the triggers of what is loaded,
+// the effects, Worlds, Generate, Macro, modulators, Feel, tempo and sound, the
+// output). The Body page's rule builder and the MIDI panel's "learn an action"
+// both pick from it, so a body and a pad play the same instrument.
 
 import type { SearchOption } from './components/SearchSelect'
 import { actionIds, actionInfo } from './actions'
@@ -16,7 +16,7 @@ const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Trans
 
 // The picker's headings, in order (an unknown one goes last)
 const ORDER = [
-  'Randomize', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4', 'Triggers (what is loaded)', 'Effects', 'Scenes', 'Worlds',
+  'Randomize', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4', 'Background', 'Triggers (what is loaded)', 'Effects', 'Scenes', 'Worlds',
   'Generate', 'Macro', 'Modulators', 'Feel', 'Tempo and sound', 'Sonify', 'Transport', 'Output', 'Session'
 ]
 
@@ -41,8 +41,12 @@ export function triggerOptions(st: St = useStore.getState()): SearchOption[] {
   for (const id of actionIds(st)) {
     const a = actionInfo(id, st)
     if (!a) continue
-    const layer = /^act:layer:(\d+):/.exec(id)
-    put({ value: id, label: a.label, group: a.group, title: a.title, keywords: layer ? [`L${Number(layer[1]) + 1}`] : undefined })
+    const layer = /^act:layer:(\d+):(op)?/.exec(id)
+    // ("L2 opacity", "bg opacity" : the opacity entries first)
+    const keywords = layer
+      ? [`L${Number(layer[1]) + 1}`, ...(layer[2] ? [`L${Number(layer[1]) + 1} opacity`] : [])]
+      : id.startsWith('act:bg:') ? ['bg', 'bg opacity'] : undefined
+    put({ value: id, label: a.label, group: a.group, title: a.title, keywords })
   }
   st.scenes.forEach((s, i) => put({ value: `scene:${i}`, label: `SCENE ${i + 1}${s.name ? ' · ' + s.name : ''}`, group: 'Scenes' }))
   put({ value: 'fire:sonify', label: midiTargetLabel('fire:sonify'), group: 'Sonify' })

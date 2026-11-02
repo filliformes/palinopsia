@@ -15,6 +15,40 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Body rules : each layer's opacity, and the Background's** (Vincent : "in Body, I
+  should be able to select each Layer's opacity as options for creating a rule"). Five
+  new actions per layer in the shared vocabulary (`actions.ts`, so the Body rule picker,
+  MIDI learn and every rule get them at once) : `act:layer:<i>:opoff` / `opfull` /
+  `optoggle` / `opup` / `opdown`, read "LAYER 2 opacity off / full / off / back / up /
+  down", in each Layer group after punch; the same five for the Background
+  (`act:bg:<verb>`, "BACKGROUND opacity …", a new **Background** heading after Layer 4,
+  offered while the session has a Background, "(gone)" and doing nothing otherwise).
+  Off and full are instant; **off / back** keeps the opacity it took down (per layer and
+  the Background, as freeze keeps the speed) and gives it back, full when nothing an
+  action did took it to 0; up / down are a tenth, clamped. One store write each
+  (`setOpacity` / `setBackgroundOpacity`) : one undo step, a quick run of steps
+  coalesced; the morph eases to it when one is under way; OSC feedback echoes it as any
+  change (the dataflou opacity destinations are inbound only). A pinned layer, a pinned
+  layer opacity (`lay:<i>:opacity`) or a pinned `bg:opacity` refuses with its toast
+  ("L2 opacity is persistent : the action leaves it"). The list's search ranks them
+  first for "L2 opacity" / "bg opacity" (`triggerCatalog.ts` keywords). There is no
+  continuous rule kind on the Body page : a body feature drives an opacity through a
+  `body` modulator bound with the opacity's **M** (both were already modulation
+  targets; the README now says so). Checked in the test copy (RTX 4070, camera never
+  opened, `getUserMedia` stubbed) : all 25 ids fired through the rule engine
+  (`bodyBus.fireGesture` → App's dispatcher), 67/67 store + compositor checks (each
+  layer from 0.6 / 0.45 / 0.8 / 0.3 : off 0, back to its value, full 1, up clamps at 1,
+  down 0.9, x3 0.7, eleven downs clamp at 0, the three other layers untouched; the
+  Background 0.7 → 0 → 0.7 → 1 → 0.9 → 1); undo : off from 0.5 undoes to 0.5, three
+  quick ups 0.5 → 0.8 undo in one step; pins refused (control, whole layer,
+  Background); a fire mid-morph (1.5 s, compositor at 0.413) settles at 0.9. In the UI
+  with real CDP clicks : "L2 opacity" lists the five first, "opacity" the 25 under
+  Layer 1-4 + Background, the pick saves as `act:layer:1:optoggle` (auto name "pinch L
+  takes layer 2's opacity off and back", `/body/PinchLL2OpBack`), its test button takes
+  L2 0.6 → 0 → 0.6 (store and compositor), the rule survives closing the page and a
+  window reload and fires by its gesture after (0.35 → 0 → 0.35); MIDI learn lists the
+  25 and arms `act:bg:optoggle`. A `body` modulator on a synthetic hand height bound to
+  L2 and Background opacity : the compositor follows 0.2 / 0.5 / 0.9. Console errors 0.
 - **MACRO : the Macro knobs row shows or hides, hidden by default** (Vincent : "I don't
   use it so often and I think neither will the average user for now; so I think it would
   save some UI space to be able to not see it all the time"). A **MACRO** button at the
