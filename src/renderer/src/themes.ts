@@ -1784,6 +1784,17 @@ export const THEMES: Theme[] = [
 
 ]
 
+/** Generate's first entry : not a theme (nothing is drawn at random) but the
+ *  blankest session to start from : four empty layers, no effects, a finish
+ *  that leaves the picture as it is, and eight plain modulators running and
+ *  bound to nothing (store.ts makeInitComposition, generateInit). */
+export const GEN_INIT = {
+  id: 'init',
+  name: 'Init',
+  group: 'Start',
+  blurb: 'A blank session to start from : four empty layers, no effects, the picture left as it is, and eight plain modulators running and bound to nothing (slow sine, triangle, square, saw, random steps, smooth random, envelope, ramp). Pick a source on layer 1, then M on any control binds a modulator.'
+}
+
 /** Themes grouped by family, in declaration order : drives the dropdown's optgroups. */
 export const THEME_FAMILIES: Array<{ family: string; themes: Theme[] }> = (() => {
   const order: string[] = []

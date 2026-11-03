@@ -43,7 +43,7 @@ import { blurbFor } from './shaders/isf/shaderBlurbs'
 import { generatorBlurb } from './shaders/isf/sourceBlurbs'
 import { inputsForShader, type IsfInputDesc } from './shaders/isf/inputs'
 import { SOURCE_EDITOR_KEY } from './shaders/userShaders'
-import { THEME_FAMILIES } from './themes'
+import { GEN_INIT, THEME_FAMILIES } from './themes'
 import { BG_PRESETS, BG_SOURCES, bgPresetToState } from './bgPresets'
 import { BLEND_LABELS } from './components/abMix'
 import { fracFor } from './components/AutoControls'
@@ -571,7 +571,16 @@ function chainItems(): SearchItem[] {
 }
 
 function themeItems(): SearchItem[] {
-  return THEME_FAMILIES.flatMap((f) =>
+  const init: SearchItem = {
+    key: `theme:${GEN_INIT.id}`,
+    kind: 'theme' as const,
+    label: GEN_INIT.name,
+    group: GEN_INIT.group,
+    hint: 'a blank session to start from : empty layers, eight plain modulators',
+    title: `Generate the blank Init session (asks to save changes first) : ${GEN_INIT.blurb}`,
+    run: () => generateFromTheme(GEN_INIT.id)
+  }
+  return [init, ...THEME_FAMILIES.flatMap((f) =>
     f.themes.map((t) => ({
       key: `theme:${t.id}`,
       kind: 'theme' as const,
@@ -581,7 +590,7 @@ function themeItems(): SearchItem[] {
       title: `Generate a “${t.name}” session (asks to save changes first) : ${t.blurb}`,
       run: () => generateFromTheme(t.id)
     }))
-  )
+  )]
 }
 
 /** Every control of what is loaded now : each unit's inputs (and an effect's

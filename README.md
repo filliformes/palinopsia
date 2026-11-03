@@ -208,7 +208,9 @@ first-ever launch pays this once; it persists on disk afterwards.
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
    **Generate** in the toolbar : 126 themed recipes that build a coherent
-   session (visuals + World + palette + macro biases + motion) in one click.
+   session (visuals + World + palette + macro biases + motion) in one click. Its
+   first entry, **Init**, is the opposite : a blank session to start from (empty
+   layers, no effects, eight plain modulators ready to bind).
 
 **Lost?** Press **`?`** anytime for the full keyboard cheat-sheet, and **`Ctrl+K`** to
 find any effect, source, parameter, preset, theme or page by typing.
@@ -1588,8 +1590,8 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
   presets), finishing on/off.
 - **Scenes** : next, previous, **random**, a numbered slot.
 - **Worlds** : next, previous, random, or one by name (over the Morph time).
-- **Generate** : a random theme, the **next theme in its family**, or a random theme of
-  one family (one entry per family). Like a pad's New, it never stops to ask : unsaved
+- **Generate** : **Init** (the blank session), a random theme, the **next theme in its
+  family**, or a random theme of one family (one entry per family). Like a pad's New, it never stops to ask : unsaved
   work is kept as a recovery copy, and undo brings the session back.
 - **Macro** : each knob up or down a tenth, to a random place, or flipped to the far end,
   over its own smoothing.
@@ -2643,7 +2645,17 @@ subfolders) joins the dropdown under the folder's name, in name order (number th
 saved there later appears too. The same menu lists the linked folders : click one to
 jump to its first session, × to unlink it (the files are never touched).
 
-**Generate** (toolbar) : a dropdown of **126 visual themes** in 18 families
+**Generate** (toolbar) : first **Init**, selected when the app opens : the blankest
+session to start from. Four empty layers (pick a source on layer 1 : the bottom one plays
+normal, the others add), no effects, the Background off, the finish left so the picture
+comes out as it is (the Vibe on the source's own colors, no bloom, depth, grain or dust),
+no World mood (it reads Incongruent : coupling off), neutral Feel, no scenes, no
+bindings, the Macro knobs bare, and eight plain modulators running (their meters move)
+and bound to nothing : M1 a slow sine, M2 a triangle, M3 a square (on / off), M4 a saw
+(a rise and a drop), M5 random steps, M6 smooth random, M7 a looping envelope, M8 a slow
+ramp. The M beside any control binds one. It morphs in like any Generate; what you
+pinned and the session's mappings ride through, and Sonify is left as it is. Then a
+dropdown of **126 visual themes** in 18 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :

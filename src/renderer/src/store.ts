@@ -158,7 +158,7 @@ import {
   type RandomizeScope
 } from './randomize'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX, BG_SOURCES } from './bgPresets'
-import { THEME_BY_ID, motionFor, type Theme } from './themes'
+import { GEN_INIT, THEME_BY_ID, motionFor, type Theme } from './themes'
 
 export type { FxScope }
 
@@ -1021,6 +1021,39 @@ export function makeDefaultComposition(): CompositionState {
     modulators: makeDefaultModulators(),
     modMatrix: [],
     metaKnobs: makeDefaultMetaKnobs()
+  }
+}
+
+// Generate's Init (themes.ts GEN_INIT) : the blankest session. Four empty
+// layers (the bottom one normal, the others as a new layer is), no effects, the
+// Background off, the finish set to leave the picture as it is (the Vibe on the
+// source's own colors, no bloom, depth, grain or dust), no bindings, the Macro
+// knobs bare; and eight plain modulators, each a different motion, running so
+// their meters move, bound to nothing (M on a control binds one).
+const INIT_MODS: Array<Partial<ModulatorConfig>> = [
+  { type: 'lfo', shape: 'sine', rateHz: 0.2 }, // a slow wave
+  { type: 'lfo', shape: 'triangle', rateHz: 0.5 },
+  { type: 'lfo', shape: 'square', rateHz: 0.5 }, // on / off
+  { type: 'lfo', shape: 'sawtooth', rateHz: 0.25 }, // a rise, a drop
+  { type: 'random', rateHz: 1 }, // a new level each second
+  { type: 'lfo', shape: 'rndSmooth', rateHz: 0.5 }, // random, gliding
+  { type: 'adsr' }, // an envelope, looping
+  { type: 'ramp', ramp: { rampMs: 8000, curvePct: 0, mode: 'loop' } } // a slow climb
+]
+export function makeInitComposition(bpm: number): CompositionState {
+  const c = makeDefaultComposition()
+  const master = c.master.map((f) => {
+    if (f.shaderId === 'fx-vibe') return { ...f, inputs: { ...f.inputs, mixSrc: 1 } }
+    if (f.shaderId === 'fx-context') return { ...f, inputs: { ...f.inputs, bloom: 0, depth: 0 } }
+    if (f.shaderId === 'fx-finalizer') return { ...f, inputs: { ...f.inputs, grain: 0, parasites: 0 } }
+    return f
+  })
+  return {
+    ...c,
+    bpm,
+    layers: c.layers.map((l, i) => (i === 0 ? { ...l, blend: 'normal' as const } : l)),
+    master,
+    modulators: c.modulators.map((m, i) => ({ ...m, ...INIT_MODS[i], enabled: true, sync: 'free' as const, curve: 'linear' as const }))
   }
 }
 
@@ -2291,6 +2324,8 @@ interface StoreState {
   newSession: () => void
   /** Generate : replace the live session with a fresh one built from a theme. */
   generateTheme: (themeId: string) => void
+  /** Generate's Init : the blankest session to start from (makeInitComposition). */
+  generateInit: () => void
   loadSession: (s: Session) => void
   exportSession: () => Session
   // Path of the file this session is saved to (from Save As / Open) : enables a
@@ -5918,6 +5953,44 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     })
     // what wants to know (the session's media status) hears a new one came in
+    emitSessionLoaded()
+  },
+  generateInit: () => {
+    // As Generate does (a fresh, unsaved session, the Morph time's relay, undoable,
+    // pins and the session's mappings ride), with nothing drawn : no World is
+    // applied (each adds a mood and an audio modulator); its label reads
+    // Incongruent, the World of uncoupled layers, which these are.
+    const prevMods = get().composition.modulators
+    set((s) => {
+      resetCouplingState()
+      const comp = keep(s, makeInitComposition(s.composition.bpm))
+      if (s.morphMs > 20) { beginRelayMorph(s.composition, comp, s.morphMs, performance.now()); audioLayer.releaseOver(s.morphMs) }
+      else {
+        cancelMorph()
+        requestSceneChange(0)
+      }
+      const world = s.worlds.some((w) => w.id === 'incongruent') ? 'incongruent' : s.world
+      if (world !== s.world) localStorage.setItem('opsia.world', world)
+      return {
+        name: GEN_INIT.name,
+        composition: comp,
+        world,
+        selection: { type: 'source', layer: 0, slot: 'A' },
+        scenes: [],
+        activeSceneId: null,
+        vibePresetName: null,
+        variationBaseline: null,
+        sequence: makeDefaultSequence(),
+        sessionPath: null,
+        audioLayer: defaultAudioLayer(),
+        audioLayerArmed: NOT_ARMED,
+        surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
+        ...FEEL_NEUTRAL,
+        shutter: 0,
+        superFlicker: 0
+      }
+    })
+    notePatterns(prevMods, get().composition.modulators)
     emitSessionLoaded()
   },
   generateTheme: (themeId) => {
