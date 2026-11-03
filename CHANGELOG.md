@@ -189,8 +189,8 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   the movement in the visuals on the screen is playing the synth, creating whole
   melodies"; his design : the moving things are the players, each a voice, an Aphex-style
   picture patchbay of ten rows). The PLAY side of the new voice 11 (appended : saved
-  mixers, masks and MIDI bindings keep their voices); the sound (`synth.engine.js`, eight
-  engines behind a fixed interface) is its own entry.
+  mixers, masks and MIDI bindings keep their voices); the sound (`synth.engine.js` : the
+  eight engines behind the fixed interface, and the 24 factory sounds) is the entry above.
   - **Finding the players** (`audio/synthPlay.ts`, main thread, on the Synth tap's 96×96
     grids beside Flow, Events and Signal) : motion per 4 px block (Flow's frame
     difference, held 80 ms), light, Sobel edges (Events') and color; moving blocks
@@ -205,7 +205,8 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
     that stopped or left lets go. Poly : the 8 strongest play, a newcomer takes a voice
     only when one is free or when it is twice the weakest one that has played 0.6 s
     (one a tick); mono and unison : the strongest, another taking over after being
-    1.6 times stronger for 0.2 s (its note first, then the old one's off : legato).
+    1.6 times stronger for 0.2 s (its note first, then the old one's off, in one
+    message : the engine takes that order as a handover and strikes the new note).
   - **Per thing**, each 0..1 and smoothed (~0.1 s) : speed (its travel and its motion),
     size, brightness, hue (folded so red meets red, grey in the middle), saturation,
     texture (Sobel under it), x, y, direction (0.5 still), age (over 4 s); the whole
@@ -240,8 +241,9 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
     the voice's balance ramped per sample, then its mixer channel (DJ filter, gain, the
     15 ms voice fade, the FX send, recordings, Space). The meter reports its sounding
     voices.
-  - **The panel** (`components/SonifySynth.tsx`, after Events) : factory sounds
-    (`SYNTH_PATCHES`, the menu says so while there are none), engine (8 buttons), poly /
+  - **The panel** (`components/SonifySynth.tsx`, after Events) : the 24 factory sounds
+    (`SYNTH_PATCHES`, three per engine : a pick sets the engine and its whole tone, the
+    read, the patchbay and the levels stay), engine (8 buttons), poly /
     unison / mono, timbre / harmonics / morph with the engine's meanings under them;
     read (pitch, bars in score, range + steps / slide, sense, timing, tap); tone
     (filter, cutoff, reso, drive, hpf, fmode greyed unless morph, env amt); a 2 × 2
@@ -263,7 +265,8 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
     (p95 0.5, max 0.7), the whole Sonify tick 0.12 ms a frame on average; up to 8
     playing (poly), 1 in mono and unison. A square crossing left to right (keyboard) :
     a run of 15 notes, 53 to 77, one a scale step, `setMods` pan −0.52 → +0.49 and the
-    stand-in's right channel 0.29 → 0.71 of the sound (the mods reach the engine).
+    right channel 0.29 → 0.71 of the sound (the mods reach the engine; measured on the
+    sine stand-in the real engine replaced).
     Flashes at irregular times : onsets spread over 210 ms of the 1/8 when free, within
     3 ms of the 1/8 and of the 1/16 on a grid (10 ms before the output timestamp). Two
     of Vincent's sessions (scenes with sound patches, 10- and 11-voice masks) export
@@ -272,6 +275,24 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
     rightward and outward moves rise in height, keyboard and radial, falling ones fall,
     a still picture plays nothing, PICTURE 0 sends exactly neutral mods, a stop or an
     exit lets go 0.4 s later, poly holds 8 of 12 things.
+  - **The real engine in the worklet** (both halves merged; test copy, RTX 4070, the
+    dance film alone on L1, the sound to a virtual audio cable so a real device clocks
+    it) : `globalThis.OpsiaSynth` in the worklet scope is the real class (8 engines, 8
+    voices), no `addModule` error, 0 console errors. Each engine at its defaults, 8 s
+    from the same moment of the film : 101 to 137 strikes, RMS -22.9 to -27.2 dBFS,
+    peaks -8.9 to -12 dBFS, no 100 ms window under -60 dBFS, never clipped, the limiter
+    never reached, 0 non-finite samples out of the engine (again with every macro,
+    resonance, drive and level at 1 and chorus II : the same, its raw peak at most
+    0.99). Poly : 8 things playing, 8 voices sounding; unison : 1 thing, all 8 voices;
+    mono : 1 and 1. A factory sound changes the sound (Glass Bell over the default :
+    the spectral centroid 573 → 1171 Hz). The audio thread with 8 voices of the modal
+    engine (the heaviest; macros 0.9, drive 0.6, chorus II) beside Spectra and the FX
+    tail : 0.44 to 0.51 ms a render quantum on average (the engine 0.29 to 0.37) of
+    the 2.67 ms it has, none over it in 30 s (10,875 quanta, the audio clock at 1.000
+    of real time; one quantum of 2 to 3 ms in each of the two runs that switched the
+    engine to modal on the way in), the picture at 60 fps (p95 19.5 ms). Beside the
+    other voices at their defaults on the same film : the Synth at -25 dBFS RMS like
+    the Chord, under Spectra and Orbit (-19) and Flow and Events (-14, -15).
 
 - **The Seq page is the home of every sequencer : lanes under one transport, and a Body
   rule timeline** (Vincent : "a complete Body rule sequencer ... drag and drop rules on a

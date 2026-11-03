@@ -20,8 +20,8 @@ import { modTargetKey } from '../store'
 import type { SliderProps } from './SonifyPage'
 
 const ENGINE_HINT: Record<string, string> = {
-  dco: 'DCO : two digital oscillators, their wave and density, sync up to a metallic edge',
-  ms: 'MS : a hard-edged analog pair, ring modulation, dirt',
+  dco: 'DCO : two digital oscillators, their wave, density then interval, sync up to a metallic edge',
+  ms: 'MS : a hard-edged analog pair, the second one\'s interval then ring modulation, dirt',
   swarm: 'Swarm : a cloud of detuned voices, its shape, spread and pulse',
   fm: 'FM : bright bell to bite, by ratio steps',
   modal: 'Modal : struck resonators, a material and its damping',
@@ -168,9 +168,11 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
         {[1, 2, 3, 4, 5, 6, 7, 8].map((o) => <option key={o} value={o}>oct {o}</option>)}
       </select>
       <span className="min-w-0 flex-1" />
+      {/* 2 px less padding a side than the other chips : at the voice cards'
+          284 px the pair ran 7 px past the card's edge */}
       <div className="flex shrink-0 gap-1">
-        <button onClick={() => set({ slide: false })} className={chipCls(!s.slide)} title="Steps : a thing crossing the scale's notes strikes again at each new one (a rising hand plays a run)">steps</button>
-        <button onClick={() => set({ slide: true })} className={chipCls(s.slide)} title="Slide : the note glides with the thing, lingering on each scale note">slide</button>
+        <button onClick={() => set({ slide: false })} className={chipCls(!s.slide).replace('px-1.5', 'px-1')} title="Steps : a thing crossing the scale's notes strikes again at each new one (a rising hand plays a run)">steps</button>
+        <button onClick={() => set({ slide: true })} className={chipCls(s.slide).replace('px-1.5', 'px-1')} title="Slide : the note glides with the thing, lingering on each scale note">slide</button>
       </div>
     </Row>
     <Slider label="sense" value={s.sens} min={0} max={1} neutral={0.5} fmt={fmt2} onChange={(v) => set({ sens: v })} mod={chip('synthSens')} midiId={midi('synthSens')} title={s.mode === 'score' ? 'How much a shape must stand out at the playhead to play (up : fainter shapes too)' : 'How much movement counts as a thing (up : smaller, slower movements play too)'} />

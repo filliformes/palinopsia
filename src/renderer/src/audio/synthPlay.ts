@@ -45,8 +45,8 @@ export const SYNTH_ENGINES: SynthEngineId[] = ['dco', 'ms', 'swarm', 'fm', 'moda
 export const SYNTH_FILTERS: SynthFilterId[] = ['ladder', 'ms', 'morph']
 /** What each engine's three macros do (TIMBRE · HARMONICS · MORPH). */
 export const SYNTH_MACROS: Record<SynthEngineId, [string, string, string]> = {
-  dco: ['wave', 'density', 'sync→metal'],
-  ms: ['wave', 'ring', 'dirt'],
+  dco: ['wave', 'density→interval', 'sync→metal'],
+  ms: ['wave', 'interval→ring', 'dirt'],
   swarm: ['shape', 'spread', 'pulse'],
   fm: ['bright', 'ratio', 'bite'],
   modal: ['strike', 'material', 'damping'],
@@ -880,7 +880,9 @@ export class SynthPlayer {
         if (best && best.str > cur.str * 1.6) best.lead += dt
         for (const c of cand) if (c !== best) c.lead = 0
         if (best && best.lead > 0.2) {
-          // legato : the new note first, then the old one lets go
+          // the new note first, then the old one lets go, in one message : the
+          // engine reads that order (no render between) as a handover and
+          // strikes the new note (a note over a held one is otherwise legato)
           best.lead = 0
           this.start(best, inp, ev)
           this.stop(cur, ev)
