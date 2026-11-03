@@ -447,7 +447,7 @@ export function SectionedControls({
  *  bar's tint (a panel on another background picks one that shows on it). Keys
  *  fold it only from the bar itself (a key typed into a control in it stays
  *  the control's). */
-export function SectionHead({ title, color, folded, onToggle, right, lead, bar = 'bg-panel2/60 hover:bg-panel2', hint }: {
+export function SectionHead({ title, color, folded, onToggle, right, lead, bar = 'bg-panel2/60 hover:bg-panel2', hint, wrap }: {
   title: string
   color: string
   folded: boolean
@@ -457,6 +457,8 @@ export function SectionHead({ title, color, folded, onToggle, right, lead, bar =
   lead?: ReactNode
   bar?: string
   hint?: string
+  /** The lead may take a line of its own (a narrow panel) rather than shrink. */
+  wrap?: boolean
 }): JSX.Element {
   return (
     <div
@@ -470,7 +472,7 @@ export function SectionHead({ title, color, folded, onToggle, right, lead, bar =
           onToggle()
         }
       }}
-      className={`flex min-h-[20px] cursor-pointer select-none items-center gap-1.5 border-t border-border px-2 py-0.5 ${bar}`}
+      className={`flex min-h-[20px] cursor-pointer select-none items-center gap-1.5 border-t border-border px-2 py-0.5 ${wrap ? 'flex-wrap gap-y-0.5' : ''} ${bar}`}
       title={hint ?? (folded ? `Show ${title}` : `Fold ${title}`)}
     >
       <span className="w-2.5 shrink-0 font-mono text-[9px]" style={{ color }}>

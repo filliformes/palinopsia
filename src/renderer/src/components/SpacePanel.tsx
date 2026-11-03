@@ -33,6 +33,7 @@ import type { SonifyModParam } from '@shared/types'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { Row, RangeRow, Seg, Shell, Stepper, chip, sonifyCovered, themeVar } from './sonifyUi'
 import { ownerWindow } from './ownerWindow'
+import { SONI_VOICE_ORDER } from './soniGroups'
 import { showToast } from './Toast'
 
 const MODE_HINT: Record<SpaceMode, string> = {
@@ -115,7 +116,7 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
           </button>
         }
       >
-        <Row label="output" hint="Where Sonify's sound goes">
+        <Row label="output" fit={170} hint="Where Sonify's sound goes">
           <Seg<SpaceMode> options={['stereo', 'speakers', 'objects']} value={space.mode} onChange={(m) => setSpace({ mode: m })} title={(m) => MODE_HINT[m]} />
         </Row>
         {on && (
@@ -260,12 +261,16 @@ export function SpacePanel({ chip: modChip, assign, renderAssign }: {
             <span className="w-[18px] shrink-0 text-center" title="Lit : the voice follows where it plays in the picture. Dark : a fixed place.">fol</span>
             {['az', 'el', 'width', 'span', 'spin'].map((h) => <span key={h} className="min-w-0 flex-1 text-center">{h}</span>)}
           </div>
-          {SPACE_VOICES.map((v, i) => (
-            <VoiceRow
-              key={v} voice={v} index={i} setVoice={setVoice} open={open === v} onOpen={() => setOpen(open === v ? null : v)} modChip={modChip}
-              assignBox={assign && assign.startsWith(`space.${v}.`) && renderAssign ? renderAssign(assign as SonifyModParam) : null}
-            />
-          ))}
+          {/* in the voices' family order (the voice cards'), each at its own channel index */}
+          {SONI_VOICE_ORDER.map((i) => {
+            const v = SPACE_VOICES[i]
+            return (
+              <VoiceRow
+                key={v} voice={v} index={i} setVoice={setVoice} open={open === v} onOpen={() => setOpen(open === v ? null : v)} modChip={modChip}
+                assignBox={assign && assign.startsWith(`space.${v}.`) && renderAssign ? renderAssign(assign as SonifyModParam) : null}
+              />
+            )
+          })}
         </Shell>
       )}
     </div>
