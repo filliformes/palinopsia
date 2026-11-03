@@ -15,6 +15,22 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Init, Generate's first entry** (Vincent : "Make the most basic, totally blank, INIT
+  session, with a set of 8 basic modulators, so the least experienced user can start from
+  there and not be confused. Put this in Generate, as the FIRST option on the list").
+  Not a theme (nothing drawn) : `themes.ts GEN_INIT` (the first option, group Start, and
+  the menu's selection at launch), `store.ts makeInitComposition` (the default
+  composition with the bottom layer normal, the Vibe at mixSrc 1, Context's bloom and
+  depth 0, the Finalizer's grain and dust 0, and the eight modulators : sine 0.2 Hz,
+  triangle, square, saw, random, smooth random, a looping ADSR, an 8 s ramp, all on, free
+  clock, linear, no bindings) and `generateInit` (Generate's write path : unsaved, the
+  relay morph, undoable, pins and mappings ride, a new Audio Layer, scenes and sequence
+  cleared, Feel neutral with no shutter or flicker; no World applied, each adds a mood and
+  an audio modulator : the label reads Incongruent, the World of uncoupled layers). In
+  Ctrl+K (first among the themes) and as `act:gen:init` (GENERATE Init : MIDI, a Body
+  rule). Checked in the test copy from the toolbar : the menu opens on Init under START,
+  Generate builds it (four empty layers, eight modulators moving, no bindings), and a
+  generator on layer 1 comes out the same with the finish on as with it off (1 of 255).
 - **Sonify's state made persistent** (Vincent : "add a new right-click option to Sonify
   : Make current state persistent. This is enabled so that when I have a cool Sonify
   state, I can make it persist when I switch between Scenes that were saved with a

@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { collageClipsFor, useStore } from '../store'
-import { THEME_FAMILIES, THEMES } from '../themes'
+import { GEN_INIT, THEME_FAMILIES, THEMES } from '../themes'
 import { SearchSelect } from './SearchSelect'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { showToast } from './Toast'
@@ -209,6 +209,14 @@ export function SessionLoader(): JSX.Element {
  *  painted sources stand in. The search (Ctrl/Cmd+K) generates through it too.
  *  False when you stayed. */
 export async function generateFromTheme(id: string): Promise<boolean> {
+  // Init : the blank session (not a theme)
+  if (id === GEN_INIT.id) {
+    if (!(await leaveSession('starting a blank Init session'))) return false
+    useStore.getState().generateInit()
+    markClean()
+    showToast('Init · a blank session : pick a source on layer 1')
+    return true
+  }
   const current = THEMES.find((t) => t.id === id)
   // Generate replaces the session : unsaved changes are asked about first.
   if (!(await leaveSession(`generating “${current?.name ?? 'a theme'}”`))) return false
@@ -226,8 +234,9 @@ export async function generateFromTheme(id: string): Promise<boolean> {
 }
 
 export function GenerateMenu(): JSX.Element {
-  const [sel, setSel] = useState(THEMES[0].id)
-  const current = THEMES.find((t) => t.id === sel)
+  // Init first (the place to start), then the themes by family
+  const [sel, setSel] = useState(GEN_INIT.id)
+  const current = sel === GEN_INIT.id ? GEN_INIT : THEMES.find((t) => t.id === sel)
 
   return (
     <div
@@ -241,9 +250,12 @@ export function GenerateMenu(): JSX.Element {
         className="tb-generate w-[120px] text-[12px]"
         value={sel}
         menuWidth={248}
-        options={THEME_FAMILIES.flatMap((f) =>
-          f.themes.map((t) => ({ value: t.id, label: t.name, group: f.family, title: t.blurb }))
-        )}
+        options={[
+          { value: GEN_INIT.id, label: GEN_INIT.name, group: GEN_INIT.group, title: GEN_INIT.blurb },
+          ...THEME_FAMILIES.flatMap((f) =>
+            f.themes.map((t) => ({ value: t.id, label: t.name, group: f.family, title: t.blurb }))
+          )
+        ]}
         onChange={(v) => setSel(v)}
         title={current?.blurb ?? 'Pick a visual theme (type to search by name or family)'}
       />

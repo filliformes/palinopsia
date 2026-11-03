@@ -47,7 +47,7 @@ import { DICE_SOURCES, randomizeInputs } from './randomize'
 import { SHADER_BY_ID, inPickerOrder } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { allChains, chainByKey } from './userChains'
-import { THEMES, THEME_BY_ID, THEME_FAMILIES } from './themes'
+import { GEN_INIT, THEMES, THEME_BY_ID, THEME_FAMILIES } from './themes'
 import { knobDisplayValue, setKnobTarget } from './metaSmooth'
 import { modEngine } from './engine/modulation'
 import { linkPlay, setLinkPlaying } from './link'
@@ -373,12 +373,13 @@ export function lastActionChain(): string | null {
 let lastTheme: string | null = null
 let generating = false
 async function generate(id: string): Promise<void> {
-  const theme = THEME_BY_ID[id]
+  const theme = id === GEN_INIT.id ? GEN_INIT : THEME_BY_ID[id]
   if (!theme || generating) return
   generating = true
   try {
     if (!(await leaveSession(`generating “${theme.name}”`, false))) return
-    get().generateTheme(id)
+    if (id === GEN_INIT.id) get().generateInit()
+    else get().generateTheme(id)
     markClean()
     lastTheme = id
     showToast(`Generated · ${theme.name}`)
@@ -520,7 +521,8 @@ export function fireAction(id: string): void {
       return
     }
     case 'gen': {
-      if (p[2] === 'rand') void generate(pickOne(THEMES).id)
+      if (p[2] === 'init') void generate(GEN_INIT.id)
+      else if (p[2] === 'rand') void generate(pickOne(THEMES).id)
       else if (p[2] === 'next') {
         const cur = themeNow(st)
         const fam = cur ? THEME_FAMILIES.find((f) => f.themes.some((t) => t.id === cur)) : null
@@ -701,6 +703,7 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
     }
     case 'gen': {
       const t = 'Replaces the session as the Generate button does, without asking : unsaved work is kept as a recovery copy, and undo brings it back'
+      if (p[2] === 'init') return { label: 'GENERATE Init (blank)', verb: 'starts a blank Init session', token: 'GenInit', group: 'Generate', title: `${GEN_INIT.blurb} ${t}` }
       if (p[2] === 'rand') return { label: 'GENERATE random theme', verb: 'generates a theme', token: 'Gen', group: 'Generate', title: t }
       if (p[2] === 'next') return { label: 'GENERATE next in its family', verb: 'generates the next theme', token: 'GenNext', group: 'Generate', title: `The next theme in the current theme’s family (a random one when the session is not a theme). ${t}` }
       if (p[2] === 'family') {
@@ -821,7 +824,7 @@ export function actionIds(st: St = get()): string[] {
   }
   out.push('act:chain:next', 'act:chain:prev', 'act:chain:rand', 'act:finishing', 'act:scene:rand')
   out.push('act:world:next', 'act:world:prev', 'act:world:rand', ...st.worlds.map((w) => `act:world:id:${w.id}`))
-  out.push('act:gen:rand', 'act:gen:next', ...THEME_FAMILIES.map((f) => `act:gen:family:${f.family}`))
+  out.push('act:gen:init', 'act:gen:rand', 'act:gen:next', ...THEME_FAMILIES.map((f) => `act:gen:family:${f.family}`))
   st.composition.metaKnobs.forEach((_, k) => { for (const v of META_VERBS) out.push(`act:meta:${k}:${v}`) })
   st.composition.modulators.forEach((m, n) => {
     out.push(`act:mod:${n}:trig`, `act:mod:${n}:onoff`)
