@@ -1203,6 +1203,50 @@ input[type='range'].live-overlay {
   border-radius: 4px;
 }
 
+/* A MAIN control's slider (the Sonify Synth's TIMBRE / HARMONICS / MORPH) : a
+   taller groove that fills in the accent up to the value (accent2 while
+   modulated) and a bigger thumb, ringed in the card's color so it stands out
+   in every theme. The fill follows --v (0..1), set by the Slider (and by the
+   live overlay while modulated); the 7 px keep it under the thumb's middle. */
+input[type='range'].soni-main {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  --v: 0.5;
+  --mc: var(--c-accent);
+}
+input[type='range'].soni-main.is-live {
+  --mc: var(--c-accent2);
+}
+input[type='range'].soni-main::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, rgb(var(--mc)) calc(7px + (100% - 14px) * var(--v)), rgb(var(--c-input-bg)) 0);
+  box-shadow: inset 0 0 0 1px rgb(var(--c-border) / 0.9);
+}
+input[type='range'].soni-main::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: rgb(var(--mc));
+  box-shadow: 0 0 0 2px rgb(var(--c-panel2)), 0 1px 3px rgb(0 0 0 / 0.45);
+}
+input[type='range'].soni-main:hover::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgb(var(--c-panel2)), 0 0 0 3px rgb(var(--mc) / 0.45);
+}
+input[type='range'].soni-main:focus-visible {
+  outline: none;
+}
+input[type='range'].soni-main:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgb(var(--c-panel2)), 0 0 0 3px rgb(var(--c-text) / 0.6);
+}
+
 /* ─────────────────────────────────────────────────────────────────
    Rich-theme styling. Activated by ThemeName ∈ RICH_THEMES (Nature,
    the rich themes). Components opt in by reading `isRichTheme()` from
