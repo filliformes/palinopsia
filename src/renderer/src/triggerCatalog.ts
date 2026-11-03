@@ -59,7 +59,7 @@ export function triggerOptions(st: St = useStore.getState(), opts: { self?: bool
   st.scenes.forEach((s, i) => put({ value: `scene:${i}`, label: `SCENE ${i + 1}${s.name ? ' · ' + s.name : ''}`, group: 'Scenes' }))
   put({ value: 'fire:sonify', label: midiTargetLabel('fire:sonify'), group: 'Sonify' })
   SONI_VOICE_NAMES.forEach((n, i) => put({ value: `sonify:voice:${i}`, label: `SONIFY ${n} on/off`, group: 'Sonify' }))
-  core('Transport', ['fire:flush', 'fire:freeze', 'fire:record', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo'])
+  core('Transport', ['fire:flush', 'fire:black', 'fire:freeze', 'fire:record', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:undo', 'fire:redo'])
   core('Session', ['session:new', 'session:load', 'session:open'])
   const named = [...groups.keys()]
   const rank = (g: string): number => (ORDER.includes(g) ? ORDER.indexOf(g) : ORDER.length)

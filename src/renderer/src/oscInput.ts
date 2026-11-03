@@ -82,6 +82,7 @@
 //   /opsia/space/{voice}/az|el|width|span|spin          f 0..1 over the field's range (az 0.5 = 0)
 //   /opsia/space/{voice}/follow                         >= 0.5 (follow the picture, else fixed)
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
+//   /opsia/black                                        >= 0.5 fades the whole show to black over the Morph time, < 0.5 back (no value : over)
 //   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
 //   /opsia/surface/active {0|1}                         bool : enable the Metasurface
@@ -1154,6 +1155,14 @@ function route(address: string, args: Args, host = ''): void {
       return
     }
 
+    case 'black': {
+      // Black : the whole show to black over the Morph time (>= 0.5) or back. A
+      // value, not a trigger : a controller's toggle stays in step with it (a
+      // message with no value turns it over).
+      st.setBlack(args.length ? n >= 0.5 : 'toggle')
+      return
+    }
+
     case 'panic': {
       // The remote panic flush : drop every self-feeding buffer (same as key 0 /
       // the ⚡ Flush button). A rising-edge trigger, so a held value fires once.
@@ -1649,6 +1658,7 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/play', 0, 1, seqTransportPlaying() ? 1 : 0, 'The Seq transport : >= 0.5 plays every lane it starts, < 0.5 stops them all')
   add('/opsia/seq/rules', 0, 1, st.ruleSeqOn ? 1 : 0, 'The Body rule timeline running (>= 0.5)')
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
+  add('/opsia/black', 0, 1, st.black ? 1 : 0, 'Black : >= 0.5 fades the whole show (picture and sound) to black over the Morph time, < 0.5 brings it back')
   add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
   for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'macro', 'inspector', 'sonify', 'resolume', 'background'])
     add(`/opsia/randomize/${sc}`, 0, 1, 0, `Randomize ${sc} (trigger)`, false)

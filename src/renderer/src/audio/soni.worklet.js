@@ -768,7 +768,7 @@ class SpaceBus {
   // and before the subs and the limiter, with the FX return for now. (Scaled back
   // from the master instead, it jumped for a block on a sharp master pull and
   // was gone at master 0.)
-  finish(master, n, xL, xR) {
+  finish(master, n, xL, xR, bk0 = 1, dbk = 0) {
     const out = this.out;
     if (!out) return;
     const nch = Math.min(this.nch, out.length);
@@ -804,7 +804,8 @@ class SpaceBus {
     for (let ch = 0; ch < nch; ch++) {
       const o = out[ch];
       for (let s = 0; s < n; s++) {
-        let v = o[s];
+        // (Black : every channel, the subs too)
+        let v = bk0 < 1 || dbk !== 0 ? o[s] * (bk0 + dbk * (s + 1)) : o[s];
         if (!Number.isFinite(v)) v = 0;
         o[s] = v;
         const a = v < 0 ? -v : v; if (a > pkS[s]) pkS[s] = a;
@@ -996,6 +997,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     this.gateStep = 1 / Math.max(1, GATE_S * sampleRate);
     this.vGain = new Float32Array(NVOICE).fill(-1); // -1 = not yet set : start at the target
     this.mgS = -1; // master gain, ramped the same way
+    // Black (black.ts) : the last stage eased from bkFrom to bkTo over bkDur s
+    // from bkT0, on everything that leaves (the Audio Layer, Space, recordings)
+    this.bkFrom = 1; this.bkTo = 1; this.bkT0 = 0; this.bkDur = 0;
     // ── limiter ──
     this.limEnv = 1;
     // ── metering (sent back ~10Hz) ──
@@ -1086,6 +1090,14 @@ class SoniProcessor extends AudioWorkletProcessor {
     // every off / on used to leave one more engine playing to nobody.
     if (m.t === 'end') { this.ended = true; return; }
     if (m.t === 'space') { this.space.set(m); return; }
+    if (m.t === 'black') {
+      // from wherever it is now (a press mid-way turns it round)
+      this.bkFrom = this.blackAt(currentTime);
+      this.bkTo = clampf(Number(m.to) || 0, 0, 1);
+      this.bkT0 = currentTime;
+      this.bkDur = Math.max(0, (Number(m.ms) || 0) / 1000);
+      return;
+    }
     if (m.t === 'grid') {
       const tap = this.taps[m.tap];
       if (!tap) return;
@@ -1272,6 +1284,15 @@ class SoniProcessor extends AudioWorkletProcessor {
    *  notes that stay glide to their new places (60 ms at least), new ones start
    *  at theirs (silent, they swell in), and the ones left out fade out at
    *  their own pitch (chordM keeps them rendered until they are silent). */
+  /** Black's gain at audio time `t` (eased, as the picture's : black.ts). */
+  blackAt(t) {
+    if (this.bkDur <= 0) return this.bkTo;
+    const k = (t - this.bkT0) / this.bkDur;
+    if (k >= 1) return this.bkTo;
+    const e = k <= 0 ? 0 : k * k * (3 - 2 * k);
+    return this.bkFrom + (this.bkTo - this.bkFrom) * e;
+  }
+
   setChordFreqs(fr, gl) {
     const n = Math.min(NCHORD, fr.length), old = this.chordN;
     if (n !== old) {
@@ -2299,6 +2320,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     const mg1 = clampf(cfg.master, 0, 2);
     const mg0 = this.mgS < 0 ? mg1 : this.mgS, dmg = (mg1 - mg0) / n;
     this.mgS = mg1;
+    // Black : on everything, the Audio Layer joined, before the limiter
+    const bk0 = this.blackAt(currentTime), bk1 = this.blackAt(currentTime + n / sampleRate);
+    const bkOn = bk0 < 1 || bk1 < 1, dbk = (bk1 - bk0) / n;
     // Input 2 : the Audio Layer (a sound file, a live input), already at its own
     // levels : joined AFTER Sonify's master (its volume is its own) and BEFORE the
     // limiter, so the EQ, the glue, the recordings and Space all have it. In
@@ -2311,6 +2335,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       const mg = mg0 + dmg * (s + 1); // ramped : a stepped master zippered
       let l = outL[s] * mg, r = outR[s] * mg;
       if (exL) { l += exL[s]; r += exR[s]; }
+      if (bkOn) { const bk = bk0 + dbk * (s + 1); l *= bk; r *= bk; }
       if (!Number.isFinite(l)) l = 0;
       if (!Number.isFinite(r)) r = 0;
       const p = Math.max(Math.abs(l), Math.abs(r));
@@ -2327,7 +2352,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (ar > this.pkR) this.pkR = ar;
       this.ssL += l * l; this.ssR += r * r;
     }
-    if (spc.on && spc.out) spc.finish(cfg.master, n, exL, exR);
+    if (spc.on && spc.out) spc.finish(cfg.master, n, exL, exR, bkOn ? bk0 : 1, bkOn ? dbk : 0);
     this.nMeter += n;
     this.peak = peak; this.limMin = limMin;
     if (currentTime - this.lastMeter > 0.1) {

@@ -71,6 +71,7 @@ import { audioLayer, defaultAudioLayer, NOT_ARMED, sanitizeAudioLayer, type Audi
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
 import { playEdited } from './playEvents'
+import { fadeBlack } from './black'
 import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
@@ -2261,6 +2262,10 @@ interface StoreState {
   ruleSeqOn: boolean
   /** Run / stop the rule timeline on purpose (its play, the transport, MIDI, OSC). */
   setRuleSeqOn: (on: boolean) => void
+  /** Black (black.ts) : the whole show faded to black over the Morph time. A live
+   *  state : never saved, never in a session or a scene. */
+  black: boolean
+  setBlack: (on: boolean | 'toggle') => void
 
   // Session round-tripping
   newSession: () => void
@@ -5756,6 +5761,13 @@ export const useStore = create<StoreState>((set, get) => ({
     if (on === get().ruleSeqOn) return
     set({ ruleSeqOn: on })
     playEdited('rules', on)
+  },
+  black: false,
+  setBlack: (on) => {
+    const next = on === 'toggle' ? !get().black : on
+    if (next === get().black) return
+    set({ black: next })
+    fadeBlack(next, get().morphMs)
   },
 
   newSession: () => {

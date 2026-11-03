@@ -1871,6 +1871,12 @@ export class Compositor {
   // The texture presented last frame : snapshotted into `snapshot` the moment a
   // crossfade begins (so no per-frame blit in the steady state).
   private lastPresent: WebGLTexture | null = null;
+  // Black (black.ts) : how much of the finished frame leaves (1 all, 0 black),
+  // set by the loop every frame; its target is made on first use and let go a
+  // while after the show is back (a 4096 dome's is 128 MB)
+  private blackLevel = 1;
+  private blackTarget: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private blackIdleSince = -1;
   // Fulldome : when a config is set, the present pass renders a square
   // domemaster from the flat composite and the CANVAS becomes that master (so
   // recording, stills, NDI / Spout and the output stream all carry the dome).
@@ -2164,6 +2170,11 @@ export class Compositor {
   scaleLayerOpacity(i: number, k: number): void {
     const L = this.layers[i];
     if (L) L.opacity *= Math.max(0, Math.min(1, k));
+  }
+
+  /** Black (black.ts) : how much of the finished frame leaves this frame. */
+  setBlack(level: number): void {
+    this.blackLevel = level < 0 ? 0 : level > 1 ? 1 : level;
   }
 
   /** Scale a layer's sound this frame (its Audio slot, its film's volume) : the
@@ -3820,6 +3831,24 @@ export class Compositor {
     // Monomedia freeze-drop: hold the frame shown when it began (captured at the end
     // of that frame, below).
     if (this.freezeActive && this.freezeCaptured) present = this.snapshot.tex;
+    // Black (black.ts) : the finished frame toward black, before Flash safety (it
+    // nets a fast cut too), so the preview and every output go black together,
+    // the master FX's grain and dust included. A freeze holds the frame from
+    // before it, so the two stay apart (a frame frozen under Black comes back lit).
+    const preBlack = present;
+    if (this.blackLevel < 0.999) {
+      if (!this.blackTarget) this.blackTarget = makeTarget(gl, this.w, this.h);
+      // black OVER the frame at 1 - level : its colors times the level exactly
+      this.blendInto(this.blackTarget.fbo, present, this.blackTex(), 'normal', 1 - this.blackLevel);
+      present = this.blackTarget.tex;
+      this.blackIdleSince = -1;
+    } else if (this.blackTarget) {
+      if (this.blackIdleSince < 0) this.blackIdleSince = timeMs;
+      else if (timeMs - this.blackIdleSince > 10000) {
+        disposeTarget(gl, this.blackTarget);
+        this.blackTarget = null;
+      }
+    }
     // Strobe-safety limiter : the very last stage on the presented frame, so it nets
     // ALL upstream flash sources (Shutter, Superimposition, Frame-Weave, Cameraless
     // blank, datamosh bloom, hard cuts…). It counts flashes per second (real time)
@@ -3903,7 +3932,7 @@ export class Compositor {
     // the start of the next frame read a buffer that frame's layer pass may already
     // have reused (mixTarget), so the freeze could hold a raw layer mix.
     if (this.freezeActive && !this.freezeCaptured) {
-      this.copyInto(this.snapshot.fbo, present);
+      this.copyInto(this.snapshot.fbo, preBlack);
       this.freezeCaptured = true;
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
@@ -3960,6 +3989,7 @@ export class Compositor {
     this.abSwatchCaps.clear();
     disposeTarget(gl, this.snapshot);
     disposeTarget(gl, this.xfadeTarget);
+    if (this.blackTarget) { disposeTarget(gl, this.blackTarget); this.blackTarget = null; }
     if (this.fxOpac) { disposeTarget(gl, this.fxOpac[0]); disposeTarget(gl, this.fxOpac[1]); }
     if (this.audioTexGL) { gl.deleteTexture(this.audioTexGL); this.audioTexGL = null; }
     if (this.depthTex) { gl.deleteTexture(this.depthTex); this.depthTex = null; }

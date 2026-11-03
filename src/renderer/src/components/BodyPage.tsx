@@ -66,7 +66,7 @@ const ACTION_VERB: Record<string, string> = {
   'rand:sourcefx': 'randomizes source FX', 'rand:layerfx': 'randomizes layer FX', 'rand:mods': 'randomizes modulators',
   'rand:finishing': 'randomizes finishing', 'rand:bg': 'randomizes background', 'rand:master': 'randomizes master FX',
   'rand:meta': 'randomizes Macro knobs', 'rand:inspector': 'randomizes the inspector', 'rand:sonify': 'randomizes Sonify', 'rand:resolume': 'rolls the Resolume pins',
-  'fire:vary': 'varies', 'fire:flush': 'flushes buffers', 'fire:freeze': 'toggles freeze', 'fire:record': 'toggles record',
+  'fire:vary': 'varies', 'fire:flush': 'flushes buffers', 'fire:black': 'goes black (again : back)', 'fire:freeze': 'toggles freeze', 'fire:record': 'toggles record',
   'fire:tap': 'taps tempo', 'fire:seq': 'toggles the sequencer', 'fire:soniseq': 'toggles the Sonify sequencer',
   'fire:keyseq': 'toggles the Key sequencer',
   'fire:sonify': 'toggles Sonify', 'fire:undo': 'undoes', 'fire:redo': 'redoes', 'master:chain': 'toggles master FX',
@@ -77,7 +77,7 @@ const ACTION_TOKEN: Record<string, string> = {
   'fire:randomize': 'Rnd', 'rand:all': 'RndAll', 'rand:sources': 'RndSrc', 'rand:sourcefx': 'RndSrcFx',
   'rand:layerfx': 'RndLyrFx', 'rand:mods': 'RndMod', 'rand:finishing': 'RndFin', 'rand:bg': 'RndBg',
   'rand:master': 'RndMst', 'rand:meta': 'RndMacro', 'rand:inspector': 'RndInsp', 'rand:sonify': 'RndSoni', 'rand:resolume': 'RndReso',
-  'fire:vary': 'Vary', 'fire:flush': 'Flush', 'fire:freeze': 'Freeze', 'fire:record': 'Rec', 'fire:tap': 'Tap',
+  'fire:vary': 'Vary', 'fire:flush': 'Flush', 'fire:black': 'Black', 'fire:freeze': 'Freeze', 'fire:record': 'Rec', 'fire:tap': 'Tap',
   'fire:seq': 'Seq', 'fire:soniseq': 'SoniSeq', 'fire:keyseq': 'KeySeq', 'fire:sonify': 'Soni', 'fire:undo': 'Undo', 'fire:redo': 'Redo',
   'master:chain': 'MstChain', 'session:new': 'SesNew', 'session:load': 'SesLoad', 'session:open': 'SesOpen'
 }

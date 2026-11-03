@@ -15,6 +15,34 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Black, at the far right of the top bar** (Vincent : "add a ''Black'' button at the
+  rightmost of the top toolbar, next to Flush. This takes all the active layer's (and
+  background and audio) opacity down to 0 in the Morph time", and "yes, Sonify fades
+  too"). A dimmer on what leaves, not a fader write : `black.ts` holds the fade (an
+  eased level from where it is to 0 or 1 over `morphMs`, a press mid-way turns it
+  round), the store holds the switch (`black`, `setBlack(on | 'toggle')`, never saved :
+  not in sessions, scenes or localStorage). **The picture** : the loop hands the level
+  to `Compositor.setBlack`, and `render()` draws black over the finished frame at
+  `1 - level` (into `blackTarget`, made on first use and let go 10 s after the show is
+  back) after the scene crossfade and the freeze, BEFORE Flash safety, so the preview,
+  `lastPresent` and every output (the output window, NDI / Spout / Syphon, recordings,
+  the dome, the light output's zones) go black together, the master FX's grain, dust
+  and grading included. The freeze captures the frame from before it (`preBlack`), so
+  a frame frozen under Black comes back lit. **The sound** : each layer's film and
+  Audio slot through `scaleLayerSound` (multiplied with the relay's envelope), and the
+  worklet's last stage (`{ t: 'black', to, ms }`, eased on audio time : Sonify and the
+  Audio Layer joined, before the limiter, on the stereo bus and every Space channel,
+  so the speakers, the recordings and SpatGRIS all fade); a node made while black
+  starts there. Nothing moves : the faders, pins, undo and the session are untouched,
+  everything keeps playing under it and comes back as it is by then; it holds through
+  scene changes and Generate. The button lights red while black and its tooltip
+  gives the Morph time. Key `.` (PowerPoint's blackout key), `fire:black` (MIDI / OSC
+  Learn, Body rules, the Transport group of the action pickers), `Ctrl+K` (Black),
+  `/opsia/black` (≥ 0.5 black, < 0.5 back, no value : over; advertised and echoed).
+  Measured in the test copy at Morph 1 s : the frame's mean 93.5 → 0.3 at 1 s → 0,
+  Sonify's peak 0.32 → 0, the films' sound scale with them; back the same; a press at
+  0.64 turned round without a step; `.` at Morph 0 a cut; real OSC 1 / 1 / 0 / bare /
+  bare : black, black, back, black, back.
 - **A dice on Sonify's Reverb / Delay** (Vincent : "Also add a randomize dice to
   Reverb/Delay too"). `autoSonify.ts randomFx(fx)` re-rolls the delay (mode, time,
   feedback, tone, mix) and the reverb (Quartz or Prism, size, decay, damp, predelay,

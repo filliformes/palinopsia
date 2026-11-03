@@ -830,6 +830,16 @@ class SonifyEngine {
     if (n && node) { try { n.connect(node, 0, 2) } catch (e) { console.warn('[sonify] audio layer input', e) } }
   }
 
+  // Black (black.ts) : where the worklet's last stage is going, kept for a node
+  // made later (which starts there, with no fade)
+  private blackTo = 1
+  /** Fade everything the worklet sends (Sonify, the Audio Layer : the speakers,
+   *  Space, the recordings) to `to` (0 black, 1 back) over `ms`. */
+  setBlack(to: number, ms: number): void {
+    this.blackTo = to
+    this.node?.port.postMessage({ t: 'black', to, ms })
+  }
+
   /** The Audio Layer's send for the Filter voice's line-in (null : none). */
   setLayerSend(n: AudioNode | null): void {
     if (n === this.layerSend) return
@@ -1090,6 +1100,7 @@ class SonifyEngine {
       this.synthKey = ''
       this.pushConfig(this.cfg)
       if (this.spaceMsg) node.port.postMessage(this.spaceMsg)
+      if (this.blackTo < 1) node.port.postMessage({ t: 'black', to: this.blackTo, ms: 0 })
       this.applySpaceRoute()
       if (ctx.state !== 'running') await ctx.resume()
     } catch (e) {

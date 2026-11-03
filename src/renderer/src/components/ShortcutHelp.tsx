@@ -47,6 +47,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['0', 'Panic flush (empty feedback buffers)'],
       ['R', 'Randomize (Transport’s current mode)'],
       ['H', 'Freeze / hold the output'],
+      ['.', 'Black : the whole show (picture and sound) to black over the Morph time  ·  again : back'],
       ['L', 'MIDI Learn on/off (it learns OSC controllers too)'],
       ['Esc', 'Close this sheet, then the top page (the Source Editor first) · exit MIDI Learn'],
       ['Esc on the output', 'Close a fullscreen output over the controls, else back to them (an installation : hold Esc or O 1.5 s)'],
