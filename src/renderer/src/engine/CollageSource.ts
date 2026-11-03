@@ -55,6 +55,7 @@
 import type { CollageClip, CollageEdl } from '@shared/collage'
 import { uploadVideoFrame } from './VideoSource'
 import { AssembleSource } from './AssembleSource'
+import { FrameWatch } from './frameWatch'
 import type { CollageSoundDeck, CollageSoundPiece } from '../audio/collageVoice'
 import { glGeneration } from './glGeneration'
 
@@ -1065,12 +1066,9 @@ function pathFromMediaUrl(url: string | undefined): string | null {
 
 /** Does an assemblage deck have a decoded frame waiting? AssembleSource.upload()
  *  hands back its texture every frame whether or not a new frame arrived, so
- *  read its live deck's flag instead of re-blitting a still frame 60 times a
- *  second. Falls back to "yes" if that shape ever changes. */
+ *  ask instead of re-blitting a still frame 60 times a second. */
 function asmFresh(a: AssembleSource): boolean {
-  const p = a as unknown as { decks?: Array<{ pending?: boolean }>; live?: number }
-  const dk = p.decks?.[p.live ?? 0]
-  return dk ? dk.pending !== false : true
+  return a.fresh()
 }
 
 interface Deck {
@@ -1085,8 +1083,6 @@ interface Deck {
   lenSec: number // window length (the whole file when looping natively)
   content: [number, number, number, number] // picture rect inside the layer, AS BLITTED
   blitted: boolean // the array layer holds a frame of this deck
-  blitAt: number // performance.now() of the last blit
-  blitT: number // the element's currentTime at the last blit
   pending: boolean // a decoded frame is waiting to be blitted
   rvfc: number
   seeking: boolean // gate : never queue a second seek
@@ -1103,8 +1099,9 @@ interface Deck {
   needFrame: boolean // cued while frozen : play until one frame of it lands
   unusedAt: number // when no piece played it any more (0 = in use) : paused after a grace
   bad: boolean // its file failed to load or decode : re-cued onto another film
-  onFrame: (() => void) | null // its frame callback (re-armed when a new file loads)
+  onFrame: VideoFrameRequestCallback | null // its frame callback (re-armed when a new file loads)
   cueStart: number // where its cue starts playing (loaded later when a piece takes it)
+  watch: FrameWatch // its frame callbacks : none come while the window is minimized
 }
 
 interface Cell {
@@ -1252,12 +1249,12 @@ export class CollageSource {
     const deck: Deck = {
       asm: null,
       el, src: '', clip: null, inSec: 0, lenSec: 0,
-      content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0, seeking: false, seekAt: 0,
+      content: [0, 0, 1, 1], blitted: false, pending: false, rvfc: 0, seeking: false, seekAt: 0,
       pendingSeek: null, churning: false, nextRoll: 0, pan: [0.5, 0.5], panNext: null,
       varyU: 0, used: true, shown: true, running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null,
-      cueStart: 0
+      cueStart: 0, watch: new FrameWatch()
     }
-    el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true })
+    el.addEventListener('seeked', () => { deck.seeking = false; deck.pending = true; deck.watch.presented(el) })
     // A bad file must never wedge the wall : clear the gate, and flag it so the
     // next tick puts this deck on another film (it used to sit on its last frame
     // for good : a re-deal with the same seed re-cued the same broken file).
@@ -1268,8 +1265,9 @@ export class CollageSource {
     // A new src aborts any seek in flight WITHOUT a 'seeked' : clear the gate,
     // or the window loop waits on a seek that will never report back.
     el.addEventListener('emptied', () => { deck.seeking = false })
-    const step = (): void => {
+    const step = (_now: number, md: VideoFrameCallbackMetadata): void => {
       deck.pending = true
+      deck.watch.presented(el, md)
       if (typeof el.requestVideoFrameCallback === 'function')
         deck.rvfc = el.requestVideoFrameCallback(step)
     }
@@ -1289,10 +1287,11 @@ export class CollageSource {
     asm.setPlaying(true)
     return {
       asm, el: document.createElement('video'), src: edl.id, clip: null,
-      inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, blitAt: 0, blitT: -1, pending: false, rvfc: 0,
+      inSec: 0, lenSec: 0, content: [0, 0, 1, 1], blitted: false, pending: false, rvfc: 0,
       seeking: false, seekAt: 0, pendingSeek: null, churning: false, nextRoll: 0,
       pan: [0.5, 0.5], panNext: null, varyU: rnd() * 2 - 1, used: true, shown: true,
-      running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null, cueStart: 0
+      running: true, needFrame: false, unusedAt: 0, bad: false, onFrame: null, cueStart: 0,
+      watch: new FrameWatch()
     }
   }
 
@@ -1603,6 +1602,7 @@ export class CollageSource {
     d.seeking = false
     d.bad = false
     d.src = url
+    d.watch.reset()
     d.el.src = url
     d.el.load()
     // Re-arm the frame callback on the new file (as VideoSource.load does) : one
@@ -2357,7 +2357,6 @@ export class CollageSource {
     if (pass !== 2 && this.arr && this.fbo) {
       let bound = false
       const T = this.tile
-      const now = performance.now()
       // Round-robin under a time budget : the films that miss this frame go
       // first next frame.
       const nDeck = Math.min(this.decks.length, this.arrLayers)
@@ -2376,12 +2375,13 @@ export class CollageSource {
         } else {
           if (d.el.readyState < 2 || !d.el.videoWidth) continue
           // rVFC only fires while the page is being composited : with the window
-          // occluded or minimized (the app then runs on a timer to keep the
+          // minimized or hidden (the app then runs on a timer to keep the
           // projector stream alive) it goes quiet and the wall would freeze. A
-          // playing deck whose playhead has moved on since its last blit gets one
-          // anyway; uploading makes the element hand over its current frame.
-          if (!d.pending && (d.el.paused || now - d.blitAt < 120 || Math.abs(d.el.currentTime - d.blitT) < 0.02))
-            continue
+          // playing deck whose film has moved on about a frame since its last
+          // blit gets one anyway (frameWatch.ts); uploading makes the element
+          // hand over its current frame. It waited 120 ms between those before :
+          // a minimized wall showed 10 different frames a second, not 55.
+          if (!d.pending && !d.watch.due(d.el)) continue
           d.pending = false
           vw = d.el.videoWidth
           vh = d.el.videoHeight
@@ -2405,8 +2405,7 @@ export class CollageSource {
         }
         d.needFrame = false
         if (!d.blitted) this.cropsDirty = true // its pieces leave their stand-in
-        d.blitAt = now
-        d.blitT = d.asm ? -1 : d.el.currentTime
+        if (!d.asm) d.watch.uploaded(d.el)
         if (!bound) {
           gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
           gl.viewport(0, 0, T, T)

@@ -12,6 +12,7 @@
 
 import { originalPathOf, type AssembleClip } from '@shared/assemble'
 import { uploadVideoFrame } from './VideoSource'
+import { FrameWatch } from './frameWatch'
 
 /** What Sonify's Assemblage voice hears of an edit (soundInfo). */
 export interface AssembleSoundInfo {
@@ -35,6 +36,7 @@ interface Deck {
   seeking: boolean // a seek is in flight (gate : never queue a second)
   seekAt: number // when it started, for the stuck-seek safety net
   pendingSeek: (() => void) | null // deferred seek awaiting 'loadedmetadata'
+  watch: FrameWatch // its frame callbacks : none come while the window is minimized
 }
 
 export class AssembleSource {
@@ -76,19 +78,22 @@ export class AssembleSource {
     el.preload = 'auto'
     el.crossOrigin = 'anonymous'
     const deck: Deck = {
-      el, src: '', pending: false, rvfc: 0, seeking: false, seekAt: 0, pendingSeek: null
+      el, src: '', pending: false, rvfc: 0, seeking: false, seekAt: 0, pendingSeek: null,
+      watch: new FrameWatch()
     }
     el.addEventListener('seeked', () => {
       deck.seeking = false
       deck.pending = true
+      deck.watch.presented(el)
     })
     el.addEventListener('error', () => {
       // A bad file must not wedge the edit : clear the gate so the next seek
       // can be issued, and let the clip run out its screen time normally.
       deck.seeking = false
     })
-    const step = (): void => {
+    const step = (_now: number, md: VideoFrameCallbackMetadata): void => {
       deck.pending = true
+      deck.watch.presented(el, md)
       if (typeof el.requestVideoFrameCallback === 'function') {
         deck.rvfc = el.requestVideoFrameCallback(step)
       }
@@ -238,6 +243,7 @@ export class AssembleSource {
     deck.seeking = false
     if (deck.src !== url) {
       deck.src = url
+      deck.watch.reset()
       deck.el.src = url
       try {
         deck.el.load()
@@ -455,16 +461,26 @@ export class AssembleSource {
     return [el.videoWidth, el.videoHeight]
   }
 
+  /** A frame to upload is waiting on the deck on screen (the Collage asks before
+   *  it spends its upload budget on an assemblage piece). */
+  fresh(): boolean {
+    const deck = this.decks[this.live]
+    return deck.pending || deck.watch.due(deck.el)
+  }
+
   upload(): WebGLTexture | null {
     const deck = this.decks[this.live]
     if (!this.clips.length) return this.tex
     // Upload when a new decoded frame is waiting, or unconditionally while we
-    // still have no texture at all (first frames, rVFC-less fallback).
-    if (deck.pending || !this.tex) {
+    // still have no texture at all (first frames, rVFC-less fallback). Minimized
+    // or hidden, no frame callback comes : once the film has moved on about a
+    // frame (frameWatch.ts).
+    if (deck.pending || !this.tex || deck.watch.due(deck.el)) {
       const t = uploadVideoFrame(this.gl, deck.el, this.tex)
       if (t) {
         this.tex = t
         deck.pending = false
+        deck.watch.uploaded(deck.el)
       }
     }
     return this.tex

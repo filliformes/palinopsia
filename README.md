@@ -1718,7 +1718,9 @@ bottom:
   you on a one-display computer. On any other output (a projector on another display,
   a span, a window) `Esc` hands focus back to the controls and the show goes on. An
   installation asks for a 1.5 s hold instead (below). For one second as it opens, a
-  covering output says `Esc to close`.
+  covering output says `Esc to close`. Minimize or hide the control window and the
+  output goes on, films included : every film, Collage wall and Assemble edit keeps
+  its own frame rate.
 - **Record** : format + record / stop + screenshot → `Recorded/`, or any folder you
   pick with **location…** (remembered on this computer; ↺ goes back to `Recorded/`,
   the path opens the folder; if the chosen folder can't be reached, an unplugged
