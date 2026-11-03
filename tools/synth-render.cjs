@@ -706,13 +706,16 @@ function checkContract(sr) {
     const hand = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 0.6, off: 1 }, { t: 1.2, off: 2 }] })
     const over = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 1.2, off: 2 }, { t: 1.2, off: 1 }] })
     const late = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, on: [2, midi(60), 0.8] }, { t: 0.7, off: 1 }, { t: 1.2, off: 2 }] })
+    // the control : the same pitch move with no second note (the unison's
+    // beating, the same voices' phases, cancel out of the comparison)
+    const move = render({ sr, seconds: 1.4, cfg, events: [{ t: 0.05, on: [1, midi(57), 0.8] }, { t: 0.6, pitch: [1, midi(60)] }, { t: 1.2, off: 1 }] })
     // (sustain 0.15 : a new attack peaks ~16 dB over it; windows long enough
     // to average the unison's beating)
     // an attack is a bump : the first 35 ms after the change over the level
     // the new note then holds (the pitch's own level change cancels out)
     const bump = (r) => levelAt(r, 0.605, 0.64) - levelAt(r, 0.8, 1.15)
     ok(`${mode} : a handover strikes`, bump(hand) > 6, `the new note's first 35 ms over its held level : ${fmt(bump(hand))} dB`)
-    ok(`${mode} : an overlap stays legato`, bump(over) < 2, `the same after an overlapping note : ${fmt(bump(over))} dB`)
+    ok(`${mode} : an overlap stays legato`, bump(over) - bump(move) < 2, `the same after an overlapping note, over a plain pitch move : ${fmt(bump(over) - bump(move))} dB`)
     const l1 = levelAt(late, 0.66, 0.69), l2 = levelAt(late, 0.75, 1.15)
     ok(`${mode} : a noteOff for an id no longer sounding never releases`, l2 > l1 - 3 && l2 > -60, `the sounding note after the old id's noteOff : ${fmt(l2 - l1)} dB`)
   }

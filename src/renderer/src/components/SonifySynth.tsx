@@ -324,7 +324,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
         <button
           onClick={() => set({ patch: normalizeSynth({}).patch })}
           className="self-end rounded px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="The patchbay's default rows (speed → velocity, hue → timbre, size → harmonics, texture → morph, brightness → cutoff, saturation → resonance, motion → drive, speed → envelope inverted, x → pan, direction → bend)"
+          title="The patchbay's default rows (speed → velocity, hue → timbre, size → harmonics, texture → morph, brightness → cutoff, saturation → resonance, motion → drive, speed → envelope inverted, x → pan; no bend : a bend holds the notes off the scale)"
         >↺ rows</button>
       </Section>
     </div>
