@@ -23,6 +23,7 @@ import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
 import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
+import { defaultSignalPatch, normalizeSignalPatch, signalHit, signalPlayerCfg, type SignalRow } from './signalPlay'
 
 export const GRID = 96
 // Signal's grains play this long after their step : a fixed latency, longer
@@ -202,6 +203,16 @@ export interface SoniConfig {
     path: number // 0 horizontal · 1 vertical · 2 radial · 3 spiral (as Spectra)
     loOct: number; hiOct: number
     snap: number // 0 free frequency .. 1 on the global scale
+    // PLAY : who plays the grains. 'heads' : the read heads above (the scan of
+    // marks on a clock). 'picture' : PICTURE PLAY, the picture's moving things
+    // (found as the Synth finds them, signalPlay.ts), each hit shaped by the
+    // eight patchbay rows; heads, steps, spread, thresh, density and path rest.
+    play: 'heads' | 'picture'
+    pmode: 'height' | 'keyboard' | 'radial' // where a thing's pitch comes from
+    tie: boolean // false STRIKE : a thing ticks grains on the clock · true TIE : one held grain a thing
+    sens: number // 0..1 how much movement counts as a thing
+    picture: number // 0..1 every patchbay depth scaled
+    patch: SignalRow[] // 8 rows : velocity, decay, tone, fm, wave, rate, pan, chance
   }
   chord: {
     on: boolean; tap: number; gain: number; pan: number
@@ -306,7 +317,7 @@ export function defaultSoniConfig(): SoniConfig {
     raster: { on: false, tap: 0, gain: 0.4, pan: 0, note: 45, freq: 110, quantize: true, rx: 0.35, ry: 0.35, rw: 0.3, rh: 0.3, smooth: 0, tone: 0.6 },
     sstv: { on: false, tap: 0, gain: 0.4, pan: 0, lineHz: 12, sync: false, dev: 1, syncLev: 0.5 },
     filter: { on: false, tap: 0, gain: 0.6, pan: 0, q: 0.5, noise: 0.5, lineIn: false, loop: 0, sweepOn: false, sweepHz: 0.25, x: 0.5, gamma: 1.6, path: 0, pace: 0, loOct: 1, hiOct: 8, quantize: false },
-    signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1 },
+    signal: { on: false, tap: 0, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4, heads: 2, rate: 8, sync: false, steps: 16, spread: 0.5, thresh: 0.5, density: 0.35, path: 0, loOct: 4, hiOct: 8, snap: 1, play: 'heads', pmode: 'height', tie: false, sens: 0.5, picture: 0.8, patch: defaultSignalPatch() },
     chord: { on: false, tap: 0, gain: 0.6, pan: 0, voices: 7, loOct: 2, hiOct: 6, gamma: 1.6, spread: 0.6, attack: 0.4, release: 0.8, tone: 0.3, waves: 0, wavesRate: 0.4, wavesSync: 0, noise: 0, air: 0.4 },
     collage: {
       on: false, gain: 0.7, pan: 0, reso: 0.5, ring: 0.5, bright: 0.5, width: 1, inGain: 0, hp: 20, lp: 20000, hpSlope: 24, lpSlope: 24, ringIn: 0, comp: 0, loOct: 2, hiOct: 6,
@@ -738,6 +749,17 @@ class SonifyEngine {
   // moves a head on from where it is instead of throwing it across the frame.
   private sigIdx = [0, 0, 0, 0]
   private sigRead = { x: 0, y: 0 } // scratch for the path geometry
+  // Signal's PICTURE PLAY (signalPlay.ts) : its own SynthPlayer finds and
+  // tracks the moving things on Signal's tap; `sigPpKey` what they were found on
+  // (a change : every hold let go, the things forgotten). Per thing : the
+  // quarter step it first played on (its STRIKE phase), its strike velocity,
+  // and whether it holds a TIE grain in the worklet.
+  private sigPlay = new SynthPlayer()
+  private sigPpKey = ''
+  private sigPpSent = false
+  private sigPpStart = new Map<number, number>()
+  private sigPpVel = new Map<number, number>()
+  private sigPpHeld = new Set<number>()
   private salience = new Float32Array(GRID * GRID) // Events detection scratch
   // The Synth's players (synthPlay.ts) : the moving things, tracked, and the
   // notes they play. `synthTable` is the scale's notes over its range (a new
@@ -1098,6 +1120,7 @@ class SonifyEngine {
       this.synthPlay.reset()
       this.synthSent = false
       this.synthKey = ''
+      this.sigPpForget()
       this.pushConfig(this.cfg)
       if (this.spaceMsg) node.port.postMessage(this.spaceMsg)
       if (this.blackTo < 1) node.port.postMessage({ t: 'black', to: this.blackTo, ms: 0 })
@@ -1491,7 +1514,13 @@ class SonifyEngine {
       raster: { ...d.raster, ...cfg.raster },
       sstv: { ...d.sstv, ...cfg.sstv },
       filter: { ...d.filter, ...cfg.filter },
-      signal: { ...d.signal, ...cfg.signal },
+      signal: {
+        ...d.signal, ...cfg.signal,
+        play: cfg.signal?.play === 'picture' ? 'picture' : 'heads',
+        pmode: cfg.signal?.pmode === 'keyboard' || cfg.signal?.pmode === 'radial' ? cfg.signal.pmode : 'height',
+        tie: !!cfg.signal?.tie,
+        patch: normalizeSignalPatch(cfg.signal?.patch)
+      },
       chord: { ...d.chord, ...cfg.chord },
       collage: { ...d.collage, ...cfg.collage },
       assemblage: { ...d.assemblage, ...cfg.assemblage },
@@ -1800,6 +1829,7 @@ class SonifyEngine {
       }
       this.assemblageSets = []
       this.synthStop()
+      this.sigPpStop()
       return
     }
     // ~30 Hz. (33 against a two-frame period of 33.3 ms at 60 Hz let frame
@@ -1912,6 +1942,14 @@ class SonifyEngine {
       const key = `${sy.tap}:${tp.kind}:${tp.layer}:${sy.mode}:${sy.voices}`
       if (key !== this.synthKey) { this.synthStop(); this.synthKey = key }
     } else this.synthStop()
+    const sgc = this.cfg.signal
+    if (sgc.on && sgc.play === 'picture') {
+      // Picture Play : found on something else now (another tap or source,
+      // another read, STRIKE ↔ TIE) : every hold let go, the things forgotten
+      const tp = this.cfg.taps[sgc.tap]
+      const key = `${sgc.tap}:${tp.kind}:${tp.layer}:${sgc.pmode}:${sgc.tie ? 1 : 0}`
+      if (key !== this.sigPpKey) { this.sigPpStop(); this.sigPpKey = key }
+    } else this.sigPpStop()
     if (this.cfg.signal.on) need[this.cfg.signal.tap] = true
     else if (this.sigBeats !== -1 || this.signalDots.length || this.signalBars.length) {
       // off : no marks left on the overlay for the next switch-on to show
@@ -1956,7 +1994,10 @@ class SonifyEngine {
 
       if (this.cfg.flow.on && this.cfg.flow.tap === t) this.analyzeFlow(t, dt)
       if (this.cfg.events.on && this.cfg.events.tap === t) this.analyzeEvents(t, frameDt)
-      if (this.cfg.signal.on && this.cfg.signal.tap === t) this.analyzeSignal(t, frameDt)
+      if (this.cfg.signal.on && this.cfg.signal.tap === t) {
+        if (this.cfg.signal.play === 'picture') this.analyzeSignalPicture(t, frameDt, nowMs, fresh)
+        else this.analyzeSignal(t, frameDt)
+      }
       if (sy.on && sy.tap === t) this.analyzeSynth(t, frameDt, nowMs, fresh)
     }
   }
@@ -2166,34 +2207,9 @@ class SonifyEngine {
     const idx = this.sigIdx
     for (let h = 0; h < 4; h++) if (!(idx[h] >= 0)) idx[h] = 0
 
-    let c0 = Number.isFinite(this.sigClock) ? this.sigClock : 0
-    let c1: number
-    if (sg.sync) {
-      // Synced, the clock runs on the beat clock both Sonify sequencers share,
-      // not on this tap's frame times, and its steps are pulled onto the beat's
-      // own grid (step n at beat n / rate) : four steps a beat are sixteenths
-      // in time with the sequencers instead of drifting against them. The pull
-      // is gentle, so a modulated rate bends the grid rather than jumping it.
-      const beats = soniBeats()
-      if (this.sigBeats < 0) {
-        // switched on, or just synced : anchor on the beat grid, the heads on
-        // the bar, and fire nothing this frame rather than a burst of the
-        // steps between the old clock and the new one
-        c0 = c1 = beats * r
-        for (let h = 0; h < 4; h++) { const L = lens[h] ?? lens[0]; idx[h] = ((Math.floor(c1) % L) + L) % L }
-      } else {
-        c1 = c0 + Math.max(0, Math.min(bps * 0.1, beats - this.sigBeats)) * r
-        let e = beats * r - c1
-        e -= Math.round(e)
-        c1 += e * 0.25
-        if (c1 < c0) c1 = c0
-      }
-      this.sigBeats = beats
-    } else {
-      this.sigBeats = -1
-      c1 = c0 + sps * frameDt
-    }
-    this.sigClock = c1
+    const { c0, c1, anchored } = this.signalClock(sg.sync, r, frameDt)
+    // switched on, or just synced : the heads on the bar
+    if (anchored) for (let h = 0; h < 4; h++) { const L = lens[h] ?? lens[0]; idx[h] = ((Math.floor(c1) % L) + L) % L }
 
     const reads = Math.max(4, Math.round(24 / H)) // cells sampled along one head's band
     // Each read is the brightest point of its whole cell on the 96 grid, not
@@ -2283,6 +2299,196 @@ class SonifyEngine {
     if (!onsets.length || !this.node) return
     const out = new Float32Array(onsets)
     this.node.port.postMessage({ t: 'signal', events: out }, [out.buffer])
+  }
+
+  /** Signal's step clock, advanced over this frame : `c0` → `c1` in steps
+   *  (`r` steps a second, or a beat when synced). Synced, the clock runs on the
+   *  beat clock both Sonify sequencers share, not on this tap's frame times, and
+   *  its steps are pulled onto the beat's own grid (step n at beat n / rate) :
+   *  four steps a beat are sixteenths in time with the sequencers instead of
+   *  drifting against them. The pull is gentle, so a modulated rate bends the
+   *  grid rather than jumping it. `anchored` : just switched on or synced, the
+   *  clock set on the beat grid and nothing to fire this frame (rather than a
+   *  burst of the steps between the old clock and the new one). */
+  private signalClock(sync: boolean, r: number, frameDt: number): { c0: number; c1: number; sps: number; anchored: boolean } {
+    const bps = Math.max(1, this.bpm) / 60
+    const sps = sync ? bps * r : r
+    let c0 = Number.isFinite(this.sigClock) ? this.sigClock : 0
+    let c1: number
+    let anchored = false
+    if (sync) {
+      const beats = soniBeats()
+      if (this.sigBeats < 0) {
+        c0 = c1 = beats * r
+        anchored = true
+      } else {
+        c1 = c0 + Math.max(0, Math.min(bps * 0.1, beats - this.sigBeats)) * r
+        let e = beats * r - c1
+        e -= Math.round(e)
+        c1 += e * 0.25
+        if (c1 < c0) c1 = c0
+      }
+      this.sigBeats = beats
+    } else {
+      this.sigBeats = -1
+      c1 = c0 + sps * frameDt
+    }
+    this.sigClock = c1
+    return { c0, c1, sps, anchored }
+  }
+
+  /** Signal's PICTURE PLAY : the picture's moving things play Signal's grains
+   *  (signalPlay.ts). Its own SynthPlayer finds and tracks them on this tap, as
+   *  the Synth's does, and gives each its pitch (where it is, as PMODE reads it,
+   *  on the scale; SNAP blends in the free frequency) and its patchbay mods;
+   *  every hit then takes the voice's knobs moved by the thing's rows (decay,
+   *  tone, fm, wave, pan) and the strike's velocity.
+   *  STRIKE : each thing ticks on Signal's clock, from the quarter step it first
+   *  played on, every 1, 2, 4, 8 or 16 quarter steps (its rate row : four times
+   *  the clock .. a quarter of it), each tick played by its chance row; free, a
+   *  thing that appears also strikes at once. TIE : one grain held a thing, struck
+   *  again at each new scale note it crosses, let go when it stops; its pitch,
+   *  level, pan, tone and fm follow it every frame. */
+  private analyzeSignalPicture(t: number, frameDt: number, nowMs: number, fresh: boolean): void {
+    const node = this.node
+    const sg = this.cfg.signal
+    const mv = sonifyModValues
+    const eff = (k: string, base: number): number => {
+      const v = mv.get(k) ?? base
+      return Number.isFinite(v) ? v : base
+    }
+    const pcfg = signalPlayerCfg(sg)
+    const tbl = this.signalFreqs
+    const out = this.sigPlay.step({
+      cur: this.luma[t], prev: this.lumaPrev[t], rgba: this.rgbaTap[t], fresh,
+      dt: frameDt, nowMs, cfg: pcfg, table: tbl,
+      aspect: this.frame.aspect, radial: this.radialOf,
+      beats: soniBeats(), bpm: this.bpm, bar: soniBar(),
+      // (its depths are its own : the Synth's modulators never reach them)
+      mod: () => undefined
+    })
+    const knobs = { decay: eff('signalDecay', sg.decay), tone: eff('signalTone', sg.tone), fm: eff('signalFm', sg.fm), wave: sg.wave }
+    const panRow = pcfg.patch[6].src !== 'none' && pcfg.patch[6].depth !== 0
+    // the pitch : the thing's scale note, SNAP blending in the free frequency
+    // at its place (as a read head's mark : the table's lowest .. highest note)
+    const root = effRoot(this.cfg)
+    const f0 = tbl.length ? tbl[0] : noteFreq(12 * (sg.loOct + 1) + root)
+    const f1 = tbl.length > 1 ? tbl[tbl.length - 1] : noteFreq(12 * (sg.hiOct + 1) + root)
+    const snap = Math.max(0, Math.min(1, eff('signalSnap', sg.snap)))
+    const pitch = (place: number, hz: number): number => {
+      const free = f0 * Math.pow(f1 / f0, place)
+      const q = hz > 0 ? hz : free
+      return Math.exp(Math.log(free) * (1 - snap) + Math.log(q) * snap)
+    }
+    const things = this.sigPlay.playingThings(pcfg.mode, this.radialOf)
+    const byId = new Map(things.map((th) => [th.id, th]))
+    const modsOf = new Map(out.mods.map((m) => [m.id, m.m]))
+    // the strikes (k 0) of this tick : a new thing, or a new scale note
+    const struck = new Map<number, number>()
+    for (const e of out.ev) if (e.k === 0) struck.set(e.id, e.vel)
+    const gone: number[] = []
+    for (const e of out.ev) if (e.k === 1) gone.push(e.id)
+
+    const events: number[] = []
+    const dots: number[] = []
+    const hit = (id: number, tOff: number, vel: number, hold: boolean): void => {
+      const th = byId.get(id)
+      if (!th) return
+      const h = signalHit(knobs, modsOf.get(id) ?? out.ev.find((e) => e.id === id && e.m)?.m, th, panRow)
+      const freq = pitch(th.place, th.hz)
+      const amp = Math.max(0, Math.min(1, vel))
+      if (!Number.isFinite(freq) || !Number.isFinite(amp)) return
+      events.push(tOff, freq, amp, h.pan, h.wave, h.decay, h.tone, h.fm, hold ? id : -1)
+      dots.push(th.x, th.y, amp)
+    }
+
+    let stepped = false
+    const off: number[] = []
+    if (sg.tie) {
+      // TIE : a strike lets the thing's held grain go and holds a new one
+      for (const id of gone) { if (this.sigPpHeld.delete(id)) off.push(id); this.sigPpVel.delete(id) }
+      for (const [id, vel] of struck) {
+        if (this.sigPpHeld.has(id)) off.push(id)
+        this.sigPpVel.set(id, vel)
+        this.sigPpHeld.add(id)
+        hit(id, 0, vel, true)
+      }
+      stepped = true
+    } else {
+      // STRIKE : quarter steps of Signal's clock
+      const rate = eff('signalRate', sg.rate)
+      const r = sg.sync ? Math.max(0.25, Math.min(16, rate)) : Math.max(0.25, Math.min(64, rate))
+      const { c0, c1, sps, anchored } = this.signalClock(sg.sync, r, frameDt)
+      const q0 = Math.floor(c0 * 4), q1 = Math.floor(c1 * 4)
+      for (const id of gone) { this.sigPpStart.delete(id); this.sigPpVel.delete(id) }
+      for (const [id, vel] of struck) {
+        this.sigPpVel.set(id, vel)
+        if (!this.sigPpStart.has(id)) {
+          // a thing that appears : its phase from the next quarter step; free,
+          // it also strikes at once (synced, it waits for the grid)
+          this.sigPpStart.set(id, q1 + 1)
+          if (!sg.sync) hit(id, 0, vel, false)
+        }
+      }
+      if (!anchored) {
+        for (let q = Math.max(q0 + 1, q1 - 15); q <= q1; q++) {
+          stepped = true
+          const tOff = Math.max(0, SIG_AHEAD - (c1 * 4 - q) / (sps * 4))
+          for (const th of things) {
+            const st = this.sigPpStart.get(th.id)
+            if (st === undefined || q < st) continue
+            const h = signalHit(knobs, modsOf.get(th.id), th, panRow)
+            // the rate row : 4x .. 1/4x the clock, a power of two (on the grid)
+            const per = Math.max(1, Math.round(4 / h.rate))
+            if ((q - st) % per !== 0) continue
+            if (h.chance < 1 && Math.random() >= h.chance) continue
+            const vel = (this.sigPpVel.get(th.id) ?? 0.7) * h.level
+            hit(th.id, tOff, vel, false)
+          }
+        }
+      }
+    }
+
+    // TIE : every held grain follows its thing (pitch, level, pan, tone, fm)
+    const set: number[] = []
+    if (sg.tie) {
+      for (const id of this.sigPpHeld) {
+        const th = byId.get(id)
+        if (!th) continue
+        const h = signalHit(knobs, modsOf.get(id), th, panRow)
+        set.push(id, pitch(th.place, th.hz), Math.max(0, Math.min(1, (this.sigPpVel.get(id) ?? 0.7) * h.level)), h.pan, h.tone, h.fm)
+        dots.push(th.x, th.y, Math.max(0, Math.min(1, this.sigPpVel.get(id) ?? 0.7)))
+      }
+    }
+    this.signalBars = new Float32Array(0)
+    if (stepped || dots.length) this.signalDots = new Float32Array(dots)
+    if (!node || (!events.length && !off.length && !set.length)) return
+    this.sigPpSent = true
+    node.port.postMessage({
+      t: 'sigpp',
+      events: events.length ? new Float32Array(events) : undefined,
+      off: off.length ? off : undefined,
+      set: set.length ? new Float32Array(set) : undefined
+    })
+  }
+
+  /** Picture Play's things forgotten (a fresh engine : no holds left there). */
+  private sigPpForget(): void {
+    this.sigPlay.reset()
+    this.sigPpKey = ''
+    this.sigPpSent = false
+    this.sigPpStart.clear()
+    this.sigPpVel.clear()
+    this.sigPpHeld.clear()
+  }
+
+  /** Every Picture Play hold let go, the things forgotten (Signal off, back to
+   *  the read heads, Sonify off, or the things now found on something else). */
+  private sigPpStop(): void {
+    if (!this.sigPpSent && !this.sigPlay.active && !this.sigPpHeld.size) return
+    const had = this.sigPpSent || this.sigPpHeld.size > 0
+    this.sigPpForget()
+    if (had) this.node?.port.postMessage({ t: 'sigpp', all: true })
   }
 
   /** Block-matching motion field on the 96×96 luma grids → grain events. */

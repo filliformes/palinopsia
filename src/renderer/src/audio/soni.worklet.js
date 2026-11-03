@@ -905,7 +905,11 @@ class SoniProcessor extends AudioWorkletProcessor {
     for (let k = 0; k < NSIG; k++) {
       this.sig.push({ on: false, wait: 0, phase: 0, inc: 0, amp: 0, pan: 0.5, env: 0, decMul: 0.999,
         age: 0, len: 1, fmPh: 0, lp: 0, seed: 1, p0: 0, p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0,
-        born: -1, lastL: 0, lastR: 0 });
+        born: -1, lastL: 0, lastR: 0,
+        // its own sound, set at the strike (Picture Play shapes each hit; a read
+        // head's takes the knobs as they are then), and a hold (TIE : the thing
+        // `id` keeps it sounding until it lets go)
+        wave: 0, lpK: 1, fmIdx: 0, hold: false, id: -1, seen: 0 });
     }
     this.sigPending = []; // scheduled onsets [{t0, freq, amp, pan}]
     this.sgDcL = 0; this.sgDcR = 0; // stolen grains' last samples, faded like Events'
@@ -1224,6 +1228,47 @@ class SoniProcessor extends AudioWorkletProcessor {
         this.sigPending.push({ t0: base + (t0 < 0 ? 0 : t0 > 1 ? 1 : t0), freq: f, amp: a < 0 ? 0 : a > 1 ? 1 : a, pan: p < 0 ? 0 : p > 1 ? 1 : p });
       }
       if (this.sigPending.length > PENDING_CAP) this.sigPending.splice(0, this.sigPending.length - PENDING_CAP);
+      return;
+    }
+    if (m.t === 'sigpp') {
+      // Signal's Picture Play (signalPlay.ts) : `events` [tOffset, freq, amp, pan,
+      // wave, decay, tone, fm, holdId] × n (holdId -1 : a plain hit); `off` the
+      // things that let go (TIE), `all` every hold; `set` [id, freq, amp, pan,
+      // tone, fm] × n : a held grain follows its thing.
+      const base = currentTime;
+      if (m.all) { for (let k = 0; k < NSIG; k++) this.sig[k].hold = false; for (const e of this.sigPending) e.hold = -1; }
+      if (m.off) for (const id of m.off) {
+        for (let k = 0; k < NSIG; k++) { const g = this.sig[k]; if (g.on && g.hold && g.id === id) g.hold = false; }
+        for (const e of this.sigPending) if (e.hold === id) e.hold = -1;
+      }
+      const ev = m.events;
+      if (ev) for (let i = 0; i + 8 < ev.length; i += 9) {
+        const t0 = ev[i], f = ev[i + 1], a = ev[i + 2], p = ev[i + 3];
+        if (!(Number.isFinite(t0) && Number.isFinite(f) && Number.isFinite(a) && Number.isFinite(p))) continue;
+        const w = Number.isFinite(ev[i + 4]) ? Math.max(0, Math.min(8, Math.round(ev[i + 4]))) : 0;
+        const fin = (x, d) => (Number.isFinite(x) ? clampf(x, 0, 1) : d);
+        this.sigPending.push({
+          t0: base + (t0 < 0 ? 0 : t0 > 1 ? 1 : t0), freq: f, amp: a < 0 ? 0 : a > 1 ? 1 : a, pan: p < 0 ? 0 : p > 1 ? 1 : p,
+          wave: w, dec: fin(ev[i + 5], 0.3), tone: fin(ev[i + 6], 0.6), fm: fin(ev[i + 7], 0.4),
+          hold: Number.isFinite(ev[i + 8]) && ev[i + 8] >= 0 ? ev[i + 8] | 0 : -1
+        });
+      }
+      if (this.sigPending.length > PENDING_CAP) this.sigPending.splice(0, this.sigPending.length - PENDING_CAP);
+      const st = m.set;
+      if (st) for (let i = 0; i + 5 < st.length; i += 6) {
+        const id = st[i] | 0;
+        for (let k = 0; k < NSIG; k++) {
+          const g = this.sig[k];
+          if (!g.on || !g.hold || g.id !== id) continue;
+          g.seen = currentTime;
+          let f = st[i + 1];
+          if (Number.isFinite(f) && f > 0) { f = f < 20 ? 20 : f; while (f > sampleRate * 0.5) f *= 0.5; g.inc = f / sampleRate; }
+          if (Number.isFinite(st[i + 2])) g.amp = clampf(st[i + 2], 0, 1);
+          if (Number.isFinite(st[i + 3])) g.pan = clampf(st[i + 3], 0, 1);
+          if (Number.isFinite(st[i + 4])) { const hz = 200 * Math.pow(100, clampf(st[i + 4], 0, 1)); g.lpK = 1 - Math.exp(-TAU * Math.min(hz, sampleRate * 0.5) / sampleRate); }
+          if (Number.isFinite(st[i + 5])) g.fmIdx = clampf(st[i + 5], 0, 1) * 0.9;
+        }
+      }
       return;
     }
     if (m.t === 'events') {
@@ -2155,10 +2200,11 @@ class SoniProcessor extends AudioWorkletProcessor {
             // the pip and the ping keep env at 1 (their window is their
             // envelope) : what is left of the window is their loudness
             let quiet = 1e9;
-            const win = wave === 0 || wave === 8;
             for (let k = 0; k < NSIG; k++) {
               const g2 = this.sig[k];
-              const lvl = win ? 1 - g2.age / g2.len : g2.env;
+              const win = g2.wave === 0 || g2.wave === 8;
+              // (a held grain is a thing still playing : the last to go)
+              const lvl = (win ? 1 - g2.age / g2.len : g2.env) + (g2.hold ? 2 : 0);
               if (g2.born !== this.block && lvl < quiet) { quiet = lvl; slot = k; }
             }
             if (slot < 0) continue; // the whole pool started this block : drop it
@@ -2170,7 +2216,20 @@ class SoniProcessor extends AudioWorkletProcessor {
           let w0 = Math.round((e.t0 - nowT) / dt);
           g.wait = w0 < 0 ? 0 : w0 > n - 1 ? n - 1 : w0;
           g.on = true; g.born = this.block; g.phase = 0; g.inc = f * dt; g.amp = e.amp; g.pan = e.pan;
-          g.age = 0; g.len = decSamp; g.env = 1; g.decMul = decMul; g.fmPh = 0; g.lp = 0;
+          g.age = 0; g.env = 1; g.fmPh = 0; g.lp = 0;
+          if (e.wave === undefined) {
+            // a read head's mark : the knobs as they are now
+            g.wave = wave; g.len = decSamp; g.decMul = decMul; g.lpK = lpK; g.fmIdx = fmIdx; g.hold = false; g.id = -1;
+          } else {
+            // a Picture Play hit : its own sound (and a TIE's hold)
+            g.wave = e.wave;
+            g.len = Math.max(4, 0.0002 * Math.pow(2500, e.dec) * sampleRate);
+            g.decMul = Math.exp(-6.9077552 / g.len);
+            const th = 200 * Math.pow(100, e.tone);
+            g.lpK = 1 - Math.exp(-TAU * (th < nyq ? th : nyq) * dt);
+            g.fmIdx = e.fm * 0.9;
+            g.hold = e.hold >= 0; g.id = e.hold; g.seen = nowT;
+          }
           g.p0 = g.p1 = g.p2 = g.p3 = g.p4 = g.p5 = g.p6 = 0;
           g.seed = ((Math.random() * 2147483646) | 0) + 1;
         } else {
@@ -2185,10 +2244,14 @@ class SoniProcessor extends AudioWorkletProcessor {
       // under the pip and square 8 dB under, so picking them sounded broken.
       // After : every wave within 5 dB of the pip (damped's -5 is its own : at a
       // short decay a struck sine has lost half its level by its first crest).
-      const wg = wave === 5 ? 0.75 : wave === 7 ? 2.6 : wave === 2 ? 0.95 : wave === 4 ? 0.8 : 1;
       for (let k = 0; k < NSIG; k++) {
         const g = this.sig[k];
         if (!g.on) continue;
+        // its own wave, tone and fm (set at its strike)
+        const wave = g.wave, lpK = g.lpK, fmIdx = g.fmIdx;
+        // a hold whose thing has gone quiet (no word for 1.5 s) : let it go
+        if (g.hold && nowT - g.seen > 1.5) g.hold = false;
+        const wg = wave === 5 ? 0.75 : wave === 7 ? 2.6 : wave === 2 ? 0.95 : wave === 4 ? 0.8 : 1;
         let p = g.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
         const gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
         let lv = 0;
@@ -2206,7 +2269,8 @@ class SoniProcessor extends AudioWorkletProcessor {
             else { const c = u * 2 - 1; w = Math.exp(-4.5 * c * c); }
             sig = sinT(ph) * w;
           } else {
-            g.env *= g.decMul;
+            // held (TIE) : it sounds on, until its thing lets go
+            if (!g.hold) g.env *= g.decMul;
             if (g.env < 0.0004) { g.on = false; break; }
             if (wave === 1) {
               sig = sinT(ph); // DAMPED : struck, instant attack, the tuning fork
@@ -2250,7 +2314,8 @@ class SoniProcessor extends AudioWorkletProcessor {
           }
           const v = sig * g.amp;
           g.phase += g.inc; if (g.phase >= 1) g.phase -= 1;
-          g.age++;
+          // a held pip or ping waits at the top of its window
+          if (!(g.hold && (wave === 0 || wave === 8) && g.age >= g.len * 0.5)) g.age++;
           L[s] += v * gL; R[s] += v * gR;
           lv = v;
         }

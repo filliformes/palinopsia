@@ -44,7 +44,8 @@ const MODE_HINT: Record<string, string> = {
   score: 'A playhead sweeps the picture on the beat and the shapes it crosses play (light and edges, not motion), pitch by height : the picture as a piano roll'
 }
 const GRID_LABEL: Record<string, string> = { free: 'free', '8': '1/8', '16': '1/16', '8t': '1/8T' }
-const SRC_LABEL: Record<string, string> = {
+/** A source's short name in the patchbay menus (Signal's Picture Play shares it). */
+export const SRC_LABEL: Record<string, string> = {
   none: 'none', speed: 'speed', size: 'size', brightness: 'brightness', hue: 'hue', saturation: 'saturation',
   texture: 'texture', x: 'x', y: 'y', direction: 'direction', age: 'age',
   motion: 'motion ▣', light: 'light ▣', warmth: 'warmth ▣', busyness: 'busyness ▣', cut: 'cut ▣'

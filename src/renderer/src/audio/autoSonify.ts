@@ -219,10 +219,16 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
   }),
   // Signal : the pip and the struck sine weigh double (the register this voice
   // is for). Synced, the rate is a musical division of the beat; free, a pace.
+  // Who plays it (PLAY) and the Picture Play patchbay rows stay yours (the
+  // Picture section's own dice re-rolls the rows); playing from the picture,
+  // its read is rolled too (the pitch's place, STRIKE or TIE, sense, PICTURE).
   signal: (c) => {
     const sync = rnd() < 0.4
+    const pic = c.signal.play === 'picture'
+      ? { pmode: pick(['height', 'height', 'keyboard', 'radial'] as const), tie: rnd() < 0.3, sens: rr(0.35, 0.75), picture: rr(0.55, 1) }
+      : {}
     return {
-      ...c.signal, sync, rate: sync ? pick([1, 2, 3, 4, 6, 8]) : rr(3, 20),
+      ...c.signal, ...pic, sync, rate: sync ? pick([1, 2, 3, 4, 6, 8]) : rr(3, 20),
       wave: pick([0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8]), decay: rr(0.1, 0.55), tone: rr(0.3, 0.95), fm: rr(0.1, 0.8),
       heads: pick([1, 2, 2, 3, 4]), steps: pick([8, 12, 16, 16, 24, 32]), spread: rr(0, 1),
       thresh: rr(0.3, 0.7), density: rr(0.15, 0.6), path: pick([0, 0, 0, 1, 2, 3]),

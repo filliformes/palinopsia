@@ -33,6 +33,7 @@ import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCard
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { AssignRow, useBound } from './AutoControls'
 import { SynthCard } from './SonifySynth'
+import { SignalPictureRead, SignalPictureRows, SignalPlaySwitch } from './SonifySignal'
 import { SectionHead } from './FinishingSections'
 import { SONI_GROUPS, SONI_TAIL, SONI_VOICE_ORDER, soniVoiceColor } from './soniGroups'
 import { SYNTH_PARAM_LABEL, SYNTH_SLOT_COLORS } from '../audio/synthPlay'
@@ -1949,11 +1950,15 @@ export function SonifyPage({
               9: (
                 <VoiceShell
                   title="Signal" on={cfg.signal.on}
-                  hint="Read heads walk the picture on a clock; every mark they cross fires a micro-grain. The picture is the pattern : point it at machine marks and it plays them as data."
+                  hint={cfg.signal.play === 'picture'
+                    ? 'Picture Play : the moving things play the micro-grains, as they play the Synth. Where a thing is gives its pitch; its speed, size, brightness and the rest shape every hit (the PICTURE rows). STRIKE ticks them on the clock, TIE holds one a thing.'
+                    : 'Read heads walk the picture on a clock; every mark they cross fires a micro-grain. The picture is the pattern : point it at machine marks and it plays them as data.'}
                   onToggle={() => pv('signal', { on: !cfg.signal.on })}
                   onDice={() => diceVoice('signal')}
+                  diceTitle="Randomize Signal : its grain, clock, heads and range (and, in picture play, how the picture is read : pitch, strike or tie, sense, PICTURE). PLAY and the PICTURE rows stay : the Picture section's own dice re-rolls them"
                 >
                   <TapSelect cfg={cfg} voice={cfg.signal} onChange={(tap) => pv('signal', { tap })} />
+                  <SignalPlaySwitch sg={cfg.signal} set={(p) => pv('signal', p)} />
                   <Row label="wave">
                     <select
                       className="input select-compact min-w-0 flex-1 text-[10px]"
@@ -1975,6 +1980,18 @@ export function SonifyPage({
                   <Slider label="decay" value={cfg.signal.decay} min={0} max={1} neutral={0.3} fmt={(v) => { const ms = 0.2 * Math.pow(2500, v); return ms < 10 ? ms.toFixed(1) + 'ms' : Math.round(ms) + 'ms' }} onChange={(v) => pv('signal', { decay: v })} mod={chip('signalDecay')} title="How long a grain lasts, from a 0.2 ms tick to a 500 ms ring" />
                   <Slider label="tone" value={cfg.signal.tone} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { tone: v })} mod={chip('signalTone')} title="Brightness of the noise, click and pink grains (a lowpass from 200 Hz up)" />
                   <Slider label="fm" value={cfg.signal.fm} min={0} max={1} neutral={0.4} onChange={(v) => pv('signal', { fm: v })} mod={chip('signalFm')} title="How metallic the fm grain is (its modulator sits at 1.5 times the pitch)" />
+                  {cfg.signal.play === 'picture' && <SignalPictureRead sg={cfg.signal} set={(p) => pv('signal', p)} Slider={Slider} />}
+                  {cfg.signal.play === 'picture' && !cfg.signal.tie && (<>
+                  <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} title={cfg.signal.sync ? `How often a moving thing ticks : per beat, at ${bpm} BPM (its rate row runs it from a quarter to four times this)` : 'How often a moving thing ticks, per second (its rate row runs it from a quarter to four times this)'} />
+                  <Row label="clock">
+                    <button
+                      onClick={() => pv('signal', { sync: !cfg.signal.sync, rate: !cfg.signal.sync ? Math.min(16, Math.max(1, Math.round(cfg.signal.rate / 2))) : cfg.signal.rate * 2 })}
+                      className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.signal.sync ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+                      title={`Lock the ticks to the tempo (${bpm} BPM) : rate becomes ticks per beat, and a thing that appears waits for the grid`}
+                    >sync</button>
+                  </Row>
+                  </>)}
+                  {cfg.signal.play !== 'picture' && (<>
                   <Row label="heads">
                     {[1, 2, 3, 4].map((h) => (
                       <button
@@ -2020,6 +2037,7 @@ export function SonifyPage({
                       <option value={3}>spiral</option>
                     </select>
                   </Row>
+                  </>)}
                   <Row label="range">
                     <select className="input select-compact text-[10px]" value={cfg.signal.loOct} onChange={(e) => pv('signal', { loOct: Math.min(Number(e.target.value), cfg.signal.hiOct - 1) })} title="Lowest octave">
                       {[1, 2, 3, 4, 5, 6].map((o) => <option key={o} value={o}>oct {o}</option>)}
@@ -2029,9 +2047,10 @@ export function SonifyPage({
                       {[4, 5, 6, 7, 8, 9].map((o) => <option key={o} value={o}>oct {o}</option>)}
                     </select>
                   </Row>
-                  <Slider label="snap" value={cfg.signal.snap} min={0} max={1} neutral={1} fmt={(v) => (v < 0.02 ? 'free' : v > 0.98 ? 'scale' : Math.round(v * 100) + '%')} onChange={(v) => pv('signal', { snap: v })} mod={chip('signalSnap')} title="Pitch from height : free frequency at 0, the global scale at 1. The middle is microtonal (a blend in pitch, not a crossfade of two notes)" />
+                  <Slider label="snap" value={cfg.signal.snap} min={0} max={1} neutral={1} fmt={(v) => (v < 0.02 ? 'free' : v > 0.98 ? 'scale' : Math.round(v * 100) + '%')} onChange={(v) => pv('signal', { snap: v })} mod={chip('signalSnap')} title={`Pitch from ${cfg.signal.play === 'picture' ? 'where a thing is' : 'height'} : free frequency at 0, the global scale at 1. The middle is microtonal (a blend in pitch, not a crossfade of two notes)`} />
                   <Slider label="gain" value={cfg.signal.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { gain: v })} title="How loud the Signal voice is (before its mixer channel)" />
-                  <Slider label="pan" value={cfg.signal.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('signal', { pan: v })} title="Places the Signal voice left (-1) or right (+1); each grain is also panned by where its mark sits" />
+                  <Slider label="pan" value={cfg.signal.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('signal', { pan: v })} title={cfg.signal.play === 'picture' ? 'Places the Signal voice left (-1) or right (+1); each grain is also panned by its thing (the pan row, else where it is)' : 'Places the Signal voice left (-1) or right (+1); each grain is also panned by where its mark sits'} />
+                  {cfg.signal.play === 'picture' && <SignalPictureRows sg={cfg.signal} set={(p) => pv('signal', p)} Slider={Slider} />}
                 </VoiceShell>
               ),
               10: (

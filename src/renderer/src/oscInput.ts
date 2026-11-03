@@ -104,7 +104,8 @@ import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { AUDIO_LAYER } from './audio/audioLayer'
 import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
-import { SYNTH_DESTS, SYNTH_ENGINES, SYNTH_FILTERS, SYNTH_GRIDS, SYNTH_MODES, SYNTH_SRCS, normalizeSynth, synthFromPatch, type SynthCfg } from './audio/synthPlay'
+import { SYNTH_DESTS, SYNTH_ENGINES, SYNTH_FILTERS, SYNTH_GRIDS, SYNTH_MODES, SYNTH_SRCS, normalizeSynth, synthFromPatch, type SynthCfg, type SynthSrc } from './audio/synthPlay'
+import { SIGNAL_DESTS, normalizeSignalPatch } from './audio/signalPlay'
 import { SYNTH_PATCHES } from './audio/synthPatches'
 import { KEY_MODES } from './audio/soniKeyModel'
 import { GLUE_VOICES, defaultEq, normalizeEq, type SoniGlue } from './audio/eqMath'
@@ -820,6 +821,33 @@ function route(address: string, args: Args, host = ''): void {
           else if (ctl === 'density') V('signal', { density: clamp01(n) })
           else if (ctl === 'path') V('signal', { path: idx(0, 3) })
           else if (ctl === 'snap') V('signal', { snap: clamp01(n) })
+          // PICTURE PLAY (signalPlay.ts) : who plays (heads | picture, or 0 / 1),
+          // the pitch's place (height keyboard radial), STRIKE / TIE (tie >= 0.5),
+          // sense, PICTURE, and a patchbay row as the Synth's :
+          // /patch/<destination>/source (its name or index) and /depth (0..1 : -1..+1)
+          else if (ctl === 'play' || ctl === 'pmode' || (ctl === 'patch' && segs[5] === 'source')) {
+            const a0 = args[0]
+            const list: readonly string[] = ctl === 'play' ? ['heads', 'picture'] : ctl === 'pmode' ? ['height', 'keyboard', 'radial'] : SYNTH_SRCS
+            const v = typeof a0?.value === 'string' ? a0.value.trim().toLowerCase() : list[idx(0, list.length - 1)]
+            if (!v || !list.includes(v)) return
+            if (ctl === 'play') V('signal', { play: v as 'heads' | 'picture' })
+            else if (ctl === 'pmode') V('signal', { pmode: v as 'height' | 'keyboard' | 'radial' })
+            else {
+              const di = (SIGNAL_DESTS as readonly string[]).indexOf(segs[4] ?? '')
+              if (di < 0) return
+              const rows = normalizeSignalPatch(sg.patch)
+              V('signal', { patch: rows.map((r, i) => (i === di ? { ...r, src: v as SynthSrc } : r)) })
+            }
+          }
+          else if (ctl === 'patch' && segs[5] === 'depth') {
+            const di = (SIGNAL_DESTS as readonly string[]).indexOf(segs[4] ?? '')
+            if (di < 0) return
+            const rows = normalizeSignalPatch(sg.patch)
+            V('signal', { patch: rows.map((r, i) => (i === di ? { ...r, depth: clamp01(n) * 2 - 1 } : r)) })
+          }
+          else if (ctl === 'tie') V('signal', { tie: n >= 0.5 })
+          else if (ctl === 'sens') V('signal', { sens: clamp01(n) })
+          else if (ctl === 'picture') V('signal', { picture: clamp01(n) })
           return
         }
         case 'raster':
@@ -1552,6 +1580,20 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/signal/density', 0, 1, so.signal.density, 'Signal marks per head per step')
     addI('/opsia/sonify/signal/path', 0, 3, so.signal.path, 'Signal path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
     add('/opsia/sonify/signal/snap', 0, 1, so.signal.snap, 'Signal pitch : free frequency (0) to the scale (1)')
+    // Signal's Picture Play : the moving things play it
+    addI('/opsia/sonify/signal/play', 0, 1, so.signal.play === 'picture' ? 1 : 0, 'Signal : who plays the grains, 0 the read heads · 1 the moving things in the picture (or heads | picture)')
+    addI('/opsia/sonify/signal/pmode', 0, 2, Math.max(0, ['height', 'keyboard', 'radial'].indexOf(so.signal.pmode ?? 'height')), 'Signal Picture Play pitch : 0 height · 1 keyboard · 2 radial (or its name)')
+    add('/opsia/sonify/signal/tie', 0, 1, so.signal.tie ? 1 : 0, 'Signal Picture Play : STRIKE (ticks on the clock) or TIE (one held grain a thing, >= 0.5)')
+    add('/opsia/sonify/signal/sens', 0, 1, so.signal.sens ?? 0.5, 'Signal Picture Play : how much movement counts as a thing')
+    add('/opsia/sonify/signal/picture', 0, 1, so.signal.picture ?? 0.8, 'Signal Picture Play : every patchbay depth scaled')
+    {
+      const rows = normalizeSignalPatch(so.signal.patch)
+      SIGNAL_DESTS.forEach((d, i) => {
+        const row = rows[i]
+        addI(`/opsia/sonify/signal/patch/${d}/source`, 0, SYNTH_SRCS.length - 1, SYNTH_SRCS.indexOf(row.src), `Signal patchbay ${d} : its source, ${SYNTH_SRCS.map((x, j) => `${j} ${x}`).join(' · ')} (or its name)`)
+        add(`/opsia/sonify/signal/patch/${d}/depth`, 0, 1, (row.depth + 1) / 2, `Signal patchbay ${d} : its depth (0 : -1 · 0.5 : none · 1 : +1)`)
+      })
+    }
     // the Synth : the moving things in the picture play it
     {
       const sy = normalizeSynth(so.synth)

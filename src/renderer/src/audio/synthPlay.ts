@@ -1015,6 +1015,19 @@ export class SynthPlayer {
     ev.push({ k: 1, id: t.id, hz: 0, vel: 0, at: 0 })
   }
 
+  /** The things playing now : their id, place (as `mode` reads the pitch : 0
+   *  lowest .. 1 highest), position and note (Hz). Signal's Picture Play
+   *  (sonify.ts) strikes its own grains from them. */
+  playingThings(mode: SynthMode, radial: (x: number, y: number) => number): Array<{ id: number; x: number; y: number; place: number; hz: number }> {
+    const out: Array<{ id: number; x: number; y: number; place: number; hz: number }> = []
+    for (const t of this.tracks) {
+      if (!t.playing || !(t.hz > 0)) continue
+      const place = mode === 'keyboard' ? clamp01(t.x) : mode === 'radial' ? clamp01(radial(t.x, t.y)) : clamp01(1 - t.y)
+      out.push({ id: t.id, x: t.x, y: t.y, place, hz: t.hz })
+    }
+    return out
+  }
+
   /** Where the thing is, as the pitch reads it : 0 lowest .. 1 highest. */
   private place(t: Track, inp: SynthIn): number {
     switch (inp.cfg.mode) {
