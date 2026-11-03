@@ -35,7 +35,7 @@
 //      the next grid point, and it strikes them on the audio block.
 //   7. the patchbay : each tick, each playing thing's mods (setMods).
 
-import type { SynthEngineId, SynthFilterId, SynthSound } from './synthPatches'
+import { SYNTH_PATCHES, type SynthEngineId, type SynthFilterId, type SynthPatch, type SynthSound } from './synthPatches'
 
 export type SynthMode = 'height' | 'keyboard' | 'radial' | 'score'
 export type SynthGrid = 'free' | '8' | '16' | '8t'
@@ -120,6 +120,11 @@ export interface SynthCfg extends SynthSound {
   bars: 1 | 2 | 4 // the score playhead's length
   picture: number // scales every patchbay depth (0 = the picture only picks the notes)
   patch: SynthRow[] // 10 rows, in SYNTH_DESTS order
+  // The factory sound last picked (its name), so the Sound menu can show it :
+  // ABSENT until one is picked (a session that never picked one saves the same
+  // bytes as before the field existed). Edits after the pick leave it : the
+  // menu then reads "<name> · edited" (synthPatchState).
+  preset?: string
 }
 
 export function defaultSynthPatch(): SynthRow[] {
@@ -202,8 +207,33 @@ export function normalizeSynth(raw: unknown): SynthCfg {
     patch: d.patch.map((dr, i) => {
       const x = rows[i] as Partial<SynthRow> | undefined
       return { src: oneOf(x?.src, SYNTH_SRCS, dr.src), depth: num(x?.depth, dr.depth, -1, 1) }
-    })
+    }),
+    // (only a factory sound that exists : a renamed one reads as none)
+    ...(typeof r.preset === 'string' && SYNTH_PATCHES.some((p) => p.name === r.preset) ? { preset: r.preset } : {})
   }
+}
+
+/** A factory sound as a Synth patch : its whole sound and its name (the menu
+ *  shows it). The read, the patchbay and the voice's gain / pan stay. */
+export function synthFromPatch(p: SynthPatch): Partial<SynthCfg> {
+  return { ...p.sound, preset: p.name }
+}
+
+/** The factory sound the Sound menu shows : the one last picked, its place in
+ *  SYNTH_PATCHES, and whether any of its sound fields changed since (a slider,
+ *  the engine, a dice, OSC, MIDI : picking it again brings it back). */
+export function synthPatchState(c: SynthCfg): { patch: SynthPatch; index: number; edited: boolean } | null {
+  if (!c.preset) return null
+  const index = SYNTH_PATCHES.findIndex((p) => p.name === c.preset)
+  if (index < 0) return null
+  const patch = SYNTH_PATCHES[index]
+  const now = synthSound(c) as unknown as Record<string, unknown>
+  const want = patch.sound as unknown as Record<string, unknown>
+  const edited = Object.keys(want).some((k) => {
+    const a = now[k], b = want[k]
+    return typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) > 1e-6 : a !== b
+  })
+  return { patch, index, edited }
 }
 
 /** The engine's static sound (setConfig), from a Synth config. */

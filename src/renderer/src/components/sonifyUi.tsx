@@ -198,10 +198,11 @@ export function Divider(): JSX.Element {
   return <div className="my-0.5 h-px bg-border/60" />
 }
 
-/** A card's label column, then its controls. */
-export function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }): JSX.Element {
+/** A card's label column, then its controls. `wrap` : the controls may wrap
+ *  onto a second line in a narrow column (rather than run past the card). */
+export function Row({ label, children, hint, wrap }: { label: string; children: ReactNode; hint?: string; wrap?: boolean }): JSX.Element {
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className={`flex min-w-0 items-center ${wrap ? 'flex-wrap gap-x-1.5 gap-y-1' : 'gap-1.5'}`}>
       <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted" title={hint}>{label}</span>
       {children}
     </div>

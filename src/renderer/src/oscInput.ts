@@ -101,7 +101,7 @@ import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { AUDIO_LAYER } from './audio/audioLayer'
 import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
-import { SYNTH_DESTS, SYNTH_ENGINES, SYNTH_FILTERS, SYNTH_GRIDS, SYNTH_MODES, SYNTH_SRCS, normalizeSynth, type SynthCfg } from './audio/synthPlay'
+import { SYNTH_DESTS, SYNTH_ENGINES, SYNTH_FILTERS, SYNTH_GRIDS, SYNTH_MODES, SYNTH_SRCS, normalizeSynth, synthFromPatch, type SynthCfg } from './audio/synthPlay'
 import { SYNTH_PATCHES } from './audio/synthPatches'
 import { KEY_MODES } from './audio/soniKeyModel'
 import { GLUE_VOICES, defaultEq, normalizeEq, type SoniGlue } from './audio/eqMath'
@@ -944,12 +944,13 @@ function route(address: string, args: Args, host = ''): void {
           else if (ctl === 'envamt') S({ envAmt: clamp01(n) * 2 - 1 })
           else if (ctl === 'preset') {
             // a factory sound by name or 1-based number : the sound only (the
-            // read, the patchbay and the levels stay)
+            // read, the patchbay and the voice's gain / pan stay), its name shown
+            // in the Sound menu
             const a0 = args[0]
             const p = typeof a0?.value === 'string'
               ? SYNTH_PATCHES.find((x) => x.name.toLowerCase() === String(a0.value).trim().toLowerCase())
               : SYNTH_PATCHES[Math.round(n) - 1]
-            if (p) S({ ...p.sound })
+            if (p) S(synthFromPatch(p))
           }
           else if (ctl === 'patch') {
             const di = (SYNTH_DESTS as readonly string[]).indexOf(segs[4] ?? '')

@@ -6,7 +6,7 @@
 // per-voice snap), two image taps (master or any layer), and an output-device
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
-import { isValidElement, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
 import { Blink } from './Blink'
 import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
@@ -223,9 +223,15 @@ export interface SliderProps {
   parse?: (text: string) => number | null
   /** MIDI Learn : the track takes a knob (a learn target id). */
   midiId?: string
+  /** A main control (the Synth's three macros) : its label on a line of its
+   *  own, strong, with what it does right now (`note`), over a taller track
+   *  across the whole row that fills in the accent (accent2 while modulated). */
+  main?: { note: string }
+  /** No label column (a slider in a section header : the header's title names it). */
+  noLabel?: boolean
 }
 function Slider({
-  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse, lead, midiId
+  label, value, min, max, step = 0.01, neutral, fmt, onChange, title, mod, parse, lead, midiId, main, noLabel
 }: SliderProps): JSX.Element {
   // The `mod` node (when present) is a <ModChip param=… inactive=…/>, so read its
   // param straight off the element : no call-site needs to repeat it. A slider
@@ -244,6 +250,25 @@ function Slider({
     if (!live || !modParam || !ref.current) return
     return registerLiveOverlay({ el: ref.current, key: modTargetKey({ kind: 'sonify', param: modParam }), format: (x) => String(x) })
   }, [live, modParam])
+  // A main control's fill (a CSS variable the track paints, 0..1) : the stored
+  // value, or the live one while modulated (as the thumb; never under a drag).
+  const fillOf = (v: number): string => (Math.max(0, Math.min(1, (v - min) / (max - min || 1)))).toFixed(4)
+  const valueRef = useRef(value)
+  valueRef.current = value
+  useLayoutEffect(() => {
+    if (main && ref.current && !live) ref.current.style.setProperty('--v', fillOf(value))
+  })
+  useEffect(() => {
+    const el = ref.current
+    if (!main || !live || !modParam || !el) return
+    return registerLiveOverlay({
+      key: modTargetKey({ kind: 'sonify', param: modParam }),
+      view: ownerWindow(el),
+      apply: (v) => el.style.setProperty('--v', fillOf(el.ownerDocument.activeElement === el ? valueRef.current : v)),
+      idle: () => el.style.setProperty('--v', fillOf(valueRef.current))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!main, live, modParam, min, max])
   const shown = fmt ? fmt(value) : value.toFixed(2)
   const fmtShown = fmt ?? ((v: number): string => v.toFixed(2))
   const modKey = modParam ? modTargetKey({ kind: 'sonify', param: modParam }) : undefined
@@ -286,52 +311,75 @@ function Slider({
     }
     setTyping(null)
   }
+  const track = (
+    <span className="relative flex min-w-0 flex-1">
+      {midiId && <MidiLearnOverlay id={midiId} />}
+      <input
+        ref={ref}
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onPointerDown={onPointerDown}
+        onDoubleClick={() => neutral !== undefined && onChange(neutral)}
+        className={main ? `soni-main min-w-0 flex-1${live ? ' is-live' : ''}` : `min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
+        title={`${title ?? `${label} ${shown}`}${live ? ' : modulated (drag sets the base)' : ''} · Shift-drag : finer${parse ? ' · click the value to type it' : ''}`}
+      />
+    </span>
+  )
+  const readout = (
+    typing !== null ? (
+      <input
+        autoFocus
+        className="input w-12 shrink-0 !px-0.5 text-right font-mono !text-[9px]"
+        value={typing}
+        onChange={(e) => setTyping(e.target.value)}
+        onBlur={(e) => commit(e.currentTarget.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit(e.currentTarget.value)
+          else if (e.key === 'Escape') { e.stopPropagation(); setTyping(null) }
+        }}
+      />
+    ) : parse ? (
+      <button
+        onClick={() => setTyping(shown)}
+        className={`w-12 shrink-0 cursor-text text-right font-mono text-[9px] underline decoration-dotted underline-offset-2 ${live ? 'text-accent2' : 'text-muted'} hover:text-text`}
+        title="Click to type the value"
+      >
+        <LiveNum liveKey={modKey} value={value} fmt={fmtShown} />
+      </button>
+    ) : (
+      <LiveNum liveKey={modKey} value={value} fmt={fmtShown} className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : main ? 'text-text' : 'text-muted'}`} />
+    )
+  )
+  const assignRow = modParam && modProps?.open && !modInactive && <SonifyAssign param={modParam} />
+  if (main) return (<>
+    <div className="flex min-w-0 flex-col" data-main-control={label}>
+      <div className="flex min-w-0 items-baseline gap-1.5 leading-none" title={title}>
+        <span className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-text">{label}</span>
+        <span className="min-w-0 truncate font-mono text-[9px] text-accent">{main.note}</span>
+      </div>
+      <div className="flex min-w-0 items-center gap-1.5">
+        {track}
+        {readout}
+        {mod}
+      </div>
+    </div>
+    {assignRow}
+  </>)
   return (<>
     <div className="flex min-w-0 items-center gap-1.5">
       {/* the label column (the Row's width) : a `lead` sits inside it, right of the
           label, so every track still starts at the same place */}
-      <span className="flex w-14 shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-muted" title={title}>
-        <span className="min-w-0 truncate">{label}</span>
-        {lead}
-      </span>
-      <span className="relative flex min-w-0 flex-1">
-        {midiId && <MidiLearnOverlay id={midiId} />}
-        <input
-          ref={ref}
-          type="range" min={min} max={max} step={step} value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          onPointerDown={onPointerDown}
-          onDoubleClick={() => neutral !== undefined && onChange(neutral)}
-          className={`min-w-0 flex-1 ${live ? 'accent-accent2' : 'accent-accent'}`}
-          title={`${title ?? `${label} ${shown}`}${live ? ' : modulated (drag sets the base)' : ''} · Shift-drag : finer${parse ? ' · click the value to type it' : ''}`}
-        />
-      </span>
-      {typing !== null ? (
-        <input
-          autoFocus
-          className="input w-12 shrink-0 !px-0.5 text-right font-mono !text-[9px]"
-          value={typing}
-          onChange={(e) => setTyping(e.target.value)}
-          onBlur={(e) => commit(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit(e.currentTarget.value)
-            else if (e.key === 'Escape') { e.stopPropagation(); setTyping(null) }
-          }}
-        />
-      ) : parse ? (
-        <button
-          onClick={() => setTyping(shown)}
-          className={`w-12 shrink-0 cursor-text text-right font-mono text-[9px] underline decoration-dotted underline-offset-2 ${live ? 'text-accent2' : 'text-muted'} hover:text-text`}
-          title="Click to type the value"
-        >
-          <LiveNum liveKey={modKey} value={value} fmt={fmtShown} />
-        </button>
-      ) : (
-        <LiveNum liveKey={modKey} value={value} fmt={fmtShown} className={`w-12 shrink-0 text-right font-mono text-[9px] ${live ? 'text-accent2' : 'text-muted'}`} />
+      {!noLabel && (
+        <span className="flex w-14 shrink-0 items-center gap-1 font-mono text-[9px] uppercase text-muted" title={title}>
+          <span className="min-w-0 truncate">{label}</span>
+          {lead}
+        </span>
       )}
+      {track}
+      {readout}
       {mod}
     </div>
-    {modParam && modProps?.open && !modInactive && <SonifyAssign param={modParam} />}
+    {assignRow}
   </>)
 }
 
@@ -431,8 +479,8 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   ...(SYNTH_PARAM_LABEL as Partial<Record<SonifyModParam, string>>)
 }
 
-function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
-  title: string; on: boolean; hint: string; onToggle: () => void; onDice?: () => void; children: ReactNode
+function VoiceShell({ title, on, hint, onToggle, onDice, diceTitle, children }: {
+  title: string; on: boolean; hint: string; onToggle: () => void; onDice?: () => void; diceTitle?: string; children: ReactNode
 }): JSX.Element {
   return (
     <Shell
@@ -446,7 +494,7 @@ function VoiceShell({ title, on, hint, onToggle, onDice, children }: {
           {PROBE_MARK[title].glyph}
         </span>
       )}
-      right={onDice && <IconBtn onClick={onDice} title={`Randomize ${title}`}>🎲</IconBtn>}
+      right={onDice && <IconBtn onClick={onDice} title={diceTitle ?? `Randomize ${title}`}>🎲</IconBtn>}
     >
       {children}
     </Shell>
@@ -1532,6 +1580,7 @@ export function SonifyPage({
             hint="The moving things in the picture play a synthesizer : each thing that starts moving takes a voice (in poly the 8 strongest), its place picks the note on the key and scale, and how it looks (its speed, size, color, texture, where it goes) shapes its sound through the picture patchbay. A thing that stops, or leaves the frame, lets its note go. On the mirror : a ring on each thing that plays, its note beside it."
             onToggle={() => pv('synth', { on: !cfg.synth.on })}
             onDice={() => diceVoice('synth')}
+            diceTitle="Randomize the Synth : its sound (half the time a factory sound) and how the picture is read (pitch, range, steps or slide, timing, PICTURE). The patchbay rows stay : the Picture section's own dice re-rolls them"
           >
             <SynthCard
               cfg={cfg}

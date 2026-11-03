@@ -667,6 +667,63 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **The Sonify Synth's card : the sound it plays named, sections, the main knobs bigger,
+  a dice for the picture** (Vincent's four : "show what preset is selected in the Sound
+  dropdown when I select one", "add better organized sections (like in the Finishing and
+  source/fx inspectors, with categories colorized)", "make Timbre, Harmonics and Morph
+  visually different from the other sliders, so we know they are more important" and "add
+  a randomize button only for the Picture section").
+  **The Sound menu keeps the factory sound's name** : a pick writes it on the config,
+  `SoniConfig.synth.preset` (`synthFromPatch`), absent until a sound is picked so a
+  session that never picked one saves the same bytes (the Synth's export rule;
+  `normalizeSynth` keeps only a name that exists). The menu (grouped by engine) shows it,
+  and `synthPatchState` compares the sound fields with the patch : once one moved (a
+  slider, the engine, OSC, MIDI; a modulator writes nothing, so it never counts) it reads
+  **"Choir Ah · edited"** (a hidden option, so picking the sound again is a change and
+  brings it back). OSC `/opsia/sonify/synth/preset` names it too; the Synth's dice, when it
+  draws a factory sound (half the time), lands it whole and named, its level included (the
+  factory levels are matched in loudness), and clears the name when it rolls an engine of
+  its own. Sessions, scenes, presets and the reload carry the name like any Synth field.
+  **Sections in the Finishing panel's look** : `FinishingSections.tsx` exports its header
+  (`SectionHead` : chevron and title in the section's color, the state on the right; keys
+  fold it only from the bar itself now) and its colors (`SECTION_COLORS`), and the card
+  uses them : **engine** (accent) · **read** (earth) · **tone** (red) · **envelope**
+  (violet) · **life** (neutral) · **picture** (accent2), each a header bar across the card
+  with its state (`dco · poly`, `height · oct 3→5 · free`, `ladder`, `a.05 d.35 s.60
+  r.35`, `glide 0.10 · chorus I`) and a rail of its color down its rows; folding is kept on
+  this computer (`collapsed['soni-synth-<id>']`), PICTURE folded until opened. PICTURE's
+  amount, its M, its learn overlay and its dice sit IN its header (a click on them never
+  folds it), the ten rows under it, as before. The range row wraps its steps / slide pair
+  under the octaves in a narrow column : at the column's narrowest (240 px) the card ran
+  283 px of content in 204, now 204 in 204 (no overflow at 240, 320 or 640).
+  **TIMBRE / HARMONICS / MORPH** are drawn as the main controls (`Slider`'s `main`) : the
+  name strong on a line of its own with what the macro does on this engine beside it in
+  the accent (`wave`, `density→interval`, `sync→metal` …, the line under them is gone),
+  over a full-width taller track (`.soni-main` : a 6 px groove that fills in the accent up
+  to the value, a 14 px thumb ringed in the card's color; accent2 while modulated, the
+  fill following the live value through the live overlay). Their M chips and MIDI / OSC
+  learn targets are unchanged.
+  **The Picture section's own dice** (`randomSynthPatchbay`) re-rolls only the ten rows :
+  velocity always gets a source (positive 85 % of the time), a row rests now and then
+  (bend half the time), each row draws from the sources that suit it 70 % of the time and
+  from a thing's own sources over the whole picture's, depths mostly moderate with mixed
+  signs, resonance, drive and bend gentle, and the envelope keeps a sign that means
+  something (quick, small or detailed things pluck; slow, big or long-playing ones
+  swell). One undo step. The Synth's own dice already left the rows alone (it rolls the
+  sound and the read); both tooltips now say which does what.
+  Measured in the test copy (RTX 4070) through real CDP input, 51 checks : three sounds
+  picked by typing into the menu each named and loaded exactly; a drag on TIMBRE reads
+  "Choir Ah · edited", picking it again restores it; the name survives a reload, a session
+  file round trip and a scene recall (a scene of an untouched Synth clears it); an old
+  session re-exports byte for byte as the master build does (28,814 bytes, no Synth
+  block); 30 Picture dice clicks changed only `synth.patch` (a diff of the whole Sonify
+  config), velocity never none, the envelope's sign always meaningful, 211 thing sources
+  to 36 whole-picture ones, median depth 0.49; one undo brought the rows back; 20 main
+  dice clicks never touched the rows (8 factory sounds, all named, none edited); 23 learn
+  overlays on the card before and after (13 knobs and the 10 depths); 0 console errors.
+  Headless, 20,000 rolls : velocity never none, never all none, the envelope's sign
+  always right, 84 % thing sources, median |depth| 0.50 (p90 0.79). The card is 42 px
+  taller folded (745 → 787 px at 320 px), 46 px open.
 - **An imported film plays at its own speed by default** (Vincent : "by default, all
   imported videos should be toggled to use their own speed, not the global speed").
   `store.setSourceVideo` (the one door every film comes through : the source menu's

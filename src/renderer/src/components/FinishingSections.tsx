@@ -10,7 +10,7 @@
 // "dust" under FILM DAMAGE). The full label stays everywhere else (M panel,
 // modulation lists, OSC).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ModTarget } from '@shared/types'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { modTargetKey, useStore } from '../store'
@@ -51,7 +51,8 @@ export interface FinishingSection {
   summary?: (v: Values) => string
 }
 
-const C = {
+// (exported : every sectioned panel colors its sections from the same set)
+export const SECTION_COLORS = {
   neutral: 'rgb(var(--c-muted))',
   accent: 'rgb(var(--c-accent))',
   accent2: 'rgb(var(--c-accent2))',
@@ -60,6 +61,7 @@ const C = {
   earth: 'rgb(184 138 98)',
   violet: 'rgb(176 127 224)'
 }
+const C = SECTION_COLORS
 
 const num = (v: Values, k: string, d: number): number => (typeof v[k] === 'number' ? (v[k] as number) : d)
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-3
@@ -439,6 +441,50 @@ export function SectionedControls({
   )
 }
 
+/** A section's header bar : the fold chevron and the title in the section's
+ *  color, then its switch or its summary on the right. Shared with the other
+ *  sectioned panels (the Sonify Synth's card) so they read alike. `bar` : the
+ *  bar's tint (a panel on another background picks one that shows on it). Keys
+ *  fold it only from the bar itself (a key typed into a control in it stays
+ *  the control's). */
+export function SectionHead({ title, color, folded, onToggle, right, lead, bar = 'bg-panel2/60 hover:bg-panel2', hint }: {
+  title: string
+  color: string
+  folded: boolean
+  onToggle: () => void
+  right?: ReactNode
+  /** Between the title and the right side, filling the bar (a slider). */
+  lead?: ReactNode
+  bar?: string
+  hint?: string
+}): JSX.Element {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onToggle()
+        }
+      }}
+      className={`flex min-h-[20px] cursor-pointer select-none items-center gap-1.5 border-t border-border px-2 py-0.5 ${bar}`}
+      title={hint ?? (folded ? `Show ${title}` : `Fold ${title}`)}
+    >
+      <span className="w-2.5 shrink-0 font-mono text-[9px]" style={{ color }}>
+        {folded ? '▸' : '▾'}
+      </span>
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color }}>
+        {title}
+      </span>
+      {lead ?? <div className="min-w-0 flex-1" />}
+      {right}
+    </div>
+  )
+}
+
 function Section({
   shaderId,
   section: s,
@@ -479,32 +525,19 @@ function Section({
   const leadDim = s.own?.map((n) => dim?.[n]).find(Boolean)
   return (
     <div>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => setCollapsed(key, !folded)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            setCollapsed(key, !folded)
-          }
-        }}
-        className="flex min-h-[20px] cursor-pointer select-none items-center gap-1.5 border-t border-border bg-panel2/60 px-2 py-0.5 hover:bg-panel2"
-        title={folded ? `Show ${s.title}` : `Fold ${s.title}`}
-      >
-        <span className="w-2.5 shrink-0 font-mono text-[9px]" style={{ color: s.color }}>
-          {folded ? '▸' : '▾'}
-        </span>
-        <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: s.color }}>
-          {s.title}
-        </span>
-        <div className="min-w-0 flex-1" />
-        {sw ? (
-          <EnumSwitch inp={sw} value={values[sw.name]} onChange={onChange} modTargetFor={modTargetFor} />
-        ) : s.summary ? (
-          <span className="truncate font-mono text-[9px] text-muted">{s.summary(values)}</span>
-        ) : null}
-      </div>
+      <SectionHead
+        title={s.title}
+        color={s.color}
+        folded={folded}
+        onToggle={() => setCollapsed(key, !folded)}
+        right={
+          sw ? (
+            <EnumSwitch inp={sw} value={values[sw.name]} onChange={onChange} modTargetFor={modTargetFor} />
+          ) : s.summary ? (
+            <span className="truncate font-mono text-[9px] text-muted">{s.summary(values)}</span>
+          ) : null
+        }
+      />
       {!folded && (
         <div className="border-l-2" style={{ borderLeftColor: s.color }}>
           {lead && (leadDim ? <div className="opacity-40" title={leadDim}>{lead}</div> : lead)}

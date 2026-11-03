@@ -18,7 +18,7 @@
 import type { CompositionState, FxInstance, SourceSlot } from '@shared/types'
 import type { SoniConfig } from './sonify'
 import { SYNTH_PATCHES } from './synthPatches'
-import { normalizeSynth } from './synthPlay'
+import { SYNTH_DESTS, normalizeSynth, synthFromPatch, type SynthDest, type SynthRow, type SynthSrc } from './synthPlay'
 
 type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord' | 'signal'
 
@@ -231,17 +231,20 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
   },
   // Synth : a sound and an engine, weighted toward what plays well under a
   // moving picture (poly, a filter open enough to hear the strikes, short to
-  // middle envelopes); half the time a factory sound when there are some. The
-  // patchbay, the sense, the tap and the levels stay yours.
+  // middle envelopes); half the time a factory sound when there are some (whole,
+  // its level too : the factory levels are matched in loudness, and the Sound
+  // menu shows its name). The patchbay rows, the sense, the tap and the voice's
+  // gain / pan stay yours (the Picture section's own dice re-rolls the rows :
+  // randomSynthPatchbay).
   synth: (c) => {
-    const s = normalizeSynth(c.synth)
+    const { preset: _was, ...s } = normalizeSynth(c.synth)
     const lo = pick([2, 3, 3, 4])
     const read = {
       mode: pick(['height', 'height', 'height', 'keyboard', 'radial', 'score'] as const),
       loOct: lo, hiOct: lo + pick([1, 2, 2, 3]),
       grid: pick(['free', 'free', '8', '16', '8t'] as const), slide: rnd() < 0.25, picture: rr(0.5, 1)
     }
-    if (SYNTH_PATCHES.length && rnd() < 0.5) return { ...s, ...pick(SYNTH_PATCHES).sound, level: s.level, ...read }
+    if (SYNTH_PATCHES.length && rnd() < 0.5) return { ...s, ...synthFromPatch(pick(SYNTH_PATCHES)), ...read }
     return {
       ...s, ...read,
       engine: pick(['dco', 'dco', 'ms', 'ms', 'swarm', 'fm', 'fm', 'modal', 'voice', 'fold', 'pluck', 'pluck'] as const),
@@ -254,6 +257,59 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
     }
   },
   chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6), waves: rnd() < 0.5 ? 0 : rr(0.1, 0.5), wavesRate: rr(0.15, 0.6) })
+}
+
+// The Synth's picture patchbay, re-rolled (the Picture section's dice) : a new
+// source and depth for each of the ten rows, weighted so it always plays and
+// never sounds broken. Velocity always has a source (positive mostly : the
+// faster or bigger, the harder), a row or two may rest, each row draws from the
+// sources that make sense for it most of the time and from the per-thing
+// sources over the whole-picture ones; depths mostly moderate, signs mixed. The
+// envelope keeps a sign that means something (quick, small or detailed things
+// pluck; slow, big or long-playing ones swell into pads), resonance, drive and
+// bend stay gentle. The sound, the read and PICTURE are not touched.
+const THING: SynthSrc[] = ['speed', 'size', 'brightness', 'hue', 'saturation', 'texture', 'x', 'y', 'direction', 'age']
+const WHOLE: SynthSrc[] = ['motion', 'light', 'warmth', 'busyness', 'cut']
+// each destination's natural sources (drawn 70 % of the time)
+const LIKES: Record<SynthDest, SynthSrc[]> = {
+  vel: ['speed', 'speed', 'size', 'brightness', 'motion'],
+  timbre: ['hue', 'hue', 'brightness', 'saturation', 'texture', 'y'],
+  harmonics: ['size', 'texture', 'y', 'saturation', 'age'],
+  morph: ['texture', 'speed', 'age', 'saturation', 'direction'],
+  cutoff: ['brightness', 'brightness', 'y', 'speed', 'size', 'light'],
+  reso: ['saturation', 'texture', 'age', 'warmth'],
+  drive: ['motion', 'speed', 'size', 'busyness', 'saturation'],
+  env: [],
+  pan: ['x', 'x', 'x', 'hue', 'y'],
+  bend: ['direction', 'direction', 'y', 'speed']
+}
+// the envelope's sources with the sign that makes them mean something
+// (negative depth : a high source plucks; positive : it swells)
+const ENV: [SynthSrc, 1 | -1][] = [['speed', -1], ['speed', -1], ['size', 1], ['texture', -1], ['age', 1], ['motion', -1], ['busyness', -1]]
+const r2 = (v: number): number => Math.round(v * 100) / 100
+/** |depth| : mostly moderate, now and then strong. */
+const amount = (): number => (rnd() < 0.15 ? rr(0.65, 0.9) : rr(0.25, 0.65))
+export function randomSynthPatchbay(): SynthRow[] {
+  const used = new Map<SynthSrc, number>()
+  const rows = SYNTH_DESTS.map((d): SynthRow => {
+    if (d === 'env') {
+      if (rnd() < 0.15) return { src: 'none', depth: 0 }
+      const [src, sign] = pick(ENV)
+      return { src, depth: r2(sign * rr(0.4, 0.85)) }
+    }
+    // a row may rest (never velocity; bend half the time : a bend is heard as out of tune)
+    if (d !== 'vel' && rnd() < (d === 'bend' ? 0.5 : 0.12)) return { src: 'none', depth: 0 }
+    let src: SynthSrc = 'none'
+    for (let tries = 0; tries < 6; tries++) {
+      src = rnd() < 0.7 ? pick(LIKES[d]) : rnd() < 0.8 ? pick(THING) : pick(WHOLE)
+      if ((used.get(src) ?? 0) < 3) break // one source on three rows at most
+    }
+    used.set(src, (used.get(src) ?? 0) + 1)
+    const sign = d === 'vel' ? (rnd() < 0.85 ? 1 : -1) : d === 'pan' ? (rnd() < 0.8 ? 1 : -1) : d === 'cutoff' ? (rnd() < 0.7 ? 1 : -1) : rnd() < 0.6 ? 1 : -1
+    const a = d === 'vel' ? rr(0.5, 0.9) : d === 'pan' ? rr(0.5, 0.9) : d === 'reso' || d === 'drive' ? rr(0.15, 0.5) : d === 'bend' ? rr(0.1, 0.3) : amount()
+    return { src, depth: r2(sign * a) }
+  })
+  return rows
 }
 
 /** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,
