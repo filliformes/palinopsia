@@ -94,6 +94,7 @@ import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
 import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
 import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, relaySoundEnvelopes, morphDebug } from './morph'
+import { blackLevel } from './black'
 
 import { surfaceComposition, nearestSurfaceScene, tracePath, newPlayhead } from './surface'
 import { keepPersistent } from './persist'
@@ -366,6 +367,8 @@ export default function App(): JSX.Element {
   const midiLearnMode = useStore((s) => s.midiLearnMode)
   const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
   const [flushFlashing, flushFlash] = useFlash()
+  const black = useStore((s) => s.black)
+  const morphSec = useStore((s) => s.morphMs / 1000)
   // The keyboard cheat-sheet (`?`). A ref shadows the state so the mount-once
   // keydown handler can read "is it open?" for the Esc path without a stale closure.
   const [helpOpen, setHelpOpen] = useState(false)
@@ -1096,6 +1099,13 @@ export default function App(): JSX.Element {
           fireFreeze()
           return
         }
+        // . : Black, the whole show to black over the Morph time (again : back),
+        // the top bar's button (PowerPoint's own blackout key).
+        if (k === '.') {
+          e.preventDefault()
+          useStore.getState().setBlack('toggle')
+          return
+        }
       }
       // Esc: close the cheat-sheet first if it's up (it sits above everything).
       if (e.key === 'Escape' && helpOpenRef.current) {
@@ -1635,7 +1645,15 @@ export default function App(): JSX.Element {
         const relayEnv = relayEnvelopes()
         if (relayEnv) relayEnv.forEach((k, i) => { if (k < 0.999) comp!.scaleLayerOpacity(i, k) })
         // ...and its sound with it (an outgoing sound fades instead of being cut)
-        relaySoundEnvelopes()?.forEach((k, i) => { if (k < 0.999) comp!.scaleLayerSound(i, k) })
+        // 2j. Black (black.ts) : the finished frame, and every layer's film and
+        //     Audio slot with it, toward black over the Morph time (on the relay's).
+        const relaySnd = relaySoundEnvelopes()
+        const blk = blackLevel(now)
+        comp!.setBlack(blk)
+        for (let i = 0; i < st.composition.layers.length; i++) {
+          const k = (relaySnd?.[i] ?? 1) * blk
+          if (k < 0.999) comp!.scaleLayerSound(i, k)
+        }
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // Timer clock (the window doesn't paint) : wait for THIS render before
@@ -2321,6 +2339,17 @@ export default function App(): JSX.Element {
             title="Panic flush (0) : empty every self-feeding buffer (feedback, and the datamosh / sediment / corrode / scanner / echo accumulators) so a runaway image recovers WITHOUT a reload. Parameters, modulators and the clock stay put."
           >
             ⚡ Flush
+          </button>
+        </span>
+        {/* Black : the whole show to black over the Morph time, and back (black.ts). */}
+        <span className="relative flex shrink-0">
+          <MidiLearnOverlay id="fire:black" />
+          <button
+            onClick={() => useStore.getState().setBlack('toggle')}
+            className={`btn text-[12px] ${black ? '!border-danger !bg-danger/20 !text-danger' : ''}`}
+            title={`${black ? 'BLACK : the show is faded out. Click (or .) : it comes back' : 'Black (.) : the whole show fades to black'} over the Morph time (${morphSec < 10 ? morphSec.toFixed(1) : Math.round(morphSec)} s) : every layer, the Background, the films' sound, Sonify and the Audio Layer, on the preview and every output and recording. Nothing is moved : it dims what leaves, so everything keeps playing under it and comes back as it is then. MIDI / OSC learnable, /opsia/black`}
+          >
+            ■ Black
           </button>
         </span>
         </div>

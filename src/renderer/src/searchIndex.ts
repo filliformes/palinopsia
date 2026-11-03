@@ -862,6 +862,7 @@ function commandItems(s: St, units: UnitInfo[]): SearchItem[] {
       showToast('Panic flush : buffers emptied', 'warn')
     }),
     cmd('freeze', 'Freeze / hold', 'H · hold the output (again : let it go)', ['hold', 'pause', 'still'], fireFreeze),
+    cmd('black', 'Black', `. · ${s.black ? 'black now : bring the show back' : 'the whole show to black'} over the Morph time`, ['blackout', 'fade', 'out', 'dark', 'hide', 'end'], () => useStore.getState().setBlack('toggle')),
     cmd('record', 'Record', 'start a take, or stop the one rolling', ['rec', 'capture', 'take', 'video'], fireRecordToggle),
     cmd('macro', 'Macro knobs', `the MACRO button · ${s.macroBar ? 'shown : hide the row (the knobs keep playing)' : 'hidden : show the row of 16 knobs'}`, ['macro', 'knobs', 'bar', 'row', 'show', 'hide', 'meta'], () => {
       const st = useStore.getState()

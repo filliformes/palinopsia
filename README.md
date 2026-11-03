@@ -241,6 +241,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
+| `.` | **Black** : the whole show (picture and sound) to black over the Morph time; again, back (the top bar's ■ Black) |
 | `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close the Source Editor / Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
 | `Ctrl/Cmd+K` | **Search everything** : effects, sources, parameters, presets, master chains, Generate themes, pages and commands in one palette (again : close it; see [below](#search-everything-ctrlk)) |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
@@ -278,7 +279,7 @@ that couldn't start *and why* (permission denied / no device / cancelled).
 control of every source and effect, each effect's dry/wet, the layer and Mixer
 controls, the Background's, the 16 Macro knobs), **presets** (each shader's, yours, the
 layer, Mixer and Background ones), **master chains**, **Generate themes**, the
-**pages** and tabs, and **commands** (Randomize, Vary, Panic flush, Freeze, Record,
+**pages** and tabs, and **commands** (Randomize, Vary, Panic flush, Black, Freeze, Record,
 MIDI Learn, Fulldome, New, Open, Undo, Redo). Results come in groups, each row saying
 where it will land; a row that can't apply is greyed and says why. The keyword tags
 work as in every picker (`reverb`, `paint`), and several words narrow it (`mosh l2`).
@@ -776,6 +777,19 @@ every rack effect (Light Trails, Wide Time, Slit Buffer, Context's trails), so a
 runaway feedback build-up clears instantly without reloading anything. Generators
 that grow their picture (Reaction, Colony…) are left alone : their buffer *is* the
 picture.
+
+Right of it, **■ Black** (key `.`) fades the whole show to black over the **Morph
+time** : every layer, the Background, the films' own sound, Sonify and the Audio
+Layer, on the preview and on every output (the output window, NDI / Spout / Syphon,
+recordings, the dome, the light output), the master effects' grain and dust
+included. Press it again and the show comes back over the same time; a press
+half-way turns it round from where it is. The button stays lit red while the show
+is out. It moves no fader : it dims what leaves, so everything keeps playing under
+it and comes back as it is by then (a scene recalled, a Generate or a fader moved
+while black comes back too), and it holds through scene changes. At Morph 0 it is a
+cut (Flash safety still nets a fast flicker). A frame frozen (`H`) under Black comes
+back lit. It is never saved : a launch, a session or a scene always starts shown.
+MIDI / OSC learnable, a Body rule action, in `Ctrl+K`, and `/opsia/black`.
 
 ### Depth (2.5D)
 
@@ -1380,7 +1394,7 @@ Learnable targets:
   the **Sonify Synth**'s knobs and its ten **patchbay depths** (each mirrors its own
   curve; each Sonify voice's on / off, the Synth's too, is a fire below).
 - **Fires** (pad/note or button-CC, press edge only) : **Vary**, **Randomize**
-  (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Record**
+  (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Black**, **Record**
   start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
   **Sonify-sequence** and **key-sequence** transports, the Seq page's **transport** and
   its **rule timeline**, the **Master FX chain** on/off,
@@ -3400,6 +3414,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/space/{voice}/az · el · width · span · spin` | f 0..1 | Where a Sonify voice sits (`spectra` `orbit` `flow` `events` `raster` `sstv` `filter` `chord` `collage` `signal` `assemblage`), 0..1 over each range (az 0.5 = straight ahead) |
 | `/opsia/space/{voice}/follow` | bool | It follows the picture (≥ 0.5), else it stays at its fixed place |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
+| `/opsia/black` | f | **Black** : ≥ 0.5 fades the whole show (picture and sound) to black over the Morph time, < 0.5 brings it back; a message with no value turns it over (key `.` / the ■ Black button); answered by the outbound feedback |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
 | `/opsia/surface/active` | bool | Enable / disable the Metasurface |

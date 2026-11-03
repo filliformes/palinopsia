@@ -103,7 +103,7 @@ function toggleSoniVoice(i: number): void {
 // key, Audio Layer and output lives in ./actions.ts (ids act:...), handed over
 // below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
-  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:freeze', 'fire:record',
+  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:freeze', 'fire:record',
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:transport', 'fire:ruleseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
@@ -123,6 +123,7 @@ export function fireTrigger(id: string): void {
     case 'fire:randomize': fireSelectedRandomize(); return
     case 'fire:sonify': st.setSonify({ ...st.sonify, on: !st.sonify.on }); return
     case 'fire:flush': firePanic(); return
+    case 'fire:black': st.setBlack('toggle'); return
     case 'fire:freeze': fireFreeze(); return
     case 'fire:record': fireRecordToggle(); return
     case 'fire:tap': tapTempo(); return
@@ -195,6 +196,7 @@ export interface MidiDevice {
 // fire:randomize    note/CC press → the selected Randomize
 // fire:sonify       note/CC press → Sonify on/off
 // fire:flush        note/CC press → panic flush (empty self-feeding buffers)
+// fire:black        note/CC press → Black : the whole show to black over the Morph time, again back
 // fire:freeze       note/CC press → toggle the global freeze / hold latch
 // fire:record       note/CC press → start (fast take) / stop recording
 // fire:tap          note/CC press → tap tempo
@@ -312,6 +314,8 @@ export function midiTargetLabel(id: string): string {
       return 'SONIFY on/off'
     case 'fire:flush':
       return 'FLUSH'
+    case 'fire:black':
+      return 'BLACK on/off'
     case 'fire:freeze':
       return 'FREEZE / hold'
     case 'fire:record':
