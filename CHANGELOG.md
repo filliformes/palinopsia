@@ -15,6 +15,23 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Sonify's state made persistent** (Vincent : "add a new right-click option to Sonify
+  : Make current state persistent. This is enabled so that when I have a cool Sonify
+  state, I can make it persist when I switch between Scenes that were saved with a
+  different set of Sonify parameters"). A pin like the others (`persist.ts SONIFY_PIN`
+  = 'sonify', in the session's `pins` : saved with it, New clears it, the ◆ list names
+  it "Sonify, its whole state"); Sonify is not in the composition, so the gate is the
+  recall's : `recallScene` and `sequenceTo` (the scene sequencer, the pad) skip the
+  scene's Sonify while it is pinned. `components/sonifyPin.ts` gives the two items
+  (**Make current state persistent** / **✓ Persistent**, and **Set this Sonify in every
+  scene** : `setSonifyInEveryScene`, as a scene saves it, never its on-state or device)
+  to the Transport's Sonify button right-click (after its two window items) and to the
+  Sonify page's header bar right-click; the button wears the pin's gold, the page a
+  **● persistent** chip that lets go. Checked in the test copy with two scenes saved with
+  different Sonify states : a recall changed it; pinned from the button's item, a recall
+  and the sequencer left it (dorian / 7 held); let go from the page's menu, the recall
+  changed it again (minor / 4 with the Chord); Set in every scene wrote it in both and
+  Ctrl+Z took it back; the session export carries the pin.
 - **A MIDI or OSC control as a modulator, and a takeover of any modulator** (Vincent :
   "what if any incoming set of OSC or MIDI device could entirely replace one of the 8
   modulators ? any modulation would still be bound to it; but it could then affect a

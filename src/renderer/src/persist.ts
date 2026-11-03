@@ -11,6 +11,8 @@
 //   - a whole source slot : 'src:<i>:<A|B>' (a control on it has one more
 //     part, its input : 'src:0:A:grow')
 //   - a modulator card : 'mod:<n>'
+//   - Sonify, its whole state : 'sonify' (not in the composition : the scene
+//     recall's own gate, store.ts recallScene, leaves it alone)
 // The pins belong to the session, outside the scenes : no scene can unpin
 // anything, and a scene saved before a pin still recalls around it.
 //
@@ -56,6 +58,7 @@ const rackKey = (s: FxScope): string => (s.kind === 'master' || s.kind === 'back
 export const unitPin = (s: FxScope, instId: string): string => `fxunit:${rackKey(s)}:${instId}`
 export const slotPin = (layer: number, slot: 'A' | 'B'): string => `src:${layer}:${slot}`
 export const modPin = (n: number): string => `mod:${n}`
+export const SONIFY_PIN = 'sonify'
 
 // The menu words for the whole pins (Pin.tsx usePinItems)
 export const PIN_WORDS = {
@@ -593,6 +596,7 @@ const shaderName = (id: string | null | undefined): string => (id ? SHADER_BY_ID
  *  picture now (a pin on an effect since removed, or a source since changed,
  *  holds nothing until it comes back). */
 export function describePin(key: string, live: CompositionState): { label: string; here: boolean } {
+  if (key === SONIFY_PIN) return { label: 'Sonify, its whole state', here: true }
   const p = parsePin(key)
   if (!p) return { label: key, here: false }
   switch (p.k) {

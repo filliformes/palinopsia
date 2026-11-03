@@ -2725,6 +2725,12 @@ this … in every scene** :
   it drives still follows each scene, except the bindings on persistent controls, which
   keep running their persistent modulator. Pinning a World's modulator makes it yours.
   A gold border and a gold name mark the card.
+- **Right-click the Sonify button** (or the Sonify page's header bar) → **Make current
+  state persistent** : Sonify as it plays now (its voices, the mixer, the tail, the key
+  and scale) stays when you switch scenes, whatever Sonify each scene was saved with;
+  no scene recall, the sequencer or the scene pad changes it, your hand still does. The
+  button turns gold and the page shows **● persistent** (click it to let scenes change
+  Sonify again). **Set this Sonify in every scene** writes it into every scene instead.
 
 A whole pin wins over the control pins inside it. The **◆ n persistent** list names
 them all ("L1 FX · Shatter, the whole effect", "L1 A · sea.mov, the whole source",

@@ -7,6 +7,9 @@
 // picker. The sound engine lives in audio/sonify.ts (AudioWorklet).
 
 import { createContext, Fragment, isValidElement, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react'
+import { SONIFY_PIN } from '../persist'
+import { sonifyPinItems } from './sonifyPin'
+import { ContextMenu } from './ContextMenu'
 import { Blink } from './Blink'
 import type { SonifyModParam } from '@shared/types'
 import { registerLiveOverlay } from './liveOverlay'
@@ -682,6 +685,9 @@ export function SonifyPage({
   // probes are drawn, and dragged, against THIS, never the bars.
   const pictureRef = useRef<HTMLDivElement | null>(null)
   const [pic, setPic] = useState({ w: 0, h: 0 })
+  // Sonify persistent (its right-click : sonifyPin.ts) and that menu
+  const soniPinned = useStore((s) => s.pins.includes(SONIFY_PIN))
+  const [pinMenu, setPinMenu] = useState<{ x: number; y: number } | null>(null)
   // A drag's grip on a probe (offset from the pointer, and the modulation's
   // swing from the base at grab time, so a modulated probe moves under the hand).
   const grip = useRef({ dx: 0, dy: 0, sx: 0, sy: 0 })
@@ -1132,8 +1138,27 @@ export function SonifyPage({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-bg">
       {/* Header : wraps gracefully on a narrow window instead of pushing controls off. */}
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-border px-3 py-2">
-        <span className="text-[13px] font-semibold">Sonify</span>
+      <div
+        className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-border px-3 py-2"
+        // right-click : make its state persistent, set it in every scene (sonifyPin.ts)
+        onContextMenu={(e) => {
+          if (e.target !== e.currentTarget && (e.target as HTMLElement).closest('input, select, textarea')) return
+          e.preventDefault()
+          setPinMenu({ x: e.clientX, y: e.clientY })
+        }}
+      >
+        <span className="text-[13px] font-semibold" title="Right-click the bar : make Sonify's state persistent (scenes leave it as it is), or set it in every scene">Sonify</span>
+        {soniPinned && (
+          <button
+            onClick={() => useStore.getState().togglePin(SONIFY_PIN)}
+            className="rounded px-1.5 py-0.5 font-mono text-[10px] ring-1"
+            style={{ color: 'rgb(var(--c-pin))', boxShadow: 'inset 0 0 0 1px rgb(var(--c-pin) / 0.7)', background: 'rgb(var(--c-pin) / 0.1)' }}
+            title="Persistent : no scene recall, the sequencer or the scene pad changes Sonify (a hand on it still does). Click : let scenes change it again"
+          >
+            ● persistent
+          </button>
+        )}
+        {pinMenu && <ContextMenu x={pinMenu.x} y={pinMenu.y} items={sonifyPinItems(soniPinned)} onClose={() => setPinMenu(null)} />}
         <button
           onClick={() => {
             const comp = useStore.getState().composition
