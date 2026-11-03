@@ -100,6 +100,8 @@ import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
 import { AUDIO_LAYER } from './audio/audioLayer'
 import { SONI_SCALES, scaleFromName, withSonifyParam, type SoniConfig } from './audio/sonify'
+import { SYNTH_DESTS, SYNTH_ENGINES, SYNTH_FILTERS, SYNTH_GRIDS, SYNTH_MODES, SYNTH_SRCS, normalizeSynth, type SynthCfg } from './audio/synthPlay'
+import { SYNTH_PATCHES } from './audio/synthPatches'
 import { KEY_MODES } from './audio/soniKeyModel'
 import { GLUE_VOICES, defaultEq, normalizeEq, type SoniGlue } from './audio/eqMath'
 import { eqPresets, type EqPreset } from './audio/eqPresets'
@@ -126,11 +128,12 @@ import { sourceEvent } from './pointerInput'
 type Args = OscInEvent['args']
 // Sonify : the voices that read the picture (they have a tap), each voice's
 // octave span [lo min, lo max, hi min, hi max], and the Orbit shapes in UI order.
-const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1, signal: 1 } as const
+const SONI_TAP_VOICES = { spectra: 1, orbit: 1, flow: 1, events: 1, raster: 1, sstv: 1, filter: 1, chord: 1, signal: 1, synth: 1 } as const
 const SONI_OCT_SPAN: Record<string, [number, number, number, number] | undefined> = {
   spectra: [0, 4, 4, 8], flow: [1, 4, 4, 7], events: [1, 4, 4, 7], chord: [0, 4, 3, 8], collage: [0, 4, 3, 9], assemblage: [0, 4, 3, 9], filter: [0, 4, 4, 8],
-  signal: [1, 6, 4, 9]
+  signal: [1, 6, 4, 9], synth: [0, 7, 1, 8]
 }
+const SYNTH_VOICE_MODES = ['poly', 'unison', 'mono'] as const
 const ORBIT_RATIOS = [1, 2, 1.5, 1.3333333, 3]
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v))
 
@@ -711,7 +714,7 @@ function route(address: string, args: Args): void {
         apply({ ...c, taps })
         return
       }
-      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage' | 'fx'>(
+      const V = <K extends 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage' | 'synth' | 'fx'>(
         k: K, patch: Partial<SoniConfig[K]>
       ): void => apply({ ...c, [k]: { ...c[k], ...patch } })
       // Every voice that reads the picture : which tap it listens to (0 A · 1 B).
@@ -905,6 +908,54 @@ function route(address: string, args: Args): void {
           else if (ctl === 'noisesync') V(fv, { noiseSync: idx(0, 3) })
           else if (ctl === 'detune') V(fv, { detune: clamp01(n) })
           else if (ctl === 'voicing') V(fv, { voicing: idx(0, 4) })
+          return
+        }
+        // /opsia/sonify/synth/* : the Synth (the moving things play it). The
+        // usual conventions; an enum takes its name, its index (int) or 0..1;
+        // a patchbay row is /patch/<destination>/source and /depth (0..1 :
+        // -1..+1, 0.5 the middle).
+        case 'synth': {
+          const sy = normalizeSynth(c.synth)
+          const S = (p: Partial<SynthCfg>): void => V('synth', p)
+          const pickOf = <T extends string>(list: readonly T[]): T | null => {
+            const a0 = args[0]
+            if (typeof a0?.value === 'string') { const v = a0.value.trim().toLowerCase() as T; return list.includes(v) ? v : null }
+            return list[idx(0, list.length - 1)] ?? null
+          }
+          if (ctl === 'on') S({ on: n >= 0.5 })
+          else if (ctl === 'gain') S({ gain: clamp01(n) })
+          else if (ctl === 'pan') S({ pan: clamp01(n) * 2 - 1 })
+          else if (ctl === 'engine') { const v = pickOf(SYNTH_ENGINES); if (v) S({ engine: v }) }
+          else if (ctl === 'voices') { const v = pickOf(SYNTH_VOICE_MODES); if (v) S({ voices: v }) }
+          else if (ctl === 'filter') { const v = pickOf(SYNTH_FILTERS); if (v) S({ filter: v }) }
+          else if (ctl === 'mode') { const v = pickOf(SYNTH_MODES); if (v) S({ mode: v }) }
+          else if (ctl === 'grid') { const v = pickOf(SYNTH_GRIDS); if (v) S({ grid: v }) }
+          else if (ctl === 'chorus') S({ chorus: idx(0, 2) as 0 | 1 | 2 })
+          else if (ctl === 'bars') S({ bars: ([1, 2, 4] as const)[idx(0, 2)] })
+          else if (ctl === 'slide') S({ slide: n >= 0.5 })
+          else if (ctl === 'envamt') S({ envAmt: clamp01(n) * 2 - 1 })
+          else if (ctl === 'preset') {
+            // a factory sound by name or 1-based number : the sound only (the
+            // read, the patchbay and the levels stay)
+            const a0 = args[0]
+            const p = typeof a0?.value === 'string'
+              ? SYNTH_PATCHES.find((x) => x.name.toLowerCase() === String(a0.value).trim().toLowerCase())
+              : SYNTH_PATCHES[Math.round(n) - 1]
+            if (p) S({ ...p.sound })
+          }
+          else if (ctl === 'patch') {
+            const di = (SYNTH_DESTS as readonly string[]).indexOf(segs[4] ?? '')
+            if (di < 0) return
+            const row = sy.patch[di]
+            let next = row
+            if (segs[5] === 'source') { const v = pickOf(SYNTH_SRCS); if (v) next = { ...row, src: v } }
+            else if (segs[5] === 'depth') next = { ...row, depth: clamp01(n) * 2 - 1 }
+            if (next !== row) S({ patch: sy.patch.map((r, i) => (i === di ? next : r)) })
+          }
+          else if ((['timbre', 'harmonics', 'morph', 'cutoff', 'reso', 'drive', 'hpf', 'fmode', 'attack', 'decay', 'sustain', 'release', 'glide', 'drift', 'level', 'sens', 'picture'] as const).includes(ctl as 'timbre')) {
+            S({ [ctl]: clamp01(n) } as Partial<SynthCfg>)
+          }
+          else if (ctl === 'resonance') S({ reso: clamp01(n) })
           return
         }
         case 'fx':
@@ -1465,6 +1516,34 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/signal/density', 0, 1, so.signal.density, 'Signal marks per head per step')
     addI('/opsia/sonify/signal/path', 0, 3, so.signal.path, 'Signal path : 0 horizontal · 1 vertical · 2 radial · 3 spiral')
     add('/opsia/sonify/signal/snap', 0, 1, so.signal.snap, 'Signal pitch : free frequency (0) to the scale (1)')
+    // the Synth : the moving things in the picture play it
+    {
+      const sy = normalizeSynth(so.synth)
+      add('/opsia/sonify/synth/on', 0, 1, sy.on ? 1 : 0, 'Synth voice on (the moving things in the picture play it)')
+      add('/opsia/sonify/synth/gain', 0, 1, sy.gain, 'Synth gain')
+      add('/opsia/sonify/synth/pan', 0, 1, (sy.pan + 1) / 2, 'Synth balance (0 left · 0.5 middle · 1 right)')
+      addI('/opsia/sonify/synth/engine', 0, SYNTH_ENGINES.length - 1, SYNTH_ENGINES.indexOf(sy.engine), `Synth engine : ${SYNTH_ENGINES.map((e, i) => `${i} ${e}`).join(' · ')} (or its name)`)
+      addI('/opsia/sonify/synth/voices', 0, 2, SYNTH_VOICE_MODES.indexOf(sy.voices), 'Synth voices : 0 poly (the 8 strongest things) · 1 unison · 2 mono')
+      for (const k of ['timbre', 'harmonics', 'morph', 'cutoff', 'drive', 'hpf', 'fmode', 'attack', 'decay', 'sustain', 'release', 'glide', 'drift', 'level'] as const) {
+        add(`/opsia/sonify/synth/${k}`, 0, 1, sy[k], `Synth ${k === 'hpf' ? 'high-pass' : k === 'fmode' ? 'morph filter mode (low-pass, band-pass, high-pass)' : k}`)
+      }
+      add('/opsia/sonify/synth/resonance', 0, 1, sy.reso, 'Synth resonance')
+      add('/opsia/sonify/synth/envamt', 0, 1, (sy.envAmt + 1) / 2, 'Synth envelope on the cutoff (0 : -1 · 0.5 : none · 1 : +1)')
+      addI('/opsia/sonify/synth/filter', 0, 2, SYNTH_FILTERS.indexOf(sy.filter), 'Synth filter : 0 ladder · 1 ms · 2 morph')
+      addI('/opsia/sonify/synth/chorus', 0, 2, sy.chorus, 'Synth chorus : 0 off · 1 I · 2 II')
+      addI('/opsia/sonify/synth/mode', 0, 3, SYNTH_MODES.indexOf(sy.mode), 'Synth pitch from : 0 height · 1 keyboard (left to right) · 2 radial (center to edge; the dome : zenith to rim) · 3 score (a playhead on the beat)')
+      add('/opsia/sonify/synth/sens', 0, 1, sy.sens, 'Synth sense : how much movement counts as a thing')
+      addI('/opsia/sonify/synth/grid', 0, 3, SYNTH_GRIDS.indexOf(sy.grid), 'Synth timing : 0 free · 1 on the 1/8 · 2 on the 1/16 · 3 on the 1/8 triplet')
+      add('/opsia/sonify/synth/slide', 0, 1, sy.slide ? 1 : 0, 'Synth : steps (a new strike at each scale note, < 0.5) or slide (>= 0.5)')
+      addI('/opsia/sonify/synth/bars', 0, 2, [1, 2, 4].indexOf(sy.bars), 'Synth score playhead length : 0 one bar · 1 two · 2 four')
+      add('/opsia/sonify/synth/picture', 0, 1, sy.picture, 'Synth PICTURE : every patchbay depth scaled (0 = the picture only picks the notes)')
+      add('/opsia/sonify/synth/preset', 0, Math.max(1, SYNTH_PATCHES.length), 0, 'Synth factory sound : its number (1-based) or its name (the sound only)', false)
+      SYNTH_DESTS.forEach((d, i) => {
+        const row = sy.patch[i]
+        addI(`/opsia/sonify/synth/patch/${d}/source`, 0, SYNTH_SRCS.length - 1, SYNTH_SRCS.indexOf(row.src), `Synth patchbay ${d} : its source, ${SYNTH_SRCS.map((s, j) => `${j} ${s}`).join(' · ')} (or its name)`)
+        add(`/opsia/sonify/synth/patch/${d}/depth`, 0, 1, (row.depth + 1) / 2, `Synth patchbay ${d} : its depth (0 : -1 · 0.5 : none · 1 : +1)`)
+      })
+    }
     add('/opsia/sonify/raster/on', 0, 1, so.raster.on ? 1 : 0, 'Raster voice on')
     add('/opsia/sonify/raster/gain', 0, 1, so.raster.gain, 'Raster gain')
     add('/opsia/sonify/raster/x', 0, 1, norm('rasterX', so.raster.rx), 'Raster rect x')

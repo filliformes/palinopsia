@@ -44,7 +44,7 @@ const MODE_HINT: Record<SpaceMode, string> = {
 // one color per voice, then the FX return (the map and the rows share them).
 // A voice past the list (one added later) still gets a color of its own : a
 // missing hue made an invalid color, and the map drew it in the last one used.
-const HUES = [28, 200, 120, 330, 52, 265, 175, 0, 300, 90, 232]
+const HUES = [28, 200, 120, 330, 52, 265, 175, 0, 300, 90, 232, 150]
 const voiceColor = (s: number, a = 1): string =>
   s === SPACE_FX ? `rgba(160,160,160,${a})` : `hsla(${HUES[s] ?? Math.round((s * 137.5) % 360)},80%,60%,${a})`
 

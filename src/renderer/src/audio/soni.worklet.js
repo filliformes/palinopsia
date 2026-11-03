@@ -1,8 +1,9 @@
 // The Sonify AudioWorklet processor (plain JS : loaded via Vite ?url as a
 // module asset, added with audioContext.audioWorklet.addModule).
 //
-// One processor runs all nine voices (Spectra · Orbit · Flow · Events ·
-// Raster · Transmission · Filter · Chord · Collage) plus the master bus with an
+// One processor runs all twelve voices (Spectra · Orbit · Flow · Events ·
+// Raster · Transmission · Filter · Chord · Collage · Signal · Assemblage ·
+// Synth, the last one played through synth.engine.js) plus the master bus with an
 // always-on peak limiter. Rules: zero allocation inside
 // process(); no AudioParams (control flows through port messages); image
 // frames arrive as transferred Uint8Array luma grids, double-buffered and
@@ -21,8 +22,9 @@ const TAU = 6.283185307179586;
 // sequencer masks a session saves), so a new voice is APPENDED : Signal is 9,
 // and only the UI shows it before Chord. Inserting it at 7 would have moved
 // Chord and the Collage, and every saved mixer setting with them. The
-// Assemblage (an edit's own sound, cut with the picture) is 10.
-const NVOICE = 11;
+// Assemblage (an edit's own sound, cut with the picture) is 10, the Synth
+// (the moving things in the picture playing synth.engine.js) 11.
+const NVOICE = 12;
 // Above this fraction of the sample rate a partial can't be played : it would
 // fold back as an out-of-key whistle (and an Events phase would run away).
 const NYQ_FRAC = 0.45;
@@ -864,6 +866,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       signal:  { on: false, gain: 0.6, pan: 0, wave: 0, decay: 0.3, tone: 0.6, fm: 0.4 },
       collage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0, ringIn: 0 },
       assemblage: { on: false, gain: 0.7, pan: 0, bank: 0, bankSend: false, decay: 0.5, choke: false, cutoff: 1, peak: 0, slope: 0, tone: 0, tilt: 0, waves: 0, wavesRate: 0.5, wavesSync: 0, noise: 0, noiseRate: 0.5, noiseSync: 0, detune: 0, voicing: 0, ringIn: 0 },
+      synth: { on: false, gain: 0.7, pan: 0 },
       fx:      { send: 0, dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1, rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5, rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5, rvCross: 0.3, rvLowMult: 1, rvHighMult: 1 }
     };
     this.spectraFreqs = new Float32Array(NPART); // filled by cfg
@@ -1011,7 +1014,70 @@ class SoniProcessor extends AudioWorkletProcessor {
     // The Collage comp (one, on the whole bus) and where it writes
     this.lev = new Leveler(sampleRate);
     this.lvL = new Float32Array(128); this.lvR = new Float32Array(128); this.lvG = new Float32Array(128);
+    // ── the Synth (voice 11) : the engine synth.engine.js handed over in this
+    // worklet scope (added before this module), driven by the moving things the
+    // main thread finds (synthPlay.ts). `syQ` : its note events by time (a grid
+    // onset waits for its beat), struck on the audio block they fall in (2.7 ms
+    // at 48 kHz); `sySent` : the static sound the engine was last given.
+    const Synth = globalThis.OpsiaSynth;
+    this.synth = null;
+    if (typeof Synth === 'function') {
+      try { this.synth = new Synth(sampleRate); } catch (e) { this.synth = null; }
+    }
+    if (!this.synth) this.port.postMessage({ t: 'synth-missing' });
+    this.syQ = [];
+    this.sySent = null;
+    this.syOn = false;
+    this.syPanS = -2; // the voice's balance as applied (ramped across the block)
     this.port.onmessage = (e) => this.onMsg(e.data);
+  }
+
+  // The Synth's static sound (the config's own fields, maybe modulated) : to
+  // the engine only when one of them changed (the modulation overlay comes 30
+  // times a second; setConfig is never per block).
+  syncSynth() {
+    const sy = this.cfg.synth;
+    if (!this.synth || !sy) return;
+    const on = !!sy.on;
+    if (this.syOn && !on) { this.synth.allOff(); this.syQ.length = 0; }
+    this.syOn = on;
+    const prev = this.sySent;
+    let changed = !prev;
+    if (prev) for (const k in prev) if (prev[k] !== sy[k]) { changed = true; break; }
+    if (!changed) return;
+    const snd = {
+      engine: sy.engine, timbre: sy.timbre, harmonics: sy.harmonics, morph: sy.morph, voices: sy.voices,
+      filter: sy.filter, cutoff: sy.cutoff, reso: sy.reso, drive: sy.drive, hpf: sy.hpf, fmode: sy.fmode,
+      envAmt: sy.envAmt, attack: sy.attack, decay: sy.decay, sustain: sy.sustain, release: sy.release,
+      glide: sy.glide, drift: sy.drift, chorus: sy.chorus, level: sy.level
+    };
+    for (const k in snd) if (snd[k] === undefined) delete snd[k];
+    this.sySent = snd;
+    try { this.synth.setConfig({ ...snd }); } catch (e) { /* a bad engine call never stops the mix */ }
+  }
+
+  // The Synth's events due in this block (by time; a grid onset waits). A
+  // strike carries its thing's mods : set before (the envelope's shape is read
+  // at the strike) and after (an engine that keeps no mods for a voice not yet
+  // sounding gets them then).
+  runSynthQueue(n) {
+    const q = this.syQ, s = this.synth;
+    if (!q.length || !s) return;
+    const until = currentTime + n / sampleRate;
+    let w = 0;
+    for (let i = 0; i < q.length; i++) {
+      const e = q[i];
+      if (e.t0 > until) { q[w++] = e; continue; }
+      try {
+        if (e.k === 0) {
+          if (e.m) s.setMods(e.id, e.m);
+          s.noteOn(e.id, e.hz, e.vel);
+          if (e.m) s.setMods(e.id, e.m);
+        } else if (e.k === 1) s.noteOff(e.id);
+        else s.setPitch(e.id, e.hz);
+      } catch (err) { /* a bad engine call never stops the mix */ }
+    }
+    q.length = w;
   }
 
   onMsg(m) {
@@ -1059,6 +1125,47 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       if (m.cfg.fx) this.applyFx(m.cfg.fx);
       if (m.cfg.mixFilter) for (let i = 0; i < NVOICE; i++) this.djf[i].setX(m.cfg.mixFilter[i] != null ? m.cfg.mixFilter[i] : 0.5, sampleRate);
+      if (!m.cfg.synth) m.cfg.synth = { on: false, gain: 0.7, pan: 0 };
+      this.syncSynth();
+      return;
+    }
+    // The Synth's notes and mods (synthPlay.ts, ~30 a second) : events by time
+    // (`at` : a grid onset's delay), the playing things' mods at once; `off`
+    // releases everything (the Synth off, its things found again).
+    if (m.t === 'synth') {
+      const s = this.synth;
+      if (!s) return;
+      if (m.off) { try { s.allOff(); } catch (e) { /* engine */ } this.syQ.length = 0; return; }
+      const now = currentTime;
+      const ev = m.ev;
+      if (ev) for (let i = 0; i < ev.length; i++) {
+        const e = ev[i];
+        if (!e || !Number.isFinite(e.id)) continue;
+        if (e.k !== 1 && !(e.hz > 0 && Number.isFinite(e.hz))) continue;
+        const at = Number.isFinite(e.at) && e.at > 0 ? Math.min(2, e.at) : 0;
+        // a grid onset carries its audio time (`when`); else from now
+        const t0 = at > 0 && Number.isFinite(e.when) && e.when > now - 0.05 && e.when < now + 2 ? e.when : now + at;
+        if (e.k === 1) {
+          // an end before its (grid) strike has sounded : it lets go just after
+          // it (a quick thing still plays a short note, on the beat)
+          for (let j = this.syQ.length - 1; j >= 0; j--) {
+            const p = this.syQ[j];
+            if (p.id === e.id && p.k === 0) { this.syQ.push({ t0: p.t0 + 0.08, k: 1, id: e.id, hz: 0, vel: 0, m: null }); e.k = -1; break; }
+          }
+          if (e.k === -1) continue;
+        }
+        this.syQ.push({ t0, k: e.k, id: e.id, hz: e.hz, vel: clampf(e.vel, 0, 1), m: e.m || null });
+      }
+      // keep them in time order (a grid strike sits behind later free events)
+      if (this.syQ.length > 1) this.syQ.sort((a, b) => a.t0 - b.t0);
+      if (this.syQ.length > PENDING_CAP) this.syQ.splice(0, this.syQ.length - PENDING_CAP);
+      const mods = m.mods;
+      if (mods) for (let i = 0; i < mods.length; i++) {
+        const x = mods[i];
+        if (!x || !x.m || !Number.isFinite(x.id)) continue;
+        sanitize(x.m, null);
+        try { s.setMods(x.id, x.m); } catch (e) { /* engine */ }
+      }
       return;
     }
     // The Chord's notes alone : a modulated note count (a new chord, at once)
@@ -1075,6 +1182,8 @@ class SoniProcessor extends AudioWorkletProcessor {
       }
       // fx params drive the reverb/delay objects (not read live) → re-apply.
       if (mm.fx && this.cfg.fx) this.applyFx(this.cfg.fx);
+      // the Synth's sound : the engine's setConfig, when a value really moved
+      if (mm.synth) this.syncSynth();
       return;
     }
     if (m.t === 'flow') {
@@ -1286,6 +1395,8 @@ class SoniProcessor extends AudioWorkletProcessor {
     else if (idx === 3) { for (let k = 0; k < NEVENT; k++) this.notes[k].on = false; dropStale(this.evPending, now); this.evDcL = this.evDcR = 0; }
     else if (idx === 7) { this.cAmp.fill(0); this.cGL.fill(-1); this.cGR.fill(-1); this.chordM = this.chordN; }
     else if (idx === 9) { for (let k = 0; k < NSIG; k++) this.sig[k].on = false; dropStale(this.sigPending, now); this.sgDcL = this.sgDcR = 0; }
+    // (the Synth's queue is cleared when it goes off : what it holds now came after)
+    else if (idx === 11) this.syPanS = -2;
   }
 
   // Flush a voice's scratch (vL/vR) through its gate, gain and DJ filter into
@@ -2132,6 +2243,26 @@ class SoniProcessor extends AudioWorkletProcessor {
       this.mixVoice(9, sg.on, sg.gain, L, R, outL, outR, n);
     }
 
+    // ── SYNTH : the moving things playing synth.engine.js (their notes, pitches
+    // and mods come from the main thread; the engine ADDS its stereo into the
+    // voice's scratch), then the voice's balance and its mixer channel ──
+    const sy = cfg.synth;
+    const syOn = !!(sy && sy.on) && !!this.synth;
+    if (this.voiceLive(11, syOn)) {
+      this.runSynthQueue(n);
+      try { this.synth.render(L, R, n); } catch (e) { L.fill(0, 0, n); R.fill(0, 0, n); }
+      const p1 = clampf(sy.pan, -1, 1);
+      const p0 = this.syPanS < -1 ? p1 : this.syPanS, dp = (p1 - p0) / n;
+      this.syPanS = p1;
+      if (p0 !== 0 || p1 !== 0) {
+        for (let s = 0; s < n; s++) {
+          const p = p0 + dp * (s + 1);
+          L[s] *= 1 - (p > 0 ? p : 0); R[s] *= 1 + (p < 0 ? p : 0);
+        }
+      }
+      this.mixVoice(11, syOn, sy.gain, L, R, outL, outR, n);
+    }
+
     // ── shared FX tail : send the (dry) mix into delay → reverb, return the wet ──
     // Runs while there's send OR the reverb/delay are still ringing (so cutting the
     // send lets the tail decay naturally instead of snapping off).
@@ -2211,7 +2342,9 @@ class SoniProcessor extends AudioWorkletProcessor {
         spk: spc.on ? spc.pk.slice(0, spc.nch) : null,
         // the Collage comp's deepest reduction (dB), -1 : bypassed; the Assemblage's
         lvGr: this.lev.live ? this.lev.grMax : -1,
-        lv2Gr: this.lev2.live ? this.lev2.grMax : -1
+        lv2Gr: this.lev2.live ? this.lev2.grMax : -1,
+        // the Synth's sounding voices
+        syn: this.synth && syOn ? this.synth.activeVoices() : 0
       });
       this.lev.grMax = 0;
       this.lev2.grMax = 0;
