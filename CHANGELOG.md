@@ -43,7 +43,9 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   (re-armed under 0.45 : a 1 then 0 button is one press), a message with no value fires
   each time, a rule's box toggles on each press. Bundles arrive unpacked (osc.js); no
   wildcards. The OSC bindings are indexed by address (`Map<address, inputs>`, rebuilt
-  when a map changes) for one lookup per message. **Answers** : a learned control replies
+  when a map changes) for one lookup per message, and a batch's continuous writes land
+  once per control (the last value, flushed in a microtask and before any `/opsia`
+  message, so the twin's order holds). **Answers** : a learned control replies
   in the controller's own address and range (ints when it sends ints, T/F when it sends
   booleans) to the IP it was learned from (`OscInEvent.host`, new : main's receiver passes
   osc.js's `rinfo.address`) on a reply port set once per controller (`store.oscReplies`,
@@ -79,7 +81,11 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   in the precedence, so older sessions play as they did); OSC learned on a knob follows
   Learn into. The learn overlay's green is bound where Learn into points, a dashed green
   bound only in the other scope; right-click clears all of a control's mappings
-  (`clearMappings`). The Macro row's dot counts OSC-learned knobs and OSC pads. Main
+  (`clearMappings`). The Sonify Synth's knobs and its ten patchbay depths
+  (`sonify:param:<p>`, the depths now carry a learn overlay) and its voice toggle go
+  through the same setter and reader (`sonify.ts sonifyParamOf`, the mod-matrix base's
+  getter made pure and shared), so they learn MIDI and OSC alike and answer the
+  controller. The Macro row's dot counts OSC-learned knobs and OSC pads. Main
   changed (the sender's IP) : restart `npm run dev`; a mapping learned before that knows
   no sender and cannot answer until learned again.
 - **The Body rule timeline counts in minutes and seconds too, and takes exact values**
@@ -204,6 +210,163 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   Shapes : nobody to find, so it measures the effect at rest) : PASS, flat 60 fps, dome
   60 fps p95 20 ms, heaviest 60 / 60. Not built, offered : a **follow** switch (the fill
   riding the figure's bounding box instead of the screen).
+- **The Sonify Synth's sound : eight engines behind the contract, 24 factory patches, a
+  render harness** (`audio/synth.engine.js`, `audio/synthPatches.ts`,
+  `tools/synth-render.cjs`; the play side is its own entry). Eight voices (poly steals the
+  quietest released voice, then the oldest, over 5 ms; unison stacks all eight, ±15
+  cents, spread in pan, about +2 dB over one voice; mono : last note, glide, a note
+  stack). Each voice : engine → DC blocker → drive → tone filter → VCA, one ADSR for amp
+  and filter (exponential-ish attack and decay, a release linear in level), a per-voice
+  three-band 1/f drift (TinyPro5) on pitch, the 2nd oscillator and the cutoff. Everything
+  that moves is set every 16 samples and ramped per sample (schwung-quark's pattern).
+  The engines, each with timbre / harmonics / morph :
+  **dco** (jx-move's DCO pair with exact-event BLEP / BLAMP : pulse → square → saw →
+  pulse-saw; density copies after klaine/crest then the 2nd DCO's interval; free → hard
+  sync → the cross-clocked metal), **ms** (aphex-move's VCO-1 + VCO-2 + ring + pink
+  noise, the noise and drive pushed into the filter by morph), **swarm** (essaim-move :
+  2 to 6 self-retriggering oscillators per note, each with its own SVF; morph from a
+  drone to ~40 Hz chatter with envelope → FM), **fm** (schwung-hank's 2-op macro layer :
+  its ratio list, crossfaded between steps, the coupled modulator envelope with its 0.30
+  floor, the 7 kHz index rolloff, the bite shaper), **modal** (a 14-mode complex
+  one-pole bank, string → bar → bell, a Hann mallet, damping that shortens the high
+  modes first, bowed while held), **voice** (a glottal buzz and breath through five
+  formants from Peterson and Barney's vowels : a e i o u, the throat, the breath),
+  **fold** (a sine / triangle wavefolder with antiderivative anti-aliasing, symmetry,
+  a vactrol low-pass gate) and **pluck** (Karplus-Strong with Lagrange tuning, allpass
+  stiffness, steel → nylon → muted damping). Tone filters : the jx-move IR3109-style
+  ladder, the aphex-move Korg-35 style HP → LP pair (its HP stage on `hpf`), a morphing
+  SVF (LP → BP → HP, klaine/crest's saturating band-pass); all three self-oscillate
+  bounded, seeded near the top (TinyPro5). The drive is schwung-quark's ADAA soft clip
+  run 2x oversampled (a 31-tap halfband), with the FM bite in the same stage. The bus :
+  jx-move's HPF, BBD chorus I / II (its line always written, so switching it on never
+  steps) and output knee. Mods sent before a note are kept per id and taken at its
+  strike; in mono / unison a noteOff for an id no longer sounding only leaves the stack,
+  and a handover (the new noteOn, then the old noteOff, before the next render) strikes.
+  Measured with `node tools/synth-render.cjs check` (at 48 and 44.1 kHz) :
+  **tuning** within 0.07 cents A1..A6 on every engine (pluck and modal included);
+  **aliasing**, inharmonic energy under 10 kHz, the worst note from C1 to C7 with bright
+  settings : -75 to -94 dB per engine (a naive saw : -18), hard sync -70, a 10 % pulse
+  -71, FM ratio 3 -73, the FM bite -55, a full-drive saw above F#6 -47 (WARN); the top
+  half of the FM bite is chaos, noise by design (schwung-hank's "a lot is noise");
+  **clicks** : none (on / off, steals, engine and filter switches mid-note, macro and
+  filter sweeps at full speed, re-strikes, mode and chorus switches; the meter catches a
+  -50 dBFS step); **DC** under -60 dBFS; **stability** : 80 minutes of random configs,
+  notes and mods, no NaN / Inf, no subnormal, the peak bounded at the knee;
+  **loudness** : the engines within 0.8 dB on the standard phrase (-18.7 to -19.5
+  LUFS at level 0.7), the patches -19.98 to -20.60 LUFS; **CPU**, 8 voices with chorus
+  II and drive : 3.4 to 7.2 % of one core in Node, the heaviest the modal bank;
+  no per-sample allocation (numbers crossing calls too big to inline go through typed
+  arrays : a boxed double per call had cost the dco 10.5 % against 6.1 %). Credits and
+  license texts in THIRD_PARTY_NOTICES.md.
+- **Sonify Synth : the moving things in the picture play it** (Vincent : "truly feel like
+  the movement in the visuals on the screen is playing the synth, creating whole
+  melodies"; his design : the moving things are the players, each a voice, an Aphex-style
+  picture patchbay of ten rows). The PLAY side of the new voice 11 (appended : saved
+  mixers, masks and MIDI bindings keep their voices); the sound (`synth.engine.js` : the
+  eight engines behind the fixed interface, and the 24 factory sounds) is the entry above.
+  - **Finding the players** (`audio/synthPlay.ts`, main thread, on the Synth tap's 96×96
+    grids beside Flow, Events and Signal) : motion per 4 px block (Flow's frame
+    difference, held 80 ms), light, Sobel edges (Events') and color; moving blocks
+    joined into regions with hysteresis (a seed at `4 + (1 − sense) × 24` mean
+    |difference|, grown through half of it and through blocks off a 1.5 s background,
+    one-block gaps bridged so a dancer's arm and body stay one thing); a region of 40
+    blocks or more (a moving camera, a screen of footage behind a dancer) split into its
+    strongest cores (their own hysteresis, at most three); two thin regions facing each
+    other (the two edges of a flat shape, whose inside never changes) joined into one.
+    Tracking : greedy nearest centroid against the predicted place, stable
+    integer ids, a note after two sightings in a row, a 0.25 s grace before a thing
+    that stopped or left lets go. Poly : the 8 strongest play, a newcomer takes a voice
+    only when one is free or when it is twice the weakest one that has played 0.6 s
+    (one a tick); mono and unison : the strongest, another taking over after being
+    1.6 times stronger for 0.2 s (its note first, then the old one's off, in one
+    message : the engine takes that order as a handover and strikes the new note).
+  - **Per thing**, each 0..1 and smoothed (~0.1 s) : speed (its travel and its motion),
+    size, brightness, hue (folded so red meets red, grey in the middle), saturation,
+    texture (Sobel under it), x, y, direction (0.5 still), age (over 4 s); the whole
+    picture : motion, light, warmth, busyness and cut (a frame difference 3.5 times its
+    2 s average and over 18 : 1, fading over ~1 s; the cut frame starts nothing).
+  - **Pitch** on the Sonify key and scale over loOct..hiOct : height, keyboard, radial
+    (aspect-true from the centre, the corners the edge; on a full dome the angle from
+    the zenith over half the aperture, through `pictureToDirection`) and score (a
+    playhead on the beat clock, 1 / 2 / 4 bars, Link's bars with Link on : the runs of
+    rows that stand out at its column, light and edges, are the shapes, pitch by
+    height). Steps : `noteOn` again on the same id at each new scale note, past
+    0.5 + 0.4 of a step and 60 ms apart (no trill on a boundary). Slide : `setPitch`
+    between the notes in log frequency, a double smoothstep lingering on each note. A
+    key change moves every playing note to the same place on the new scale (`setPitch`,
+    no strike). Timing : free, or onsets sent with their audio time at the next 1/8,
+    1/16, 1/8T (the beat clock carried from the frame's start to now, the audio time
+    from the context's output timestamp : its `currentTime` here moves in ~10 ms
+    steps), struck by the worklet on the audio block they fall in; an end before its
+    strike lets go 80 ms after it.
+  - **The picture patchbay** : ten fixed destinations (vel, timbre, harmonics, morph,
+    cutoff, reso, drive, env, pan, bend), each a source (none, the 10 per-thing, the 5
+    whole-picture) and a depth −1..+1, all scaled by **PICTURE**. Centered rows :
+    `depth × picture × (2f − 1)`; the strike's velocity 0.7 pulled toward
+    `0.15 + 0.85 f` by |depth × picture| (f upside down for a negative depth), the held
+    `vel` 0.5 + depth × picture × (f − f at the strike) (around its own strike); pan and
+    bend absolute. PICTURE 0 sends exactly neutral mods. Each strike carries its mods
+    (set before the `noteOn`, for the envelope's shape, and after); every tick each
+    playing thing's mods.
+  - **The worklet** (`soni.worklet.js`, NVOICE 12) : `synth.engine.js` added to the
+    worklet scope first (`SYNTH_ENGINE_URL`), built from `globalThis.OpsiaSynth`; the
+    static sound to `setConfig` only when a value moved; a time-ordered event queue;
+    the voice's balance ramped per sample, then its mixer channel (DJ filter, gain, the
+    15 ms voice fade, the FX send, recordings, Space). The meter reports its sounding
+    voices.
+  - **The panel** (`components/SonifySynth.tsx`, after Events) : the 24 factory sounds
+    (`SYNTH_PATCHES`, three per engine : a pick sets the engine and its whole tone, the
+    read, the patchbay and the levels stay), engine (8 buttons), poly /
+    unison / mono, timbre / harmonics / morph with the engine's meanings under them;
+    read (pitch, bars in score, range + steps / slide, sense, timing, tap); tone
+    (filter, cutoff, reso, drive, hpf, fmode greyed unless morph, env amt); a 2 × 2
+    envelope; life (glide, drift, chorus, level), gain, pan; PICTURE over the folded
+    ten rows (source menu, depth, M). The mirror : a ring on each playing thing (size
+    the velocity, color its voice, its note beside it), a dot on each thing found, the
+    score playhead.
+  - **Everything a voice has** : sessions and scenes (a session that never used the
+    Synth saves byte for byte as before : its block, its twelfth mixer channel and
+    sequencer step and its Space place are left out while untouched), the sequencer
+    masks, mod targets (`synthTimbre … synthSens` and the ten depths `synthDVel …
+    synthDBend`), OSC `/opsia/sonify/synth/...` (advertised, echoed), MIDI Learn on
+    its knobs (a new continuous target `sonify:param:<param>`), the voice dice (a
+    weighted sound and engine, half the time a factory sound, the patchbay kept), the
+    whole dice, Space (one source where its playing things are, the loud ones weighing
+    most : source 12, the FX return and the Collage pieces moved up by one).
+  - Measured (test copy, RTX 4070, a dance film in front of a projected screen) : 59.8
+    fps with the Sonify page open and 7 to 8 things playing; the players 0.3 ms a tick
+    (p95 0.5, max 0.7), the whole Sonify tick 0.12 ms a frame on average; up to 8
+    playing (poly), 1 in mono and unison. A square crossing left to right (keyboard) :
+    a run of 15 notes, 53 to 77, one a scale step, `setMods` pan −0.52 → +0.49 and the
+    right channel 0.29 → 0.71 of the sound (the mods reach the engine; measured on the
+    sine stand-in the real engine replaced).
+    Flashes at irregular times : onsets spread over 210 ms of the 1/8 when free, within
+    3 ms of the 1/8 and of the 1/16 on a grid (10 ms before the output timestamp). Two
+    of Vincent's sessions (scenes with sound patches, 10- and 11-voice masks) export
+    byte for byte as master's (a625e05). Headless (the same film, 53 s) : about 10
+    strikes a second, runs of 2 to 3 notes a thing; synthetic shapes : rising,
+    rightward and outward moves rise in height, keyboard and radial, falling ones fall,
+    a still picture plays nothing, PICTURE 0 sends exactly neutral mods, a stop or an
+    exit lets go 0.4 s later, poly holds 8 of 12 things.
+  - **The real engine in the worklet** (both halves merged; test copy, RTX 4070, the
+    dance film alone on L1, the sound to a virtual audio cable so a real device clocks
+    it) : `globalThis.OpsiaSynth` in the worklet scope is the real class (8 engines, 8
+    voices), no `addModule` error, 0 console errors. Each engine at its defaults, 8 s
+    from the same moment of the film : 101 to 137 strikes, RMS -22.9 to -27.2 dBFS,
+    peaks -8.9 to -12 dBFS, no 100 ms window under -60 dBFS, never clipped, the limiter
+    never reached, 0 non-finite samples out of the engine (again with every macro,
+    resonance, drive and level at 1 and chorus II : the same, its raw peak at most
+    0.99). Poly : 8 things playing, 8 voices sounding; unison : 1 thing, all 8 voices;
+    mono : 1 and 1. A factory sound changes the sound (Glass Bell over the default :
+    the spectral centroid 573 → 1171 Hz). The audio thread with 8 voices of the modal
+    engine (the heaviest; macros 0.9, drive 0.6, chorus II) beside Spectra and the FX
+    tail : 0.44 to 0.51 ms a render quantum on average (the engine 0.29 to 0.37) of
+    the 2.67 ms it has, none over it in 30 s (10,875 quanta, the audio clock at 1.000
+    of real time; one quantum of 2 to 3 ms in each of the two runs that switched the
+    engine to modal on the way in), the picture at 60 fps (p95 19.5 ms). Beside the
+    other voices at their defaults on the same film : the Synth at -25 dBFS RMS like
+    the Chord, under Spectra and Orbit (-19) and Flow and Events (-14, -15).
+
 - **The Seq page is the home of every sequencer : lanes under one transport, and a Body
   rule timeline** (Vincent : "a complete Body rule sequencer ... drag and drop rules on a
   timeline and make them active or not active for a pre-determined amount of time", then

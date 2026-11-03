@@ -66,6 +66,7 @@ const NV = SPACE_VOICES.length
 const FX_PLACE = { el: 30, width: 180, hspan: 0.5, vspan: 0.5 } // the reverb / delay : all around, overhead
 const COLLAGE = SPACE_VOICES.indexOf('collage')
 const ASSEMBLAGE = SPACE_VOICES.indexOf('assemblage')
+const SYNTH = SPACE_VOICES.indexOf('synth')
 
 // a place's modulation is the base's (the store) unless the overlay holds a value
 registerSpaceModBase((param) => {
@@ -290,6 +291,19 @@ class SpaceEngine {
           sx += pc.x * w; sy += pc.y * w; sw += w
         }
       if (sw > 1e-6) set(ASSEMBLAGE, sx / sw, sy / sw)
+    }
+    // Synth : where its playing things are, the loud ones weighing most (one
+    // source for the voice : its things pan themselves inside it)
+    {
+      const v = sonifyEngine.synthView()
+      let sx = 0, sy = 0, sw = 0
+      for (let i = 0; i < v.n; i++) {
+        const o = i * 6
+        if (!v.dots[o + 5]) continue
+        const w = 0.05 + v.dots[o + 2]
+        sx += v.dots[o] * w; sy += v.dots[o + 1] * w; sw += w
+      }
+      if (sw > 0) set(SYNTH, sx / sw, sy / sw)
     }
   }
 

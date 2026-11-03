@@ -100,6 +100,11 @@ class OscLearnEngine {
   // (heard or answered), per address its last whole message
   private shown = new Map<string, number>()
   private lastArgs = new Map<string, Args>()
+  // continuous writes of one batch from main (~16 ms of messages), the last
+  // value per control : a fader streaming 200 messages a second writes the
+  // store once a batch, not once a message
+  private pending = new Map<string, number>()
+  private flushQueued = false
   private timer: ReturnType<typeof setInterval> | null = null
   private unsub: (() => void) | null = null
   private running = false
@@ -347,7 +352,7 @@ class OscLearnEngine {
       if (v !== null) this.shown.set(g.key, v)
       for (const e of g.live) {
         if (isContinuousTarget(e.id)) {
-          if (v !== null) applyContinuous(e.id, oscNorm(v, e.b))
+          if (v !== null) this.queue(e.id, oscNorm(v, e.b))
           continue
         }
         // a trigger : each message with no value is a press; a value presses
@@ -367,6 +372,24 @@ class OscLearnEngine {
         else fireTrigger(e.id)
       }
     }
+  }
+
+  private queue(id: string, t: number): void {
+    this.pending.delete(id) // (in the order they came)
+    this.pending.set(id, t)
+    if (this.flushQueued) return
+    this.flushQueued = true
+    queueMicrotask(() => this.flush())
+  }
+
+  /** Write what the batch so far played (oscInput calls it before an /opsia
+   *  message, so between a learned control and its twin the last still wins). */
+  flush(): void {
+    this.flushQueued = false
+    if (!this.pending.size) return
+    const p = [...this.pending]
+    this.pending.clear()
+    for (const [id, t] of p) applyContinuous(id, t)
   }
 
   // ── Answers ───────────────────────────────────────────────────────────

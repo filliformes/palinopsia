@@ -227,6 +227,12 @@ clipAudio.setPlayheads((layer, slot) => {
 // Sonify's output device.
 setMediaSink(useStore.getState().sonify.sinkId ?? '')
 useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
+// The Synth's radial pitch reads the composition's frame and the dome.
+{
+  const frame = (st: ReturnType<typeof useStore.getState>): void => sonifyEngine.setFrame(st.compW / Math.max(1, st.compH), st.dome ?? null)
+  frame(useStore.getState())
+  useStore.subscribe(frame)
+}
 // The Audio Layer follows its state (the store can't import it : it imports
 // Sonify's engine, which the store imports first).
 audioLayer.sync(useStore.getState().audioLayer, useStore.getState().audioLayerArmed)

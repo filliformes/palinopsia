@@ -28,18 +28,20 @@ import {
   fireInspectorRandomize, fireNewSession, fireLoadSession, fireOpenSession
 } from './commands'
 import { knobTargetValue, setKnobTarget, shuffleMetaValues } from './metaSmooth'
-import { liveModValues, metaLiveValues } from './engine/modulation'
+import { liveModValues, metaLiveValues, sonifyModValues } from './engine/modulation'
 import { sameMidiInput } from './mappingModel'
 import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
 import { useStore } from './store'
 import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum } from './link'
-import type { SoniConfig } from './audio/sonify'
+import { sonifyParamOf, withSonifyParam, type SoniConfig } from './audio/sonify'
+import { SYNTH_PARAM_LABEL } from './audio/synthPlay'
+import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { actionLabel, fireAction } from './actions'
 import { seqTransportToggle } from './engine/ruleSeq'
 
-const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
+const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage', 'synth'] as const
 // Field-macro CC targets → their store setters. These "feel" dials aren't
 // mod-matrix destinations, so the Meta knobs can't reach them : MIDI is the
 // only way to bind hardware to them.
@@ -187,6 +189,7 @@ export interface MidiDevice {
 // surface:x / :y    CC → the Metasurface cursor axis (drives scene-morphing;
 //                   activates the surface; needs >=2 placed scenes)
 // sonify:master     CC → Sonify master gain
+// sonify:param:<p>  CC → a Sonify parameter over its modulation span (the Synth's knobs)
 // sonify:voice:<i>  note/CC press → toggle Sonify voice i on/off (0..8)
 // fire:vary         note/CC press → Variation at the current spread
 // fire:randomize    note/CC press → the selected Randomize
@@ -213,6 +216,7 @@ export function isContinuousTarget(id: string): boolean {
     id === 'surface:x' ||
     id === 'surface:y' ||
     id === 'sonify:master' ||
+    id.startsWith('sonify:param:') ||
     id === 'bg:opacity' ||
     id === 'bg:speed' ||
     id === 'bg:depth' ||
@@ -240,6 +244,10 @@ export function midiTargetLabel(id: string): string {
   if (id === 'bg:depth') return 'BACKGROUND shadow'
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : lm[2] === 'harmony' ? 'A·B hue' : 'opacity'}`
+  if (id.startsWith('sonify:param:')) {
+    const p = id.slice(13)
+    return `SONIFY ${SYNTH_PARAM_LABEL[p] ?? p}`
+  }
   const sv = /^sonify:voice:(\d+)$/.exec(id)
   if (sv) {
     const k = SONI_VOICE_KEYS[Number(sv[1])]
@@ -742,6 +750,13 @@ export function applyContinuous(id: string, t: number): boolean {
     return true
   }
   if (id in FIELD_SETTERS) { FIELD_SETTERS[id](t); return true }
+  // a Sonify parameter (a Synth knob, a patchbay depth) : over the span its modulation uses
+  if (id.startsWith('sonify:param:')) {
+    const p = id.slice(13), d = SONIFY_MOD_DESCS[p]
+    if (!d) return false
+    st.setSonify(withSonifyParam(useStore.getState().sonify, p, d.min + t * (d.max - d.min)))
+    return true
+  }
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
   if (lm) {
     const i = Number(lm[1])
@@ -802,6 +817,11 @@ export function readContinuous(id: string): number | null {
   }
   const fk = FIELD_KEYS[id]
   if (fk) return clamp01(st[fk])
+  if (id.startsWith('sonify:param:')) {
+    const p = id.slice(13), d = SONIFY_MOD_DESCS[p]
+    const v = d ? sonifyModValues.get(p) ?? sonifyParamOf(st.sonify, p) : undefined
+    return d && typeof v === 'number' && d.max > d.min ? clamp01((v - d.min) / (d.max - d.min)) : null
+  }
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
   if (lm) {
     const i = Number(lm[1])

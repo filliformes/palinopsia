@@ -15,12 +15,14 @@
 //   active scale table, then posted to the worklet.
 
 import { registerSonifyModBase, sonifyModValues } from '../engine/modulation'
-import { soniBeats } from './soniClock'
-import { SONI_WORKLET_URL } from './soniWorklet'
+import { soniBar, soniBeats } from './soniClock'
+import { SONI_WORKLET_URL, SYNTH_ENGINE_URL } from './soniWorklet'
 import { CollageVoice, type CollageSoundSet } from './collageVoice'
 import type { AssembleSoundInfo } from '../engine/AssembleSource'
-import { SPACE_MAX_CH } from '@shared/spatial'
+import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
+import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
+import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
 
 export const GRID = 96
 // Signal's grains play this long after their step : a fixed latency, longer
@@ -272,11 +274,16 @@ export interface SoniConfig {
     rvDiff: number; rvLowDamp: number // Quartz
     rvCross: number; rvLowMult: number; rvHighMult: number // Prism
   }
+  // The Synth (synthPlay.ts, synth.engine.js) : the moving things in the
+  // picture play it, each one a voice; its place picks the note, its looks
+  // shape the sound through the picture patchbay. Voice 11.
+  synth: SynthCfg
   // Per-voice DJ filter for the mixer page (one per voice, BY INDEX :
-  // spectra·orbit·flow·events·raster·sstv·filter·chord·collage·signal). Signal is
-  // appended at 9 so a saved session's channels stay on their voices; the UI
-  // shows it before Chord all the same. 0.5 = bypass, <0.5
-  // lowpass sweep, >0.5 highpass sweep. Volume is each voice's own `gain`.
+  // spectra·orbit·flow·events·raster·sstv·filter·chord·collage·signal·
+  // assemblage·synth). Signal is appended at 9 so a saved session's channels
+  // stay on their voices; the UI shows it before Chord all the same. 0.5 =
+  // bypass, <0.5 lowpass sweep, >0.5 highpass sweep. Volume is each voice's
+  // own `gain`. A config saved with fewer entries keeps them (readers pad).
   mixFilter: number[]
   taps: [SoniTap, SoniTap]
   // The output EQ (eqMath.ts) : after everything, on the way to the speakers
@@ -319,10 +326,27 @@ export function defaultSoniConfig(): SoniConfig {
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,
       rvCross: 0.3, rvLowMult: 1, rvHighMult: 1
     },
-    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    mixFilter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     taps: [{ kind: 'master', layer: 0 }, { kind: 'layer', layer: 0 }],
-    eq: defaultEq()
+    eq: defaultEq(),
+    // LAST : a session's export leaves it out while it is untouched (see
+    // sessionSonify), so a session that never used the Synth saves the same
+    // bytes it always did.
+    synth: defaultSynth()
   }
+}
+
+const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
+
+/** A Sonify config as a session saves it : the Synth's block left out while
+ *  it is the default (never touched), and the twelfth mixer channel (the
+ *  Synth's) while it is at bypass, so a session that never used the Synth is
+ *  saved byte for byte as before it existed. Loading fills them back in. */
+export function sessionSonify(c: SoniConfig): SoniConfig {
+  const out = { ...c } as Partial<SoniConfig>
+  if (!c.synth || sameJson(normalizeSynth(c.synth), defaultSynth())) delete out.synth
+  if (Array.isArray(c.mixFilter) && c.mixFilter.length === 12 && c.mixFilter[11] === 0.5) out.mixFilter = c.mixFilter.slice(0, 11)
+  return out as SoniConfig
 }
 
 const noteFreq = (n: number): number => 440 * Math.pow(2, (n - 69) / 12)
@@ -407,7 +431,14 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   collageBank: ['collage', 'bank'], collageDecay: ['collage', 'decay'], collageCutoff: ['collage', 'cutoff'],
   collageWaves: ['collage', 'waves'], collageDetune: ['collage', 'detune'], chordWaves: ['chord', 'waves'],
   chordNoise: ['chord', 'noise'], chordAir: ['chord', 'air'],
-  fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix']
+  fxSend: ['fx', 'send'], fxReverb: ['fx', 'rvMix'], fxDelay: ['fx', 'dlyMix'],
+  // the Synth : its sound (the worklet hands a change to the engine's
+  // setConfig), its gain, and what the play side reads here (picture, sense)
+  synthTimbre: ['synth', 'timbre'], synthHarmonics: ['synth', 'harmonics'], synthMorph: ['synth', 'morph'],
+  synthCutoff: ['synth', 'cutoff'], synthReso: ['synth', 'reso'], synthDrive: ['synth', 'drive'],
+  synthEnvAmt: ['synth', 'envAmt'], synthGlide: ['synth', 'glide'], synthDrift: ['synth', 'drift'],
+  synthLevel: ['synth', 'level'], synthGain: ['synth', 'gain'],
+  synthPicture: ['synth', 'picture'], synthSens: ['synth', 'sens']
 }
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
 
@@ -521,7 +552,41 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
       return c.raster.quantize
         ? { ...c, raster: { ...c.raster, note: Math.round(v) } }
         : { ...c, raster: { ...c.raster, freq: noteFreq(v) } }
-    default: return c
+    default: {
+      // the Synth's patchbay depths (one per row)
+      const row = (SYNTH_DEPTH_PARAMS as readonly string[]).indexOf(param)
+      if (row >= 0) {
+        const sy = normalizeSynth(c.synth)
+        const patch = sy.patch.map((r, i) => (i === row ? { ...r, depth: Math.max(-1, Math.min(1, v)) } : r))
+        return { ...c, synth: { ...sy, patch } }
+      }
+      return c
+    }
+  }
+}
+
+/** One sonify mod-param's value in a config (REAL units, the inverse of
+ *  withSonifyParam) : the mod-matrix's base, and what a learned MIDI / OSC
+ *  control answers. Undefined for a param the config does not hold. */
+export function sonifyParamOf(c: SoniConfig, param: string): number | undefined {
+  const simple = SONI_SIMPLE_MODS[param]
+  if (simple) { const [voice, field] = simple; return (c[voice] as unknown as Record<string, number> | undefined)?.[field] }
+  switch (param) {
+    case 'spectraX': return c.spectra.x
+    case 'filterX': return c.filter.x
+    case 'orbitX': return c.orbit.cx
+    case 'orbitY': return c.orbit.cy
+    case 'orbitR': return c.orbit.rx
+    case 'orbitPitch': return c.orbit.quantize ? c.orbit.note : freqNote(c.orbit.freq)
+    case 'rasterX': return c.raster.rx
+    case 'rasterY': return c.raster.ry
+    case 'rasterW': return c.raster.rw
+    case 'rasterH': return c.raster.rh
+    case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
+    default: {
+      const row = (SYNTH_DEPTH_PARAMS as readonly string[]).indexOf(param)
+      return row >= 0 ? c.synth?.patch?.[row]?.depth : undefined
+    }
   }
 }
 
@@ -673,6 +738,19 @@ class SonifyEngine {
   private sigIdx = [0, 0, 0, 0]
   private sigRead = { x: 0, y: 0 } // scratch for the path geometry
   private salience = new Float32Array(GRID * GRID) // Events detection scratch
+  // The Synth's players (synthPlay.ts) : the moving things, tracked, and the
+  // notes they play. `synthTable` is the scale's notes over its range (a new
+  // array only when the notes change : the players re-pitch on a new one);
+  // `synthKey` what the players were found on (a change : all off, found again).
+  private synthPlay = new SynthPlayer()
+  private synthTable: Float32Array = new Float32Array(0)
+  private synthKey = ''
+  private synthSent = false // the worklet may have notes (an all-off is due when they stop)
+  // The composition's frame (App) : its aspect, and the dome (radial pitch
+  // reads the domemaster's zenith .. rim)
+  private frame: { aspect: number; dome: DomeConfig | null } = { aspect: 16 / 9, dome: null }
+  /** How many synth voices sound (the worklet's meter). */
+  synthVoices = 0
   // live meter (UI reads these; written from the worklet's meter messages)
   meterPeak = 0
   meterLim = 1
@@ -725,25 +803,7 @@ class SonifyEngine {
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
-    registerSonifyModBase((param) => {
-      const c = this.cfg
-      const simple = SONI_SIMPLE_MODS[param]
-      if (simple) { const [voice, field] = simple; return (c[voice] as unknown as Record<string, number>)[field] }
-      switch (param) {
-        case 'spectraX': return c.spectra.x
-        case 'filterX': return c.filter.x
-        case 'orbitX': return c.orbit.cx
-        case 'orbitY': return c.orbit.cy
-        case 'orbitR': return c.orbit.rx
-        case 'orbitPitch': return c.orbit.quantize ? c.orbit.note : freqNote(c.orbit.freq)
-        case 'rasterX': return c.raster.rx
-        case 'rasterY': return c.raster.ry
-        case 'rasterW': return c.raster.rw
-        case 'rasterH': return c.raster.rh
-        case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
-        default: return undefined
-      }
-    })
+    registerSonifyModBase((param) => sonifyParamOf(this.cfg, param))
   }
 
   isRunning(): boolean { return !!this.node }
@@ -843,6 +903,9 @@ class SonifyEngine {
     this.ctxReady = (async (): Promise<AudioContext> => {
       const ctx = new AudioContext({ latencyHint: 'interactive' })
       try {
+        // the Synth's engine first : the soni processor builds it from the
+        // shared worklet scope (globalThis.OpsiaSynth)
+        await ctx.audioWorklet.addModule(SYNTH_ENGINE_URL)
         await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
       } catch (e) {
         void ctx.close().catch(() => {}) // never leak a context (one per retry)
@@ -989,7 +1052,8 @@ class SonifyEngine {
           this.spaceMeter = m.spk ?? null
           this.collageCompGr = typeof m.lvGr === 'number' ? m.lvGr : -1
           this.asmCompGr = typeof m.lv2Gr === 'number' ? m.lv2Gr : -1
-        }
+          this.synthVoices = typeof m.syn === 'number' ? m.syn : 0
+        } else if (m?.t === 'synth-missing') console.warn('[sonify] the Synth engine did not load : the Synth stays silent')
       }
       // To the speakers through the output EQ; the recordings (recDest, the DXV3
       // tap) take the sound before it : the EQ tunes the room, not the take.
@@ -1019,6 +1083,10 @@ class SonifyEngine {
       if (this.tap) node.connect(this.tap)
       if (this.extIn) { try { this.extIn.connect(node, 0, 2) } catch (e) { console.warn('[sonify] audio layer input', e) } }
       this.node = node
+      // a fresh engine has no notes : the Synth's things start over on it
+      this.synthPlay.reset()
+      this.synthSent = false
+      this.synthKey = ''
       this.pushConfig(this.cfg)
       if (this.spaceMsg) node.port.postMessage(this.spaceMsg)
       this.applySpaceRoute()
@@ -1416,13 +1484,14 @@ class SonifyEngine {
       collage: { ...d.collage, ...cfg.collage },
       assemblage: { ...d.assemblage, ...cfg.assemblage },
       fx: { ...d.fx, ...cfg.fx },
-      // Older presets/scenes carried 7 (pre-Chord), 8 (pre-Collage) or 9
-      // (pre-Signal) entries : keep their filter positions and pad the newer
-      // channels to bypass (0.5) instead of discarding the whole array. Any
-      // other shape → default.
+      synth: normalizeSynth(cfg.synth),
+      // Older presets/scenes carried 7 (pre-Chord), 8 (pre-Collage), 9
+      // (pre-Signal), 10 (pre-Assemblage) or 11 (pre-Synth) entries : keep
+      // their filter positions and pad the newer channels to bypass (0.5)
+      // instead of discarding the whole array. Any other shape → default.
       mixFilter:
-        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 11
-          ? [...cfg.mixFilter, 0.5, 0.5, 0.5, 0.5].slice(0, 11)
+        Array.isArray(cfg.mixFilter) && cfg.mixFilter.length >= 7 && cfg.mixFilter.length <= 12
+          ? [...cfg.mixFilter, 0.5, 0.5, 0.5, 0.5, 0.5].slice(0, 12)
           : d.mixFilter
     }
     const sinkChanged = cfg.sinkId !== this.cfg.sinkId
@@ -1450,6 +1519,12 @@ class SonifyEngine {
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)
       : new Float32Array(0)
+    // the Synth's notes : a new array only when they change (the players then
+    // move every playing note to the same place on the new scale, slid there)
+    {
+      const tab = scaleTable(effRoot(cfg), cfg.scale, cfg.synth.loOct, cfg.synth.hiOct)
+      if (tab.length !== this.synthTable.length || tab.some((f, i) => f !== this.synthTable[i])) this.synthTable = tab
+    }
     // Sonify off, the engine running for the Audio Layer : every voice silent.
     const live = !!cfg.on
     this.node.port.postMessage({
@@ -1522,6 +1597,9 @@ class SonifyEngine {
           detune: cfg.assemblage.detune, voicing: cfg.assemblage.voicing, ringIn: cfg.assemblage.ringIn ?? 0,
           comp: cfg.assemblage.comp ?? 0
         },
+        // the Synth : its voice fields and the engine's static sound (the
+        // worklet hands the sound to the engine's setConfig when it changes)
+        synth: { on: live && cfg.synth.on, gain: cfg.synth.gain, pan: cfg.synth.pan, ...synthSound(cfg.synth) },
         fx: { ...cfg.fx },
         mixFilter: cfg.mixFilter
       },
@@ -1709,6 +1787,7 @@ class SonifyEngine {
         this.asmOffAt = 0
       }
       this.assemblageSets = []
+      this.synthStop()
       return
     }
     // ~30 Hz. (33 against a two-frame period of 33.3 ms at 60 Hz let frame
@@ -1811,6 +1890,16 @@ class SonifyEngine {
     if (this.cfg.chord.on) need[this.cfg.chord.tap] = true
     // Signal reads the picture too. Missing here, its tap was read only when
     // ANOTHER voice happened to claim it : alone, Signal never scanned at all.
+    // The Synth : its things are found on its tap's grids. Off, or found on
+    // something else now (another tap or source, another read mode, another
+    // voice count) : every note off, the things forgotten.
+    const sy = this.cfg.synth
+    if (sy.on) {
+      need[sy.tap] = true
+      const tp = this.cfg.taps[sy.tap]
+      const key = `${sy.tap}:${tp.kind}:${tp.layer}:${sy.mode}:${sy.voices}`
+      if (key !== this.synthKey) { this.synthStop(); this.synthKey = key }
+    } else this.synthStop()
     if (this.cfg.signal.on) need[this.cfg.signal.tap] = true
     else if (this.sigBeats !== -1 || this.signalDots.length || this.signalBars.length) {
       // off : no marks left on the overlay for the next switch-on to show
@@ -1856,7 +1945,79 @@ class SonifyEngine {
       if (this.cfg.flow.on && this.cfg.flow.tap === t) this.analyzeFlow(t, dt)
       if (this.cfg.events.on && this.cfg.events.tap === t) this.analyzeEvents(t, frameDt)
       if (this.cfg.signal.on && this.cfg.signal.tap === t) this.analyzeSignal(t, frameDt)
+      if (sy.on && sy.tap === t) this.analyzeSynth(t, frameDt, nowMs, fresh)
     }
+  }
+
+  /** The composition's frame : its aspect, and the dome when it is on (the
+   *  Synth's radial pitch reads the domemaster : the zenith low, the rim high). */
+  setFrame(aspect: number, dome: DomeConfig | null): void {
+    if (Number.isFinite(aspect) && aspect > 0) this.frame.aspect = aspect
+    this.frame.dome = dome && dome.enabled ? dome : null
+  }
+
+  /** Radial pitch : 0 at the centre, 1 at the edge. On a full dome the
+   *  domemaster's centre is the zenith and its rim the edge of the aperture
+   *  (pictureToDirection maps the frame point as the dome does); flat, the
+   *  aspect-true distance from the middle, the corners the edge (the Collage
+   *  voice's rule). */
+  private radialOf = (x: number, y: number): number => {
+    const d = this.frame.dome
+    if (d && d.mode === 'fisheye') {
+      const dir = pictureToDirection(x, y, d, this.frame.aspect, 0, { width: 360, low: 0, high: 90 })
+      return Math.max(0, Math.min(1, (90 - dir.el) / Math.max(1, d.aperture / 2)))
+    }
+    const a = this.frame.aspect
+    const dx = (x - 0.5) * a, dy = y - 0.5
+    return Math.min(1, Math.hypot(dx, dy) / Math.hypot(0.5 * a, 0.5))
+  }
+
+  /** The Synth's players on this tap's grids (synthPlay.ts) : the moving things,
+   *  their notes and their patchbay mods, sent to the worklet in one message. */
+  private analyzeSynth(t: number, frameDt: number, nowMs: number, fresh: boolean): void {
+    const node = this.node
+    if (!node) return
+    const out = this.synthPlay.step({
+      cur: this.luma[t], prev: this.lumaPrev[t], rgba: this.rgbaTap[t], fresh,
+      dt: frameDt, nowMs, cfg: this.cfg.synth, table: this.synthTable,
+      aspect: this.frame.aspect, radial: this.radialOf,
+      // (the beat clock was counted at the frame's start : carried on to now,
+      // a render of a few ms ago would put every grid onset that much late)
+      beats: soniBeats() + (Math.max(0, performance.now() - nowMs) * this.bpm) / 60000, bpm: this.bpm, bar: soniBar(),
+      mod: (p) => sonifyModValues.get(p)
+    })
+    if (!out.ev.length && !out.mods.length) return
+    this.synthSent = true
+    // a grid onset at its audio time (the delay counted from the message's
+    // arrival drifted by the few ms the message took; the context's own clock
+    // here moves in steps of its device buffer, ~10 ms : its output timestamp,
+    // carried to now, plus the latency between the processing and the output)
+    const ctx = this.ctx
+    if (ctx && out.ev.some((e) => e.at > 0)) {
+      const ts = ctx.getOutputTimestamp()
+      const audioNow = typeof ts.contextTime === 'number' && typeof ts.performanceTime === 'number' && ts.performanceTime > 0
+        ? ts.contextTime + (performance.now() - ts.performanceTime) / 1000 + (ctx.baseLatency || 0) + (ctx.outputLatency || 0)
+        : ctx.currentTime
+      for (const e of out.ev) if (e.at > 0) e.when = audioNow + e.at
+    }
+    node.port.postMessage({ t: 'synth', ev: out.ev, mods: out.mods })
+  }
+
+  /** Every Synth note off, the things forgotten (the Synth off, Sonify off, or
+   *  the things now found on something else). */
+  private synthStop(): void {
+    if (!this.synthSent && !this.synthPlay.active) return
+    this.synthSent = false
+    this.synthPlay.reset()
+    this.synthKey = ''
+    this.node?.port.postMessage({ t: 'synth', off: true })
+  }
+
+  /** What the Synth plays now, for the mirror : per thing [x, y, vel, slot,
+   *  midi note, playing] (stride 6), and the score playhead (-1 : none). */
+  synthView(): { dots: Float32Array; n: number; scoreX: number; stats: { ms: number; blobs: number; tracks: number; playing: number } } {
+    const p = this.synthPlay
+    return { dots: p.dots, n: this.cfg.synth.on && this.cfg.on ? p.nDots : 0, scoreX: this.cfg.synth.on && this.cfg.on ? p.scoreX : -1, stats: p.stats }
   }
 
   /** Detect edge / motion peaks on the 96×96 luma grid → discrete note events.

@@ -13,7 +13,7 @@ import { useStore } from './store'
 
 type St = ReturnType<typeof useStore.getState>
 
-const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage']
+const SONI_VOICE_NAMES = ['Spectra', 'Orbit', 'Flow', 'Events', 'Raster', 'Transmission', 'Filter', 'Chord', 'Collage', 'Signal', 'Assemblage', 'Synth']
 
 // The picker's headings, in order (an unknown one goes last)
 const ORDER = [

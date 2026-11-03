@@ -449,7 +449,9 @@ function OscRange({ b, scope, id }: { b: OscBinding; scope: MappingScope; id: st
     if (min === b.min && max === b.max) return
     setOscBinding(id, { ...b, min: Math.min(min, max), max: Math.max(min, max) }, scope)
   }
-  const box = 'input box-content w-[6ch] px-1 py-0 text-right font-mono text-[9px] tabular-nums'
+  // (the .input class sets its own size after Tailwind's : a compact box is styled inline)
+  const box = 'input text-right font-mono tabular-nums'
+  const boxStyle = { width: '7ch', height: 15, fontSize: 9, padding: '0 3px', lineHeight: '15px' }
   const keys = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
   }
@@ -457,9 +459,9 @@ function OscRange({ b, scope, id }: { b: OscBinding; scope: MappingScope; id: st
     <div className="flex min-w-0 items-center gap-1 pl-8 font-mono text-[9px] text-muted">
       <span title="Which value of the message it reads (a message with no number there is a press)">value {b.arg + 1}</span>
       <span>·</span>
-      <input className={box} value={lo} onChange={(e) => setLo(e.target.value)} onBlur={commit} onKeyDown={keys} title="The controller's value for the bottom of the control" />
+      <input className={box} style={boxStyle} value={lo} onChange={(e) => setLo(e.target.value)} onBlur={commit} onKeyDown={keys} title="The controller's value for the bottom of the control" />
       <span>..</span>
-      <input className={box} value={hi} onChange={(e) => setHi(e.target.value)} onBlur={commit} onKeyDown={keys} title="The controller's value for the top of the control" />
+      <input className={box} style={boxStyle} value={hi} onChange={(e) => setHi(e.target.value)} onBlur={commit} onKeyDown={keys} title="The controller's value for the top of the control" />
       <span title={b.bool ? 'It sends true / false : answers go back so' : b.int ? 'It sends whole numbers : answers go back as whole numbers' : 'It sends decimals'}>{b.bool ? 'T/F' : b.int ? 'int' : ''}</span>
     </div>
   )
@@ -500,8 +502,8 @@ function ReplyRow({ host, n, reply, set }: { host: string; n: number; reply?: { 
         onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ''))}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-        className="input box-content px-1 py-0 text-right text-[10px] tabular-nums"
-        style={{ width: PORT_W }}
+        className="input text-right tabular-nums"
+        style={{ width: PORT_W, height: 16, fontSize: 10, padding: '0 3px', boxSizing: 'content-box' }}
         title="The UDP port this controller listens on (TouchOSC : its incoming port). Empty : no answers"
       />
       <button

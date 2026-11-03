@@ -33,13 +33,13 @@ export type SpaceProtocol = 'spatgris' | 'adm'
 export const SPACE_MAX_CH = 32
 
 /** The Sonify voices in the worklet's order (its voice index), then the FX tail. */
-export const SPACE_VOICES = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage'] as const
+export const SPACE_VOICES = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage', 'synth'] as const
 export type SpaceVoice = (typeof SPACE_VOICES)[number]
-export const SPACE_FX = SPACE_VOICES.length // the FX tail's return : source 10
+export const SPACE_FX = SPACE_VOICES.length // the FX tail's return : source 12 (after the Synth, 11)
 export const SPACE_SOURCES = SPACE_VOICES.length + 1
 /** Collage pieces as sources of their own : the Collage voice's films arrive on
  *  the worklet's input 1 as the stereo bus (channels 0-1) and up to this many
- *  mono piece groups (channels 2-31). Sources 11.. in the matrix. */
+ *  mono piece groups (channels 2-31). Sources 13.. in the matrix. */
 export const SPACE_PIECES = 30
 export const SPACE_PIECE0 = SPACE_SOURCES
 export const SPACE_SRC_ALL = SPACE_SOURCES + SPACE_PIECES
@@ -74,7 +74,8 @@ export function placePatch(f: SpaceField, v: number): Partial<VoicePlace> {
 
 export const SPACE_VOICE_LABEL: Record<SpaceVoice, string> = {
   spectra: 'Spectra', orbit: 'Orbit', flow: 'Flow', events: 'Events', raster: 'Raster',
-  sstv: 'Transmission', filter: 'Filter', chord: 'Chord', collage: 'Collage', signal: 'Signal', assemblage: 'Assemblage'
+  sstv: 'Transmission', filter: 'Filter', chord: 'Chord', collage: 'Collage', signal: 'Signal', assemblage: 'Assemblage',
+  synth: 'Synth'
 }
 
 export interface Speaker {
@@ -138,7 +139,9 @@ export function defaultVoicePlaces(): Record<SpaceVoice, VoicePlace> {
     chord: place({ follow: false, el: 90, width: 120, hspan: 0.3, vspan: 0.3 }), // from above
     collage: place({ width: 120, hspan: 0.25, vspan: 0.2 }),
     signal: place({ width: 90 }),
-    assemblage: place({ width: 120, hspan: 0.2, vspan: 0.15 })
+    assemblage: place({ width: 120, hspan: 0.2, vspan: 0.15 }),
+    // where its playing things are, weighted by how loud each one strikes
+    synth: place({ width: 90 })
   }
 }
 
