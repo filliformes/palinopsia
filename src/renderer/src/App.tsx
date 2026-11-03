@@ -56,6 +56,7 @@ import { MixerPanel } from './components/MixerPanel'
 import { FeelPanel } from './components/FeelPanel'
 import { MetaBar } from './components/MetaBar'
 import { MidiLearnOverlay } from './components/MidiLearnOverlay'
+import { BlackButton } from './components/BlackButton'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
@@ -367,8 +368,6 @@ export default function App(): JSX.Element {
   const midiLearnMode = useStore((s) => s.midiLearnMode)
   const setMidiLearnMode = useStore((s) => s.setMidiLearnMode)
   const [flushFlashing, flushFlash] = useFlash()
-  const black = useStore((s) => s.black)
-  const morphSec = useStore((s) => s.morphMs / 1000)
   // The keyboard cheat-sheet (`?`). A ref shadows the state so the mount-once
   // keydown handler can read "is it open?" for the Esc path without a stale closure.
   const [helpOpen, setHelpOpen] = useState(false)
@@ -2342,16 +2341,7 @@ export default function App(): JSX.Element {
           </button>
         </span>
         {/* Black : the whole show to black over the Morph time, and back (black.ts). */}
-        <span className="relative flex shrink-0">
-          <MidiLearnOverlay id="fire:black" />
-          <button
-            onClick={() => useStore.getState().setBlack('toggle')}
-            className={`btn text-[12px] ${black ? '!border-danger !bg-danger/20 !text-danger' : ''}`}
-            title={`${black ? 'BLACK : the show is faded out. Click (or .) : it comes back' : 'Black (.) : the whole show fades to black'} over the Morph time (${morphSec < 10 ? morphSec.toFixed(1) : Math.round(morphSec)} s) : every layer, the Background, the films' sound, Sonify and the Audio Layer, on the preview and every output and recording. Nothing is moved : it dims what leaves, so everything keeps playing under it and comes back as it is then. MIDI / OSC learnable, /opsia/black`}
-          >
-            ■ Black
-          </button>
-        </span>
+        <BlackButton />
         </div>
       </div>
       </header>

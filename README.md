@@ -783,8 +783,10 @@ time** : every layer, the Background, the films' own sound, Sonify and the Audio
 Layer, on the preview and on every output (the output window, NDI / Spout / Syphon,
 recordings, the dome, the light output), the master effects' grain and dust
 included. Press it again and the show comes back over the same time; a press
-half-way turns it round from where it is. The button stays lit red while the show
-is out. It moves no fader : it dims what leaves, so everything keeps playing under
+half-way turns it round from where it is. While a fade runs, a line runs clockwise
+round the button from the top in exactly the fade's time (red on the way out, light
+on the way back), so you see how long is left; the button stays lit red while the
+show is out. It moves no fader : it dims what leaves, so everything keeps playing under
 it and comes back as it is by then (a scene recalled, a Generate or a fader moved
 while black comes back too), and it holds through scene changes. At Morph 0 it is a
 cut (Flash safety still nets a fast flicker). A frame frozen (`H`) under Black comes

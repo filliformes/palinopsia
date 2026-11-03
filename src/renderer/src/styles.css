@@ -558,6 +558,11 @@ html[data-show-mode='true'] [data-hide-in-show='true'] {
 .fire-blink.c-accent { --blink-c: var(--c-accent); }
 .fire-blink.c-accent2 { --blink-c: var(--c-accent2); }
 .fire-blink.c-text { --blink-c: var(--c-text); }
+/* The Black button's fade line (BlackButton.tsx) : its dash drawn round the edge */
+@keyframes black-fade-line {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
 @keyframes fire-blink {
   0% { background: rgb(var(--blink-c) / 0.85); }
   100% { background: rgb(var(--blink-c) / 0); }
