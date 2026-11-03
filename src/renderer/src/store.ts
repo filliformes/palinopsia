@@ -2266,6 +2266,10 @@ interface StoreState {
    *  state : never saved, never in a session or a scene. */
   black: boolean
   setBlack: (on: boolean | 'toggle') => void
+  /** The fade under way (or the last) : when it began (performance.now) and how
+   *  long it takes, the Morph time at the press (the button draws it). */
+  blackFadeAt: number
+  blackFadeMs: number
 
   // Session round-tripping
   newSession: () => void
@@ -5763,11 +5767,14 @@ export const useStore = create<StoreState>((set, get) => ({
     playEdited('rules', on)
   },
   black: false,
+  blackFadeAt: 0,
+  blackFadeMs: 0,
   setBlack: (on) => {
     const next = on === 'toggle' ? !get().black : on
     if (next === get().black) return
-    set({ black: next })
-    fadeBlack(next, get().morphMs)
+    const ms = get().morphMs
+    set({ black: next, blackFadeAt: performance.now(), blackFadeMs: ms })
+    fadeBlack(next, ms)
   },
 
   newSession: () => {

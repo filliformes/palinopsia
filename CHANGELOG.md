@@ -15,6 +15,21 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Black's button draws its fade** (Vincent : "Like in dataflou_compositor, I would
+  need the Black button to show the amount of time it takes to fade out or fade in (so
+  the morph time), but visually : a clockwise line filling the rectangle in the N
+  amount of morph time"). `components/BlackButton.tsx` (the button moved out of
+  App.tsx) : at each press a `FadeLine` (keyed on the store's new `blackFadeAt`, with
+  `blackFadeMs`, the Morph time at the press) draws one SVG path round the button's
+  edge, clockwise from the middle of its top, corners as `.btn`'s, `pathLength` 1 and
+  a dash run 0 → 1 by the `black-fade-line` keyframes over the fade's time, linear
+  (time, not the eased level). Timed from the press (a negative delay), so a redrawn
+  top bar goes on where it was and a fade already over is its end. Red on the way out
+  (the edge stays plain while it runs so the line reads, lit red when it lands), the
+  text color on the way back (gone at the end); a press mid-way starts a new line, as
+  the fade starts over; Morph 0 draws none. Checked in the test copy at Morph 2 s and
+  30 s, the animation paused at 0.25 / 0.5 / 0.75 / 1 : the dash offset 0.75 / 0.5 /
+  0.25 / 0, clockwise from the top; the border plain during the fade and red after.
 - **Black, at the far right of the top bar** (Vincent : "add a ''Black'' button at the
   rightmost of the top toolbar, next to Flush. This takes all the active layer's (and
   background and audio) opacity down to 0 in the Morph time", and "yes, Sonify fades
