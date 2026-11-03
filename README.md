@@ -897,7 +897,7 @@ gesture, so gliding a knob costs nothing.
 
 ## Modulation brain (8 modulators + matrix)
 
-Eight modulator slots, each of a chosen **type**, picked from a menu in five families :
+Eight modulator slots, each of a chosen **type**, picked from a menu in six families :
 
 | Family | Types |
 |---|---|
@@ -906,9 +906,31 @@ Eight modulator slots, each of a chosen **type**, picked from a menu in five fam
 | **random** (chance) | `random` · `sh` (sample and hold) · `slew` · `chaos` |
 | **gestures** (movement with a life of its own) | `organic` · `motion` · `physics` |
 | **listening** (follows the room) | `audio` · `vision` · `body` · `homeostat` |
+| **played** (a control in your hands) | `controller` |
 
 Each has a clock (free Hz or BPM division), type-specific params, a live meter, and
-retrigger. The modulator the active World installs for its audio routing carries `⊛`
+retrigger.
+
+**A MIDI or OSC control as a modulator.** The **`controller`** type makes the slot a
+control in your hands : press **learn** on its card (or Learn `L` and click its INPUT)
+and move a fader, turn a knob or hit a pad, on any MIDI device or OSC controller (a
+TouchOSC fader, a Max patch, a phone). Every parameter bound to the slot then follows
+your hand, each with its own depth, direction (mul / replace) and shaping, so one
+fader can open a filter, close another and lift an opacity at once, and scenes and
+Generate keep moving the values it plays around. A fader is **smoothed**; a **pad
+plays as an envelope** : it rises over the attack (**A**), how hard you hit sets how
+far (**VEL**, or always all the way), and it falls over the release (**R**). Quiet, it
+holds. **Any other modulator can be taken over** by a control too : its **✋** (in
+the card's header) turns the card to its takeover side, where you learn the control
+(**TAKE**). While you play it, it takes the modulator over from its own motion (in
+120 ms, no jump), holds it **HOLD** ms after your hand stops, then glides back to the
+LFO (or whatever it is) over **BACK** ms; a pad pulls the modulator to its velocity on
+its envelope and hands it back over its release. Each slot has one input (learning a
+MIDI control drops an OSC one and the other way round), learned where Learn into
+points (this computer or this session); **✕** forgets it. Pandore or dataFLOU can play
+them straight in, no learning : `/opsia/mod/<n>/in` and `/opsia/mod/<n>/take` (0..1),
+with `/note` for a pad (its velocity, 0 = off). Generate and the dice never deal a
+controller (they can re-roll a slot that is one : pin it, right-click, to keep it). The modulator the active World installs for its audio routing carries `⊛`
 (wherever it sits) and Randomize leaves it alone; change it or its bindings and it is yours.
 
 **`steps`** is a **step sequencer with conditional steps and swing** : up to 16 steps,
@@ -3416,6 +3438,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/space/{voice}/az · el · width · span · spin` | f 0..1 | Where a Sonify voice sits (`spectra` `orbit` `flow` `events` `raster` `sstv` `filter` `chord` `collage` `signal` `assemblage`), 0..1 over each range (az 0.5 = straight ahead) |
 | `/opsia/space/{voice}/follow` | bool | It follows the picture (≥ 0.5), else it stays at its fixed place |
 | `/opsia/panic` | trigger | **Panic flush** : drop every self-feeding buffer (same as key `0` / the ⚡ Flush button); advertised over OSCQuery |
+| `/opsia/mod/<n>/in` · `/opsia/mod/<n>/take` | f 0..1 | A modulator slot's **controller input** (the `controller` type) or its **takeover**, played straight in (no learning); `…/in/note` · `…/take/note` : a pad, its velocity (0 = off) played as the input's envelope |
 | `/opsia/black` | f | **Black** : ≥ 0.5 fades the whole show (picture and sound) to black over the Morph time, < 0.5 brings it back; a message with no value turns it over (key `.` / the ■ Black button); answered by the outbound feedback |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |

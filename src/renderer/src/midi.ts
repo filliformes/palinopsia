@@ -22,6 +22,7 @@
 // (applyContinuous, fireTrigger) are shared.
 
 import type { MidiBinding } from '@shared/types'
+import { controlBus, controlKeyOf } from './engine/controlBus'
 import { BG_SPEED_MAX } from '@shared/types'
 import {
   fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle,
@@ -207,6 +208,9 @@ export interface MidiDevice {
 //                   turns it on or off, a CC sets it (64 and up on, below off)
 // fire:transport    note/CC press → the Seq transport : play its lanes / stop them all
 // fire:ruleseq      note/CC press → toggle the Body rule timeline
+// mod:in:<i>        CC / a note → modulator slot i's controller input (the
+//                   Controller type) : a CC its value, a note its envelope
+// mod:take:<i>      the same, as a takeover of slot i (any other type)
 
 /** Continuous targets take knobs/faders only : notes are ignored while one
  *  of these is the armed learn target (keep twisting until it takes). */
@@ -222,7 +226,8 @@ export function isContinuousTarget(id: string): boolean {
     id === 'bg:opacity' ||
     id === 'bg:speed' ||
     id === 'bg:depth' ||
-    /^layer:\d+:(mix|harmony|opacity)$/.test(id)
+    /^layer:\d+:(mix|harmony|opacity)$/.test(id) ||
+    controlKeyOf(id) !== null
   )
 }
 
@@ -237,6 +242,8 @@ export function midiTargetLabel(id: string): string {
     const r = useStore.getState().bodyControl.rules.find((x) => x.id === id.slice(5))
     return r ? `RULE ${r.name} : on/off` : 'RULE (gone)'
   }
+  const mi = /^mod:(in|take):([0-7])$/.exec(id)
+  if (mi) return `M${Number(mi[2]) + 1} ${mi[1] === 'in' ? 'CONTROLLER input' : 'TAKEOVER'}`
   if (id === 'scene:next') return 'SCENE next'
   if (id === 'scene:prev') return 'SCENE prev'
   if (id.startsWith('scene:')) return `SCENE ${Number(id.slice(6)) + 1}`
@@ -638,6 +645,17 @@ class MidiManager {
     let binding: MidiBinding | null = null
     if (status === 0x90 && value > 0) binding = { kind: 'note', channel, number }
     else if (status === 0xb0) binding = { kind: 'cc', channel, number }
+    // A note's release, for a modulator input playing it as an envelope (its
+    // attack came with the note on)
+    if (!binding && (status === 0x80 || status === 0x90)) {
+      if (!useStore.getState().midiLearnMode) {
+        for (const id of midiTargetsFor({ kind: 'note', channel, number })) {
+          const ck = controlKeyOf(id)
+          if (ck) controlBus.note(ck, false)
+        }
+      }
+      return
+    }
     if (!binding) return
 
     const st = useStore.getState()
@@ -657,8 +675,9 @@ class MidiManager {
     if (st.midiLearnMode && st.midiLearnTarget) {
       const target = st.midiLearnTarget
       // Continuous targets are CC-only — ignore pad hits so the user can
-      // keep trying with a knob/fader.
-      if (isContinuousTarget(target) && binding.kind !== 'cc') return
+      // keep trying with a knob/fader. (A modulator input takes a pad too : it
+      // plays the note as an envelope.)
+      if (isContinuousTarget(target) && binding.kind !== 'cc' && !controlKeyOf(target)) return
       if (target.startsWith('meta:')) {
         st.updateMetaKnob(Number(target.slice(5)), { midiCc: { channel, number } })
       } else {
@@ -708,6 +727,9 @@ class MidiManager {
     // learnable trigger — fire:*, scene:*, sonify:voice:*, and every rand:*
     // dice — works without being listed here.
     for (const id of ids) {
+      // a modulator input on a pad : the note's attack (its release : above)
+      const ck = controlKeyOf(id)
+      if (ck) { if (binding.kind === 'note') controlBus.note(ck, true, value / 127); continue }
       if (isContinuousTarget(id)) continue
       // a Body rule's box on a pad : each hit turns it on or off (its CC above)
       if (id.startsWith('rule:')) { if (binding.kind === 'note') st.setBodyRuleActive(id.slice(5), 'toggle', 'midi'); continue }
@@ -745,6 +767,12 @@ export function midiSilenced(b: MidiBinding): boolean {
 /** Set a continuous target from a 0..1 position (each mirrors its slider's
  *  mapping). False when the id is not one (or its thing is gone). */
 export function applyContinuous(id: string, t: number): boolean {
+  // a modulator slot's controller input (engine/controlBus.ts)
+  const ck = controlKeyOf(id)
+  if (ck) {
+    controlBus.set(ck, t)
+    return true
+  }
   const st = useStore.getState()
   if (id.startsWith('meta:')) {
     const i = Number(id.slice(5))
@@ -809,6 +837,8 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : Number.isFinite(
  *  what a learned control answers follows modulators, scenes and Generate.
  *  A Body rule's box reads 1 on, 0 off. Null for anything without a value. */
 export function readContinuous(id: string): number | null {
+  // (a modulator's input is the hand itself : nothing to answer)
+  if (controlKeyOf(id)) return null
   const st = useStore.getState()
   if (id.startsWith('meta:')) {
     const i = Number(id.slice(5))

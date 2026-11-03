@@ -58,7 +58,7 @@ import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, m
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
-import { makeDefaultModulator, makeDefaultModulators, modEngine } from './engine/modulation'
+import { DEFAULT_TAKEOVER, makeDefaultModulator, makeDefaultModulators, modEngine } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
 import { sanitizeBodyMod } from './engine/bodyClutch'
 import { samePattern, sanitizeSteps } from './engine/stepSeq'
@@ -72,6 +72,7 @@ import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
 import { playEdited } from './playEvents'
 import { fadeBlack } from './black'
+import { controlBus, controlKeyOf } from './engine/controlBus'
 import { registerUserShader, remapShaderIds, userShaderId, userShaderIdsIn, type UserShaderInfo } from './shaders/userShaders'
 import { makeDefaultKeySeq, sanitizeKeySeq } from './audio/soniKeyModel'
 import { isSoniRate } from './audio/soniClock'
@@ -1191,8 +1192,13 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       const m = c.modulators ?? []
       return makeDefaultModulators().map((d, i) => {
         const x = { ...d, ...(m[i] ?? {}) }
-        // (the body block's clutch checked; the rest of it passes as it was)
-        return { ...x, steps: sanitizeSteps(x.steps), body: sanitizeBodyMod(x.body, d.body) }
+        // (the body block's clutch checked; the rest of it passes as it was;
+        // the controller's and a takeover's merged onto their defaults)
+        return {
+          ...x, steps: sanitizeSteps(x.steps), body: sanitizeBodyMod(x.body, d.body),
+          controller: { ...d.controller, ...(x.controller ?? {}) },
+          ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {})
+        }
       })
     })(),
     // a binding's shaping, checked (a hand-edited file, an older or newer one)
@@ -1723,6 +1729,14 @@ interface StoreState {
   midiMap: Record<string, MidiBinding>
   // `scope` : where the mapping goes (this computer by default, as before)
   setMidiBinding: (id: string, b: MidiBinding | null, scope?: MappingScope) => void
+  /** Learn armed from a modulator card's own button : Learn goes off again once
+   *  that input is learned (null : the ordinary, staying Learn). */
+  learnOnce: string | null
+  /** Learn one modulator input (mod:in:<slot> / mod:take:<slot>) : Learn on,
+   *  that input armed, off again when a control is learned onto it. */
+  learnModInput: (id: string) => void
+  /** Forget a modulator input's control, in both scopes, MIDI and OSC. */
+  forgetModInput: (id: string) => void
   // OSC Learn : the same targets, played by OSC messages outside /opsia
   // (oscLearn.ts). This computer's, in localStorage like the MIDI map.
   oscMap: Record<string, OscBinding>
@@ -2651,6 +2665,35 @@ function leaveDomeSquare(st: { compW: number; compH: number }, set: CompSizeSet)
   }
   persistDomeSquare({ w: d.w, h: d.h })
 })()
+
+// A modulator input has one control (one input per slot) : learning a MIDI one
+// drops the OSC one in the same scope, and the other way round.
+function dropOtherKind(s: StoreState, id: string, kind: 'midi' | 'osc', scope: MappingScope): Partial<StoreState> {
+  if (kind === 'osc') {
+    if (scope === 'session') {
+      if (!s.sessionOscMap[id]) return {}
+      const sessionOscMap = { ...s.sessionOscMap }
+      delete sessionOscMap[id]
+      return { sessionOscMap }
+    }
+    if (!s.oscMap[id]) return {}
+    const oscMap = { ...s.oscMap }
+    delete oscMap[id]
+    saveMap('opsia.oscMap', oscMap)
+    return { oscMap }
+  }
+  if (scope === 'session') {
+    if (!s.sessionMidiMap[id]) return {}
+    const sessionMidiMap = { ...s.sessionMidiMap }
+    delete sessionMidiMap[id]
+    return { sessionMidiMap }
+  }
+  if (!s.midiMap[id]) return {}
+  const midiMap = { ...s.midiMap }
+  delete midiMap[id]
+  try { localStorage.setItem('opsia.midiMap', JSON.stringify(midiMap)) } catch { /* quota */ }
+  return { midiMap }
+}
 
 export const useStore = create<StoreState>((set, get) => ({
   theme: loadTheme(),
@@ -3862,16 +3905,21 @@ export const useStore = create<StoreState>((set, get) => ({
   // Turning OFF also drops the pending target (cancelling); turning ON never
   // clears bindings — it's a browse/bind mode, not a reset.
   setMidiLearnMode: (on) =>
-    set(on ? { midiLearnMode: true } : { midiLearnMode: false, midiLearnTarget: null }),
+    set(on ? { midiLearnMode: true } : { midiLearnMode: false, midiLearnTarget: null, learnOnce: null }),
   setMidiLearnTarget: (t) => set({ midiLearnTarget: t }),
   midiMap: loadMidiMap(),
   setMidiBinding: (id, b, scope = 'computer') =>
     set((s) => {
+      // a modulator input has ONE control : learning one drops the OSC one
+      const mod = controlKeyOf(id)
+      const one = mod && b ? dropOtherKind(s, id, 'osc', scope) : {}
+      if (mod && !b) controlBus.clear(mod)
+      const done = b && s.learnOnce === id ? { midiLearnMode: false, midiLearnTarget: null, learnOnce: null } : {}
       if (scope === 'session') {
         const sessionMidiMap = { ...s.sessionMidiMap }
         if (b) sessionMidiMap[id] = b
         else delete sessionMidiMap[id]
-        return { sessionMidiMap }
+        return { sessionMidiMap, ...one, ...done }
       }
       const midiMap = { ...s.midiMap }
       if (b) midiMap[id] = b
@@ -3881,22 +3929,35 @@ export const useStore = create<StoreState>((set, get) => ({
       } catch {
         /* quota — bindings just won't survive the restart */
       }
-      return { midiMap }
+      return { midiMap, ...one, ...done }
     }),
+  learnOnce: null,
+  learnModInput: (id) => set({ midiLearnMode: true, midiLearnTarget: id, learnOnce: id }),
+  forgetModInput: (id) => {
+    const st = get()
+    for (const scope of ['computer', 'session'] as const) {
+      st.setMidiBinding(id, null, scope)
+      st.setOscBinding(id, null, scope)
+    }
+  },
   oscMap: loadOscMap(),
   setOscBinding: (id, b, scope = 'computer') =>
     set((s) => {
+      const mod = controlKeyOf(id)
+      const one = mod && b ? dropOtherKind(s, id, 'midi', scope) : {}
+      if (mod && !b) controlBus.clear(mod)
+      const done = b && s.learnOnce === id ? { midiLearnMode: false, midiLearnTarget: null, learnOnce: null } : {}
       if (scope === 'session') {
         const sessionOscMap = { ...s.sessionOscMap }
         if (b) sessionOscMap[id] = b
         else delete sessionOscMap[id]
-        return { sessionOscMap }
+        return { sessionOscMap, ...one, ...done }
       }
       const oscMap = { ...s.oscMap }
       if (b) oscMap[id] = b
       else delete oscMap[id]
       saveMap('opsia.oscMap', oscMap)
-      return { oscMap }
+      return { oscMap, ...one, ...done }
     }),
   sessionMidiMap: {},
   sessionOscMap: {},

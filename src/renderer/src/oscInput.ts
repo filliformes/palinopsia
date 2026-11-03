@@ -82,6 +82,7 @@
 //   /opsia/space/{voice}/az|el|width|span|spin          f 0..1 over the field's range (az 0.5 = 0)
 //   /opsia/space/{voice}/follow                         >= 0.5 (follow the picture, else fixed)
 //   /opsia/panic                                        trigger (flush self-feeding buffers)
+//   /opsia/mod/<n>/in · take f   (+ /note f)            a modulator slot's controller input / takeover, 0..1 (a note : velocity, 0 = off)
 //   /opsia/black                                        >= 0.5 fades the whole show to black over the Morph time, < 0.5 back (no value : over)
 //   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
@@ -94,6 +95,7 @@
 //   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
 import { resolumeLearn } from './resolume'
+import { controlBus } from './engine/controlBus'
 import { oscLearn } from './oscLearn'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
@@ -1155,6 +1157,20 @@ function route(address: string, args: Args, host = ''): void {
       return
     }
 
+    case 'mod': {
+      // A modulator slot's controller input played straight in, no learning
+      // (Pandore, dataFLOU) : /opsia/mod/<n>/in f, the Controller type's, and
+      // /opsia/mod/<n>/take f, a takeover; /…/note f plays a note (its
+      // velocity 0..1, 0 = off) as the input's envelope.
+      const mi = parseInt(segs[2] ?? '', 10) - 1
+      const which = segs[3]
+      if (!(mi >= 0 && mi < 8) || (which !== 'in' && which !== 'take')) return
+      const key = `${which}:${mi}`
+      if (segs[4] === 'note') controlBus.note(key, n > 0, n)
+      else controlBus.set(key, n)
+      return
+    }
+
     case 'black': {
       // Black : the whole show to black over the Morph time (>= 0.5) or back. A
       // value, not a trigger : a controller's toggle stays in step with it (a
@@ -1658,6 +1674,12 @@ function enumerateLeaves(): Leaf[] {
   add('/opsia/seq/play', 0, 1, seqTransportPlaying() ? 1 : 0, 'The Seq transport : >= 0.5 plays every lane it starts, < 0.5 stops them all')
   add('/opsia/seq/rules', 0, 1, st.ruleSeqOn ? 1 : 0, 'The Body rule timeline running (>= 0.5)')
   add('/opsia/panic', 0, 1, 0, 'Panic flush : drop every self-feeding buffer (trigger)', false)
+  for (let i = 1; i <= 8; i++) {
+    add(`/opsia/mod/${i}/in`, 0, 1, 0, `M${i}'s controller input (the Controller type) : a value 0..1`, false)
+    add(`/opsia/mod/${i}/in/note`, 0, 1, 0, `M${i}'s controller input as a note : its velocity (0..1, 0 = off), played as the input's envelope`, false)
+    add(`/opsia/mod/${i}/take`, 0, 1, 0, `M${i}'s takeover : a value 0..1 that takes the modulator over while it moves, then hands it back`, false)
+    add(`/opsia/mod/${i}/take/note`, 0, 1, 0, `M${i}'s takeover as a note : its velocity (0..1, 0 = off) pulls the modulator over on the envelope`, false)
+  }
   add('/opsia/black', 0, 1, st.black ? 1 : 0, 'Black : >= 0.5 fades the whole show (picture and sound) to black over the Morph time, < 0.5 brings it back')
   add('/opsia/vary', 0, 1, 0, 'Vary : a variant of the whole scene at the Transport spread (trigger)', false)
   for (const sc of ['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'macro', 'inspector', 'sonify', 'resolume', 'background'])

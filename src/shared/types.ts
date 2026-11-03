@@ -329,6 +329,7 @@ export type ModulatorType =
   | 'turing'
   | 'cellular'
   | 'steps'
+  | 'controller'
 
 // Which audio feature an `audio` modulator follows (bus in engine/audioIn.ts).
 // `noisiness` (spectral flatness) is the crossmodal partner of image saturation :
@@ -675,6 +676,24 @@ export interface StepsConfig {
 }
 
 // One modulator slot's configuration (runtime state lives in the engine).
+// How a controller input plays a modulator (engine/controlBus.ts) : the
+// Controller type's own, or a takeover's. WHICH control it is lives in the MIDI /
+// OSC mappings (Learn targets mod:in:<slot>, mod:take:<slot>); here, how it plays.
+export interface ControlInputConfig {
+  smooth: number // 0..0.99 : a fader's steps softened (one-pole, like the followers)
+  attackMs: number // a note : its rise (0 : at once)
+  releaseMs: number // and its fall
+  velocity: boolean // a note plays its velocity (off : always full)
+}
+// A takeover : a control that takes a modulator over from its own motion while
+// you play it, then glides back to it. A fader holds it `holdMs` after your hand
+// stops, then the modulator glides back over `backMs`; a note pulls it to its
+// velocity over the attack and lets it go over the release.
+export interface TakeoverConfig extends ControlInputConfig {
+  holdMs: number
+  backMs: number
+}
+
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
@@ -761,6 +780,12 @@ export interface ModulatorConfig {
   // step on or a rest, each with a condition (chance, some passes, fill, first),
   // swing and glide. Its own probabilities are this type's SLIP, so it has none.
   steps: StepsConfig
+  // Controller : the slot is a MIDI / OSC control (its mapping : mod:in:<slot>).
+  controller: ControlInputConfig
+  // Takeover (any type but controller) : how its control takes the slot over
+  // (its mapping : mod:take:<slot>; none learned, it never acts). Absent : the
+  // defaults (DEFAULT_TAKEOVER).
+  takeover?: TakeoverConfig
 }
 
 // What an assignment modulates: float ISF inputs, or a Meta knob (the
