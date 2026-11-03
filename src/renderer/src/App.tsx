@@ -15,6 +15,7 @@ import { clearFrameVals } from './engine/frameVals'
 import { applyTonicity, applyDrift, applyFlowInterrupt, shutterHold, shutterClear } from './engine/temperament'
 import { applyFlicker } from './engine/flicker'
 import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
+import { setPainting } from './engine/frameWatch'
 import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
 import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTrigger } from './engine/modulation'
@@ -1646,6 +1647,8 @@ export default function App(): JSX.Element {
         // will. Painting, the paint does it, and an extra submit can block on a
         // full command queue (see gridReadback.kick).
         comp!.paintingClock = painting
+        // ...and no film gets a frame callback : they upload on this tick instead.
+        setPainting(painting)
         if (!painting) comp!.finishFrame()
         // 3a. Outside consumers of the finished picture. Each one is a GPU
         //     conversion + an ASYNCHRONOUS readback (engine/frameCapture) : the

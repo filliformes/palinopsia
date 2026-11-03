@@ -840,6 +840,34 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Fixed
 
+- **Films keep playing on the output while the control window is minimized or
+  hidden** (seen testing the Sonify Synth : the projector, NDI, Spout and recordings
+  went on, but a film on them showed a new frame about once a second). The film
+  sources upload a frame only when `requestVideoFrameCallback` says one was presented,
+  and Chromium calls back only while the page is composited : minimized or hidden,
+  about once a second, while the render loop runs on in timer mode
+  (`backgroundThrottling: false` was already set everywhere; the films' own clocks ran
+  at 1.0, only their uploads stopped). New `engine/frameWatch.ts` : App tells it when
+  the loop runs on its timer (`setPainting`), and while callbacks are quiet (that, or a
+  callback 400 ms overdue while the film ran on 0.25 s) VideoSource, AssembleSource and
+  the Collage's decks upload on the engine's tick once the film has moved about a frame
+  (its period learned from the callbacks' `mediaTime`, 1/30 s until one comes), never
+  mid-seek. The Collage's own fallback waited 120 ms between uploads (its
+  `blitAt` / `blitT` are gone). Measured in the test copy on the RTX 4070 with a
+  windowed output, different frames a second on the output, visible then minimized,
+  before → after : a 960x540 30 fps film 29.1 / **1.4** → 30.0 / **29.4** (hidden 1.3
+  → 29.5), a Collage of six films 52 / **10** → 58 / **30**, an Assemble edit 27 /
+  **1.5** → 26 / **29.2** (cuts included), a 4K film 27 minimized; the output at 58-59
+  fps and the loop at 60 throughout; a DXV3 and an H.264 take recorded while minimized
+  change 145 and 151 times in 150 and 151 frames. Cost : the uploads a visible film
+  makes (30 a second for a 30 fps film, 3.2 ms a second of render thread against 3.0
+  visible; the whole copy's CPU minimized 126-130 % of a core before, 129-135 % after).
+  Uploading on every tick instead took a minimized 4K film's loop to 53 fps. Visible
+  playback is unchanged (30 callbacks, 30 uploads a second), reverse (the seek pump)
+  moves as it does visible, a paused film holds and takes seeks, the Collage's 9-path
+  probe passes. The Web Audio clock held 1.0 minimized on every sink tried ('none',
+  the VB-Audio CABLE, the headphones; Sonify and the Synth playing), in the normal and
+  the unthrottled test copy : the 0.66x seen on 11-02 did not come back.
 - **A film keeps playing when the composition size changes** (Vincent : "when changing
   from let's say 1080p to 4K UHD in composition size, a video that is playing (Imported
   video) on a layer gets replaced with another shader-based source (like Drift Field)").

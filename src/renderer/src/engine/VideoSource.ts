@@ -8,6 +8,7 @@
 
 import { trackMediaSink, untrackMediaSink } from './mediaSink'
 import { glGeneration } from './glGeneration'
+import { FrameWatch } from './frameWatch'
 
 /** Upload the current frame of a <video> into a GL texture (creating it on
  *  first use), matching the engine's bottom-left orientation. Returns the
@@ -65,6 +66,9 @@ export class VideoSource {
   private pendingFrame = true
   private rvfcId = 0
   private rvfcOn = false
+  // No callbacks come while the window is minimized or hidden : the film then
+  // uploads on the engine's tick (frameWatch.ts).
+  private watch = new FrameWatch()
   // Override-mode seek gate: own ONE in-flight seek so we don't re-seek every
   // frame (perpetual seeking never settles a frame). Cleared by 'seeked' + safety.
   private seeking = false
@@ -375,6 +379,7 @@ void main(){
       }
       this.seeking = false
       this.pendingFrame = true // the seeked frame is now presentable
+      this.watch.presented(this.video)
     })
   }
 
@@ -387,8 +392,9 @@ void main(){
       return
     }
     this.rvfcOn = true
-    const cb = (): void => {
+    const cb = (_now: number, md: VideoFrameCallbackMetadata): void => {
       this.pendingFrame = true
+      this.watch.presented(v, md)
       this.rvfcId = v.requestVideoFrameCallback(cb)
     }
     this.rvfcId = v.requestVideoFrameCallback(cb)
@@ -415,6 +421,7 @@ void main(){
     this.lastKf = -1
     this.seekMs = 0
     this.kfMode = false
+    this.watch.reset()
     this.loadedSrc = src
     this.fetchKeyframes(src)
     if (this.rvfcOn && typeof this.video.cancelVideoFrameCallback === 'function' && this.rvfcId) {
@@ -701,9 +708,12 @@ void main(){
 
   upload(): WebGLTexture | null {
     if (this.grain.on && this.voices) return this.blendVoices(performance.now() / 1000)
-    if (this.pendingFrame || !this.rvfcOn || !this.tex) {
+    // Minimized or hidden, no frame callback comes : upload once the film has moved
+    // on about a frame (frameWatch.ts), never mid-seek.
+    if (this.pendingFrame || !this.rvfcOn || !this.tex || this.watch.due(this.video)) {
       this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
       this.pendingFrame = false
+      this.watch.uploaded(this.video)
     }
     return this.tex
   }
