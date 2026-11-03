@@ -1416,8 +1416,10 @@ class SoniProcessor extends AudioWorkletProcessor {
     else if (idx === 3) { for (let k = 0; k < NEVENT; k++) this.notes[k].on = false; dropStale(this.evPending, now); this.evDcL = this.evDcR = 0; }
     else if (idx === 7) { this.cAmp.fill(0); this.cGL.fill(-1); this.cGR.fill(-1); this.chordM = this.chordN; }
     else if (idx === 9) { for (let k = 0; k < NSIG; k++) this.sig[k].on = false; dropStale(this.sigPending, now); this.sgDcL = this.sgDcR = 0; }
-    // (the Synth's queue is cleared when it goes off : what it holds now came after)
-    else if (idx === 11) this.syPanS = -2;
+    // (the Synth's queue is cleared when it goes off : what it holds now came
+    // after). Its engine starts from silence : the voices it let go froze in
+    // their release when it stopped rendering, and came back on the next on.
+    else if (idx === 11) { this.syPanS = -2; try { this.synth && this.synth.reset && this.synth.reset(); } catch (e) { /* engine */ } }
   }
 
   // Flush a voice's scratch (vL/vR) through its gate, gain and DJ filter into

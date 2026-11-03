@@ -297,8 +297,9 @@ export function randomSynthPatchbay(): SynthRow[] {
       const [src, sign] = pick(ENV)
       return { src, depth: r2(sign * rr(0.4, 0.85)) }
     }
-    // a row may rest (never velocity; bend half the time : a bend is heard as out of tune)
-    if (d !== 'vel' && rnd() < (d === 'bend' ? 0.5 : 0.12)) return { src: 'none', depth: 0 }
+    // a row may rest (never velocity; bend three times in four : a bend holds
+    // the notes off the scale, heard as out of tune)
+    if (d !== 'vel' && rnd() < (d === 'bend' ? 0.75 : 0.12)) return { src: 'none', depth: 0 }
     let src: SynthSrc = 'none'
     for (let tries = 0; tries < 6; tries++) {
       src = rnd() < 0.7 ? pick(LIKES[d]) : rnd() < 0.8 ? pick(THING) : pick(WHOLE)

@@ -139,7 +139,10 @@ export function defaultSynthPatch(): SynthRow[] {
     // quick flicks pluck, slow drifts swell into pads
     { src: 'speed', depth: -0.7 },
     { src: 'x', depth: 0.8 },
-    { src: 'direction', depth: 0.2 }
+    // no bend : a bend holds the note off its scale note for as long as the
+    // thing moves (direction at 0.2 played a rising thing up to 31 cents sharp,
+    // a falling one as flat, each voice its own way : heard as out of tune)
+    { src: 'none', depth: 0 }
   ]
 }
 
@@ -166,6 +169,9 @@ const oneOf = <T,>(v: unknown, list: readonly T[], d: T): T => (list.includes(v 
 
 /** A whole, valid Synth config from anything saved (a session, a scene, a
  *  preset, OSC) : every field there, in range, the patchbay ten rows. */
+// the patchbay's bend row (SYNTH_DESTS order : vel timbre harmonics morph cutoff reso drive env pan bend)
+const BEND_ROW = 9
+
 export function normalizeSynth(raw: unknown): SynthCfg {
   const d = defaultSynth()
   const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<SynthCfg>
@@ -206,6 +212,9 @@ export function normalizeSynth(raw: unknown): SynthCfg {
     picture: num(r.picture, d.picture, 0, 1),
     patch: d.patch.map((dr, i) => {
       const x = rows[i] as Partial<SynthRow> | undefined
+      // the bend row at the old default (direction, 0.2 : out of tune whenever a
+      // thing moved) is the new one, none; any other bend stays as it was chosen
+      if (i === BEND_ROW && x?.src === 'direction' && x?.depth === 0.2) return { src: 'none', depth: 0 }
       return { src: oneOf(x?.src, SYNTH_SRCS, dr.src), depth: num(x?.depth, dr.depth, -1, 1) }
     }),
     // (only a factory sound that exists : a renamed one reads as none)

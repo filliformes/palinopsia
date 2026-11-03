@@ -341,7 +341,11 @@ function stair(steps, x) {
   const m = steps.length - 1
   const y = clamp(x, 0, 1) * m
   const i = Math.min(m - 1, y | 0)
-  const s = sstep((y - i - 0.3) / 0.4)
+  // the riser a tenth of the step, just past its middle : 90 % of the knob
+  // sits on an interval, a place half way between two plays the lower one and
+  // two thirds the upper (a riser over the middle 40 % put the panel's default
+  // and Noise Lead a quarter-tone off any interval)
+  const s = sstep((y - i - 0.52) / 0.1)
   return steps[i] + (steps[i + 1] - steps[i]) * s
 }
 // Each voice's xorshift state lives in an Int32Array : under pointer
@@ -383,6 +387,13 @@ const dco = {
         u[0] = u[1] = rnd01(v) * 0.999
         u[2] = u[3] = u[4] = 0
       }
+      // DCO-2 near DCO-1's phase (a fifth of a cycle either way at most) : near
+      // unison, a phase anywhere could cancel the note (the same note up to
+      // 13 dB apart, a saw leaning to its octave); right on it, two narrow
+      // pulses stacked doubled their peaks into the filter (aliasing). Within
+      // a fifth the fundamental keeps 1.8 dB, and each note its own colour.
+      const ph = st.d1[0] + (rnd01(v) * 2 - 1) * 0.2
+      st.uf[0] = st.uf[1] = ph - Math.floor(ph)
     }
   },
   ctl(v, s, snap) {
@@ -543,7 +554,11 @@ const ms = {
   start(v, s, fresh) {
     const st = v.ms
     if (fresh) {
-      st.ph1 = rnd01(v); st.ph2 = rnd01(v)
+      // VCO-2 near VCO-1's phase (a fifth of a cycle either way : near unison, a
+      // phase anywhere could cancel the note; see the DCO)
+      st.ph1 = rnd01(v)
+      const p2 = st.ph1 + (rnd01(v) * 2 - 1) * 0.2
+      st.ph2 = p2 - Math.floor(p2)
       st.xp = 0; st.Fp = 1
       st.pk.fill(0)
     }
@@ -804,6 +819,11 @@ function fmCap(f, r, sr) { return Math.max(0, (0.42 * sr - f) / Math.max(1, f * 
 // its grit without the whistle.
 function fbRoll(hz, sr) { const x = hz / (0.0275 * sr); return 1 / (1 + x * x) }
 const FM_RATIOS = [0.5, 1, 1.5, 2, 2.5, 3, 3.7, 4, 5, 5.4, 6, 7, 8, 9.2, 11, 14]
+// A half ratio (0.5, 1.5, 2.5) on a carrier at the note puts the spectrum's
+// lowest common frequency at HALF the note : it played an octave down (the f/2
+// line up to 31 dB over f). Its carrier and modulator run at twice : the same
+// sidebands, around the note.
+const fmCarrier = (r) => (Math.abs(r * 2 - Math.round(r * 2)) < 1e-6 && Math.round(r * 2) % 2 === 1 ? 2 : 1)
 class FmSt {
   constructor() {
     this.pc = 0; this.pa = 0; this.pb = 0; this.fa = 0; this.fb = 0
@@ -812,6 +832,7 @@ class FmSt {
     this.xp = 0; this.Fp = 0; this.dcx = 0; this.dcy = 0
     this.slotA = 0
     this.bite = 0
+    this.cmA = 1; this.cmB = 1 // each slot's carrier multiple (a half ratio : 2)
   }
 }
 const fm = {
@@ -820,6 +841,9 @@ const fm = {
     if (fresh) {
       st.pc = 0; st.pa = 0; st.pb = 0; st.fa = 0; st.fb = 0
       st.xp = 0; st.Fp = 0; st.dcx = 0; st.dcy = 0; st.me = 0
+      // unison : each voice from its own phases (the eight in phase summed as
+      // one, the attack 5 dB over poly)
+      if (s.voiceMode === 1) { st.pc = rnd01(v); st.pa = rnd01(v); st.pb = rnd01(v) }
     }
     st.mStage = 1
   },
@@ -849,11 +873,15 @@ const fm = {
     const rS0 = slotOfA === 0 ? ra : rb, rS1 = slotOfA === 0 ? rb : ra
     const w1 = slotOfA === 0 ? xb : 1 - xb
     const f = v.dt * sr
+    // a half ratio's slot : its carrier and modulator at twice (fmCarrier); a
+    // slot changes its ratio only while it is silent, so it never clicks
+    const c0 = fmCarrier(rS0), c1 = fmCarrier(rS1)
+    st.cmA = c0; st.cmB = c1
     // index : bright², velocity, the coupled envelope, and a cap that keeps the
     // sidebands under Nyquist (Carson's rule)
     const I0 = T * T * 11 * (0.65 + 0.35 * v.vel) * me
-    const I_0 = Math.min(I0, fmCap(f, rS0, sr)) * fmRoll(f * rS0, sr)
-    const I_1 = Math.min(I0, fmCap(f, rS1, sr)) * fmRoll(f * rS1, sr)
+    const I_0 = Math.min(I0, fmCap(f * c0, rS0, sr)) * fmRoll(f * c0 * rS0, sr)
+    const I_1 = Math.min(I0, fmCap(f * c1, rS1, sr)) * fmRoll(f * c1 * rS1, sr)
     // bite : Hank's feedback-then-shaper split, the feedback enveloped too
     const fbn = M < 0.6 ? M / 0.6 : 1
     const top = clamp((T - 0.66) / 0.34, 0, 1)
@@ -861,17 +889,18 @@ const fm = {
     const fbk = fx * fx * 6 * me
     const d = M < 0.35 ? 0 : (M - 0.35) / 0.65
     setR(R, 0, v.dt, snap)
-    setR(R, 1, Math.min(0.49, v.dt * rS0), snap)
-    setR(R, 2, Math.min(0.49, v.dt * rS1), snap)
+    setR(R, 1, Math.min(0.49, v.dt * c0 * rS0), snap)
+    setR(R, 2, Math.min(0.49, v.dt * c1 * rS1), snap)
     setR(R, 3, w1, snap)
     setR(R, 4, I_0 / TAU, snap)
     setR(R, 5, I_1 / TAU, snap)
-    setR(R, 6, (fbk * fmRoll(f * rS0, sr) * fbRoll(f * rS0, sr)) / TAU, snap)
-    setR(R, 7, (fbk * fmRoll(f * rS1, sr) * fbRoll(f * rS1, sr)) / TAU, snap)
+    setR(R, 6, (fbk * fmRoll(f * c0 * rS0, sr) * fbRoll(f * c0 * rS0, sr)) / TAU, snap)
+    setR(R, 7, (fbk * fmRoll(f * c1 * rS1, sr) * fbRoll(f * c1 * rS1, sr)) / TAU, snap)
     st.bite = d
   },
   run(v, s, buf, n) {
     const st = v.fm, R = st.R
+    const cmA = st.cmA, cmB = st.cmB
     let pc = st.pc, pa = st.pa, pb = st.pb, fa = st.fa, fb = st.fb
     let dtc = R[0], dta = R[2], dtb = R[4], w1 = R[6], ia = R[8], ib = R[10], fka = R[12], fkb = R[14]
     const dtci = R[1], dtai = R[3], dtbi = R[5], w1i = R[7], iai = R[9], ibi = R[11], fkai = R[13], fkbi = R[15]
@@ -884,12 +913,12 @@ const fm = {
       if (w1 < 1 - 1e-6) {
         const m = sin1(pa + fa * fka)
         fa = 0.5 * (fa + m)
-        y += (1 - w1) * sin1(pc + ia * m)
+        y += (1 - w1) * sin1(pc * cmA + ia * m)
       }
       if (w1 > 1e-6) {
         const m = sin1(pb + fb * fkb)
         fb = 0.5 * (fb + m)
-        y += w1 * sin1(pc + ib * m)
+        y += w1 * sin1(pc * cmB + ib * m)
       }
       buf[i] = y
     }
@@ -942,13 +971,16 @@ const modal = {
     const T = v.T
     const period = s.sr / Math.max(20, v.dt * s.sr)
     st.exL = Math.max(2, Math.min(0.012 * s.sr, period * 1.5 * Math.pow(0.08, T)))
-    st.ex = 0
+    // unison : each voice's mallet a little apart (up to a period, 3 ms at
+    // most : never a flam) and of either polarity, so the eight sum as eight
+    // and not as one (struck together they were 9 dB over poly)
+    st.ex = s.voiceMode === 1 ? -Math.floor(rnd01(v) * Math.min(0.003 * s.sr, period)) : 0
     // a soft mallet excites fewer modes and a damped bar rings shorter : most
     // of that level is given back, so the knobs change the tone more than the
     // loudness
     const tc = T < 0.5 ? 1.8 - 1.6 * T : 1 - 0.42 * (T - 0.5)
     const mc = Math.pow(200, 0.22 * v.M)
-    st.exA = (2 / st.exL) * (0.35 + 0.65 * v.velG) * tc * mc
+    st.exA = (2 / st.exL) * (0.35 + 0.65 * v.velG) * tc * mc * (s.voiceMode === 1 && rnd01(v) < 0.5 ? -1 : 1)
     st.exH = T > 0.65 ? (T - 0.65) * 1.6 : 0
   },
   ctl(v, s, snap) {
@@ -1010,7 +1042,8 @@ const modal = {
     const exL = st.exL, exA = st.exA, exH = st.exH
     for (let i = 0; i < n; i++) {
       let x = 0
-      if (exn < exL) {
+      if (exn < 0) exn++ // (a unison voice's mallet still to fall)
+      else if (exn < exL) {
         x = exA * (0.5 - 0.5 * Math.cos((TAU * exn) / exL))
         if (exH > 0) x += exH * exA * (rnd01(v) * 2 - 1) * 2
         exn++
@@ -1518,6 +1551,9 @@ class Voice {
     this.dx = new Float64Array(9)
     this.dr0 = 0; this.dr1 = 0; this.dr2 = 0
     this.tolC = 0; this.tolC2 = 0; this.tolF = 0; this.noteC = 0
+    // the envelope times' inputs as last computed (envTimes)
+    this.ef = 0; this.envA = -1; this.envD = -1; this.envR = -1; this.envF = 0
+    this.atkS = 0.01; this.decS = 0.3; this.relS = 0.3
     // output
     this.R = new Float64Array(2 * 7) // gL, gR, drive pre, bias, comp, wet, bite
     this.bx = 0; this.bF = 0; this.bdx = 0; this.bdy = 0
@@ -1626,7 +1662,15 @@ class OpsiaSynth {
         for (const v of this.v) if (v.gate) this.release(v)
         this.stN = 0; this.topId = -1
         this.voiceMode = m
-        for (const v of this.v) { v.uniC = 0; v.uniPan = 0; v.uniG = 1 }
+        for (const v of this.v) {
+          // a steal in flight : its note would land in the old mode, out of
+          // the new one's reach (a note stuck for good)
+          if (v.stealing) v.pendVel = -1
+          // a voice still ringing keeps its unison place to the end of its
+          // release (reset here, its tail jumped 6 dB and lost its width); a
+          // poly strike resets it (strike)
+          if (v.stage === 0 && !v.stealing) { v.uniC = 0; v.uniPan = 0; v.uniG = 1 }
+        }
       }
     }
     if (!this.primed) {
@@ -1705,6 +1749,8 @@ class OpsiaSynth {
   }
   strike(v, p, vel, fresh, legatoOnly, skipStruck) {
     const s = this
+    // poly : the voice's own place (a voice left from unison keeps it no more)
+    if (s.voiceMode === 0) { v.uniC = 0; v.uniPan = 0; v.uniG = 1 }
     if (fresh) {
       v.fresh = true
       v.p = p
@@ -1723,12 +1769,10 @@ class OpsiaSynth {
     v.age = ++s.clock
     // a new id brings its own mods (sent before its note, or none)
     if (fresh || v.modId !== v.id) this.loadMods(v, fresh)
-    // the envelope's times, scaled by the picture's env at the strike
-    const ef = clamp(v.tEnv, -1, 1)
-    const cs = s.cfg
-    v.atkS = 0.001 * Math.pow(6000, cs.attack) * exp2(3 * ef)
-    v.decS = 0.003 * Math.pow(2667, cs.decay) * exp2(2 * ef)
-    v.relS = 0.004 * Math.pow(2500, cs.release) * exp2(2 * ef)
+    // the envelope's times, scaled by the picture's env at the strike (kept :
+    // the times follow the panel while the note sounds, envTimes)
+    v.ef = clamp(v.tEnv, -1, 1)
+    this.envTimes(v)
     v.noteC = (rnd01(v) * 2 - 1) * 2
     // the engine(s)
     this.prepVoice(v)
@@ -1742,6 +1786,33 @@ class OpsiaSynth {
   release(v) {
     v.gate = false
     if (v.stage !== 0) v.stage = 4
+  }
+  /** A voice's envelope times from the panel's attack / decay / release, scaled
+   *  by the picture's env at its strike (v.ef) : at the strike, then every
+   *  control tick (a release turned while a note holds was its old one). */
+  envTimes(v) {
+    const cs = this.cfg, ef = v.ef
+    if (v.envA !== cs.attack || v.envD !== cs.decay || v.envR !== cs.release || v.envF !== ef) {
+      v.envA = cs.attack; v.envD = cs.decay; v.envR = cs.release; v.envF = ef
+      v.atkS = 0.001 * Math.pow(6000, cs.attack) * exp2(3 * ef)
+      v.decS = 0.003 * Math.pow(2667, cs.decay) * exp2(2 * ef)
+      v.relS = 0.004 * Math.pow(2500, cs.release) * exp2(2 * ef)
+    }
+  }
+  /** Everything silent at once, no tail (the Synth switched back on : a voice
+   *  frozen in its release, the chorus's line, would play again). */
+  reset() {
+    for (const v of this.v) {
+      v.gate = false; v.stage = 0; v.env = 0
+      v.stealing = false; v.pendVel = -1; v.fade = 1; v.id = -1
+      v.R[0] = v.R[1] = v.R[2] = v.R[3] = 0
+      v.uniC = 0; v.uniPan = 0; v.uniG = 1
+    }
+    this.stN = 0; this.topId = -1; this.handFrom = -1; this.handTo = -1
+    this.choBuf.fill(0); this.choLp = 0
+    for (const q of this.cpre) { q.z1 = 0; q.z2 = 0 }
+    for (const ch of this.cpost) for (const q of ch) { q.z1 = 0; q.z2 = 0 }
+    this.hpL = 0; this.hpR = 0
   }
   noteOff(id) {
     id = id | 0
@@ -1881,6 +1952,7 @@ class OpsiaSynth {
       if (ch === 0) v.dr0 = d; else if (ch === 1) v.dr1 = d; else v.dr2 = d
     }
     this.prepVoice(v)
+    this.envTimes(v)
     // the envelope
     if (v.stage === 1) {
       const ta = Math.max(0.001, v.atkS) / 1.466

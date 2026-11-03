@@ -958,6 +958,53 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Fixed
 
+- **The Sonify Synth, in tune and without its bugs** (Vincent : "Re-look at synth : make
+  sure its pitch is right, and re-analyze it thoroughly to make sure it hasn't got any
+  bugs"). Measured with the render harness and a reviewer's scripts (every engine from
+  MIDI 24 to 96, each macro 0 to 1, at 44.1 and 48 kHz : the fundamental within a cent
+  wherever the design has one; bend exactly ±2 semitones, glide on target, unison
+  centred, block size bit-identical, no NaN in 1440 extreme renders). Fixed :
+  - **the default bend detuned every moving note** : the patchbay's last row was
+    direction → bend at 0.2 (× PICTURE 0.8 : a rising thing up to 31 cents sharp, a
+    falling one as flat, each voice its own way). The default row is none;
+    `normalizeSynth` turns the old default (direction, exactly 0.2) into none, so a
+    saved session plays in tune too (a bend you chose stays); the Picture dice rests
+    bend three times in four (was half).
+  - **FM's half ratios played an octave down** : 0.5, 1.5 and 2.5 put the spectrum's
+    lowest common frequency at f/2 (the f/2 line up to 31 dB over f), and the panel's
+    harmonics default sits between 2.5 and 3, so size → harmonics flipped notes between
+    two octaves. A half ratio's slot runs its carrier and modulator at twice
+    (`fmCarrier`, the same sidebands around the note; a slot only changes ratio while
+    silent). Growl Bass (ratio 0.5) now plays at its note, not an octave under it.
+  - **the harmonics staircase sat between intervals** : its riser took the middle 40 %
+    of each step, so the panel's default on ms (0.3) put VCO-2 at +9.5 semitones,
+    Noise Lead at +15.5 (a quarter-tone off the octave), dco 0.5 a fifth 14 cents flat.
+    The riser is a tenth, just past the middle (`stair` : 0.52 .. 0.62) : 90 % of the
+    knob is on an interval, a half way place plays the lower, two thirds the upper (ms
+    0.3 → the fifth, Noise Lead → the octave, dco 0.5 → the fifth).
+  - **the same note came out up to 13 dB apart (dco, ms)** : DCO-2 / VCO-2 started at
+    a random phase while near unison, so it could cancel the note (a saw leaning to its
+    octave). They start within a fifth of a cycle of the first one (in phase exactly,
+    two narrow pulses stacked their peaks into the filter : aliasing) : notes now
+    within ~2.7 dB, each with a little colour of its own.
+  - **old notes came back when the Synth was switched on again** : off, the worklet
+    released the voices and stopped rendering them 15 ms later, frozen mid-release; the
+    next on played those tails (seconds of a pad). `voiceStart(11)` resets the engine
+    (`reset()` : every voice silent, the chorus line cleared).
+  - **a stuck note when the voice mode changed during a steal** (picking a mono sound
+    while a busy picture played) : the mode switch cancels a steal in flight.
+  - **leaving unison mid-note made its tail 6 dB louder and mono** : the switch kept
+    the ringing voices' unison place (a poly strike resets it).
+  - **attack, decay and release were read at the strike only** : turning the release
+    while a note held did nothing to it. The times follow the panel every control tick
+    (`envTimes`, the picture's env at the strike kept).
+  - **unison was louder on modal and FM** (attack +9.2 / +6.3 dB over poly, averaged
+    over 24 strikes) : the eight voices started in phase. FM's unison voices start from
+    their own phases, modal's mallets fall up to a period apart (3 ms at most) with
+    either polarity : +0.5 / -0.1 dB now.
+  The harness's legato check compares against a plain pitch move (the unison's beating
+  read as an attack). All harness checks pass at 44.1 and 48 kHz; the Synth plays,
+  stops and plays again in the test copy.
 - **Films keep playing on the output while the control window is minimized or
   hidden** (seen testing the Sonify Synth : the projector, NDI, Spout and recordings
   went on, but a film on them showed a new frame about once a second). The film
