@@ -199,8 +199,17 @@ export function Divider(): JSX.Element {
 }
 
 /** A card's label column, then its controls. `wrap` : the controls may wrap
- *  onto a second line in a narrow column (rather than run past the card). */
-export function Row({ label, children, hint, wrap }: { label: string; children: ReactNode; hint?: string; wrap?: boolean }): JSX.Element {
+ *  onto a second line in a narrow column (rather than run past the card).
+ *  `fit` : the controls stay together, beside the label while the row holds
+ *  `fit` px of them, else on their own line under it (a narrow column : never
+ *  squeezed past usable, never past the card). */
+export function Row({ label, children, hint, wrap, fit }: { label: string; children: ReactNode; hint?: string; wrap?: boolean; fit?: number }): JSX.Element {
+  if (fit) return (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted" title={hint}>{label}</span>
+      <div className="flex min-w-0 items-center gap-1.5" style={{ flex: `1 1 ${fit}px` }}>{children}</div>
+    </div>
+  )
   return (
     <div className={`flex min-w-0 items-center ${wrap ? 'flex-wrap gap-x-1.5 gap-y-1' : 'gap-1.5'}`}>
       <span className="w-14 shrink-0 font-mono text-[9px] uppercase text-muted" title={hint}>{label}</span>
@@ -213,7 +222,7 @@ export function Row({ label, children, hint, wrap }: { label: string; children: 
  *  card's own buttons on the right. `open` shows the body (a voice hides it
  *  while off; a sequencer keeps it open to be edited while stopped). */
 export function Shell({
-  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, space, foot, collapsed = false, onCollapse, children
+  title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, space, foot, collapsed = false, onCollapse, edge, children
 }: {
   title: string
   hint?: string
@@ -234,11 +243,13 @@ export function Shell({
   // A card that folds to its header (the sequencers) : the chevron left of the pill.
   collapsed?: boolean
   onCollapse?: () => void
+  // Its family's color (the voice cards) : a thicker left edge in it.
+  edge?: string
   children?: ReactNode
 }): JSX.Element {
   const gap = space !== undefined && !collapsed ? spaceGap(space) : undefined
   return (
-    <section className={`rounded border transition-colors ${roomy ? 'px-3 pt-2.5 pb-1' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`}>
+    <section className={`rounded border transition-colors ${roomy ? 'px-3 pt-2.5 pb-1' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`} style={edge ? { borderLeftWidth: 2, borderLeftColor: edge } : undefined}>
       <div className={`flex min-w-0 items-center gap-2 ${collapsed ? (roomy ? 'mb-1.5' : '') : roomy ? 'mb-2.5' : 'mb-1'}`} style={gap !== undefined ? { marginBottom: Math.max(6, gap + 2) } : undefined}>
         {onCollapse && (
           <button onClick={onCollapse} className="-mr-1 shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-accent" title={collapsed ? `Show the ${title}` : `Fold the ${title} to its header (it keeps playing)`}>

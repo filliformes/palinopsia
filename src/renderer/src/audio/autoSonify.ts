@@ -312,6 +312,24 @@ export function randomSynthPatchbay(): SynthRow[] {
   return rows
 }
 
+/** A new Reverb / Delay (its card's dice, and the whole dice's tail) : the
+ *  delay and the reverb re-rolled, both reverb modes' own controls too, and
+ *  their levels in the tail. The send is the caller's; freeze stays as it is
+ *  (a frozen tail would hold whatever was ringing). */
+export function randomFx(fx: SoniConfig['fx']): SoniConfig['fx'] {
+  return {
+    ...fx,
+    dlyMode: pick([0, 1, 1, 2, 2]), dlyTime: r2(rnd() < 0.3 ? rr(0.06, 0.18) : rr(0.18, 0.75)),
+    dlyFb: r2(rr(0.15, 0.6)), dlyTone: r2(rr(0.2, 0.75)), dlyMix: r2(rr(0.15, 0.55)),
+    rvMode: rnd() < 0.55 ? 0 : 1, rvSize: r2(rr(0.35, 0.9)), rvDecay: r2(rr(0.3, 0.75)), rvDamp: r2(rr(0.1, 0.6)),
+    rvPre: Math.round(rr(5, 60)), rvMod: Math.round(rr(2, 16)), rvModRate: r2(rr(0.15, 1.5)),
+    rvWidth: r2(rr(0.7, 1)), rvLocut: Math.round(rr(120, 400)),
+    rvDiff: r2(rr(0.6, 0.95)), rvLowDamp: r2(rr(0.2, 0.7)),
+    rvCross: r2(rr(0.15, 0.5)), rvLowMult: r2(rr(0.6, 1.8)), rvHighMult: r2(rr(0.4, 1.2)),
+    rvMix: r2(rr(0.4, 0.8))
+  }
+}
+
 /** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,
  *  a key/scale/octave, and maybe an FX tail. `on`/`sinkId` are kept by the caller. */
 export function randomSonify(cur: SoniConfig): SoniConfig {
@@ -345,7 +363,7 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
     chord: V('chord') as SoniConfig['chord'],
     synth: V('synth') as unknown as SoniConfig['synth'],
     fx: rnd() < 0.5
-      ? { ...cur.fx, send: rr(0.2, 0.5), rvMode: pick([0, 1]), rvSize: rr(0.4, 0.85), rvDecay: rr(0.4, 0.8), dlyTime: rr(0.1, 0.6), dlyFb: rr(0.2, 0.5), dlyMode: pick([0, 1, 2]) }
+      ? { ...randomFx(cur.fx), send: r2(rr(0.2, 0.5)) }
       : { ...cur.fx, send: 0 }
   }
 }

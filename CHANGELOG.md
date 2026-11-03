@@ -15,6 +15,13 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **A dice on Sonify's Reverb / Delay** (Vincent : "Also add a randomize dice to
+  Reverb/Delay too"). `autoSonify.ts randomFx(fx)` re-rolls the delay (mode, time,
+  feedback, tone, mix) and the reverb (Quartz or Prism, size, decay, damp, predelay,
+  shimmer, mod rate, width, low-cut, both modes' own controls, mix) inside musical
+  ranges; the send stays (an off tail comes on at the default 0.05, as a voice's dice
+  turns its voice on) and freeze is left as it is. The whole-instrument dice now draws
+  its tail from it too (its send range unchanged).
 - **OSC Learn, and MIDI / OSC mappings saved in the session** (Vincent : "yes build OSC
   learn this way" and "I'd also like the option to be able to save learned MIDI and OSC
   in the session, if i'm working on a piece which needs a custom setup specially for a
@@ -667,6 +674,22 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **Sonify's voices in five families, the Synth between Chord and Collage** (Vincent :
+  "Synth should be between Chord and Collage in the Sonify modules order. Also : if
+  other Sonify modules need reorganizing (with colored categories), do it.").
+  `components/soniGroups.ts` holds the families, in the sectioned panels' colors
+  (`SECTION_COLORS`) : **spectrum** accent2 (Spectra, Filter), **wave** red (Orbit,
+  Raster, Transmission), **hits** amber (Flow, Events, Signal), **notes** violet (Chord,
+  Synth), **films** earth (Collage, Assemblage), plus the **tail** neutral (Reverb /
+  Delay). The voices view renders every card by its stored index from a `card` record
+  and `SONI_GROUPS` places them, so the order lives in one list; each family is a
+  `VoiceGroup` : the shared `SectionHead` (fold key `soni-group-<id>`, the voices that
+  are on as its summary) and a `FamilyColor` context the `VoiceShell` reads for the
+  card's 2 px left edge (`Shell`'s new `edge`). `VOICE_ORDER` is now
+  `SONI_VOICE_ORDER` (the mixer, the effects sequencer, whose column letters take the
+  family color, and Space's voice list), and the mixer strips carry the edge too. No
+  stored index moved : sessions, mixer channels, filters, sequencer masks and MIDI
+  bindings (`sonify:voice:i`) are untouched.
 - **Sonify's Reverb / Delay is on by default, low** (Vincent : "by default, Chord and
   Collage should be OFF and collapsed. Delay/Reverb should be ON, but its SEND should be
   a 0.05"). `defaultSoniConfig().fx.send` 0 → 0.05, so a first launch and the ↺ reset
@@ -840,6 +863,21 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Fixed
 
+- **Sonify's cards kept inside the column at any width** (Vincent : "Some parameters
+  get out of the boundaries of the Sonify inspector when resized"). Measured with every
+  voice on at 240, 260, 280, 300, 320, 400 and 640 px : at 240 the range rows' ♪ scale
+  ran 41 px past the card (Spectra, Flow, Events), Events' blend 9, the reverb's freeze
+  4, and sliders were squeezed to 0-39 px (Filter's sweep, Raster's pitch,
+  Transmission's lines, the rate rows, the Synth's envelope, PICTURE's amount and its
+  ten patchbay depths, the mixer's 26). `Row` takes a `fit` : its controls stay one
+  group, beside the label while the row holds that many pixels of them, else on a line
+  of their own under it (never squeezed, never past the card). The Synth's envelope
+  goes one slider per row when two would not fit (`auto-fit` grid), PICTURE's amount
+  takes its own line in the header (`SectionHead`'s new `wrap`), a patchbay row puts its
+  depth under its source when narrow, and under 300 px each mixer strip is two lines
+  (pill, name and filter tag over its two sliders). The Synth's chip rows (voices,
+  pitch, timing, filter) and Space's output switch read in full at 240 now. After :
+  nothing past a card, no slider under 40 px, at every width measured.
 - **A film keeps playing when the composition size changes** (Vincent : "when changing
   from let's say 1080p to 4K UHD in composition size, a video that is playing (Imported
   video) on a layer gets replaced with another shader-based source (like Drift Field)").

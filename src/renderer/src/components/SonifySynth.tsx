@@ -101,7 +101,8 @@ function Section({ id, color, summary, lead, right, hint, folds = false, childre
         onToggle={() => setCollapsed(key, !folded)}
         bar="bg-panel3/30 hover:bg-panel3/50"
         hint={hint}
-        lead={lead && <div className="flex min-w-0 flex-1 cursor-default flex-col" onClick={own} onDoubleClick={own}>{lead}</div>}
+        wrap={!!lead}
+        lead={lead && <div className="flex min-w-0 cursor-default flex-col" style={{ flex: '1 1 140px' }} onClick={own} onDoubleClick={own}>{lead}</div>}
         right={
           right ? <span className="flex shrink-0 items-center" onClick={own} onDoubleClick={own}>{right}</span>
             : summary ? <span className="min-w-0 truncate font-mono text-[9px] text-muted">{summary}</span> : null
@@ -153,7 +154,9 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
     const title = `${SYNTH_DEST_LABEL[d]} : ${DEST_HINT[d]}. Its depth, -1 to +1 (negative : the source upside down; double-click : 0)`
     return (
       <div key={d} className="flex flex-col">
-        <div className="flex min-w-0 items-center gap-1">
+        {/* its depth beside the source while there is room for a usable slider,
+            else on a line of its own under it (a narrow card) */}
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
           <span className="w-14 shrink-0 truncate font-mono text-[9px] uppercase text-muted" title={title}>{SYNTH_DEST_LABEL[d]}</span>
           <select
             className="input select-compact w-[78px] shrink-0 !px-0.5"
@@ -165,6 +168,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
             {SYNTH_SRCS.map((x) => <option key={x} value={x} title={SYNTH_SRC_HINT[x]}>{SRC_LABEL[x]}</option>)}
           </select>
           {/* (a MIDI knob or an OSC fader learns it : sonify:param:<its depth>) */}
+          <span className="flex min-w-0 items-center gap-1" style={{ flex: '1 1 104px' }}>
           <span className="relative flex min-w-0 flex-1">
             <MidiLearnOverlay id={midi(param)} />
             <input
@@ -178,6 +182,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
           </span>
           <LiveNum liveKey={modTargetKey({ kind: 'sonify', param })} value={row.depth} fmt={pm} className="w-8 shrink-0 text-right font-mono text-[9px] text-muted" />
           {chip(param)}
+          </span>
         </div>
         {assignBox(param)}
       </div>
@@ -234,7 +239,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
             </button>
           ))}
         </div>
-        <Row label="voices" hint="poly : the 8 strongest moving things play, each its own voice · unison : the strongest one, every voice on its note · mono : the strongest one, gliding from note to note">
+        <Row label="voices" fit={150} hint="poly : the 8 strongest moving things play, each its own voice · unison : the strongest one, every voice on its note · mono : the strongest one, gliding from note to note">
           <Seg options={['poly', 'unison', 'mono'] as const} value={s.voices} onChange={(v) => set({ voices: v })}
             title={(v) => (v === 'poly' ? 'The 8 strongest moving things play' : v === 'unison' ? 'The strongest thing plays, every voice on its note' : 'The strongest thing plays, one voice')} />
         </Row>
@@ -244,7 +249,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
       </Section>
 
       <Section id="read" color={SEC.read} summary={`${MODE_LABEL[s.mode]} · oct ${s.loOct}→${s.hiOct} · ${GRID_LABEL[s.grid]}`} hint="How the picture is read : where the pitch comes from, the range, steps or slide, how much movement counts, the timing, the tap">
-        <Row label="pitch" hint={MODE_HINT[s.mode]}>
+        <Row label="pitch" fit={196} hint={MODE_HINT[s.mode]}>
           <Seg options={SYNTH_MODES} value={s.mode} onChange={(v) => set({ mode: v })} label={(v) => MODE_LABEL[v]} title={(v) => MODE_HINT[v]} />
         </Row>
         {s.mode === 'score' && (
@@ -269,14 +274,14 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
           </div>
         </Row>
         <Slider label="sense" value={s.sens} min={0} max={1} neutral={0.5} fmt={fmt2} onChange={(v) => set({ sens: v })} mod={chip('synthSens')} midiId={midi('synthSens')} title={s.mode === 'score' ? 'How much a shape must stand out at the playhead to play (up : fainter shapes too)' : 'How much movement counts as a thing (up : smaller, slower movements play too)'} />
-        <Row label="timing" hint="free : a note the moment the movement is seen · a grid : each strike waits for the next 1/8, 1/16 or 1/8 triplet of the beat clock">
+        <Row label="timing" fit={168} hint="free : a note the moment the movement is seen · a grid : each strike waits for the next 1/8, 1/16 or 1/8 triplet of the beat clock">
           <Seg options={SYNTH_GRIDS} value={s.grid} onChange={(v) => set({ grid: v })} label={(v) => GRID_LABEL[v]} />
         </Row>
         {tap}
       </Section>
 
       <Section id="tone" color={SEC.tone} summary={s.filter} hint="The filter after the engine : its kind, cutoff, resonance, drive, the high-pass and how far the envelope moves the cutoff">
-        <Row label="filter" hint="ladder : round and warm · ms : sharp, screaming when pushed · morph : low-pass to band-pass to high-pass">
+        <Row label="filter" fit={150} hint="ladder : round and warm · ms : sharp, screaming when pushed · morph : low-pass to band-pass to high-pass">
           <Seg options={SYNTH_FILTERS} value={s.filter} onChange={(v) => set({ filter: v })} />
         </Row>
         <Slider label="cutoff" value={s.cutoff} min={0} max={1} neutral={0.6} fmt={fmt2} onChange={(v) => set({ cutoff: v })} mod={chip('synthCutoff')} midiId={midi('synthCutoff')} title="The filter's cutoff" />
@@ -290,7 +295,7 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
       </Section>
 
       <Section id="envelope" color={SEC.envelope} summary={`a${short(s.attack)} d${short(s.decay)} s${short(s.sustain)} r${short(s.release)}`} hint="One envelope for every voice : attack, decay, sustain, release (a d s r in the header)">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(124px,1fr))] gap-x-3 gap-y-1">
           {env('a', 'attack', 'Attack : how fast a strike rises')}
           {env('d', 'decay', 'Decay : how fast it falls to the sustain')}
           {env('s', 'sustain', 'Sustain : the level a held thing keeps')}
