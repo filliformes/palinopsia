@@ -5,9 +5,11 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
-import type { ArpMode, AudioFeature, BodyFeature, LfoShape, ModulatorConfig, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, VisionFeature } from '@shared/types'
+import type { ArpMode, AudioFeature, BodyFeature, ControlInputConfig, LfoShape, ModulatorConfig, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, TakeoverConfig, VisionFeature } from '@shared/types'
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
-import { DIVISIONS, modEngine } from '../engine/modulation'
+import { DEFAULT_CONTROLLER, DEFAULT_TAKEOVER, DIVISIONS, modEngine } from '../engine/modulation'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { describeBinding } from '../midi'
 import { CLUTCH_AT_DEFAULT, CLUTCH_BAND } from '../engine/bodyClutch'
 import { condLabel, parseStepCond, randomStepPattern, STEP_MAX, STEP_PROBS, stepLength, stepsOf, SWING_MAX, SWING_MIN, type ParsedCond } from '../engine/stepSeq'
 import { ContextMenu, type MenuItem } from './ContextMenu'
@@ -38,7 +40,8 @@ const MOD_GROUPS: Array<{ label: string; title: string; types: ModulatorType[] }
   { label: 'rhythms', title: 'Patterns on a clock : a walk of levels, a drawn step sequence, euclidean pulses, a mutating loop, cells', types: ['arp', 'steps', 'euclid', 'turing', 'cellular'] },
   { label: 'random', title: 'Chance : random values, sample and hold, a glide, chaos', types: ['random', 'sh', 'slew', 'chaos'] },
   { label: 'gestures', title: 'Movement with a life of its own : drifting, traced, physical', types: ['organic', 'motion', 'physics'] },
-  { label: 'listening', title: 'Follows the room : the sound, the picture, your body, a quality held steady', types: ['audio', 'vision', 'body', 'homeostat'] }
+  { label: 'listening', title: 'Follows the room : the sound, the picture, your body, a quality held steady', types: ['audio', 'vision', 'body', 'homeostat'] },
+  { label: 'played', title: 'A control in your hands : a MIDI or OSC fader, knob or pad (any other type can also be taken over by one : its ✋)', types: ['controller'] }
 ]
 const CELL_RULES = [30, 90, 110, 150]
 const LFO_SHAPES: LfoShape[] = ['sine', 'triangle', 'square', 'sawtooth', 'rndStep', 'rndSmooth', 'spastic']
@@ -187,6 +190,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
   // the card persistent (right-click) : its configuration rides every scene,
   // dice and Generate; a gold border, a gold name
   const pin = usePin(modPin(index), `M${index + 1}`, PIN_WORDS.mod)
+  // the card's other side : its takeover (✋), in the same silhouette
+  const [takeView, setTakeView] = useState(false)
+  const takeSide = takeView && m.type !== 'controller'
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
@@ -252,6 +258,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
             </optgroup>
           ))}
         </select>
+        {m.type !== 'controller' && <TakeButton index={index} open={takeSide} onToggle={() => setTakeView(!takeView)} />}
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
@@ -266,7 +273,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
 
       {/* clock : everything except ramp/adsr/audio is clock-driven
           (audio is driven by the signal itself) */}
-      {m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'body' && m.type !== 'homeostat' && (
+      {!takeSide && m.type !== 'ramp' && m.type !== 'adsr' && m.type !== 'audio' && m.type !== 'vision' && m.type !== 'body' && m.type !== 'homeostat' && m.type !== 'controller' && (
         <div className="flex min-w-0 shrink-0 items-center gap-1">
           <button
             onClick={() => update(index, { sync: m.sync === 'bpm' ? 'free' : 'bpm' })}
@@ -349,7 +356,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
           here : modulators emit their raw signal). Bounded + scrollable so a
           param-heavy type (euclid) can never spill past the card border. */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        <TypeParams index={index} />
+        {takeSide ? <InputRows index={index} which="take" /> : <TypeParams index={index} />}
       </div>
     </div>
   )
@@ -696,6 +703,8 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
         </>
       )
     }
+    case 'controller':
+      return <InputRows index={index} which="in" />
     case 'homeostat': {
       const h = m.homeostat ?? { feature: 'edges' as VisionFeature, setpoint: 0.5, gain: 0.4, adapt: 0.3 }
       return (
@@ -1462,6 +1471,114 @@ function ClutchDot({ index }: { index: number }): JSX.Element {
     return () => cancelAnimationFrame(raf)
   }, [index])
   return <span ref={ref} className="h-2 w-2 shrink-0 rounded-full" />
+}
+
+// ── Controllers (engine/controlBus.ts) : the Controller type's input, a takeover ──
+
+/** What is learned on a modulator input, said short ('' : nothing) :
+ *  "<midi|osc|note>|<what>". The session's mapping first (it wins on its input). */
+function learnedOn(s: ReturnType<typeof useStore.getState>, id: string): string {
+  const sm = s.sessionMidiMap[id], so = s.sessionOscMap[id]
+  const mb = sm ?? s.midiMap[id], ob = so ?? s.oscMap[id]
+  if (mb) return `${mb.kind === 'note' ? 'note' : 'midi'}|${describeBinding(mb)}${sm ? ' · session' : ''}`
+  if (ob) return `osc|${ob.address}${ob.arg > 0 ? ` #${ob.arg + 1}` : ''}${so ? ' · session' : ''}`
+  return ''
+}
+
+/** The header's ✋ : a takeover of this modulator by a control. Lit : one is
+ *  learned; click : the card's takeover side (and back). Learn (L) on it
+ *  learns the control straight away. */
+function TakeButton({ index, open, onToggle }: { index: number; open: boolean; onToggle: () => void }): JSX.Element {
+  const id = `mod:take:${index}`
+  const learned = useStore((s) => learnedOn(s, id))
+  return (
+    <span className="relative flex shrink-0">
+      <MidiLearnOverlay id={id} />
+      <button
+        onClick={onToggle}
+        className={`shrink-0 rounded px-1 font-mono text-[9px] ${open ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : learned ? 'bg-accent2/15 text-accent2' : 'bg-panel3/60 text-muted hover:text-accent'}`}
+        title={`Takeover : a MIDI or OSC control takes this modulator over while you play it, then hands it back to its own motion (every parameter bound to it follows)${learned ? ` · now : ${learned.slice(learned.indexOf('|') + 1)}` : ' · none learned yet'}. Click : ${open ? 'back to its own settings' : 'its takeover settings'}`}
+      >
+        ✋
+      </button>
+    </span>
+  )
+}
+
+/** A modulator input's rows : the control learned on it (learn · forget), then
+ *  how it plays. A fader : smoothing (and, for a takeover, how long it holds
+ *  after your hand stops and how long the glide back takes). A note : its
+ *  envelope (attack, release) and whether its velocity counts. */
+function InputRows({ index, which }: { index: number; which: 'in' | 'take' }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const update = useStore((s) => s.updateModulator)
+  const id = `mod:${which}:${index}`
+  const learned = useStore((s) => learnedOn(s, id))
+  const armed = useStore((s) => s.midiLearnMode && s.midiLearnTarget === id)
+  const kind = learned ? learned.slice(0, learned.indexOf('|')) : ''
+  const what = learned ? learned.slice(learned.indexOf('|') + 1) : ''
+  const take = which === 'take'
+  const c: ControlInputConfig | TakeoverConfig = take ? { ...DEFAULT_TAKEOVER, ...(m.takeover ?? {}) } : { ...DEFAULT_CONTROLLER, ...(m.controller ?? {}) }
+  const set = (p: Partial<TakeoverConfig>): void =>
+    take ? update(index, { takeover: { ...(c as TakeoverConfig), ...p } }) : update(index, { controller: { ...c, ...p } })
+  const note = kind === 'note'
+  const st = useStore.getState
+  return (
+    <>
+      <Row label={take ? 'TAKE' : 'INPUT'} title={take
+        ? 'The control that takes this modulator over : learn, then move a fader, a knob or hit a pad (MIDI or OSC). Also /opsia/mod/' + (index + 1) + '/take'
+        : 'The control this modulator is : learn, then move a fader, a knob or hit a pad (MIDI or OSC). Also /opsia/mod/' + (index + 1) + '/in'}>
+        <span className="relative flex min-w-0 flex-1">
+          <MidiLearnOverlay id={id} />
+          <span className={`min-w-0 flex-1 truncate font-mono text-[9px] ${armed ? 'text-accent2' : learned ? 'text-accent' : 'text-muted'}`} title={learned ? what : 'none learned yet'}>
+            {armed ? 'move a control…' : learned ? what : 'none'}
+          </span>
+        </span>
+        <button
+          onClick={() => (armed ? st().setMidiLearnMode(false) : st().learnModInput(id))}
+          className={`shrink-0 rounded px-1 font-mono text-[9px] ${armed ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent'}`}
+          title={armed ? 'Listening : move a control (click : stop)' : 'Learn : move a control, MIDI or OSC, and it is this input (where Learn into points : this computer or this session)'}
+        >
+          {armed ? '…' : 'learn'}
+        </button>
+        {learned && (
+          <button onClick={() => st().forgetModInput(id)} className="shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-danger" title="Forget this control">
+            ✕
+          </button>
+        )}
+      </Row>
+      {note ? (
+        <>
+          <MiniSlider label="A" name="Attack : how fast a hit rises" value={c.attackMs} min={0} max={10000} onChange={(v) => set({ attackMs: v })} />
+          <MiniSlider label="R" name={take ? 'Release : how long it takes to hand back' : 'Release : how long it falls after the note ends'} value={c.releaseMs} min={0} max={20000} onChange={(v) => set({ releaseMs: v })} />
+          <Row label="VEL" title="On : how hard you hit sets how far it goes. Off : always all the way">
+            <button
+              onClick={() => set({ velocity: !c.velocity })}
+              className={`rounded px-1 py-0.5 font-mono text-[9px] ${c.velocity ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`}
+            >
+              {c.velocity ? 'velocity' : 'full'}
+            </button>
+          </Row>
+        </>
+      ) : (
+        <>
+          {take && (
+            <>
+              <SliderRow label="HOLD" value={(c as TakeoverConfig).holdMs} min={100} max={20000} log integer
+                title="How long the control keeps the modulator after your hand stops (ms)"
+                onChange={(v) => set({ holdMs: v })} />
+              <SliderRow label="BACK" value={(c as TakeoverConfig).backMs} min={50} max={30000} log integer
+                title="Then, how long the glide back to the modulator's own motion takes (ms)"
+                onChange={(v) => set({ backMs: v })} />
+            </>
+          )}
+          <SliderRow label="SMOOTH" value={c.smooth} min={0} max={0.99}
+            title="Softens the control's steps : 0 follows at once, →1 glides"
+            onChange={(v) => set({ smooth: v })} />
+        </>
+      )}
+    </>
+  )
 }
 
 function Row({

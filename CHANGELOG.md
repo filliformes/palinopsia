@@ -15,6 +15,41 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **A MIDI or OSC control as a modulator, and a takeover of any modulator** (Vincent :
+  "what if any incoming set of OSC or MIDI device could entirely replace one of the 8
+  modulators ? any modulation would still be bound to it; but it could then affect a
+  lot of parameters at the same time", then "Both, one input per slot, glide back to
+  the generator, and #4 : yes"). A binding points at a modulator SLOT, never at its
+  type, so the slot's bindings, depths, modes and shaping all stay. **The input** :
+  two Learn targets per slot, `mod:in:<i>` (the new `controller` type) and
+  `mod:take:<i>` (a takeover), continuous for MIDI / OSC Learn (`isContinuousTarget`)
+  with a pad allowed too; `applyContinuous` and a pad's note on / note off (a new
+  note-off path in `onMessage`, only for these) write `engine/controlBus.ts`
+  (`in:<i>` / `take:<i>` : value, last-moved time, gate, velocity; live, never saved).
+  `/opsia/mod/<n>/in · take` (+ `/note`) play it straight in. One input per slot :
+  `setMidiBinding` / `setOscBinding` drop the other kind in the same scope
+  (`dropOtherKind`) and clear the bus on forget; the card's **learn** arms Learn for
+  that input alone (`learnModInput`, `learnOnce` : Learn goes off once it is learned);
+  **✕** forgets it in both scopes (`forgetModInput`). **The engine** (`modulation.ts`) :
+  `playInput` plays a fader (one-pole `smooth`, frame-rate independent) or a pad (a
+  linear attack / release envelope times its velocity, or full); the `controller` type
+  is that value (it holds when quiet). The TAKEOVER blends before the curve, for every
+  type but controller : a fader's weight comes in over 120 ms (`TAKE_CATCH_MS`), holds
+  `holdMs` after the last move, falls over `backMs`; a pad's weight is its envelope, the
+  pull toward its velocity. `ModulatorConfig.controller` (merged onto
+  `DEFAULT_CONTROLLER` at load) and the optional `takeover` (`DEFAULT_TAKEOVER`). **The
+  card** : a `played` family in the type menu; the controller's rows INPUT (learned
+  control · learn · ✕) then SMOOTH, or A / R / VEL for a pad; the header's **✋** (lit
+  when a control is learned, a Learn overlay of its own) flips the card to its
+  takeover side (TAKE, then HOLD / BACK / SMOOTH or A / R / VEL), inside the fixed
+  silhouette. Generate and the dice never deal a controller (TYPE_POOL). Checked in the
+  test copy, MIDI through the manager's own handler (thru off), OSC by real UDP : the
+  card's learn took CC 74 and switched Learn off; the CC played 0 → 1; a pad (vel 100)
+  rose to 0.787 and fell over 600 ms; a CC took an LFO over in 200 ms, held 1.2 s,
+  was half way back 1 s later and gone at 2.2 s; a pad (vel 127) pulled it to 1 and
+  handed it back over 1.2 s; `/opsia/mod/1/in 0.25` → 0.25; OSC Learn onto the same
+  input dropped its MIDI control and played; every card side fits (scrollHeight 107 of
+  107).
 - **Black's button draws its fade** (Vincent : "Like in dataflou_compositor, I would
   need the Black button to show the amount of time it takes to fade out or fade in (so
   the morph time), but visually : a clockwise line filling the rectangle in the N

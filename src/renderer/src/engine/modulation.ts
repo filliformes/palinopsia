@@ -16,7 +16,7 @@ import { auModBase, setAuMod } from './audioLayerMod'
 import { auBaseOf, auSpan, auValueOf } from '@shared/auMod'
 import { forkShapeGhosts, pruneShapes, shapeValue } from './modShape'
 import { condPlays, defaultSteps, parseStepCond, stepLength, stepsOf, swingLate } from './stepSeq'
-import type { ColorChannel, CompositionState, LfoShape, ModCurve, ModulatorConfig } from '@shared/types'
+import type { ColorChannel, CompositionState, ControlInputConfig, LfoShape, ModCurve, ModulatorConfig, TakeoverConfig } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { colorOf, fitPart, hsvaOf, PART_INDEX, rgbaOf } from './colorParts'
 import { controlKey } from '../modKey'
@@ -24,6 +24,7 @@ import { audioBus } from './audioIn'
 import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
+import { controlBus, type ControlIn } from './controlBus'
 import { CLUTCH_AT_DEFAULT, CLUTCH_CATCH_EPS, CLUTCH_CATCH_MAX_MS, clutchEngaged, clutchStepK } from './bodyClutch'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
@@ -35,6 +36,35 @@ const TWO_PI = Math.PI * 2
 // below tune their smoothing to this, then scale by the real dt, so a given
 // `smooth` feels the same at any frame rate (see the audio/vision/homeostat cases).
 const FR_MS = 1000 / 60
+
+// ── Controllers (engine/controlBus.ts) : the Controller type, a takeover ──
+export const DEFAULT_CONTROLLER: ControlInputConfig = { smooth: 0.3, attackMs: 20, releaseMs: 600, velocity: true }
+export const DEFAULT_TAKEOVER: TakeoverConfig = { smooth: 0.3, attackMs: 40, releaseMs: 1200, velocity: true, holdMs: 1500, backMs: 2000 }
+// a fader's takeover comes in this fast (a jump to the hand would click)
+const TAKE_CATCH_MS = 120
+// The slot's own state for one input : the value played, a note's envelope and
+// the level it struck (held through its release)
+interface InState { v: number; env: number; top: number }
+const inState = (): InState => ({ v: 0, env: 0, top: 0 })
+/** An input played into a value : a fader's smoothed (one-pole, frame-rate
+ *  independent); a note's attack / release envelope times its velocity (or
+ *  full). Nothing heard yet : it holds (0). */
+function playInput(e: ControlIn | undefined, c: ControlInputConfig, st: InState, dtMs: number): number {
+  if (!e) return st.v
+  if (e.note) {
+    if (e.gate) {
+      st.top = c.velocity ? e.vel : 1
+      st.env = c.attackMs <= 0 ? 1 : Math.min(1, st.env + dtMs / c.attackMs)
+    } else {
+      st.env = c.releaseMs <= 0 ? 0 : Math.max(0, st.env - dtMs / c.releaseMs)
+    }
+    st.v = st.env * st.top
+    return st.v
+  }
+  const sm = Math.max(0, Math.min(0.99, c.smooth))
+  st.v += (e.v - st.v) * (1 - Math.pow(sm, dtMs / FR_MS))
+  return st.v
+}
 
 // ── BPM sync (dataFLOU's DIVISIONS + effectiveLfoHz) ──────────────────
 export const DIVISIONS: Array<{ label: string; beats: number }> = [
@@ -240,6 +270,9 @@ interface SlotState {
   clipRead: ClipReadState // a clip's playhead as last read (audio type, from a clip)
   visionValue: number // one-pole smoothed picture feature (vision type)
   bodyValue: number // one-pole smoothed body feature (body type)
+  ctl: InState // the controller type's input
+  take: InState // a takeover's input
+  takeW: number // how much the takeover holds the slot (0 : its own motion, 1 : the control)
   bodySeeded: boolean // the body type has written bodyValue (a clutch holds that; never written : it starts from the feature)
   clutchOn: boolean // the clutch is engaged (body type with a clutch)
   clutchCatchAt: number // when the grab's glide began (0 : not gliding)
@@ -339,6 +372,9 @@ function makeSlot(now: number): SlotState {
     clipRead: newClipReadState(),
     visionValue: 0,
     bodyValue: 0,
+    ctl: inState(),
+    take: inState(),
+    takeW: 0,
     bodySeeded: false,
     clutchOn: false,
     clutchCatchAt: 0,
@@ -1091,6 +1127,12 @@ export class ModEngine {
           }
           break
         }
+        case 'controller': {
+          // The slot is a control : what its learned input plays (a fader, a
+          // note's envelope). Unclocked : the hand is the clock. Quiet, it holds.
+          v01 = playInput(controlBus.get(`in:${i & 7}`), cfg.controller ?? DEFAULT_CONTROLLER, s.ctl, dtMs)
+          break
+        }
         case 'homeostat': {
           // Negative-feedback controller (AGC-as-modulator). Watch a picture
           // feature and regulate it around a SELF-ADAPTING baseline, so a feature
@@ -1237,6 +1279,28 @@ export class ModEngine {
         }
       }
 
+      // TAKEOVER : the slot's control (mod:take:<slot>) takes it over from its
+      // own motion while you play it, then hands it back : a fader comes in fast
+      // (TAKE_CATCH_MS), holds holdMs after your hand stops and glides back over
+      // backMs; a note pulls it to its velocity on its envelope (the release is
+      // the way back). Every binding of the slot follows, as for its own motion.
+      if (cfg.type !== 'controller') {
+        const te = controlBus.get(`take:${i & 7}`)
+        if (te) {
+          const tk = cfg.takeover ?? DEFAULT_TAKEOVER
+          const x = playInput(te, tk, s.take, dtMs)
+          if (te.note) {
+            s.takeW = s.take.env
+            v01 += (s.take.top - v01) * s.takeW
+          } else {
+            const playing = te.at > 0 && now - te.at < Math.max(0, tk.holdMs)
+            s.takeW = playing
+              ? Math.min(1, s.takeW + dtMs / TAKE_CATCH_MS)
+              : tk.backMs <= 0 ? 0 : Math.max(0, s.takeW - dtMs / tk.backMs)
+            v01 += (x - v01) * s.takeW
+          }
+        } else s.takeW = 0
+      }
       this.values[i] = shapeCurve(Math.max(0, Math.min(1, v01)), cfg.curve)
     }
     return this.values
@@ -1283,7 +1347,8 @@ export function makeDefaultModulator(): ModulatorConfig {
     euclid: { steps: 16, pulses: 5, decay: 0.35 },
     turing: { length: 8, mutate: 0.15 },
     cellular: { rule: 90, cells: 24 },
-    steps: defaultSteps()
+    steps: defaultSteps(),
+    controller: { ...DEFAULT_CONTROLLER }
   }
 }
 
