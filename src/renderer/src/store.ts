@@ -64,7 +64,7 @@ import { DEPTH_RES_DEFAULT, DEPTH_RES_STEPS } from './engine/depthEstimate'
 import { beginSceneMorph, beginRelayMorph, cancelMorph, requestSceneChange } from './morph'
 import { DEFAULT_LIGHT_PATH } from './lightPath'
 import { autoSurfacePos } from './surface'
-import { defaultSoniConfig, sonifyEngine, type SoniConfig } from './audio/sonify'
+import { defaultSoniConfig, sessionSonify, sonifyEngine, type SoniConfig } from './audio/sonify'
 import { audioLayer, defaultAudioLayer, NOT_ARMED, sanitizeAudioLayer, type AudioLayerArmed } from './audio/audioLayer'
 import { emitSessionLoaded } from './sessionEvents'
 import { tempoEdited } from './tempoEvents'
@@ -588,7 +588,7 @@ function makeDefaultSoniSeq(): SoniSeq {
     bias: 0,
     edge: 'wrap',
     steps: Array.from({ length: 16 }, () => ({
-      voices: [false, false, false, false, false, false, false, false, false, false, false],
+      voices: [false, false, false, false, false, false, false, false, false, false, false, false],
       preset: ''
     }))
   }
@@ -606,6 +606,16 @@ function persistSoniSeq(sq: SoniSeq): void {
     }
   }, 250)
 }
+/** The voices' places as a session saves them : the Synth's left out while it
+ *  is its default (a session that never used it saves what it always did). */
+function sessionSpaceVoices(v: Record<SpaceVoice, VoicePlace>): Record<SpaceVoice, VoicePlace> {
+  const d = defaultVoicePlaces().synth
+  const s = v.synth
+  if (!s || (Object.keys(d) as Array<keyof VoicePlace>).some((k) => s[k] !== d[k])) return v
+  const out = { ...v } as Partial<Record<SpaceVoice, VoicePlace>>
+  delete out.synth
+  return out as Record<SpaceVoice, VoicePlace>
+}
 function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
   if (!raw || typeof raw !== 'object') return fallback
   const d = makeDefaultSoniSeq()
@@ -616,9 +626,9 @@ function sanitizeSoniSeq(raw: unknown, fallback: SoniSeq): SoniSeq {
         return {
           // 8 = saved before the Collage voice, 9 before Signal : padded, the
           // newer voices stay off in those steps.
-          // 10 before the Assemblage voice.
-          voices: Array.isArray(st?.voices) && st!.voices.length >= 8 && st!.voices.length <= 11
-            ? [...st!.voices.map(Boolean), false, false, false].slice(0, 11)
+          // 10 before the Assemblage voice, 11 before the Synth.
+          voices: Array.isArray(st?.voices) && st!.voices.length >= 8 && st!.voices.length <= 12
+            ? [...st!.voices.map(Boolean), false, false, false, false].slice(0, 12)
             : ds.voices,
           preset: typeof st?.preset === 'string' ? st!.preset : ''
         }
@@ -4920,7 +4930,7 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleSoniSeqVoice: (step, voice) =>
     set((s) => {
       const steps = s.soniSeq.steps.map((st, i) =>
-        i === step ? { ...st, voices: [...st.voices, false, false, false].slice(0, 11).map((v, vi) => (vi === voice ? !v : v)) } : st
+        i === step ? { ...st, voices: [...st.voices, false, false, false, false].slice(0, 12).map((v, vi) => (vi === voice ? !v : v)) } : st
       )
       const soniSeq = { ...s.soniSeq, steps }
       persistSoniSeq(soniSeq)
@@ -5343,8 +5353,9 @@ export const useStore = create<StoreState>((set, get) => ({
           // Compositions are immutable : the snapshot is a reference.
           composition: s.composition,
           world: s.worlds.find((w) => w.id === s.world) ?? null,
-          // The sound patch travels with the scene (on/sink stay machine-local).
-          sonify: { ...s.sonify, on: false, sinkId: '' }
+          // The sound patch travels with the scene (on/sink stay machine-local;
+          // the Synth's parts only once touched, as in a session file).
+          sonify: sessionSonify({ ...s.sonify, on: false, sinkId: '' })
         }
       ]
     })),
@@ -5886,8 +5897,13 @@ export const useStore = create<StoreState>((set, get) => ({
       feel: { density: s.density, gestureTexture: s.gestureTexture, coalesce: s.coalesce, tonicity: s.tonicity, drift: s.drift, flow: s.flow },
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
-      sonify: { ...s.sonify, on: false, sinkId: '' },
-      soniSeq: { ...s.soniSeq, on: false, cur: 0 },
+      // (the Synth's parts left out while they were never touched : a session
+      // that never used the Synth saves the same bytes as before it existed)
+      sonify: sessionSonify({ ...s.sonify, on: false, sinkId: '' }),
+      soniSeq: {
+        ...s.soniSeq, on: false, cur: 0,
+        steps: s.soniSeq.steps.map((st) => (st.voices.length === 12 && !st.voices[11] ? { ...st, voices: st.voices.slice(0, 11) } : st))
+      },
       sonifyOn: s.sonify.on,
       soniSeqOn: s.soniSeq.on,
       soniKeySeq: { ...s.soniKeySeq, on: false },
@@ -5909,7 +5925,7 @@ export const useStore = create<StoreState>((set, get) => ({
       resolume: s.resolume,
       dome: { ...s.dome, grid: false }, // (the alignment grid is the room's, not the piece's)
       outXform: s.outXform,
-      spaceVoices: s.space.voices,
+      spaceVoices: sessionSpaceVoices(s.space.voices),
       // your own shaders it plays (the composition, the scenes), with their source
       userShaders: (() => {
         const ids = userShaderIdsIn(s.composition)

@@ -17,6 +17,8 @@
 
 import type { CompositionState, FxInstance, SourceSlot } from '@shared/types'
 import type { SoniConfig } from './sonify'
+import { SYNTH_PATCHES } from './synthPatches'
+import { normalizeSynth } from './synthPlay'
 
 type Voice = 'raster' | 'flow' | 'orbit' | 'spectra' | 'sstv' | 'filter' | 'events' | 'chord' | 'signal'
 
@@ -190,7 +192,7 @@ const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)]
  *  the dice re-voices the instrument, it never blasts or silences it. */
 // Per-voice parameter randomizers (character only — `on`/`tap` set by the caller).
 // Shared by the whole-instrument dice and the per-voice dice.
-export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage'
+export type SoniVoiceKey = 'spectra' | 'orbit' | 'flow' | 'events' | 'raster' | 'sstv' | 'filter' | 'chord' | 'collage' | 'signal' | 'assemblage' | 'synth'
 const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>> = {
   spectra: (c) => ({ ...c.spectra, quantize: rnd() < 0.85, sweepOn: rnd() < 0.75, sync: rnd() < 0.3, sweepHz: rr(0.06, 0.8), x: rr(0.2, 0.8), path: pick([0, 0, 0, 1, 2, 3]), pace: rnd() < 0.4 ? rr(0.2, 0.8) : 0, gamma: rr(1.2, 2.6), breath: rnd() < 0.4 ? rr(0.2, 0.7) : 0, loOct: pick([1, 2, 2, 3]), hiOct: pick([6, 7, 7, 8]) }),
   orbit: (c) => ({ ...c.orbit, quantize: rnd() < 0.85, note: 33 + Math.floor(rnd() * 28), cx: rr(0.3, 0.7), cy: rr(0.3, 0.7), rx: rr(0.08, 0.35), ry: rr(0.08, 0.35), ratio: pick([1, 2, 1.5, 3]), drive: rr(0.6, 2), smooth: rr(0.2, 0.8) }),
@@ -227,13 +229,37 @@ const R_PARAMS: Record<SoniVoiceKey, (c: SoniConfig) => Record<string, unknown>>
       loOct: pick([3, 4, 4, 5]), hiOct: pick([7, 8, 8, 9]), snap: pick([1, 1, 0.5, 0])
     }
   },
+  // Synth : a sound and an engine, weighted toward what plays well under a
+  // moving picture (poly, a filter open enough to hear the strikes, short to
+  // middle envelopes); half the time a factory sound when there are some. The
+  // patchbay, the sense, the tap and the levels stay yours.
+  synth: (c) => {
+    const s = normalizeSynth(c.synth)
+    const lo = pick([2, 3, 3, 4])
+    const read = {
+      mode: pick(['height', 'height', 'height', 'keyboard', 'radial', 'score'] as const),
+      loOct: lo, hiOct: lo + pick([1, 2, 2, 3]),
+      grid: pick(['free', 'free', '8', '16', '8t'] as const), slide: rnd() < 0.25, picture: rr(0.5, 1)
+    }
+    if (SYNTH_PATCHES.length && rnd() < 0.5) return { ...s, ...pick(SYNTH_PATCHES).sound, level: s.level, ...read }
+    return {
+      ...s, ...read,
+      engine: pick(['dco', 'dco', 'ms', 'ms', 'swarm', 'fm', 'fm', 'modal', 'voice', 'fold', 'pluck', 'pluck'] as const),
+      timbre: rr(0.2, 0.8), harmonics: rr(0.1, 0.7), morph: rnd() < 0.5 ? 0 : rr(0, 0.6),
+      voices: pick(['poly', 'poly', 'poly', 'mono', 'unison'] as const),
+      filter: pick(['ladder', 'ladder', 'ms', 'morph'] as const),
+      cutoff: rr(0.4, 0.85), reso: rr(0.05, 0.55), drive: rr(0, 0.4), hpf: rnd() < 0.7 ? 0 : rr(0, 0.25), fmode: rr(0, 1),
+      envAmt: rr(-0.2, 0.6), attack: rr(0, 0.3), decay: rr(0.15, 0.6), sustain: rr(0.3, 0.85), release: rr(0.15, 0.6),
+      glide: rnd() < 0.6 ? rr(0, 0.2) : rr(0.2, 0.5), drift: rr(0, 0.4), chorus: pick([0, 1, 1, 2] as const)
+    }
+  },
   chord: (c) => ({ ...c.chord, voices: 3 + Math.floor(rnd() * 8), loOct: pick([1, 2, 2, 3]), hiOct: pick([5, 6, 6, 7]), gamma: rr(1.2, 2.4), spread: rr(0.3, 0.9), attack: rr(0.1, 1.2), release: rr(0.3, 2), tone: rr(0, 0.6), waves: rnd() < 0.5 ? 0 : rr(0.1, 0.5), wavesRate: rr(0.15, 0.6) })
 }
 
 /** Randomize the whole Sonify instrument : pick 2–3 voices, re-roll their params,
  *  a key/scale/octave, and maybe an FX tail. `on`/`sinkId` are kept by the caller. */
 export function randomSonify(cur: SoniConfig): SoniConfig {
-  const all: SoniVoiceKey[] = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'signal', 'chord']
+  const all: SoniVoiceKey[] = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'signal', 'chord', 'synth']
   const bag = [...all]
   for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1));[bag[i], bag[j]] = [bag[j], bag[i]] }
   const chosen = new Set(bag.slice(0, rnd() < 0.4 ? 3 : 2))
@@ -261,6 +287,7 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
     filter: V('filter') as SoniConfig['filter'],
     signal: V('signal') as SoniConfig['signal'],
     chord: V('chord') as SoniConfig['chord'],
+    synth: V('synth') as unknown as SoniConfig['synth'],
     fx: rnd() < 0.5
       ? { ...cur.fx, send: rr(0.2, 0.5), rvMode: pick([0, 1]), rvSize: rr(0.4, 0.85), rvDecay: rr(0.4, 0.8), dlyTime: rr(0.1, 0.6), dlyFb: rr(0.2, 0.5), dlyMode: pick([0, 1, 2]) }
       : { ...cur.fx, send: 0 }

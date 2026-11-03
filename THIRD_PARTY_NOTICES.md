@@ -85,3 +85,70 @@ The hash functions used across the generators, effects and native nodes
 `.1031` and `33.33` constants) are David Hoskins' "Hash without Sine"
 (https://www.shadertoy.com/view/4djSRW), MIT License, Copyright (c) 2014
 David Hoskins.
+
+## The Sonify Synth's engines (`src/renderer/src/audio/synth.engine.js`)
+
+The Synth voice's sound engine ports parts of the MIT-licensed works below
+(each block carries a short credit comment where it is used); MIT works may be
+conveyed inside Palinopsia's GPL-3.0-or-later.
+
+- **jx-move** by Vincent Fillion (Copyright (c) 2026 Filliformes), MIT License :
+  the DCO pair with exact-event BLEP / BLAMP residuals, hard sync and the
+  cross-clocked "metal" mode; the IR3109-style 4-pole ladder; the BBD
+  chorus (I and II), its filters and output mix; the non-resonant HPF; the
+  output knee; mono / unison note priority.
+- **aphex-move** by Vincent Fillion (Copyright (c) 2026 Filliformes), MIT
+  License : the VCO
+  shapes and ring modulator of the ms engine, its pink noise, the Korg-35 style
+  HP / LP filter pair (`k35.h`), the drift design (`drift.h`) and the linear
+  release.
+- **essaim-move** by Vincent Fillion (Copyright (c) 2026 fillioning), MIT
+  License : the swarm
+  voice (self-retriggering oscillators, sine → triangle → saw → square, a
+  state-variable filter per oscillator drawn 50 / 30 / 20 low / band / high).
+- **schwung-hank** by Charles Vestal (charlesvestal/schwung-hank), MIT License
+  (stated in its README and source headers; it ships no LICENSE file) : the 2-operator FM
+  macro layer, its ratio list, the index and feedback laws, the modulator
+  envelope coupled to the carrier's (2.2x shorter decay, a 0.30 sustain floor),
+  the index rolloff above 7 kHz and the bite shaper.
+- **schwung-quark** (james-fish/schwung-quark, Copyright (c) 2026 James Fish),
+  MIT License : the
+  control-rate ramps, the first-order ADAA soft-clip drive, the morphing SVF's
+  LP → BP → HP weights, the dual band-pass vowel pair.
+- **crest** (klaine/crest, Copyright (c) 2026 Klaine), MIT License :
+  per-sample shape and density smoothing, the detuned density copies, the
+  4-point polyBLEP form and the saturating band-pass state of the SVF.
+- **TinyPro5** (fleshinachair/TinyPro5, Copyright (c) 2026 Mathew Taylor), MIT
+  License : the three-band
+  1/f drift walk and the self-oscillation seeding.
+
+Each of them is licensed under these terms :
+
+  > Permission is hereby granted, free of charge, to any person obtaining a copy
+  > of this software and associated documentation files (the "Software"), to deal
+  > in the Software without restriction, including without limitation the rights
+  > to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  > copies of the Software, and to permit persons to whom the Software is
+  > furnished to do so, subject to the following conditions:
+  >
+  > The above copyright notice and this permission notice shall be included in
+  > all copies or substantial portions of the Software.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  > IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  > FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  > SOFTWARE.
+
+The rest is built here from published methods : the complex one-pole modal
+bank (M. Mathews and J. O. Smith, "Methods for synthesizing very high Q
+parametrically well behaved two pole filters", 2003), the vowel formants
+(G. E. Peterson and H. L. Barney's 1952 averages for F1 to F3), the string
+(Karplus and Strong, with Lagrange fractional delay and first-order allpass
+dispersion), the topology-preserving filters (V. Zavalishin, "The Art of VA
+Filter Design"), antiderivative anti-aliasing for the wavefolder and the
+shapers (J. D. Parker, V. Zavalishin and E. Le Bivic, 2016) and the
+Kaiser-windowed halfband of the 2x drive. klaine/amino and klaine/bizar were
+read for reference; no code is taken from them.

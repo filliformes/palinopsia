@@ -1416,7 +1416,32 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   fxDelay: { min: 0, max: 1, def: 0.35 },
   // the key sequencer's Every on its slider's log map (0 = 250 ms, 1 = 5 min;
   // the default 0.42 is 5 s) : a swing moves it by ratios, as the ear hears time
-  keyEvery: { min: 0, max: 1, def: 0.4225 }
+  keyEvery: { min: 0, max: 1, def: 0.4225 },
+  // the Synth (synthPlay.ts) : its sound and gain (the worklet's engine), the
+  // PICTURE amount and the sense (the play side), the patchbay depths
+  synthTimbre: { min: 0, max: 1, def: 0.5 },
+  synthHarmonics: { min: 0, max: 1, def: 0.3 },
+  synthMorph: { min: 0, max: 1, def: 0 },
+  synthCutoff: { min: 0, max: 1, def: 0.6 },
+  synthReso: { min: 0, max: 1, def: 0.25 },
+  synthDrive: { min: 0, max: 1, def: 0.15 },
+  synthEnvAmt: { min: -1, max: 1, def: 0.3 },
+  synthGlide: { min: 0, max: 1, def: 0.1 },
+  synthDrift: { min: 0, max: 1, def: 0.2 },
+  synthLevel: { min: 0, max: 1, def: 0.7 },
+  synthGain: { min: 0, max: 1, def: 0.7 },
+  synthPicture: { min: 0, max: 1, def: 0.8 },
+  synthSens: { min: 0, max: 1, def: 0.5 },
+  synthDVel: { min: -1, max: 1, def: 0.8 },
+  synthDTimbre: { min: -1, max: 1, def: 0.5 },
+  synthDHarm: { min: -1, max: 1, def: 0.5 },
+  synthDMorph: { min: -1, max: 1, def: 0.4 },
+  synthDCutoff: { min: -1, max: 1, def: 0.6 },
+  synthDReso: { min: -1, max: 1, def: 0.3 },
+  synthDDrive: { min: -1, max: 1, def: 0.3 },
+  synthDEnv: { min: -1, max: 1, def: -0.7 },
+  synthDPan: { min: -1, max: 1, def: 0.8 },
+  synthDBend: { min: -1, max: 1, def: 0.2 }
 }
 // Space : each voice's place (space.<voice>.<field>), in the same overlay. The
 // space engine reads the values and registers the bases (store.space).
