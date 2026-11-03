@@ -124,8 +124,9 @@ export function ModulationPanel(): JSX.Element {
 }
 
 // What moves the Macro knobs on its own : knobs a modulator drives (while
-// modulation is live), knobs on a MIDI CC, pads that fire a knob action and
-// Body rules that do. OSC and dataflou are not counted (nothing to read ahead).
+// modulation is live), knobs on a MIDI CC or a learned OSC control, pads that
+// fire a knob action and Body rules that do. /opsia OSC and dataflou are not
+// counted (nothing to read ahead).
 function macroDrivers(s: ReturnType<typeof useStore.getState>): { mod: number; cc: number; pads: number; rules: number } {
   const isKnobAction = (id: string): boolean => id.startsWith('act:meta:') || id === 'rand:meta'
   const modKnobs = new Set<number>()
@@ -133,8 +134,8 @@ function macroDrivers(s: ReturnType<typeof useStore.getState>): { mod: number; c
   const body = s.bodyControl
   return {
     mod: modKnobs.size,
-    cc: s.composition.metaKnobs.filter((k) => k.midiCc).length,
-    pads: Object.keys(s.midiMap).filter(isKnobAction).length,
+    cc: s.composition.metaKnobs.filter((k, i) => k.midiCc || s.oscMap[`meta:${i}`] || s.sessionOscMap[`meta:${i}`]).length,
+    pads: [s.midiMap, s.sessionMidiMap, s.oscMap, s.sessionOscMap].reduce((n, m) => n + Object.keys(m).filter(isKnobAction).length, 0),
     rules: body.enabled ? body.rules.filter((r) => r.enabled && isKnobAction(r.action)).length : 0
   }
 }
@@ -148,8 +149,8 @@ function MacroToggle(): JSX.Element {
   const d = useStore(useShallow(macroDrivers))
   const why = [
     d.mod && `${d.mod} knob${d.mod > 1 ? 's' : ''} on a modulator`,
-    d.cc && `${d.cc} on a MIDI CC`,
-    d.pads && `${d.pads} MIDI pad${d.pads > 1 ? 's' : ''}`,
+    d.cc && `${d.cc} on a MIDI CC or an OSC control`,
+    d.pads && `${d.pads} pad${d.pads > 1 ? 's' : ''} (MIDI or OSC)`,
     d.rules && `${d.rules} Body rule${d.rules > 1 ? 's' : ''}`
   ].filter(Boolean)
   const live = !shown && why.length > 0

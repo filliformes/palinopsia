@@ -203,6 +203,12 @@ export function OscPanel(): JSX.Element {
               <span className="text-text">0–1</span> · e.g. <span className="text-text">/opsia/macro/1</span> · OSCQuery{' '}
               <span className="text-text">:{oscPort + 1}</span>
             </div>
+            <div
+              className="font-mono text-[9px] leading-relaxed text-muted"
+              title="Any address outside /opsia (a TouchOSC layout, a Max patch, a phone) : turn on MIDI Learn, click a control, move the controller's. Its mappings, ranges and reply ports are in the MIDI section's list."
+            >
+              any other address : <span className="text-text">OSC Learn</span> (MIDI Learn, then move it)
+            </div>
             {last && oscEnabled && (
               <div className="truncate font-mono text-[9px] text-accent/80" title={last}>
                 last ↙ {last}

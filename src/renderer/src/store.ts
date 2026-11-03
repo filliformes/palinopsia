@@ -32,6 +32,8 @@ import type {
   SourceSlot,
   World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
+import type { MappingScope, OscBinding, SessionMappings } from '@shared/types'
+import { sanitizeMidiMap, sanitizeOscMap, sessionMappingsOut } from './mappingModel'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
@@ -700,15 +702,22 @@ function loadMidiMap(): Record<string, MidiBinding> {
   }
 }
 
-// The MIDI mappings of Body rules that are not there any more (a rule box's
-// `rule:<id>`, an action's `act:rule:<id>:…`) : dropped, the map saved again
-// (`save`). The same map when nothing goes. Rules are keyed by their id, never
-// their place, so deleting or moving another rule never re-targets one.
-function dropRuleBindings(
-  map: Record<string, MidiBinding>,
+// The session's own mappings, from a session file (none in an older file).
+function sessionMapsFrom(m: SessionMappings | undefined): { sessionMidiMap: Record<string, MidiBinding>; sessionOscMap: Record<string, OscBinding> } {
+  return { sessionMidiMap: sanitizeMidiMap(m?.midi), sessionOscMap: sanitizeOscMap(m?.osc) }
+}
+
+// The MIDI (or OSC) mappings of Body rules that are not there any more (a rule
+// box's `rule:<id>`, an action's `act:rule:<id>:…`) : dropped, the map saved
+// again (`save` : its localStorage key). The same map when nothing goes. Rules
+// are keyed by their id, never their place, so deleting or moving another rule
+// never re-targets one. (The session's own mappings keep theirs : a rule not on
+// this computer reads "(gone)" there and does nothing.)
+function dropRuleBindings<B>(
+  map: Record<string, B>,
   rules: ReadonlyArray<{ id: string }>,
-  save = true
-): Record<string, MidiBinding> {
+  save: string | false = 'opsia.midiMap'
+): Record<string, B> {
   const ids = new Set(rules.map((r) => r.id))
   const stale = Object.keys(map).filter((k) => {
     const m = /^(?:rule|act:rule):([^:]+)/.exec(k)
@@ -719,12 +728,50 @@ function dropRuleBindings(
   for (const k of stale) delete out[k]
   if (save) {
     try {
-      localStorage.setItem('opsia.midiMap', JSON.stringify(out))
+      localStorage.setItem(save, JSON.stringify(out))
     } catch {
       /* quota : the next binding saves it */
     }
   }
   return out
+}
+
+// This computer's OSC Learn mappings (the MIDI map's twin, its own key).
+function loadOscMap(): Record<string, OscBinding> {
+  try {
+    const out = sanitizeOscMap(JSON.parse(localStorage.getItem('opsia.oscMap') || '{}'))
+    let rules: Array<{ id: string }> = []
+    try {
+      const saved = JSON.parse(localStorage.getItem('opsia.bodyControl') || '{}')
+      if (Array.isArray(saved.rules)) rules = saved.rules
+    } catch { /* no rules : their mappings go */ }
+    return dropRuleBindings(out, rules, false)
+  } catch {
+    return {}
+  }
+}
+
+function saveMap(key: string, map: object): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(map))
+  } catch {
+    /* quota : the mappings just won't survive the restart */
+  }
+}
+
+// The reply port of each OSC controller (by its IP), per computer.
+function loadOscReplies(): Record<string, { port: number; on: boolean }> {
+  try {
+    const raw = JSON.parse(localStorage.getItem('opsia.oscReplies') || '{}') as Record<string, { port?: unknown; on?: unknown }>
+    const out: Record<string, { port: number; on: boolean }> = {}
+    for (const [host, r] of Object.entries(raw ?? {})) {
+      const port = Number(r?.port)
+      if (host.length <= 64 && Number.isInteger(port) && port >= 0 && port <= 65535) out[host] = { port, on: r?.on !== false }
+    }
+    return out
+  } catch {
+    return {}
+  }
 }
 
 // The last on / off of each Body rule and who made it (setBodyRuleActive) :
@@ -1663,7 +1710,34 @@ interface StoreState {
   setMidiLearnMode: (on: boolean) => void
   setMidiLearnTarget: (t: string | null) => void
   midiMap: Record<string, MidiBinding>
-  setMidiBinding: (id: string, b: MidiBinding | null) => void
+  // `scope` : where the mapping goes (this computer by default, as before)
+  setMidiBinding: (id: string, b: MidiBinding | null, scope?: MappingScope) => void
+  // OSC Learn : the same targets, played by OSC messages outside /opsia
+  // (oscLearn.ts). This computer's, in localStorage like the MIDI map.
+  oscMap: Record<string, OscBinding>
+  setOscBinding: (id: string, b: OscBinding | null, scope?: MappingScope) => void
+  // The session's own mappings (Learn into : this session) : saved in the
+  // session file, brought by a load, emptied by New, kept by Generate (the
+  // same piece, a new look), never touched by scenes. On an input they use,
+  // they silence this computer's mappings (mappings.ts).
+  sessionMidiMap: Record<string, MidiBinding>
+  sessionOscMap: Record<string, OscBinding>
+  // Where Learn puts what it learns (shown beside MIDI Learn while it is on).
+  // Per computer, this computer by default.
+  learnScope: MappingScope
+  setLearnScope: (scope: MappingScope) => void
+  // One mapping to the other scope (an existing one there is replaced).
+  moveMapping: (kind: 'midi' | 'osc', id: string, to: MappingScope) => void
+  // This computer's mappings all into the session / the session's copied here.
+  moveAllMappingsToSession: () => void
+  copySessionMappingsToComputer: () => void
+  // Everything learned on one control : MIDI and OSC, both scopes (the learn
+  // overlay's right-click; a Macro knob's own CC too).
+  clearMappings: (id: string) => void
+  // Learned OSC controls answer their controller (by its IP) on its reply
+  // port : off until a port is set; `on` false turns one controller off.
+  oscReplies: Record<string, { port: number; on: boolean }>
+  setOscReply: (host: string, patch: Partial<{ port: number; on: boolean }> | null) => void
   // Which MIDI input feeds the app ('' = all inputs). Machine-local.
   midiInputName: string
   setMidiInputName: (name: string) => void
@@ -3772,8 +3846,14 @@ export const useStore = create<StoreState>((set, get) => ({
     set(on ? { midiLearnMode: true } : { midiLearnMode: false, midiLearnTarget: null }),
   setMidiLearnTarget: (t) => set({ midiLearnTarget: t }),
   midiMap: loadMidiMap(),
-  setMidiBinding: (id, b) =>
+  setMidiBinding: (id, b, scope = 'computer') =>
     set((s) => {
+      if (scope === 'session') {
+        const sessionMidiMap = { ...s.sessionMidiMap }
+        if (b) sessionMidiMap[id] = b
+        else delete sessionMidiMap[id]
+        return { sessionMidiMap }
+      }
       const midiMap = { ...s.midiMap }
       if (b) midiMap[id] = b
       else delete midiMap[id]
@@ -3783,6 +3863,80 @@ export const useStore = create<StoreState>((set, get) => ({
         /* quota — bindings just won't survive the restart */
       }
       return { midiMap }
+    }),
+  oscMap: loadOscMap(),
+  setOscBinding: (id, b, scope = 'computer') =>
+    set((s) => {
+      if (scope === 'session') {
+        const sessionOscMap = { ...s.sessionOscMap }
+        if (b) sessionOscMap[id] = b
+        else delete sessionOscMap[id]
+        return { sessionOscMap }
+      }
+      const oscMap = { ...s.oscMap }
+      if (b) oscMap[id] = b
+      else delete oscMap[id]
+      saveMap('opsia.oscMap', oscMap)
+      return { oscMap }
+    }),
+  sessionMidiMap: {},
+  sessionOscMap: {},
+  learnScope: localStorage.getItem('opsia.learnScope') === 'session' ? 'session' : 'computer',
+  setLearnScope: (scope) => {
+    localStorage.setItem('opsia.learnScope', scope)
+    set({ learnScope: scope })
+  },
+  moveMapping: (kind, id, to) => {
+    const s = get()
+    if (kind === 'midi') {
+      const b = (to === 'session' ? s.midiMap : s.sessionMidiMap)[id]
+      if (!b) return
+      s.setMidiBinding(id, b, to)
+      s.setMidiBinding(id, null, to === 'session' ? 'computer' : 'session')
+    } else {
+      const b = (to === 'session' ? s.oscMap : s.sessionOscMap)[id]
+      if (!b) return
+      s.setOscBinding(id, b, to)
+      s.setOscBinding(id, null, to === 'session' ? 'computer' : 'session')
+    }
+  },
+  moveAllMappingsToSession: () => {
+    set((s) => {
+      saveMap('opsia.midiMap', {})
+      saveMap('opsia.oscMap', {})
+      return {
+        sessionMidiMap: { ...s.sessionMidiMap, ...s.midiMap },
+        sessionOscMap: { ...s.sessionOscMap, ...s.oscMap },
+        midiMap: {},
+        oscMap: {}
+      }
+    })
+  },
+  copySessionMappingsToComputer: () => {
+    set((s) => {
+      const midiMap = { ...s.midiMap, ...s.sessionMidiMap }
+      const oscMap = { ...s.oscMap, ...s.sessionOscMap }
+      saveMap('opsia.midiMap', midiMap)
+      saveMap('opsia.oscMap', oscMap)
+      return { midiMap, oscMap }
+    })
+  },
+  clearMappings: (id) => {
+    const s = get()
+    if (id.startsWith('meta:') && s.composition.metaKnobs[Number(id.slice(5))]?.midiCc) s.updateMetaKnob(Number(id.slice(5)), { midiCc: null })
+    if (s.midiMap[id]) s.setMidiBinding(id, null, 'computer')
+    if (s.sessionMidiMap[id]) s.setMidiBinding(id, null, 'session')
+    if (s.oscMap[id]) s.setOscBinding(id, null, 'computer')
+    if (s.sessionOscMap[id]) s.setOscBinding(id, null, 'session')
+  },
+  oscReplies: loadOscReplies(),
+  setOscReply: (host, patch) =>
+    set((s) => {
+      const oscReplies = { ...s.oscReplies }
+      if (patch === null) delete oscReplies[host]
+      else oscReplies[host] = { ...(oscReplies[host] ?? { port: 0, on: true }), ...patch }
+      saveMap('opsia.oscReplies', oscReplies)
+      return { oscReplies }
     }),
   midiInputName: localStorage.getItem('opsia.midiInput') ?? '',
   setMidiInputName: (name) => {
@@ -4384,10 +4538,15 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const bodyControl = { ...s.bodyControl, ...partial }
       localStorage.setItem('opsia.bodyControl', JSON.stringify(bodyControl))
-      // a deleted rule takes its MIDI mappings with it
+      // a deleted rule takes this computer's MIDI and OSC mappings with it
       const midiMap = partial.rules ? dropRuleBindings(s.midiMap, bodyControl.rules) : s.midiMap
+      const oscMap = partial.rules ? dropRuleBindings(s.oscMap, bodyControl.rules, 'opsia.oscMap') : s.oscMap
       // pushed to the tracker by an App effect watching it
-      return midiMap === s.midiMap ? { bodyControl } : { bodyControl, midiMap }
+      return {
+        bodyControl,
+        ...(midiMap === s.midiMap ? {} : { midiMap }),
+        ...(oscMap === s.oscMap ? {} : { oscMap })
+      }
     }),
   setBodyRuleActive: (id, on, source) => {
     const rules = get().bodyControl.rules
@@ -5636,6 +5795,9 @@ export const useStore = create<StoreState>((set, get) => ({
         // and an empty Audio Layer (a live input it had closes)
         audioLayer: defaultAudioLayer(),
         audioLayerArmed: NOT_ARMED,
+        // no mappings of its own (this computer's keep playing)
+        sessionMidiMap: {},
+        sessionOscMap: {},
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -5704,6 +5866,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // brings no sound of its own there.
         audioLayer: defaultAudioLayer(),
         audioLayerArmed: NOT_ARMED,
+        // (the session's own MIDI / OSC mappings stay : the same piece, a new look)
         // Reset the draw-sequencer gesture (as newSession does) so a stale path
         // can't export into the generated session and reactivate.
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -5775,6 +5938,9 @@ export const useStore = create<StoreState>((set, get) => ({
       // what the session holds persistent (none in an older file)
       // (a pin on the gone gate hair holds nothing : dropped)
       pins: Array.isArray(s.pins) ? [...new Set(s.pins.filter((k): k is string => typeof k === 'string' && !/^fx:master:[^:]+:filmHair$/.test(k)))] : [],
+      // its own MIDI / OSC mappings, in place of the last session's (none in
+      // an older file); this computer's stay as they are
+      ...sessionMapsFrom(s.mappings),
       variationBaseline: null,
       // The old selection can dangle onto an FX unit the loaded session lacks, and
       // the old palette name no longer describes it : reset both (as newSession does).
@@ -5924,6 +6090,9 @@ export const useStore = create<StoreState>((set, get) => ({
       })(),
       audioLayer: s.audioLayer,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
+      // its own MIDI / OSC mappings, only when it has some (a session without
+      // any is written as before, byte for byte)
+      ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap)),
       ui: { theme: s.theme }
     }
   }

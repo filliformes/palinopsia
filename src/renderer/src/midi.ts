@@ -14,8 +14,12 @@
 //   scenes, Vary, Randomize and the Sonify toggle on the press edge only.
 //
 // Meta-knob CC bindings live in the session (composition.metaKnobs[i].midiCc);
-// everything else is machine-local in store.midiMap (localStorage), keyed by
-// the target ids below.
+// everything else is in store.midiMap, keyed by the target ids below : this
+// computer's (localStorage), or the session's own (store.sessionMidiMap, its
+// file) when Learn into says this session. On an input the session uses, its
+// mappings silence this computer's (midiTargetsFor). OSC Learn plays the same
+// targets from OSC messages outside /opsia (oscLearn.ts) : the setters below
+// (applyContinuous, fireTrigger) are shared.
 
 import type { MidiBinding } from '@shared/types'
 import { BG_SPEED_MAX } from '@shared/types'
@@ -23,7 +27,9 @@ import {
   fireSelectedRandomize, fireVariation, firePanic, fireFreeze, fireRecordToggle,
   fireInspectorRandomize, fireNewSession, fireLoadSession, fireOpenSession
 } from './commands'
-import { setKnobTarget, shuffleMetaValues } from './metaSmooth'
+import { knobTargetValue, setKnobTarget, shuffleMetaValues } from './metaSmooth'
+import { liveModValues, metaLiveValues } from './engine/modulation'
+import { sameMidiInput } from './mappingModel'
 import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
 import { useStore } from './store'
@@ -633,7 +639,9 @@ class MidiManager {
     }
 
     // Global MIDI Learn : bind the selected target, stay in learn mode so
-    // the next control can be mapped straight away (dataFLOU behaviour).
+    // the next control can be mapped straight away (dataFLOU behaviour). The
+    // mapping goes where Learn into says (this computer or this session); a
+    // Macro knob's CC stays on the knob itself, as it always did.
     if (st.midiLearnMode && st.midiLearnTarget) {
       const target = st.midiLearnTarget
       // Continuous targets are CC-only — ignore pad hits so the user can
@@ -642,7 +650,7 @@ class MidiManager {
       if (target.startsWith('meta:')) {
         st.updateMetaKnob(Number(target.slice(5)), { midiCc: { channel, number } })
       } else {
-        st.setMidiBinding(target, binding)
+        st.setMidiBinding(target, binding, st.learnScope)
       }
       st.setMidiLearnTarget(null)
       return
@@ -654,6 +662,9 @@ class MidiManager {
     // ── Normal routing (ONE-TO-MANY) ────────────────────────────────────
     // The SAME binding may drive several targets at once, so every match is
     // applied — no early return per hit. Meta knobs go through the smoother.
+    // The targets : the session's mappings on this input when it has any (a
+    // piece's own setup wins for the inputs it uses), else this computer's.
+    const ids = midiTargetsFor(binding)
     if (binding.kind === 'cc') {
       const t = value / 127
       let ccHandled = false
@@ -665,45 +676,11 @@ class MidiManager {
           ccHandled = true
         }
       }
-      // Transport continuous controls — each mirrors its slider's mapping.
-      const map = st.midiMap
-      if (matches(map['transport:bpm'], binding)) {
-        useStore.setState((s) => ({ composition: { ...s.composition, bpm: Math.round(40 + t * 200) } }))
-        tempoEdited(Math.round(40 + t * 200))
-        ccHandled = true
-      }
-      if (matches(map['transport:speed'], binding)) { st.setGlobalSpeed(Math.pow(2, -6 + t * 12)); ccHandled = true }
-      if (matches(map['transport:morph'], binding)) { st.setMorphMs(Math.round(Math.pow(t, MORPH_POW) * 30000)); ccHandled = true }
-      if (matches(map['transport:prox'], binding)) { st.setProximity(t); ccHandled = true }
-      // Field macros / temperament (the "feel" dials — not mod-matrix targets).
-      for (const fid in FIELD_SETTERS) {
-        if (matches(map[fid], binding)) { FIELD_SETTERS[fid](t); ccHandled = true }
-      }
-      // Per-layer A↔B crossfade (source mix) + layer opacity.
-      for (let i = 0; i < st.composition.layers.length; i++) {
-        if (matches(map[`layer:${i}:mix`], binding)) { st.setSourceMix(i, t); ccHandled = true }
-        if (matches(map[`layer:${i}:harmony`], binding)) { st.setHarmony(i, t * 2 - 1); ccHandled = true }
-        if (matches(map[`layer:${i}:opacity`], binding)) { st.setOpacity(i, t); ccHandled = true }
-      }
-      if (matches(map['bg:opacity'], binding)) { st.setBackgroundOpacity(t); ccHandled = true }
-      if (matches(map['bg:speed'], binding)) { st.setBackgroundSpeed(t * BG_SPEED_MAX); ccHandled = true }
-      if (matches(map['bg:depth'], binding)) { st.setBackgroundDepth(t); ccHandled = true }
-      // Metasurface cursor (activates the surface; needs ≥2 placed scenes).
-      if (matches(map['surface:x'], binding)) {
-        st.setSurfaceXY(t, st.surface.y)
-        if (!st.surface.active) st.setSurfaceActive(true)
-        ccHandled = true
-      }
-      if (matches(map['surface:y'], binding)) {
-        st.setSurfaceXY(st.surface.x, t)
-        if (!st.surface.active) st.setSurfaceActive(true)
-        ccHandled = true
-      }
-      if (matches(map['sonify:master'], binding)) { st.setSonify({ ...st.sonify, master: t }); ccHandled = true }
-      // A Body rule's box on a knob or a latching button : on from 64, off below
-      // (the release of a momentary button turns it off again)
-      for (const r of st.bodyControl.rules) {
-        if (matches(map[`rule:${r.id}`], binding)) { st.setBodyRuleActive(r.id, value >= 64, 'midi'); ccHandled = true }
+      for (const id of ids) {
+        // A Body rule's box on a knob or a latching button : on from 64, off below
+        // (the release of a momentary button turns it off again)
+        if (id.startsWith('rule:')) { st.setBodyRuleActive(id.slice(5), value >= 64, 'midi'); ccHandled = true; continue }
+        if (isContinuousTarget(id)) { applyContinuous(id, t); ccHandled = true }
       }
       // A CC used as a continuous control never also fires a trigger bound to
       // the same number.
@@ -714,15 +691,12 @@ class MidiManager {
     // or a zero-velocity note-off must not double-fire. Every matching trigger
     // fires — one pad can drive several actions.
     if (value <= 0) return
-    const map = st.midiMap
     // One pad can drive several actions : every matching DISCRETE binding fires,
-    // through the shared fireTrigger (same path as a body gesture). Iterating the
-    // whole map (minus continuous targets, handled above) means any learnable
-    // trigger — fire:*, scene:*, sonify:voice:*, and every rand:* dice — works
-    // without being listed here.
-    for (const id in map) {
+    // through the shared fireTrigger (same path as a body gesture). Any
+    // learnable trigger — fire:*, scene:*, sonify:voice:*, and every rand:*
+    // dice — works without being listed here.
+    for (const id of ids) {
       if (isContinuousTarget(id)) continue
-      if (!matches(map[id], binding)) continue
       // a Body rule's box on a pad : each hit turns it on or off (its CC above)
       if (id.startsWith('rule:')) { if (binding.kind === 'note') st.setBodyRuleActive(id.slice(5), 'toggle', 'midi'); continue }
       fireTrigger(id)
@@ -730,9 +704,127 @@ class MidiManager {
   }
 }
 
-function matches(a: MidiBinding | undefined, b: MidiBinding): boolean {
-  if (!a) return false
-  return a.kind === b.kind && a.channel === b.channel && a.number === b.number
+/** The targets a MIDI input plays : the session's mappings on it when it has
+ *  any (they silence this computer's on THAT input only), else this
+ *  computer's. (A Macro knob's CC, on the knob, is not in either map.) */
+export function midiTargetsFor(b: MidiBinding): string[] {
+  const st = useStore.getState()
+  const pick = (map: Record<string, MidiBinding>): string[] => {
+    const out: string[] = []
+    for (const id in map) if (sameMidiInput(map[id], b)) out.push(id)
+    return out
+  }
+  const own = pick(st.sessionMidiMap)
+  return own.length ? own : pick(st.midiMap)
+}
+
+/** A computer mapping a session mapping silences (the same input). */
+export function midiSilenced(b: MidiBinding): boolean {
+  const map = useStore.getState().sessionMidiMap
+  for (const id in map) if (sameMidiInput(map[id], b)) return true
+  return false
+}
+
+// ── Continuous targets : one place sets them, one place reads them ──────
+// MIDI (a CC, 0..127 as 0..1) and OSC Learn (the controller's range as 0..1)
+// both land here, so a learned control and its /opsia twin write the same
+// store action (last message wins, like MIDI and the mouse).
+
+/** Set a continuous target from a 0..1 position (each mirrors its slider's
+ *  mapping). False when the id is not one (or its thing is gone). */
+export function applyContinuous(id: string, t: number): boolean {
+  const st = useStore.getState()
+  if (id.startsWith('meta:')) {
+    const i = Number(id.slice(5))
+    const knob = st.composition.metaKnobs[i]
+    if (!knob) return false
+    setKnobTarget(i, t, knob.smoothMs)
+    return true
+  }
+  if (id in FIELD_SETTERS) { FIELD_SETTERS[id](t); return true }
+  const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
+  if (lm) {
+    const i = Number(lm[1])
+    if (!st.composition.layers[i]) return false
+    if (lm[2] === 'mix') st.setSourceMix(i, t)
+    else if (lm[2] === 'harmony') st.setHarmony(i, t * 2 - 1)
+    else st.setOpacity(i, t)
+    return true
+  }
+  switch (id) {
+    case 'transport:bpm': {
+      const bpm = Math.round(40 + t * 200)
+      useStore.setState((s) => ({ composition: { ...s.composition, bpm } }))
+      tempoEdited(bpm)
+      return true
+    }
+    case 'transport:speed': st.setGlobalSpeed(Math.pow(2, -6 + t * 12)); return true
+    case 'transport:morph': st.setMorphMs(Math.round(Math.pow(t, MORPH_POW) * 30000)); return true
+    case 'transport:prox': st.setProximity(t); return true
+    case 'bg:opacity': st.setBackgroundOpacity(t); return true
+    case 'bg:speed': st.setBackgroundSpeed(t * BG_SPEED_MAX); return true
+    case 'bg:depth': st.setBackgroundDepth(t); return true
+    // Metasurface cursor (activates the surface; needs ≥2 placed scenes).
+    case 'surface:x':
+      st.setSurfaceXY(t, st.surface.y)
+      if (!st.surface.active) st.setSurfaceActive(true)
+      return true
+    case 'surface:y':
+      st.setSurfaceXY(st.surface.x, t)
+      if (!st.surface.active) st.setSurfaceActive(true)
+      return true
+    case 'sonify:master': st.setSonify({ ...st.sonify, master: t }); return true
+  }
+  return false
+}
+
+const FIELD_KEYS: Record<string, 'density' | 'gestureTexture' | 'coalesce' | 'tonicity' | 'drift' | 'flow' | 'shutter' | 'superFlicker'> = {
+  'field:density': 'density', 'field:gestureTexture': 'gestureTexture', 'field:coalesce': 'coalesce',
+  'field:tonicity': 'tonicity', 'field:drift': 'drift', 'field:flow': 'flow',
+  'field:shutter': 'shutter', 'field:superFlicker': 'superFlicker'
+}
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : Number.isFinite(v) ? v : 0)
+
+/** Where a continuous target is now, 0..1 (the inverse of applyContinuous) :
+ *  the value playing (a modulator's, a Macro knob gliding to its target), so
+ *  what a learned control answers follows modulators, scenes and Generate.
+ *  A Body rule's box reads 1 on, 0 off. Null for anything without a value. */
+export function readContinuous(id: string): number | null {
+  const st = useStore.getState()
+  if (id.startsWith('meta:')) {
+    const i = Number(id.slice(5))
+    if (!st.composition.metaKnobs[i]) return null
+    return clamp01(metaLiveValues.get(i) ?? knobTargetValue(i))
+  }
+  if (id.startsWith('rule:')) {
+    const r = st.bodyControl.rules.find((x) => x.id === id.slice(5))
+    return r ? (r.enabled ? 1 : 0) : null
+  }
+  const fk = FIELD_KEYS[id]
+  if (fk) return clamp01(st[fk])
+  const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
+  if (lm) {
+    const i = Number(lm[1])
+    const l = st.composition.layers[i]
+    if (!l) return null
+    const live = liveModValues.get(`lay:${i}:${lm[2]}`)
+    if (lm[2] === 'mix') return clamp01(live ?? l.sourceMix)
+    if (lm[2] === 'harmony') return clamp01(((live ?? l.harmony ?? 0) + 1) / 2)
+    return clamp01(live ?? l.opacity)
+  }
+  switch (id) {
+    case 'transport:bpm': return clamp01((st.composition.bpm - 40) / 200)
+    case 'transport:speed': return clamp01((Math.log2(Math.max(1e-6, st.globalSpeed)) + 6) / 12)
+    case 'transport:morph': return clamp01(Math.pow(st.morphMs / 30000, 1 / MORPH_POW))
+    case 'transport:prox': return clamp01(st.proximity)
+    case 'bg:opacity': return clamp01(liveModValues.get('bg:opacity') ?? st.composition.background?.opacity ?? 0)
+    case 'bg:speed': return clamp01((liveModValues.get('bg:speed') ?? st.composition.background?.speed ?? 0) / BG_SPEED_MAX)
+    case 'bg:depth': return clamp01(liveModValues.get('bg:depth') ?? st.composition.background?.depth ?? 0)
+    case 'surface:x': return clamp01(st.surface.x)
+    case 'surface:y': return clamp01(st.surface.y)
+    case 'sonify:master': return clamp01(st.sonify.master)
+  }
+  return null
 }
 
 export const midi = new MidiManager()

@@ -195,6 +195,7 @@
       <li><a href="#vision"><span class="n">12</span><span class="t">Vision</span></a></li>
       <li><a href="#body"><span class="n">13</span><span class="t">Embodied · Body</span></a></li>
       <li><a href="#sync"><span class="n">14</span><span class="t">Discovery &amp; feedback</span></a></li>
+      <li><a href="#learn"><span class="n">15</span><span class="t">OSC Learn</span></a></li>
     </ol>
   </div>
   <p class="none" id="none" hidden>Nothing matches. Esc clears the filter.</p>
@@ -219,7 +220,7 @@
       <div><dt>Point2D</dt><dd>Two normalized args, each scaled to its own axis range.</dd></div>
       <div><dt>Indices</dt><dd>Layers, Macro knobs, scenes, audio bands, Worlds and FX slots count from <code>1</code>, like the UI. Enum indices count from <code>0</code>.</dd></div>
       <div><dt>Tempo</dt><dd><code>/opsia/bpm</code> is sent in BPM, clamped <code>20..800</code>. The few other raw values (seconds, gains, a pan, a count) say so in their row.</dd></div>
-      <div><dt>Outside /opsia</dt><dd>Only <code>/opsia/…</code> plays Opsia. While the Resolume mapper learns, Resolume's own <code>/composition/…</code> messages become its columns; anything else is ignored.</dd></div>
+      <div><dt>Outside /opsia</dt><dd>Any other address is a controller's own : <a href="#learn">OSC Learn</a> learns it and plays what it was learned on (never in place of an <code>/opsia/…</code> address). While the Resolume mapper learns, Resolume's own <code>/composition/…</code> messages become its columns.</dd></div>
     </dl>
   </section>
 
@@ -586,6 +587,55 @@
       <code>osc</code> tool (<code>/opsia/…</code> only; a trigger it sends fires every time). The agent's numbers go as
       0..1 floats, as on the wire, so <code>1</code> is the top of a menu; an int goes only to an index address, or as
       <code>{"int": n}</code>.</p>
+  </section>
+
+  <!-- ── OSC Learn ───────────────────────────────────────── -->
+  <section id="learn">
+    <div class="sec-head">
+      <span class="sec-num">15</span>
+      <h2>OSC Learn</h2>
+      <span class="sec-note">any controller, in its own addresses</span>
+    </div>
+    <p class="blurb">One port, two doors. Every message arrives on the same OSC input port : <code>/opsia/…</code> goes to the
+      map above, exactly as before and also while Learn is on; any other address is a controller's own, learned in
+      MIDI Learn's mode and played through what it was learned on. A learned address never replaces or hides a
+      built-in one, and both may drive the same control : the last message wins.</p>
+    <div class="sync">
+      <div class="card">
+        <h3>Learn</h3>
+        <p>MIDI Learn on, click a control, send from the controller : the first message, MIDI or OSC, binds. Every
+          learnable control learns OSC (Macro knobs, transport, layers, Feel, scenes, rule boxes, the learn list's
+          actions); one address can play several. One number : that value. Several (<code>/accxyz x y z</code>) : the one
+          moved most over 300 ms. Strings are passed over; no value is a press. A stream already flowing at the click
+          waits 1.5 s for anything fresher. Bundles unpacked, no wildcards.</p>
+        <p class="flow">/1/fader3 <span class="a">→</span> Layer 1 opacity</p>
+      </div>
+      <div class="card">
+        <h3>Range</h3>
+        <p>Found from the values : inside <code>0..1</code> (and true / false) → 0..1, inside <code>-1..1</code> with some
+          below 0 → -1..1, whole numbers to 127 → <code>0..127</code>, else the span seen. It widens for 5 s after
+          learning, then is typed per row in the Connect tab's mappings list. Continuous controls get it scaled into
+          their own range; triggers fire going up past the middle (<code>1</code> then <code>0</code> is one press), a
+          rule's box toggles on each press.</p>
+        <p class="flow">i 64 of 0..127 <span class="a">→</span> 0.504</p>
+      </div>
+      <div class="card">
+        <h3>Answers</h3>
+        <p>Give the controller a reply port in the list : its learned controls answer in its own address and range
+          (ints when it sends ints), at the IP it sent from, on change only, at most 30 a second, never the value that
+          just came in (0.3 s after it last moved). The value playing : a modulator's, a scene recall's, Generate's. Off
+          until a port is set; on / off per controller.</p>
+        <p class="flow"><span class="a">Opsia</span> → UDP → controller IP : reply port</p>
+      </div>
+      <div class="card">
+        <h3>This computer · this session</h3>
+        <p>Learn into <b>computer</b> (every session, as before) or <b>session</b> (saved in its file : a piece's own
+          setup; New clears it, Generate keeps it, scenes never touch it). On an address and value the session uses, its
+          mapping stands in for the computer's, there only. Learned addresses are never advertised : OSCQuery and
+          dataflou keep <code>/opsia</code> only.</p>
+        <p class="flow">session <span class="a">&gt;</span> computer, per input</p>
+      </div>
+    </div>
   </section>
 
   <footer>

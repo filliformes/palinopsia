@@ -11,6 +11,7 @@ export type OscInMessage = {
   timestamp: number
   address: string
   args: Array<{ type: string; value: number | string | boolean }>
+  host?: string // the sender's IP (OSC Learn answers learned controls there)
 }
 
 export class OscReceiver {
@@ -48,14 +49,17 @@ export class OscReceiver {
         // Post-ready errors are almost always a single malformed packet —
         // swallow them so one bad sender can't take the listener down.
       })
-      udp.on('message', (msg) => {
+      // (a bundle arrives here message by message : osc.js unpacks it)
+      udp.on('message', (msg, _timeTag, info) => {
         // Ignore anything from a socket we've since stopped or replaced.
         if (this.udp !== udp) return
         const m = msg as osc.OscMessage
         if (!this.onMessage || !m || typeof m.address !== 'string') return
+        const from = (info as { address?: unknown } | undefined)?.address
         this.onMessage({
           timestamp: Date.now(),
           address: m.address,
+          ...(typeof from === 'string' ? { host: from } : {}),
           args: (m.args ?? []).map((a) => ({
             type: String(a.type),
             value: (a.value as number | string | boolean) ?? 0

@@ -15,6 +15,73 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **OSC Learn, and MIDI / OSC mappings saved in the session** (Vincent : "yes build OSC
+  learn this way" and "I'd also like the option to be able to save learned MIDI and OSC
+  in the session, if i'm working on a piece which needs a custom setup specially for a
+  certain session and not another one"). **One port, two doors** : every message still
+  arrives on the OSC input port; `oscInput.ts route()` keeps `/opsia/…` (and Resolume's
+  `/composition/…`) exactly as before, and hands every other address to
+  `renderer/src/oscLearn.ts` (`oscLearn.handle(address, args, host)`, where it used to
+  drop them). So a learned address can never replace or hide a built-in one, `/opsia`
+  keeps playing while Learn is armed, and a learned `/1/fader3` and its
+  `/opsia/layer1/opacity` twin call the same store action (last message wins).
+  **Learn** reuses MIDI Learn's mode, targets, overlays and ids (`midiLearnMode` /
+  `midiLearnTarget`) : an armed target binds to the first MIDI or non-`/opsia` OSC
+  message, so every learnable control (knobs, rule boxes, scenes, actions from the learn
+  list…) is OSC-learnable. The binding is `OscBinding { kind: 'osc', address, arg, min,
+  max, int?, bool?, host }` (`shared/types.ts`), in `store.oscMap` (localStorage
+  `opsia.oscMap`, the MIDI map's twin). Which value : the only number, else (a 3-value
+  `/accxyz`) the one that moved most over a 300 ms window; strings are passed over, a
+  message with no number is a press. An address still heard 200 ms before the click (an
+  accelerometer left streaming) waits 1.5 s : any fresh address in that time wins. The
+  range is calibrated (`mappingModel.ts calibrate`) : values inside 0..1 (true / false
+  too) → 0..1; inside -1..1 with some below 0 → -1..1; whole numbers to 127 → 0..127;
+  else the span seen with 0 in it; it keeps widening for 5 s after learning
+  (`CALIBRATE_MS`, an int fader first seen at 0 and 1 becomes 0..127) and is typed per
+  row after. Continuous targets get the value scaled in (`midi.ts applyContinuous`, now
+  the one setter MIDI CCs and OSC share); triggers fire on the rising edge past 0.5
+  (re-armed under 0.45 : a 1 then 0 button is one press), a message with no value fires
+  each time, a rule's box toggles on each press. Bundles arrive unpacked (osc.js); no
+  wildcards. The OSC bindings are indexed by address (`Map<address, inputs>`, rebuilt
+  when a map changes) for one lookup per message. **Answers** : a learned control replies
+  in the controller's own address and range (ints when it sends ints, T/F when it sends
+  booleans) to the IP it was learned from (`OscInEvent.host`, new : main's receiver passes
+  osc.js's `rinfo.address`) on a reply port set once per controller (`store.oscReplies`,
+  localStorage `opsia.oscReplies`; off until a port is set, on / off per controller), on
+  change only, at most 30 a second (`ANSWER_HZ`), held off 300 ms after the input last
+  spoke (`HOLD_MS` : never the value that just came in), reading the value PLAYING
+  (`midi.ts readContinuous` : a modulator's live value, a Macro knob's glide target, a
+  rule box's on / off), so a TouchOSC fader follows scene recalls, modulators and Generate.
+  An XY pad's two values answer in one message (`lastArgs`). The `/opsia` feedback,
+  OSCQuery and dataflou are unchanged : learned addresses are the controller's, never
+  advertised. **Where a mapping lives**, for MIDI and OSC : **this computer** (the
+  default, as before : `store.midiMap` / `oscMap` in localStorage) or **this session**
+  (`store.sessionMidiMap` / `sessionOscMap`, the session file's new optional `mappings: {
+  midi?, osc? }`, written only when it holds some : a session without any is the same
+  file byte for byte, measured on a session saved by master). **Learn into** (`store.
+  learnScope`, per computer) : a `computer | session` switch beside MIDI Learn on the top
+  bar and in the MIDI section while Learn is on; each row moves between the two (↑ / ↓),
+  **move all to session** and **copy to computer** on the group headers. A load brings
+  the session's mappings and drops the last session's, New clears them, Generate keeps
+  them (the same piece, a new look), scenes never touch them, Installation mode loads them
+  with the session, autosaves carry them, the session guard sees them (a changed session
+  mapping asks "Save changes?"). **Precedence** : a session mapping on an input (the same
+  channel + CC or note, or the same address + value) silences this computer's mappings on
+  THAT input only (`midi.ts midiTargetsFor`, `oscLearn` index); two session mappings may
+  share an input. The list (the MIDI section, now the MIDI and OSC ledger) groups **this
+  session**, **macro knobs**, **this computer** (silenced rows greyed, "replaced by this
+  session") and **OSC controllers** (each IP, its reply port, on / off), each row tagged
+  MIDI / OSC, OSC rows with the value and an editable range. A session mapping whose
+  target is not here (a Body rule not on this computer) reads "(gone)" and does nothing;
+  a deleted rule takes this computer's MIDI and OSC mappings with it, the session's keep
+  theirs. **The Macro knobs' CCs stay on the knob** (`composition.metaKnobs[i].midiCc` :
+  in the session and its scenes, as before, whatever Learn into says; they take no part
+  in the precedence, so older sessions play as they did); OSC learned on a knob follows
+  Learn into. The learn overlay's green is bound where Learn into points, a dashed green
+  bound only in the other scope; right-click clears all of a control's mappings
+  (`clearMappings`). The Macro row's dot counts OSC-learned knobs and OSC pads. Main
+  changed (the sender's IP) : restart `npm run dev`; a mapping learned before that knows
+  no sender and cannot answer until learned again.
 - **The Body rule timeline counts in minutes and seconds too, and takes exact values**
   (Vincent : "I also need it to not only be tied to bars and beats; I want to be able to
   choose an amount of seconds and minutes each rule will play. make it more precise").

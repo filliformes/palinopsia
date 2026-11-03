@@ -93,6 +93,7 @@
 //   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
 import { resolumeLearn } from './resolume'
+import { oscLearn } from './oscLearn'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
 import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { BG_SOURCES } from './bgPresets'
@@ -295,7 +296,7 @@ export function resetOscEdge(address: string): void {
   edge.delete(address)
 }
 
-function route(address: string, args: Args): void {
+function route(address: string, args: Args, host = ''): void {
   // Resolume's own OSC output (its addresses start /composition) feeds the
   // mapper's LEARN mode : wiggle a control in Resolume and it becomes a column.
   if (address.startsWith('/composition')) {
@@ -303,7 +304,13 @@ function route(address: string, args: Args): void {
     return
   }
   let segs = address.split('/').filter(Boolean)
-  if (segs[0] !== 'opsia') return
+  // Any other address is a controller's own : OSC Learn learns it (Learn on)
+  // or plays what it was learned on (oscLearn.ts). /opsia/… never goes there,
+  // so a learned address can never replace or hide a built-in one.
+  if (segs[0] !== 'opsia') {
+    oscLearn.handle(address, args, host)
+    return
+  }
   const st = useStore.getState()
   const n = firstNum(args)
 
@@ -1166,16 +1173,18 @@ export function initOscInput(): () => void {
   const off = window.api.onOscReceived((batch) => {
     for (const m of batch) {
       try {
-        route(m.address, m.args)
+        route(m.address, m.args, m.host)
       } catch {
         // One malformed/unmapped message must never break the rest of the batch.
       }
     }
   })
   const offShape = watchOscQueryShape()
+  oscLearn.start()
   return () => {
     off()
     offShape()
+    oscLearn.stop()
   }
 }
 

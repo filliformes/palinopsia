@@ -58,7 +58,7 @@ import { MidiLearnOverlay } from './components/MidiLearnOverlay'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
-import { MidiPanel } from './components/MidiPanel'
+import { LearnScopeSwitch, MidiPanel } from './components/MidiPanel'
 import { PerformancePanel } from './components/PerformancePanel'
 import { PictureReadout } from './components/PictureReadout'
 import { DepthMenu } from './components/DepthMenu'
@@ -2265,12 +2265,14 @@ export default function App(): JSX.Element {
           }
           title={
             midiLearnMode
-              ? 'MIDI Learn ON : click a highlighted control, then move a knob / hit a pad to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
-              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads to Macro knobs, transport controls, Vary / Randomize / Sonify and scenes.'
+              ? 'MIDI Learn ON : click a highlighted control, then move a knob / hit a pad, or move a control on an OSC controller (any address outside /opsia), to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
+              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads, and OSC controllers in their own addresses (OSC Learn), to Macro knobs, transport controls, Vary / Randomize / Sonify and scenes.'
           }
         >
           MIDI<span className="tb-long"> Learn</span>
         </button>
+        {/* while it is on : where what it learns goes (this computer / this session) */}
+        {midiLearnMode && <LearnScopeSwitch short />}
         <RecPill />
         <AgentBadge />
         <UndoButtons />
