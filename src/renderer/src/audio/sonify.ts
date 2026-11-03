@@ -320,7 +320,8 @@ export function defaultSoniConfig(): SoniConfig {
       accent: 0.4, tape: true
     },
     fx: {
-      send: 0,
+      // on, low : a touch of room on everything from the first sound
+      send: 0.05,
       dlyMix: 0.35, dlyTime: 0.3, dlyFb: 0.35, dlyTone: 0.5, dlyMode: 1,
       rvMode: 0, rvMix: 0.6, rvSize: 0.6, rvDecay: 0.6, rvDamp: 0.3, rvPre: 20, rvMod: 6, rvModRate: 0.5,
       rvWidth: 1, rvLocut: 220, rvFreeze: false, rvDiff: 0.85, rvLowDamp: 0.5,

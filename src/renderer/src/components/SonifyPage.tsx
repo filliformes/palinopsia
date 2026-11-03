@@ -1351,7 +1351,7 @@ export function SonifyPage({
                 on={cfg.fx.send > 0}
                 open
               >
-                <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} title="How much of the whole Sonify mix feeds the shared delay and reverb (the FX tail)" />
+                <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.05} onChange={(v) => pfx({ send: v })} title="How much of the whole Sonify mix feeds the shared delay and reverb (the FX tail)" />
                 <Slider label="delay" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} title="How loud the delay is in the FX tail" />
                 <Slider label="reverb" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} title="How loud the reverb is in the FX tail" />
               </Shell>
@@ -2061,9 +2061,9 @@ export function SonifyPage({
           <VoiceShell
             title="Reverb / Delay" on={cfg.fx.send > 0.0001}
             hint="a shared FX tail : the whole mix sends into an analog delay → Quartz/Prism reverb"
-            onToggle={() => pfx({ send: cfg.fx.send > 0.0001 ? 0 : 0.35 })}
+            onToggle={() => pfx({ send: cfg.fx.send > 0.0001 ? 0 : 0.05 })}
           >
-            <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ send: v })} mod={chip('fxSend')} title="How much of the sonify mix feeds the shared reverb / delay tail" />
+            <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.05} onChange={(v) => pfx({ send: v })} mod={chip('fxSend')} title="How much of the sonify mix feeds the shared reverb / delay tail" />
             <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">delay (BBD / analog)</div>
             <Row label="mode">
               <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.fx.dlyMode} onChange={(e) => pfx({ dlyMode: Number(e.target.value) })} title="Delay routing">

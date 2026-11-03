@@ -2086,7 +2086,8 @@ the app). It is never remembered : the next time, Sonify opens in the app.
 
 **Shared FX tail : Reverb / Delay** : one **send** feeds the whole mix into an
 analog **BBD delay** → a high-quality **reverb**, returned to the master (the tail
-rings out when you pull the send back). Both are ported from the Essaim / Res
+rings out when you pull the send back; it starts on, the send at a low **0.05**).
+Both are ported from the Essaim / Res
 instruments. The delay is bucket-brigade: tape-glided **time**, **feedback**,
 BBD **tone** (dark analog repeats ↔ bright) with wow/flutter, mono / stereo /
 ping-pong. The reverb is a modulated 8-line FDN with two colourings : **Quartz**
