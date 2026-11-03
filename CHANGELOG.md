@@ -15,6 +15,41 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Signal's Picture Play** (Vincent : "update Signal so that it can be played like
+  Synth, in the same principles" · "I don't want it to sound really different : I just
+  want to be able to drive it with the visuals' parameters like Synth : movement,
+  brightness, etc. Make this an option, so the old ''read head'' behaviour can be still
+  accessible" · notes : "A switch for both" · the 10th row : Chance). Signal's card has a
+  **PLAY** switch, READ HEADS (as it was, the default : old sessions unchanged) or
+  PICTURE PLAY. `audio/signalPlay.ts` : Signal's own `SynthPlayer` (the Synth's finder
+  and tracker, its own instance) through an adapter (`signalPlayerCfg` : the read
+  height / keyboard / radial, sense, PICTURE, eight rows in the Synth's slots 0..7, poly,
+  free grid, no slide), `signalHit` (a thing's mods → the hit : decay, tone and fm around
+  their knobs, the wave stepped from the one picked by up to four, the rate a power of
+  two 1/4..4, pan from the row or else x, chance, the held level), the default rows
+  (speed → velocity, size → decay, brightness → tone, texture → fm, speed → rate, x →
+  pan) and the section's dice (`randomSignalPatchbay`). `sonify.ts
+  analyzeSignalPicture` : pitch = the thing's scale note, SNAP blending in the free
+  frequency at its place; STRIKE ticks on Signal's clock in quarter steps (the clock is
+  now one `signalClock` both ways share), each thing from the quarter step after it
+  appears, every 1/2/4/8/16 quarters by its rate row, each tick by its chance row; free,
+  a new thing also strikes at once (synced it waits for the grid). TIE : a held grain per
+  thing, re-struck at each new scale note, let go when it stops; every frame its pitch,
+  level, pan, tone and fm follow. A change of tap, source, read or STRIKE ↔ TIE, Signal
+  off, back to the heads or Sonify off lets every hold go (`{t:'sigpp', all}`). Worklet :
+  a `sigpp` message (hits [t, freq, amp, pan, wave, decay, tone, fm, holdId], `off`,
+  `set`); every grain now carries its own wave, length, tone and fm (a read head's takes
+  the knobs at its strike, as before), a held grain keeps its envelope (pip / ping wait
+  at the window's peak), is the last to be stolen, and lets go by itself after 1.5 s
+  without word from its thing. OSC `/opsia/sonify/signal/{play,pmode,tie,sens,picture}`
+  and `/patch/<row>/{source,depth}` (OSCQuery too); the voice's dice rolls the Picture
+  Play read when it is on (the rows and PLAY stay). Checked in the test copy (moving
+  particles, Signal alone) : the heads as before (144 grains in 3 s), STRIKE 158 hits in
+  4 s free and 106 in 3 s synced (pitch 294 Hz .. 6.3 kHz by height, pan by x), the wave
+  row spreading hits over seven waves, TIE 119 holds each let go at its next strike with
+  669 follow-ups; a frozen picture silent within 0.5 s (damped and held pip), TIE off,
+  Signal off and back to the heads each one all-off, no hold left; the card fits its
+  column, no errors.
 - **Init, Generate's first entry** (Vincent : "Make the most basic, totally blank, INIT
   session, with a set of 8 basic modulators, so the least experienced user can start from
   there and not be confused. Put this in Generate, as the FIRST option on the list").
