@@ -1367,6 +1367,13 @@ input[type='range'].live-overlay {
   background: rgba(80, 210, 130, 0.3);
   box-shadow: 0 0 0 1px rgba(80, 210, 130, 0.7) inset;
 }
+/* bound only in the other scope than Learn into (this computer / this session) */
+.midi-learn-other {
+  background: rgba(80, 210, 130, 0.12);
+  box-shadow: none;
+  outline: 1px dashed rgba(80, 210, 130, 0.85);
+  outline-offset: -1px;
+}
 @keyframes midi-learn-pulse {
   from {
     box-shadow: 0 0 0 1px rgba(90, 150, 255, 0.5) inset;

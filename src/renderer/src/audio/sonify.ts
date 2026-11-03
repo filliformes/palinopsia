@@ -565,6 +565,31 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
   }
 }
 
+/** One sonify mod-param's value in a config (REAL units, the inverse of
+ *  withSonifyParam) : the mod-matrix's base, and what a learned MIDI / OSC
+ *  control answers. Undefined for a param the config does not hold. */
+export function sonifyParamOf(c: SoniConfig, param: string): number | undefined {
+  const simple = SONI_SIMPLE_MODS[param]
+  if (simple) { const [voice, field] = simple; return (c[voice] as unknown as Record<string, number> | undefined)?.[field] }
+  switch (param) {
+    case 'spectraX': return c.spectra.x
+    case 'filterX': return c.filter.x
+    case 'orbitX': return c.orbit.cx
+    case 'orbitY': return c.orbit.cy
+    case 'orbitR': return c.orbit.rx
+    case 'orbitPitch': return c.orbit.quantize ? c.orbit.note : freqNote(c.orbit.freq)
+    case 'rasterX': return c.raster.rx
+    case 'rasterY': return c.raster.ry
+    case 'rasterW': return c.raster.rw
+    case 'rasterH': return c.raster.rh
+    case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
+    default: {
+      const row = (SYNTH_DEPTH_PARAMS as readonly string[]).indexOf(param)
+      return row >= 0 ? c.synth?.patch?.[row]?.depth : undefined
+    }
+  }
+}
+
 /** Where the scanning voices really are, from the worklet (~10 Hz) : positions
  *  0..1 and their effective rates (cycles/s, sync and modulation included), so
  *  the page's overlay draws what you hear. */
@@ -778,28 +803,7 @@ class SonifyEngine {
 
   constructor() {
     // The mod-matrix swings around each param's BASE : the current config.
-    registerSonifyModBase((param) => {
-      const c = this.cfg
-      const simple = SONI_SIMPLE_MODS[param]
-      if (simple) { const [voice, field] = simple; return (c[voice] as unknown as Record<string, number>)[field] }
-      switch (param) {
-        case 'spectraX': return c.spectra.x
-        case 'filterX': return c.filter.x
-        case 'orbitX': return c.orbit.cx
-        case 'orbitY': return c.orbit.cy
-        case 'orbitR': return c.orbit.rx
-        case 'orbitPitch': return c.orbit.quantize ? c.orbit.note : freqNote(c.orbit.freq)
-        case 'rasterX': return c.raster.rx
-        case 'rasterY': return c.raster.ry
-        case 'rasterW': return c.raster.rw
-        case 'rasterH': return c.raster.rh
-        case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
-        default: {
-          const row = (SYNTH_DEPTH_PARAMS as readonly string[]).indexOf(param)
-          return row >= 0 ? c.synth?.patch?.[row]?.depth : undefined
-        }
-      }
-    })
+    registerSonifyModBase((param) => sonifyParamOf(this.cfg, param))
   }
 
   isRunning(): boolean { return !!this.node }

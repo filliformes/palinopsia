@@ -18,6 +18,7 @@ import {
 import { LiveNum, Row, Seg, chip as chipCls } from './sonifyUi'
 import { modTargetKey } from '../store'
 import type { SliderProps } from './SonifyPage'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const ENGINE_HINT: Record<string, string> = {
   dco: 'DCO : two digital oscillators, their wave, density then interval, sync up to a metallic edge',
@@ -101,14 +102,18 @@ export function SynthCard({ cfg, set, chip, assignBox, Slider, tap }: {
           >
             {SYNTH_SRCS.map((x) => <option key={x} value={x} title={SYNTH_SRC_HINT[x]}>{SRC_LABEL[x]}</option>)}
           </select>
-          <input
-            type="range" min={-1} max={1} step={0.01} value={row.depth}
-            onChange={(e) => setRow({ depth: Number(e.target.value) })}
-            onDoubleClick={() => setRow({ depth: 0 })}
-            disabled={row.src === 'none'}
-            className="min-w-0 flex-1 accent-accent disabled:opacity-40"
-            title={title}
-          />
+          {/* (a MIDI knob or an OSC fader learns it : sonify:param:<its depth>) */}
+          <span className="relative flex min-w-0 flex-1">
+            <MidiLearnOverlay id={midi(param)} />
+            <input
+              type="range" min={-1} max={1} step={0.01} value={row.depth}
+              onChange={(e) => setRow({ depth: Number(e.target.value) })}
+              onDoubleClick={() => setRow({ depth: 0 })}
+              disabled={row.src === 'none'}
+              className="min-w-0 flex-1 accent-accent disabled:opacity-40"
+              title={title}
+            />
+          </span>
           <LiveNum liveKey={modTargetKey({ kind: 'sonify', param })} value={row.depth} fmt={pm} className="w-8 shrink-0 text-right font-mono text-[9px] text-muted" />
           {chip(param)}
         </div>

@@ -57,6 +57,14 @@ export function knobDisplayValue(i: number): number {
   return knobDisplay[i] ?? useStore.getState().composition.metaKnobs[i]?.value ?? 0
 }
 
+/** Where knob i is going : the end of its glide, else where it is. (A learned
+ *  OSC control answers with this, so a fader that set the glide never sees it
+ *  run back through the glide's way.) */
+export function knobTargetValue(i: number): number {
+  // (at rest : the committed value, which a scene recall or a Generate moves)
+  return tweens[i]?.to ?? metaGlides.get(i) ?? useStore.getState().composition.metaKnobs[i]?.value ?? 0
+}
+
 export function subscribeKnobDisplay(cb: () => void): () => void {
   listeners.add(cb)
   return () => listeners.delete(cb)

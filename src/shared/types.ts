@@ -956,6 +956,32 @@ export interface MidiBinding {
   number: number // CC# or note#
 }
 
+// A control learned from an OSC message outside /opsia (OSC Learn : a TouchOSC
+// fader, a Max patch, a phone's sensors). The message's address and which of
+// its values it reads; the range that value moves over on the controller
+// (calibrated at learn, editable), and who sent it : answers go back there, in
+// the controller's own address and range.
+export interface OscBinding {
+  kind: 'osc'
+  address: string // '/1/fader3' : never /opsia/… (the built-in door)
+  arg: number // 0-based; a message with no number there is a press
+  min: number
+  max: number
+  int?: boolean // the controller sends whole numbers : answers go back as ints
+  bool?: boolean // ... or true / false
+  host: string // the sender's IP when it was learned ('' : unknown)
+}
+
+// Where a mapping lives : this computer (localStorage, every session) or this
+// session (its file : a piece's own controller setup).
+export type MappingScope = 'computer' | 'session'
+
+// A session's own MIDI and OSC mappings (target id → binding).
+export interface SessionMappings {
+  midi?: Record<string, MidiBinding>
+  osc?: Record<string, OscBinding>
+}
+
 export interface MetaKnobState {
   name: string
   value: number // committed 0..1 position
@@ -1293,6 +1319,10 @@ export interface Session {
   // Generate's Density no longer follows you into every session after. Absent
   // (an older file) : neutral. Shutter and Superimposition stay out (strobes).
   feel?: { density: number; gestureTexture: number; coalesce: number; tonicity: number; drift: number; flow: number }
+  // The session's own MIDI and OSC mappings (Learn into : this session) : a
+  // piece's custom controller setup. On an input it uses, it silences this
+  // computer's mappings. Absent (no session mapping, every older file) : none.
+  mappings?: SessionMappings
   // Opaque renderer UI snapshot (theme, panel sizes, selection). The main
   // process never inspects it : it just round-trips it to disk.
   ui?: unknown
@@ -1304,6 +1334,8 @@ export interface OscInEvent {
   timestamp: number
   address: string
   args: Array<{ type: string; value: number | string | boolean }>
+  // the sender's IP (OSC Learn records it : learned controls answer there)
+  host?: string
 }
 
 export interface OscListenResult {

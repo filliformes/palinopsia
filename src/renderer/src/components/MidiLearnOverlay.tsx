@@ -4,40 +4,63 @@
 // dataFLOU's (whose targets are buttons that check learn mode themselves),
 // this overlay CAPTURES the click : most Palinopsia targets are sliders and
 // knobs, and a click meant to arm a binding must not also drag the value.
-// Right-click clears an existing binding.
+// Right-click clears everything learned on the control.
+//
+// The same overlay learns OSC (oscLearn.ts) : an armed control binds to the
+// first MIDI or OSC message. Green = bound where Learn into points (this
+// computer or this session); a dashed green = bound only in the other one.
 //
 // Render it inside any relatively-positioned wrapper. It renders nothing at
 // all when learn mode is off : zero cost in play mode.
 
 import type { MouseEvent } from 'react'
-import { describeBinding, isContinuousTarget, midiTargetLabel } from '../midi'
+import { isContinuousTarget, midiTargetLabel } from '../midi'
+import { describeAnyBinding } from '../mappingModel'
 import { useStore } from '../store'
 
 export function MidiLearnOverlay({ id }: { id: string }): JSX.Element | null {
   const mode = useStore((s) => s.midiLearnMode)
   const selected = useStore((s) => s.midiLearnTarget === id)
-  // Meta knobs keep their CC on the knob itself (session data); everything
-  // else lives in the machine-local map. Selected as a STRING so the zustand
-  // selector returns a stable primitive (no re-render churn).
-  const bound = useStore((s) => {
+  // What is learned on it, both scopes. Selected as a STRING so the zustand
+  // selector returns a stable primitive (no re-render churn) :
+  // "<here>|<other>|<description>".
+  const state = useStore((s) => {
+    if (!s.midiLearnMode) return ''
+    const here: string[] = []
+    const other: string[] = []
+    // Meta knobs keep their CC on the knob itself (session data)
     if (id.startsWith('meta:')) {
       const cc = s.composition.metaKnobs[Number(id.slice(5))]?.midiCc
-      return cc ? `CC${cc.number} ch${cc.channel + 1}` : null
+      if (cc) here.push(`CC${cc.number} ch${cc.channel + 1} (on the knob)`)
     }
-    const b = s.midiMap[id]
-    return b ? describeBinding(b) : null
+    const put = (b: Parameters<typeof describeAnyBinding>[0] | undefined, scope: 'computer' | 'session'): void => {
+      if (!b) return
+      const text = `${describeAnyBinding(b)} (${scope === 'computer' ? 'this computer' : 'this session'})`
+      ;(scope === s.learnScope ? here : other).push(text)
+    }
+    put(s.sessionMidiMap[id], 'session')
+    put(s.sessionOscMap[id], 'session')
+    put(s.midiMap[id], 'computer')
+    put(s.oscMap[id], 'computer')
+    return `${here.length ? 1 : 0}|${other.length ? 1 : 0}|${[...here, ...other].join(' · ')}`
   })
   const setTarget = useStore((s) => s.setMidiLearnTarget)
-  const setBinding = useStore((s) => s.setMidiBinding)
-  const updateMetaKnob = useStore((s) => s.updateMetaKnob)
+  const clearMappings = useStore((s) => s.clearMappings)
   if (!mode) return null
 
-  const cls = selected ? 'midi-learn-selected' : bound ? 'midi-learn-green' : 'midi-learn-blue'
+  const [hereS, otherS, bound] = state.split('|')
+  const cls = selected
+    ? 'midi-learn-selected'
+    : hereS === '1'
+      ? 'midi-learn-green'
+      : otherS === '1'
+        ? 'midi-learn-green midi-learn-other'
+        : 'midi-learn-blue'
   const hint = isContinuousTarget(id)
-    ? 'move a knob/fader'
+    ? 'move a knob / fader, or a fader sending OSC'
     : id.startsWith('rule:')
-      ? 'hit a pad (each hit : on or off) or move a knob (on from half way)'
-      : 'hit a pad / press a button'
+      ? 'hit a pad (each hit : on or off), move a knob (on from half way) or press an OSC button (each press : on or off)'
+      : 'hit a pad / press a button, or send an OSC message'
   return (
     <div
       className={`midi-learn-overlay ${cls}`}
@@ -55,15 +78,14 @@ export function MidiLearnOverlay({ id }: { id: string }): JSX.Element | null {
       onContextMenu={(e: MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (id.startsWith('meta:')) updateMetaKnob(Number(id.slice(5)), { midiCc: null })
-        else setBinding(id, null)
+        clearMappings(id)
         if (selected) setTarget(null)
       }}
       title={
         selected
           ? `${midiTargetLabel(id)} : waiting (${hint}). Click to deselect.`
           : bound
-            ? `${midiTargetLabel(id)} : bound to ${bound}. Click + move a control to rebind · right-click to clear.`
+            ? `${midiTargetLabel(id)} : ${bound}. Click + move a control to rebind (a MIDI and an OSC mapping each, per scope) · right-click to clear them all.`
             : `${midiTargetLabel(id)} : click, then ${hint} to bind.`
       }
     />

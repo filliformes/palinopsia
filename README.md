@@ -80,7 +80,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 
 **Control & internals**
 - [Resolume OSC mapper](#resolume-osc-mapper-key-k) : Palinopsia signals × any Resolume address, read from a composition
-- [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · setup
+- [OSC implementation](#osc-implementation) : inbound · outbound · OSCQuery · [OSC Learn](#osc-learn--any-controller-in-its-own-addresses) · setup
 - [dataflou mesh](#dataflou-mesh) : Palinopsia as a node on the mesh, its sources and destinations
 - [Ableton Link](#ableton-link) : the tempo, the bar and play / stop shared with every Link app on the network
 - [Agent (MCP)](#agent-mcp) : an AI agent on this computer reads and plays Palinopsia, looks at the output, writes shaders
@@ -1359,7 +1359,9 @@ overlay**. Click one (it pulses), then move a knob / hit a pad on your
 controller : bound (the overlay turns **green**). The mode stays armed so you can
 map the next control immediately; right-click a green overlay to clear its
 binding, press the button / `L` again or `Esc` to exit. While learning, incoming
-MIDI never fires anything : browse your controller safely.
+MIDI never fires anything : browse your controller safely. The same mode learns **OSC
+controllers** in their own addresses (move a TouchOSC fader instead of a knob) : see
+[OSC Learn](#osc-learn--any-controller-in-its-own-addresses).
 
 **One CC, many targets** : learn the *same* CC onto several controls and one knob
 drives them all at once (every match fires, not just the first). A wide hardware
@@ -1374,8 +1376,9 @@ Learnable targets:
   slider's curve).
 - **Continuous (CC)** : each of the **4 layer opacities**, their **A/B mix** and
   their A/B **hue** harmony (in the Mixer), the **Background**'s opacity, speed and
-  shadow, the **8 Feel dials**, the **Metasurface XY**, and the **Sonify master**
-  (each mirrors its own curve).
+  shadow, the **8 Feel dials**, the **Metasurface XY**, the **Sonify master**, and
+  the **Sonify Synth**'s knobs and its ten **patchbay depths** (each mirrors its own
+  curve; each Sonify voice's on / off, the Synth's too, is a fire below).
 - **Fires** (pad/note or button-CC, press edge only) : **Vary**, **Randomize**
   (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Record**
   start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
@@ -1396,12 +1399,35 @@ Learnable targets:
   binding follows the rule, not its place in the list, and goes with it when it is
   deleted.
 
-Everything except the Macro-knob CCs is machine-local (survives restarts,
-doesn't travel with sessions). The **MIDI** section of the Connect tab
-(key `A`) has the **input dropdown** (all controllers, or just one : hot-plug
-is handled), a **live-activity readout** (last message + how many controls are
-wired, so you can confirm the port is really talking), and the full bindings
-ledger with per-row clear.
+**Where a mapping lives : this computer or this session.** While Learn is on, a
+**computer | session** switch beside the MIDI Learn button (and in the MIDI section) says
+where what you learn goes, for MIDI and OSC alike :
+
+- **this computer** (the default, as before) : the mapping works in every session on this
+  computer (kept in the app's settings, survives restarts, never in a session file);
+- **this session** : saved in the session file, a piece's own controller setup. Loading
+  a session brings its mappings and removes the last session's; **New** clears them;
+  **Generate** keeps them (the same piece, a new look); scenes never touch them; an
+  installation loads them with its session; a changed one makes the session ask "Save
+  changes?". A session without any is saved exactly as before.
+
+Where the session has a mapping on an input (the same channel and CC or note, or the same
+OSC address and value), it **stands in for this computer's mappings on that input only** :
+a piece's custom setup wins for the knobs it uses, every other mapping of the computer
+keeps working. Two session mappings may share an input (one knob, several controls). The
+Macro knobs' CCs are neither : they stay **on the knob**, in the session and its scenes,
+as they always did (and take no part in that precedence).
+
+The **MIDI** section of the Connect tab (key `A`) has the **input dropdown** (all
+controllers, or just one : hot-plug is handled), a **live-activity readout** (last message
++ how many controls are wired, so you can confirm the port is really talking), and the
+full **ledger of MIDI and OSC mappings** in groups : **this session**, **macro knobs**,
+**this computer** (a mapping the session stands in for is greyed, "replaced by this
+session") and **OSC controllers** (each controller's reply port). Each row is tagged
+MIDI or OSC, moves to the other side (↑ into the session, ↓ to the computer) or clears
+(×); **move all to session** and **copy to computer** take a whole group. A mapping whose
+control is not here (a Body rule not on this computer, a scene the session lacks) reads
+"(gone)" and does nothing.
 
 **MIDI output.** The same panel also picks a **MIDI output** device and sends
 Opsia's tempo out over it: a 24-PPQN **clock** + **Start/Stop transport** (both
@@ -3241,7 +3267,9 @@ turns it on and off, and opens the mapper. In Resolume : Preferences › OSC ›
 
 ## OSC implementation
 
-All addresses live under `/opsia`; anything else is ignored. **Every continuous
+All addresses live under `/opsia`; any other address is a controller's own, learned
+with [OSC Learn](#osc-learn--any-controller-in-its-own-addresses) (Resolume's
+`/composition/…` feeds the Resolume mapper). **Every continuous
 control takes a normalized `0..1` float** scaled to the target's declared range.
 Enums accept a name (`s`), an int index (`i`), or a `0..1` float across members.
 Bools/toggles are true at `≥ 0.5`. Triggers fire on the **rising edge**. **BPM is
@@ -3415,6 +3443,50 @@ Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: 
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
 (value `1`) to the same OSC-out target, so an embodied gesture can play the sound side
 in Pandore.
+
+### OSC Learn : any controller, in its own addresses
+
+**One port, two doors.** Every message arrives on the same OSC input port. `/opsia/…`
+goes to the built-in router exactly as above, also while Learn is on; any other address
+(a TouchOSC layout's `/1/fader3`, a Max patch's `/slider`, a phone's `/accxyz`) is
+learned and played by [MIDI Learn](#midi)'s own mode. A learned address never replaces
+or hides a built-in one (the two cannot meet), and both may drive the same control : a
+learned `/1/fader3` on Layer 1's opacity and `/opsia/layer1/opacity` from a patch move the
+same thing, the last message wins (like MIDI and the mouse).
+
+**Learn** : turn on MIDI Learn, click a highlighted control, send from the controller.
+The first message, MIDI or OSC, binds. Every learnable control learns OSC : the Macro
+knobs, the transport, layers, Feel dials, scenes, rule boxes, the actions of the learn
+list. One address can play several controls.
+
+| A message | What it plays |
+|---|---|
+| one number (`f`, `i`, `d`, `T`/`F`) | that value |
+| several numbers (`/accxyz x y z`) | the one you moved most over a short window (300 ms) |
+| strings | passed over |
+| no value (`/cue/next`) | a press, every time (triggers only) |
+
+The **range** is found from the values : inside 0..1 (true / false too) is 0..1, inside
+-1..1 with some below 0 is -1..1, whole numbers up to 127 are 0..127, anything else the
+span seen; it keeps widening for 5 s after learning, then type it in the list.
+Continuous controls get the value scaled into their own range; **triggers** (scenes,
+actions, rule boxes) fire going up past the middle, so a button sending `1` then `0` is
+one press, and a rule's box toggles on each press. An address already streaming when you
+click the control (an accelerometer left on) waits 1.5 s : anything else you move in that
+time is learned instead. Bundles are unpacked; no wildcards.
+
+**Answers** : in the ledger's **OSC controllers** group, give a controller its **reply
+port** (TouchOSC : its incoming port). Its learned controls then answer it in its own
+address and range (whole numbers when it sends them), at the IP it sent from, on change
+only and at most 30 times a second, and never with the value that just came in (a fader
+is left alone 0.3 s after it last moved). They answer the value playing : a modulator's,
+a scene recall's, Generate's, so the fader follows like a motorized one; an XY pad's two
+values go back in one message. Off until a port is set, and on / off per controller. The
+`/opsia` feedback above is unchanged, and **OSCQuery** keeps advertising only `/opsia` :
+learned addresses belong to the controller.
+
+Where a learned mapping lives (this computer or this session) and how a session's
+mappings stand in for the computer's : see [MIDI](#midi).
 
 ### OSCQuery
 
