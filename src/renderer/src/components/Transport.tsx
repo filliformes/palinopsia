@@ -9,6 +9,8 @@
 // mono-caps zoo. The World section lives in the TOP bar now.
 
 import { useEffect, useRef, useState } from 'react'
+import { SONIFY_PIN } from '../persist'
+import { sonifyPinItems } from './sonifyPin'
 import { randomSonify } from '../audio/autoSonify'
 import { fireFreeze, isFrozen, subscribeFrozen } from '../commands'
 import { useSyncExternalStore } from 'react'
@@ -161,6 +163,7 @@ export function Transport(): JSX.Element {
       }
     }
   ]
+  const soniPinned = useStore((s) => s.pins.includes(SONIFY_PIN))
   const sonifyItems: MenuItem[] = [
     { label: 'Sonify…', onClick: () => useStore.getState().setSonifyPageOpen(true) },
     {
@@ -170,7 +173,9 @@ export function Transport(): JSX.Element {
         st.setSonifyPageWindow(true)
         st.setSonifyPageOpen(true)
       }
-    }
+    },
+    { label: '', divider: true },
+    ...sonifyPinItems(soniPinned)
   ]
   const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
   const bodyOn = useStore((s) => s.bodyControl.enabled)
@@ -458,7 +463,9 @@ export function Transport(): JSX.Element {
             onClick={() => setSonifyPageOpen(sonifyPageWindow || !sonifyPageOpen)}
             onContextMenu={openPageMenu('sonify')}
             className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
-            title="Open Sonify, the image-to-sound engine (S) : lights while the sound is running. Right-click : open it in a window"
+            // persistent (its right-click) : the gold of every pin
+            style={soniPinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)', color: sonifyOn ? undefined : 'rgb(var(--c-pin))' } : undefined}
+            title={`Open Sonify, the image-to-sound engine (S) : lights while the sound is running.${soniPinned ? ' Persistent : scenes leave it as it is.' : ''} Right-click : open it in a window, make its state persistent, set it in every scene`}
           >
             {sonifyOn ? '◉ Sonify' : 'Sonify'}
           </button>

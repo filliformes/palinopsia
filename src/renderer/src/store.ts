@@ -54,7 +54,7 @@ import { pickLayer, playingLayers, type LayerPick } from './shaders/isf/masterPr
 import { canHostFx } from './fxScopes'
 import { modTargetKey, partOf } from './modKey'
 import { colorOf, hsvaOf, PART_INDEX } from './engine/colorParts'
-import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin } from './persist'
+import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin, SONIFY_PIN } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
 import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
@@ -2202,6 +2202,8 @@ interface StoreState {
   clearPins: () => void
   /** Write what plays now for this pin into every scene (one undo step). */
   setInEveryScene: (key: string, label: string) => void
+  /** Sonify as it is now, written into every scene (Sonify's right-click). */
+  setSonifyInEveryScene: () => void
   // Overwrite an existing scene with the current live state.
   updateSceneFromLive: (id: string) => void
   duplicateScene: (id: string) => void
@@ -5617,8 +5619,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const world = worldIdIn(worlds, scene.world, s.world)
       if (world !== s.world) localStorage.setItem('opsia.world', world)
       // Normalize defensively (idempotent) : a scene may predate a schema field.
-      // Recall the scene's sound patch too (keep the local on-state + device).
-      if (scene.sonify) {
+      // Recall the scene's sound patch too (keep the local on-state + device),
+      // unless Sonify is persistent (its right-click : persist.ts SONIFY_PIN).
+      if (scene.sonify && !s.pins.includes(SONIFY_PIN)) {
         const cur = s.sonify
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
         const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
@@ -5680,6 +5683,24 @@ export const useStore = create<StoreState>((set, get) => ({
       changed ? 'ok' : 'warn',
       5200
     )
+  },
+  setSonifyInEveryScene: () => {
+    const s = get()
+    if (!s.scenes.length) {
+      showToast('No scenes yet : save one first', 'warn', 3500)
+      return
+    }
+    // (as a scene saves it : never its on-state or its device)
+    const sonify = { ...s.sonify, on: false, sinkId: '' }
+    let changed = 0
+    const scenes = s.scenes.map((sc) => {
+      if (sc.sonify && sameDeep(sc.sonify, sonify)) return sc
+      changed++
+      return { ...sc, sonify }
+    })
+    if (changed) set({ scenes })
+    const many = (k: number): string => `${k} scene${k === 1 ? '' : 's'}`
+    showToast(changed ? `Sonify : set in ${changed} of ${many(s.scenes.length)}. Ctrl+Z undoes.` : 'Sonify : every scene already has it', changed ? 'ok' : 'warn', 4200)
   },
   surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
   setSurfaceActive: (active) =>
@@ -5791,8 +5812,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const world = worldIdIn(worlds, scene.world, s.world)
       if (world !== s.world) localStorage.setItem('opsia.world', world)
       // Recall the scene's sound patch too (keep the local on-state + device) —
-      // a sequencer-driven set played every scene with the wrong (frozen) sound.
-      if (scene.sonify) {
+      // a sequencer-driven set played every scene with the wrong (frozen) sound
+      // (not while Sonify is persistent : persist.ts SONIFY_PIN).
+      if (scene.sonify && !s.pins.includes(SONIFY_PIN)) {
         const cur = s.sonify
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
         sound = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
