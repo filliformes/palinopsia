@@ -667,6 +667,15 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **Sonify's Reverb / Delay is on by default, low** (Vincent : "by default, Chord and
+  Collage should be OFF and collapsed. Delay/Reverb should be ON, but its SEND should be
+  a 0.05"). `defaultSoniConfig().fx.send` 0 → 0.05, so a first launch and the ↺ reset
+  start with a touch of room on everything; the card's on pill and a double-click on
+  either send slider (the card's and the mixer's FX tail) bring 0.05 back too (were
+  0.35). Chord and Collage already started off, and an off voice's card is folded to
+  its header : unchanged. Sessions, scenes and presets carry their own send, so they
+  play as saved; this computer's remembered Sonify (`opsia.sonify`) keeps its own until
+  ↺.
 - **The Sonify Synth's card : the sound it plays named, sections, the main knobs bigger,
   a dice for the picture** (Vincent's four : "show what preset is selected in the Sound
   dropdown when I select one", "add better organized sections (like in the Finishing and
