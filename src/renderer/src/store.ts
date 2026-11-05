@@ -1381,6 +1381,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
       const j = otherLayer(i)
       if (j !== null && R() < 0.5) slot.sidechain = { kind: 'layer', layer: j }
     }
+    // a source a theme says reads a layer (the fur growing on the letters below it)
+    const reads = theme.reads?.[id]
+    if (reads !== undefined && reads !== i) slot.sidechain = { kind: 'layer', layer: reads }
     return slot
   }
   const layers: LayerState[] = Array.from({ length: 4 }, (_, i) => {

@@ -24,7 +24,7 @@ import type { NativeGenerator, SourcePointer } from './nativeGenerators'
 import { domeFill } from './domeSignal'
 import { tempoBpm } from './tempoSignal'
 import { audioBus } from './audioIn'
-import { glGeneration } from './glGeneration'
+import { acquireMsaa, msaaBuffer, releaseMsaa } from './sharedMsaa'
 import type { FromWorker, MarbleSettings, ToWorker } from '../workers/marbleWorker'
 import type { HandGestureLog } from '@shared/types'
 import MarbleWorker from '../workers/marbleWorker?worker&inline'
@@ -72,35 +72,6 @@ void main() {
   // premultiplied (the resolve averages it) back to straight alpha
   o = c.a > 0.0 ? vec4(c.rgb / c.a, c.a) : vec4(0.0);
 }`
-
-// ── The multisampled buffer, one per GL context and size (sources draw one after
-// another, so every Marbling slot shares it : 4K at 4x is 265 MB) ──
-interface Msaa { gl: WebGL2RenderingContext; gen: number; w: number; h: number; fbo: WebGLFramebuffer; rb: WebGLRenderbuffer[]; samples: number }
-let msaa: Msaa | null = null
-let users = 0 // Marbling slots alive : the buffer goes with the last one
-
-function sharedMsaa(gl: WebGL2RenderingContext, w: number, h: number): Msaa {
-  if (msaa && msaa.gl === gl && msaa.gen === glGeneration() && msaa.w === w && msaa.h === h) return msaa
-  if (msaa && msaa.gl === gl && msaa.gen === glGeneration()) {
-    gl.deleteFramebuffer(msaa.fbo)
-    for (const r of msaa.rb) gl.deleteRenderbuffer(r)
-  }
-  const samples = Math.max(1, Math.min(4, (gl.getParameter(gl.MAX_SAMPLES) as number) || 4))
-  const fbo = gl.createFramebuffer()!
-  const c = gl.createRenderbuffer()!
-  const ds = gl.createRenderbuffer()!
-  gl.bindRenderbuffer(gl.RENDERBUFFER, c)
-  gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.RGBA8, w, h)
-  gl.bindRenderbuffer(gl.RENDERBUFFER, ds)
-  gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.DEPTH24_STENCIL8, w, h)
-  gl.bindRenderbuffer(gl.RENDERBUFFER, null)
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo)
-  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, c)
-  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, ds)
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-  msaa = { gl, gen: glGeneration(), w, h, fbo, rb: [c, ds], samples }
-  return msaa
-}
 
 // The declared defaults (shaders/isf/index.ts) : a slot whose colors were never
 // touched sends none, and must paint the same palette the Inspector shows.
@@ -188,7 +159,7 @@ export class MarbleSource implements NativeGenerator {
     this.worker = new MarbleWorker()
     this.worker.onmessage = (e: MessageEvent<FromWorker>): void => this.onWorker(e.data)
     this.send({ t: 'seed', seed: Math.floor(Math.random() * 1e6) + 1 })
-    users++
+    acquireMsaa()
   }
 
   private send(m: ToWorker, tr?: Transferable[]): void {
@@ -415,7 +386,7 @@ export class MarbleSource implements NativeGenerator {
   private draw(pal: number[], water: number[]): void {
     const g = this.g
     const gl = g.gl
-    const ms = sharedMsaa(gl, this.w, this.h)
+    const ms = msaaBuffer(gl, this.w, this.h)
     gl.bindFramebuffer(gl.FRAMEBUFFER, ms.fbo)
     gl.viewport(0, 0, this.w, this.h)
     gl.colorMask(true, true, true, true)
@@ -487,14 +458,7 @@ export class MarbleSource implements NativeGenerator {
     gl.deleteVertexArray(this.fanVao)
     gl.deleteVertexArray(this.covVao)
     this.g.dispose()
-    // the shared buffer goes with the last Marbling slot
-    users = Math.max(0, users - 1)
-    if (!users && msaa) {
-      if (msaa.gl === gl && msaa.gen === glGeneration()) {
-        gl.deleteFramebuffer(msaa.fbo)
-        for (const r of msaa.rb) gl.deleteRenderbuffer(r)
-      }
-      msaa = null
-    }
+    // the shared buffer goes with the last slot that draws in it
+    releaseMsaa(gl)
   }
 }

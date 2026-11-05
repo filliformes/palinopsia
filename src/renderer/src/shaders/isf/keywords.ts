@@ -110,6 +110,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   contour: ['contour', 'topographic', 'lines', 'noise', 'matte', 'map', 'audio'],
   differential: ['polyrhythm', 'oscillator', 'waves', 'harmonograph', 'geometry', 'contour'],
   'direct-marks': ['film', 'scratches', 'marks', 'ink', 'hand-drawn', 'cameraless'],
+  'gen-fur': ['fur', 'hair', 'pelt', 'coat', 'animal', 'velvet', 'plush', 'grass', 'moss', 'brush', 'comb', 'strands', 'fiber', 'tiger', 'leopard', 'wind', 'click', 'mouse', 'organic', 'audio'],
   'gen-sandplate': ['chladni', 'cymatics', 'sand', 'plate', 'vibration', 'resonance', 'nodal', 'figures', 'modes', 'grains', 'particles', 'audio', 'metal', 'steel', 'brass', 'rust', 'slate', 'glass', 'paper', 'felt', 'click', 'mouse', 'organic', 'physics'],
   'gen-marble': ['marbling', 'marble', 'ebru', 'suminagashi', 'paint', 'ink', 'drops', 'drop', 'liquid', 'water', 'fluid', 'float', 'comb', 'swirl', 'paper', 'flat', 'pattern', 'click', 'mouse', 'draw', 'interactive', 'pour'],
   'gen-lattice': ['dots', 'points', '3d', 'stars', 'starfield', 'grid', 'perspective', 'space', 'well', 'ripple', 'tunnel', 'warp', 'sphere', 'globe', 'torus', 'donut', 'ring', 'galaxy', 'spiral', 'organic', 'irregular', 'blob', 'pollen', 'cells'],

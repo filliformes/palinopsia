@@ -15,6 +15,23 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Fur, a new source** (`gen-fur`; Vincent : "Brushable fur sounds great haha ! Let's do
+  it also"). Native (`engine/FurSource.ts`) : up to 1.5 million real strands, each one
+  instance of a tapered triangle strip with no attributes (its root and look from
+  gl_InstanceID, its lean from a grid), bent from root to tip, gathering into tufts,
+  depth-tested and multisampled in the buffer it now shares with Marbling
+  (`engine/sharedMsaa.ts`), lit by Kajiya-Kay's fiber model so the tone follows the
+  hair's direction against the lamp : combed marks read as on velvet, light one way and
+  dark the other. The groom is two small half-float grids : the nap (combed by the
+  pointers, healing toward the rest field over HEAL seconds, for good at the end of the
+  slider) and the lean (a damped spring toward the nap plus the wind, its neighbors
+  coupled so ripples travel). AUDIO : the mids gust through it, hits re-part it. MARKS :
+  spots, stripes, patches. SIDECHAIN colors the coat from another layer or grows the hair
+  only where it is bright, so letters or a silhouette come out furry. A click parts the
+  coat, a drag combs it, a Body pinch too. Under full-dome fill the hair grows out from a
+  crown at the zenith. 17 presets, the chains Studio Hide / Flash Photo / Faded Rug, the
+  Generate themes Pelt / Big Cat / Gale / Furred Letters (a theme's `reads` now reaches a
+  source's sidechain too).
 - **Sand Plate, a new source** (`gen-sandplate`; Vincent : "Implement Chladni sand as a
   new source. Make it able to look like this (this is sand on a metal plate), so maybe
   have a few different surfaces sand can go onto" · "add a Rotation parameter, so that the

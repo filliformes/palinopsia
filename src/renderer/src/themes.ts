@@ -1074,6 +1074,88 @@ export const THEMES: Theme[] = [
   // color and sharp edges are the look). Its slow motion never sweeps what
   // re-deals or reloads it.
   mk({
+    id: 'pelt', name: 'Pelt', family: 'Living Surfaces',
+    blurb: 'A coat of real hairs under a studio lamp, breathing in a slow wind. Drag on the preview to comb it : your marks show as on velvet, then heal.',
+    world: 'parametric',
+    palette: [[0.04, 0.03, 0.02, 1], [0.3, 0.2, 0.12, 1], [0.8, 0.65, 0.5, 1]],
+    sources: ['gen-fur'],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-fur': ['Brown coat', 'Mink', 'Silver fox', 'Black bear', 'Highland', 'Velvet', 'Plush', 'Moss', 'Sheep', 'Wet otter'] },
+    pickInputs: {
+      'gen-fur': { wind: [0.08, 0.14, 0.22] },
+      'fx-grain': { character: [1], amount: [0.02, 0.04], parasites: [0], chroma: [0] },
+      'fx-grade': { brightness: [0], contrast: [1.06, 1.14], saturation: [1], lift: [0], gamma: [0.95, 1] }
+    },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(density|brush|hold|heal|flow|marks|side|sideUse|ground|audio|audioPart|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'big-cat', name: 'Big Cat', family: 'Living Surfaces',
+    blurb: 'Spots and stripes in a living coat : a tiger, a leopard, a zebra, the marks parting and rippling with the hair as the wind goes through.',
+    world: 'parametric',
+    palette: [[0.03, 0.02, 0.015, 1], [0.6, 0.35, 0.12, 1], [0.95, 0.8, 0.5, 1]],
+    sources: ['gen-fur'],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-fur': ['Tiger', 'Leopard', 'Zebra'] },
+    pickInputs: {
+      'gen-fur': { wind: [0.12, 0.2, 0.3], whorl: [0.1, 0.25, 0.4], markScale: [4, 6, 8, 10] },
+      'fx-grade': { brightness: [0], contrast: [1.08, 1.16], saturation: [1, 1.05], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(density|brush|hold|heal|flow|marks|side|sideUse|ground|audio|audioPart|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'gale', name: 'Gale', family: 'Living Surfaces',
+    blurb: 'The sound as wind : its mids send gusts running through a long coat, and the hits re-part the whole of it.',
+    world: 'parametric',
+    palette: [[0.03, 0.03, 0.03, 1], [0.3, 0.3, 0.32, 1], [0.85, 0.85, 0.88, 1]],
+    sources: ['gen-fur'],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-fur': ['Hears the room'] },
+    pickInputs: {
+      'gen-fur': { audio: [0.7, 0.85, 1], length: [0.06, 0.09, 0.13], wind: [0.1, 0.2], spring: [0.6, 0.8] },
+      'fx-grade': { brightness: [0], contrast: [1.06, 1.12], saturation: [1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(density|brush|hold|heal|flow|marks|side|sideUse|ground|audio|audioPart|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'furred-letters', name: 'Furred Letters', family: 'Living Surfaces',
+    blurb: 'Words grown in fur : the hair only grows where the letters below are bright, on a dark ground, breathing in the wind. Drag to comb them.',
+    world: 'parametric',
+    palette: [[0.01, 0.01, 0.01, 1], [0.4, 0.28, 0.2, 1], [0.9, 0.8, 0.7, 1]],
+    sources: ['gen-fur'],
+    // the letters below, seen only through the fur that grows on them
+    stack: [['gen-text'], ['gen-fur']],
+    muted: [0],
+    reads: { 'gen-fur': 0 },
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-fur': ['Grown on a layer'] },
+    pickInputs: {
+      'gen-text': { size: [0.4, 0.55, 0.7] },
+      'gen-fur': { length: [0.02, 0.03, 0.045], lie: [0.5, 0.65], wind: [0.08, 0.15] },
+      'fx-grade': { brightness: [0], contrast: [1.05, 1.1], saturation: [1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(density|brush|hold|heal|flow|marks|side|sideUse|ground|audio|audioPart|bloom|lift|haze)$' }
+  }),
+  mk({
     id: 'singing-plate', name: 'Singing Plate', family: 'Living Surfaces',
     blurb: 'Sand on a vibrating plate : the grains gather on the still lines of the note it rings at, and dance off to a new figure every few seconds.',
     world: 'parametric',
