@@ -59,6 +59,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime', 'drop', 'sprinkle', 'sprinkleN'),
     g('paint', 'tool', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
   ],
+  'gen-fur': [
+    g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
+    g('hand and wind', 'brush', 'hold', 'heal', 'groom', 'wind', 'gust', 'spring', 'audio', 'audioPart', 'lightAngle', 'lightHeight'),
+    g('look', 'tip', 'root', 'skin', 'marks', 'markColor', 'markScale', 'shine', 'gloss', 'side', 'sideUse', 'ground')
+  ],
   'gen-sandplate': [
     g('figure', 'order', 'tones', 'warp', 'wander', 'every', 'sync', 'glide', 'audio', 'redraw'),
     g('shake', 'drive', 'rotate', 'width', 'scatter', 'uneven', 'tilt', 'tiltAngle', 'pour', 'finger', 'reseed'),
@@ -295,6 +300,15 @@ const DIMS: Record<string, (q: Dim) => Why> = {
         put(d, off, `Colors is ${n} : only the first ${n} colors are dropped.`)
       }
     }
+    return d
+  },
+  'gen-fur': ({ zero, is }) => {
+    const d: Why = {}
+    if (zero('audio')) put(d, ['audioPart'], 'Audio is at 0 : the sound does nothing.')
+    if (is('marks', 0)) put(d, ['markColor', 'markScale'], 'Marks is on none.')
+    if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
+    if (zero('ground')) put(d, ['skin'], 'Skin opacity is at 0 : only the hairs show.')
+    if (zero('whorl')) put(d, ['scale'], 'Whorls is at 0.')
     return d
   },
   // Sand Plate : the timer and the beat time the redraws; the tilt's angle needs a

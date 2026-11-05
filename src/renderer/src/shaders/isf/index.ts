@@ -1807,6 +1807,64 @@ export const GENERATORS: IsfShader[] = [
       audio: [0, 0], grains: [0.8, 0.8], grainSize: [0.7, 1.2], sparkle: [0.2, 0.7], pour: [0, 0.2], finger: [0.3, 0.6],
       side: [0, 0], surface: [0, 0], shape: [0, 0], rotate: [0, 0], ground: [1, 1], sheen: [0.2, 0.6], lightAngle: [0, 6.2832]
     }
+  },
+  {
+    // Native (engine/FurSource.ts) : a coat of real strands under a studio lamp, combed
+    // by the pointers, healing back, rippled by the wind and the sound.
+    id: 'gen-fur',
+    name: 'Fur',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Fur : a field of real hairs under a studio lamp, hundreds of thousands of them, that you can brush. Drag on the preview : the nap lies the way you combed it, your marks showing as on velvet, and heals back over HEAL seconds. A click parts it. WIND keeps it breathing; AUDIO sends the mids through it as gusts and lets the accents re-part the whole coat. MARKS draws spots, stripes or patches; SIDECHAIN colors the coat from another layer, or grows the hair only where that layer is bright, so letters or a silhouette come out furry.',
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'length', TYPE: 'float', MIN: 0.01, MAX: 0.2, DEFAULT: 0.05, LABEL: 'length' },
+        { NAME: 'density', TYPE: 'float', MIN: 0.02, MAX: 1, DEFAULT: 0.5, LABEL: 'hairs' },
+        { NAME: 'thickness', TYPE: 'float', MIN: 0.3, MAX: 3, DEFAULT: 1, LABEL: 'thickness' },
+        { NAME: 'clump', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'clump' },
+        { NAME: 'curl', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'curl' },
+        { NAME: 'wild', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'wild' },
+        { NAME: 'flow', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: -1.5708, LABEL: 'grows toward' },
+        { NAME: 'lie', TYPE: 'float', MIN: 0, MAX: 0.95, DEFAULT: 0.7, LABEL: 'lies flat' },
+        { NAME: 'whorl', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'whorls' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.2, MAX: 5, DEFAULT: 1.4, LABEL: 'whorl size' },
+        { NAME: 'drift', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.05, LABEL: 'drift' },
+        { NAME: 'repart', TYPE: 'event', LABEL: 're-part ▸' },
+        { NAME: 'brush', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'brush size' },
+        { NAME: 'hold', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'brush firmness' },
+        { NAME: 'heal', TYPE: 'float', MIN: 0.5, MAX: 60, DEFAULT: 15, LABEL: 'heal' },
+        { NAME: 'groom', TYPE: 'event', LABEL: 'groom ▸' },
+        { NAME: 'wind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.12, LABEL: 'wind' },
+        { NAME: 'gust', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'gust' },
+        { NAME: 'spring', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'spring' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'audioPart', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'hits re-part' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'tip', TYPE: 'color', DEFAULT: [0.55, 0.37, 0.22, 1], LABEL: 'tips' },
+        { NAME: 'root', TYPE: 'color', DEFAULT: [0.1, 0.055, 0.03, 1], LABEL: 'roots' },
+        { NAME: 'skin', TYPE: 'color', DEFAULT: [0.02, 0.012, 0.008, 1], LABEL: 'skin' },
+        { NAME: 'marks', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['none', 'spots', 'stripes', 'patches'], DEFAULT: 0, LABEL: 'marks' },
+        { NAME: 'markColor', TYPE: 'color', DEFAULT: [0.03, 0.022, 0.018, 1], LABEL: 'mark color' },
+        { NAME: 'markScale', TYPE: 'float', MIN: 1, MAX: 20, DEFAULT: 6, LABEL: 'mark size' },
+        { NAME: 'shine', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'shine' },
+        { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'gloss' },
+        { NAME: 'side', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sidechain' },
+        { NAME: 'sideUse', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['color', 'grows on it', 'both'], DEFAULT: 0, LABEL: 'sidechain as' },
+        { NAME: 'ground', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'skin opacity' }
+      ]
+    })}*/`,
+    // The hairs are the machine's, the brush and the sidechain are staging : never
+    // dealt. The coat's colors roll through its presets.
+    curated: {
+      length: [0.025, 0.09], density: [0.5, 0.5], thickness: [0.8, 1.4], clump: [0.2, 0.7], curl: [0, 0.4], wild: [0.1, 0.5],
+      flow: [-3.1416, 3.1416], lie: [0.45, 0.85], whorl: [0.05, 0.5], scale: [0.6, 3], drift: [0, 0.2], brush: [0.4, 0.4], hold: [0.8, 0.8], heal: [15, 15],
+      wind: [0.05, 0.3], gust: [0, 0], spring: [0.3, 0.7], audio: [0, 0], audioPart: [0.5, 0.5], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75],
+      marks: [0, 0], markScale: [3, 10], shine: [0.3, 0.7], gloss: [0.25, 0.7], side: [0, 0], sideUse: [0, 0], ground: [1, 1]
+    }
   }
 ]
 

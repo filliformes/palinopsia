@@ -194,6 +194,8 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-marble': /^(color[1-6]|water)$/,
   // Sand Plate : the sand and its plate are chosen with the surface (its presets).
   'gen-sandplate': /^(sand|plate)$/,
+  // Fur : a coat's colors go together (its presets).
+  'gen-fur': /^(tip|root|skin|markColor)$/,
   'sync-osc': /^loA$/,
   // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
   // set it racing), Crawl's ground (clear hides the picture under it) and Store

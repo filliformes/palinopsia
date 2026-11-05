@@ -837,6 +837,31 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
   },
+  // ── Fur : chains for a coat under the lamp (they keep its colors : mixSrc 1). ──
+  {
+    name: 'Studio Hide', group: 'Fur',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.14, saturation: 1.02, lift: 0, gamma: 0.96 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.03, size: 1.2, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Flash Photo', group: 'Fur',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0.02, contrast: 1.3, saturation: 1.08, lift: 0, gamma: 0.9 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.4, chroma: 0.05, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.06, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0.08 }
+  },
+  {
+    name: 'Faded Rug', group: 'Fur',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 0.92, saturation: 0.72, lift: 0.03, gamma: 1.05 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.8, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 0.9, gamma: 1, autoLevel: 0, splitTone: 0.15 }
+  },
   // ── Sand plate : chains for sand on metal (they keep its colors : mixSrc 1, and
   // no bloom : a white grain that glows stops being a grain). ──
   {

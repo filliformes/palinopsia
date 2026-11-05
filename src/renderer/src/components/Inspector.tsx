@@ -260,13 +260,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'gen-sandplate'
+            slot.shaderId === 'gen-fur'
+              ? 'A layer the coat reads, by SIDECHAIN : its colors on the hairs, or the hair growing only where it is bright, so letters or a silhouette come out furry.'
+              : slot.shaderId === 'gen-sandplate'
               ? 'A layer whose colors the sand takes, by SIDECHAIN : the lines become a window onto that picture, drawn in grains.'
               : slot.shaderId === 'lowercase'
               ? "A layer this source reads, one sample per cell, as that cell's density : the picture arrives as a field of lit and unlit cells rather than a copy of itself. Raise the sidechain control to hear it. None = the source's own density."
