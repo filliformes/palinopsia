@@ -15,6 +15,27 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Flowing metal, in Relief and Inflate** (`flow`, `flowSpeed`, `bands`, `split`, `ripple`; Vincent :
+  "build flowing metal"). In `engine/reliefShade.ts`, `roomAt()` replaces the still room with bands
+  of light running by themselves, on an integrated clock : a hard line, a dark gap, a thin line, a
+  long slide to dark. They live in the direction the surface reflects, so they wrap round the real
+  volume, and a little in the frame, so a flat top still shows them passing. Red and blue read the
+  same bands ahead and behind, widest where the surface turns away (the color split). The band edges
+  are as wide as a pixel of them (`fwidth`), so they never shimmer. Every shiny material takes it,
+  tinted metal included, and 0 is the room as before. The idea of three channels reading one set of
+  bands comes from Paper Shaders' `liquid-metal` (Apache-2.0); no code copied (THIRD_PARTY_NOTICES).
+  5 + 5 presets (Flowing chrome, Prism flow / Prism letters, Liquid gold / Molten gold, Slow mercury,
+  Racing bands), the chain Flowing Picture, the theme Mercury, in Liquid Metal and Chrome Type too.
+  Hard band edges exposed what the still room hid, all fixed : Relief's height is 32-bit where the card
+  can filter it (else 16); Inflate's pressure stays 32-bit, read by whole texels, relaxed from wide
+  down to one pixel, and its height and slope come out into a filtered target, so normals are
+  continuous across the grid's cells instead of one facet per cell (Balloon and Clay read smoother
+  too); strokes step by a share of the radius when Chaos changes it (each capsule's cap pokes past
+  the next one's slope, a ripple falling with the square of the step), under a frame budget so
+  huge strokes with a 32-way mirror fall back to coarser steps rather than behind. Gate : 60 fps,
+  59.7 updates/s on the dome, heaviest included. Also fixed in both, before release : a fresh
+  Inflate read `from` alpha while its panel said bright, which blacked out an opaque picture; its
+  orbit, Relief's convexity and color pick had the same mismatch.
 - **Relief, a new source; Inflate and Thin Film, two new effects** (`gen-relief`,
   `node-inflate`, `fx-thinfilm`; Vincent : "Relief is also a new and great idea, implement
   it all as you proposed, with Thin Film"). Relief (`engine/ReliefSource.ts`) : a stroke is

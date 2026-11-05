@@ -78,6 +78,13 @@ line, the analog x-distortion and the tinted chroma bleed follow its model).
   Commons Attribution 3.0 Unported License
   (https://creativecommons.org/licenses/by/3.0/).
 
+## Flowing metal (`src/renderer/src/engine/reliefShade.ts`)
+
+The idea of red, green and blue reading one set of moving bands a little apart, so their edges
+split into color, comes from the `liquid-metal` shader of Paper Shaders
+(https://github.com/paper-design/shaders, https://shaders.paper.design), Apache License 2.0. No
+code was copied : Palinopsia's bands are its own, driven by the real surface's reflection.
+
 ## "Hash without Sine" (many shaders)
 
 The hash functions used across the generators, effects and native nodes

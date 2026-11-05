@@ -922,11 +922,16 @@ export const NATIVE_NODES: IsfShader[] = [
         { NAME: 'shadow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'shadow' },
         { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
         { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'flow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'flowing' },
+        { NAME: 'flowSpeed', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.3, LABEL: 'flow speed' },
+        { NAME: 'bands', TYPE: 'float', MIN: 1, MAX: 12, DEFAULT: 3, LABEL: 'bands' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'color split' },
+        { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripple' },
         { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
         { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' }
       ]
     })}*/`,
-    curated: { from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1] }
+    curated: { flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6], from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1] }
   },
   {
     // Native (engine/silhouetteNode.ts) : the Silhouette source's looks on any
@@ -1958,6 +1963,11 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'sideUse', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['its colors', 'reflected', 'glass'], DEFAULT: 0, LABEL: 'sidechain as' },
         { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
         { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'light height' },
+        { NAME: 'flow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'flowing' },
+        { NAME: 'flowSpeed', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.3, LABEL: 'flow speed' },
+        { NAME: 'bands', TYPE: 'float', MIN: 1, MAX: 12, DEFAULT: 3, LABEL: 'bands' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'color split' },
+        { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripple' },
         { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
         { NAME: 'follow', TYPE: 'long', VALUES: [0, 1], LABELS: ['its own', 'Context light path'], DEFAULT: 0, LABEL: 'light from' }
       ]
@@ -1965,6 +1975,7 @@ export const GENERATORS: IsfShader[] = [
     // Who draws, the sidechain and the mirrors are staging : never dealt. The colors
     // roll through its presets.
     curated: {
+      flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6],
       draw: [1, 1], rate: [0.5, 1.6], speed: [0.25, 0.6], curve: [0.2, 0.7], length: [0.35, 0.8], audio: [0, 0], sink: [0.05, 0.2], melt: [0, 0],
       brush: [0, 7], mode: [0, 0], size: [0.25, 0.65], convex: [0.5, 1], chaos: [0, 0.4], rough: [0, 0.3], fuse: [0.3, 0.9], ribs: [2, 8], dash: [0, 0], broken: [0, 0.3],
       mirror: [0, 0], fold: [6, 6], relief: [0.35, 0.8], gloss: [0.4, 0.9], grain: [0, 0.4], dents: [0, 0.4], bevel: [0.1, 0.5], shadow: [0.4, 0.8], edge: [0, 0], film: [0, 0],
