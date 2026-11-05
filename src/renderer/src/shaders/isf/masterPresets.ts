@@ -841,7 +841,14 @@ export const MASTER_PRESETS: MasterPreset[] = [
   {
     name: 'Chrome Everything', group: 'Relief',
     fx: [
-      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.55, round: 0.9, volume: 0.5, material: 3, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.1, mix: 1 } }
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.55, round: 0.9, volume: 0.5, material: 3, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.1, flow: 0, flowSpeed: 0.3, bands: 3, split: 0.35, ripple: 0.3, mix: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Flowing Picture', group: 'Relief',
+    fx: [
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.6, round: 0.95, volume: 0.5, material: 3, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.4, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.05, flow: 1, flowSpeed: 0.25, bands: 2.5, split: 0.4, ripple: 0.35, mix: 1 } }
     ],
     vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
@@ -855,7 +862,7 @@ export const MASTER_PRESETS: MasterPreset[] = [
   {
     name: 'Soap Picture', group: 'Relief',
     fx: [
-      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.4, puff: 0.5, round: 1, volume: 0.45, material: 4, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.7, film: 0, filmThick: 0.28, shadow: 0.25, lightAngle: 2.36, lightHeight: 0.6, orbit: 0.05, mix: 1 } }
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.4, puff: 0.5, round: 1, volume: 0.45, material: 4, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.7, film: 0, filmThick: 0.28, shadow: 0.25, lightAngle: 2.36, lightHeight: 0.6, orbit: 0.05, flow: 0, flowSpeed: 0.3, bands: 3, split: 0.35, ripple: 0.3, mix: 1 } }
     ],
     vibe: { mixSrc: 1, contrast: 1, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },

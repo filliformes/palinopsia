@@ -75,6 +75,11 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     amount: 'How much of the effect.'
   },
   'node-inflate': {
+    flow: 'Turns what it reflects from the still room into bands of light running across the surface by themselves. 0 = the room as before.',
+    flowSpeed: 'How fast the bands run, and which way. 0 holds them still.',
+    bands: 'How many bands : a few wide ones low, a tight chrome ripple high.',
+    split: 'Red and blue fall a little ahead and behind the bands, most where the surface turns away : a prism along their edges.',
+    ripple: 'How much the bands wobble as they run, like a liquid. 0 = clean straight bands.',
     from: 'What gets blown up : the layer’s alpha (letters and cut-out shapes), what is bright in it, or what is dark (a full picture).',
     threshold: 'Where the shape’s edge falls.',
     puff: 'How far in from the edges it rises, and with it how tall : a thin edge bevel low, a full balloon high.',
@@ -579,6 +584,11 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     speed: 'How fast they draw.',
     curve: 'How much the wandering strokes turn.',
     length: 'How long a wandering stroke goes on before another starts.',
+    flow: 'Turns what it reflects from the still room into bands of light running across the surface by themselves. 0 = the room as before.',
+    flowSpeed: 'How fast the bands run, and which way. 0 holds them still.',
+    bands: 'How many bands : a few wide ones low, a tight chrome ripple high.',
+    split: 'Red and blue fall a little ahead and behind the bands, most where the surface turns away : a prism along their edges.',
+    ripple: 'How much the bands wobble as they run, like a liquid. 0 = clean straight bands.',
     sens: 'How little a thing must move in the sidechain to be followed. Up for a dim or slow picture, down for only the big gestures.',
     audio: 'The sound’s hits each land a stroke, bigger when it is louder : the chance a hit draws. 0 = the sound does nothing.',
     sink: 'What is drawn slowly sinks back into the ground, so the page never fills. 0 = it stays.',

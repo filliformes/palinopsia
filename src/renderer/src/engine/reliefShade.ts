@@ -46,16 +46,57 @@ vec3 studio(vec3 r, float az) {
   return room + vec3(1.0, 0.98, 0.95) * bx * 1.7 + vec3(0.72, 0.8, 1.0) * strip * 0.9;
 }
 
+// Flowing metal : instead of the room, bands of light running across the surface by
+// themselves. The bands live in the direction the surface reflects, so they wrap round
+// the real volume, and a little in the frame, so a flat top still shows them passing.
+// Red and blue read the same bands a little ahead and behind : the color split, widest
+// where the surface turns away, as a prism does.
+uniform float uFlow, uFlowT, uBands, uSplit, uRipple;
+float flowN(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  vec4 q = vec4(i.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
+  vec3 a = fract(vec3(q.xyx) * 0.1031); a += dot(a, a.yzx + 33.33);
+  vec3 b = fract(vec3(q.zyz) * 0.1031); b += dot(b, b.yzx + 33.33);
+  vec3 c = fract(vec3(q.xwx) * 0.1031); c += dot(c, c.yzx + 33.33);
+  vec3 d = fract(vec3(q.zwz) * 0.1031); d += dot(d, d.yzx + 33.33);
+  return mix(mix(fract((a.x + a.y) * a.z), fract((b.x + b.y) * b.z), f.x),
+             mix(fract((c.x + c.y) * c.z), fract((d.x + d.y) * d.z), f.x), f.y);
+}
+// Where in the bands this reflection falls (they run at an angle to the lamp, and turn with it)
+float flowAt(vec3 r, vec2 P, float az) {
+  vec2 d = vec2(cos(az + 1.22), sin(az + 1.22));
+  float rip = uRipple > 0.0 ? uRipple * 1.5 * (flowN(P * 3.1 + uFlowT * 0.23) + 0.5 * flowN(P * 7.3 - uFlowT * 0.31) - 0.75) : 0.0;
+  return dot(r.xy, d) * uBands * 0.55 + dot(P, d) * uBands * 0.45 + rip - uFlowT;
+}
+// One band, s in 0..1 : a hard bright line, a dark gap, a thin line, then a long slide to dark
+float flowBand(float s, float w) {
+  float first = smoothstep(0.0, w, s) - smoothstep(0.07, 0.07 + w, s);
+  float rest = smoothstep(0.11, 0.11 + w, s) * (1.0 - smoothstep(0.11, 1.0, s));
+  return max(first, rest * rest);
+}
+// What this direction sees : the room, or as much of the bands as FLOWING asks
+vec3 roomAt(vec3 r, float az, vec2 P, float nv, float w) {
+  vec3 st = studio(r, az);
+  if (uFlow <= 0.0) return st;
+  float s = flowAt(r, P, az);
+  float sp = uSplit * (0.03 + 0.34 * (1.0 - nv));
+  vec3 b = vec3(flowBand(fract(s + sp), w), flowBand(fract(s), w), flowBand(fract(s - 1.3 * sp), w));
+  return mix(st, mix(vec3(0.03, 0.03, 0.045), vec3(1.0, 1.0, 1.03), b), uFlow);
+}
+
 // A surface lit : M the material (0 matte 1 metal 2 brushed 3 gloss plastic 4 chrome
 // 5 ink 6 film), N its normal, L the lamp, a its color, g how tight its highlight.
-vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 reflected, float reflectAmt, float film, float filmNm) {
+vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 reflected, float reflectAmt, float film, float filmNm, vec2 P) {
   vec3 V = vec3(0.0, 0.0, 1.0);
   vec3 H = normalize(L + V);
   float nl = max(0.0, dot(N, L));
   float nv = max(0.0, N.z);
   float fres = pow(1.0 - nv, 5.0);
   vec3 r = reflect(-V, N);
-  vec3 env = mix(studio(r, az), reflected, reflectAmt);
+  // (the band edges as wide as a pixel of them, so they never shimmer where they crowd)
+  float w = uFlow > 0.0 ? 0.012 + 1.5 * fwidth(flowAt(r, P, az)) : 0.012;
+  vec3 env = mix(roomAt(r, az, P, nv, w), reflected, reflectAmt);
   vec3 c;
   if (M < 0.5) {
     // matte : a soft wrapped light and a broad dull sheen, as on modeling clay
@@ -68,8 +109,8 @@ vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 refle
   } else if (M < 2.5) {
     // brushed metal : the highlight stretched across the cut
     // and the room's reflection blurred by the scratches, with a shoulder : never a flat band
-    vec3 e = studio(normalize(r + vec3(0.17, 0.0, 0.0)), az) + studio(normalize(r - vec3(0.17, 0.0, 0.0)), az)
-           + studio(normalize(r + vec3(0.0, 0.17, 0.0)), az) + studio(normalize(r - vec3(0.0, 0.17, 0.0)), az);
+    vec3 e = roomAt(normalize(r + vec3(0.17, 0.0, 0.0)), az, P, nv, w + 0.1) + roomAt(normalize(r - vec3(0.17, 0.0, 0.0)), az, P, nv, w + 0.1)
+           + roomAt(normalize(r + vec3(0.0, 0.17, 0.0)), az, P, nv, w + 0.1) + roomAt(normalize(r - vec3(0.0, 0.17, 0.0)), az, P, nv, w + 0.1);
     e = mix(e * 0.25, reflected, reflectAmt);
     e /= 1.0 + 0.35 * e;
     float sp = pow(max(0.0, dot(N, H)), 22.0 * g);

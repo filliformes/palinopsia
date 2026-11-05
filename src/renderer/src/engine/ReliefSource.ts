@@ -27,6 +27,9 @@ import { SynthPlayer, defaultSynth } from '../audio/synthPlay'
 
 const STEP = 1 / 60
 const MAX_SEGS = 6000 // stamped capsules a frame (the mirrors multiply them)
+// Pixels the fine steps along a stroke may stamp in a frame. Normal drawing stays far under it;
+// huge strokes with a 32-way mirror on the dome fall back to coarser steps instead of falling behind.
+const FINE_FILL = 60e6
 const STRIDE = 10
 const HMAX = 0.3 // tallest height, frame heights (for the depth test)
 
@@ -252,7 +255,7 @@ void main() {
     }
     if (uHasSide > 0.5 && uSideAmt > 0.0 && uSideUse < 0.5) alb = mix(alb, sideC * 1.1, uSideAmt);
     float nm = uFilmNm + h * 5200.0 + (og_fbm(P * 5.0 + uDrift, 3.0) - 0.5) * 420.0;
-    vec3 lit = shadeSurface(shadeM, alb, N, L, uAz, 0.3 + uSheen * 1.2, refl, reflAmt, uFilm, nm);
+    vec3 lit = shadeSurface(shadeM, alb, N, L, uAz, 0.3 + uSheen * 1.2, refl, reflAmt, uFilm, nm, P);
     if (M > 4.5 && M < 5.5) {
       // ribbed : the grooves go dark
       float ao = smoothstep(0.0, 0.012, h);
@@ -269,7 +272,7 @@ void main() {
       vec3 bent = textureLod(uSide, uv + N.xy * 0.11, 0.0).rgb;
       vec3 V = vec3(0.0, 0.0, 1.0);
       float fr = pow(1.0 - N.z, 3.0);
-      vec3 glassC = bent * (0.86 + 0.2 * N.z) + studio(reflect(-V, N), uAz) * (0.1 + 0.7 * fr);
+      vec3 glassC = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(-V, N), uAz, P, N.z, 0.05) * (0.1 + 0.7 * fr);
       lit = mix(lit, glassC, uSideAmt);
     }
     // a soft edge where the relief meets the ground
@@ -398,6 +401,8 @@ export class ReliefSource implements NativeGenerator {
 
   private newWalkerNow = false
   private dropsLanded = false // fused drops melt in as they land : baked at once
+  private flowT = 0 // how far the flowing metal's bands have run (integrated : a knob never jumps them)
+  private fineFill = FINE_FILL // what is left of FINE_FILL this frame
 
   feed(_audio: WebGLTexture | null, side: WebGLTexture | null): void {
     this.side = side
@@ -415,7 +420,7 @@ export class ReliefSource implements NativeGenerator {
   }
 
   private colorIndex(): number {
-    const n = Math.round(num(this.inputs, 'colorPick', 6))
+    const n = Math.round(num(this.inputs, 'colorPick', 1))
     return n >= 1 && n <= 5 ? n - 1 : Math.floor(this.rand() * 5)
   }
 
@@ -436,7 +441,7 @@ export class ReliefSource implements NativeGenerator {
       // what a replay needs : the stroke's own settings, then its points
       const I = this.inputs
       s.log.push(mat, s.color, Math.round(num(I, 'mode', 0)), s.size, s.seed)
-      s.log.push(num(I, 'mirror', 0), num(I, 'fold', 6), num(I, 'chaos', 0.15), num(I, 'convex', 0.6), num(I, 'rough', 0.1), num(I, 'ribs', 4), num(I, 'dash', 0), num(I, 'broken', 0), num(I, 'fuse', 0.5))
+      s.log.push(num(I, 'mirror', 0), num(I, 'fold', 6), num(I, 'chaos', 0.15), num(I, 'convex', 0.7), num(I, 'rough', 0.1), num(I, 'ribs', 4), num(I, 'dash', 0), num(I, 'broken', 0), num(I, 'fuse', 0.5))
       s.log.push(x, y)
     }
     this.emit(s, x, y, x, y, s.r, s.r)
@@ -457,7 +462,15 @@ export class ReliefSource implements NativeGenerator {
       // of a degree each, or a mirror shows the teeth; a full buffer drops the finest first)
       const turn = Math.abs(Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy))
       const room = Math.floor((MAX_SEGS - this.nInst) / (this.copies() * 2))
-      const n = Math.max(1, Math.min(160, room, Math.max(Math.ceil(len / Math.max(0.002, s.size * 0.4)), Math.ceil(turn / 0.012))))
+      // (a radius that changes along the stroke : each capsule's round cap pokes a little past
+      // the next one's slope, a ripple that falls with the square of the step, so under a pixel)
+      const wobbles = num(this.inputs, 'chaos', 0.15) > 0 || s.mat === 6
+      // (and the ripple goes by the step against the radius : a fixed share of it, down to under a pixel)
+      const stepLen = wobbles ? Math.max(0.4 / this.h, s.size * 0.008) : Math.max(0.002, s.size * 0.4)
+      const copy = this.copies()
+      const cost = copy * Math.pow(2 * s.size * this.h, 2)
+      const n = Math.max(1, Math.min(160, room, Math.floor(this.fineFill / cost), Math.max(Math.ceil(len / stepLen), Math.ceil(turn / 0.012))))
+      this.fineFill -= n * cost
       for (let i = 1; i <= n; i++) {
         const t = i / n, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t
         this.segTo(s, a * x0 + b * cx + c * mx, a * y0 + b * cy + c * my)
@@ -763,7 +776,10 @@ export class ReliefSource implements NativeGenerator {
   private ensure(): void {
     const g = this.g, gl = g.gl
     if (this.H) return
-    const m = (): Target => g.target(this.w, this.h, { half: 'rgba', linear: true })
+    // (32-bit where the card can filter it : a band's hard edge on a nearly flat top shows
+    // every step of a 16-bit height, as stairs)
+    const fine = !!gl.getExtension('OES_texture_float_linear')
+    const m = (): Target => g.target(this.w, this.h, fine ? { linear: true } : { half: 'rgba', linear: true })
     this.H = [m(), m()]
     this.S = m()
     this.C = m()
@@ -861,6 +877,7 @@ export class ReliefSource implements NativeGenerator {
     this.clearAll()
     this.logN = ops.length ? Math.max(...ops.map((o) => o.id)) : 0
     const live = this.inputs, keepMode = this.curMode
+    this.fineFill = Infinity // (a rebuild is one frame, and must match what was drawn)
     const HEAD = 14 // the settings logged ahead of the points : see beginStroke
     for (const op of ops) {
       if (op.k !== 'stroke' || op.ev.length < HEAD + 2) continue
@@ -904,6 +921,7 @@ export class ReliefSource implements NativeGenerator {
     this.ensure()
     if (firstEnsure) this.clearAll()
     const dt = this.clock.tick(clockSec)
+    this.fineFill = FINE_FILL
     const nowMs = performance.now()
     if (this.pendingOps) { const o = this.pendingOps; this.pendingOps = null; this.replay(o) }
     if (this.cleared) {
@@ -1005,6 +1023,7 @@ export class ReliefSource implements NativeGenerator {
     const [er, eg, eb] = col(I, 'edgeColor', [1, 0.72, 0.42])
     const sideAmt = Math.max(0, Math.min(1, num(I, 'side', 0)))
     this.drift = (this.drift + dt * 0.012) % 512
+    this.flowT = (this.flowT + Math.max(-1, Math.min(1, num(I, 'flowSpeed', 0.3))) * 0.8 * dt + 8192) % 8192
     const p = this.showP
     p.use().i1('uC', 0).i1('uSide', 1).f2('RENDERSIZE', this.w, this.h).f2('uFrame', this.frame[0], this.frame[1])
       .f3('uGround', gr, gg, gb).f3('uEdgeCol', er, eg, eb)
@@ -1021,6 +1040,8 @@ export class ReliefSource implements NativeGenerator {
       .f1('uShadow', Math.max(0, Math.min(1, num(I, 'shadow', 0.6))))
       .f1('uSideAmt', sideAmt).f1('uSideUse', Math.round(num(I, 'sideUse', 0))).f1('uHasSide', this.side ? 1 : 0)
       .f1('uPx', Math.max(1, this.h / 1080)).f1('uDrift', this.drift)
+      .f1('uFlow', Math.max(0, Math.min(1, num(I, 'flow', 0)))).f1('uFlowT', this.flowT).f1('uBands', Math.max(0.5, Math.min(16, num(I, 'bands', 3))))
+      .f1('uSplit', Math.max(0, Math.min(1, num(I, 'split', 0.35)))).f1('uRipple', Math.max(0, Math.min(1, num(I, 'ripple', 0.3))))
     gl.uniform3fv(p.u('uPal'), new Float32Array(pal))
     g.bind(0, map.tex)
     g.bind(1, this.side ?? this.blank())

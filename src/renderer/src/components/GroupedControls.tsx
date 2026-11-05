@@ -62,7 +62,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   'gen-relief': [
     g('draw and light', 'draw', 'rate', 'speed', 'curve', 'length', 'sens', 'audio', 'sink', 'melt', 'stroke', 'clear', 'lightAngle', 'lightHeight', 'orbit', 'follow'),
     g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
-    g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'side', 'sideUse', 'ground', 'groundOp')
+    g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'ground', 'groundOp')
   ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
@@ -155,7 +155,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   'node-inflate': [
     g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
     g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick'),
-    g('light', 'shadow', 'lightAngle', 'lightHeight', 'orbit')
+    g('light and flow', 'shadow', 'lightAngle', 'lightHeight', 'orbit', 'flow', 'flowSpeed', 'bands', 'split', 'ripple')
   ],
   'fx-thinfilm': [
     g('film', 'thickness', 'follow', 'lean', 'ior', 'keep'),
@@ -328,6 +328,15 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('film') && isnt('brush', 7)) put(d, ['filmThick'], 'No film : oil film is at 0 and the brush is not soap film.')
     if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
+    if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
+    if (is('brush', 0) || is('brush', 6)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'This brush has no reflection to flow.')
+    return d
+  },
+  'node-inflate': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (zero('film') && isnt('material', 4)) put(d, ['filmThick'], 'No film : oil film is at 0 and the material is not soap film.')
+    if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
+    if (is('material', 0)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'Clay has no reflection to flow.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

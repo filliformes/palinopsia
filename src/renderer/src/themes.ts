@@ -1081,13 +1081,29 @@ export const THEMES: Theme[] = [
     sources: ['gen-relief'],
     bgSources: ['solid-color'],
     bgOpacity: 0,
-    presets: {'gen-relief': ['Liquid chrome', 'Fused drops', 'Oil slick', 'Melting']},
+    presets: {'gen-relief': ['Liquid chrome', 'Flowing chrome', 'Prism flow', 'Slow mercury', 'Fused drops', 'Oil slick', 'Melting']},
     pickInputs: { 'gen-relief': { orbit: [0.1, 0.2, -0.15], rate: [0.6, 0.9, 1.2] }, 'fx-grade': { brightness: [0], contrast: [1.04, 1.1], saturation: [1], lift: [0], gamma: [1] } },
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(rough|chaos|dents|grain|flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'mercury', name: 'Mercury', family: 'Living Surfaces',
+    blurb: 'Strokes of liquid metal with bands of light running along them by themselves, sometimes split into a prism along their edges.',
+    world: 'parametric',
+    palette: [[0.015, 0.015, 0.02, 1], [0.3, 0.32, 0.38, 1], [0.95, 0.96, 1, 1]],
+    sources: ['gen-relief'],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: {'gen-relief': ['Flowing chrome', 'Prism flow', 'Liquid gold', 'Slow mercury', 'Racing bands']},
+    pickInputs: { 'gen-relief': { rate: [0.6, 0.9, 1.2] }, 'fx-grade': { brightness: [0], contrast: [1.04, 1.1], saturation: [1], lift: [0], gamma: [1] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(rough|chaos|dents|grain|flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'clay-studio', name: 'Clay Studio', family: 'Living Surfaces',
@@ -1103,7 +1119,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'engraver', name: 'Engraver', family: 'Living Surfaces',
@@ -1119,7 +1135,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'geometer', name: 'Geometer', family: 'Living Surfaces',
@@ -1135,7 +1151,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'soap-skin', name: 'Soap Skin', family: 'Living Surfaces',
@@ -1151,7 +1167,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'chrome-type', name: 'Chrome Type', family: 'Living Surfaces',
@@ -1162,14 +1178,14 @@ export const THEMES: Theme[] = [
     stackFx: [['node-inflate']],
     bgSources: ['solid-color'],
     bgOpacity: 0,
-    presets: {'node-inflate': ['Liquid chrome', 'Soft chrome', 'Gold', 'Rose gold', 'Soap letters', 'Oil-slick chrome', 'Candy']},
+    presets: {'node-inflate': ['Liquid chrome', 'Flowing chrome', 'Prism letters', 'Molten gold', 'Soft chrome', 'Gold', 'Soap letters', 'Oil-slick chrome']},
     // (from their alpha : a dark or colored letter is below any brightness threshold)
     pickInputs: { 'node-inflate': { from: [0], threshold: [0.5] }, 'gen-text': { size: [0.25, 0.33, 0.42], posX: [-0.08, 0, 0.08], posY: [-0.08, 0, 0.08], angle: [-0.12, 0, 0.12], drift: [0, 0.04, 0.08] }, 'fx-grade': { brightness: [0], contrast: [1.04, 1.1], saturation: [1], lift: [0], gamma: [1] } },
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'oil-on-water', name: 'Oil on Water', family: 'Living Surfaces',
@@ -1187,7 +1203,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
     id: 'pelt', name: 'Pelt', family: 'Living Surfaces',
