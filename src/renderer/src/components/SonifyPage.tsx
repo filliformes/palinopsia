@@ -34,6 +34,7 @@ import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { AssignRow, useBound } from './AutoControls'
 import { SynthCard } from './SonifySynth'
 import { SignalPictureRead, SignalPictureRows, SignalPlaySwitch } from './SonifySignal'
+import { SIGNAL_PARAM_LABEL } from '../audio/signalPlay'
 import { SectionHead } from './FinishingSections'
 import { SONI_GROUPS, SONI_TAIL, SONI_VOICE_ORDER, soniVoiceColor } from './soniGroups'
 import { SYNTH_PARAM_LABEL, SYNTH_SLOT_COLORS } from '../audio/synthPlay'
@@ -466,9 +467,6 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   orbitDrive: 'Orbit drive', orbitSmooth: 'Orbit smooth',
   flowDur: 'Flow grain', flowColour: 'Flow color',
   eventsDecay: 'Events decay',
-  signalDecay: 'Signal decay', signalTone: 'Signal tone', signalFm: 'Signal fm',
-  signalRate: 'Signal rate', signalSpread: 'Signal spread', signalThresh: 'Signal threshold',
-  signalDensity: 'Signal density', signalSnap: 'Signal snap',
   rasterSmooth: 'Raster smooth', rasterTone: 'Raster tone',
   sstvLine: 'Transmission line rate', sstvDev: 'Transmission transpose',
   filterQ: 'Filter resonance', filterSweep: 'Filter sweep rate',
@@ -481,7 +479,8 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
   chordNoise: 'Chord noise', chordAir: 'Chord air',
   fxSend: 'FX send', fxReverb: 'FX reverb mix', fxDelay: 'FX delay mix',
   keyEvery: 'Key sequencer every',
-  ...(SYNTH_PARAM_LABEL as Partial<Record<SonifyModParam, string>>)
+  ...(SYNTH_PARAM_LABEL as Partial<Record<SonifyModParam, string>>),
+  ...(SIGNAL_PARAM_LABEL as Partial<Record<SonifyModParam, string>>)
 }
 
 function VoiceShell({ title, on, hint, onToggle, onDice, diceTitle, children }: {
@@ -1977,12 +1976,12 @@ export function SonifyPage({
                       <option value={8}>ping</option>
                     </select>
                   </Row>
-                  <Slider label="decay" value={cfg.signal.decay} min={0} max={1} neutral={0.3} fmt={(v) => { const ms = 0.2 * Math.pow(2500, v); return ms < 10 ? ms.toFixed(1) + 'ms' : Math.round(ms) + 'ms' }} onChange={(v) => pv('signal', { decay: v })} mod={chip('signalDecay')} title="How long a grain lasts, from a 0.2 ms tick to a 500 ms ring" />
-                  <Slider label="tone" value={cfg.signal.tone} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { tone: v })} mod={chip('signalTone')} title="Brightness of the noise, click and pink grains (a lowpass from 200 Hz up)" />
-                  <Slider label="fm" value={cfg.signal.fm} min={0} max={1} neutral={0.4} onChange={(v) => pv('signal', { fm: v })} mod={chip('signalFm')} title="How metallic the fm grain is (its modulator sits at 1.5 times the pitch)" />
-                  {cfg.signal.play === 'picture' && <SignalPictureRead sg={cfg.signal} set={(p) => pv('signal', p)} Slider={Slider} />}
+                  <Slider label="decay" value={cfg.signal.decay} min={0} max={1} neutral={0.3} fmt={(v) => { const ms = 0.2 * Math.pow(2500, v); return ms < 10 ? ms.toFixed(1) + 'ms' : Math.round(ms) + 'ms' }} onChange={(v) => pv('signal', { decay: v })} mod={chip('signalDecay')} midiId="sonify:param:signalDecay" title="How long a grain lasts, from a 0.2 ms tick to a 500 ms ring" />
+                  <Slider label="tone" value={cfg.signal.tone} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { tone: v })} mod={chip('signalTone')} midiId="sonify:param:signalTone" title="Brightness of the noise, click and pink grains (a lowpass from 200 Hz up)" />
+                  <Slider label="fm" value={cfg.signal.fm} min={0} max={1} neutral={0.4} onChange={(v) => pv('signal', { fm: v })} mod={chip('signalFm')} midiId="sonify:param:signalFm" title="How metallic the fm grain is (its modulator sits at 1.5 times the pitch)" />
+                  {cfg.signal.play === 'picture' && <SignalPictureRead sg={cfg.signal} set={(p) => pv('signal', p)} chip={chip} Slider={Slider} />}
                   {cfg.signal.play === 'picture' && !cfg.signal.tie && (<>
-                  <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} title={cfg.signal.sync ? `How often a moving thing ticks : per beat, at ${bpm} BPM (its rate row runs it from a quarter to four times this)` : 'How often a moving thing ticks, per second (its rate row runs it from a quarter to four times this)'} />
+                  <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} midiId="sonify:param:signalRate" title={cfg.signal.sync ? `How often a moving thing ticks : per beat, at ${bpm} BPM (its rate row runs it from a quarter to four times this)` : 'How often a moving thing ticks, per second (its rate row runs it from a quarter to four times this)'} />
                   <Row label="clock">
                     <button
                       onClick={() => pv('signal', { sync: !cfg.signal.sync, rate: !cfg.signal.sync ? Math.min(16, Math.max(1, Math.round(cfg.signal.rate / 2))) : cfg.signal.rate * 2 })}
@@ -2004,7 +2003,7 @@ export function SonifyPage({
                       >{h}</button>
                     ))}
                   </Row>
-                  <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} title={cfg.signal.sync ? `Steps per beat, at ${bpm} BPM` : 'Steps per second'} />
+                  <Slider label="rate" value={cfg.signal.rate} min={0.25} max={cfg.signal.sync ? 16 : 64} neutral={8} fmt={(v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))) + (cfg.signal.sync ? '/beat' : '/s')} onChange={(v) => pv('signal', { rate: v })} mod={chip('signalRate')} midiId="sonify:param:signalRate" title={cfg.signal.sync ? `Steps per beat, at ${bpm} BPM` : 'Steps per second'} />
                   <Row label="clock">
                     <button
                       onClick={() => pv('signal', { sync: !cfg.signal.sync, rate: !cfg.signal.sync ? Math.min(16, Math.max(1, Math.round(cfg.signal.rate / 2))) : cfg.signal.rate * 2 })}
@@ -2021,9 +2020,9 @@ export function SonifyPage({
                       {[8, 12, 16, 24, 32, 48, 64, 96].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </Row>
-                  <Slider label="spread" value={cfg.signal.spread} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { spread: v })} mod={chip('signalSpread')} title="The polymeter : at 0 every head sweeps in unison, toward 1 their sweeps shorten to 12, 10 and 7 sixteenths and drift in and out of phase" />
-                  <Slider label="thresh" value={cfg.signal.thresh} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { thresh: v })} mod={chip('signalThresh')} title="What counts as a mark : a cell must be brighter than this to fire. Low = the head fires on almost anything, high = only the brightest" />
-                  <Slider label="density" value={cfg.signal.density} min={0} max={1} neutral={0.35} onChange={(v) => pv('signal', { density: v })} mod={chip('signalDensity')} title="How many marks one head may fire per step (the brightest first)" />
+                  <Slider label="spread" value={cfg.signal.spread} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { spread: v })} mod={chip('signalSpread')} midiId="sonify:param:signalSpread" title="The polymeter : at 0 every head sweeps in unison, toward 1 their sweeps shorten to 12, 10 and 7 sixteenths and drift in and out of phase" />
+                  <Slider label="thresh" value={cfg.signal.thresh} min={0} max={1} neutral={0.5} onChange={(v) => pv('signal', { thresh: v })} mod={chip('signalThresh')} midiId="sonify:param:signalThresh" title="What counts as a mark : a cell must be brighter than this to fire. Low = the head fires on almost anything, high = only the brightest" />
+                  <Slider label="density" value={cfg.signal.density} min={0} max={1} neutral={0.35} onChange={(v) => pv('signal', { density: v })} mod={chip('signalDensity')} midiId="sonify:param:signalDensity" title="How many marks one head may fire per step (the brightest first)" />
                   <Row label="path">
                     <select
                       className="input select-compact min-w-0 flex-1 text-[10px]"
@@ -2047,10 +2046,10 @@ export function SonifyPage({
                       {[4, 5, 6, 7, 8, 9].map((o) => <option key={o} value={o}>oct {o}</option>)}
                     </select>
                   </Row>
-                  <Slider label="snap" value={cfg.signal.snap} min={0} max={1} neutral={1} fmt={(v) => (v < 0.02 ? 'free' : v > 0.98 ? 'scale' : Math.round(v * 100) + '%')} onChange={(v) => pv('signal', { snap: v })} mod={chip('signalSnap')} title={`Pitch from ${cfg.signal.play === 'picture' ? 'where a thing is' : 'height'} : free frequency at 0, the global scale at 1. The middle is microtonal (a blend in pitch, not a crossfade of two notes)`} />
+                  <Slider label="snap" value={cfg.signal.snap} min={0} max={1} neutral={1} fmt={(v) => (v < 0.02 ? 'free' : v > 0.98 ? 'scale' : Math.round(v * 100) + '%')} onChange={(v) => pv('signal', { snap: v })} mod={chip('signalSnap')} midiId="sonify:param:signalSnap" title={`Pitch from ${cfg.signal.play === 'picture' ? 'where a thing is' : 'height'} : free frequency at 0, the global scale at 1. The middle is microtonal (a blend in pitch, not a crossfade of two notes)`} />
                   <Slider label="gain" value={cfg.signal.gain} min={0} max={1} neutral={0.6} onChange={(v) => pv('signal', { gain: v })} title="How loud the Signal voice is (before its mixer channel)" />
                   <Slider label="pan" value={cfg.signal.pan} min={-1} max={1} neutral={0} onChange={(v) => pv('signal', { pan: v })} title={cfg.signal.play === 'picture' ? 'Places the Signal voice left (-1) or right (+1); each grain is also panned by its thing (the pan row, else where it is)' : 'Places the Signal voice left (-1) or right (+1); each grain is also panned by where its mark sits'} />
-                  {cfg.signal.play === 'picture' && <SignalPictureRows sg={cfg.signal} set={(p) => pv('signal', p)} Slider={Slider} />}
+                  {cfg.signal.play === 'picture' && <SignalPictureRows sg={cfg.signal} set={(p) => pv('signal', p)} chip={chip} assignBox={assignBox} Slider={Slider} />}
                 </VoiceShell>
               ),
               10: (

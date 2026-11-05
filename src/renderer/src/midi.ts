@@ -38,6 +38,7 @@ import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum } from './link'
 import { sonifyParamOf, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { SYNTH_PARAM_LABEL } from './audio/synthPlay'
+import { SIGNAL_PARAM_LABEL } from './audio/signalPlay'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { actionLabel, fireAction } from './actions'
 import { seqTransportToggle } from './engine/ruleSeq'
@@ -191,7 +192,7 @@ export interface MidiDevice {
 // surface:x / :y    CC → the Metasurface cursor axis (drives scene-morphing;
 //                   activates the surface; needs >=2 placed scenes)
 // sonify:master     CC → Sonify master gain
-// sonify:param:<p>  CC → a Sonify parameter over its modulation span (the Synth's knobs)
+// sonify:param:<p>  CC → a Sonify parameter over its modulation span (the Synth's and Signal's knobs)
 // sonify:voice:<i>  note/CC press → toggle Sonify voice i on/off (0..8)
 // fire:vary         note/CC press → Variation at the current spread
 // fire:randomize    note/CC press → the selected Randomize
@@ -255,7 +256,7 @@ export function midiTargetLabel(id: string): string {
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : lm[2] === 'harmony' ? 'A·B hue' : 'opacity'}`
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13)
-    return `SONIFY ${SYNTH_PARAM_LABEL[p] ?? p}`
+    return `SONIFY ${SYNTH_PARAM_LABEL[p] ?? SIGNAL_PARAM_LABEL[p] ?? p}`
   }
   const sv = /^sonify:voice:(\d+)$/.exec(id)
   if (sv) {

@@ -15,6 +15,19 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Signal's knobs take modulators and MIDI Learn** (Vincent : "add the chips and MIDI
+  Learn"). Ten new Sonify targets (`signalSens`, `signalPicture`, one `signalD*` per
+  PICTURE row) in `shared/types.ts`, `SONIFY_MOD_DESCS`, `withSonifyParam` /
+  `sonifyParamOf`; `signalModOf` answers the SynthPlayer's slot names with Signal's own,
+  and the sense reaches the finder live. Every row has its **M**, its live number and
+  its binding row, and sense and PICTURE have theirs. MIDI / OSC Learn
+  (`sonify:param:<p>`) now covers the whole card : those ten, and the eight older Signal
+  sliders that had a chip but no Learn (decay, tone, fm, rate, spread, thresh, density,
+  snap). Names in one place (`SIGNAL_PARAM_LABEL`). Checked in the test copy with a
+  square LFO, hits logged against its state : the wave row 1 wave / 5 waves, PICTURE 0
+  every pan, decay and tone flat / spread, the decay row, the chance row 137 / 99 hits,
+  sense 0.44 / 2.66 things found (2.8 unbound); by clicks : 15 chips, 15 overlays, CC 0 /
+  127 → the ends, an OSC fader learned on a row; the 240 px column overflows nothing.
 - **Signal's Picture Play** (Vincent : "update Signal so that it can be played like
   Synth, in the same principles" · "I don't want it to sound really different : I just
   want to be able to drive it with the visuals' parameters like Synth : movement,
@@ -1008,6 +1021,14 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   518 px survived a cold relaunch; console errors 0.
 
 ### Fixed
+
+- **A modulator on the Synth's sense did nothing.** The chip was there and its value
+  moved, but the player reads the sense off the config, which never saw it : it reaches
+  the finder now (things found 0.63 / 2.42 under a square LFO). A MIDI knob on it always
+  worked (it writes the config).
+- **Signal's pan row is continuous at depth 0** : a row with a source plays at any depth,
+  0 the middle, so a modulated depth crosses 0 without a jump to where the thing is (a row
+  dragged to exactly 0 used to mean that). Source `none` still means where the thing is.
 
 - **The Sonify Synth, in tune and without its bugs** (Vincent : "Re-look at synth : make
   sure its pitch is right, and re-analyze it thoroughly to make sure it hasn't got any

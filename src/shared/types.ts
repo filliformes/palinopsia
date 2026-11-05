@@ -821,6 +821,11 @@ export type SonifyModParam =
   | 'synthEnvAmt' | 'synthGlide' | 'synthDrift' | 'synthLevel' | 'synthGain' | 'synthPicture' | 'synthSens'
   | 'synthDVel' | 'synthDTimbre' | 'synthDHarm' | 'synthDMorph' | 'synthDCutoff'
   | 'synthDReso' | 'synthDDrive' | 'synthDEnv' | 'synthDPan' | 'synthDBend'
+  // Signal's Picture Play : the sense, the PICTURE amount (read by the play
+  // side) and each picture patchbay row's depth (-1..1)
+  | 'signalSens' | 'signalPicture'
+  | 'signalDVel' | 'signalDDecay' | 'signalDTone' | 'signalDFm'
+  | 'signalDWave' | 'signalDRate' | 'signalDPan' | 'signalDChance'
   // Space : where each voice sits in the room (shared/spatial.ts)
   | import('./spatial').SpaceModParam
 export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
@@ -837,7 +842,10 @@ export const SONIFY_MOD_PARAMS: SonifyModParam[] = [
   'synthTimbre', 'synthHarmonics', 'synthMorph', 'synthCutoff', 'synthReso', 'synthDrive',
   'synthEnvAmt', 'synthGlide', 'synthDrift', 'synthLevel', 'synthGain', 'synthPicture', 'synthSens',
   'synthDVel', 'synthDTimbre', 'synthDHarm', 'synthDMorph', 'synthDCutoff',
-  'synthDReso', 'synthDDrive', 'synthDEnv', 'synthDPan', 'synthDBend'
+  'synthDReso', 'synthDDrive', 'synthDEnv', 'synthDPan', 'synthDBend',
+  'signalSens', 'signalPicture',
+  'signalDVel', 'signalDDecay', 'signalDTone', 'signalDFm',
+  'signalDWave', 'signalDRate', 'signalDPan', 'signalDChance'
 ]
 
 // One part of a color input, in the color picker's own space (HSV, what the

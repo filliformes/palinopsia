@@ -23,7 +23,7 @@ import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
 import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
-import { defaultSignalPatch, normalizeSignalPatch, signalHit, signalPlayerCfg, type SignalRow } from './signalPlay'
+import { SIGNAL_DEPTH_PARAMS, defaultSignalPatch, normalizeSignalPatch, signalHit, signalModOf, signalPlayerCfg, type SignalRow } from './signalPlay'
 
 export const GRID = 96
 // Signal's grains play this long after their step : a fixed latency, longer
@@ -450,7 +450,9 @@ const SONI_SIMPLE_MODS: Record<string, [keyof SoniConfig, string]> = {
   synthCutoff: ['synth', 'cutoff'], synthReso: ['synth', 'reso'], synthDrive: ['synth', 'drive'],
   synthEnvAmt: ['synth', 'envAmt'], synthGlide: ['synth', 'glide'], synthDrift: ['synth', 'drift'],
   synthLevel: ['synth', 'level'], synthGain: ['synth', 'gain'],
-  synthPicture: ['synth', 'picture'], synthSens: ['synth', 'sens']
+  synthPicture: ['synth', 'picture'], synthSens: ['synth', 'sens'],
+  // Signal's Picture Play : what its play side reads here
+  signalSens: ['signal', 'sens'], signalPicture: ['signal', 'picture']
 }
 const freqNote = (f: number): number => 69 + 12 * Math.log2(Math.max(1, f) / 440)
 
@@ -572,6 +574,12 @@ export function withSonifyParam(c: SoniConfig, param: string, v: number): SoniCo
         const patch = sy.patch.map((r, i) => (i === row ? { ...r, depth: Math.max(-1, Math.min(1, v)) } : r))
         return { ...c, synth: { ...sy, patch } }
       }
+      // Signal's Picture Play depths (one per row)
+      const sigRow = (SIGNAL_DEPTH_PARAMS as readonly string[]).indexOf(param)
+      if (sigRow >= 0) {
+        const patch = normalizeSignalPatch(c.signal.patch).map((r, i) => (i === sigRow ? { ...r, depth: Math.max(-1, Math.min(1, v)) } : r))
+        return { ...c, signal: { ...c.signal, patch } }
+      }
       return c
     }
   }
@@ -597,7 +605,9 @@ export function sonifyParamOf(c: SoniConfig, param: string): number | undefined 
     case 'rasterPitch': return c.raster.quantize ? c.raster.note : freqNote(c.raster.freq)
     default: {
       const row = (SYNTH_DEPTH_PARAMS as readonly string[]).indexOf(param)
-      return row >= 0 ? c.synth?.patch?.[row]?.depth : undefined
+      if (row >= 0) return c.synth?.patch?.[row]?.depth
+      const sigRow = (SIGNAL_DEPTH_PARAMS as readonly string[]).indexOf(param)
+      return sigRow >= 0 ? c.signal?.patch?.[sigRow]?.depth : undefined
     }
   }
 }
@@ -2030,9 +2040,13 @@ class SonifyEngine {
   private analyzeSynth(t: number, frameDt: number, nowMs: number, fresh: boolean): void {
     const node = this.node
     if (!node) return
+    const sm = sonifyModValues.get('synthSens')
+    const synthSensMod = sm !== undefined && Number.isFinite(sm) ? Math.max(0, Math.min(1, sm)) : undefined
     const out = this.synthPlay.step({
       cur: this.luma[t], prev: this.lumaPrev[t], rgba: this.rgbaTap[t], fresh,
-      dt: frameDt, nowMs, cfg: this.cfg.synth, table: this.synthTable,
+      // (a modulator on the sense has to reach the finder : the player reads the
+      // sense off the config, and only its depths through `mod`)
+      dt: frameDt, nowMs, cfg: synthSensMod === undefined ? this.cfg.synth : { ...this.cfg.synth, sens: synthSensMod }, table: this.synthTable,
       aspect: this.frame.aspect, radial: this.radialOf,
       // (the beat clock was counted at the frame's start : carried on to now,
       // a render of a few ms ago would put every grid onset that much late)
@@ -2357,18 +2371,24 @@ class SonifyEngine {
       const v = mv.get(k) ?? base
       return Number.isFinite(v) ? v : base
     }
-    const pcfg = signalPlayerCfg(sg)
+    const pcfg = signalPlayerCfg({ ...sg, sens: eff('signalSens', sg.sens) })
     const tbl = this.signalFreqs
     const out = this.sigPlay.step({
       cur: this.luma[t], prev: this.lumaPrev[t], rgba: this.rgbaTap[t], fresh,
       dt: frameDt, nowMs, cfg: pcfg, table: tbl,
       aspect: this.frame.aspect, radial: this.radialOf,
       beats: soniBeats(), bpm: this.bpm, bar: soniBar(),
-      // (its depths are its own : the Synth's modulators never reach them)
-      mod: () => undefined
+      // (its depths and PICTURE by their own params : the Synth's modulators
+      // never reach them)
+      mod: (p) => {
+        const own = signalModOf(p)
+        return own ? mv.get(own) : undefined
+      }
     })
     const knobs = { decay: eff('signalDecay', sg.decay), tone: eff('signalTone', sg.tone), fm: eff('signalFm', sg.fm), wave: sg.wave }
-    const panRow = pcfg.patch[6].src !== 'none' && pcfg.patch[6].depth !== 0
+    // (a row with a source plays at any depth, 0 the middle : a modulated depth
+    // crosses 0 without a jump; no source : the hit sits where the thing is)
+    const panRow = pcfg.patch[6].src !== 'none'
     // the pitch : the thing's scale note, SNAP blending in the free frequency
     // at its place (as a read head's mark : the table's lowest .. highest note)
     const root = effRoot(this.cfg)

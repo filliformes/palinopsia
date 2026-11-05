@@ -7,11 +7,13 @@
 // and dice in the header, its eight rows folded under it), in the Synth card's
 // look.
 
+import type { SonifyModParam } from '@shared/types'
 import type { SoniConfig } from '../audio/sonify'
 import { SYNTH_SRCS, SYNTH_SRC_HINT } from '../audio/synthPlay'
-import { SIGNAL_DESTS, SIGNAL_DEST_HINT, SIGNAL_DEST_LABEL, defaultSignalPatch, normalizeSignalPatch, randomSignalPatchbay, type SignalDest, type SignalRow } from '../audio/signalPlay'
-import { IconBtn, Row, Seg } from './sonifyUi'
-import { useStore } from '../store'
+import { SIGNAL_DEPTH_PARAMS, SIGNAL_DESTS, SIGNAL_DEST_HINT, SIGNAL_DEST_LABEL, defaultSignalPatch, normalizeSignalPatch, randomSignalPatchbay, type SignalDest, type SignalRow } from '../audio/signalPlay'
+import { IconBtn, LiveNum, Row, Seg } from './sonifyUi'
+import { modTargetKey, useStore } from '../store'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import type { SliderProps } from './SonifyPage'
 import { SECTION_COLORS, SectionHead } from './FinishingSections'
 import { SRC_LABEL } from './SonifySynth'
@@ -19,6 +21,7 @@ import { SRC_LABEL } from './SonifySynth'
 type Sig = SoniConfig['signal']
 const fmt2 = (v: number): string => v.toFixed(2)
 const pm = (v: number): string => `${v > 0 ? '+' : ''}${v.toFixed(2)}`
+const midi = (p: string): string => `sonify:param:${p}`
 const PMODE_LABEL: Record<Sig['pmode'], string> = { height: 'height', keyboard: 'keys', radial: 'radial' }
 const PMODE_HINT: Record<Sig['pmode'], string> = {
   height: 'Pitch from height : low at the bottom, high at the top',
@@ -44,7 +47,12 @@ export function SignalPlaySwitch({ sg, set }: { sg: Sig; set: (p: Partial<Sig>) 
 }
 
 /** Picture Play's read : the pitch's place, STRIKE / TIE, the sense. */
-export function SignalPictureRead({ sg, set, Slider }: { sg: Sig; set: (p: Partial<Sig>) => void; Slider: (p: SliderProps) => JSX.Element }): JSX.Element {
+export function SignalPictureRead({ sg, set, chip, Slider }: {
+  sg: Sig
+  set: (p: Partial<Sig>) => void
+  chip: (p: SonifyModParam, inactive?: boolean) => JSX.Element
+  Slider: (p: SliderProps) => JSX.Element
+}): JSX.Element {
   return (
     <>
       <Row label="pitch" fit={150} hint="Where a thing's pitch comes from (on the scale; SNAP lets it off)">
@@ -61,13 +69,19 @@ export function SignalPictureRead({ sg, set, Slider }: { sg: Sig; set: (p: Parti
             : 'TIE : one held grain per moving thing (the pip and the ping hold at their peak, the others at full), struck again at each new scale note it crosses, let go over the decay when it stops; its pitch, level, pan, tone and fm follow it'}
         />
       </Row>
-      <Slider label="sense" value={sg.sens} min={0} max={1} neutral={0.5} fmt={fmt2} onChange={(v) => set({ sens: v })} title="How much movement counts as a thing (up : smaller, slower movements play too)" />
+      <Slider label="sense" value={sg.sens} min={0} max={1} neutral={0.5} fmt={fmt2} onChange={(v) => set({ sens: v })} mod={chip('signalSens')} midiId={midi('signalSens')} title="How much movement counts as a thing (up : smaller, slower movements play too)" />
     </>
   )
 }
 
 /** The PICTURE section : its amount and dice in the header, its eight rows. */
-export function SignalPictureRows({ sg, set, Slider }: { sg: Sig; set: (p: Partial<Sig>) => void; Slider: (p: SliderProps) => JSX.Element }): JSX.Element {
+export function SignalPictureRows({ sg, set, chip, assignBox, Slider }: {
+  sg: Sig
+  set: (p: Partial<Sig>) => void
+  chip: (p: SonifyModParam, inactive?: boolean) => JSX.Element
+  assignBox: (...ps: SonifyModParam[]) => JSX.Element | null
+  Slider: (p: SliderProps) => JSX.Element
+}): JSX.Element {
   const key = 'soni-signal-picture'
   const stored = useStore((st) => st.collapsed[key])
   const setCollapsed = useStore((st) => st.setCollapsed)
@@ -79,8 +93,10 @@ export function SignalPictureRows({ sg, set, Slider }: { sg: Sig; set: (p: Parti
     const r: SignalRow = patch[i]
     const setRow = (p: Partial<SignalRow>): void => set({ patch: patch.map((x, j) => (j === i ? { ...x, ...p } : x)) })
     const title = `${SIGNAL_DEST_LABEL[d]} : ${SIGNAL_DEST_HINT[d]}. Its depth, -1 to +1 (negative : the source upside down; double-click : 0)`
+    const param = SIGNAL_DEPTH_PARAMS[i] as SonifyModParam
     return (
-      <div key={d} className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+      <div key={d} className="flex flex-col">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
         <span className="w-14 shrink-0 truncate font-mono text-[9px] uppercase text-muted" title={title}>{SIGNAL_DEST_LABEL[d]}</span>
         <select
           className="input select-compact w-[78px] shrink-0 !px-0.5"
@@ -91,17 +107,24 @@ export function SignalPictureRows({ sg, set, Slider }: { sg: Sig; set: (p: Parti
         >
           {SYNTH_SRCS.map((x) => <option key={x} value={x} title={SYNTH_SRC_HINT[x]}>{SRC_LABEL[x]}</option>)}
         </select>
+        {/* (a MIDI knob or an OSC fader learns it : sonify:param:<its depth>) */}
         <span className="flex min-w-0 items-center gap-1" style={{ flex: '1 1 104px' }}>
-          <input
-            type="range" min={-1} max={1} step={0.01} value={r.depth}
-            onChange={(e) => setRow({ depth: Number(e.target.value) })}
-            onDoubleClick={() => setRow({ depth: 0 })}
-            disabled={r.src === 'none'}
-            className="min-w-0 flex-1 accent-accent disabled:opacity-40"
-            title={title}
-          />
-          <span className="w-8 shrink-0 text-right font-mono text-[9px] text-muted">{pm(r.depth)}</span>
+          <span className="relative flex min-w-0 flex-1">
+            <MidiLearnOverlay id={midi(param)} />
+            <input
+              type="range" min={-1} max={1} step={0.01} value={r.depth}
+              onChange={(e) => setRow({ depth: Number(e.target.value) })}
+              onDoubleClick={() => setRow({ depth: 0 })}
+              disabled={r.src === 'none'}
+              className="min-w-0 flex-1 accent-accent disabled:opacity-40"
+              title={title}
+            />
+          </span>
+          <LiveNum liveKey={modTargetKey({ kind: 'sonify', param })} value={r.depth} fmt={pm} className="w-8 shrink-0 text-right font-mono text-[9px] text-muted" />
+          {chip(param)}
         </span>
+      </div>
+      {assignBox(param)}
       </div>
     )
   }
@@ -117,7 +140,7 @@ export function SignalPictureRows({ sg, set, Slider }: { sg: Sig; set: (p: Parti
         wrap
         lead={
           <div className="flex min-w-0 cursor-default flex-col" style={{ flex: '1 1 140px' }} onClick={own} onDoubleClick={own}>
-            <Slider label="picture" noLabel value={sg.picture} min={0} max={1} neutral={0.8} fmt={fmt2} onChange={(v) => set({ picture: v })} title="How much the picture shapes the hits : every patchbay depth scaled (0 = the picture only picks the pitches and when they play; ▸ shows the rows)" />
+            <Slider label="picture" noLabel value={sg.picture} min={0} max={1} neutral={0.8} fmt={fmt2} onChange={(v) => set({ picture: v })} mod={chip('signalPicture')} midiId={midi('signalPicture')} title="How much the picture shapes the hits : every patchbay depth scaled (0 = the picture only picks the pitches and when they play; ▸ shows the rows)" />
           </div>
         }
         right={

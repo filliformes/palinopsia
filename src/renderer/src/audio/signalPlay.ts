@@ -8,7 +8,7 @@
 // TIE : one grain held per thing, struck again at each new note it crosses.
 // The READ HEADS (the scan of marks on a clock) stay the other way to play it.
 
-import { defaultSynth, SYNTH_SRCS, type SynthCfg, type SynthMods, type SynthRow, type SynthSrc } from './synthPlay'
+import { defaultSynth, SYNTH_DEPTH_PARAMS, SYNTH_SRCS, type SynthCfg, type SynthMods, type SynthRow, type SynthSrc } from './synthPlay'
 
 export const SIGNAL_DESTS = ['vel', 'decay', 'tone', 'fm', 'wave', 'rate', 'pan', 'chance'] as const
 export type SignalDest = (typeof SIGNAL_DESTS)[number]
@@ -22,11 +22,32 @@ export const SIGNAL_DEST_HINT: Record<SignalDest, string> = {
   fm: 'how metallic the fm hit is, around the fm knob',
   wave: 'which wave the thing plays : steps through the nine waves from the one picked',
   rate: 'STRIKE : how often the thing ticks, from a quarter to four times the clock',
-  pan: 'where the hit sits, left to right',
+  pan: 'where the hit sits, left to right, around the middle (source none : where the thing is)',
   chance: 'how likely a hit is to play : a low source thins the thing\'s hits (depth up : the pattern breathes)'
 }
 
 export type SignalRow = SynthRow
+
+/** Each row's depth as a modulation target (sonify param), in row order. */
+export const SIGNAL_DEPTH_PARAMS = [
+  'signalDVel', 'signalDDecay', 'signalDTone', 'signalDFm',
+  'signalDWave', 'signalDRate', 'signalDPan', 'signalDChance'
+] as const
+
+/** Signal's modulatable params by name (the M chips, MIDI learn). */
+export const SIGNAL_PARAM_LABEL: Record<string, string> = {
+  signalDecay: 'Signal decay', signalTone: 'Signal tone', signalFm: 'Signal fm',
+  signalRate: 'Signal rate', signalSpread: 'Signal spread', signalThresh: 'Signal threshold',
+  signalDensity: 'Signal density', signalSnap: 'Signal snap',
+  signalSens: 'Signal sense', signalPicture: 'Signal picture amount'
+}
+SIGNAL_DESTS.forEach((d, i) => { SIGNAL_PARAM_LABEL[SIGNAL_DEPTH_PARAMS[i]] = `Signal picture → ${SIGNAL_DEST_LABEL[d]} depth` })
+
+/** The player asks by the Synth's names (its slots) : which of Signal's params
+ *  answers (the Synth's own modulators never reach Signal; slots 8 and 9 rest). */
+const SIGNAL_MOD_OF: Record<string, string> = { synthPicture: 'signalPicture' }
+SIGNAL_DEPTH_PARAMS.forEach((p, i) => { SIGNAL_MOD_OF[SYNTH_DEPTH_PARAMS[i]] = p })
+export const signalModOf = (synthParam: string): string | undefined => SIGNAL_MOD_OF[synthParam]
 
 /** Gentle by default : Signal still sounds like Signal, the picture shapes it. */
 export function defaultSignalPatch(): SignalRow[] {
