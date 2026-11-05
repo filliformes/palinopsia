@@ -1142,7 +1142,7 @@ const HAND_LOG_NUMBERS = 200000
 /** Marbling's `clear ▸` empties the water, and with it the hand-made log (one
  *  undo step brings both back). */
 function withClearedHandOps(src: SourceSlot, name: string, value: number | number[]): SourceSlot {
-  if (name !== 'clear' || src.shaderId !== 'gen-marble' || !src.handOps?.length) return src
+  if (name !== 'clear' || (src.shaderId !== 'gen-marble' && src.shaderId !== 'gen-relief') || !src.handOps?.length) return src
   if (!(typeof value === 'number' && value >= 0.5)) return src
   return { ...src, handOps: [] }
 }
@@ -1375,6 +1375,8 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
       slot.collageFolder = clips.folder
       slot.collagePool = clips.pool
     }
+    // (a new empty log is a blank page : Generate over a Relief starts a new drawing)
+    if (id === 'gen-relief') slot.handOps = []
     if (id === 'gen-text') {
       slot.text = pickLines(theme.words)
       // Half the time another layer fills the letters : the type becomes a window.

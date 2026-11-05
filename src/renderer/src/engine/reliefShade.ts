@@ -1,0 +1,98 @@
+// The materials that Relief (a source) and Inflate (an effect) share : a height
+// given a light, as paint, plastic, chrome or a soap film. GLSL ES 3.00, math only.
+// Thin film after the optics every soap bubble obeys : light reflected off a film's two
+// faces interferes, by phase 4 pi n d cos(t) / lambda, half a wave shifted at the first face.
+
+export const FILM_GLSL = `
+// The color a film of \`nm\` nanometers gives back at this angle (cosI : the incidence).
+// Nine wavelengths, each weighted by a rough tristimulus response. 0 nm reflects
+// nothing (the black of a bubble about to burst).
+vec3 filmColor(float nm, float cosI, float ior) {
+  float sinT2 = (1.0 - cosI * cosI) / (ior * ior);
+  float cosT = sqrt(max(0.0, 1.0 - sinT2));
+  vec3 sum = vec3(0.0);
+  vec3 norm = vec3(0.0);
+  for (int i = 0; i < 9; i++) {
+    float l = 400.0 + 35.0 * float(i);
+    float phase = 12.5663706 * ior * nm * cosT / l;
+    // two-beam reflectance, the half-wave shift at the first face makes a thin film dark
+    float I = 0.5 - 0.5 * cos(phase);
+    vec3 w = vec3(exp(-pow((l - 605.0) / 52.0, 2.0)) + 0.18 * exp(-pow((l - 445.0) / 24.0, 2.0)),
+                  exp(-pow((l - 545.0) / 48.0, 2.0)),
+                  exp(-pow((l - 455.0) / 34.0, 2.0)));
+    sum += I * w;
+    norm += w;
+  }
+  return sum / norm;
+}
+`
+
+export const RELIEF_SHADE = `${FILM_GLSL}
+// A photo studio to reflect : a dark room, a big softbox where the lamp stands, a
+// strip light opposite, a floor. It turns with the lamp, so turning the light slides
+// every reflection across the metal.
+vec3 studio(vec3 r, float az) {
+  float c = cos(-az), s = sin(-az);
+  vec3 q = vec3(c * r.x - s * r.y, s * r.x + c * r.y, r.z);
+  // a pale ceiling, a hard dark horizon, a warm floor : what makes metal read as metal
+  vec3 sky = mix(vec3(0.86, 0.89, 0.95), vec3(0.09, 0.1, 0.13), smoothstep(0.06, 0.92, q.z));
+  vec3 gnd = mix(vec3(0.008, 0.008, 0.01), vec3(0.17, 0.145, 0.125), smoothstep(0.0, -0.85, q.z));
+  vec3 room = mix(gnd, sky, smoothstep(-0.015, 0.03, q.z));
+  // the key softbox
+  float bx = smoothstep(0.6, 0.44, abs(q.y)) * smoothstep(0.1, 0.26, q.x) * smoothstep(0.92, 0.7, q.x);
+  bx *= smoothstep(0.04, 0.16, q.z);
+  // the strip light opposite
+  float strip = smoothstep(0.1, 0.05, abs(q.y - 0.25)) * smoothstep(-0.2, -0.32, q.x) * smoothstep(0.92, 0.7, -q.x) * smoothstep(0.0, 0.12, q.z);
+  return room + vec3(1.0, 0.98, 0.95) * bx * 1.7 + vec3(0.72, 0.8, 1.0) * strip * 0.9;
+}
+
+// A surface lit : M the material (0 matte 1 metal 2 brushed 3 gloss plastic 4 chrome
+// 5 ink 6 film), N its normal, L the lamp, a its color, g how tight its highlight.
+vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 reflected, float reflectAmt, float film, float filmNm) {
+  vec3 V = vec3(0.0, 0.0, 1.0);
+  vec3 H = normalize(L + V);
+  float nl = max(0.0, dot(N, L));
+  float nv = max(0.0, N.z);
+  float fres = pow(1.0 - nv, 5.0);
+  vec3 r = reflect(-V, N);
+  vec3 env = mix(studio(r, az), reflected, reflectAmt);
+  vec3 c;
+  if (M < 0.5) {
+    // matte : a soft wrapped light and a broad dull sheen, as on modeling clay
+    float wrap = (dot(N, L) + 0.45) / 1.45;
+    c = a * (0.14 + 0.92 * max(0.0, wrap) * max(0.0, wrap)) + vec3(0.12) * pow(max(0.0, dot(N, H)), 14.0);
+    c += a * fres * 0.15 + env * reflectAmt * 0.25;
+  } else if (M < 1.5) {
+    // polished colored metal
+    c = env * mix(vec3(1.0), a * 1.35, 0.72) + vec3(1.0) * pow(max(0.0, dot(N, H)), 90.0 * g) * 0.9;
+  } else if (M < 2.5) {
+    // brushed metal : the highlight stretched across the cut
+    // and the room's reflection blurred by the scratches, with a shoulder : never a flat band
+    vec3 e = studio(normalize(r + vec3(0.17, 0.0, 0.0)), az) + studio(normalize(r - vec3(0.17, 0.0, 0.0)), az)
+           + studio(normalize(r + vec3(0.0, 0.17, 0.0)), az) + studio(normalize(r - vec3(0.0, 0.17, 0.0)), az);
+    e = mix(e * 0.25, reflected, reflectAmt);
+    e /= 1.0 + 0.35 * e;
+    float sp = pow(max(0.0, dot(N, H)), 22.0 * g);
+    c = e * mix(vec3(1.0), a * 1.3, 0.8) * 0.85 + a * sp * 0.45 + vec3(0.9) * pow(sp, 6.0) * 0.3;
+  } else if (M < 3.5) {
+    // molded plastic : a colored body, a clear hard shine
+    c = a * (0.2 + 0.85 * nl) + vec3(1.0) * pow(max(0.0, dot(N, H)), 120.0 * g) * 0.75 + env * (0.04 + 0.5 * fres);
+  } else if (M < 4.5) {
+    // chrome : only what it reflects
+    c = env * mix(vec3(1.0), a * 1.25, 0.18) + vec3(1.0) * pow(max(0.0, dot(N, H)), 200.0 * g) * 1.2;
+  } else if (M < 5.5) {
+    // ink : flat
+    c = a;
+  } else {
+    // a soap film over dark : its colors, what it reflects on top
+    vec3 f = filmColor(filmNm, nv, 1.33);
+    c = f * f * (0.3 + 0.62 * nv) + env * (0.05 + 0.55 * fres) + vec3(1.0) * pow(max(0.0, dot(N, H)), 160.0 * g) * 0.8;
+  }
+  // an oil slick over anything shiny
+  if (film > 0.0 && M >= 0.5 && M < 5.5) {
+    vec3 f = filmColor(filmNm, nv, 1.4);
+    c = mix(c, c * (0.2 + 1.5 * f) + f * f * 0.1, film);
+  }
+  return c;
+}
+`

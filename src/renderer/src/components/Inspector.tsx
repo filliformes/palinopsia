@@ -90,6 +90,7 @@ const NODE_INPUTS: Record<string, NodeInput[]> = {
   'node-lookup': [{ label: 'palette', hint: 'a line across it is the color table', none: 'self' }],
   'node-fieldstore': [{ label: 'key from', hint: 'its brightness decides where the store is written (with key : sidechain)', none: 'self' }],
   'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }],
+  'node-inflate': [{ label: 'reflects', hint: 'the layer the metal reflects, or the glass bends', none: 'none' }],
   'node-silhouette': [
     {
       label: 'fill',
@@ -260,13 +261,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'gen-fur'
+            slot.shaderId === 'gen-relief'
+              ? 'A layer Relief reads, by SIDECHAIN : its colors in the strokes, reflected in the metal, or bent through the relief as through glass. Its moving things or its outlines can also draw the strokes (draws itself).'
+              : slot.shaderId === 'gen-fur'
               ? 'A layer the coat reads, by SIDECHAIN : its colors on the hairs, or the hair growing only where it is bright, so letters or a silhouette come out furry.'
               : slot.shaderId === 'gen-sandplate'
               ? 'A layer whose colors the sand takes, by SIDECHAIN : the lines become a window onto that picture, drawn in grains.'

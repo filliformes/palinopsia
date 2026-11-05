@@ -73,6 +73,20 @@ desaturate→recolour as a compositional pivot (DeWitt); tension-release colour 
 **Motion / modulation:** WHERE/WHEN/WHAT "trajectory" modulator (Sonnet99); temporal-
 dilation clock curve (Sonnet99); freehand macro-path editor (Sonnet99).
 
+**From a November 2026 look at open-source creative tools (not built):**
+
+- *Sources :* raymarched fractals (Oil Cloud proves the budget); a small 3D model source
+  (chrome, fragments, dust, hologram; animated rigs later, as in Mesh2Motion); Lottie, then Rive,
+  as a vector-animation source; a live trace of any layer (VTracer, MIT, with Marbling's
+  stencil fill).
+- *Effects :* a Shockwave ring through the picture; slope blur (Material Maker, MIT); brush
+  dabs laid along the flow (OpenToonz's Iwa_FlowPaintBrushFx, BSD-3); anisotropic diffusion
+  (darktable's diffuse.c, GPL-3, compatible with Opsia's license); brush dynamics for Relief
+  and Marbling strokes (libmypaint, ISC).
+- *Modulation and control :* modulators and gestures out as MIDI CC; a per-binding time offset
+  (Stagger : one modulator rippling across its targets); picking an audio band by dragging on
+  the spectrum (AstroFox, MIT).
+
 **Instrument / composition:** "individual vs. dividual" theme/variation layer archetypes
 (Klee, H13); a **best-balance freeze + still-capture** control honouring Laposky's practice;
 linked-hue binding across layers (Sonnet99).

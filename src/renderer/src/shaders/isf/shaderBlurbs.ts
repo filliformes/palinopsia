@@ -24,6 +24,10 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Takes the image down to brightness alone and paints it back with three colors: one for the darks, one for the mid-tones and one for the lights. Push the gain or bias and the fold wraps the overflow back into range, carving extra color bands out of a smooth gradient; invert runs the map backward into a color negative. Modeled on analog video colorizers.',
   'fx-threshold':
     'Cuts the picture into just two tones at a brightness you pick, with a softness control for how hard the edge is. Everything above the line goes white, everything below goes black. Put a Palette after it to turn those two tones into any two colors, or switch on the alpha key to keep the colors and cut the dark side away to transparency.',
+  'fx-thinfilm':
+    'The picture as the thickness of a soap film or an oil slick : every thickness gives back its own color, in the orders every bubble shows, slowly running in currents of its own.',
+  'node-inflate':
+    'Blows the layer up into volume : its shape gets a real height, rounded in from its edges, lit as clay, plastic, metal, chrome, soap film or glass, live. Text or a silhouette comes out as liquid chrome.',
   'fx-solarize':
     'Inverts only the parts of the image brighter than a chosen level, leaving the rest alone. Highlights turn inside-out while shadows stay normal, which is the strange tonal flip you see in darkroom prints. Subtle settings read as a glow; extreme ones read as a negative.',
   'fx-vibe':
