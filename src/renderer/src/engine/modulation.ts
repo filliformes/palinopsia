@@ -1506,7 +1506,19 @@ export const SONIFY_MOD_DESCS: Record<string, { min: number; max: number; def: n
   synthDDrive: { min: -1, max: 1, def: 0.3 },
   synthDEnv: { min: -1, max: 1, def: -0.7 },
   synthDPan: { min: -1, max: 1, def: 0.8 },
-  synthDBend: { min: -1, max: 1, def: 0.2 }
+  synthDBend: { min: -1, max: 1, def: 0.2 },
+  // Signal's Picture Play (signalPlay.ts) : the sense, the PICTURE amount, the
+  // patchbay depths (their defaults : defaultSignalPatch)
+  signalSens: { min: 0, max: 1, def: 0.5 },
+  signalPicture: { min: 0, max: 1, def: 0.8 },
+  signalDVel: { min: -1, max: 1, def: 0.6 },
+  signalDDecay: { min: -1, max: 1, def: 0.3 },
+  signalDTone: { min: -1, max: 1, def: 0.4 },
+  signalDFm: { min: -1, max: 1, def: 0.3 },
+  signalDWave: { min: -1, max: 1, def: 0 },
+  signalDRate: { min: -1, max: 1, def: 0.5 },
+  signalDPan: { min: -1, max: 1, def: 0.8 },
+  signalDChance: { min: -1, max: 1, def: 0 }
 }
 // Space : each voice's place (space.<voice>.<field>), in the same overlay. The
 // space engine reads the values and registers the bases (store.space).
