@@ -15,6 +15,33 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Sand Plate, a new source** (`gen-sandplate`; Vincent : "Implement Chladni sand as a
+  new source. Make it able to look like this (this is sand on a metal plate), so maybe
+  have a few different surfaces sand can go onto" · "add a Rotation parameter, so that the
+  plate can rotate clockwise or counterclockwise, affecting the sand"). Native
+  (`engine/SandPlateSource.ts`) : up to a million grains in a float texture, on a half-float
+  field of the plate's modes (square : cos m pi x cos n pi y +- swapped, ringing at
+  m^2 + n^2; round : J_n(k r) cos n t from a Bessel table, ringing at (n + 2s)^2). The
+  physics is static friction : a grain moves while |phi| x shake beats its own grip, so
+  sand stops in a band round each still line, thin where the plate is steep and piled up
+  at the crossings, with a few grains too stuck to move as the strays. Where more sand
+  gathers than can stand it slides (an angle of repose read from the sand's own mips, only
+  while the plate shakes), which is what makes the lines solid and continuous. ORDER,
+  TONES, WARP (the imperfection that makes the lines loop instead of the textbook
+  symmetry), a redraw on a timer, a beat or asked for; AUDIO lets the loudest frequencies
+  pick the modes, redrawn on the next accent (a held note after 2.5 s), and the level shake
+  the plate (silence : everything rests). Seven surfaces, each with its own hold on the
+  sand : black steel, spun metal, rust, slate, black glass, paper, felt. ROTATION either
+  way, up to half a turn a second : the figure and the resting sand go round with the plate,
+  grains in the air slip behind, and spun fast the pull outward beats the grip and the sand
+  flies off in spiral rings, landing again as fresh sand. On a rectangular frame the sand
+  past its edges appears on the first turn (up to 2.1M grains in all) and keeps finding its
+  lines out of sight, so no corner comes round bare; on the full dome it turns about the
+  zenith, tilt falls outward. Plate opacity 0 leaves the sand alone over the layers below,
+  SIDECHAIN colors it from another layer, dragging on the preview (or a pinch) is a finger
+  through it. 14 presets, the master chains Macro Plate / Blueprint / Wet Print, the Generate
+  themes Singing Plate / Listening Plate / Sand Over. Named Sand Plate under the app-copy rule
+  (no names in the app); searching "chladni" finds it.
 - **Signal's knobs take modulators and MIDI Learn** (Vincent : "add the chips and MIDI
   Learn"). Ten new Sonify targets (`signalSens`, `signalPicture`, one `signalD*` per
   PICTURE row) in `shared/types.ts`, `SONIFY_MOD_DESCS`, `withSonifyParam` /

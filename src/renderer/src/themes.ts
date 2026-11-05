@@ -1074,6 +1074,67 @@ export const THEMES: Theme[] = [
   // color and sharp edges are the look). Its slow motion never sweeps what
   // re-deals or reloads it.
   mk({
+    id: 'singing-plate', name: 'Singing Plate', family: 'Living Surfaces',
+    blurb: 'Sand on a vibrating plate : the grains gather on the still lines of the note it rings at, and dance off to a new figure every few seconds.',
+    world: 'parametric',
+    palette: [[0.02, 0.02, 0.03, 1], [0.3, 0.3, 0.32, 1], [0.95, 0.95, 0.92, 1]],
+    sources: ['gen-sandplate'],
+    // (the plate is the whole picture : nothing shows through it)
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-sandplate': ['Steel plate', 'Spun brass', 'Rusted sheet', 'Salt on slate', 'Black mirror', 'Felt table', 'Soot on paper', 'Fine mesh', 'Dunes'] },
+    pickInputs: {
+      'gen-sandplate': { every: [5, 8, 12], order: [9, 12, 15, 18], glide: [0.5, 0.8, 1.2] },
+      'fx-grain': { character: [1], amount: [0.03, 0.05], parasites: [0], chroma: [0] },
+      'fx-grade': { brightness: [0], contrast: [1.04, 1.1], saturation: [0.95, 1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(grains|grainSize|sync|surface|shape|rotate|every|audio|side|ground|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'listening-plate', name: 'Listening Plate', family: 'Living Surfaces',
+    blurb: 'A plate that hears : the loudest frequencies pick the figure, redrawn on the next accent, and the level shakes the sand. In silence everything rests.',
+    world: 'parametric',
+    palette: [[0.02, 0.02, 0.03, 1], [0.25, 0.25, 0.28, 1], [0.95, 0.95, 0.92, 1]],
+    sources: ['gen-sandplate'],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-sandplate': ['Listening'] },
+    pickInputs: {
+      'gen-sandplate': { audio: [0.7, 0.85, 1], surface: [0, 3, 4], order: [9, 12, 16] },
+      'fx-grade': { brightness: [0], contrast: [1.04, 1.1], saturation: [1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(grains|grainSize|sync|surface|shape|rotate|every|audio|side|ground|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'sand-over', name: 'Sand Over', family: 'Living Surfaces',
+    blurb: 'Only the sand, standing on a moving picture below : the plate gone, its lines drawn in white grains over whatever plays under them.',
+    world: 'parametric',
+    palette: [[0.03, 0.03, 0.04, 1], [0.3, 0.32, 0.35, 1], [0.95, 0.95, 0.92, 1]],
+    sources: ['gen-sandplate', 'contour', 'differential', 'slabs', 'ground'],
+    // (the picture below, the sand on top, always)
+    stack: [['contour', 'differential', 'slabs', 'ground'], ['gen-sandplate']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-sandplate': ['Steel plate', 'Salt on slate', 'Fine mesh'] },
+    pickInputs: {
+      'gen-sandplate': { ground: [0], order: [12, 18, 24], every: [6, 10] },
+      'fx-grade': { brightness: [0], contrast: [1, 1.06], saturation: [0.9, 1], lift: [0], gamma: [1] }
+    },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(grains|grainSize|sync|surface|shape|rotate|every|audio|side|ground|bloom|lift|haze)$' }
+  }),
+  mk({
     id: 'marbled-paper', name: 'Marbled Paper', family: 'Living Surfaces',
     blurb: 'Paint floating on water : drops push the older ones into rings and lobes, slow currents comb them into a marbled sheet.',
     world: 'parametric',
