@@ -59,6 +59,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime', 'drop', 'sprinkle', 'sprinkleN'),
     g('paint', 'tool', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
   ],
+  'gen-sandplate': [
+    g('figure', 'order', 'tones', 'warp', 'wander', 'every', 'sync', 'glide', 'audio', 'redraw'),
+    g('shake', 'drive', 'rotate', 'width', 'scatter', 'uneven', 'tilt', 'tiltAngle', 'pour', 'finger', 'reseed'),
+    g('material', 'surface', 'shape', 'plate', 'ground', 'sheen', 'lightAngle', 'sand', 'grains', 'grainSize', 'sparkle', 'side')
+  ],
   'gen-lattice': [
     g('points', 'form', 'count', 'size', 'irregular', 'evolve', 'vary', 'jitter', 'ink', 'ground'),
     g('camera', 'tilt', 'turn', 'height', 'lens', 'fly', 'spin', 'streak', 'fog'),
@@ -290,6 +295,16 @@ const DIMS: Record<string, (q: Dim) => Why> = {
         put(d, off, `Colors is ${n} : only the first ${n} colors are dropped.`)
       }
     }
+    return d
+  },
+  // Sand Plate : the timer and the beat time the redraws; the tilt's angle needs a
+  // tilt; a still plate leaves the width and the strays as they lie.
+  'gen-sandplate': ({ zero, is }) => {
+    const d: Why = {}
+    if (!is('sync', 0)) put(d, ['every'], 'Sync is on : the figure is redrawn on the beat.')
+    if (zero('tilt')) put(d, ['tiltAngle'], 'Tilt is at 0 : the plate lies level.')
+    if (zero('warp')) put(d, ['wander'], 'Warp is at 0 : the plate is perfect, there is nothing to wander.')
+    if (zero('ground')) put(d, ['surface', 'plate', 'sheen'], 'Plate opacity is at 0 : only the sand shows.')
     return d
   },
   'gen-lattice': ({ zero, is }) => {

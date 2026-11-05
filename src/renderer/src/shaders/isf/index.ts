@@ -1753,6 +1753,60 @@ export const GENERATORS: IsfShader[] = [
       auto: [0.25, 1.4], sync: [0, 0], size: [0.25, 0.7], vary: [0.2, 0.7], crowding: [0.4, 0.9], spreadTime: [0.35, 1.2],
       audio: [0, 0.4], budget: [60, 60], count: [4, 6], order: [0, 1], tool: [0, 0], sprinkleN: [16, 40]
     }
+  },
+  {
+    // Native (engine/SandPlateSource.ts) : a million grains on a vibrating plate's
+    // field, resting where it stands still; the sound picks the modes and shakes it.
+    id: 'gen-sandplate',
+    name: 'Sand Plate',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Sand Plate : sand on a vibrating metal plate. A grain bounces where the plate moves and rests where it stands still, so the sand gathers along the still lines of the note it rings at, and when the note changes it dances off to the new figure. ORDER is how many cells across; TONES how many modes ring at once; WARP the imperfection that makes the lines loop and wander. SHAKE narrows the lines and throws the loose grains about; silence lets everything rest. AUDIO lets the loudest frequencies pick the figure, redrawn on the next accent, and the level shake the plate. SURFACE changes what the sand lies on and how it behaves on it. ROTATION turns the plate either way, and spun fast it throws the sand outward. Click on the preview and the plate rings; drag : a finger through the sand.',
+      CATEGORIES: ['Generator', 'Organic'],
+      INPUTS: [
+        { NAME: 'order', TYPE: 'float', MIN: 2, MAX: 40, DEFAULT: 12, LABEL: 'order' },
+        { NAME: 'tones', TYPE: 'long', VALUES: [1, 2, 3, 4, 5], LABELS: ['1', '2', '3', '4', '5'], DEFAULT: 3, LABEL: 'tones' },
+        { NAME: 'warp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'warp' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'wander' },
+        { NAME: 'every', TYPE: 'float', MIN: 0, MAX: 30, DEFAULT: 8, LABEL: 'redraw every' },
+        { NAME: 'sync', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['free', 'beat', '2 beats', 'bar', '2 bars', '4 bars'], DEFAULT: 0, LABEL: 'sync' },
+        { NAME: 'glide', TYPE: 'float', MIN: 0.02, MAX: 4, DEFAULT: 0.6, LABEL: 'glide' },
+        { NAME: 'redraw', TYPE: 'event', LABEL: 'redraw ▸' },
+        { NAME: 'drive', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'shake' },
+        { NAME: 'width', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.58, LABEL: 'line width' },
+        { NAME: 'scatter', TYPE: 'float', MIN: 0, MAX: 0.3, DEFAULT: 0.006, LABEL: 'strays' },
+        { NAME: 'uneven', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'uneven' },
+        { NAME: 'tilt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.05, LABEL: 'tilt' },
+        { NAME: 'tiltAngle', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: 0, LABEL: 'tilt angle' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'grains', TYPE: 'float', MIN: 0.02, MAX: 1, DEFAULT: 0.8, LABEL: 'grains (M)' },
+        { NAME: 'grainSize', TYPE: 'float', MIN: 0.3, MAX: 3, DEFAULT: 0.85, LABEL: 'grain size' },
+        { NAME: 'sparkle', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'sparkle' },
+        { NAME: 'pour', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.05, LABEL: 'pour' },
+        { NAME: 'finger', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'finger' },
+        { NAME: 'sand', TYPE: 'color', DEFAULT: [0.84, 0.86, 0.92, 1], LABEL: 'sand' },
+        { NAME: 'side', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sidechain' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'pour all ▸' },
+        { NAME: 'surface', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6], LABELS: ['black steel', 'spun metal', 'rust', 'slate', 'black glass', 'paper', 'felt'], DEFAULT: 0, LABEL: 'surface' },
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1], LABELS: ['square', 'round'], DEFAULT: 0, LABEL: 'shape' },
+        { NAME: 'rotate', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'rotation' },
+        { NAME: 'plate', TYPE: 'color', DEFAULT: [0.032, 0.038, 0.062, 1], LABEL: 'plate color' },
+        { NAME: 'ground', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'plate opacity' },
+        { NAME: 'sheen', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'sheen' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' }
+      ]
+    })}*/`,
+    // Grains, the sync, the plate's shape and its spin are staging, never dealt. A surface
+    // and its colors are chosen together (the presets).
+    curated: {
+      order: [6, 22], tones: [1, 4], warp: [0.1, 0.6], wander: [0, 0.3], every: [4, 14], sync: [0, 0], glide: [0.3, 1.5],
+      drive: [0.3, 0.8], width: [0.25, 0.65], scatter: [0.002, 0.04], uneven: [0.1, 0.6], tilt: [0, 0.3], tiltAngle: [-3.1416, 3.1416],
+      audio: [0, 0], grains: [0.8, 0.8], grainSize: [0.7, 1.2], sparkle: [0.2, 0.7], pour: [0, 0.2], finger: [0.3, 0.6],
+      side: [0, 0], surface: [0, 0], shape: [0, 0], rotate: [0, 0], ground: [1, 1], sheen: [0.2, 0.6], lightAngle: [0, 6.2832]
+    }
   }
 ]
 

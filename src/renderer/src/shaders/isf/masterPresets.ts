@@ -837,6 +837,33 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
   },
+  // ── Sand plate : chains for sand on metal (they keep its colors : mixSrc 1, and
+  // no bloom : a white grain that glows stops being a grain). ──
+  {
+    name: 'Macro Plate', group: 'Sand plate',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.12, saturation: 0.9, lift: 0, gamma: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.2, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Blueprint', group: 'Sand plate',
+    fx: [
+      { shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.05, mixSrc: 0, colorA: [0.02, 0.07, 0.2, 1], colorB: [0.12, 0.3, 0.55, 1], colorC: [0.9, 0.95, 1, 1] } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.035, size: 1.4, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Wet Print', group: 'Sand plate',
+    fx: [
+      { shaderId: 'fx-solarize', inputs: { level: 0.72, strength: 0.28, soft: 0.25 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 0.8, lift: 0.012, gamma: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.6, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.9, gamma: 1, autoLevel: 0, splitTone: 0.12 }
+  },
   {
     name: 'Hard Memory', group: 'Frame Store',
     fx: [

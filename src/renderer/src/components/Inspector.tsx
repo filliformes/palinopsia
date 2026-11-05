@@ -260,13 +260,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'lowercase'
+            slot.shaderId === 'gen-sandplate'
+              ? 'A layer whose colors the sand takes, by SIDECHAIN : the lines become a window onto that picture, drawn in grains.'
+              : slot.shaderId === 'lowercase'
               ? "A layer this source reads, one sample per cell, as that cell's density : the picture arrives as a field of lit and unlit cells rather than a copy of itself. Raise the sidechain control to hear it. None = the source's own density."
               : 'A layer this source reads where each point appears : on a plane its brightness lifts the dots, so the picture stands up out of the field as the camera sees it; in a volume it lights and grows the points. Raise the sidechain control to use it. None = the field on its own.'
         }

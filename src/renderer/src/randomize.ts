@@ -192,6 +192,8 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Marbling : a palette and its water are chosen together (its presets), six
   // hues rolled apart would clash.
   'gen-marble': /^(color[1-6]|water)$/,
+  // Sand Plate : the sand and its plate are chosen with the surface (its presets).
+  'gen-sandplate': /^(sand|plate)$/,
   'sync-osc': /^loA$/,
   // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
   // set it racing), Crawl's ground (clear hides the picture under it) and Store
