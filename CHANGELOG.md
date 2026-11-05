@@ -15,6 +15,35 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Relief, a new source; Inflate and Thin Film, two new effects** (`gen-relief`,
+  `node-inflate`, `fx-thinfilm`; Vincent : "Relief is also a new and great idea, implement
+  it all as you proposed, with Thin Film"). Relief (`engine/ReliefSource.ts`) : a stroke is
+  stamped once, capsule by capsule, into a buffer where the depth test keeps the highest
+  height (it can cross itself without building up); each frame that buffer is combined over
+  the settled height map by the mode (raise : a smooth union whose fillet follows the size,
+  stack, plate, press, erase) and baked in when it ends, so what has been drawn costs
+  nothing : one combine, one shading pass, and the whole drawing relit every frame. Eight
+  brushes, each a profile and a material (`engine/reliefShade.ts`) : plasticine (a thumbprint
+  skin), molten metal, carved metal (two facets and a spine), chips (molded plastic flecked
+  with the palette), fused drops (each melted in as it lands), ribbed metal (up to 8 ribs
+  following every bend, dashes), ink (form from width only, broken), soap film. A studio to
+  reflect (a pale ceiling, a hard horizon, a softbox) that turns with the lamp. Size,
+  convexity, chaos, edge roughness, dents, grain, bevel, edge glow, shadow, an oil film over
+  anything shiny; mirror across, down, both or around up to 32. It draws itself : wandering
+  strokes, a compass (arcs and rules, each from the places the last one made), the moving
+  things of the sidechain (the Synth's finder, its own instance, no sound), the sidechain's
+  outlines, the sound's hits. It lives : the lamp orbits or follows the Context light path,
+  strokes sink and melt (radially on the dome). The sidechain can also get into the material
+  : its colors, its reflection in the metal, or bent through the relief as glass. Mouse strokes
+  join the slot's hand-made log (undo, saved with the session), a Body pinch draws live. Inflate
+  (`engine/inflateNode.ts`) : a jump flood over the layer's shape, bounded at 720 rows, gives a
+  rounded height lit with the same materials, plus glass : text or a silhouette as live chrome.
+  Thin Film : the picture as a film's thickness, a sum over nine wavelengths of two-beam
+  interference (the idea from OpenToonz's Iwa_SpectrumFx, BSD-3; our own code), in slow currents
+  of its own. 14 + 12 + 11 presets, the chains Chrome Everything / Oil on Everything / Soap
+  Picture / Studio Relief, the Generate themes Liquid Metal / Clay Studio / Engraver / Geometer /
+  Soap Skin / Chrome Type / Oil on Water (Generate over a Relief starts on a blank page). Fulldome
+  gate : 60 fps flat and on the dome, updates 59+/s, heaviest included.
 - **Fur, a new source** (`gen-fur`; Vincent : "Brushable fur sounds great haha ! Let's do
   it also"). Native (`engine/FurSource.ts`) : up to 1.5 million real strands, each one
   instance of a tapered triangle strip with no attributes (its root and look from

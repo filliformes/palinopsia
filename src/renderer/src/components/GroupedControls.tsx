@@ -59,6 +59,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('drops', 'auto', 'sync', 'audio', 'size', 'vary', 'crowding', 'spreadTime', 'drop', 'sprinkle', 'sprinkleN'),
     g('paint', 'tool', 'count', 'order', 'color1', 'color2', 'color3', 'color4', 'color5', 'color6')
   ],
+  'gen-relief': [
+    g('draw and light', 'draw', 'rate', 'speed', 'curve', 'length', 'sens', 'audio', 'sink', 'melt', 'stroke', 'clear', 'lightAngle', 'lightHeight', 'orbit', 'follow'),
+    g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
+    g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'side', 'sideUse', 'ground', 'groundOp')
+  ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
     g('hand and wind', 'brush', 'hold', 'heal', 'groom', 'wind', 'gust', 'spring', 'audio', 'audioPart', 'lightAngle', 'lightHeight'),
@@ -147,6 +152,15 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('key', 'keyMode', 'keyThresh', 'keySoft', 'border', 'borderHue')
   ],
   // Silhouette (effect) : how the people are found · how they look · how it lands
+  'node-inflate': [
+    g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
+    g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick'),
+    g('light', 'shadow', 'lightAngle', 'lightHeight', 'orbit')
+  ],
+  'fx-thinfilm': [
+    g('film', 'thickness', 'follow', 'lean', 'ior', 'keep'),
+    g('currents', 'swirl', 'scale', 'rate', 'amount')
+  ],
   'node-silhouette': [
     g('find', 'people', 'detail', 'smooth', 'sync'),
     g('look', 'mode', 'threshold', 'softness', 'color', 'shade'),
@@ -300,6 +314,20 @@ const DIMS: Record<string, (q: Dim) => Why> = {
         put(d, off, `Colors is ${n} : only the first ${n} colors are dropped.`)
       }
     }
+    return d
+  },
+  'gen-relief': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (is('draw', 0)) put(d, ['rate', 'speed', 'curve', 'length'], 'It only draws by hand.')
+    if (isnt('draw', 1)) put(d, ['curve', 'length'], 'Only the wandering strokes curve and end.')
+    if (isnt('draw', 3)) put(d, ['sens'], 'Only following the moving things has something to sense.')
+    if (isnt('brush', 5)) put(d, ['ribs', 'dash'], 'Only the ribbed metal has ribs and dashes.')
+    if (isnt('brush', 6)) put(d, ['broken'], 'Only the ink breaks.')
+    if (isnt('mirror', 4)) put(d, ['fold'], 'Only the mirror around has copies to count.')
+    if (zero('edge')) put(d, ['edgeColor'], 'Edge glow is at 0.')
+    if (zero('film') && isnt('brush', 7)) put(d, ['filmThick'], 'No film : oil film is at 0 and the brush is not soap film.')
+    if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
+    if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

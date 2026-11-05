@@ -1,5 +1,5 @@
 // SandPlateSource : the native Sand Plate generator (id 'gen-sandplate'). Sand on
-// a vibrating plate (the figures Ernst Chladni drew in 1787) : a grain bounces
+// a vibrating plate (the figures a violin bow draws on it) : a grain bounces
 // where the plate moves and rests where it doesn't, so the sand gathers on the
 // plate's still lines.
 //
@@ -524,7 +524,7 @@ export class SandPlateSource implements NativeGenerator {
       const o = Math.max(2, orders[i])
       const wt = i === 0 ? 1 : 0.45 + 0.4 * this.rand()
       if (round) {
-        // Chladni's law : a mode with n diameters and s circles rings at (n + 2s)^2,
+        // the plate's law : a mode with n diameters and s circles rings at (n + 2s)^2,
         // so n + 2s stands for the order; its wave number from the zero of J_n near
         // (s + n / 2 - 1 / 4) pi, on a plate of radius 0.5
         const sum = Math.max(2, Math.round(o * 0.7))

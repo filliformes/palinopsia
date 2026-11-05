@@ -62,6 +62,7 @@ import smear from './fx/Smear.fs?raw'
 import palette from './fx/Palette.fs?raw'
 import threshold from './fx/Threshold.fs?raw'
 import solarize from './fx/Solarize.fs?raw'
+import thinFilm from './fx/ThinFilm.fs?raw'
 import moshBlocks from './fx/MoshBlocks.fs?raw'
 import grain from './fx/Grain.fs?raw'
 import streak from './fx/Streak.fs?raw'
@@ -893,6 +894,39 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     }*/`,
     curated: { cuts: [0.3, 0.9], pulse: [0, 1], refresh: [0.1, 0.6], bloom: [0, 0.6], drop: [0, 0.3], quality: [0.25, 0.75], size: [0, 3], mix: [0.8, 1] }
+  },
+  {
+    // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
+    // lit with Relief's materials.
+    id: 'node-inflate',
+    name: 'Inflate',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Inflate : blows the layer up into volume. Its shape (its alpha, what is bright, or what is dark) gets a real height, rounded in from its edges, and that height is lit as clay, molded plastic, polished metal, chrome, soap film or glass, live, whatever the layer is doing. A line of text, a logo or a silhouette comes out as liquid chrome. Pick a SIDECHAIN and the metal reflects that layer, the glass bends it.',
+      CATEGORIES: ['FX', 'Stylize'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'from', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['its alpha', 'what is bright', 'what is dark'], DEFAULT: 1, LABEL: 'shape from' },
+        { NAME: 'threshold', TYPE: 'float', MIN: 0.02, MAX: 0.98, DEFAULT: 0.4, LABEL: 'threshold' },
+        { NAME: 'puff', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'puff' },
+        { NAME: 'round', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.85, LABEL: 'round' },
+        { NAME: 'volume', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'volume' },
+        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['clay', 'plastic', 'metal', 'chrome', 'soap film', 'glass'], DEFAULT: 3, LABEL: 'material' },
+        { NAME: 'keep', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'keep colors' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.8, 0.82, 0.86, 1], LABEL: 'tint' },
+        { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'gloss' },
+        { NAME: 'film', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'oil film' },
+        { NAME: 'filmThick', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'film thickness' },
+        { NAME: 'shadow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'shadow' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' }
+      ]
+    })}*/`,
+    curated: { from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1] }
   },
   {
     // Native (engine/silhouetteNode.ts) : the Silhouette source's looks on any
@@ -1865,6 +1899,77 @@ export const GENERATORS: IsfShader[] = [
       wind: [0.05, 0.3], gust: [0, 0], spring: [0.3, 0.7], audio: [0, 0], audioPart: [0.5, 0.5], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75],
       marks: [0, 0], markScale: [3, 10], shine: [0.3, 0.7], gloss: [0.25, 0.7], side: [0, 0], sideUse: [0, 0], ground: [1, 1]
     }
+  },
+  {
+    // Native (engine/ReliefSource.ts, materials engine/reliefShade.ts) : strokes with real
+    // height in clay, metal, plastic, ink and soap film, relit every frame.
+    id: 'gen-relief',
+    name: 'Relief',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Relief : a drawing in materials with real volume. Every stroke has height : strokes FUSE into each other, STACK on top, PRESS into what is there or cut it away, and when the light turns the whole drawing is lit again. Draw on the preview, or let it draw itself : DRAW wanders, builds with a compass, follows the moving things or the outlines of the layer picked as SIDECHAIN. Eight brushes : plasticine, molten metal, carved metal, recycled-plastic chips, fused drops, ribbed metal, ink, soap film. SINK and MELT let what is drawn fade and run, so the page never fills. SIDECHAIN also puts another layer in the material : its colors, its reflection in the metal, or seen through the relief as through glass.',
+      CATEGORIES: ['Generator', 'Painterly'],
+      INPUTS: [
+        { NAME: 'draw', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['by hand', 'wander', 'compass', 'moving things', 'outlines'], DEFAULT: 1, LABEL: 'draws itself' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0, MAX: 3, DEFAULT: 0.8, LABEL: 'how many' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'speed' },
+        { NAME: 'curve', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'curve' },
+        { NAME: 'length', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'stroke length' },
+        { NAME: 'sens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'sense' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'sink', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'sink' },
+        { NAME: 'melt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'melt' },
+        { NAME: 'stroke', TYPE: 'event', LABEL: 'stroke ▸' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' },
+        { NAME: 'brush', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7], LABELS: ['plasticine', 'molten metal', 'carved metal', 'chips', 'fused drops', 'ribbed metal', 'ink', 'soap film'], DEFAULT: 1, LABEL: 'brush' },
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['raise', 'stack', 'plate', 'press', 'erase'], DEFAULT: 0, LABEL: 'mode' },
+        { NAME: 'size', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'size' },
+        { NAME: 'convex', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'convexity' },
+        { NAME: 'chaos', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'chaos' },
+        { NAME: 'rough', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'edge roughness' },
+        { NAME: 'fuse', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'fuse' },
+        { NAME: 'ribs', TYPE: 'long', VALUES: [1, 2, 3, 4, 5, 6, 7, 8], LABELS: ['1', '2', '3', '4', '5', '6', '7', '8'], DEFAULT: 4, LABEL: 'ribs' },
+        { NAME: 'dash', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'dashes' },
+        { NAME: 'broken', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'broken ink' },
+        { NAME: 'mirror', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['off', 'across', 'down', 'both', 'around'], DEFAULT: 0, LABEL: 'mirror' },
+        { NAME: 'fold', TYPE: 'float', MIN: 2, MAX: 32, DEFAULT: 6, LABEL: 'around' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'volume' },
+        { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'gloss' },
+        { NAME: 'grain', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'grain' },
+        { NAME: 'dents', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'dents' },
+        { NAME: 'bevel', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'bevel' },
+        { NAME: 'shadow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'shadow' },
+        { NAME: 'edge', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'edge glow' },
+        { NAME: 'edgeColor', TYPE: 'color', DEFAULT: [1, 0.72, 0.42, 1], LABEL: 'glow color' },
+        { NAME: 'film', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'oil film' },
+        { NAME: 'filmThick', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'film thickness' },
+        { NAME: 'colorPick', TYPE: 'long', VALUES: [1, 2, 3, 4, 5, 6], LABELS: ['color 1', 'color 2', 'color 3', 'color 4', 'color 5', 'any'], DEFAULT: 1, LABEL: 'draws in' },
+        { NAME: 'color1', TYPE: 'color', DEFAULT: [0.78, 0.8, 0.84, 1], LABEL: 'color 1' },
+        { NAME: 'color2', TYPE: 'color', DEFAULT: [0.85, 0.32, 0.18, 1], LABEL: 'color 2' },
+        { NAME: 'color3', TYPE: 'color', DEFAULT: [0.16, 0.34, 0.72, 1], LABEL: 'color 3' },
+        { NAME: 'color4', TYPE: 'color', DEFAULT: [0.92, 0.72, 0.2, 1], LABEL: 'color 4' },
+        { NAME: 'color5', TYPE: 'color', DEFAULT: [0.08, 0.08, 0.1, 1], LABEL: 'color 5' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.035, 0.035, 0.04, 1], LABEL: 'ground' },
+        { NAME: 'groundOp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'ground opacity' },
+        { NAME: 'side', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sidechain' },
+        { NAME: 'sideUse', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['its colors', 'reflected', 'glass'], DEFAULT: 0, LABEL: 'sidechain as' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'light height' },
+        { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
+        { NAME: 'follow', TYPE: 'long', VALUES: [0, 1], LABELS: ['its own', 'Context light path'], DEFAULT: 0, LABEL: 'light from' }
+      ]
+    })}*/`,
+    // Who draws, the sidechain and the mirrors are staging : never dealt. The colors
+    // roll through its presets.
+    curated: {
+      draw: [1, 1], rate: [0.5, 1.6], speed: [0.25, 0.6], curve: [0.2, 0.7], length: [0.35, 0.8], audio: [0, 0], sink: [0.05, 0.2], melt: [0, 0],
+      brush: [0, 7], mode: [0, 0], size: [0.25, 0.65], convex: [0.5, 1], chaos: [0, 0.4], rough: [0, 0.3], fuse: [0.3, 0.9], ribs: [2, 8], dash: [0, 0], broken: [0, 0.3],
+      mirror: [0, 0], fold: [6, 6], relief: [0.35, 0.8], gloss: [0.4, 0.9], grain: [0, 0.4], dents: [0, 0.4], bevel: [0.1, 0.5], shadow: [0.4, 0.8], edge: [0, 0], film: [0, 0],
+      filmThick: [0.1, 0.6], colorPick: [1, 6], groundOp: [1, 1], side: [0, 0], sideUse: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.3, 0.7], orbit: [-0.2, 0.2], follow: [0, 0]
+    }
   }
 ]
 
@@ -1927,6 +2032,10 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-solarize', name: 'Solarize', category: 'FX', source: solarize,
     curated: { level: [0.4, 0.8], strength: [0.5, 1], soft: [0.04, 0.3] }
+  },
+  {
+    id: 'fx-thinfilm', name: 'Thin Film', category: 'FX', source: thinFilm,
+    curated: { thickness: [0.1, 0.6], follow: [0.2, 0.8], swirl: [0.1, 0.6], scale: [1, 5], rate: [0.05, 0.3], lean: [0, 0.6], ior: [1.25, 1.6], keep: [0.3, 0.9], amount: [0.7, 1] }
   },
   {
     id: 'fx-mosh-blocks', name: 'Mosh Blocks', category: 'FX', source: moshBlocks,

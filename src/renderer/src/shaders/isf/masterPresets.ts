@@ -837,6 +837,36 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
   },
+  // ── Relief : volume and film over the whole picture ──
+  {
+    name: 'Chrome Everything', group: 'Relief',
+    fx: [
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.55, round: 0.9, volume: 0.5, material: 3, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.1, mix: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Oil on Everything', group: 'Relief',
+    fx: [
+      { shaderId: 'fx-thinfilm', inputs: { thickness: 0.32, follow: 0.6, swirl: 0.4, scale: 2.5, rate: 0.12, lean: 0.3, ior: 1.45, keep: 0.75, amount: 0.9 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1.05, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Soap Picture', group: 'Relief',
+    fx: [
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.4, puff: 0.5, round: 1, volume: 0.45, material: 4, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.7, film: 0, filmThick: 0.28, shadow: 0.25, lightAngle: 2.36, lightHeight: 0.6, orbit: 0.05, mix: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Studio Relief', group: 'Relief',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.1, saturation: 1, lift: 0, gamma: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.025, size: 1.2, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Fur : chains for a coat under the lamp (they keep its colors : mixSrc 1). ──
   {
     name: 'Studio Hide', group: 'Fur',
