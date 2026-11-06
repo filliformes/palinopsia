@@ -202,81 +202,253 @@ export function useGlass(ref: RefObject<HTMLElement | null>, shape: GlassShape, 
   }, [enabled, active])
 }
 
-// ── a slider while it is held : its thumb becomes a clear lens ──
+// ── motion ──
+// The interface's small animations have their own switch, not the system's reduce-motion :
+// Windows reports that whenever its animation effects are off, often just for speed, and
+// these only ever answer a hand or a change of scene, a few pixels for half a second.
+const MOTION_KEY = 'opsia.motion'
+let moving = (() => {
+  try {
+    return localStorage.getItem(MOTION_KEY) !== '0'
+  } catch {
+    return true
+  }
+})()
+const motionListeners = new Set<() => void>()
+
+export function motionEnabled(): boolean {
+  return moving
+}
+export function setMotionEnabled(v: boolean): void {
+  moving = v
+  try {
+    localStorage.setItem(MOTION_KEY, v ? '1' : '0')
+  } catch {
+    /* private storage : for this run */
+  }
+  for (const l of motionListeners) l()
+}
+export function useMotionEnabled(): boolean {
+  return useSyncExternalStore((l) => {
+    motionListeners.add(l)
+    return () => motionListeners.delete(l)
+  }, motionEnabled)
+}
+/** How much slower this runs : 1, but in a test copy, to look at it frame by frame. */
+export function motionSlow(): number {
+  if (!import.meta.env.VITE_OPSIA_TEST) return 1
+  return (window as unknown as { __glassSlow?: number }).__glassSlow ?? 1
+}
+
+// ── a slider while it is held ──
+// Its thumb becomes a clear lens and its line a string : the line bends toward the hand,
+// and rings for a moment when let go, harder the faster the hand was going. All of it is
+// drawn over the slider, whose own thumb and line hide meanwhile (is-held in styles.css).
 const LENS: GlassShape = { bezel: 10, scale: 14 }
 const LENS_W = 42
 const LENS_H = 24
-const THUMB_W = 5 // styles.css : the slim slider's pill
+// the slim slider, as styles.css draws it
+const THUMB_W = 8
+const THUMB_H = 15
+const TRACK_INSET = 2
+const LINE_REST = 4
+const LINE_HELD = 5
+const PULL = 9 // CSS px : the furthest the hand bends the string
+const STIFFNESS = 900 // rings at about 5 Hz
+const DAMPING = 13 // and is gone in about half a second
+const PLUCK_MIN = 1.5 // CSS px : even a click rings a little
+const PLUCK_FAST = 2.5 // CSS px more, for a hand going fast
+const SVG_NS = NS
+
+interface Hold {
+  input: HTMLInputElement
+  lens: HTMLDivElement | null
+  svg: SVGSVGElement
+  fill: SVGPathElement
+  rest: SVGPathElement
+  pill: SVGRectElement
+  down: boolean
+  pointerX: number
+  pointerY: number
+  speed: number // CSS px a second, along the slider
+  movedAt: number
+  y: number
+  v: number
+  width: number
+}
 
 /** Follows every horizontal slim slider of this document while it is held. */
 export function installSliderLens(doc: Document): () => void {
   const win = doc.defaultView
   if (!win) return () => {}
-  let held: HTMLInputElement | null = null
-  let lens: HTMLDivElement | null = null
+  let hold: Hold | null = null
   let raf = 0
+  let last = 0
 
-  const place = (): void => {
-    const i = held
-    const l = lens
-    if (!i || !l) return
-    if (!i.isConnected) return release()
+  const finish = (): void => {
+    win.cancelAnimationFrame(raf)
+    const h = hold
+    hold = null
+    if (!h) return
+    h.input.classList.remove('is-held')
+    h.svg.remove()
+    if (h.lens) {
+      dropGlass(h.lens)
+      h.lens.remove()
+    }
+  }
+
+  const frame = (now: number): void => {
+    const h = hold
+    if (!h) return
+    if (!h.input.isConnected) return finish()
+    const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)) / motionSlow()
+    last = now
+    const i = h.input
     const r = i.getBoundingClientRect()
+    const z = i.offsetWidth > 0 ? r.width / i.offsetWidth : 1 // the UI zoom : all this lives outside it
+    const mid = r.top + r.height / 2
+    if (h.down) {
+      // a soft limit : the further the hand, the less the string follows
+      const pull = PULL * z
+      const want = moving ? pull * Math.tanh((h.pointerY - mid) / (pull * 2.2)) : 0
+      h.y += (want - h.y) * (1 - Math.exp(-dt * 30))
+      h.width = LINE_HELD * z
+    } else {
+      h.v += (-STIFFNESS * h.y - DAMPING * h.v) * dt
+      h.y += h.v * dt
+      h.width += (LINE_REST * z - h.width) * (1 - Math.exp(-dt * 12))
+      if (Math.abs(h.y) < 0.1 * z && Math.abs(h.v) < 3 * z) return finish()
+    }
     const min = Number(i.min) || 0
     const max = i.max === '' ? 100 : Number(i.max)
     const frac = max > min ? Math.max(0, Math.min(1, (Number(i.value) - min) / (max - min))) : 0
-    const z = i.offsetWidth > 0 ? r.width / i.offsetWidth : 1 // the UI zoom : the lens lives outside it
-    const x = r.left + (THUMB_W * z) / 2 + frac * (r.width - THUMB_W * z)
-    const w = LENS_W * z
-    const h = LENS_H * z
-    if (l.offsetWidth !== Math.round(w)) {
-      l.style.width = `${w}px`
-      l.style.height = `${h}px`
-      applyGlass(l, w, h, LENS)
+    const tw = THUMB_W * z
+    const x = r.left + TRACK_INSET * z + tw / 2 + frac * (r.width - 2 * TRACK_INSET * z - tw)
+    const left = r.left + h.width / 2
+    const right = r.right - h.width / 2
+    const crest = mid + h.y
+    // two arcs meeting flat at the thumb, each pinned at its end of the slider
+    h.fill.setAttribute('d', `M${left} ${mid}Q${x - (x - left) * 0.35} ${crest} ${x} ${crest}`)
+    h.rest.setAttribute('d', `M${x} ${crest}Q${x + (right - x) * 0.35} ${crest} ${right} ${mid}`)
+    h.fill.setAttribute('stroke-width', String(h.width))
+    h.rest.setAttribute('stroke-width', String(h.width))
+    h.pill.setAttribute('x', String(x - tw / 2))
+    h.pill.setAttribute('y', String(crest - (THUMB_H * z) / 2))
+    h.pill.setAttribute('width', String(tw))
+    h.pill.setAttribute('height', String(THUMB_H * z))
+    h.pill.setAttribute('rx', String(tw / 2))
+    const l = h.lens
+    if (l) {
+      const w = LENS_W * z
+      const lh = LENS_H * z
+      if (l.offsetWidth !== Math.round(w)) {
+        l.style.width = `${w}px`
+        l.style.height = `${lh}px`
+        applyGlass(l, w, lh, LENS)
+      }
+      l.style.left = `${x - w / 2}px`
+      l.style.top = `${crest - lh / 2}px`
     }
-    l.style.left = `${x - w / 2}px`
-    l.style.top = `${r.top + r.height / 2 - h / 2}px`
-    raf = win.requestAnimationFrame(place)
+    raf = win.requestAnimationFrame(frame)
   }
+
   const release = (): void => {
-    win.cancelAnimationFrame(raf)
-    held?.classList.remove('is-held')
-    held = null
-    const l = lens
-    lens = null
-    if (!l) return
-    l.classList.add('is-leaving')
-    win.setTimeout(() => {
-      dropGlass(l)
-      l.remove()
-    }, 110)
+    const h = hold
+    if (!h || !h.down) return
+    h.down = false
+    if (!moving) return finish()
+    // a hand at rest has no speed, whatever it last moved at
+    const speed = win.performance.now() - h.movedAt > 90 ? 0 : h.speed
+    const z = h.input.offsetWidth > 0 ? h.input.getBoundingClientRect().width / h.input.offsetWidth : 1
+    const amp = (PLUCK_MIN + PLUCK_FAST * Math.min(1, speed / 700)) * z
+    // pulled far enough, the pull is the pluck; else a little kick
+    if (Math.abs(h.y) < amp) h.v = amp * Math.sqrt(STIFFNESS)
+    const l = h.lens
+    if (l) {
+      h.pill.style.visibility = 'visible'
+      l.classList.add('is-leaving')
+      win.setTimeout(() => {
+        dropGlass(l)
+        l.remove()
+        if (hold === h) h.lens = null
+      }, 110)
+    }
   }
+
   const down = (e: PointerEvent): void => {
     const t = e.target as HTMLInputElement | null
     if (!t || t.tagName !== 'INPUT' || t.type !== 'range' || t.disabled || e.button !== 0) return
     if (t.classList.contains('soni-main') || !win.getComputedStyle(t).writingMode.startsWith('horizontal')) return
-    release()
+    finish()
+    const cs = win.getComputedStyle(t)
+    const svg = doc.createElementNS(SVG_NS, 'svg') as SVGSVGElement
+    svg.setAttribute('class', 'glass-string')
+    svg.setAttribute('aria-hidden', 'true')
+    const arc = (color: string): SVGPathElement => {
+      const a = doc.createElementNS(SVG_NS, 'path') as SVGPathElement
+      a.setAttribute('fill', 'none')
+      a.setAttribute('stroke', color)
+      a.setAttribute('stroke-linecap', 'round')
+      svg.appendChild(a)
+      return a
+    }
+    const fill = arc(cs.getPropertyValue('--q-fill').trim())
+    const rest = arc(cs.getPropertyValue('--q-rest').trim())
+    const pill = doc.createElementNS(SVG_NS, 'rect') as SVGRectElement
+    pill.setAttribute('fill', cs.getPropertyValue('--q-tick').trim())
+    svg.appendChild(pill)
+    doc.body.appendChild(svg)
+    let lens: HTMLDivElement | null = null
+    if (on) {
+      lens = doc.createElement('div')
+      lens.className = 'glass-lens'
+      doc.body.appendChild(lens)
+    }
+    pill.style.visibility = lens ? 'hidden' : 'visible'
     t.classList.add('is-held')
-    if (!on) return void (held = t)
-    held = t
-    lens = doc.createElement('div')
-    lens.className = 'glass-lens'
-    doc.body.appendChild(lens)
-    place()
+    const z = t.offsetWidth > 0 ? t.getBoundingClientRect().width / t.offsetWidth : 1
+    hold = {
+      input: t,
+      lens,
+      svg,
+      fill,
+      rest,
+      pill,
+      down: true,
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      speed: 0,
+      movedAt: 0,
+      y: 0,
+      v: 0,
+      width: LINE_REST * z
+    }
+    last = win.performance.now()
+    frame(last)
   }
-  const up = (): void => {
-    if (held) release()
+  const move = (e: PointerEvent): void => {
+    const h = hold
+    if (!h || !h.down) return
+    const now = win.performance.now()
+    const ms = Math.max(1, now - h.movedAt)
+    if (h.movedAt) h.speed += (Math.abs(e.clientX - h.pointerX) * (1000 / ms) - h.speed) * 0.4
+    h.movedAt = now
+    h.pointerX = e.clientX
+    h.pointerY = e.clientY
   }
   doc.addEventListener('pointerdown', down, true)
-  win.addEventListener('pointerup', up, true)
-  win.addEventListener('pointercancel', up, true)
-  win.addEventListener('blur', up)
+  doc.addEventListener('pointermove', move, true)
+  win.addEventListener('pointerup', release, true)
+  win.addEventListener('pointercancel', release, true)
+  win.addEventListener('blur', release)
   return () => {
-    release()
+    finish()
     doc.removeEventListener('pointerdown', down, true)
-    win.removeEventListener('pointerup', up, true)
-    win.removeEventListener('pointercancel', up, true)
-    win.removeEventListener('blur', up)
+    doc.removeEventListener('pointermove', move, true)
+    win.removeEventListener('pointerup', release, true)
+    win.removeEventListener('pointercancel', release, true)
+    win.removeEventListener('blur', release)
   }
 }
 

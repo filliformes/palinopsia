@@ -200,7 +200,7 @@ first-ever launch pays this once; it persists on disk afterwards.
    setting (a keyer that is off, the light angle of a flat relief) is greyed out,
    with the reason on hover; it still works. The bar under the preview sizes it (the
    panels below then scroll; double-click : automatic again, never under 160 px), and
-   **V** (or the expand arrows in the capsule on the picture) folds the panels away for a
+   **V** (or the expand arrows at the end of the preview's right-hand capsule) folds the panels away for a
    big picture.
    **Drag files in from the desktop** : a film, a sound file or a folder (a Collage of
    its films) onto a layer's **A** or **B** row, a sound onto an Audio Layer slot (a
@@ -238,7 +238,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Alt+E` (`Cmd+Option+E` on a Mac) | **Source Editor** : write a shader of your own, or a copy of a built-in one |
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
-| `V` | **Big preview** : fold the panels under the preview away, and back (the expand arrows in the capsule on the picture) |
+| `V` | **Big preview** : fold the panels under the preview away, and back (the expand arrows at the end of the preview's right-hand capsule) |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
@@ -277,13 +277,15 @@ picture, in glass, with a red dot when something went wrong; when a page covers 
 picture, it docks in the empty middle of the [bottom toolbar](#the-transport-bar-bottom)
 instead.
 
-**The capsule on the picture** gathers what the preview's corners used to hold : the
-scene (its arrows step through the bank), the Morph time, the output's size, the frame
-rate and the big preview's switch. **Interface glass** (the capsule, the lens on the right
+**Two small capsules in the preview's bottom corners** hold what those corners used to : at the
+left, the scene (its arrows step through the bank) and the Morph time; at the right, the output's
+size, the frame rate and the big preview's switch. They stay quiet until your mouse comes near. **Interface glass** (the capsules, the lens on the right
 column's tabs, the lens a slider becomes while you hold it, `Ctrl+K` and the messages) sits
 above the canvas, so it is never in the outputs, NDI or recordings. Turn it off with
 **interface glass** in the **performance** tab (plain dark chips, remembered on this
-computer); an installation runs without it.
+computer); an installation runs without it. A slider's line is a string while you hold it : it
+bends toward your hand and rings when you let go, and the left capsule's scene name scrambles into
+place when it changes; **interface motion** in the **performance** tab turns both off.
 
 ### Search everything (`Ctrl+K`)
 

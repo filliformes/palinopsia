@@ -1209,39 +1209,44 @@ input[type='range'].live-overlay {
 }
 
 /* ======== Slim sliders ========
-   Every range in the app that has no look of its own : a slim line filled in the accent
-   (accent2 while modulated), a short pill for the thumb. The line is the thumb's own border
-   image, so it follows any value by itself (a modulator's, an undo's) with no script, and
-   the box's overflow clips it at the ends. Weights are these variables, nothing else. */
+   Every range in the app that has no look of its own : a slim rounded line filled in the
+   accent (accent2 while modulated), a soft pill for the thumb. The line is the thumb's own
+   border image, so it follows any value by itself (a modulator's, an undo's) with no script.
+   The track clips it one radius in from each end, and the box's own background draws the
+   round caps there. Held, glass.ts draws it all over the slider, as a string (is-held hides
+   this). glass.ts knows these sizes : THUMB_W, THUMB_H, TRACK_INSET, LINE_REST. */
 input[type='range']:not(.soni-main) {
-  --q-h: 3px;
-  --q-gap: 2px;
+  --q-h: 4px;
+  --q-r: 2px;
+  --q-w: 8px;
+  --q-th: 15px;
   --q-fill: rgb(var(--c-accent));
   --q-rest: rgb(var(--c-text) / 0.17);
   --q-tick: rgb(var(--c-accent));
   -webkit-appearance: none;
   appearance: none;
   height: 16px;
-  background: transparent;
-  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 50%, var(--q-fill) calc(var(--q-r) - 0.25px), transparent calc(var(--q-r) + 0.25px)) left center / var(--q-r) 100% no-repeat,
+    radial-gradient(circle at 0 50%, var(--q-rest) calc(var(--q-r) - 0.25px), transparent calc(var(--q-r) + 0.25px)) right center / var(--q-r) 100% no-repeat;
   cursor: pointer;
   outline: none;
+}
+input[type='range']:not(.soni-main)::-webkit-slider-runnable-track {
+  margin-inline: var(--q-r);
+  overflow: hidden;
 }
 input[type='range']:not(.soni-main)::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 5px; /* glass.ts THUMB_W */
-  height: 13px;
-  border-radius: 2.5px;
+  width: var(--q-w);
+  height: var(--q-th);
+  border-radius: calc(var(--q-w) / 2);
   background: var(--q-tick);
-  border-image: linear-gradient(90deg, var(--q-fill) 50%, var(--q-rest) 0) 0 1 / calc(50% - var(--q-h) / 2) 100vw / 0 calc(100vw + var(--q-gap));
+  border-image: linear-gradient(90deg, var(--q-fill) 50%, var(--q-rest) 0) 0 1 / calc(50% - var(--q-h) / 2) 100vw / 0 100vw;
 }
 input[type='range']:not(.soni-main):hover {
   --q-rest: rgb(var(--c-text) / 0.27);
-}
-input[type='range']:not(.soni-main):active,
-input[type='range']:not(.soni-main).is-held {
-  --q-h: 4px;
 }
 input[type='range'].accent-accent2:not(.soni-main) {
   --q-fill: rgb(var(--c-accent2));
@@ -1251,23 +1256,14 @@ input[type='range'].accent-muted:not(.soni-main) {
   --q-fill: rgb(var(--c-muted));
   --q-tick: rgb(var(--c-muted));
 }
-/* held : the lens is the thumb, and the line runs whole under it */
 input[type='range']:not(.soni-main).is-held {
-  --q-gap: 0px;
+  background: none;
 }
 input[type='range']:not(.soni-main).is-held::-webkit-slider-thumb {
-  border-radius: 0;
-  background: linear-gradient(transparent calc(50% - var(--q-h) / 2), var(--q-fill) 0 calc(50% + var(--q-h) / 2), transparent 0);
-}
-html[data-glass='off'] input[type='range']:not(.soni-main).is-held {
-  --q-gap: 2px;
-}
-html[data-glass='off'] input[type='range']:not(.soni-main).is-held::-webkit-slider-thumb {
-  border-radius: 2.5px;
-  background: var(--q-tick);
+  opacity: 0;
 }
 input[type='range']:not(.soni-main):focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px rgb(var(--c-text) / 0.55);
+  background: rgb(var(--c-text));
 }
 input[type='range']:not(.soni-main):disabled {
   cursor: default;
@@ -1278,11 +1274,14 @@ input[type='range']:not(.soni-main):disabled {
 input[type='range'][style*='vertical']:not(.soni-main) {
   height: auto;
   width: 16px;
+  background:
+    radial-gradient(circle at 50% 0, var(--q-fill) calc(var(--q-r) - 0.25px), transparent calc(var(--q-r) + 0.25px)) bottom center / 100% var(--q-r) no-repeat,
+    radial-gradient(circle at 50% 100%, var(--q-rest) calc(var(--q-r) - 0.25px), transparent calc(var(--q-r) + 0.25px)) top center / 100% var(--q-r) no-repeat;
 }
 input[type='range'][style*='vertical']:not(.soni-main)::-webkit-slider-thumb {
-  width: 13px;
-  height: 5px;
-  border-image: linear-gradient(0deg, var(--q-fill) 50%, var(--q-rest) 0) 1 0 / 100vw calc(50% - var(--q-h) / 2) / calc(100vw + var(--q-gap)) 0;
+  width: var(--q-th);
+  height: var(--q-w);
+  border-image: linear-gradient(0deg, var(--q-fill) 50%, var(--q-rest) 0) 1 0 / 100vw calc(50% - var(--q-h) / 2) / 100vw 0;
 }
 
 /* ======== Glass ========
@@ -1303,6 +1302,24 @@ input[type='range'][style*='vertical']:not(.soni-main)::-webkit-slider-thumb {
 }
 html[data-glass='off'] .glass {
   background: rgb(14 14 16 / 0.78);
+}
+/* the capsules in the preview's corners : small and quiet, the picture leads. A hand near one
+   brings it forward. */
+.glass-capsule {
+  color: rgb(255 255 255 / 0.8);
+  background: rgb(14 14 16 / 0.24);
+  box-shadow:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.13),
+    inset 0 1px 0.5px -0.5px rgb(255 255 255 / 0.26);
+  opacity: 0.78;
+  transition: opacity 140ms ease-out;
+}
+.glass-capsule:hover,
+.glass-capsule:focus-within {
+  opacity: 1;
+}
+html[data-glass='off'] .glass-capsule {
+  background: rgb(14 14 16 / 0.5);
 }
 /* a floating panel (Ctrl+K) : the theme's own tint, the picture frosted behind it */
 .glass-panel {
@@ -1362,6 +1379,17 @@ html[data-glass='off'] .glass-panel-head {
     transform: scale(0.45);
     opacity: 0.4;
   }
+}
+/* a held slider's line, a string : see glass.ts */
+.glass-string {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 399;
+  pointer-events: none;
+  overflow: visible;
 }
 .tab-track {
   background: rgb(var(--c-text) / 0.045);

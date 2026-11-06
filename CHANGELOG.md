@@ -22,17 +22,28 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   displacement map comes from the element's own rounded shape (per size, cached, remade on
   resize), its filter in the element's own document so a page in its own window works, sRGB
   filtering or the map's zero would not be 0.5. Only where there is something to bend : the
-  capsule on the picture (`PictureCapsule.tsx`, replaces the three corner tags : scene with
-  its arrows, Morph, size, fps, big preview; folds what a narrow preview has no room for), a
+  two capsules in the preview's bottom corners (`PictureCapsule.tsx`, replace the three corner
+  tags : scene with its arrows and Morph at the left, size, fps and big preview at the right; split
+  in two, 26 px tall and faint until hovered on his notes "too big and too visible", mostly on the
+  black beside the picture; a narrow preview folds what it has no room for), a
   lens on the right column's tabs on one track, a lens for a slider's thumb while it is held
   (`installSliderLens`, also in each page window; not the Mixer's standing faders), `Ctrl+K`
   and messages. A message now passes over the top of the picture, red dot for a warning (red
   words on a moving picture can't be read), and falls back to the toolbar dock when something
   covers the picture. **interface glass** in the performance tab turns it off (`opsia.glass`,
   per computer; `html[data-glass]`, copied to page windows); off in Installation mode. Sliders :
-  every plain range is now a 3 px line filled in the accent (accent2 modulated) with a 5 x 13
-  pill, drawn in CSS from the thumb's border image so it needs no script and follows any value;
-  Sonify's main macros keep their look. Measured on the app's own counter : 53.8 / 55.6 / 53 /
+  every plain range is now a 4 px rounded line filled in the accent (accent2 modulated) with an
+  8 x 15 pill, drawn in CSS from the thumb's border image so it needs no script and follows any value;
+  Sonify's main macros keep their look. Rounded on his note ("a little more rounded, especially
+  at the edges, I still want this to feel playful") : round caps on the line, no gap to the pill.
+  And two small animations, for state changes only, our own code after Fancy
+  Components' elastic line and scramble (both MIT; no animation library added) : a held slider's
+  line is a string (`glass.ts`, drawn over the slider : it bends toward the hand, then rings about
+  half a second when let go, harder the faster the hand was going, not the Mixer's faders), and
+  the left capsule's scene name scrambles into place (`ScrambleText.tsx`). **interface motion** in the
+  performance tab turns both off (`opsia.motion`). Not tied to the system's reduce-motion : Windows
+  reports it whenever its animation effects are off (they are on the AERO), which would have left
+  them dead on arrival, and these only answer a hand or a change of scene. Measured on the app's own counter : 53.8 / 55.6 / 53 /
   53.2 fps, glass on / off / on / off, a difference within its wobble. The stock browser slider
   was most of the "default widget" look. Glass is DOM above the canvas : never in outputs.
 - **Flowing metal, in Relief and Inflate** (`flow`, `flowSpeed`, `bands`, `split`, `ripple`; Vincent :

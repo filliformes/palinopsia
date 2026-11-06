@@ -90,10 +90,10 @@ dilation clock curve (Sonnet99); freehand macro-path editor (Sonnet99).
 **From two animation libraries, November 2026 (Fancy Components and Componentry, both MIT, not
 built) :**
 
-- *Interface, as small code of our own (they need React 19 and Motion, Opsia has neither) :* a
-  slider's line plucked like a string when let go (Fancy's elastic line); names that scramble
-  or flip into place (Fancy's scramble, Componentry's split flap); the wordmark breathing with
-  the sound on a variable font's width axis; a message swelling out of the capsule (goo filter).
+- *Interface, as small code of our own (they need React 19 and Motion, Opsia has neither) :* the
+  wordmark breathing with the sound on a variable font's width axis; a message swelling out of
+  the capsule (goo filter); more names that flip into place (Componentry's split flap). The
+  plucked slider and the scene name's scramble are built.
 - *Sources :* a field of lines facing a point (Componentry's magnet lines); text falling under
   physics (Fancy's gravity, matter-js); typography made of particles; an ASCII effect.
 
