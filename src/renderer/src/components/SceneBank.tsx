@@ -13,7 +13,7 @@ import { describePin } from '../persist'
 // Step to the scene one slot before/after the active one (wrapping). A pad
 // bound to scene:prev / scene:next fires this same path; with no active scene
 // it recalls the first, and an empty bank is a no-op.
-function stepScene(dir: 1 | -1): void {
+export function stepScene(dir: 1 | -1): void {
   const st = useStore.getState()
   const n = st.scenes.length
   if (n === 0) return

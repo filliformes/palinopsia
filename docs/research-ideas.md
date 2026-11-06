@@ -87,6 +87,16 @@ dilation clock curve (Sonnet99); freehand macro-path editor (Sonnet99).
   (Stagger : one modulator rippling across its targets); picking an audio band by dragging on
   the spectrum (AstroFox, MIT).
 
+**From two animation libraries, November 2026 (Fancy Components and Componentry, both MIT, not
+built) :**
+
+- *Interface, as small code of our own (they need React 19 and Motion, Opsia has neither) :* the
+  wordmark breathing with the sound on a variable font's width axis; a message swelling out of
+  the capsule (goo filter); more names that flip into place (Componentry's split flap). The
+  plucked slider and the scene name's scramble are built.
+- *Sources :* a field of lines facing a point (Componentry's magnet lines); text falling under
+  physics (Fancy's gravity, matter-js); typography made of particles; an ASCII effect.
+
 **Instrument / composition:** "individual vs. dividual" theme/variation layer archetypes
 (Klee, H13); a **best-balance freeze + still-capture** control honouring Laposky's practice;
 linked-hue binding across layers (Sonnet99).

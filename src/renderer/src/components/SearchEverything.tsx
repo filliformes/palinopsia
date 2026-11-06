@@ -21,6 +21,9 @@ import { commitNow } from '../undo'
 import { buildSearchIndex, KIND_LABEL, rankSearch, targetsSummary, type SearchRow, type SearchKind } from '../searchIndex'
 import { focusedHostDocument, menuHostOf } from './ContextMenu'
 import { showToast } from './Toast'
+import { useGlass, type GlassShape } from '../glass'
+
+const PANEL_GLASS: GlassShape = { radius: 16, bezel: 20, scale: 42, blur: 16, saturate: 1.6 }
 
 // ── Open / closed (outside React : App's key handler toggles it) ─────────
 
@@ -86,6 +89,8 @@ function Palette({ doc }: { doc: Document }): JSX.Element {
   const [recent] = useState(readRecent)
   const listRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  useGlass(panelRef, PANEL_GLASS)
 
   // What the index reads : rebuilt when any of it changes under the palette
   // (not on the tempo a linked app writes every frame).
@@ -188,7 +193,7 @@ function Palette({ doc }: { doc: Document }): JSX.Element {
   let idx = -1
   return (
     <div
-      className="fixed inset-0 z-[250] flex flex-col items-center bg-black/45 px-4 pb-6"
+      className="fixed inset-0 z-[250] flex flex-col items-center bg-black/25 px-4 pb-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closeSearch()
       }}
@@ -197,7 +202,8 @@ function Palette({ doc }: { doc: Document }): JSX.Element {
       <div
         role="dialog"
         aria-label="Search everything"
-        className="flex max-h-[560px] min-h-0 w-[620px] max-w-full flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-2xl"
+        ref={panelRef}
+        className="glass-panel flex max-h-[560px] min-h-0 w-[620px] max-w-full flex-col overflow-hidden"
         // Clicks on the palette's chrome keep the focus in the field (else the
         // bare-key shortcuts would fire under it); rows pick on their click.
         onMouseDown={(e) => {
@@ -246,7 +252,7 @@ function Palette({ doc }: { doc: Document }): JSX.Element {
           {rows.length === 0 && <div className="px-3 py-3 text-[11px] text-muted">Nothing matches.</div>}
           {sections.map((sec) => (
             <div key={sec.title}>
-              <div className="sticky top-0 z-10 bg-panel px-3 pb-0.5 pt-1.5 font-mono text-[9px] uppercase tracking-wide text-accent2">
+              <div className="glass-panel-head sticky top-0 z-10 px-3 pb-0.5 pt-1.5 font-mono text-[9px] uppercase tracking-wide text-accent2">
                 {sec.title}
               </div>
               {sec.rows.map((row, ri) => {

@@ -32,7 +32,9 @@ import PreviewPointerOverlay from './components/PreviewPointerOverlay'
 import { sonifyEngine } from './audio/sonify'
 import { spaceEngine } from './audio/space'
 import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession, registerShowPanels } from './commands'
-import { Toaster, showToast } from './components/Toast'
+import { Toaster, showToast, usePictureToastDock } from './components/Toast'
+import { PictureCapsule } from './components/PictureCapsule'
+import { glassEnabled, setGlassEnabled, useGlass, useSliderLens, type GlassShape } from './glass'
 import { ShortcutHelp } from './components/ShortcutHelp'
 import { SearchEverything, toggleSearch } from './components/SearchEverything'
 import { onCaptureError } from './engine/CaptureSource'
@@ -333,6 +335,8 @@ export default function App(): JSX.Element {
     return () => registerShowPanels(null)
   }, [])
   const previewRef = useRef<HTMLDivElement | null>(null)
+  usePictureToastDock(previewRef)
+  useSliderLens()
   const previewColRef = useRef<HTMLElement | null>(null)
   const compositorRef = useRef<Compositor | null>(null)
   // the preview canvas as an input (Marbling's drops) : nothing happens unless a
@@ -756,6 +760,7 @@ export default function App(): JSX.Element {
       const k = await window.api.kioskConfig().catch(() => null)
       if (cancelled || !k?.kiosk) return
       kioskMode = true // an installation never stops on a "Save changes?" dialog
+      if (glassEnabled()) setGlassEnabled(false, false) // nobody is at its controls : the frames go to the picture
       if (k.sessionPath) {
         try {
           // your shaders first : the session's own versions of them stay its own
@@ -2373,21 +2378,18 @@ export default function App(): JSX.Element {
                 imageRendering: renderScale < 1 ? 'pixelated' : 'auto'
               }}
             />
-            {/* FPS bottom-right, mirroring the resolution tag bottom-left. */}
-            <FpsTag />
             <PreviewPointerOverlay canvasRef={canvasRef} />
-            <div className="pointer-events-none absolute bottom-2 left-2 font-mono text-[10px] text-muted/70">
-              {domeOn
-                ? `dome · ${domeRes}² master from ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`
-                : `output · ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`}
-            </div>
-            <button
-              onClick={() => setBigPreview((b) => !b)}
-              className="absolute right-2 top-2 rounded border border-border/60 bg-black/50 px-1.5 py-0.5 font-mono text-[10px] text-muted opacity-60 transition-opacity hover:text-text hover:opacity-100"
-              title={bigPreview ? 'Bring the panels back under the preview (V)' : 'Big preview : fold the panels under it away (V)'}
-            >
-              {bigPreview ? '⤡ panels' : '⤢ big'}
-            </button>
+            <PictureCapsule
+              big={bigPreview}
+              onBig={() => setBigPreview((b) => !b)}
+              output={domeOn ? `dome ${domeRes}²` : `${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`}
+              outputTitle={
+                domeOn
+                  ? `Dome : a ${domeRes}² master from a ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)} composition`
+                  : `The output : ${Math.round(compW * renderScale)}×${Math.round(compH * renderScale)}`
+              }
+              fps={<FpsTag />}
+            />
           </div>
           {!bigPreview && (
             <PreviewSizer
@@ -2621,17 +2623,11 @@ function FpsTag(): JSX.Element {
       ? 'Composition frames per second, then the refresh rate of the display this window is on. The render is locked to that rate, so matching it means every frame is drawn.'
       : 'Composition frames per second (rolling average).'
   return (
-    // Hoverable (cursor-help) : under pointer-events-none its explanation could
-    // never show. The tag is a few characters in the corner, so it takes no
-    // drag the preview would miss.
-    <div
-      className="absolute bottom-2 right-2 cursor-help font-mono text-[10px] text-muted/70"
-      title={title}
-    >
+    <span className="cursor-help" title={title}>
       {fps > 0
         ? `${Math.round(fps)} fps${hz != null ? ` / ${formatHz(hz)} Hz` : ''}`
         : '- fps'}
-    </div>
+    </span>
   )
 }
 
@@ -2642,10 +2638,33 @@ function FpsTag(): JSX.Element {
  *  UI zoom by the column's rendered width over its CSS width. Measured once on
  *  mount and when the column resizes; a change under 2 px is ignored, so the
  *  resize it causes settles at once. */
+const TAB_LENS: GlassShape = { bezel: 5, scale: 4 } // barely bends : the letters under it stay whole
+
 function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => number)) => void }): JSX.Element {
   const rightView = useStore((s) => s.rightView)
   const setRightView = useStore((s) => s.setRightView)
   const rowRef = useRef<HTMLDivElement | null>(null)
+  const lensRef = useRef<HTMLDivElement | null>(null)
+  useGlass(lensRef, TAB_LENS)
+  // the lens sits on the tab that is on, and slides when another one is
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    const lens = lensRef.current
+    if (!row || !lens) return
+    const place = (): void => {
+      const tab = row.querySelector<HTMLElement>('[data-on="1"]')
+      if (!tab) return
+      lens.style.left = `${tab.offsetLeft - 1}px`
+      lens.style.top = `${tab.offsetTop - 1}px`
+      lens.style.width = `${tab.offsetWidth + 2}px`
+      lens.style.height = `${tab.offsetHeight + 2}px`
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(row)
+    void document.fonts?.ready.then(place)
+    return () => ro.disconnect()
+  }, [rightView])
   useLayoutEffect(() => {
     const row = rowRef.current
     const col = row?.parentElement
@@ -2695,21 +2714,21 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     }
   ]
   return (
-    <div ref={rowRef} className="flex shrink-0 flex-wrap gap-1">
+    <div ref={rowRef} className="tab-track relative flex shrink-0 flex-wrap items-center gap-0.5 px-[3px] py-[2px]">
       {tabs.map((t) => (
         <button
           key={t.id}
+          data-on={rightView === t.id ? '1' : undefined}
           onClick={() => setRightView(t.id)}
           title={t.title}
-          className={`rounded border px-2 py-0.5 font-mono text-[9px] transition-colors ${
-            rightView === t.id
-              ? 'border-accent bg-accent/10 text-accent'
-              : 'border-border text-muted hover:text-accent'
+          className={`rounded-full border border-transparent px-2 py-0.5 font-mono text-[9px] transition-colors ${
+            rightView === t.id ? 'text-accent' : 'text-muted hover:text-text'
           }`}
         >
           {t.label}
         </button>
       ))}
+      <div ref={lensRef} className="glass-tab" />
     </div>
   )
 }
