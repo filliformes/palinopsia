@@ -15,6 +15,26 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Liquid glass on the interface, slim sliders** (Vincent : "propose how to integrate Liquid
+  Glass, used sparingly, so it looks a bit more slick and modern, less LLM-style"; "I want
+  Glass+quiet sliders"; on the thin ones : "I liked it better without thin sliders, the UI was
+  more colorful [...] can we try an in-between ?"). `glass.ts` : a backdrop filter whose
+  displacement map comes from the element's own rounded shape (per size, cached, remade on
+  resize), its filter in the element's own document so a page in its own window works, sRGB
+  filtering or the map's zero would not be 0.5. Only where there is something to bend : the
+  capsule on the picture (`PictureCapsule.tsx`, replaces the three corner tags : scene with
+  its arrows, Morph, size, fps, big preview; folds what a narrow preview has no room for), a
+  lens on the right column's tabs on one track, a lens for a slider's thumb while it is held
+  (`installSliderLens`, also in each page window; not the Mixer's standing faders), `Ctrl+K`
+  and messages. A message now passes over the top of the picture, red dot for a warning (red
+  words on a moving picture can't be read), and falls back to the toolbar dock when something
+  covers the picture. **interface glass** in the performance tab turns it off (`opsia.glass`,
+  per computer; `html[data-glass]`, copied to page windows); off in Installation mode. Sliders :
+  every plain range is now a 3 px line filled in the accent (accent2 modulated) with a 5 x 13
+  pill, drawn in CSS from the thumb's border image so it needs no script and follows any value;
+  Sonify's main macros keep their look. Measured on the app's own counter : 53.8 / 55.6 / 53 /
+  53.2 fps, glass on / off / on / off, a difference within its wobble. The stock browser slider
+  was most of the "default widget" look. Glass is DOM above the canvas : never in outputs.
 - **Flowing metal, in Relief and Inflate** (`flow`, `flowSpeed`, `bands`, `split`, `ripple`; Vincent :
   "build flowing metal"). In `engine/reliefShade.ts`, `roomAt()` replaces the still room with bands
   of light running by themselves, on an integrated clock : a hard line, a dark gap, a thin line, a

@@ -200,7 +200,8 @@ first-ever launch pays this once; it persists on disk afterwards.
    setting (a keyer that is off, the light angle of a flat relief) is greyed out,
    with the reason on hover; it still works. The bar under the preview sizes it (the
    panels below then scroll; double-click : automatic again, never under 160 px), and
-   **V** (or **⤢ big** on the preview) folds the panels away for a big picture.
+   **V** (or the expand arrows in the capsule on the picture) folds the panels away for a
+   big picture.
    **Drag files in from the desktop** : a film, a sound file or a folder (a Collage of
    its films) onto a layer's **A** or **B** row, a sound onto an Audio Layer slot (a
    film there plays its soundtrack), a session file anywhere.
@@ -237,7 +238,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `Alt+E` (`Cmd+Option+E` on a Mac) | **Source Editor** : write a shader of your own, or a copy of a built-in one |
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
-| `V` | **Big preview** : fold the panels under the preview away, and back (the preview's **⤢ big**) |
+| `V` | **Big preview** : fold the panels under the preview away, and back (the expand arrows in the capsule on the picture) |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
 | `L` | **MIDI Learn** on/off : from any tab or full-page view |
@@ -269,10 +270,20 @@ changes nothing (leaving a box you emptied does the same). Right-click a control
 an effect, a source or a modulator card for
 [**Persistent**](#persistent--what-stays-put) (scenes, Randomize and
 Generate leave it as it plays) and **Set in every scene**.
-**Feedback:** a brief **toast**, docked in the empty middle of the
-[bottom toolbar](#the-transport-bar-bottom), confirms actions with no natural home on
-screen : a recording saved (with its filename), a panic flush, or a live-capture
-that couldn't start *and why* (permission denied / no device / cancelled).
+**Feedback:** a brief **toast** confirms actions with no natural home on screen : a
+recording saved (with its filename), a panic flush, or a live-capture that couldn't start
+*and why* (permission denied / no device / cancelled). It passes over the top of the
+picture, in glass, with a red dot when something went wrong; when a page covers the
+picture, it docks in the empty middle of the [bottom toolbar](#the-transport-bar-bottom)
+instead.
+
+**The capsule on the picture** gathers what the preview's corners used to hold : the
+scene (its arrows step through the bank), the Morph time, the output's size, the frame
+rate and the big preview's switch. **Interface glass** (the capsule, the lens on the right
+column's tabs, the lens a slider becomes while you hold it, `Ctrl+K` and the messages) sits
+above the canvas, so it is never in the outputs, NDI or recordings. Turn it off with
+**interface glass** in the **performance** tab (plain dark chips, remembered on this
+computer); an installation runs without it.
 
 ### Search everything (`Ctrl+K`)
 
@@ -747,9 +758,9 @@ Left → right:
 - **`{ }`** (opens the [Source Editor](#source-editor--your-own-shaders-alte), also
   `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
-  learned pad). Messages (a refused effect drop, a saved recording) appear in the
-  toolbar's empty middle, always in the same place, over nothing; a long instruction
-  grows upward from there.
+  learned pad). Messages (a refused effect drop, a saved recording) pass over the top of
+  the picture; with a page over it they appear in the toolbar's empty middle, always in the
+  same place, over nothing, and a long instruction grows upward from there.
 - **Output** (opens the Output / mapping page; lights while the external output is on;
   right-click : **Watch the Output in a window** or close it, or the
   [Output page in a window](#output--mapping-key-o) of its own) · **Body** (opens the embodied-control

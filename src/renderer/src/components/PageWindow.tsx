@@ -14,6 +14,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { BODY_PAGE_FRAME, OUTPUT_PAGE_FRAME, PAGE_WINDOW_TITLES, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { useStore } from '../store'
+import { installSliderLens } from '../glass'
 import { watchUserInput } from '../sessionGuard'
 import { Toaster, showToast } from './Toast'
 import { MenuHost } from './ContextMenu'
@@ -102,7 +103,7 @@ function copyStyles(to: Document): void {
 }
 
 function copyRootAttributes(to: Document): void {
-  for (const a of ['data-theme', 'class', 'lang']) {
+  for (const a of ['data-theme', 'data-glass', 'class', 'lang']) {
     const v = document.documentElement.getAttribute(a)
     if (v == null) to.documentElement.removeAttribute(a)
     else to.documentElement.setAttribute(a, v)
@@ -192,6 +193,7 @@ export function PageWindow({ page, children }: { page: WindowPage; children: Rea
     const rootObs = new MutationObserver(() => copyRootAttributes(doc))
     rootObs.observe(document.documentElement, { attributes: true })
     const unKeys = forwardKeys(w)
+    const unLens = installSliderLens(doc)
     // an edit here is your hands on the controls too (a session just opened
     // must not absorb it as the engine settling)
     const unInput = watchUserInput(w)
@@ -211,6 +213,7 @@ export function PageWindow({ page, children }: { page: WindowPage; children: Rea
       rootObs.disconnect()
       if (queued) cancelAnimationFrame(queued)
       unKeys()
+      unLens()
       unInput()
       w!.removeEventListener('beforeunload', onGone)
       window.clearInterval(keep)

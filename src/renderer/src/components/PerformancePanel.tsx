@@ -15,6 +15,7 @@ import type { PerfStats } from '@shared/types'
 import { perfMeter } from '../engine/perfMeter'
 import { currentFps, currentSkips, formatHz } from '../perf'
 import { useStore } from '../store'
+import { setGlassEnabled, useGlassEnabled } from '../glass'
 
 const MB = 1024 * 1024
 
@@ -86,6 +87,7 @@ function Bar({ frac, danger }: { frac: number; danger?: boolean }): JSX.Element 
 }
 
 export function PerformancePanel(): JSX.Element {
+  const glassOn = useGlassEnabled()
   // Reactive state for the VRAM estimate + active list.
   const compW = useStore((s) => s.compW)
   const compH = useStore((s) => s.compH)
@@ -235,6 +237,14 @@ export function PerformancePanel(): JSX.Element {
             {chip(!!midiOut && midiClock, 'MIDI clock', 'Opsia is sending MIDI clock + transport to the selected output device (e.g. the Move).')}
             {chip(recording, 'REC', 'A recording is in progress (the output is being encoded to disk : heavy CPU in the main process).')}
           </div>
+          <button
+            type="button"
+            onClick={() => setGlassEnabled(!glassOn)}
+            className={`self-start rounded border px-1.5 py-0.5 font-mono text-[9px] ${glassOn ? 'border-accent/60 text-accent' : 'border-border text-muted hover:text-text'}`}
+            title="The glass on the interface : the capsule on the picture, the tab's lens, a held slider's lens, the search and the messages. It takes the composition 2 or 3 frames a second on a busy picture. It is never in the outputs or recordings. Off : plain dark chips. Remembered on this computer."
+          >
+            interface glass : {glassOn ? 'on' : 'off'}
+          </button>
           <p className="font-mono text-[8px] leading-tight text-muted">
             Hover any label, number or chip for what it measures. CPU is measured per section (ms/frame) ; VRAM is estimated from the app’s allocations (render size dominates) ; the whole-GPU and VRAM percentages are read from the graphics driver, and show “-” where it reports no figure. The chips are status indicators, not buttons.
           </p>
