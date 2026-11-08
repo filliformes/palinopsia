@@ -947,8 +947,13 @@ class SonifyEngine {
       const ctx = new AudioContext({ latencyHint: 'interactive' })
       try {
         // the Synth's engine first : the soni processor builds it from the
-        // shared worklet scope (globalThis.OpsiaSynth)
-        await ctx.audioWorklet.addModule(SYNTH_ENGINE_URL)
+        // shared worklet scope (globalThis.OpsiaSynth). On its own catch : if
+        // it fails, the rest of Sonify still starts (the Synth reports missing).
+        try {
+          await ctx.audioWorklet.addModule(SYNTH_ENGINE_URL)
+        } catch (e) {
+          console.warn('[sonify] the Synth engine did not load', e)
+        }
         await ctx.audioWorklet.addModule(SONI_WORKLET_URL)
       } catch (e) {
         void ctx.close().catch(() => {}) // never leak a context (one per retry)
@@ -1565,7 +1570,10 @@ class SonifyEngine {
     this.asmNotes.set(scaleTable(effRoot(cfg), cfg.scale, cfg.assemblage.loOct, Math.max(cfg.assemblage.loOct + 1, cfg.assemblage.hiOct)), glide)
     // Signal's scale table. Built whatever `snap` says : snap BLENDS the free
     // frequency with this one, so the quantized end must always exist.
-    this.signalFreqs = scaleTable(effRoot(cfg), cfg.scale, cfg.signal.loOct, cfg.signal.hiOct)
+    {
+      const tab = scaleTable(effRoot(cfg), cfg.scale, cfg.signal.loOct, cfg.signal.hiOct)
+      if (tab.length !== this.signalFreqs.length || tab.some((f, i) => f !== this.signalFreqs[i])) this.signalFreqs = tab
+    }
     // note pitch table for the events voice
     this.eventFreqs = cfg.events.quantize
       ? scaleTable(effRoot(cfg), cfg.scale, cfg.events.loOct, cfg.events.hiOct)

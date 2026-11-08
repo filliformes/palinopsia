@@ -2,8 +2,9 @@
 //
 // Without a delay the Loop rack and the loop blend read the layer's last frame.
 // With one, they read the frame from `delay` ago : a ring of past frames, stored
-// small (about half the layer's size, inside a memory budget, so a 4096 dome
-// layer stays near 70 MB), each with the time it was taken. A slot is written
+// small (about half the layer's size, inside a 64 MB budget), each with the
+// time it was taken, read back into one full-size 8-bit target (a 4096 dome
+// layer : about 130 MB in all). A slot is written
 // every delay / 30 seconds, so the ring always spans the delay at any length
 // up to LOOP_DELAY_MAX_MS; the two slots around "now - delay" are crossfaded,
 // so a long delay does not step. Each echo comes back through the small ring,
@@ -11,6 +12,8 @@
 //
 // The clock is the global one (the layer's own Speed leaves it alone, so an
 // echo set in beats stays on the beat); a frozen picture freezes its echoes.
+
+import { glGeneration } from './glGeneration'
 
 export const LOOP_DELAY_MAX_MS = 4000
 const SLOTS = 32
@@ -33,6 +36,7 @@ uniform float la, lb, k;
 void main(){ o = mix(texture(ring, vec3(uv, la)), texture(ring, vec3(uv, lb)), k); }`
 
 interface Progs {
+  gen: number // the GL generation it was built in (a GPU reset kills programs)
   copy: WebGLProgram
   uSrc: WebGLUniformLocation | null
   read: WebGLProgram
@@ -62,10 +66,11 @@ function compile(gl: WebGL2RenderingContext, fs: string): WebGLProgram {
 
 function progs(gl: WebGL2RenderingContext): Progs {
   let p = progsByGl.get(gl)
-  if (!p) {
+  if (!p || p.gen !== glGeneration()) {
     const copy = compile(gl, COPY_FS)
     const read = compile(gl, READ_FS)
     p = {
+      gen: glGeneration(),
       copy,
       uSrc: gl.getUniformLocation(copy, 'src'),
       read,
@@ -113,7 +118,8 @@ export class LoopDelayRing {
     }
     this.outTex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, this.outTex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null)
+    // (8-bit : the ring is, so half floats here held nothing more, at twice the size)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -127,7 +133,7 @@ export class LoopDelayRing {
 
   /** Bytes it holds on the card (the resource HUD). */
   bytes(): number {
-    return this.rw * this.rh * 4 * SLOTS + this.w * this.h * 8
+    return this.rw * this.rh * 4 * SLOTS + this.w * this.h * 4
   }
 
   /** Advance the clock by `dt`, then the picture `delaySec` ago into the ring's

@@ -265,7 +265,8 @@ void main(){
   // NaN/Inf guard: a single bad frame from any source would otherwise lock the
   // feedback buffer forever (NaN self-perpetuates through prev, and feedback
   // survives shader swaps). Fall back to the live source when the trail is bad.
-  o = all(equal(p, p)) ? p : texture(src, uv);
+  // (and when the source is the bad one too, a Loop source reading this layer back : black)
+  o = all(equal(p, p)) ? p : (all(equal(s, s)) ? s : vec4(0.0));
 }`;
 
 // A/B source mix: out = mix(A, blendMode(A,B), x) : 'normal' degenerates to
@@ -515,6 +516,12 @@ class PingPong {
   read(): WebGLTexture { return this.tex[1 - this.cur]; }      // previous frame (feedback)
   out(): WebGLTexture { return this.tex[this.cur]; }           // just-written frame
   swap() { this.cur = 1 - this.cur; }
+  /** Both frames to transparent black. */
+  clear(gl: WebGL2RenderingContext) {
+    gl.clearColor(0, 0, 0, 0);
+    for (const f of this.fbo) { gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.clear(gl.COLOR_BUFFER_BIT); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
   dispose(gl: WebGL2RenderingContext) {
     gl.deleteFramebuffer(this.fbo[0]); gl.deleteFramebuffer(this.fbo[1]);
     gl.deleteTexture(this.tex[0]); gl.deleteTexture(this.tex[1]);
@@ -1018,6 +1025,7 @@ export class ISFLayer {
   loopBlend = 0;
   /** The loop's delay, seconds (0 : the last frame comes back). */
   loopDelaySec = 0;
+  loopSynced = false;
   /** The ring of past frames the delay reads (lazy; freed after a while unused). */
   delay: LoopDelayRing | null = null;
   /** A Loop source : the layer each slot plays the picture of (null : not one). */
@@ -1742,9 +1750,11 @@ export class ISFLayer {
 
   /** PANIC : flush this layer's self-feeding buffers — the three FX racks' native
    *  nodes and the reaction-diffusion feedback ping-pong (dropped, recreated black
-   *  next frame). The per-layer `pp` (post-feedback persist) is rewritten every
-   *  frame from the fresh source, so it needs no clearing. */
+   *  next frame), and the per-layer `pp` (post-feedback persist) : a Loop source
+   *  reads it back (its own layer, a Cross Loop), so it is not always rewritten
+   *  from a fresh source. */
   flush(): void {
+    this.pp.clear(this.shared.gl);
     this.rackA.flushNodes();
     this.rackB.flushNodes();
     this.rackLayer.flushNodes();
@@ -3203,6 +3213,7 @@ export class Compositor {
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
       L.loopBlend = Math.max(0, LOOP_BLENDS.indexOf(l.loopBlend ?? 'mix'));
       L.loopDelaySec = l.feedback ? loopDelaySec(l, this.bpm) : 0;
+      L.loopSynced = (l.loopSync ?? 0) > 0;
       L.loopFromA = l.sourceA.kind === 'feedback' ? loopFromOf(l.sourceA, i, this.layers.length) : null;
       L.loopFromB = l.sourceB?.kind === 'feedback' ? loopFromOf(l.sourceB, i, this.layers.length) : null;
       L.sourceMix = l.sourceMix;
@@ -3689,7 +3700,10 @@ export class Compositor {
         // (an audio slot sounds only while its layer would show : not muted, or soloed)
         L.tickVideos(li, rawDt, this.globalSpeed * L.speed, this.bpm, this.layers.some((x) => x.solo) ? L.solo : !L.mute);
         L.tickAssemble(li, rawDt, this.globalSpeed * L.speed);
-        if (L.skipBlank()) continue;
+        if (L.skipBlank()) {
+          if (L.delay) { L.delay.dispose(); L.delay = null; } // (an emptied layer lets its echoes go)
+          continue;
+        }
         gl.bindVertexArray(null); // ISF draws own the default VAO
         const seen = (soloing ? L.solo : !L.mute) && L.opacity > 0.001;
         const layerCtx: NodeApplyCtx = { ...nodeCtx, dt: Math.abs(dtSec * L.speed), live: seen || this.sideReadLast.has(li) };
@@ -3725,7 +3739,9 @@ export class Compositor {
             L.delay?.dispose();
             L.delay = new LoopDelayRing(gl, this.vao, this.w, this.h);
           }
-          loop = L.delay.read(Math.abs(dtSec), L.loopDelaySec);
+          // (in beats, the wall clock : the BPM sets the beat, not the global speed;
+          // a frozen picture still freezes its echoes)
+          loop = L.delay.read(L.loopSynced && this.globalSpeed !== 0 ? Math.abs(rawDt) : Math.abs(dtSec), L.loopDelaySec);
         } else if (L.delay) {
           // a delay sweeping through 0 must not reallocate on every crossing
           L.delay.idle += Math.abs(rawDt);

@@ -21,9 +21,9 @@ vec3 filmColor(float nm, float cosI, float ior) {
     float phase = 12.5663706 * ior * nm * cosT / l;
     // two-beam reflectance, the half-wave shift at the first face makes a thin film dark
     float I = 0.5 - 0.5 * cos(phase);
-    vec3 w = vec3(exp(-pow((l - 605.0) / 52.0, 2.0)) + 0.18 * exp(-pow((l - 445.0) / 24.0, 2.0)),
-                  exp(-pow((l - 545.0) / 48.0, 2.0)),
-                  exp(-pow((l - 455.0) / 34.0, 2.0)));
+    // (squared by hand : pow() of a negative base is undefined, NaN on some drivers)
+    float wq1 = (l - 605.0) / 52.0, wq2 = (l - 445.0) / 24.0, wq3 = (l - 545.0) / 48.0, wq4 = (l - 455.0) / 34.0;
+    vec3 w = vec3(exp(-wq1 * wq1) + 0.18 * exp(-wq2 * wq2), exp(-wq3 * wq3), exp(-wq4 * wq4));
     sum += I * w;
     norm += w;
   }

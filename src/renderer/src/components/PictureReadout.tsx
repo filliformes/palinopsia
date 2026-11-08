@@ -25,7 +25,7 @@ const GROUPS: Array<{ title: string; feats: Feat[] }> = [
     feats: [
       { f: 'brightness', label: 'brightness', kind: 'level', hint: 'How bright the picture is on average (0 black, 1 white)' },
       { f: 'contrast', label: 'contrast', kind: 'level', hint: 'The spread between its darkest and brightest parts' },
-      { f: 'saturation', label: 'saturation', kind: 'level', hint: 'How colorful it is (0 grey, 1 vivid)' },
+      { f: 'saturation', label: 'saturation', kind: 'level', hint: 'How colorful it is (0 gray, 1 vivid)' },
       { f: 'hue', label: 'hue', kind: 'level', hint: 'The dominant color, around the color wheel (red, yellow, green, cyan, blue, magenta, back to red)' },
       { f: 'warmth', label: 'warmth', kind: 'center', ends: ['cool', 'warm'], hint: 'The balance of red against blue (0.5 neutral)' }
     ]

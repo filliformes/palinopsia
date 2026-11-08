@@ -991,7 +991,7 @@ function pictureDemo(sr, seconds) {
             th.on = true; th.next = t + 0.2 + (1 - th.sp) * 1.4
           }
         }
-        if (th.on) s.setMods(th.id, { vel: 0.4 + 0.5 * th.sp, cutoff: (th.sp - 0.5) * 0.6, timbre: (th.hu - 0.5) * 0.6, morph: (th.sz - 0.5) * 0.5, pan: th.x, bend: (th.sp - 0.5) * 0.1, env: th.sz - 0.5 })
+        if (th.on) s.setMods(th.id, { vel: 0.5 + 0.2 * (th.sp - 0.5), cutoff: (th.sp - 0.5) * 0.6, timbre: (th.hu - 0.5) * 0.6, morph: (th.sz - 0.5) * 0.5, pan: th.x, bend: (th.sp - 0.5) * 0.1, env: th.sz - 0.5 })
       }
     },
   })

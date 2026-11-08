@@ -1536,7 +1536,7 @@ function InputRows({ index, which }: { index: number; which: 'in' | 'take' }): J
           </span>
         </span>
         <button
-          onClick={() => (armed ? st().setMidiLearnMode(false) : st().learnModInput(id))}
+          onClick={() => (armed ? (st().learnOnce ? st().setMidiLearnMode(false) : st().setMidiLearnTarget(null)) : st().learnModInput(id))}
           className={`shrink-0 rounded px-1 font-mono text-[9px] ${armed ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent'}`}
           title={armed ? 'Listening : move a control (click : stop)' : 'Learn : move a control, MIDI or OSC, and it is this input (where Learn into points : this computer or this session)'}
         >

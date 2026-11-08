@@ -648,12 +648,11 @@ class MidiManager {
     else if (status === 0xb0) binding = { kind: 'cc', channel, number }
     // A note's release, for a modulator input playing it as an envelope (its
     // attack came with the note on)
+    // (always, Learn or not : a release lost while learning would hold the envelope open)
     if (!binding && (status === 0x80 || status === 0x90)) {
-      if (!useStore.getState().midiLearnMode) {
-        for (const id of midiTargetsFor({ kind: 'note', channel, number })) {
-          const ck = controlKeyOf(id)
-          if (ck) controlBus.note(ck, false)
-        }
+      for (const id of midiTargetsFor({ kind: 'note', channel, number })) {
+        const ck = controlKeyOf(id)
+        if (ck) controlBus.note(ck, false)
       }
       return
     }
@@ -787,7 +786,9 @@ export function applyContinuous(id: string, t: number): boolean {
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13), d = SONIFY_MOD_DESCS[p]
     if (!d) return false
-    st.setSonify(withSonifyParam(useStore.getState().sonify, p, d.min + t * (d.max - d.min)))
+    const so = useStore.getState().sonify
+    const max = p === 'signalRate' && so.signal?.sync ? Math.min(16, d.max) : d.max // synced, the rate stops at 16
+    st.setSonify(withSonifyParam(so, p, d.min + t * (max - d.min)))
     return true
   }
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)

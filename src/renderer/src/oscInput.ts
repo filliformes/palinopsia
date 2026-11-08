@@ -992,7 +992,7 @@ function route(address: string, args: Args, host = ''): void {
           else if (ctl === 'filter') { const v = pickOf(SYNTH_FILTERS); if (v) S({ filter: v }) }
           else if (ctl === 'mode') { const v = pickOf(SYNTH_MODES); if (v) S({ mode: v }) }
           else if (ctl === 'grid') { const v = pickOf(SYNTH_GRIDS); if (v) S({ grid: v }) }
-          else if (ctl === 'chorus') S({ chorus: idx(0, 2) as 0 | 1 | 2 })
+          else if (ctl === 'chorus') { const v = pickOf(['off', 'i', 'ii'] as const); if (v) S({ chorus: (['off', 'i', 'ii'] as const).indexOf(v) as 0 | 1 | 2 }) }
           else if (ctl === 'bars') S({ bars: ([1, 2, 4] as const)[idx(0, 2)] })
           else if (ctl === 'slide') S({ slide: n >= 0.5 })
           else if (ctl === 'envamt') S({ envAmt: clamp01(n) * 2 - 1 })

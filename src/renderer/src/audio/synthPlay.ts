@@ -68,7 +68,7 @@ export const SYNTH_SRC_HINT: Record<SynthSrc, string> = {
   speed: 'how fast the thing moves (its motion and its travel)',
   size: 'how much of the picture it covers',
   brightness: 'how light it is',
-  hue: 'its color : red and orange low, cyan high (a grey thing sits in the middle)',
+  hue: 'its color : red and orange low, cyan high (a gray thing sits in the middle)',
   saturation: 'how vivid its color is',
   texture: 'smooth (low) or detailed (high) : the edges under it',
   x: 'where it is across : left low, right high',
@@ -787,10 +787,14 @@ export class SynthPlayer {
     const tr = this.tracks, n = this.nBlob, asp = inp.aspect
     for (const t of tr) t.seen = false
     this.used.fill(0, 0, n)
-    // every pair inside its gate, nearest first
+    // every pair inside its gate, nearest first (a track the score's new pass
+    // ended is never paired again : the band under it strikes anew on bar 1)
+    let alive = 0
+    for (const t of tr) if (t.miss <= GRACE) alive++
     const pairs: Array<[number, number, number]> = []
     for (let ti = 0; ti < tr.length; ti++) {
       const t = tr[ti]
+      if (t.miss > GRACE) continue
       const px = t.x + t.vx * dt / Math.max(0.2, asp), py = t.y + t.vy * dt
       const tRad = Math.sqrt(t.area / (score ? GRID : NBB)) * 0.5
       for (let b = 0; b < n; b++) {
@@ -817,7 +821,8 @@ export class SynthPlayer {
     for (const t of tr) if (!t.seen) { t.miss += dt; t.hits = t.playing ? t.hits : 0 }
     // new things (none on a cut, and never past the cap of tracks)
     for (let b = 0; b < n; b++) {
-      if (this.used[b] || tr.length >= MAX_TRACKS) continue
+      if (this.used[b] || alive >= MAX_TRACKS) continue
+      alive++
       const t: Track = {
         id: this.nextId++, x: this.blX[b], y: this.blY[b], rx: this.blX[b], ry: this.blY[b], vx: 0, vy: 0,
         area: this.blA[b], str: this.blW[b], hits: 0, miss: 0, seen: true, playing: false, playT: 0, slot: -1,
@@ -944,8 +949,10 @@ export class SynthPlayer {
             if (hz && hz !== t.hz) { t.hz = hz; ev.push({ k: 2, id: t.id, hz, vel: 0, at: 0 }) }
           } else if (Math.abs(fi - t.k) > 0.5 + STEP_HYST && next !== t.k && now >= t.pendUntil && now - t.struckAt >= STEP_GAP) {
             // Steps : a new scale note, struck again on the same voice
+            // (the held expression counts from this strike)
             t.k = next
             t.hz = tab[next]
+            t.strikeF = this.src(inp.cfg.patch[0].src, t)
             const vel = this.strikeVel(t, inp)
             const at = this.onsetDelay(inp)
             t.pendUntil = now + at * 1000

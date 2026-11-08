@@ -123,7 +123,7 @@ void main() {
   vec3 N = normalize(vec3(-g * 0.35, 1.0));
   vec3 L = normalize(vec3(cos(lightAngle), sin(lightAngle), 1.1));
   float spec = pow(max(0.0, dot(reflect(-L, N), vec3(0.0, 0.0, 1.0))), 28.0);
-  float sheen = (spec * 0.9 + pow(1.0 - N.z, 2.0) * 0.6) * shine;
+  float sheen = (spec * 0.9 + pow(max(0.0, 1.0 - N.z), 2.0) * 0.6) * shine;
   col = col * tint.rgb * (1.0 - seams * 0.55 * s0) + vec3(sheen) * mix(vec3(1.0), tint.rgb, 0.4);
   gl_FragColor = vec4(col, max(a, min(1.0, sheen)));
 }
