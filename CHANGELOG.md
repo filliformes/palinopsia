@@ -998,6 +998,16 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **Sonify's families are boxes that hold their voices** (Vincent : "the header sections are
+  smaller than the different sonify modes inside; it's confusing visually. Can you propose
+  something more logical" : he picked A, a box per family, over a title per family or a
+  colored band, mocked on the real page). `VoiceGroup` is one box (rounded, the family's color
+  as a 3 px left edge) with the head inside it at the family size (`SectionHead size="family"` :
+  32 px, a 12.5 px title instead of 9 px, the chevron and the voices-on summary bigger too);
+  the cards inside drop their own colored edge (the `FamilyColor` context is gone) and sit a
+  little darker than the box (`InFamily` in sonifyUi.tsx). Under 280 px the box loses its inner
+  margin : with it, six cards spilled at 240 (dice, octave pickers); without, none. Overflow
+  sweep with every voice on at 240 / 260 / 280 / 300 / 320 / 400 / 640 : nothing out of a card.
 - **The Source Editor lists every ISF shader, A to Z** (Vincent : "make sure all shaders
   (sources and fx) are there, and always classify them in alphabetical order"). Vibe Palette,
   Context and Finalizer were missing (kept out of `FX_SHADERS` so a rack can't load a second);

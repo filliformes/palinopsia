@@ -29,7 +29,7 @@ function spaceLabel(param: string): string {
   const p = parseSpaceModParam(param)
   return p ? `${SPACE_VOICE_LABEL[p.voice]} ${SPACE_FIELD_RANGE[p.field].label} in the room` : param
 }
-import { Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered, LiveNum } from './sonifyUi'
+import { InFamily, Shell, Row, RangeRow, Stepper, IconBtn, Divider, Seg, CardGrip, useCardSpace, spaceGap, SUB_GAP, chip, pill, GrMeter, parseHz, parseDb, sonifyCovered, LiveNum } from './sonifyUi'
 import { SONI_RATES, RATE_LABEL } from '../audio/soniClock'
 import { AssignRow, useBound } from './AutoControls'
 import { SynthCard } from './SonifySynth'
@@ -486,10 +486,9 @@ const PARAM_LABELS: Partial<Record<SonifyModParam, string>> = {
 function VoiceShell({ title, on, hint, onToggle, onDice, diceTitle, children }: {
   title: string; on: boolean; hint: string; onToggle: () => void; onDice?: () => void; diceTitle?: string; children: ReactNode
 }): JSX.Element {
-  const edge = useContext(FamilyColor)
   return (
     <Shell
-      title={title} hint={hint} on={on} onToggle={onToggle} edge={edge}
+      title={title} hint={hint} on={on} onToggle={onToggle}
       lead={PROBE_MARK[title] && (
         <span
           className="w-3 shrink-0 text-center font-mono text-[11px] leading-none"
@@ -506,28 +505,35 @@ function VoiceShell({ title, on, hint, onToggle, onDice, diceTitle, children }: 
   )
 }
 
-// The color of the family a card sits in (its VoiceGroup's).
-const FamilyColor = createContext<string | undefined>(undefined)
-
-/** A family of voice cards (soniGroups.ts) : its header in the family's color
- *  with the voices that are on (click : fold its cards to it, they keep
- *  playing), and the color on each card's left edge. */
-function VoiceGroup({ id, color, hint, playing, children }: {
-  id: string; color: string; hint: string; playing: string; children: ReactNode
+/** A family of voice cards (soniGroups.ts) : ONE box in the family's color (its
+ *  left edge) that holds its voices, its head bigger than theirs, with the voices
+ *  that are on (click : fold the box to its head, they keep playing). Vincent :
+ *  "the header sections are smaller than the different sonify modes inside; it's
+ *  confusing visually" (picked this over a title or a colored band, 2026-11-07). */
+function VoiceGroup({ id, color, hint, playing, tight, children }: {
+  id: string; color: string; hint: string; playing: string
+  /** a narrow column (under 280 px) : no margin inside the box, the cards keep every pixel */
+  tight?: boolean
+  children: ReactNode
 }): JSX.Element {
   const key = `soni-group-${id}`
   const folded = useStore((s) => !!s.collapsed[key])
   const toggle = useStore((s) => s.toggleSection)
   return (
-    <div data-soni-group={id} className="flex flex-col gap-2">
-      <div className="overflow-hidden rounded">
+    <div
+      data-soni-group={id}
+      className={`flex flex-col gap-1.5 rounded-md border border-border bg-panel2/35 ${tight ? '' : 'px-1.5'} ${folded ? '' : 'pb-1.5'}`}
+      style={{ borderLeftWidth: 3, borderLeftColor: color }}
+    >
+      <div className={`${tight ? '' : '-mx-1.5'} overflow-hidden rounded-t-md`}>
         <SectionHead
+          size="family" bar="hover:bg-panel2/50"
           title={id} color={color} folded={folded} onToggle={() => toggle(key)}
           hint={`${hint}. Click : ${folded ? 'show its cards' : 'fold its cards (they keep playing)'}`}
-          right={<span className="min-w-0 truncate font-mono text-[9px] text-muted">{playing}</span>}
+          right={<span className="min-w-0 truncate font-mono text-[10px] text-muted">{playing}</span>}
         />
       </div>
-      {!folded && <FamilyColor.Provider value={color}>{children}</FamilyColor.Provider>}
+      {!folded && <InFamily.Provider value>{children}</InFamily.Provider>}
     </div>
   )
 }
@@ -794,10 +800,10 @@ export function SonifyPage({
   const resetDefault = (): void => setSonify({ ...defaultSoniConfig(), on: cfg.on, sinkId: cfg.sinkId, eq: cfg.eq })
   const diceVoice = (k: SoniVoiceKey): void => setSonify(randomizeVoice(cfg, k))
   // A family's header : its name, color, hint, and which of its voices are on.
-  const groupProps = (gi: number): { id: string; color: string; hint: string; playing: string } => {
+  const groupProps = (gi: number): { id: string; color: string; hint: string; playing: string; tight: boolean } => {
     const g = SONI_GROUPS[gi]
     const on = g.voices.filter((i) => cfg[VOICE_KEYS[i]].on).map((i) => VOICE_NAMES[i])
-    return { id: g.id, color: g.color, hint: g.hint, playing: on.length ? on.join(' · ') : 'off' }
+    return { id: g.id, color: g.color, hint: g.hint, playing: on.length ? on.join(' · ') : 'off', tight: voiceW < 280 }
   }
   const savePreset = (): void => {
     const n = presetName.trim()
@@ -2167,7 +2173,7 @@ export function SonifyPage({
                 {g.voices.map((i) => <Fragment key={i}>{card[i]}</Fragment>)}
               </VoiceGroup>
             ))}
-          <VoiceGroup id={SONI_TAIL.id} color={SONI_TAIL.color} hint={SONI_TAIL.hint} playing={cfg.fx.send > 0.0001 ? `send ${cfg.fx.send.toFixed(2)}` : 'off'}>
+          <VoiceGroup id={SONI_TAIL.id} color={SONI_TAIL.color} hint={SONI_TAIL.hint} tight={voiceW < 280} playing={cfg.fx.send > 0.0001 ? `send ${cfg.fx.send.toFixed(2)}` : 'off'}>
           <VoiceShell
             title="Reverb / Delay" on={cfg.fx.send > 0.0001}
             hint="a shared FX tail : the whole mix sends into an analog delay → Quartz/Prism reverb"

@@ -2125,9 +2125,10 @@ and closing the window closes the page (the sound plays on, as when the page clo
 the app). It is never remembered : the next time, Sonify opens in the app.
 
 **The twelve voices** (each one lineage of the sonification literature), shown in
-**five families**, each a colored header over its cards (click it : the cards fold to
-it and keep playing; the header says which of its voices are on) and a colored edge on
-every card, the mixer strip and the sequencer's column too :
+**five families**, each a box that holds its voices, its left edge in the family's color
+and its head bigger than the cards inside (click the head : the box folds to it and the
+voices keep playing; the head says which of them are on), the color on the mixer strip
+and the sequencer's column too :
 **spectrum** (blue : Spectra, Filter : the frame as frequencies), **wave** (red :
 Orbit, Raster, Transmission : the pixels are the sound itself), **hits** (amber :
 Flow, Events, Signal : what moves or stands out fires sounds), **notes** (violet :
