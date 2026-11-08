@@ -15,6 +15,7 @@ import { CodecMoshNode } from './codecMosh'
 import { SilhouetteNode } from './silhouetteNode'
 import { FieldStoreNode } from './fieldStore'
 import { InflateNode } from './inflateNode'
+import { DrapeNode } from './drapeNode'
 import { domeFill } from './domeSignal'
 // The dome's disc helpers, shared with the ISF shaders' "// @dome" (Feedback).
 import DOME_GLSL from '../shaders/isf/lib/dome.glsl?raw'
@@ -5229,9 +5230,10 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-sediment') return new SedimentNode(gl)
   if (shaderId === 'node-silhouette') return new SilhouetteNode(gl)
   if (shaderId === 'node-inflate') return new InflateNode(gl)
+  if (shaderId === 'node-drape') return new DrapeNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
+export const NATIVE_NODE_IDS = ['node-drape', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

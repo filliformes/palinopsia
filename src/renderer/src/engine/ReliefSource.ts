@@ -34,7 +34,7 @@ const STRIDE = 10
 const HMAX = 0.3 // tallest height, frame heights (for the depth test)
 
 // brush : the stroke's profile (stamp) and its material (shade : see reliefShade.ts)
-export const RELIEF_BRUSHES = ['plasticine', 'molten', 'carved', 'chips', 'drops', 'ribbed', 'ink', 'film']
+export const RELIEF_BRUSHES = ['plasticine', 'molten', 'carved', 'chips', 'drops', 'ribbed', 'ink', 'film', 'foil']
 
 // ── The stamp : one capsule (a segment with a radius at each end) ──────────────
 const STAMP_VS = `#version 300 es
@@ -106,7 +106,12 @@ void main() {
     // ink : flat, the form built only from its width; a broken line lifts off the page
     h = 0.05;
     if (uBroken > 0.0 && og_vnoise(vec2(along * 26.0 + seed, across * 2.5)) < uBroken * 0.62) discard;
-  } else h = pow(max(0.0, 1.0 - d * d), 0.6);               // film : a bubble's skin
+  } else if (mat < 7.5) h = pow(max(0.0, 1.0 - d * d), 0.6); // film : a bubble's skin
+  else {
+    // foil : a thin sheet pressed flat, crinkled where it was folded
+    float crk = og_vnoise(vP * 140.0 + seed * 5.0) + 0.5 * og_vnoise(vP * 310.0 - seed * 3.0);
+    h = pow(max(0.0, 1.0 - d * d), 0.28) * (0.42 + 0.1 * crk);
+  }
   h *= r * aa;
   gl_FragDepth = 1.0 - clamp(h / ${HMAX}, 0.0, 1.0);
   o = vec4(h, mat, color, seed);
@@ -175,7 +180,7 @@ uniform sampler2D uC, uSide;
 uniform vec2 uFrame;
 uniform vec3 uGround, uEdgeCol, uPal[6];
 uniform vec3 uL;
-uniform float uAz, uGroundA, uRelief, uGrain, uDents, uBevel, uEdge, uFilm, uFilmNm, uSheen, uShadow, uSideAmt, uSideUse, uHasSide, uPx, uDrift;
+uniform float uAz, uGroundA, uRelief, uGrain, uDents, uBevel, uEdge, uFilm, uFilmNm, uSheen, uShadow, uSideAmt, uSideUse, uHasSide, uPx, uDrift, uCav, uDisp, uRim;
 out vec4 fragColor;
 ${RELIEF_SHADE}
 float hAt(vec2 uv) { return textureLod(uC, uv, 0.0).r; }
@@ -196,7 +201,7 @@ void main() {
   float M = floor(c.g + 0.5);
   float inRelief = h > 0.00012 ? 1.0 : 0.0;
   // the material's skin : dents the size of a thumb, a grain the size of its print
-  float skin = M < 0.5 ? 1.0 : (M > 2.5 && M < 3.5) ? 0.45 : (M > 6.5 || (M > 1.5 && M < 2.5)) ? 0.0 : 0.16;
+  float skin = M < 0.5 ? 1.0 : (M > 2.5 && M < 3.5) ? 0.45 : M > 7.5 ? 0.5 : (M > 6.5 || (M > 1.5 && M < 2.5)) ? 0.0 : 0.16;
   if (inRelief > 0.5 && M > 1.5 && M < 2.5) slope *= 1.0 + (og_vnoise(vec2(h * 1100.0, c.a * 3.0)) - 0.5) * (0.12 + 0.9 * uGrain);
   if (inRelief > 0.5 && skin > 0.0) {
     if (uDents > 0.0) {
@@ -246,7 +251,7 @@ void main() {
     float idx = clamp(c.b, 0.0, 5.0);
     int i0 = int(floor(idx));
     vec3 alb = uPal[i0];
-    float shadeM = M < 0.5 ? 0.0 : M < 1.5 ? 1.0 : M < 2.5 ? 2.0 : M < 3.5 ? 3.0 : M < 4.5 ? 4.0 : M < 5.5 ? 2.0 : M < 6.5 ? 5.0 : 6.0;
+    float shadeM = M < 0.5 ? 0.0 : M < 1.5 ? 1.0 : M < 2.5 ? 2.0 : M < 3.5 ? 3.0 : M < 4.5 ? 4.0 : M < 5.5 ? 2.0 : M < 6.5 ? 5.0 : M < 7.5 ? 6.0 : 7.0;
     if (M > 2.5 && M < 3.5) {
       // chips : a colored body of recycled plastic, flecks of the whole palette
       vec3 v = og_voronoi(P * 62.0 + c.a * 5.0);
@@ -262,6 +267,12 @@ void main() {
       lit *= 0.35 + 0.65 * ao;
     }
     lit *= 1.0 - 0.72 * shadow;
+    // cavity : where strokes meet and pressed lines run, the creases get less light
+    // (the height's Laplacian over the slope's own taps; a valley is positive)
+    if (uCav > 0.0) {
+      float cur = ((b1 + b3 + a2 + c2) * 0.25 - h) / max(1e-8, 1.5 * wy * 1.5 * wy);
+      lit *= 1.0 - uCav * 0.8 * clamp(cur * uRelief * 0.12, 0.0, 1.0);
+    }
     if (uEdge > 0.0) {
       // a glow along the edges, where the side falls away
       float rim = pow(1.0 - N.z, 2.0);
@@ -269,7 +280,10 @@ void main() {
     }
     // glass : the layer behind, bent, and only the shine of the surface on top
     if (uHasSide > 0.5 && uSideAmt > 0.0 && uSideUse > 1.5) {
-      vec3 bent = textureLod(uSide, uv + N.xy * 0.11, 0.0).rgb;
+      // the color split widest at the rim (DISPERSION), a bright edge there (RIM)
+      vec2 bo = N.xy * 0.11;
+      vec3 bent = vec3(textureLod(uSide, uv + bo * (1.0 - 0.3 * uDisp), 0.0).r, textureLod(uSide, uv + bo, 0.0).g, textureLod(uSide, uv + bo * (1.0 + 0.35 * uDisp), 0.0).b);
+      bent += vec3(0.92, 0.96, 1.0) * pow(1.0 - N.z, 4.0) * uRim * 0.9;
       vec3 V = vec3(0.0, 0.0, 1.0);
       float fr = pow(1.0 - N.z, 3.0);
       vec3 glassC = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(-V, N), uAz, P, N.z, 0.05) * (0.1 + 0.7 * fr);
@@ -1042,6 +1056,9 @@ export class ReliefSource implements NativeGenerator {
       .f1('uPx', Math.max(1, this.h / 1080)).f1('uDrift', this.drift)
       .f1('uFlow', Math.max(0, Math.min(1, num(I, 'flow', 0)))).f1('uFlowT', this.flowT).f1('uBands', Math.max(0.5, Math.min(16, num(I, 'bands', 3))))
       .f1('uSplit', Math.max(0, Math.min(1, num(I, 'split', 0.35)))).f1('uRipple', Math.max(0, Math.min(1, num(I, 'ripple', 0.3))))
+      .f1('uFoilSat', Math.max(0, Math.min(1, num(I, 'rainbow', 0.25)))).f1('uFoilScale', Math.max(20, Math.min(400, num(I, 'flakes', 220))))
+      .f1('uFoilGlint', Math.max(0, Math.min(1, num(I, 'glint', 0.5)))).f1('uCav', Math.max(0, Math.min(1, num(I, 'cavity', 0))))
+      .f1('uDisp', Math.max(0, Math.min(1, num(I, 'dispersion', 0)))).f1('uRim', Math.max(0, Math.min(1, num(I, 'rim', 0))))
     gl.uniform3fv(p.u('uPal'), new Float32Array(pal))
     g.bind(0, map.tex)
     g.bind(1, this.side ?? this.blank())

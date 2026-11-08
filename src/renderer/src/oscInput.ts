@@ -98,6 +98,8 @@ import { resolumeLearn } from './resolume'
 import { controlBus } from './engine/controlBus'
 import { oscLearn } from './oscLearn'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
+import { LOOP_SYNCS, LOOP_SYNC_NAMES } from '@shared/types'
+import { LOOP_DELAY_MAX_MS } from './engine/loopDelay'
 import { BLEND_MODES, LOOP_BLENDS, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { BG_SOURCES } from './bgPresets'
 import { bodyBus } from './engine/bodyIn'
@@ -349,6 +351,9 @@ function route(address: string, args: Args, host = ''): void {
           // used to empty the slot, a typo blanking the layer mid-show)
           const lc = str.trim().toLowerCase()
           if (lc === 'none' || lc === 'off' || lc === '') { st.setSourceShader(li, slot, null); return }
+          // "loop 2" / "loop:2" : the Loop source, layer 2's picture
+          const lp = lc.match(/^loop\s*:?\s*(\d)$/)
+          if (lp) { st.setSourceLoop(li, slot, Number(lp[1]) - 1); return }
           const id = resolveGenerator(str)
           if (id) st.setSourceShader(li, slot, id)
           return
@@ -496,6 +501,9 @@ function route(address: string, args: Args, host = ''): void {
         case 'solo': st.patchLayer(li, { solo: n >= 0.5 }); return
         case 'feedback': st.patchLayer(li, { feedback: n >= 0.5 }); return
         case 'loopblend': { const m = enumFrom(args, LOOP_BLENDS); if (m) st.setLoopBlend(li, m); return }
+        // the loop's delay : 0..1 (squared, as the slider) or milliseconds above 1
+        case 'loopdelay': st.setLoopDelay(li, n > 1 ? n : n * n * LOOP_DELAY_MAX_MS); return
+        case 'loopsync': { const m = enumFrom(args, LOOP_SYNC_NAMES); if (m) st.setLoopSync(li, LOOP_SYNCS[LOOP_SYNC_NAMES.indexOf(m)]); return }
         default: return
       }
     }
@@ -1393,6 +1401,9 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
     const lbi = Math.max(0, LOOP_BLENDS.indexOf(l?.loopBlend ?? 'mix'))
     add(`/opsia/layer${n}/loopblend`, 0, 1, lbi / (LOOP_BLENDS.length - 1), 'How the returning picture meets the new frame (index: mix·add·screen·lighten·darken·multiply·difference·xor·key)')
+    add(`/opsia/layer${n}/loopdelay`, 0, 1, Math.sqrt(Math.min(LOOP_DELAY_MAX_MS, l?.loopDelay ?? 0) / LOOP_DELAY_MAX_MS), 'The loop\'s delay (0..1 squared over 0..4000 ms; a number above 1 is milliseconds)')
+    const lsi = Math.max(0, LOOP_SYNCS.indexOf(l?.loopSync ?? 0))
+    add(`/opsia/layer${n}/loopsync`, 0, 1, lsi / (LOOP_SYNCS.length - 1), 'The loop\'s delay in beats (index: free·1/16·1/8·1/4·1/2·1 bar)')
     add(`/opsia/layer${n}/vary`, 0, 1, 0, 'Vary this layer : a variant at its own amount (trigger)', false)
     const cm = Math.max(0, COUPLING_MODES.indexOf(l?.coupling?.mode ?? 'off'))
     add(`/opsia/layer${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')

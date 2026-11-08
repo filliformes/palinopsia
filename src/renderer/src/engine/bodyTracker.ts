@@ -24,7 +24,7 @@ import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
 import { createBodyWorker } from './bodyWorker'
 import FlowWorker from '../workers/flowWorker?worker&inline'
-import { roomTracker } from './roomTracker'
+import { roomTracker, setRoomMirror } from './roomTracker'
 import { handShape, HandSlots, HandSmoother, PinchPointer, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
 import { bodyPointer, setHandCursors, HAND_PID, type HandCursor } from '../pointerInput'
 
@@ -863,7 +863,7 @@ class BodyTracker {
       this.poseLost(ts)
     }
     if (hasFace) this.deriveFace(this.latestFace as NormalizedLandmark[], blendshapes, mirror, out, cfg)
-    if (room) Object.assign(out, roomTracker.features(mirror))
+    if (room) { setRoomMirror(mirror); Object.assign(out, roomTracker.features(mirror)) }
     if (cfg.silhouette) this.deriveSilhouette(out, cfg)
     if (flowOut) Object.assign(out, flowOut)
     bodyBus.update(out)

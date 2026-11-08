@@ -77,7 +77,10 @@ export interface ShaderInstance {
 
 export interface SourceSlot extends ShaderInstance {
   kind: SourceKind
-  // For kind:'feedback' : index of the layer whose previous frame we sample.
+  // For kind:'feedback' (the Loop source) : the layer whose picture this slot
+  // plays : its last frame when it is this layer or one above (a loop), this
+  // frame when it is below. mediaId carries it too ('layer:<i>'), so the slot
+  // compares and morphs like any other.
   feedbackLayer?: number
   // For kind:'video' : the clip's object URL (or path) the engine loads.
   // For kind:'assemble' : the assemblage's id (changes on every generate /
@@ -279,6 +282,11 @@ export interface LayerState {
   // How the returning picture meets the new frame (LOOP_BLENDS). Absent : 'mix',
   // the plain trail every session before the Loop rack had.
   loopBlend?: LoopBlend
+  // The loop's delay : the picture comes back after this many milliseconds
+  // (0 / absent : the last frame, as before). loopSync > 0 sets it in beats on
+  // the tempo instead (LOOP_SYNCS), and wins.
+  loopDelay?: number
+  loopSync?: number
   // A/B source crossfade : 0 = A only, 1 = B only. Ignored while B is empty.
   sourceMix: number
   // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
@@ -304,6 +312,10 @@ export interface LayerState {
 // the loop through only where the new picture is dark or transparent.
 export type LoopBlend = 'mix' | 'add' | 'screen' | 'lighten' | 'darken' | 'multiply' | 'difference' | 'xor' | 'key'
 export const LOOP_BLENDS: LoopBlend[] = ['mix', 'add', 'screen', 'lighten', 'darken', 'multiply', 'difference', 'xor', 'key']
+// The loop delay's beat choices (in beats : a 16th note is a quarter of one) and
+// their names; 0 is free (the milliseconds).
+export const LOOP_SYNCS: number[] = [0, 0.25, 0.5, 1, 2, 4]
+export const LOOP_SYNC_NAMES: string[] = ['free', '1/16', '1/8', '1/4', '1/2', '1 bar']
 
 // A spatial mask on a layer's stack contribution. mode : 0 none · 1 luma (the
 // layer's own luminance window) · 2 gradient (a linear fade) · 3 shape (box↔ellipse

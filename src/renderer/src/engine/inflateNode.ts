@@ -115,7 +115,8 @@ const SHOW_FS = `${HEAD}
 uniform sampler2D uHost, uM, uH, uSide;
 uniform vec2 uAspect, uRes;
 uniform vec3 uL, uTint;
-uniform float uAz, uPuff, uVolume, uMat, uGloss, uFilm, uFilmNm, uMixA, uKeep, uHasSide, uShadow, uT, uFrom, uThresh;
+uniform float uAz, uPuff, uVolume, uMat, uGloss, uFilm, uFilmNm, uMixA, uKeep, uHasSide, uShadow, uT, uFrom, uThresh, uCav, uDisp, uRim;
+uniform vec2 uGrid;
 ${RELIEF_SHADE}
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   vec2 h = vec2(127.1, 311.7);
@@ -136,8 +137,8 @@ void main() {
   vec3 N = normalize(vec3(-hs.gb * uVolume, 1.0));
   float m = texture(uM, vUV).r;
   vec3 alb = mix(host.a > 1e-4 ? host.rgb : uTint, uTint, 1.0 - uKeep);
-  // the materials : 0 clay 1 plastic 2 metal 3 chrome 4 soap film 5 glass
-  float M = uMat < 0.5 ? 0.0 : uMat < 1.5 ? 3.0 : uMat < 2.5 ? 1.0 : uMat < 3.5 ? 4.0 : uMat < 4.5 ? 6.0 : 4.0;
+  // the materials : 0 clay 1 plastic 2 metal 3 chrome 4 soap film 5 glass 6 foil
+  float M = uMat < 0.5 ? 0.0 : uMat < 1.5 ? 3.0 : uMat < 2.5 ? 1.0 : uMat < 3.5 ? 4.0 : uMat < 4.5 ? 6.0 : uMat > 5.5 ? 7.0 : 4.0;
   vec3 refl = vec3(0.0);
   float reflAmt = 0.0;
   if (uHasSide > 0.5) { refl = texture(uSide, vUV + reflect(vec3(0.0, 0.0, -1.0), N).xy * 0.34).rgb * 1.2; reflAmt = 1.0; }
@@ -145,12 +146,27 @@ void main() {
   vec2 P = (vUV - 0.5) * uAspect;
   vec3 lit = shadeSurface(M, alb, N, uL, uAz, 0.3 + uGloss * 1.2, refl, reflAmt, uFilm, nm, P);
   float fr = 1.0;
-  if (uMat > 4.5) {
+  // cavity : the creases between swellings get less of the room (the slope's divergence :
+  // a valley is positive)
+  if (uCav > 0.0) {
+    vec2 g = 1.0 / uGrid;
+    float cur = (texture(uH, vUV + vec2(g.x, 0.0)).g - texture(uH, vUV - vec2(g.x, 0.0)).g) / (2.0 * g.x * uAspect.x)
+              + (texture(uH, vUV + vec2(0.0, g.y)).b - texture(uH, vUV - vec2(0.0, g.y)).b) / (2.0 * g.y * uAspect.y);
+    lit *= 1.0 - uCav * 0.8 * clamp(cur * uVolume * 0.06, 0.0, 1.0);
+  }
+  if (uMat > 4.5 && uMat < 5.5) {
     // glass : a picked layer bent by the shape, else the picture itself, the room on its shoulders
-    vec2 buv = vUV + N.xy * 0.14;
-    vec3 bent = uHasSide > 0.5 ? texture(uSide, buv).rgb : texture(uHost, buv).rgb;
+    // red bends least, blue most (DISPERSION) : the split is widest at the rim, where
+    // the surface turns away (after Orb, MIT)
+    vec2 bo = N.xy * 0.14;
+    vec2 bur = vUV + bo * (1.0 - 0.3 * uDisp), bug = vUV + bo, bub = vUV + bo * (1.0 + 0.35 * uDisp);
+    vec3 bent = uHasSide > 0.5
+      ? vec3(texture(uSide, bur).r, texture(uSide, bug).g, texture(uSide, bub).b)
+      : vec3(texture(uHost, bur).r, texture(uHost, bug).g, texture(uHost, bub).b);
     fr = pow(1.0 - N.z, 3.0);
     lit = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(vec3(0.0, 0.0, -1.0), N), uAz, P, N.z, 0.05) * (0.08 + 0.75 * fr);
+    // the rim : a bright thin edge where the glass turns away
+    lit += vec3(0.92, 0.96, 1.0) * pow(1.0 - N.z, 4.0) * uRim * 0.9;
   }
   // the shadow it throws on what is outside it
   float sh = 0.0;
@@ -164,7 +180,7 @@ void main() {
   // straight alpha : the shape, over the picture as it was. Glass with nothing to bend
   // is clear in the middle : the layers under it show through.
   vec3 outC = mix(host.rgb * (1.0 - 0.6 * sh), lit, cov);
-  float clear = uMat > 4.5 && uHasSide < 0.5 ? mix(0.3, 1.0, min(1.0, fr * 2.4)) : 1.0;
+  float clear = uMat > 4.5 && uMat < 5.5 && uHasSide < 0.5 ? mix(0.3, 1.0, min(1.0, fr * 2.4)) : 1.0;
   float outA = max(host.a * (1.0 - cov), cov * clear);
   if (sh > 0.0 && host.a < 0.01) { outC = vec3(0.0); outA = 0.6 * sh; }
   outC = mix(host.rgb, outC, uMixA);
@@ -415,6 +431,13 @@ export class InflateNode implements ConvNode {
     gl.uniform1f(this.u(s, 'uBands'), Math.max(0.5, Math.min(16, num(I.bands, 3))))
     gl.uniform1f(this.u(s, 'uSplit'), Math.max(0, Math.min(1, num(I.split, 0.35))))
     gl.uniform1f(this.u(s, 'uRipple'), Math.max(0, Math.min(1, num(I.ripple, 0.3))))
+    gl.uniform1f(this.u(s, 'uFoilSat'), Math.max(0, Math.min(1, num(I.rainbow, 0.25))))
+    gl.uniform1f(this.u(s, 'uFoilScale'), Math.max(20, Math.min(400, num(I.flakes, 220))))
+    gl.uniform1f(this.u(s, 'uFoilGlint'), Math.max(0, Math.min(1, num(I.glint, 0.5))))
+    gl.uniform1f(this.u(s, 'uCav'), Math.max(0, Math.min(1, num(I.cavity, 0))))
+    gl.uniform1f(this.u(s, 'uDisp'), Math.max(0, Math.min(1, num(I.dispersion, 0))))
+    gl.uniform1f(this.u(s, 'uRim'), Math.max(0, Math.min(1, num(I.rim, 0))))
+    gl.uniform2f(this.u(s, 'uGrid'), this.height!.w, this.height!.h)
     this.draw(out.fbo, W, H)
     for (let i = 3; i >= 0; i--) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, null) }
     gl.bindVertexArray(null)

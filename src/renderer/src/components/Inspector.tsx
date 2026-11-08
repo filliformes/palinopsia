@@ -530,6 +530,21 @@ export function Inspector(): JSX.Element {
         </div>
       )
     }
+    // A Loop source has no controls of its own : say what it plays and where to work it
+    const loopSlot = selection?.type === 'source' ? composition.layers[selection.layer]?.[selection.slot === 'A' ? 'sourceA' : 'sourceB'] : null
+    if (selection?.type === 'source' && loopSlot?.kind === 'feedback') {
+      const from = loopSlot.feedbackLayer ?? selection.layer
+      return (
+        <div className="rounded-md border border-border bg-panel p-3 text-[11px] text-muted">
+          <div className="mb-1 font-mono text-[11px] text-text">
+            ↻ Loop · L{from + 1}&apos;s picture <span className="text-muted">· layer {selection.layer + 1} · src {selection.slot}</span>
+          </div>
+          {from >= selection.layer
+            ? `Layer ${from + 1}'s last frame comes back into this slot : its effects, the A·B mix, the layer FX and the layer's own feedback run again on every pass. Pick another layer in the source menu.`
+            : `Layer ${from + 1}'s picture as it is this frame : it is below, so it is a copy, not a loop (unless that layer reads this one back). Pick another layer in the source menu.`}
+        </div>
+      )
+    }
     return (
       <div className="rounded-md border border-border bg-panel p-3 text-[11px] text-muted">
         Select a source or an FX to edit its controls.

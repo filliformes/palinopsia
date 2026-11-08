@@ -15,6 +15,101 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The glass family : Glass, Rain on Glass, and a color split for Inflate's and Relief's
+  glass** (Vincent : "#4 : A glass family"). A new picker group, **Glass**.
+  - **Glass** (`fx/Glass.fs`, ISF) : a height per pattern (fluted columns, reeds, rippled
+    cathedral noise, hammered Voronoi bowls, a fine pebble, prism facets, plain frost), its
+    slope by central differences in the turned space, the picture read at the bent point,
+    red / green / blue at 0.75 / 1 / 1.3 of the bend (**dispersion**), six jittered taps for
+    **frost**, a sheen from the slope against a light, dark **seams** in the grooves.
+    Distort's own "glass" and "corrugate" stay (a cell warp, not a pane). Hammered and
+    pebbled shipped first with slopes that shattered the picture : softened to shallow
+    bowls and a low stipple.
+  - **Rain on Glass** (`fx/RainPane.fs`, ISF, `@dome`) : three grids of beading drops,
+    each a small inverted lens with a rim and a glint; one column in four (by drops) has a
+    drop sliding in stick and slip on an integrated clock (`PH_slide`), its trail clear
+    through the fog and misting over with distance; the fog a six-tap scatter tinted. On
+    the dome the pattern lives in the azimuth and the distance from the zenith, so drops
+    slide outward.
+  - **Inflate glass, Relief glass** : **glass color split** (red bends least, blue most,
+    widest at the rim, after Orb, MIT) and **glass rim** (a bright edge where the glass
+    turns away), both 0 by default; Inflate's preset **Prism glass**; every existing
+    Relief / Inflate preset sets them to 0.
+  - 10 Glass presets, 6 Rain presets, the chains **Behind Fluted Glass** and **Rainy
+    Window**, the theme **Glasshouse** (Living Surfaces). 60 fps at 1080p and on the dome.
+
+- **Foil and cavity, for Relief, Inflate and Drape** (Vincent : "#13 : Foil and finishes for
+  Relief and Inflate"). `reliefShade.ts` gains material 7, a holographic foil after
+  Holocloth's (MIT, credited) : flakes as cells of the frame (`uFoilScale` per frame height),
+  each tilted a little its own way; the diffraction hue from the surface's own angle, the
+  lamp and the place (so the rainbow runs in bands over the folds, a flake only nudging it);
+  sparse glints gated by angle (`uFoilGlint`), firing as the lamp orbits; and the key move,
+  the metal's color tinted by the rainbow so the reflections themselves go iridescent;
+  `uFoilSat` 0 is a silver holo (the rainbow is a knob, 0.25 by default). Inflate : material
+  **foil** (6); Relief : brush **foil** (8), a thin sheet pressed flat and crinkled (dents
+  give its creases); Drape : material **foil** (4). New controls **foil rainbow**, **foil
+  flakes**, **foil glints**, grayed out unless the foil is picked. **cavity** (Relief and
+  Inflate, 0 by default : every saved look stays as it was) : the height's curvature darkens
+  the creases (Relief : the Laplacian over the slope's own taps; Inflate : the divergence of
+  the slope), measured on Relief clay : the joints and crossings go dark, a little grain
+  catching in the cracks. Presets : Relief **Silver foil**, **Holo foil**, **Deep clay**;
+  Inflate **Silver foil**, **Holo foil**, **Deep chrome**; Drape **Foil sheet**; every
+  existing Relief / Inflate / Drape preset now sets the new controls to their defaults
+  (presets merge). The chain **Foil Everything**, the theme **Holo Foil** (Living Surfaces).
+
+- **Drape, a new effect : the picture on a cloth you grab** (Vincent, after the borrowing
+  audit : "build #3 : Drape : a live layer on a cloth you grab (make it an FX)").
+  `engine/drapeNode.ts`, native node `node-drape`, any rack. A Verlet cloth on the CPU
+  adapted from Holocloth by Dmitry Kurash (MIT, credited in the file) : 44 points across,
+  structural / shear / bend constraints at 1 / 0.85 / 0.35, a fixed 1/120 s step (at most 4
+  a frame, on the rack's clock : a frozen layer holds its folds), 3-14 projection passes
+  by stiffness, the grab re-applied after each (every point near the hit pulled toward
+  the pointer by a smoothstep of its distance, keeping its offset), fold occlusion from
+  how far the neighbors' mean sits in front of a point. Ours : hang / flag / float (top
+  edge, left side or nothing pinned; float springs back to its rest), gravity, wind on
+  each point's normal plus drag along it (a flag streams off its pole), gusts, the sound's
+  onsets poking a random place, the Room's people pressing into it (their boxes, the Body
+  page's mirror via `roomMirror()`), a gentle crumple at the start and on reset. Drawn
+  as a mesh four times finer than the sim, each vertex a Catmull-Rom blend of 16 sim points
+  from RGBA32F textures (positions, normals + fold), lit as cloth (wrapped light, sheen at
+  the turning edges), satin, or Relief's plastic / chrome, the back of the sheet the print
+  faint; 4x MSAA (the shared buffer), resolved into its own RGBA8 then un-premultiplied
+  into the chain (an RGBA8 multisample can't resolve into the half-float chain). Square
+  under dome fill. **Effects can take the pointer now** : `pointerInput.ts` routes the
+  mouse and Body pinches to the selected effect, else the Master's, else from the top
+  layer down its effects before its sources (`Compositor.pointerFx`, `FxRack.nodeOf`);
+  an effect's gesture is live, never logged. 12 presets (Curtain, Banner, Flag, Storm
+  flag, Bedsheet, Satin curtain, Black cloth, Chrome sheet, Plastic wrap, Room curtain,
+  Beat cloth, Hung over the picture), master chains Hung Picture and Picture in the Wind,
+  the theme **Drapery** (Living Surfaces), Inspector groups (sheet / forces / look).
+  Measured on the test copy : 60 fps at 1920 x 1080 and under dome fill at 4096.
+
+- **The loop's delay, and the Loop source** (Vincent : "build 3 and 4", the rest of the
+  loop plan).
+  - **Delay** (`LayerState.loopDelay` ms, `loopSync` beats : `LOOP_SYNCS` free, 1/16, 1/8,
+    1/4, 1/2, 1 bar; sync wins, on the tempo / Link). `engine/loopDelay.ts` : a ring of 32
+    past frames in an RGBA8 texture array, about half the layer's size inside a 64 MB budget
+    (725 x 725 a slot at a 4096 dome), each slot timed; one is written every delay / 30 s so
+    the ring always spans the delay, and the two slots around now - delay are crossfaded
+    into a full-size target that replaces `pp.read()` as what returns (the Loop rack runs on
+    it). Global clock (a layer's Speed leaves it alone : beats stay on the beat), lazy,
+    freed 3 s after the delay goes back to 0, reset by PANIC. Each echo comes back through
+    the small ring : it softens a little per pass (a tape echo). DELAY row in the drawer
+    (slider squared over 0..4000 ms, ms box, beat menu), OSC `loopdelay` / `loopsync`, the
+    Agent's `loop_delay` / `loop_sync`, morph eases the ms, a sync change hands over. Two
+    recipes : **Beat echo** (1/8, lighten, shrinking off center) and **Slow echo** (400 ms,
+    screen, growing and turning, hue moving); Tunnel and Echo Chamber themes deal them.
+  - **Loop source** : the `SourceKind 'feedback'` types.ts had declared since phase 2 and
+    nothing implemented. A slot plays a layer's picture (`feedbackLayer`, mirrored in
+    `mediaId: 'layer:<i>'` so it compares and morphs like any slot), read through the
+    sidechain resolver (a muted layer still renders while read) and blitted as is : its own
+    layer or one above is the last frame (a loop through the slot's rack, the mix, the layer
+    FX and the layer's feedback), one below is this frame. Source menu group **loops** (`↻`),
+    an Inspector note, OSC / the Agent `loop 2`, Generate pools take `loop:<n>` and a theme's
+    new `stackB` (per-layer B pools); new theme **Cross Loop** : layer 1 plays layer 2 on its
+    B while layer 2 plays layer 1 smaller and turned (two monitors facing each other). Never
+    dealt by the dice. Dome : a same-size copy of another layer, nothing to project.
+
 - **The Loop rack : effects inside a layer's feedback** (Vincent, after the borrowing
   audit of 15 sites and Hex Composer : "build the feedback loop rack first"). A layer's
   feedback was a persistence mix AFTER its racks (`persist` : mix(new, last, amount)), so
@@ -1363,6 +1458,13 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   518 px survived a cold relaunch; console errors 0.
 
 ### Fixed
+
+- **Every layer reached the picture a frame late.** A layer's `texture()` returned
+  `pp.out()` after persist had already swapped its ping-pong pair, so the blend stack and
+  every sidechain read the frame before the newest : 16 ms more latency on everything, the
+  camera included (found while building the Loop source; measured : a solid color changed
+  between two renders still showed the old one). It now returns `pp.read()`, the frame just
+  made (and, before this frame's persist, the last one).
 
 - **A modulator on the Synth's sense did nothing.** The chip was there and its value
   moved, but the player reads the sense off the config, which never saw it : it reaches

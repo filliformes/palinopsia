@@ -1,5 +1,9 @@
-// The materials that Relief (a source) and Inflate (an effect) share : a height
-// given a light, as paint, plastic, chrome or a soap film. GLSL ES 3.00, math only.
+// The materials that Relief (a source), Inflate and Drape (effects) share : a height
+// given a light, as paint, plastic, chrome, a soap film or a holographic foil. GLSL ES
+// 3.00, math only. The foil after Holocloth by Dmitry Kurash (MIT,
+// github.com/dmitrykurash/holocloth) : micro-flakes, a diffraction hue that follows
+// the angle, glints gated by angle, and the metal's own color tinted by the rainbow
+// (what makes a foil flash rather than glow).
 // Thin film after the optics every soap bubble obeys : light reflected off a film's two
 // faces interferes, by phase 4 pi n d cos(t) / lambda, half a wave shifted at the first face.
 
@@ -85,8 +89,21 @@ vec3 roomAt(vec3 r, float az, vec2 P, float nv, float w) {
   return mix(st, mix(vec3(0.03, 0.03, 0.045), vec3(1.0, 1.0, 1.03), b), uFlow);
 }
 
+// The foil's knobs : how much rainbow (0 : silver), the flakes per frame height,
+// how many glints fire. A shader that never uses the foil leaves them at 0.
+uniform float uFoilSat, uFoilScale, uFoilGlint;
+float foilHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+vec3 foilHue(float h) {
+  vec3 c = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return c * c * (3.0 - 2.0 * c);
+}
+
 // A surface lit : M the material (0 matte 1 metal 2 brushed 3 gloss plastic 4 chrome
-// 5 ink 6 film), N its normal, L the lamp, a its color, g how tight its highlight.
+// 5 ink 6 film 7 foil), N its normal, L the lamp, a its color, g how tight its highlight.
 vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 reflected, float reflectAmt, float film, float filmNm, vec2 P) {
   vec3 V = vec3(0.0, 0.0, 1.0);
   vec3 H = normalize(L + V);
@@ -124,6 +141,28 @@ vec3 shadeSurface(float M, vec3 a, vec3 N, vec3 L, float az, float g, vec3 refle
   } else if (M < 5.5) {
     // ink : flat
     c = a;
+  } else if (M > 6.5) {
+    // foil : each flake (a cell in the frame, so they hold at 4K and on the dome) is
+    // tilted a little its own way; the hue follows the angle, the lamp and the place
+    vec2 cell = floor(P * max(8.0, uFoilScale));
+    float r1 = foilHash(cell), r2 = foilHash(cell + 17.31);
+    vec3 Nf = normalize(N + (vec3(r1, r2, 0.5) - 0.5) * 0.09);
+    // (the hue from the surface itself, so the rainbow runs in bands over the folds;
+    // each flake only nudges it, and tilts its own glint and grain)
+    float facing = max(0.0, N.z);
+    float fresF = pow(1.0 - facing, 1.5);
+    vec3 rb = foilHue(fract(az * 0.159 + facing * 1.7 + length(P) * 0.9 + r1 * 0.03));
+    vec3 tintF = mix(vec3(1.0), rb, uFoilSat);
+    float flake = 0.82 + 0.18 * r2;
+    // a sparse set of flakes flashes at its own angle, as the lamp moves
+    float gate = fract(r2 * 13.7 + max(0.0, Nf.z) * 6.0 + az * 0.8);
+    float glint = smoothstep(1.0 - 0.012 * (0.3 + 2.0 * uFoilGlint), 1.0, gate) * 5.0 * uFoilGlint;
+    vec3 rf = reflect(-V, Nf);
+    vec3 e = mix(roomAt(rf, az, P, facing, w), reflected, reflectAmt);
+    // the metal's color tinted by the rainbow : the reflections themselves go iridescent
+    vec3 F0 = mix(vec3(0.92), a, 0.45) * (0.3 + tintF * 0.85);
+    c = e * F0 * flake + tintF * ((0.22 + 0.78 * fresF) * flake * 0.22 + glint * fresF * 0.5)
+      + vec3(1.0) * pow(max(0.0, dot(Nf, H)), 160.0 * g) * 0.7;
   } else {
     // a soap film over dark : its colors, what it reflects on top
     vec3 f = filmColor(filmNm, nv, 1.33);

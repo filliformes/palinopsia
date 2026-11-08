@@ -837,6 +837,39 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
   },
+  // ── Drape : the whole picture on a cloth you grab ──
+  {
+    name: 'Hung Picture', group: 'Relief',
+    fx: [
+      { shaderId: 'node-drape', inputs: {mode: 0, size: 0.85, crumple: 0.25, gravity: 0.5, wind: 0.2, gust: 0.5, stiffness: 0.7, damping: 0.25, grab: 0.15, audio: 0, people: 0, material: 1, color: [0.03, 0.03, 0.035, 1], sheen: 0.6, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.15, behind: 0} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Picture in the Wind', group: 'Relief',
+    fx: [
+      { shaderId: 'node-drape', inputs: {mode: 1, size: 0.8, crumple: 0.1, gravity: 0.25, wind: 0.7, gust: 0.7, stiffness: 0.7, damping: 0.15, grab: 0.15, audio: 0, people: 0, material: 0, color: [0.08, 0.08, 0.09, 1], sheen: 0.5, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.1, behind: 0} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Foil Everything', group: 'Relief',
+    fx: [
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.5, round: 0.9, volume: 0.5, material: 6, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.3, flow: 0, flowSpeed: 0.3, bands: 3, split: 0.35, ripple: 0.3, rainbow: 0.4, flakes: 180, glint: 0.6, cavity: 0.35, mix: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  // ── Glass : the whole picture behind a pane ──
+  {
+    name: 'Behind Fluted Glass', group: 'Relief',
+    fx: [{ shaderId: 'fx-glass', inputs: {pattern: 0, scale: 16, angle: 0, depth: 0.5, dispersion: 0.35, frost: 0.1, shine: 0.35, seams: 0.3, lightAngle: 2.36, tint: [0.94, 0.97, 1, 1], drift: 0} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Rainy Window', group: 'Relief',
+    fx: [{ shaderId: 'fx-rain-pane', inputs: {drops: 0.6, size: 0.45, slide: 0.35, trails: 0.6, fog: 0.5, bend: 0.6, shine: 0.4, tint: [0.9, 0.94, 1, 1]} }],
+    vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.85, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',

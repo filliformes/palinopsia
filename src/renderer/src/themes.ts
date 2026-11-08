@@ -68,6 +68,9 @@ export interface Theme {
   /** Per-layer source pools, bottom layer first, overriding `sources` on those
    *  layers (rock under lichen, paper under the burn). */
   stack?: string[][]
+  /** Per-layer source B pools, bottom layer first : a layer with one always gets
+   *  a B from it ('loop:<n>' : the Loop source, layer n's picture). */
+  stackB?: string[][]
   /** Per-layer effects, bottom layer first, that CLOSE that layer's rack (one
    *  drawn from each pool) : the effect a theme cannot do without, e.g. the
    *  Perspective that lays a line field on a plane. Kept out of `layerFx`, whose
@@ -589,7 +592,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'tunnel', name: 'Tunnel', family: 'Feedback / Afterimage',
-    loops: ['tunnel', 'echo-key', 'rise'],
+    loops: ['tunnel', 'echo-key', 'rise', 'beat-echo'],
     blurb: 'A feedback tunnel that wanders off-centre : never a fixed mandala.',
     world: 'musical',
     palette: [K, [0.1, 0.14, 0.3, 1], [0.7, 0.8, 1.0, 1]],
@@ -608,8 +611,36 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], drift: 0.4, coalesce: 0.5
   }),
   mk({
+    id: 'drapery', name: 'Drapery', family: 'Living Surfaces',
+    blurb: 'A picture hung on cloth in a draft : curtains, banners and sheets that sway, crease and catch the light.',
+    world: 'sublimated',
+    palette: [K, [0.1, 0.08, 0.1, 1], [0.78, 0.7, 0.66, 1]],
+    sources: ['organic', 'congeal', 'dye-field', 'filaments', 'shapes'],
+    stackFx: [['node-drape']],
+    presets: { 'node-drape': ['Curtain', 'Satin curtain', 'Black cloth', 'Banner', 'Bedsheet', 'Flag'] },
+    pickInputs: { 'node-drape': { behind: [0], people: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
+    id: 'cross-loop', name: 'Cross Loop', family: 'Feedback / Afterimage',
+    blurb: 'Two monitors facing each other : each layer plays the other\'s picture, smaller and turned, frames inside frames.',
+    world: 'synthetic',
+    palette: [K, [0.08, 0.09, 0.14, 1], [0.66, 0.7, 0.78, 1]],
+    // (full-frame sources : a sparse one on black hides the nesting; no rack
+    // effect that compounds, a grade run again on every pass climbs to white)
+    sources: ['organic', 'congeal', 'shapes', 'filaments', 'dye-field'],
+    stack: [['organic', 'congeal', 'shapes', 'filaments', 'dye-field'], ['loop:0']],
+    stackB: [['loop:1'], []],
+    stackFx: [[], ['fx-transform']],
+    pickInputs: { 'fx-transform': { zoom: [0.62, 0.7, 0.78], rotate: [0.12, -0.18, 0.3, -0.07], posX: [0.04, -0.06, 0.08], wrap: [0] } },
+    mixBlends: ['normal', 'screen'],
+    layerFx: [],
+    blends: ['screen', 'lighten'], useB: 0, feedback: 0.3, layers: [2, 2], drift: 0.35, coalesce: 0.5
+  }),
+  mk({
     id: 'echo-chamber', name: 'Echo Chamber', family: 'Feedback / Afterimage',
-    loops: ['echo-key', 'tunnel', 'drip'],
+    loops: ['echo-key', 'tunnel', 'drip', 'slow-echo', 'beat-echo'],
     blurb: 'Trails that pulse with a captured rhythm : temporal convolution echoes.',
     world: 'sublimated',
     palette: [K, [0.12, 0.18, 0.22, 1], [0.7, 0.82, 0.8, 1]],
@@ -1210,6 +1241,34 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
     motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'holo-foil', name: 'Holo Foil', family: 'Living Surfaces',
+    blurb: 'Words and shapes pressed in holographic foil : silver that turns to color at an angle, flakes that flash as the lamp goes round.',
+    world: 'parametric',
+    palette: [[0.02, 0.02, 0.025, 1], [0.32, 0.32, 0.36, 1], [0.94, 0.94, 0.97, 1]],
+    sources: ['gen-text', 'shapes', 'organic'],
+    stackFx: [['node-inflate']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'node-inflate': ['Silver foil', 'Holo foil'] },
+    pickInputs: { 'node-inflate': { from: [0, 1], threshold: [0.45], orbit: [0.25, 0.4, -0.3] }, 'gen-text': { size: [0.25, 0.33, 0.42], posX: [-0.08, 0, 0.08], posY: [-0.08, 0, 0.08], angle: [-0.12, 0, 0.12], drift: [0, 0.04] } },
+    layerFx: [],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'glasshouse', name: 'Glasshouse', family: 'Living Surfaces',
+    blurb: 'A soft world seen through glass : fluted, reeded, cathedral or rained on, the color split at every edge.',
+    world: 'sublimated',
+    palette: [[0.03, 0.035, 0.04, 1], [0.24, 0.3, 0.32, 1], [0.82, 0.86, 0.84, 1]],
+    sources: ['organic', 'dye-field', 'congeal', 'filaments', 'drift-field'],
+    stackFx: [['fx-glass', 'fx-rain-pane']],
+    presets: { 'fx-glass': ['Fluted', 'Fluted, lying down', 'Reeded', 'Cathedral', 'Hammered', 'Shower door'], 'fx-rain-pane': ['Window rain', 'Drizzle', 'Night window'] },
+    layerFx: [],
+    blends: ['screen', 'normal'], layers: [1, 2], useB: 0.4, feedback: 0, density: 0.45, drift: 0.2
   }),
   mk({
     id: 'oil-on-water', name: 'Oil on Water', family: 'Living Surfaces',

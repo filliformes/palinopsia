@@ -63,6 +63,8 @@ import palette from './fx/Palette.fs?raw'
 import threshold from './fx/Threshold.fs?raw'
 import solarize from './fx/Solarize.fs?raw'
 import thinFilm from './fx/ThinFilm.fs?raw'
+import glass from './fx/Glass.fs?raw'
+import rainPane from './fx/RainPane.fs?raw'
 import moshBlocks from './fx/MoshBlocks.fs?raw'
 import grain from './fx/Grain.fs?raw'
 import streak from './fx/Streak.fs?raw'
@@ -896,6 +898,47 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { cuts: [0.3, 0.9], pulse: [0, 1], refresh: [0.1, 0.6], bloom: [0, 0.6], drop: [0, 0.3], quality: [0.25, 0.75], size: [0, 3], mix: [0.8, 1] }
   },
   {
+    // Native (engine/drapeNode.ts) : a Verlet cloth printed with the picture, grabbed on
+    // the preview (the mouse, a Body pinch), pushed by the wind, the sound, the Room.
+    id: 'node-drape',
+    name: 'Drape',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Drape : whatever enters is printed on a sheet of cloth you can grab. Drag it on the preview (or pinch it with the Body page\'s pinch = click) and let it fall. HANG pins its top edge (a curtain, a banner), FLAG one side (in the wind), FLOAT none (a sheet drifting in the air, always coming back). The wind pushes on the folds and comes in gusts, the sound\'s hits poke it, the Room\'s people press into it where they stand. Printed on cloth, satin, plastic, chrome or holographic foil, its folds shaded; around it, nothing (BEHIND brings the picture back there).',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['hang', 'flag', 'float'], DEFAULT: 0, LABEL: 'mode' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.3, MAX: 1.3, DEFAULT: 0.9, LABEL: 'size' },
+        { NAME: 'crumple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'crumple' },
+        { NAME: 'gravity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'gravity' },
+        { NAME: 'wind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'wind' },
+        { NAME: 'gust', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'gusts' },
+        { NAME: 'stiffness', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'stiffness' },
+        { NAME: 'damping', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'damping' },
+        { NAME: 'grab', TYPE: 'float', MIN: 0.03, MAX: 0.5, DEFAULT: 0.15, LABEL: 'grab size' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound pokes' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people press' },
+        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['cloth', 'satin', 'plastic', 'chrome', 'foil'], DEFAULT: 0, LABEL: 'material' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.08, 0.08, 0.09, 1], LABEL: 'cloth color' },
+        { NAME: 'sheen', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'sheen' },
+        { NAME: 'folds', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'fold shadow' },
+        { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'foil rainbow' },
+        { NAME: 'flakes', TYPE: 'float', MIN: 20, MAX: 400, DEFAULT: 220, LABEL: 'foil flakes' },
+        { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil glints' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.15, LABEL: 'view tilt' },
+        { NAME: 'behind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'behind' },
+        { NAME: 'poke', TYPE: 'event', LABEL: 'poke' },
+        { NAME: 'reset', TYPE: 'event', LABEL: 'reset' }
+      ]
+    })}*/`,
+    curated: { mode: [0, 2], size: [0.7, 1.05], crumple: [0.1, 0.6], gravity: [0.3, 0.7], wind: [0.1, 0.6], gust: [0.3, 0.8], stiffness: [0.5, 0.9], damping: [0.15, 0.4], grab: [0.1, 0.25], audio: [0, 0.4], people: [0, 0], material: [0, 1], sheen: [0.3, 0.8], folds: [0.4, 0.8], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], tilt: [-0.1, 0.35], behind: [0, 0], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8] }
+  },
+  {
     // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
     // lit with Relief's materials.
     id: 'node-inflate',
@@ -904,7 +947,7 @@ export const NATIVE_NODES: IsfShader[] = [
     native: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Inflate : blows the layer up into volume. Its shape (its alpha, what is bright, or what is dark) gets a real height, rounded in from its edges, and that height is lit as clay, molded plastic, polished metal, chrome, soap film or glass, live, whatever the layer is doing. A line of text, a logo or a silhouette comes out as liquid chrome. Pick a SIDECHAIN and the metal reflects that layer, the glass bends it.',
+        'Inflate : blows the layer up into volume. Its shape (its alpha, what is bright, or what is dark) gets a real height, rounded in from its edges, and that height is lit as clay, molded plastic, polished metal, chrome, soap film, glass or holographic foil (its RAINBOW : 0 is silver; its FLAKES and the GLINTS that fire as the light moves), live, whatever the layer is doing. CAVITY darkens the creases between swellings. A line of text, a logo or a silhouette comes out as liquid chrome. Pick a SIDECHAIN and the metal reflects that layer, the glass bends it.',
       CATEGORIES: ['FX', 'Stylize'],
       INPUTS: [
         { NAME: 'inputImage', TYPE: 'image' },
@@ -913,7 +956,7 @@ export const NATIVE_NODES: IsfShader[] = [
         { NAME: 'puff', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'puff' },
         { NAME: 'round', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.85, LABEL: 'round' },
         { NAME: 'volume', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'volume' },
-        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['clay', 'plastic', 'metal', 'chrome', 'soap film', 'glass'], DEFAULT: 3, LABEL: 'material' },
+        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6], LABELS: ['clay', 'plastic', 'metal', 'chrome', 'soap film', 'glass', 'foil'], DEFAULT: 3, LABEL: 'material' },
         { NAME: 'keep', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'keep colors' },
         { NAME: 'tint', TYPE: 'color', DEFAULT: [0.8, 0.82, 0.86, 1], LABEL: 'tint' },
         { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'gloss' },
@@ -928,10 +971,16 @@ export const NATIVE_NODES: IsfShader[] = [
         { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'color split' },
         { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripple' },
         { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
+        { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'foil rainbow' },
+        { NAME: 'flakes', TYPE: 'float', MIN: 20, MAX: 400, DEFAULT: 220, LABEL: 'foil flakes' },
+        { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil glints' },
+        { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cavity' },
+        { NAME: 'dispersion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass color split' },
+        { NAME: 'rim', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass rim' },
         { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' }
       ]
     })}*/`,
-    curated: { flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6], from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1] }
+    curated: { flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6], from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6], dispersion: [0, 0.7], rim: [0, 0.6] }
   },
   {
     // Native (engine/silhouetteNode.ts) : the Silhouette source's looks on any
@@ -1915,7 +1964,7 @@ export const GENERATORS: IsfShader[] = [
     dice: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Relief : a drawing in materials with real volume. Every stroke has height : strokes FUSE into each other, STACK on top, PRESS into what is there or cut it away, and when the light turns the whole drawing is lit again. Draw on the preview, or let it draw itself : DRAW wanders, builds with a compass, follows the moving things or the outlines of the layer picked as SIDECHAIN. Eight brushes : plasticine, molten metal, carved metal, recycled-plastic chips, fused drops, ribbed metal, ink, soap film. SINK and MELT let what is drawn fade and run, so the page never fills. SIDECHAIN also puts another layer in the material : its colors, its reflection in the metal, or seen through the relief as through glass.',
+        'Relief : a drawing in materials with real volume. Every stroke has height : strokes FUSE into each other, STACK on top, PRESS into what is there or cut it away, and when the light turns the whole drawing is lit again. Draw on the preview, or let it draw itself : DRAW wanders, builds with a compass, follows the moving things or the outlines of the layer picked as SIDECHAIN. Nine brushes : plasticine, molten metal, carved metal, recycled-plastic chips, fused drops, ribbed metal, ink, soap film, holographic foil (its RAINBOW, FLAKES and GLINTS). CAVITY darkens the creases where strokes meet. SINK and MELT let what is drawn fade and run, so the page never fills. SIDECHAIN also puts another layer in the material : its colors, its reflection in the metal, or seen through the relief as through glass.',
       CATEGORIES: ['Generator', 'Painterly'],
       INPUTS: [
         { NAME: 'draw', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['by hand', 'wander', 'compass', 'moving things', 'outlines'], DEFAULT: 1, LABEL: 'draws itself' },
@@ -1929,7 +1978,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'melt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'melt' },
         { NAME: 'stroke', TYPE: 'event', LABEL: 'stroke ▸' },
         { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' },
-        { NAME: 'brush', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7], LABELS: ['plasticine', 'molten metal', 'carved metal', 'chips', 'fused drops', 'ribbed metal', 'ink', 'soap film'], DEFAULT: 1, LABEL: 'brush' },
+        { NAME: 'brush', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8], LABELS: ['plasticine', 'molten metal', 'carved metal', 'chips', 'fused drops', 'ribbed metal', 'ink', 'soap film', 'foil'], DEFAULT: 1, LABEL: 'brush' },
         { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['raise', 'stack', 'plate', 'press', 'erase'], DEFAULT: 0, LABEL: 'mode' },
         { NAME: 'size', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'size' },
         { NAME: 'convex', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'convexity' },
@@ -1969,7 +2018,13 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'color split' },
         { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripple' },
         { NAME: 'orbit', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'light orbit' },
-        { NAME: 'follow', TYPE: 'long', VALUES: [0, 1], LABELS: ['its own', 'Context light path'], DEFAULT: 0, LABEL: 'light from' }
+        { NAME: 'follow', TYPE: 'long', VALUES: [0, 1], LABELS: ['its own', 'Context light path'], DEFAULT: 0, LABEL: 'light from' },
+        { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'foil rainbow' },
+        { NAME: 'flakes', TYPE: 'float', MIN: 20, MAX: 400, DEFAULT: 220, LABEL: 'foil flakes' },
+        { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil glints' },
+        { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cavity' },
+        { NAME: 'dispersion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass color split' },
+        { NAME: 'rim', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass rim' }
       ]
     })}*/`,
     // Who draws, the sidechain and the mirrors are staging : never dealt. The colors
@@ -1977,7 +2032,8 @@ export const GENERATORS: IsfShader[] = [
     curated: {
       flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6],
       draw: [1, 1], rate: [0.5, 1.6], speed: [0.25, 0.6], curve: [0.2, 0.7], length: [0.35, 0.8], audio: [0, 0], sink: [0.05, 0.2], melt: [0, 0],
-      brush: [0, 7], mode: [0, 0], size: [0.25, 0.65], convex: [0.5, 1], chaos: [0, 0.4], rough: [0, 0.3], fuse: [0.3, 0.9], ribs: [2, 8], dash: [0, 0], broken: [0, 0.3],
+      rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6], dispersion: [0, 0.7], rim: [0, 0.6],
+      brush: [0, 8], mode: [0, 0], size: [0.25, 0.65], convex: [0.5, 1], chaos: [0, 0.4], rough: [0, 0.3], fuse: [0.3, 0.9], ribs: [2, 8], dash: [0, 0], broken: [0, 0.3],
       mirror: [0, 0], fold: [6, 6], relief: [0.35, 0.8], gloss: [0.4, 0.9], grain: [0, 0.4], dents: [0, 0.4], bevel: [0.1, 0.5], shadow: [0.4, 0.8], edge: [0, 0], film: [0, 0],
       filmThick: [0.1, 0.6], colorPick: [1, 6], groundOp: [1, 1], side: [0, 0], sideUse: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.3, 0.7], orbit: [-0.2, 0.2], follow: [0, 0]
     }
@@ -2043,6 +2099,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-solarize', name: 'Solarize', category: 'FX', source: solarize,
     curated: { level: [0.4, 0.8], strength: [0.5, 1], soft: [0.04, 0.3] }
+  },
+  {
+    id: 'fx-glass', name: 'Glass', category: 'FX', source: glass,
+    curated: { pattern: [0, 6], scale: [8, 40], angle: [0, 0], depth: [0.25, 0.7], dispersion: [0, 0.6], frost: [0, 0.4], shine: [0.15, 0.55], seams: [0.1, 0.5], lightAngle: [0, 6.2832], drift: [0, 0] }
+  },
+  {
+    id: 'fx-rain-pane', name: 'Rain on Glass', category: 'FX', source: rainPane,
+    curated: { drops: [0.3, 0.8], size: [0.25, 0.7], slide: [0.15, 0.6], trails: [0.3, 0.9], fog: [0.2, 0.7], bend: [0.4, 0.8], shine: [0.2, 0.6] }
   },
   {
     id: 'fx-thinfilm', name: 'Thin Film', category: 'FX', source: thinFilm,
