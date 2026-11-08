@@ -42,3 +42,8 @@ Sonification Mode prompt.txt
 # (scripts/fetch-depth.mjs, every file hash-checked), never committed.
 /resources/depth/*
 !/resources/depth/README.md
+# The Room tracker a build ships (onnxruntime-web and RTMO-s, about 63 MB) :
+# fetched by `npm run fetch:pose` (scripts/fetch-pose.mjs, every file
+# hash-checked), never committed.
+/resources/pose/*
+!/resources/pose/README.md

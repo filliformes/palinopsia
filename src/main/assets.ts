@@ -14,9 +14,11 @@
 //   opsia-asset://local/wasm/vision_wasm_internal.js
 //   opsia-asset://local/models/hand_landmarker.task
 //   opsia-asset://depth/transformers.min.js
+//   opsia-asset://pose/models/rtmo-s.onnx
 //
-// The host picks the bundled dir : "depth" is resources/depth, anything else
-// ("local") resources/mediapipe. Read-only, extension-allowlisted,
+// The host picks the bundled dir : "depth" is resources/depth, "pose" resources/pose
+// (the Room tracker : onnxruntime-web and RTMO, fetched by `npm run fetch:pose`),
+// anything else ("local") resources/mediapipe. Read-only, extension-allowlisted,
 // traversal-guarded.
 
 import { app, protocol } from 'electron'
@@ -28,6 +30,7 @@ export const ASSET_SCHEME = 'opsia-asset'
 
 const MIME: Record<string, string> = {
   js: 'text/javascript',
+  mjs: 'text/javascript',
   wasm: 'application/wasm',
   task: 'application/octet-stream',
   data: 'application/octet-stream',
@@ -62,6 +65,13 @@ function depthBase(): string {
     : join(app.getAppPath(), 'resources', 'depth')
 }
 
+/** The bundled pose/ base (the Room tracker; `npm run fetch:pose` fills it). */
+function poseBase(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'pose')
+    : join(app.getAppPath(), 'resources', 'pose')
+}
+
 /** Must run BEFORE app ready : privileged + secure + fetch-capable so MediaPipe's
  *  internal fetch / wasm instantiation works from the packaged file:// renderer. */
 export function registerAssetScheme(): void {
@@ -84,7 +94,7 @@ export function handleAssetProtocol(): void {
       return reply('bad url', 400)
     }
     if (!ALLOWED_EXT.has(extOf(rel))) return reply('forbidden', 403)
-    const base = host === 'depth' ? depthBase() : mediapipeBase()
+    const base = host === 'depth' ? depthBase() : host === 'pose' ? poseBase() : mediapipeBase()
     // Resolve under base and refuse anything that escapes it (path traversal).
     const filePath = normalize(join(base, rel))
     if (filePath !== base && !filePath.startsWith(base + sep)) {

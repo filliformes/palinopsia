@@ -81,6 +81,19 @@ extraResources:
       - models/onnx-community/depth-anything-v2-small/onnx/model_fp16.onnx
       - models/onnx-community/depth-anything-v2-small/onnx/model_quantized.onnx
       - licenses/*
+  # The Room tracker (the Body page's pose for everyone in the frame) :
+  # onnxruntime-web 1.30.0 (its WebGPU build) and RTMO-s, about 63 MB, fetched
+  # pinned and hash-checked by `npm run fetch:pose` (CI runs it before every build;
+  # never committed). Served over opsia-asset://pose/.
+  - from: resources/pose
+    to: pose
+    filter:
+      - manifest.json
+      - ort.webgpu.min.mjs
+      - ort-wasm-simd-threaded.asyncify.mjs
+      - ort-wasm-simd-threaded.asyncify.wasm
+      - models/rtmo-s.onnx
+      - licenses/*
   # The NDI runtime, when one was put in resources/ndi/<os> before building
   # (see resources/ndi/README.md). The NDI licence allows shipping it in the
   # application's own folder; without it the app uses the machine's NDI.

@@ -34,6 +34,7 @@ const REST: Record<BodyFeature, number> = {
   flowEnergy: 0, flowX: 0.5, flowY: 0.5, flowDivergence: 0.5, flowCurl: 0.5, flowCoherence: 0,
   flowCenterX: 0.5, flowCenterY: 0.5, flowArea: 0,
   moveEnergy: 0, moveExpansion: 0, moveFluidity: 0.5, moveSuddenness: 0, moveDirectness: 0.5, moveSymmetry: 0.5,
+  peopleCount: 0, peopleSpread: 0, peopleX: 0.5, nearestX: 0.5, nearestSize: 0,
   bodyPresent: 0, handsPresent: 0, facePresent: 0
 }
 

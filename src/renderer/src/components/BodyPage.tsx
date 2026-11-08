@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
 import { BODY_FEATURE_GROUPS } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
+import { roomTracker } from '../engine/roomTracker'
 import { bodyBus } from '../engine/bodyIn'
 import { CLUTCH_AT_DEFAULT } from '../engine/bodyClutch'
 import { fireTrigger, midiTargetLabel } from '../midi'
@@ -31,6 +32,11 @@ const HAND_CONN: Array<[number, number]> = [
   [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]
 ]
 // A readable pose stick-figure (BlazePose 33 : upper body + legs).
+// The Room tracker's 17 points (COCO order) : face, arms, trunk, legs.
+const COCO_CONN: Array<[number, number]> = [
+  [0, 1], [0, 2], [1, 3], [2, 4], [5, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+  [5, 11], [6, 12], [11, 12], [11, 13], [13, 15], [12, 14], [14, 16]
+]
 const POSE_CONN: Array<[number, number]> = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]
@@ -49,6 +55,7 @@ const GESTURE_LABEL: Record<BodyGesture, string> = {
   holdHandsUp: 'hold up', holdPinchLeft: 'hold pinch L', holdPinchRight: 'hold pinch R', holdArmsWide: 'hold wide', holdMouthOpen: 'hold mouth',
   coverTL: 'cover TL', coverTC: 'cover T', coverTR: 'cover TR', coverML: 'cover L', coverMC: 'cover C', coverMR: 'cover R', coverBL: 'cover BL', coverBC: 'cover B', coverBR: 'cover BR',
   bodyEnter: 'body in', bodyLeave: 'body out', handsEnter: 'hands in', handsLeave: 'hands out', faceEnter: 'face in', faceLeave: 'face out',
+  personEnter: 'person in', personLeave: 'person out',
   swipeLeft: 'swipe L', swipeRight: 'swipe R', swipeUp: 'swipe up', swipeDown: 'swipe down',
   approach: 'approach', withdraw: 'withdraw', spinCW: 'turn cw', spinCCW: 'turn ccw', stillness: 'stillness',
   impulse: 'impulse', freeze: 'freeze',
@@ -145,6 +152,7 @@ export function BodyPage({
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
   const [vals, setVals] = useState<Record<string, number>>({})
   const [live, setLive] = useState({ running: false, hands: false, pose: false, face: false, error: null as string | null })
+  const [room, setRoom] = useState(() => roomTracker.status())
   // The last gesture that fired + whether it's fresh (lights up briefly).
   const [cur, setCur] = useState<{ g: BodyGesture; fresh: boolean } | null>(null)
   const [curRule, setCurRule] = useState<{ id: string; fresh: boolean } | null>(null)
@@ -199,6 +207,24 @@ export function BodyPage({
         }
         for (const p of hand) { g.beginPath(); g.arc(p.x * W, p.y * H, 2.5, 0, 7); g.fill() }
       }
+      // The Room tracker : everyone it follows, the main person (the one the pose
+      // features read) in the pose's blue, the others paler, each with its number.
+      for (const p of pv.people) {
+        const k = p.k
+        g.strokeStyle = p.main ? 'rgba(120,200,255,0.95)' : 'rgba(200,170,255,0.7)'
+        g.lineWidth = p.main ? 2.5 : 1.5
+        for (const [a, b] of COCO_CONN) {
+          if (k[a * 3 + 2] < 0.3 || k[b * 3 + 2] < 0.3) continue
+          g.beginPath(); g.moveTo(k[a * 3] * W, k[a * 3 + 1] * H); g.lineTo(k[b * 3] * W, k[b * 3 + 1] * H); g.stroke()
+        }
+        g.fillStyle = g.strokeStyle
+        for (let i = 0; i < 17; i++) {
+          if (k[i * 3 + 2] < 0.3) continue
+          g.beginPath(); g.arc(k[i * 3] * W, k[i * 3 + 1] * H, p.main ? 2.5 : 1.8, 0, 7); g.fill()
+        }
+        g.lineWidth = 1
+        g.strokeRect(p.box[0] * W, p.box[1] * H, (p.box[2] - p.box[0]) * W, (p.box[3] - p.box[1]) * H)
+      }
       if (pv.pose) {
         g.strokeStyle = 'rgba(120,200,255,0.9)'
         for (const [a, b] of POSE_CONN) {
@@ -224,6 +250,21 @@ export function BodyPage({
         for (const p of pv.face) { g.beginPath(); g.arc(p.x * W, p.y * H, 1, 0, 7); g.fill() }
       }
       g.restore()
+      // Each tracked person's number, over their box (drawn unmirrored).
+      if (pv.people.length) {
+        g.font = '600 12px ui-monospace, monospace'
+        g.lineWidth = 3
+        for (const p of pv.people) {
+          const x = (pv.mirror ? 1 - (p.box[0] + p.box[2]) / 2 : (p.box[0] + p.box[2]) / 2) * W, y = Math.max(12, p.box[1] * H - 4)
+          const label = p.main ? `${p.id} main` : String(p.id)
+          g.textAlign = 'center'
+          g.strokeStyle = 'rgba(0,0,0,0.75)'
+          g.strokeText(label, x, y)
+          g.fillStyle = p.main ? 'rgba(120,200,255,1)' : 'rgba(200,170,255,0.95)'
+          g.fillText(label, x, y)
+        }
+        g.textAlign = 'start'
+      }
       // The shape each hand holds now, under its wrist (drawn unmirrored, so the
       // words read the right way round).
       if (pv.shapes.length) {
@@ -262,6 +303,7 @@ export function BodyPage({
       setVals({ ...all })
       const s = bodyTracker.status(); const b = bodyBus.status()
       setLive({ running: s.running, hands: b.hands, pose: b.pose, face: b.face, error: s.error })
+      setRoom(roomTracker.status())
       const lg = bodyBus.lastGesture()
       setCur(lg ? { g: lg.g, fresh: lg.ageMs < 700 } : null)
       const lr = bodyBus.lastRule()
@@ -391,7 +433,7 @@ export function BodyPage({
     { label: 'Face', keys: ['mouthPop', 'browRaise', 'winkLeft', 'winkRight', 'smile', 'frown', 'browFurrow', 'squint', 'cheekPuff', 'kiss', 'jawLeft', 'jawRight', 'mouthLeft', 'mouthRight', 'tongueOut', 'blinkBoth', 'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight'] },
     { label: 'Holds', keys: ['holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen'] },
     { label: 'Zones (silhouette)', keys: ['coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR'] },
-    { label: 'Presence (enter / leave)', keys: ['bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave'] },
+    { label: 'Presence (enter / leave)', keys: ['bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave', 'personEnter', 'personLeave'] },
     { label: 'Motion field', keys: ['swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness'] },
     { label: 'Movement qualities', keys: ['impulse', 'freeze'] }
   ]
@@ -410,6 +452,15 @@ export function BodyPage({
         : live.hands || live.pose || live.face
           ? `tracking · ${[live.hands && 'hands', live.pose && 'pose', live.face && 'face'].filter(Boolean).join(' + ')}`
           : 'no body in frame'
+  // The Room tracker's own line : how many people, how long its model takes, where.
+  const roomOn = cfg.enabled && cfg.pose && cfg.tracker === 'room'
+  const roomText = !roomOn
+    ? null
+    : room.error
+      ? `room : ${room.error}`
+      : !room.ready
+        ? 'room : loading its model…'
+        : `room · ${room.people} ${room.people === 1 ? 'person' : 'people'} · ${room.ms.toFixed(0)} ms ${room.ep === 'webgpu' ? 'on the graphics card' : 'on the processor'}`
 
   // The page reads like the layer strip : every section's name sits in the
   // left margin in its color, on a faint panel of that color, beside rows that
@@ -425,6 +476,7 @@ export function BodyPage({
         <div className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full ${cfg.enabled && (live.hands || live.pose || live.face) ? 'animate-pulse bg-red-500' : cfg.enabled ? 'bg-yellow-500' : 'bg-muted'}`} />
           <span className="font-mono text-[10px] text-muted">{statusText}</span>
+          {roomText && <span className={`font-mono text-[10px] ${room.error ? 'text-danger' : 'text-muted'}`}>· {roomText}</span>}
         </div>
         {/* Currently recognized gesture : lights up for ~0.7 s each time one fires. */}
         <span
@@ -474,6 +526,12 @@ export function BodyPage({
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <Toggle on={cfg.hands} label="Hands" onClick={() => patch({ hands: !cfg.hands })} title="Track hand landmarks (21 per hand, up to two hands) : each hand's height, side and openness, and its shape (finger curls, pinches, roll, facing, span; fist, open, point, peace, thumb up / down, ok, horns, call, gun for rules)" />
               <Toggle on={cfg.pose} label="Pose" onClick={() => patch({ pose: !cfg.pose })} title="Track the whole-body pose (33 landmarks)" />
+              <Toggle
+                on={cfg.tracker === 'room'}
+                label="Room"
+                onClick={() => patch({ tracker: cfg.tracker === 'room' ? 'close' : 'room', pose: true })}
+                title="Room tracker for the pose : every person in the frame, near or far, facing the camera or not (RTMO, on the graphics card). The nearest is the main person, the one the pose features, gestures and movement qualities read; the Room features count and place everyone. Off : MediaPipe's pose, one person within about 4 m who shows their face. Hands, Face and Silhouette stay MediaPipe's either way."
+              />
               <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
               <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />
               <Toggle on={!!cfg.flow} label="Motion" onClick={() => patch({ flow: !cfg.flow })} title="Read the camera's motion field (optical flow, no body model) : how much moves and which way, whether it spreads out (someone approaches, arms open) or closes in, turns, sweeps one way or scatters, and where. Gestures : swipe L/R/up/down, approach, withdraw, turn, and stillness when the room stops moving. Works on anything that moves, a crowd, a curtain, a hand. Cheap." />

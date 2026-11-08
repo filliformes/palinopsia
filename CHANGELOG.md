@@ -15,6 +15,32 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Room : the Body page's pose for everyone in the frame** (Vincent : "improving the
+  BODY tracking recognition", then "build it with the Apache 2.0 model, so it doesn't
+  fuck with my licensing"). MediaPipe's pose is single-person, close range (about 4 m)
+  and wants the face in view; an installation or a stage has several people, far, turning
+  away. A **Room** toggle on the TRACK row (after Pose) swaps the pose for RTMO-s
+  (OpenMMLab MMPose, Apache-2.0 : one-stage multi-person pose, COCO 17 points, body7
+  weights, 640 x 640), run by onnxruntime-web 1.30.0 (MIT) on WebGPU in a module worker
+  (`workers/poseWorker.ts` : letterboxed BGR 0..255 input, NMS 0.65, score 0.35; falls
+  back to WebAssembly). `engine/roomTracker.ts` follows the people (greedy IoU matching,
+  eased points, 0.7 s of grace, ids kept), picks the **main person** (the largest, 1.3x
+  hysteresis), maps its 17 points onto the 33 the pose features read (`mainPose()`, so
+  every pose feature, gesture and movement quality works unchanged), and adds a **Room**
+  feature group (`peopleCount` (n/8), `peopleSpread`, `peopleX`, `nearestX`,
+  `nearestSize`) and two Presence gestures (`personEnter` / `personLeave`, debounced 0.4 s).
+  `bodyTracker.ts` runs it exactly while Pose + Room + the camera are on (one frame in
+  flight, its own thread) and stops feeding MediaPipe's pose then (the silhouette's mask
+  still uses it). The preview draws every person (main in blue, numbered).
+  `BodyControlConfig.tracker` (`close` | `room`, absent = close). Measured on the RTX 4070
+  through a fake camera : 33 to 41 ms a frame for the model, the app at 60 fps with Room
+  on as off, 1.6 s to load; 1 to 7 people found on the test photos. RTMO-m was measured
+  too (48 ms, 89 MB) and not shipped. `npm run fetch:pose` (`scripts/fetch-pose.mjs`)
+  fetches the runtime, the model (out of OpenMMLab's zip, unpacked with zlib) and both
+  licenses, pinned and SHA-256 checked, into the git-ignored `resources/pose` (63 MB);
+  electron-builder ships them, CI fetches them (cached), the test build copies them.
+  YOLOv8 pose was considered and refused : Ultralytics' weights are AGPL-3.0.
+
 - **The dataflou mesh visualizer, from Palinopsia** (Vincent : "add a button in the dataflou
   section of Palinopsia to be able to launch the web page of the mesh visualiser"). The
   dataflou project's own page (Alexandre Burton's visualizer, `124_dataflou/web`) needs a node

@@ -33,6 +33,27 @@ author's permission (2026-11-07). All rights remain with its author.
 - **d3** 7.9.0 (`resources/dataflou-visualizer/lib/d3.v7.min.js`,
   https://d3js.org), Copyright 2010-2023 Mike Bostock. ISC License.
 
+## The Room tracker (`resources/pose`)
+
+The Body page's **Room** tracker (the pose of everyone in the frame) runs the works
+below. They ship inside every build in `resources/pose`, fetched pinned and
+hash-checked by `npm run fetch:pose` (`scripts/fetch-pose.mjs`); they are not in the
+git repository. Apache-2.0 and MIT works sit within Palinopsia's own
+GPL-3.0-or-later.
+
+- **RTMO-s** (`models/rtmo-s.onnx` : `rtmo-s_8xb32-600e_body7-640x640`, the ONNX
+  export OpenMMLab publishes on download.openmmlab.com), from **MMPose**
+  (https://github.com/open-mmlab/mmpose), Copyright 2018-2020 Open-MMLab. Apache
+  License 2.0 : the full text ships as `resources/pose/licenses/mmpose-LICENSE.txt`.
+  RTMO : Peng Lu et al., "RTMO: Towards High-Performance One-Stage Real-Time
+  Multi-Person Pose Estimation", CVPR 2024. Its weights were trained on seven public
+  pose datasets ("body7"), some of which carry their own terms of use.
+- **ONNX Runtime Web** 1.30.0 (`ort.webgpu.min.mjs`,
+  `ort-wasm-simd-threaded.asyncify.mjs` and `.wasm`,
+  https://github.com/microsoft/onnxruntime), Copyright (c) Microsoft Corporation.
+  MIT License : the full text ships as
+  `resources/pose/licenses/onnxruntime-web-LICENSE.txt`.
+
 ## The AI depth engine (`resources/depth`)
 
 **depth: AI** (the Performance tab's picture section) runs the works below. They ship inside every build in

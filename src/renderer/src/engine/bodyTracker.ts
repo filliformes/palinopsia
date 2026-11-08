@@ -21,6 +21,7 @@ import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
 import { createBodyWorker } from './bodyWorker'
+import { roomTracker } from './roomTracker'
 import { handShape, HandSlots, HandSmoother, PinchPointer, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
 import { bodyPointer, setHandCursors, HAND_PID, type HandCursor } from '../pointerInput'
 
@@ -130,6 +131,9 @@ export interface BodyPreview {
   // "pinch = click" : where each hand points (raw camera coordinates, between
   // the thumb and index tips), lit while it pinches.
   pinches: Array<{ x: number; y: number; down: boolean }>
+  // The Room tracker's people (raw camera coordinates : box, 17 COCO points with
+  // their scores), the main one marked; empty with the Close tracker.
+  people: Array<{ id: number; box: number[]; k: Float32Array; main: boolean }>
 }
 
 class BodyTracker {
@@ -233,6 +237,24 @@ class BodyTracker {
     return { running: this.running, error: this.err }
   }
 
+  /** The Room tracker reads the pose (Pose on, tracker Room). */
+  private roomOn(): boolean {
+    const c = this.cfg
+    return !!c && c.enabled && c.pose && c.tracker === 'room'
+  }
+
+  /** MediaPipe's pose : for the Close tracker's pose, or the silhouette's mask. */
+  private mpPose(): boolean {
+    const c = this.cfg
+    return !!c && c.pose && c.tracker !== 'room'
+  }
+
+  /** The Room tracker runs exactly while it reads the pose and the camera runs. */
+  private syncRoom(): void {
+    if (this.running && this.roomOn()) roomTracker.start()
+    else roomTracker.stop()
+  }
+
   /** Where the models run, and the last frame's detection time there (tests). */
   thread(): { worker: boolean; ms: number } {
     return { worker: this.useWorker && !!this.worker, ms: this.workerMs }
@@ -246,10 +268,14 @@ class BodyTracker {
     return { mask: this.silMask, w: this.silW, h: this.silH, version: this.silVersion, video: this.video, mirror: this.cfg.mirror }
   }
   preview(): BodyPreview {
+    const room = this.roomOn()
+    const main = room ? roomTracker.main() : null
     return {
       video: this.video,
       hands: this.latestHands,
-      pose: this.latestPose,
+      // (the Room tracker's people are drawn from `people`, the main one with them)
+      pose: room ? null : this.latestPose,
+      people: room ? roomTracker.list().map((p) => ({ id: p.id, box: p.box, k: p.k, main: p === main })) : [],
       face: this.latestFace,
       mirror: this.cfg?.mirror ?? true,
       shapes: this.latestShapes,
@@ -285,13 +311,14 @@ class BodyTracker {
       // Camera changed : restart the stream on the new device.
       this.stop()
       await this.start()
-    } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face || was.silhouette !== cfg.silhouette)) {
+    } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face || was.silhouette !== cfg.silhouette || (was.tracker ?? 'close') !== (cfg.tracker ?? 'close'))) {
       // Hands / Pose / Face / Silhouette toggled live : create or close the affected
       // landmarker only (no camera flicker). mirror + sensitivity are read per-frame.
       if (this.useWorker && this.worker) {
         if (!(await this.configureWorker())) this.workerFailed()
       } else await this.ensureLandmarkers()
     }
+    this.syncRoom()
   }
 
   // ── The tracking worker (bodyWorker.ts) ───────────────────────────────────
@@ -331,7 +358,7 @@ class BodyTracker {
     if (!w || !cfg) return Promise.resolve(false)
     return new Promise<boolean>((res) => {
       this.cfgWaiters.push(res)
-      w.postMessage({ t: 'config', cfg: { hands: !!cfg.hands, pose: !!cfg.pose, face: !!cfg.face, silhouette: !!cfg.silhouette } })
+      w.postMessage({ t: 'config', cfg: { hands: !!cfg.hands, pose: this.mpPose(), face: !!cfg.face, silhouette: !!cfg.silhouette } })
     })
   }
 
@@ -413,7 +440,7 @@ class BodyTracker {
     // Pose runs when Pose OR Silhouette is on (the silhouette rides the same
     // landmarker with segmentation masks enabled). Recreate if the segmentation
     // flag flips, since it is a create-time option.
-    const poseNeeded = cfg.pose || cfg.silhouette
+    const poseNeeded = this.mpPose() || cfg.silhouette
     const wantSeg = cfg.silhouette
     if (poseNeeded && (!this.pose || this.poseSeg !== wantSeg)) {
       if (this.pose) { try { this.pose.close() } catch { /* gone */ } this.pose = null }
@@ -495,6 +522,7 @@ class BodyTracker {
       if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
 
       this.running = true
+      this.syncRoom()
       this.loop()
     } catch (e) {
       this.err = (e as Error).message || 'camera / model load failed'
@@ -523,6 +551,7 @@ class BodyTracker {
     if (this.raf) cancelAnimationFrame(this.raf)
     this.raf = 0
     this.lastTs = -1
+    roomTracker.stop()
     try { this.hands?.close() } catch { /* already gone */ }
     try { this.pose?.close() } catch { /* already gone */ }
     try { this.face?.close() } catch { /* already gone */ }
@@ -567,6 +596,9 @@ class BodyTracker {
     const camT = video.currentTime
     const newFrame = camT !== this.lastCamT
     if (!newFrame && !cfg.hiRes) return
+    // The Room tracker takes each new camera frame in its own thread (it skips one
+    // while the last is still in its model); its people join the next result.
+    if (newFrame && this.roomOn()) roomTracker.push(video)
     const worker = this.useWorker ? this.worker : null
     // One frame in the worker at a time : while it works, a new camera frame skips
     // the models (the motion field, no model, still reads it). A result lost for
@@ -654,6 +686,12 @@ class BodyTracker {
   private process(r: WorkerResult, flowOut: Partial<Record<BodyFeature, number>> | null): void {
     const cfg = this.cfg
     if (!cfg) return
+    // The Room tracker reads the pose : its main person stands in for MediaPipe's.
+    const room = this.roomOn()
+    if (room) {
+      r = { ...r, pose: roomTracker.mainPose() }
+      for (const g of roomTracker.takeEvents()) this.emit(g)
+    }
     const ts = r.ts
     const dtLoop = this.lastLoopTs ? Math.min(0.1, Math.max(0, ts - this.lastLoopTs) / 1000) : 1 / 60
     this.lastLoopTs = ts
@@ -715,6 +753,7 @@ class BodyTracker {
       this.poseLost(ts)
     }
     if (hasFace) this.deriveFace(this.latestFace as NormalizedLandmark[], blendshapes, mirror, out, cfg)
+    if (room) Object.assign(out, roomTracker.features(mirror))
     if (cfg.silhouette) this.deriveSilhouette(out, cfg)
     if (flowOut) Object.assign(out, flowOut)
     bodyBus.update(out)
