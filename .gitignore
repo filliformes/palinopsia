@@ -42,3 +42,6 @@ Sonification Mode prompt.txt
 # (scripts/fetch-depth.mjs, every file hash-checked), never committed.
 /resources/depth/*
 !/resources/depth/README.md
+# the dataflou mesh visualizer page, built from a dataflou checkout (npm run build:visualizer) :
+# not committed until its author agrees to it travelling with Palinopsia
+resources/dataflou-visualizer/

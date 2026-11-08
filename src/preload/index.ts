@@ -86,6 +86,7 @@ const api: ExposedApi = {
   // ── dataflou mesh ────────────────────────────────────────────────
   dataflouConfigure: (cfg) => ipcRenderer.invoke('dataflou:configure', cfg),
   dataflouActions: (list) => ipcRenderer.send('dataflou:actions', list),
+  dataflouVisualizer: (open) => ipcRenderer.invoke('dataflou:visualizer', open),
   dataflouStatus: () => ipcRenderer.invoke('dataflou:status'),
   dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
   dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),

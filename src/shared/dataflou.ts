@@ -74,6 +74,8 @@ export interface DfStatus {
   declareBytes: number // our whole tree, as one DECLARE frame
   actions: number // the actions on the mesh now (0 when they are off)
   actionsDropped: number // actions left out : the tree would have been too big
+  visualizer: number // visualizer pages open on this node now
+  visualizerAvailable: boolean // does this build carry the visualizer page ?
 }
 
 export interface DfConfig {

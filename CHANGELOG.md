@@ -15,6 +15,28 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The dataflou mesh visualizer, from Palinopsia** (Vincent : "add a button in the dataflou
+  section of Palinopsia to be able to launch the web page of the mesh visualiser"). The
+  dataflou project's own page (Alexandre Burton's visualizer, `124_dataflou/web`) needs a node
+  that serves it and answers its `/ws` socket, which only the reference C++ node did.
+  `main/dataflou/visualizer.ts` does it : an HTTP server on 127.0.0.1 (an ephemeral port, on
+  the first click) serving the page's files from `resources/dataflou-visualizer`, and the
+  socket's protocol : a `snapshot` ten times a second (every node of our world view as a
+  tree with its values and wires; two a second in the page's high performance mode),
+  `subscribe` / `unsubscribe` (`subscribeRemote`), `set_value` (ours plays like an arriving
+  value, another node's goes to it), `flush_node`, `identify`, `perf_mode`; parameter edits are
+  refused with a toast. The node gained the reference's visualizer monitors (a STREAMREQ with no
+  destination path for every remote param, at most 256, 10 Hz, kept alive and stopped when the
+  last page closes) and keeps what arrives on our destinations; the renderer samples every
+  source while a page is open. `scripts/build-dataflou-visualizer.mjs` (`npm run
+  build:visualizer [web folder]`) builds the page from a dataflou checkout, answering the
+  editor panel's imports from the Atelier project (not on this computer) with a stand-in.
+  The built page is git-ignored and not in electron-builder's resources : dataflou's
+  repository has no license yet, so it ships once its author agrees (Vincent's call : bundle
+  it, ask him). Measured in the test copy with a second node : 10 snapshots a second, the
+  other node's moving value live in them, a wire made from the socket shown at once and
+  Palinopsia's density following it, unwired, a delete refused with its toast; the page in a
+  browser drew both nodes (`web v57 · core v8 (Palinopsia)`).
 - **The Body rule list on the dataflou mesh** (Vincent : "the dropdown selector for creating a
   BODY rule : I want these options as dataflou destinations in Palinopsia"). **actions** in the
   dataflou section (`DfConfig.actions`, off by default) declares every entry of
