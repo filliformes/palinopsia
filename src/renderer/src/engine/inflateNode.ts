@@ -115,7 +115,7 @@ const SHOW_FS = `${HEAD}
 uniform sampler2D uHost, uM, uH, uSide;
 uniform vec2 uAspect, uRes;
 uniform vec3 uL, uTint;
-uniform float uAz, uPuff, uVolume, uMat, uGloss, uFilm, uFilmNm, uMixA, uKeep, uHasSide, uShadow, uT, uFrom, uThresh, uCav;
+uniform float uAz, uPuff, uVolume, uMat, uGloss, uFilm, uFilmNm, uMixA, uKeep, uHasSide, uShadow, uT, uFrom, uThresh, uCav, uDisp, uRim;
 uniform vec2 uGrid;
 ${RELIEF_SHADE}
 float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -156,10 +156,17 @@ void main() {
   }
   if (uMat > 4.5 && uMat < 5.5) {
     // glass : a picked layer bent by the shape, else the picture itself, the room on its shoulders
-    vec2 buv = vUV + N.xy * 0.14;
-    vec3 bent = uHasSide > 0.5 ? texture(uSide, buv).rgb : texture(uHost, buv).rgb;
+    // red bends least, blue most (DISPERSION) : the split is widest at the rim, where
+    // the surface turns away (after Orb, MIT)
+    vec2 bo = N.xy * 0.14;
+    vec2 bur = vUV + bo * (1.0 - 0.3 * uDisp), bug = vUV + bo, bub = vUV + bo * (1.0 + 0.35 * uDisp);
+    vec3 bent = uHasSide > 0.5
+      ? vec3(texture(uSide, bur).r, texture(uSide, bug).g, texture(uSide, bub).b)
+      : vec3(texture(uHost, bur).r, texture(uHost, bug).g, texture(uHost, bub).b);
     fr = pow(1.0 - N.z, 3.0);
     lit = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(vec3(0.0, 0.0, -1.0), N), uAz, P, N.z, 0.05) * (0.08 + 0.75 * fr);
+    // the rim : a bright thin edge where the glass turns away
+    lit += vec3(0.92, 0.96, 1.0) * pow(1.0 - N.z, 4.0) * uRim * 0.9;
   }
   // the shadow it throws on what is outside it
   float sh = 0.0;
@@ -428,6 +435,8 @@ export class InflateNode implements ConvNode {
     gl.uniform1f(this.u(s, 'uFoilScale'), Math.max(20, Math.min(400, num(I.flakes, 220))))
     gl.uniform1f(this.u(s, 'uFoilGlint'), Math.max(0, Math.min(1, num(I.glint, 0.5))))
     gl.uniform1f(this.u(s, 'uCav'), Math.max(0, Math.min(1, num(I.cavity, 0))))
+    gl.uniform1f(this.u(s, 'uDisp'), Math.max(0, Math.min(1, num(I.dispersion, 0))))
+    gl.uniform1f(this.u(s, 'uRim'), Math.max(0, Math.min(1, num(I.rim, 0))))
     gl.uniform2f(this.u(s, 'uGrid'), this.height!.w, this.height!.h)
     this.draw(out.fbo, W, H)
     for (let i = 3; i >= 0; i--) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, null) }

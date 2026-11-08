@@ -180,7 +180,7 @@ uniform sampler2D uC, uSide;
 uniform vec2 uFrame;
 uniform vec3 uGround, uEdgeCol, uPal[6];
 uniform vec3 uL;
-uniform float uAz, uGroundA, uRelief, uGrain, uDents, uBevel, uEdge, uFilm, uFilmNm, uSheen, uShadow, uSideAmt, uSideUse, uHasSide, uPx, uDrift, uCav;
+uniform float uAz, uGroundA, uRelief, uGrain, uDents, uBevel, uEdge, uFilm, uFilmNm, uSheen, uShadow, uSideAmt, uSideUse, uHasSide, uPx, uDrift, uCav, uDisp, uRim;
 out vec4 fragColor;
 ${RELIEF_SHADE}
 float hAt(vec2 uv) { return textureLod(uC, uv, 0.0).r; }
@@ -280,7 +280,10 @@ void main() {
     }
     // glass : the layer behind, bent, and only the shine of the surface on top
     if (uHasSide > 0.5 && uSideAmt > 0.0 && uSideUse > 1.5) {
-      vec3 bent = textureLod(uSide, uv + N.xy * 0.11, 0.0).rgb;
+      // the color split widest at the rim (DISPERSION), a bright edge there (RIM)
+      vec2 bo = N.xy * 0.11;
+      vec3 bent = vec3(textureLod(uSide, uv + bo * (1.0 - 0.3 * uDisp), 0.0).r, textureLod(uSide, uv + bo, 0.0).g, textureLod(uSide, uv + bo * (1.0 + 0.35 * uDisp), 0.0).b);
+      bent += vec3(0.92, 0.96, 1.0) * pow(1.0 - N.z, 4.0) * uRim * 0.9;
       vec3 V = vec3(0.0, 0.0, 1.0);
       float fr = pow(1.0 - N.z, 3.0);
       vec3 glassC = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(-V, N), uAz, P, N.z, 0.05) * (0.1 + 0.7 * fr);
@@ -1055,6 +1058,7 @@ export class ReliefSource implements NativeGenerator {
       .f1('uSplit', Math.max(0, Math.min(1, num(I, 'split', 0.35)))).f1('uRipple', Math.max(0, Math.min(1, num(I, 'ripple', 0.3))))
       .f1('uFoilSat', Math.max(0, Math.min(1, num(I, 'rainbow', 0.25)))).f1('uFoilScale', Math.max(20, Math.min(400, num(I, 'flakes', 220))))
       .f1('uFoilGlint', Math.max(0, Math.min(1, num(I, 'glint', 0.5)))).f1('uCav', Math.max(0, Math.min(1, num(I, 'cavity', 0))))
+      .f1('uDisp', Math.max(0, Math.min(1, num(I, 'dispersion', 0)))).f1('uRim', Math.max(0, Math.min(1, num(I, 'rim', 0))))
     gl.uniform3fv(p.u('uPal'), new Float32Array(pal))
     g.bind(0, map.tex)
     g.bind(1, this.side ?? this.blank())

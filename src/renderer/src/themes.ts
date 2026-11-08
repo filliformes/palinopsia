@@ -1260,6 +1260,17 @@ export const THEMES: Theme[] = [
     motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
+    id: 'glasshouse', name: 'Glasshouse', family: 'Living Surfaces',
+    blurb: 'A soft world seen through glass : fluted, reeded, cathedral or rained on, the color split at every edge.',
+    world: 'sublimated',
+    palette: [[0.03, 0.035, 0.04, 1], [0.24, 0.3, 0.32, 1], [0.82, 0.86, 0.84, 1]],
+    sources: ['organic', 'dye-field', 'congeal', 'filaments', 'drift-field'],
+    stackFx: [['fx-glass', 'fx-rain-pane']],
+    presets: { 'fx-glass': ['Fluted', 'Fluted, lying down', 'Reeded', 'Cathedral', 'Hammered', 'Shower door'], 'fx-rain-pane': ['Window rain', 'Drizzle', 'Night window'] },
+    layerFx: [],
+    blends: ['screen', 'normal'], layers: [1, 2], useB: 0.4, feedback: 0, density: 0.45, drift: 0.2
+  }),
+  mk({
     id: 'oil-on-water', name: 'Oil on Water', family: 'Living Surfaces',
     blurb: "A slick of thin film over a slow dark ground : every thickness its own color, drifting in currents.",
     world: 'parametric',

@@ -62,7 +62,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   'gen-relief': [
     g('draw and light', 'draw', 'rate', 'speed', 'curve', 'length', 'sens', 'audio', 'sink', 'melt', 'stroke', 'clear', 'lightAngle', 'lightHeight', 'orbit', 'follow'),
     g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
-    g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'ground', 'groundOp')
+    g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
@@ -160,8 +160,17 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   ],
   'node-inflate': [
     g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
-    g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'cavity'),
+    g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'dispersion', 'rim', 'cavity'),
     g('light and flow', 'shadow', 'lightAngle', 'lightHeight', 'orbit', 'flow', 'flowSpeed', 'bands', 'split', 'ripple')
+  ],
+  // Glass : the pane · the light
+  'fx-glass': [
+    g('pane', 'pattern', 'scale', 'angle', 'depth', 'dispersion', 'frost', 'drift'),
+    g('light', 'shine', 'seams', 'lightAngle', 'tint')
+  ],
+  'fx-rain-pane': [
+    g('rain', 'drops', 'size', 'slide', 'trails'),
+    g('glass', 'fog', 'bend', 'shine', 'tint')
   ],
   'fx-thinfilm': [
     g('film', 'thickness', 'follow', 'lean', 'ior', 'keep'),
@@ -330,6 +339,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (isnt('brush', 5)) put(d, ['ribs', 'dash'], 'Only the ribbed metal has ribs and dashes.')
     if (isnt('brush', 6)) put(d, ['broken'], 'Only the ink breaks.')
     if (isnt('brush', 8)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil brush has a rainbow, flakes and glints.')
+    if (isnt('sideUse', 2)) put(d, ['dispersion', 'rim'], 'Only the glass (sidechain as glass) splits color and has a rim.')
     if (isnt('mirror', 4)) put(d, ['fold'], 'Only the mirror around has copies to count.')
     if (zero('edge')) put(d, ['edgeColor'], 'Edge glow is at 0.')
     if (zero('film') && isnt('brush', 7)) put(d, ['filmThick'], 'No film : oil film is at 0 and the brush is not soap film.')
@@ -352,6 +362,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
     if (is('material', 0)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'Clay has no reflection to flow.')
     if (isnt('material', 6)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
+    if (isnt('material', 5)) put(d, ['dispersion', 'rim'], 'Only the glass splits color and has a rim.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

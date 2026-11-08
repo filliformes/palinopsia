@@ -63,6 +63,8 @@ import palette from './fx/Palette.fs?raw'
 import threshold from './fx/Threshold.fs?raw'
 import solarize from './fx/Solarize.fs?raw'
 import thinFilm from './fx/ThinFilm.fs?raw'
+import glass from './fx/Glass.fs?raw'
+import rainPane from './fx/RainPane.fs?raw'
 import moshBlocks from './fx/MoshBlocks.fs?raw'
 import grain from './fx/Grain.fs?raw'
 import streak from './fx/Streak.fs?raw'
@@ -973,10 +975,12 @@ export const NATIVE_NODES: IsfShader[] = [
         { NAME: 'flakes', TYPE: 'float', MIN: 20, MAX: 400, DEFAULT: 220, LABEL: 'foil flakes' },
         { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil glints' },
         { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cavity' },
+        { NAME: 'dispersion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass color split' },
+        { NAME: 'rim', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass rim' },
         { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' }
       ]
     })}*/`,
-    curated: { flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6], from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6] }
+    curated: { flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6], from: [1, 1], threshold: [0.25, 0.6], puff: [0.2, 0.6], round: [0.5, 1], volume: [0.35, 0.8], material: [0, 5], keep: [0.5, 1], gloss: [0.4, 0.9], film: [0, 0.5], filmThick: [0.1, 0.6], shadow: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], orbit: [-0.2, 0.2], mix: [1, 1], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6], dispersion: [0, 0.7], rim: [0, 0.6] }
   },
   {
     // Native (engine/silhouetteNode.ts) : the Silhouette source's looks on any
@@ -2018,7 +2022,9 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'foil rainbow' },
         { NAME: 'flakes', TYPE: 'float', MIN: 20, MAX: 400, DEFAULT: 220, LABEL: 'foil flakes' },
         { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil glints' },
-        { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cavity' }
+        { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cavity' },
+        { NAME: 'dispersion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass color split' },
+        { NAME: 'rim', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'glass rim' }
       ]
     })}*/`,
     // Who draws, the sidechain and the mirrors are staging : never dealt. The colors
@@ -2026,7 +2032,7 @@ export const GENERATORS: IsfShader[] = [
     curated: {
       flow: [0, 1], flowSpeed: [-0.5, 0.5], bands: [1.5, 5], split: [0, 0.7], ripple: [0, 0.6],
       draw: [1, 1], rate: [0.5, 1.6], speed: [0.25, 0.6], curve: [0.2, 0.7], length: [0.35, 0.8], audio: [0, 0], sink: [0.05, 0.2], melt: [0, 0],
-      rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6],
+      rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8], cavity: [0, 0.6], dispersion: [0, 0.7], rim: [0, 0.6],
       brush: [0, 8], mode: [0, 0], size: [0.25, 0.65], convex: [0.5, 1], chaos: [0, 0.4], rough: [0, 0.3], fuse: [0.3, 0.9], ribs: [2, 8], dash: [0, 0], broken: [0, 0.3],
       mirror: [0, 0], fold: [6, 6], relief: [0.35, 0.8], gloss: [0.4, 0.9], grain: [0, 0.4], dents: [0, 0.4], bevel: [0.1, 0.5], shadow: [0.4, 0.8], edge: [0, 0], film: [0, 0],
       filmThick: [0.1, 0.6], colorPick: [1, 6], groundOp: [1, 1], side: [0, 0], sideUse: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.3, 0.7], orbit: [-0.2, 0.2], follow: [0, 0]
@@ -2093,6 +2099,14 @@ export const FX_SHADERS: IsfShader[] = [
   {
     id: 'fx-solarize', name: 'Solarize', category: 'FX', source: solarize,
     curated: { level: [0.4, 0.8], strength: [0.5, 1], soft: [0.04, 0.3] }
+  },
+  {
+    id: 'fx-glass', name: 'Glass', category: 'FX', source: glass,
+    curated: { pattern: [0, 6], scale: [8, 40], angle: [0, 0], depth: [0.25, 0.7], dispersion: [0, 0.6], frost: [0, 0.4], shine: [0.15, 0.55], seams: [0.1, 0.5], lightAngle: [0, 6.2832], drift: [0, 0] }
+  },
+  {
+    id: 'fx-rain-pane', name: 'Rain on Glass', category: 'FX', source: rainPane,
+    curated: { drops: [0.3, 0.8], size: [0.25, 0.7], slide: [0.15, 0.6], trails: [0.3, 0.9], fog: [0.2, 0.7], bend: [0.4, 0.8], shine: [0.2, 0.6] }
   },
   {
     id: 'fx-thinfilm', name: 'Thin Film', category: 'FX', source: thinFilm,

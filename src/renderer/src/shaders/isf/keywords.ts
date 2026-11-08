@@ -89,6 +89,8 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-slice-shuffle': ['glitch', 'slice', 'shuffle', 'stutter', 'cut'],
   'fx-slit-buffer': ['slit scan', 'freeze', 'smear', 'time', 'capture'],
   'fx-smear': ['smear', 'pixel sort', 'streak', 'drag', 'blur'],
+  'fx-glass': ['glass', 'fluted', 'reeded', 'ribbed', 'frosted', 'rippled', 'cathedral', 'hammered', 'pebbled', 'prism', 'refraction', 'window', 'dispersion', 'lens', 'shower'],
+  'fx-rain-pane': ['rain', 'window', 'glass', 'drops', 'droplets', 'condensation', 'fog', 'mist', 'wet', 'weather', 'pane', 'storm', 'refraction'],
   'fx-thinfilm': ['thin film', 'soap', 'bubble', 'oil', 'slick', 'iridescent', 'interference', 'rainbow', 'color', 'pearl'],
   'node-drape': ['drape', 'cloth', 'fabric', 'sheet', 'curtain', 'flag', 'banner', 'grab', 'wind', 'textile', 'satin', '3d', 'physics', 'bedsheet', 'projection'],
   'node-inflate': ['flowing', 'mercury', 'liquid metal', 'prism', 'inflate', 'puff', 'balloon', 'chrome', 'liquid', 'metal', '3d', 'relief', 'emboss', 'bevel', 'glass', 'clay', 'plastic', 'soap', 'text', 'logo'],

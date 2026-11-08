@@ -63,6 +63,29 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     wobble: 'Makes the split breathe in and out. 0 = still.',
     wobRate: 'Speed of the breathing (Hz). The default is the original slow breath.'
   },
+  'fx-glass': {
+    pattern: 'The glass : fluted columns, fine reeds, rippled cathedral glass, hammered dimples, a fine pebble, prisms, or plain frost.',
+    scale: 'How many columns, ripples or dimples across the frame\'s height.',
+    angle: 'Turns the pattern (fluted columns lying down at a quarter turn).',
+    depth: 'How far the glass bends what is behind it.',
+    dispersion: 'Red, green and blue bend a little apart : the color split at every edge.',
+    frost: 'Scatters the light : from clear to sandblasted.',
+    shine: 'The window\'s light on the ridges.',
+    seams: 'How dark the grooves between the columns and dimples are.',
+    lightAngle: 'Where the light on the ridges comes from.',
+    tint: 'The color of the glass itself.',
+    drift: 'Slides the pane slowly across the picture.'
+  },
+  'fx-rain-pane': {
+    drops: 'How many drops bead on the pane.',
+    size: 'How big the drops are.',
+    slide: 'How fast the heavy ones slide down (in fits and starts).',
+    trails: 'How clear and how long the trail a sliding drop wipes through the fog.',
+    fog: 'How misted the pane is between the drops.',
+    bend: 'How far each drop bends the scene behind it (each one a small lens, upside down).',
+    shine: 'The point of light on each drop.',
+    tint: 'The mist\'s color.'
+  },
   'fx-thinfilm': {
     thickness: 'How thick the film is. Each thickness gives back its own color : near 0 it goes dark and straw, then magenta, blue, green, paling as it thickens.',
     follow: 'How much the picture’s brightness thickens the film : the picture comes through in the order of its colors.',
@@ -103,6 +126,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     flakes: 'How fine the foil\'s flakes are (across the frame\'s height) : few and coarse, or a fine glitter.',
     glint: 'How many flakes flash at their own angle as the light moves.',
     cavity: 'Darkens the creases between swellings : the shape reads deeper.',
+    dispersion: 'The glass : red, green and blue bend a little apart, most at the rim.',
+    rim: 'The glass : a bright thin edge where it turns away.',
     flow: 'Turns what it reflects from the still room into bands of light running across the surface by themselves. 0 = the room as before.',
     flowSpeed: 'How fast the bands run, and which way. 0 holds them still.',
     bands: 'How many bands : a few wide ones low, a tight chrome ripple high.',
@@ -611,6 +636,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     flakes: 'The foil brush : how fine its flakes are.',
     glint: 'The foil brush : how many flakes flash as the light moves.',
     cavity: 'Darkens the creases where strokes meet and the lines pressed in : the drawing reads deeper.',
+    dispersion: 'The glass (sidechain as glass) : red, green and blue bend a little apart, most at the rim.',
+    rim: 'The glass (sidechain as glass) : a bright thin edge where it turns away.',
     draw: 'Who draws, besides you : nobody, wandering strokes, a compass building circles and rules, the moving things in the layer picked as SIDECHAIN, or its outlines.',
     rate: 'How many strokes run at once, by themselves.',
     speed: 'How fast they draw.',

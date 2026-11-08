@@ -15,6 +15,29 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The glass family : Glass, Rain on Glass, and a color split for Inflate's and Relief's
+  glass** (Vincent : "#4 : A glass family"). A new picker group, **Glass**.
+  - **Glass** (`fx/Glass.fs`, ISF) : a height per pattern (fluted columns, reeds, rippled
+    cathedral noise, hammered Voronoi bowls, a fine pebble, prism facets, plain frost), its
+    slope by central differences in the turned space, the picture read at the bent point,
+    red / green / blue at 0.75 / 1 / 1.3 of the bend (**dispersion**), six jittered taps for
+    **frost**, a sheen from the slope against a light, dark **seams** in the grooves.
+    Distort's own "glass" and "corrugate" stay (a cell warp, not a pane). Hammered and
+    pebbled shipped first with slopes that shattered the picture : softened to shallow
+    bowls and a low stipple.
+  - **Rain on Glass** (`fx/RainPane.fs`, ISF, `@dome`) : three grids of beading drops,
+    each a small inverted lens with a rim and a glint; one column in four (by drops) has a
+    drop sliding in stick and slip on an integrated clock (`PH_slide`), its trail clear
+    through the fog and misting over with distance; the fog a six-tap scatter tinted. On
+    the dome the pattern lives in the azimuth and the distance from the zenith, so drops
+    slide outward.
+  - **Inflate glass, Relief glass** : **glass color split** (red bends least, blue most,
+    widest at the rim, after Orb, MIT) and **glass rim** (a bright edge where the glass
+    turns away), both 0 by default; Inflate's preset **Prism glass**; every existing
+    Relief / Inflate preset sets them to 0.
+  - 10 Glass presets, 6 Rain presets, the chains **Behind Fluted Glass** and **Rainy
+    Window**, the theme **Glasshouse** (Living Surfaces). 60 fps at 1080p and on the dome.
+
 - **Foil and cavity, for Relief, Inflate and Drape** (Vincent : "#13 : Foil and finishes for
   Relief and Inflate"). `reliefShade.ts` gains material 7, a holographic foil after
   Holocloth's (MIT, credited) : flakes as cells of the frame (`uFoilScale` per frame height),

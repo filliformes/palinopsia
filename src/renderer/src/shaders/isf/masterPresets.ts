@@ -859,6 +859,17 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Glass : the whole picture behind a pane ──
+  {
+    name: 'Behind Fluted Glass', group: 'Relief',
+    fx: [{ shaderId: 'fx-glass', inputs: {pattern: 0, scale: 16, angle: 0, depth: 0.5, dispersion: 0.35, frost: 0.1, shine: 0.35, seams: 0.3, lightAngle: 2.36, tint: [0.94, 0.97, 1, 1], drift: 0} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Rainy Window', group: 'Relief',
+    fx: [{ shaderId: 'fx-rain-pane', inputs: {drops: 0.6, size: 0.45, slide: 0.35, trails: 0.6, fog: 0.5, bend: 0.6, shine: 0.4, tint: [0.9, 0.94, 1, 1]} }],
+    vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.85, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',
