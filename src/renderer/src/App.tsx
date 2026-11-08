@@ -2722,7 +2722,8 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
           data-on={rightView === t.id ? '1' : undefined}
           onClick={() => setRightView(t.id)}
           title={t.title}
-          className={`rounded-full border border-transparent px-2 py-0.5 font-mono text-[9px] transition-colors ${
+          // no-sheen : the selected tab's glass is the sliding lens, the others are plain words
+          className={`no-sheen rounded-full border border-transparent px-2 py-0.5 font-mono text-[9px] transition-colors ${
             rightView === t.id ? 'text-accent' : 'text-muted hover:text-text'
           }`}
         >

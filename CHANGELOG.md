@@ -1008,7 +1008,11 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   see-through stuff that slows the UI"; then : "I find it a bit bizarre to only have liquid
   glass in the lower toolbar. Can you put some on ALL the buttons in ALL the app"; after a feel
   test : "an in-between [...] it's nice that they pop out, but it's a bit too much now", so about
-  half the first sheen; and the tab row lost its own capsule behind the tabs). One rule in
+  half the first sheen; the tab row lost its own capsule behind the tabs, and the tabs their
+  own capsules : "keep the liquid glass capsule only on the selected tab", its sliding lens). The
+  bottom bar's resting buttons now read in the full text color like the top bar's ("it doesn't
+  pop as well as the buttons on the top toolbar" : they used the muted idle style, which the
+  layers' A / B keep to mark an empty slot). One rule in
   styles.css : a lit top rim, a sheen fading down over each control's own color, a shade at
   its foot, a softer press, on what looks like a button (`.btn`, `.btn-accent`, a bordered,
   filled or `.input` button, every dropdown, the effect and modulation chips, `.chip`); list

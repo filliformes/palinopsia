@@ -22,7 +22,7 @@ import { LinkBadge } from './LinkSection'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { ToastDock } from './Toast'
-import { TBTN, TBTN_IDLE, TBTN_LIT } from './buttonStyles'
+import { TBTN, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { Blink } from './Blink'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { showToast } from './Toast'
@@ -272,7 +272,7 @@ export function Transport(): JSX.Element {
           <MidiLearnOverlay id="fire:tap" />
           <button
             onClick={tapTempo}
-            className={`${TBTN} ${TBTN_IDLE} active:bg-accent/20`}
+            className={`${TBTN} ${TBTN_IDLE_ON} active:bg-accent/20`}
             title="Tap tempo : click on the beat (2+ taps) to set the BPM. A pause of 2s starts a fresh count."
           >
             BPM
@@ -368,7 +368,7 @@ export function Transport(): JSX.Element {
       {/* The Source Editor (Alt+E, Cmd+Option+E on a Mac) : your own shaders */}
       <button
         onClick={() => useStore.getState().setSourceEditorOpen(!useStore.getState().sourceEditorOpen)}
-        className={`${TBTN} ml-3 ${sourceEditorOpen ? TBTN_LIT : TBTN_IDLE}`}
+        className={`${TBTN} ml-3 ${sourceEditorOpen ? TBTN_LIT : TBTN_IDLE_ON}`}
         title={`Source Editor (${SOURCE_EDITOR_KEY}) : write a shader, or start from a copy of any built-in one, and keep it as your own (my shaders, in the source and FX menus)`}
       >
         {'{ }'}
@@ -377,7 +377,7 @@ export function Transport(): JSX.Element {
           selector. Moved down from the top bar; ml-3 keeps it off the Prox slider. */}
       <button
         onClick={() => setWorldPageOpen(!worldPageOpen)}
-        className={`${TBTN} ml-3 ${worldPageOpen ? TBTN_LIT : TBTN_IDLE}`}
+        className={`${TBTN} ml-3 ${worldPageOpen ? TBTN_LIT : TBTN_IDLE_ON}`}
         title="Open the World editor (W) : coupling character + Context mood + audio routing"
       >
         World
@@ -401,7 +401,7 @@ export function Transport(): JSX.Element {
         <MidiLearnOverlay id="fire:freeze" />
         <button
           onClick={() => fireFreeze()}
-          className={`${TBTN} ${frozen ? TBTN_LIT : TBTN_IDLE}`}
+          className={`${TBTN} ${frozen ? TBTN_LIT : TBTN_IDLE_ON}`}
           title={
             frozen
               ? 'Output FROZEN / held : click (or H) to release'
@@ -421,7 +421,7 @@ export function Transport(): JSX.Element {
         <button
           onClick={() => setOutputPageOpen(true)}
           onContextMenu={openPageMenu('output')}
-          className={`${TBTN} ${outputOn ? TBTN_LIT : TBTN_IDLE}`}
+          className={`${TBTN} ${outputOn ? TBTN_LIT : TBTN_IDLE_ON}`}
           title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on. Right-click : watch the Output in a window, or open this page in a window"
         >
           {outputOn ? '◉ Output' : '⛶ Output'}
@@ -440,7 +440,7 @@ export function Transport(): JSX.Element {
         <button
           onClick={() => setBodyPageOpen(true)}
           onContextMenu={openPageMenu('body')}
-          className={`${TBTN} ${bodyOn ? TBTN_LIT : TBTN_IDLE}`}
+          className={`${TBTN} ${bodyOn ? TBTN_LIT : TBTN_IDLE_ON}`}
           title="Open Body, embodied control : camera gestures drive actions and OSC (B). Lights while the camera is live. Right-click : open it in a window"
         >
           {bodyOn ? '◉ Body' : 'Body'}
@@ -450,7 +450,7 @@ export function Transport(): JSX.Element {
           <button
             onClick={() => setSequencePageOpen(true)}
             onContextMenu={openPageMenu('sequence')}
-            className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE}`}
+            className={`${TBTN} ${seqRunning ? TBTN_LIT : TBTN_IDLE_ON}`}
             title="Open the Sequence / macro-form auto-pilot (Q). Right-click : open it in a window"
           >
             {seqRunning ? '▶ Seq' : 'Seq'}
@@ -462,7 +462,7 @@ export function Transport(): JSX.Element {
             // (in its own window : brings that window up, as S does)
             onClick={() => setSonifyPageOpen(sonifyPageWindow || !sonifyPageOpen)}
             onContextMenu={openPageMenu('sonify')}
-            className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE}`}
+            className={`${TBTN} ${sonifyOn ? TBTN_LIT : TBTN_IDLE_ON}`}
             // persistent (its right-click) : the gold of every pin
             style={soniPinned ? { borderColor: 'rgb(var(--c-pin) / 0.8)', color: sonifyOn ? undefined : 'rgb(var(--c-pin))' } : undefined}
             title={`Open Sonify, the image-to-sound engine (S) : lights while the sound is running.${soniPinned ? ' Persistent : scenes leave it as it is.' : ''} Right-click : open it in a window, make its state persistent, set it in every scene`}
