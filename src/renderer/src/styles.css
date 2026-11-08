@@ -1340,6 +1340,22 @@ html:not([data-glass='off']) :is(button:is(.btn, .btn-accent, .border, .input, [
   background-image: var(--sheen-arrow, none), var(--sheen-press);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--sheen-rim-press);
 }
+/* The sections, a gentler glass than the buttons (Vincent : "add something like this to the
+   other sections, like the Inspector and Master FX sections, all the layers (including BG and
+   AU), and other sections [...] just so I can see where it can go") : a lit top edge, a glow
+   that fades within the first few lines whatever the panel's height, a soft lift. Every
+   rounded, bordered box in a panel color (the layer cards, the Inspector, Master FX, the
+   Mixer, Feel, the finishing units, the Connect sections, the pages' cards) and the long
+   bars (the top bar, the modulation strip, the bottom bar, a Connect section) : their top
+   edge only. The previews (black) stay out; .no-sheen opts out; plain with interface glass off. */
+html:not([data-glass='off']) :is(div, section, aside).border:is(.rounded, .rounded-md, .rounded-lg, .rounded-xl):is([class^='bg-panel'], [class*=' bg-panel']):not(.no-sheen, .glass *, .glass-panel, .glass-panel *) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.03) 0, rgb(255 255 255 / 0.01) 26px, rgb(255 255 255 / 0) 90px);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 1px 0 rgb(255 255 255 / 0.055), 0 1px 3px rgb(0 0 0 / 0.2);
+}
+html:not([data-glass='off']) :is(header, div.border-t.border-border:is(.bg-panel, .bg-panel2)):not(.no-sheen, .glass *, .glass-panel *) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025) 0, rgb(255 255 255 / 0) 24px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045);
+}
 /* the capsules in the preview's corners : small and quiet, the picture leads. A hand near one
    brings it forward. */
 .glass-capsule {
