@@ -1,8 +1,10 @@
 // Embodied-control tracker : a dedicated low-res webcam → MediaPipe Hands + Pose
 // → the body bus (engine/bodyIn.ts). Runs ONLY while enabled (a camera : opt-in).
-// The models run in a worker (engine/bodyWorker.ts) : this thread only hands each
-// new camera frame over and turns the landmarks that come back into features
-// (process()). If the worker can't start, the models run here, on this loop, as
+// The models run in workers (engine/bodyWorker.ts), on the processor, one worker
+// per model (a lane : hands · pose and silhouette · face) so they run side by side
+// on separate cores : this thread only hands each new camera frame to the lanes
+// that have a model, joins their results and turns the landmarks into features
+// (process()). If a worker can't start, the models run here, on this loop, as
 // they did before. MediaPipe loads the first time the camera starts, so the app
 // costs nothing for it until the performer turns it on.
 //
@@ -21,6 +23,7 @@ import { perfMeter } from './perfMeter'
 import { FlowField, STILL, type FlowStats } from './flowField'
 import { EffortReader, type EffortStats } from './effort'
 import { createBodyWorker } from './bodyWorker'
+import FlowWorker from '../workers/flowWorker?worker&inline'
 import { roomTracker } from './roomTracker'
 import { handShape, HandSlots, HandSmoother, PinchPointer, ShapeReader, rawLeftFor, type HandLabel, type HandShapeId, type HandSlot } from './handShape'
 import { bodyPointer, setHandCursors, HAND_PID, type HandCursor } from '../pointerInput'
@@ -101,6 +104,21 @@ const SHAPE_KEYS: Record<HandSlot, ShapeKeys> = {
 interface SlotShape { smoother: HandSmoother; reader: ShapeReader; had: boolean; wx: number; wy: number }
 const slotShape = (): SlotShape => ({ smoother: new HandSmoother(), reader: new ShapeReader(), had: false, wx: 0, wy: 0 })
 
+/** A tracking worker and what it runs : the hands, the pose (with the silhouette)
+ *  or the face. Created the first time its model is asked for, kept while the
+ *  camera runs (its models closed when not wanted), so a toggle is quick. */
+type LaneKey = 'hands' | 'pose' | 'face'
+const LANE_KEYS: readonly LaneKey[] = ['hands', 'pose', 'face']
+interface Lane {
+  key: LaneKey
+  w: Worker
+  ready: Promise<boolean>
+  readyRes: (ok: boolean) => void
+  waiters: Array<(ok: boolean) => void>
+  models: boolean // it runs a model now : frames go to it
+  ms: number // its detection time for the last frame
+}
+
 /** One tracked camera frame : from the worker, or the main-thread fallback. */
 interface WorkerResult {
   ts: number
@@ -156,6 +174,7 @@ class BodyTracker {
     face: { on: false, cand: false, since: 0 }
   }
   private raf = 0
+  private lastPassAt = 0 // the last pass that tracked (Hi-res keeps repeats to the display rate)
   private lastTs = -1
   private lastCamT = -1 // media time of the last camera frame tracked
   private lastLoopTs = 0 // performance.now() of the last tracked pass
@@ -172,17 +191,16 @@ class BodyTracker {
   // recreate the pose landmarker (leaking one) or desync poseSeg vs silhouette.
   private ensureChain: Promise<void> = Promise.resolve()
   private err: string | null = null
-  // The tracking worker : MediaPipe off the main thread. useWorker drops to false
-  // for the session when the worker can't start (the main-thread path takes over).
-  private worker: Worker | null = null
+  // The tracking workers (lanes) : MediaPipe off the main thread. useWorker drops
+  // to false for the session when one can't start (the main-thread path takes over).
+  private lanes: Partial<Record<LaneKey, Lane>> = {}
   private useWorker = true
-  private workerReady: Promise<boolean> | null = null
-  private workerReadyRes: ((ok: boolean) => void) | null = null
-  private cfgWaiters: Array<(ok: boolean) => void> = []
-  private inFlight = false // a frame is in the worker : the next waits for its result
+  private inFlight = false // a frame is in the lanes : the next waits for all their results
   private inFlightAt = 0
-  private inFlightTs = -1 // the frame in the worker (its detectForVideo timestamp)
-  private workerMs = 0 // the worker's detection time for the last frame
+  private inFlightTs = -1 // the frame in the lanes (its detectForVideo timestamp)
+  // that frame's results as they come in, and the lanes still to answer
+  private join: { ts: number; need: Set<LaneKey>; r: WorkerResult; err: boolean } | null = null
+  private workerMs = 0 // the slowest lane's detection time for the last frame
 
   // Preview + gesture state.
   private latestHands: NormalizedLandmark[][] = []
@@ -216,9 +234,17 @@ class BodyTracker {
   private holdSince: Partial<Record<BodyGesture, number>> = {}
   private holdFired: Partial<Record<BodyGesture, boolean>> = {}
   // Motion field (the Motion toggle).
+  // The field is computed in its own worker (workers/flowWorker.ts) : this thread
+  // only scales each new camera frame down on the graphics card and hands it over.
+  // The main-thread copy (flowField) is the fallback when that worker won't start.
   private flowField = new FlowField(FLOW_W, FLOW_H)
   private flowCtx: CanvasRenderingContext2D | null = null
   private flowGray = new Float32Array(FLOW_W * FLOW_H)
+  private flowWorker: Worker | null = null
+  private flowWorkerFailed = false
+  private flowBusy = false // a frame is in the flow worker
+  private flowBusyAt = 0
+  private flowId = 0 // bumped on a reset : a result from before it is dropped
   private flowStats: FlowStats = { ...STILL }
   private flowLastVT = -1 // the camera frame last read (video.currentTime)
   private flowLastT = 0
@@ -232,6 +258,10 @@ class BodyTracker {
   private silH = 0
   private silVersion = 0
   private silEmpty = false // nobody in frame : the mask is all zero
+
+  /** Bumped on every tracked frame : the Body page redraws its preview only when
+   *  this, the Room's people or the camera frame changed. */
+  version = 0
 
   status(): { running: boolean; error: string | null } {
     return { running: this.running, error: this.err }
@@ -256,8 +286,10 @@ class BodyTracker {
   }
 
   /** Where the models run, and the last frame's detection time there (tests). */
-  thread(): { worker: boolean; ms: number } {
-    return { worker: this.useWorker && !!this.worker, ms: this.workerMs }
+  thread(): { worker: boolean; ms: number; lanes: Partial<Record<LaneKey, number>> } {
+    const lanes: Partial<Record<LaneKey, number>> = {}
+    for (const k of LANE_KEYS) { const l = this.lanes[k]; if (l?.models) lanes[k] = l.ms }
+    return { worker: this.useWorker && Object.keys(this.lanes).length > 0, ms: this.workerMs, lanes }
   }
 
   /** The latest silhouette as an image, for the Silhouette source : the mask (half
@@ -314,93 +346,138 @@ class BodyTracker {
     } else if (cfg.enabled && this.running && was && (was.hands !== cfg.hands || was.pose !== cfg.pose || was.face !== cfg.face || was.silhouette !== cfg.silhouette || (was.tracker ?? 'close') !== (cfg.tracker ?? 'close'))) {
       // Hands / Pose / Face / Silhouette toggled live : create or close the affected
       // landmarker only (no camera flicker). mirror + sensitivity are read per-frame.
-      if (this.useWorker && this.worker) {
-        if (!(await this.configureWorker())) this.workerFailed()
+      if (this.useWorker) {
+        if (!(await this.configureLanes())) this.workerFailed()
       } else await this.ensureLandmarkers()
     }
     this.syncRoom()
   }
 
-  // ── The tracking worker (bodyWorker.ts) ───────────────────────────────────
-  /** Start (or reuse) the worker, load MediaPipe in it and apply the config.
-   *  False when it can't (the tracker then runs on the main thread, as before). */
-  private async startWorker(): Promise<boolean> {
-    if (!this.worker) {
-      let w: Worker
-      try {
-        w = createBodyWorker()
-      } catch (e) {
-        console.warn('[body] no tracking worker : on the main thread', e)
-        return false
-      }
-      this.worker = w
-      this.workerReady = new Promise<boolean>((res) => { this.workerReadyRes = res })
-      w.onmessage = (e: MessageEvent): void => this.onWorker(e.data)
-      w.onerror = (e: ErrorEvent): void => {
-        console.warn('[body] tracking worker error :', e.message)
-        this.workerFailed()
-      }
-      w.postMessage({ t: 'init', urls: { bundle: BUNDLE_URL, wasm: WASM_BASE, hand: HAND_MODEL, pose: POSE_MODEL, face: FACE_MODEL } })
+  // ── The tracking workers (bodyWorker.ts), one lane per model ───────────────
+  /** Does this lane have a model to run under the config ? */
+  private laneWanted(k: LaneKey): boolean {
+    const c = this.cfg
+    if (!c) return false
+    return k === 'hands' ? !!c.hands : k === 'pose' ? this.mpPose() || !!c.silhouette : !!c.face
+  }
+
+  /** The detector toggles one lane gets : its own model, nothing else. */
+  private laneCfg(k: LaneKey): { hands: boolean; pose: boolean; face: boolean; silhouette: boolean } {
+    const c = this.cfg
+    return {
+      hands: k === 'hands' && !!c?.hands,
+      pose: k === 'pose' && this.mpPose(),
+      face: k === 'face' && !!c?.face,
+      silhouette: k === 'pose' && !!c?.silhouette
     }
-    const ready = await Promise.race([
-      this.workerReady ?? Promise.resolve(false),
-      new Promise<boolean>((res) => window.setTimeout(() => res(false), 30000))
-    ])
-    if (!ready) { this.workerFailed(); return false }
-    const ok = await this.configureWorker()
-    if (!ok) this.workerFailed()
-    return ok
   }
 
-  /** Send the detector toggles; resolves once the worker built its landmarkers. */
-  private configureWorker(): Promise<boolean> {
-    const w = this.worker, cfg = this.cfg
-    if (!w || !cfg) return Promise.resolve(false)
-    return new Promise<boolean>((res) => {
-      this.cfgWaiters.push(res)
-      w.postMessage({ t: 'config', cfg: { hands: !!cfg.hands, pose: this.mpPose(), face: !!cfg.face, silhouette: !!cfg.silhouette } })
-    })
+  /** A new lane : its worker, loading MediaPipe. Null when no worker can start. */
+  private makeLane(k: LaneKey): Lane | null {
+    let w: Worker
+    try {
+      w = createBodyWorker()
+    } catch (e) {
+      console.warn('[body] no tracking worker : on the main thread', e)
+      return null
+    }
+    let readyRes: (ok: boolean) => void = () => {}
+    const ready = new Promise<boolean>((res) => { readyRes = res })
+    const lane: Lane = { key: k, w, ready, readyRes, waiters: [], models: false, ms: 0 }
+    w.onmessage = (e: MessageEvent): void => this.onLane(lane, e.data)
+    w.onerror = (e: ErrorEvent): void => {
+      console.warn(`[body] tracking worker (${k}) error :`, e.message)
+      this.workerFailed()
+    }
+    w.postMessage({ t: 'init', urls: { bundle: BUNDLE_URL, wasm: WASM_BASE, hand: HAND_MODEL, pose: POSE_MODEL, face: FACE_MODEL } })
+    this.lanes[k] = lane
+    return lane
   }
 
-  private onWorker(m: { t: string; msg?: string } & Partial<WorkerResult>): void {
+  /** Start the lanes the config needs (each loads MediaPipe once), give every lane
+   *  its toggles, and resolve once they all built their landmarkers. False when one
+   *  can't (the tracker then runs on the main thread, as before). */
+  private async configureLanes(): Promise<boolean> {
+    if (!this.cfg) return false
+    const oks = await Promise.all(
+      LANE_KEYS.map(async (k) => {
+        const want = this.laneWanted(k)
+        const lane = this.lanes[k] ?? (want ? this.makeLane(k) : null)
+        if (!lane) return !want
+        const ready = await Promise.race([lane.ready, new Promise<boolean>((res) => window.setTimeout(() => res(false), 30000))])
+        if (!ready || this.lanes[k] !== lane) return false
+        const ok = await new Promise<boolean>((res) => {
+          lane.waiters.push(res)
+          lane.w.postMessage({ t: 'config', cfg: this.laneCfg(k) })
+        })
+        lane.models = ok && this.laneWanted(k)
+        return ok
+      })
+    )
+    return oks.every(Boolean)
+  }
+
+  private onLane(lane: Lane, m: { t: string; msg?: string } & Partial<WorkerResult>): void {
+    if (this.lanes[lane.key] !== lane) return // a lane already let go
     if (m.t === 'ready') {
-      this.workerReadyRes?.(true)
+      lane.readyRes(true)
     } else if (m.t === 'configured') {
-      const ws = this.cfgWaiters
-      this.cfgWaiters = []
+      const ws = lane.waiters
+      lane.waiters = []
       ws.forEach((r) => r(true))
     } else if (m.t === 'error') {
-      // Loading or building the models failed : the waiters fall back to the main
+      // Loading or building a model failed : the waiters fall back to the main
       // thread. (A frame's own hiccup comes back as a result with `error`.)
-      console.warn('[body] tracking worker :', m.msg)
-      this.inFlight = false
-      this.workerReadyRes?.(false)
-      const ws = this.cfgWaiters
-      this.cfgWaiters = []
+      console.warn(`[body] tracking worker (${lane.key}) :`, m.msg)
+      if (this.join?.need.has(lane.key)) { this.inFlight = false; this.join = null }
+      lane.readyRes(false)
+      const ws = lane.waiters
+      lane.waiters = []
       ws.forEach((r) => r(false))
     } else if (m.t === 'result') {
       const r = m as WorkerResult
-      if (r.ts !== this.inFlightTs) return // a frame from before a stop
+      const j = this.join
+      if (!j || r.ts !== j.ts || !j.need.has(lane.key)) return // a frame from before a stop
+      j.need.delete(lane.key)
+      lane.ms = r.ms
+      if (r.error) j.err = true // a transient GL / graph hiccup : this frame only
+      else if (lane.key === 'hands') { j.r.hands = r.hands; j.r.handed = r.handed }
+      else if (lane.key === 'pose') { j.r.pose = r.pose; j.r.sil = r.sil }
+      else { j.r.face = r.face; j.r.blend = r.blend }
+      j.r.ms = Math.max(j.r.ms, r.ms)
+      if (j.need.size) return
+      // every lane answered : one frame, as one result
+      this.join = null
       this.inFlight = false
       if (!this.running || !this.cfg) return
-      this.workerMs = r.ms
-      if (r.error) return // a transient GL / graph hiccup : this frame only
-      this.process(r, null)
+      this.workerMs = j.r.ms
+      if (j.err) return
+      this.process(j.r, null)
     }
   }
 
-  /** The worker died or would not start : the tracker carries on, on the main
-   *  thread (the path the worker replaced), for the rest of the session. */
+  /** Let every lane go (their workers end). */
+  private dropLanes(): void {
+    for (const k of LANE_KEYS) {
+      const l = this.lanes[k]
+      if (!l) continue
+      try { l.w.terminate() } catch { /* gone */ }
+      l.readyRes(false)
+      const ws = l.waiters
+      l.waiters = []
+      ws.forEach((r) => r(false))
+    }
+    this.lanes = {}
+    this.join = null
+    this.inFlight = false
+  }
+
+  /** A worker died or would not start : the tracker carries on, on the main
+   *  thread (the path the workers replaced), for the rest of the session. */
   private workerFailed(): void {
     if (!this.useWorker) return
     this.useWorker = false
-    this.inFlight = false
-    try { this.worker?.terminate() } catch { /* gone */ }
-    this.worker = null
-    this.workerReadyRes?.(false)
-    const ws = this.cfgWaiters
-    this.cfgWaiters = []
-    ws.forEach((r) => r(false))
+    this.dropLanes()
     if (this.running) void this.startInline()
   }
 
@@ -516,7 +593,8 @@ class BodyTracker {
       //    (off the main thread). The worker keeps the module + fileset, so Hands /
       //    Pose can be toggled live without reloading. When it can't start, the
       //    models load here instead (lazy import), as they always did.
-      const viaWorker = this.useWorker && (await this.startWorker())
+      const viaWorker = this.useWorker && (await this.configureLanes())
+      if (this.useWorker && !viaWorker) this.workerFailed()
       if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
       if (!viaWorker) await this.startInline()
       if (stale()) { if (gen === this.startGen) this.stop(); else releaseStream(); return }
@@ -539,8 +617,9 @@ class BodyTracker {
   dispose(): void {
     this.cfg = null
     this.stop()
-    try { this.worker?.terminate() } catch { /* gone */ }
-    this.worker = null
+    this.dropLanes()
+    try { this.flowWorker?.terminate() } catch { /* gone */ }
+    this.flowWorker = null
   }
 
   stop(): void {
@@ -548,7 +627,7 @@ class BodyTracker {
     this.startGen++ // invalidate any start() still resolving its awaits
     this.running = false
     this.starting = false
-    if (this.raf) cancelAnimationFrame(this.raf)
+    if (this.raf) window.clearTimeout(this.raf)
     this.raf = 0
     this.lastTs = -1
     roomTracker.stop()
@@ -558,7 +637,13 @@ class BodyTracker {
     this.hands = null
     this.pose = null
     this.face = null
-    this.worker?.postMessage({ t: 'stop' })
+    for (const k of LANE_KEYS) {
+      const l = this.lanes[k]
+      if (!l) continue
+      l.w.postMessage({ t: 'stop' })
+      l.models = false
+    }
+    this.join = null
     this.inFlight = false
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
@@ -585,7 +670,13 @@ class BodyTracker {
 
   private loop = (): void => {
     if (!this.running) return
-    this.raf = requestAnimationFrame(this.loop)
+    // On a timer, not the window's frames : tracking follows the camera, and a
+    // window that doesn't paint (covered, minimized, the output over it on the
+    // same screen) gets one animation frame a second, so the tracking fell to
+    // one a second (measured). The app's windows are never throttled
+    // (backgroundThrottling off), so this stays at ~250 passes a second; each
+    // only looks whether the camera has a new frame.
+    this.raf = window.setTimeout(this.loop, 4)
     const video = this.video
     const cfg = this.cfg
     if (!video || !cfg || video.readyState < 2) return
@@ -596,14 +687,20 @@ class BodyTracker {
     const camT = video.currentTime
     const newFrame = camT !== this.lastCamT
     if (!newFrame && !cfg.hiRes) return
+    // Hi-res : a repeated picture at most at the display's rate (the loop's own
+    // timer runs faster)
+    const passAt = performance.now()
+    if (!newFrame && passAt - this.lastPassAt < 16) return
+    this.lastPassAt = passAt
     // The Room tracker takes each new camera frame in its own thread (it skips one
     // while the last is still in its model); its people join the next result.
     if (newFrame && this.roomOn()) roomTracker.push(video)
-    const worker = this.useWorker ? this.worker : null
-    // One frame in the worker at a time : while it works, a new camera frame skips
+    // the lanes with a model now (none : only the motion field and the Room run)
+    const lanes = this.useWorker ? LANE_KEYS.map((k) => this.lanes[k]).filter((l): l is Lane => !!l && l.models) : null
+    // One frame in the lanes at a time : while they work, a new camera frame skips
     // the models (the motion field, no model, still reads it). A result lost for
     // two seconds (a hung worker) frees the slot.
-    if (worker && this.inFlight && performance.now() - this.inFlightAt < 2000) {
+    if (lanes && this.inFlight && performance.now() - this.inFlightAt < 2000) {
       if (newFrame) {
         this.lastCamT = camT
         const f = this.readFlow(video, cfg)
@@ -621,18 +718,30 @@ class BodyTracker {
     // first : it needs no body in frame (a crowd, a curtain, a hand all move).
     const flowOut = this.readFlow(video, cfg)
 
-    if (worker) {
-      // The worker tracks a copy of this frame ; its result comes back through
-      // process(). Only the copy costs this thread anything.
+    if (lanes) {
+      if (!lanes.length) {
+        // No model : the frame goes straight to the features (the presence, the
+        // Room tracker's people, the motion field).
+        this.process({ ts, camT, newFrame, hands: [], handed: [], pose: null, face: null, blend: null, sil: null, ms: 0 }, flowOut)
+        return
+      }
+      // Each lane tracks its own copy of this frame, side by side; their results
+      // are joined and come back through process(). Only the copies cost this
+      // thread anything.
       this.inFlight = true
       this.inFlightAt = performance.now()
       this.inFlightTs = ts
+      const join = { ts, need: new Set(lanes.map((l) => l.key)), err: false, r: { ts, camT, newFrame, hands: [], handed: [], pose: null, face: null, blend: null, sil: null, ms: 0 } as WorkerResult }
+      this.join = join
       const t0 = performance.now()
-      const silhouette = !!cfg.silhouette, mirror = cfg.mirror
-      createImageBitmap(video).then((bitmap) => {
-        if (!this.running || this.worker !== worker || this.inFlightTs !== ts) { bitmap.close(); return }
-        worker.postMessage({ t: 'frame', bitmap, ts, camT, newFrame, silhouette, mirror }, [bitmap])
-      }).catch(() => { if (this.inFlightTs === ts) this.inFlight = false })
+      const mirror = cfg.mirror
+      for (const lane of lanes) {
+        const silhouette = lane.key === 'pose' && !!cfg.silhouette
+        createImageBitmap(video).then((bitmap) => {
+          if (!this.running || this.lanes[lane.key] !== lane || this.join !== join) { bitmap.close(); return }
+          lane.w.postMessage({ t: 'frame', bitmap, ts, camT, newFrame, silhouette, mirror }, [bitmap])
+        }).catch(() => { if (this.join === join) { this.join = null; this.inFlight = false } })
+      }
       perfMeter.add('mediapipe', performance.now() - t0) // Performance panel
       if (flowOut) bodyBus.update(flowOut)
       return
@@ -686,6 +795,7 @@ class BodyTracker {
   private process(r: WorkerResult, flowOut: Partial<Record<BodyFeature, number>> | null): void {
     const cfg = this.cfg
     if (!cfg) return
+    this.version++
     // The Room tracker reads the pose : its main person stands in for MediaPipe's.
     const room = this.roomOn()
     if (room) {
@@ -799,7 +909,9 @@ class BodyTracker {
     }
     this.flowOn = true
     const vt = video.currentTime
-    if (vt !== this.flowLastVT) {
+    if (vt !== this.flowLastVT && this.flowInWorker(video, cfg)) {
+      this.flowLastVT = vt
+    } else if (vt !== this.flowLastVT) {
       this.flowLastVT = vt
       if (!this.flowCtx) {
         const c = document.createElement('canvas')
@@ -825,7 +937,55 @@ class BodyTracker {
     return flowFeatures(this.flowStats)
   }
 
+  /** Hand this camera frame to the flow worker (scaled to the grid on the card,
+   *  so its readback is 64 × 48). False : no worker, compute it here. A frame
+   *  arriving while the last is still in the worker is skipped (true). */
+  private flowInWorker(video: HTMLVideoElement, cfg: BodyControlConfig): boolean {
+    if (this.flowWorkerFailed) return false
+    if (!this.flowWorker) {
+      try {
+        const w = new FlowWorker()
+        w.onmessage = (e: MessageEvent): void => {
+          const m = e.data as { t: string; stats: FlowStats; id: number; ms: number }
+          if (m.t !== 'flow') return
+          this.flowBusy = false
+          if (m.id !== this.flowId || !this.flowOn || !this.running) return
+          this.flowStats = m.stats
+          this.flowGestures(m.stats)
+          perfMeter.add('motionfield', m.ms)
+        }
+        w.onerror = (): void => {
+          this.flowWorkerFailed = true
+          this.flowBusy = false
+          try { w.terminate() } catch { /* gone */ }
+          this.flowWorker = null
+        }
+        this.flowWorker = w
+      } catch {
+        this.flowWorkerFailed = true
+        return false
+      }
+    }
+    if (this.flowBusy && performance.now() - this.flowBusyAt < 1000) return true
+    const now = performance.now()
+    const dt = this.flowLastT ? Math.min(0.2, (now - this.flowLastT) / 1000) : 1 / 30
+    this.flowLastT = now
+    this.flowBusy = true
+    this.flowBusyAt = now
+    const id = this.flowId
+    const w = this.flowWorker
+    const mirror = cfg.mirror
+    createImageBitmap(video, { resizeWidth: FLOW_W, resizeHeight: FLOW_H, resizeQuality: 'low' }).then((bitmap) => {
+      if (id !== this.flowId || this.flowWorker !== w || !w) { bitmap.close(); this.flowBusy = false; return }
+      w.postMessage({ t: 'frame', bitmap, dt, mirror, id }, [bitmap])
+    }).catch(() => { this.flowBusy = false })
+    return true
+  }
+
   private resetFlow(): void {
+    this.flowId++
+    this.flowBusy = false
+    this.flowWorker?.postMessage({ t: 'reset' })
     this.flowField.reset()
     this.flowStats = { ...STILL }
     this.flowLastVT = -1

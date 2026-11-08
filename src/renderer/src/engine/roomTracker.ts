@@ -33,7 +33,14 @@ export interface RoomPerson {
 
 const MATCH_IOU = 0.2 // a new box this much over an old one is the same person
 const KEEP_MS = 700 // a person missed for longer is gone
-const EASE = 0.55 // how far each frame moves a person's points toward the new ones
+const EASE = 0.55 // how far each frame moves a person's points toward the new ones (at EASE_HZ)
+const EASE_HZ = 28 // the rate EASE was tuned at : a slower rate eases further per frame
+// At most this many frames a second into the model. Its 35 ms on an idle card grew
+// to 60-200 ms under a heavy picture, and every frame it ran took that much from
+// the picture's own (a heavy picture at 60 fps fell to 45 with Room on, for 6
+// frames a second of tracking anyway; capped at 12, to 50) : ten keep the people
+// moving smoothly with the easing, and leave the card most of its time.
+const MAX_HZ = 10
 const SWITCH = 1.3 // someone must be this much larger than the main person to take over
 const COUNT_MS = 400 // a change in the head count holds this long before arrive / leave fire
 const THR = 0.35 // a detection's score must reach this
@@ -63,6 +70,8 @@ class RoomTracker {
   private inFlight = false
   private inFlightAt = 0
   private frameId = 0
+  private lastUpdate = 0 // when the people last moved (the easing is per second)
+  version = 0 // bumped each time the people move (the Body page's preview redraws)
   private people: RoomPerson[] = []
   private nextId = 1
   private mainId: number | null = null
@@ -93,6 +102,7 @@ class RoomTracker {
     this.ready = false
     this.inFlight = false
     this.people = []
+    this.lastUpdate = 0
     this.mainId = null
     this.count = this.countCand = 0
     this.events = []
@@ -110,9 +120,11 @@ class RoomTracker {
   push(source: CanvasImageSource & { width?: number }): void {
     const w = this.worker
     if (!w || !this.ready) return
-    if (this.inFlight && performance.now() - this.inFlightAt < 2000) return
+    const now = performance.now()
+    if (this.inFlight && now - this.inFlightAt < 2000) return
+    if (now - this.inFlightAt < 1000 / MAX_HZ) return
     this.inFlight = true
-    this.inFlightAt = performance.now()
+    this.inFlightAt = now
     const id = ++this.frameId
     createImageBitmap(source as ImageBitmapSource)
       .then((bitmap) => {
@@ -161,6 +173,11 @@ class RoomTracker {
   /** The frame's detections → the tracked people (ids kept by the best overlap). */
   private update(found: Array<{ score: number; box: number[]; k: number[] }>): void {
     const now = performance.now()
+    // the same easing per second whatever the frame rate
+    const dt = this.lastUpdate ? Math.min(0.5, (now - this.lastUpdate) / 1000) : 1 / EASE_HZ
+    this.lastUpdate = now
+    this.version++
+    const ease = 1 - Math.pow(1 - EASE, dt * EASE_HZ)
     const free = new Set(this.people.map((p) => p.id))
     // the best overlaps first, each person and each detection used once
     const pairs: Array<{ p: RoomPerson; d: number; o: number }> = []
@@ -178,10 +195,10 @@ class RoomTracker {
       free.delete(p.id)
       usedD.add(d)
       const f = found[d]
-      for (let i = 0; i < 4; i++) p.box[i] += (f.box[i] - p.box[i]) * EASE
+      for (let i = 0; i < 4; i++) p.box[i] += (f.box[i] - p.box[i]) * ease
       for (let i = 0; i < p.k.length; i += 3) {
-        p.k[i] += (f.k[i] - p.k[i]) * EASE
-        p.k[i + 1] += (f.k[i + 1] - p.k[i + 1]) * EASE
+        p.k[i] += (f.k[i] - p.k[i]) * ease
+        p.k[i + 1] += (f.k[i + 1] - p.k[i + 1]) * ease
         p.k[i + 2] = f.k[i + 2]
       }
       p.score = f.score
