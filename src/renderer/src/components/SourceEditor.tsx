@@ -18,7 +18,7 @@ import { tags as t } from '@lezer/highlight'
 import { Renderer as ISFRenderer } from 'interactive-shader-format'
 import { makeRedirectableGL } from '../engine/Compositor'
 import { handle } from '../engine/isfTextureBridge'
-import { FX_SHADERS, GENERATORS, SHADER_BY_ID } from '../shaders/isf'
+import { CONTEXT_SHADER, FINALIZER_SHADER, FX_SHADERS, GENERATORS, SHADER_BY_ID, VIBE_SHADER } from '../shaders/isf'
 import {
   SOURCE_EDITOR_KEY, categoryOf, fileNameOf, onUserShaderChange, registerUserShader, unregisterUserShader,
   userShaderId, userShaderIdsIn, userShaderRevision, type UserShaderInfo
@@ -575,10 +575,16 @@ function SourceEditorBody(): JSX.Element {
   }, [header])
 
   // ── the library ──
+  // Every shader written in ISF, A to Z : the sources, then the effects with the
+  // three finishing stages (kept out of FX_SHADERS so a rack can't load a second
+  // one, but a copy is yours to change). The native nodes have no ISF code to
+  // open : their GLSL lives in the engine.
+  const byName = (a: { name: string }, b: { name: string }): number => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
   const builtins = useMemo(() => ({
-    gens: GENERATORS.filter((g) => !g.native),
-    fx: FX_SHADERS.filter((f) => !f.native)
+    gens: GENERATORS.filter((g) => !g.native).sort(byName),
+    fx: [...FX_SHADERS, VIBE_SHADER, CONTEXT_SHADER, FINALIZER_SHADER].filter((f) => !f.native).sort(byName)
   }), [])
+  const myShaders = useMemo(() => [...userShaders].sort(byName), [userShaders])
   const q = filter.trim().toLowerCase()
   const match = (n: string): boolean => !q || n.toLowerCase().includes(q)
   const openBuiltin = (id: string): void => {
@@ -800,7 +806,7 @@ function SourceEditorBody(): JSX.Element {
         <aside className="no-scrollbar flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border bg-panel2/40 p-2 text-[11px]">
           <input className="input mb-1 w-full px-1.5 py-0.5 text-[11px]" placeholder="filter" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <span className="mt-1 font-mono text-[9px] uppercase tracking-wide text-muted">my shaders</span>
-          {userShaders.filter((u) => match(u.name)).map((u) => (
+          {myShaders.filter((u) => match(u.name)).map((u) => (
             <button key={u.id} onClick={() => openMine(u.id)} className={`shrink-0 truncate rounded px-1.5 py-0.5 text-left hover:bg-panel3/40 ${draft.userId === u.id ? 'bg-accent/15 text-accent' : ''}`} title={u.fromSession ? 'From the session : save it to keep it in your Shaders folder' : u.category === 'FX' ? 'an effect of yours' : 'a generator of yours'}>
               {u.name}{u.fromSession ? ' · session' : ''}
             </button>

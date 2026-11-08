@@ -1599,6 +1599,7 @@ export interface ExposedApi {
 
   // ── dataflou mesh (the dataflou section) ─────────────────────────
   dataflouConfigure: (cfg: import('./dataflou').DfConfig) => Promise<import('./dataflou').DfStatus>
+  dataflouActions: (list: import('./dataflou').DfAction[]) => void
   dataflouStatus: () => Promise<import('./dataflou').DfStatus>
   dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
   dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>

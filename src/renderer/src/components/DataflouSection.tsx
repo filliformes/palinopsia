@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { dataflouBind, useDataflouStatus } from '../dataflou'
-import { DF_DESTS, DF_SOURCES, type DfNodeView, type DfParam } from '@shared/dataflou'
+import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, type DfNodeView, type DfParam } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -103,6 +103,17 @@ export function DataflouSection(): JSX.Element {
               className="input w-24 px-1 py-0.5 text-[11px]"
               title="Only nodes of the same universe see each other"
             />
+            <button
+              onClick={() => setCfg({ actions: !cfg.actions })}
+              className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] ${cfg.actions ? 'border-accent/60 text-accent' : 'border-border text-muted hover:text-text'}`}
+              title={
+                'Every action of the Body rule list (scenes, layers, Randomize, Sonify voices, the transport, your rules...) as a destination, ' +
+                'a trigger each under act/ : it fires once as it goes on. The list follows the session. ' +
+                'Off by default : the tree then grows past what a small board (Teensy, ESP32) takes, so keep it off on a mesh that has one.'
+              }
+            >
+              actions : {cfg.actions ? 'on' : 'off'}
+            </button>
           </div>
           <div className="font-mono text-[9px] leading-relaxed text-muted">
             {state === 'on' ? (
@@ -111,6 +122,19 @@ export function DataflouSection(): JSX.Element {
                 <span className="text-text">{st.address}</span>:<span className="text-text">{st.tcpPort}</span> · publishes{' '}
                 <span className="text-text">{DF_SOURCES.length}</span> sources and takes{' '}
                 <span className="text-text">{DF_DESTS.length}</span> destinations (Macro knobs, layers, background, feel, scenes, randomize, output transform, BPM)
+                {st.actions > 0 && (
+                  <>
+                    {' '}
+                    + <span className="text-text">{st.actions}</span> actions from the Body rule list
+                  </>
+                )}
+                {st.actionsDropped > 0 && <span className="text-danger"> ({st.actionsDropped} left out : too many for one frame)</span>}
+                {st.declareBytes > DF_DECLARE_SMALL && (
+                  <span className="text-accent2">
+                    {' '}
+                    · {(st.declareBytes / 1024).toFixed(1)} KB : too big for a small board (Teensy, ESP32) on this universe
+                  </span>
+                )}
               </>
             ) : state === 'error' ? (
               <span className="text-danger">{st.error}</span>
