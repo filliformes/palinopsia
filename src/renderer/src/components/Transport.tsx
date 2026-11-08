@@ -263,7 +263,7 @@ export function Transport(): JSX.Element {
   const current = SCOPES.find((s) => s.scope === scope) ?? SCOPES[0]
 
   return (
-    <div className="bar-glass flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
+    <div className="flex flex-nowrap items-center gap-x-2 overflow-x-clip overflow-y-visible border-t border-border bg-panel px-2 py-1.5">
       <div className="flex shrink-0 items-center gap-1.5">
         {/* Tap tempo is a PAD action (fire:tap); the number box is the CC value
             target (transport:bpm) : each gets its own relative wrapper so the

@@ -1003,11 +1003,21 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   Context and Finalizer were missing (kept out of `FX_SHADERS` so a rack can't load a second);
   each list (my shaders, generators, effects) is sorted by name. Measured in the test build :
   34 generators, 60 effects, all in order. The native nodes have no ISF code to open.
-- **The bottom bar's buttons get a little liquid glass** (Vincent : "keeping the same button
-  shapes, but adding a little liquid glass feel to those buttons ? No need for see-through
-  stuff that slows the UI"). `.bar-glass` on the Transport : a lit top rim, a sheen fading down
-  over each button's own color, a shade at its foot, a softer press; plain with interface
-  glass off. No backdrop filter : nothing is sampled.
+- **Every button gets a little liquid glass** (Vincent, first on the bottom bar : "keeping the
+  same button shapes, but adding a little liquid glass feel to those buttons ? No need for
+  see-through stuff that slows the UI"; then : "I find it a bit bizarre to only have liquid
+  glass in the lower toolbar. Can you put some on ALL the buttons in ALL the app"). One rule in
+  styles.css : a lit top rim, a sheen fading down over each control's own color, a shade at
+  its foot, a softer press, on what looks like a button (`.btn`, `.btn-accent`, a bordered,
+  filled or `.input` button, every dropdown, the effect and modulation chips, `.chip`); list
+  rows, bare icons and the glass pieces keep their look, `.no-sheen` opts out. A ring keeps its
+  shadows (the Tailwind ring variables come first); a compact dropdown's chevron rides on top
+  as its own layer (`--sheen-arrow*`, set by `.select-compact`). Plain with interface glass
+  off. The Mixer's small dropdowns lose an inline `backgroundImage: 'none'` left from an old
+  chevron (nothing draws one there now) so they take it too. No backdrop filter : nothing is
+  sampled. Measured in the test copy : 144 of the 186
+  visible controls of the main view take it (the rest : section arrows, the capsules' own
+  glass, the text inside chips), 0 with glass off.
 
 - **Sonify's voices in five families, the Synth between Chord and Collage** (Vincent :
   "Synth should be between Chord and Collage in the Sonify modules order. Also : if
