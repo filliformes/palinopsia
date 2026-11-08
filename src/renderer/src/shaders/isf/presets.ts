@@ -510,19 +510,19 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
   // ── Silhouette (the body from the Body camera). Its own look only : it never
   // turns the camera on. Matte draws the body opaque, so its trail does nothing.
   'gen-silhouette': [
-    { name: 'Cutout', values: { mode: 0, threshold: 0.5, softness: 0.08, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Feathered', values: { mode: 0, threshold: 0.42, softness: 0.22, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Echoes', values: { mode: 0, threshold: 0.5, softness: 0.1, trail: 0.6, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Key matte', values: { mode: 1, threshold: 0.5, softness: 0.04, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Framed matte', values: { mode: 1, threshold: 0.45, softness: 0.15, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 1 } },
+    { name: 'Cutout', values: { mode: 0, threshold: 0.5, softness: 0.08, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Feathered', values: { mode: 0, threshold: 0.42, softness: 0.22, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Echoes', values: { mode: 0, threshold: 0.5, softness: 0.1, trail: 0.6, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Key matte', values: { mode: 1, threshold: 0.5, softness: 0.04, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Framed matte', values: { mode: 1, threshold: 0.45, softness: 0.15, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 1 } },
     { name: 'Lingering key', values: { mode: 1, threshold: 0.5, softness: 0.06, trail: 0.6, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
     { name: 'Matte comet', values: { mode: 1, threshold: 0.5, softness: 0.08, trail: 0.75, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 0.35, 0.12, 1], fit: 0 } },
     { name: 'Cold wake', values: { mode: 1, threshold: 0.48, softness: 0.12, trail: 0.5, color: [0.95, 0.92, 0.85, 1], trailColor: [0.2, 0.55, 1, 0.85], fit: 0 } },
-    { name: 'Paper figure', values: { mode: 2, threshold: 0.55, softness: 0.03, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Ember trail', values: { mode: 2, threshold: 0.5, softness: 0.12, trail: 0.8, color: [1, 0.5, 0.2, 1], fit: 0 } },
-    { name: 'Glass shadow', values: { mode: 2, threshold: 0.5, softness: 0.18, trail: 0.35, color: [0.45, 0.7, 0.95, 0.55], fit: 0 } },
-    { name: 'Absence', values: { mode: 3, threshold: 0.45, softness: 0.1, trail: 0, color: [0.95, 0.92, 0.85, 1], fit: 0 } },
-    { name: 'Slow vanish', values: { mode: 3, threshold: 0.5, softness: 0.15, trail: 0.7, color: [0.95, 0.92, 0.85, 1], fit: 0 } }
+    { name: 'Paper figure', values: { mode: 2, threshold: 0.55, softness: 0.03, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Ember trail', values: { mode: 2, threshold: 0.5, softness: 0.12, trail: 0.8, color: [1, 0.5, 0.2, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Glass shadow', values: { mode: 2, threshold: 0.5, softness: 0.18, trail: 0.35, color: [0.45, 0.7, 0.95, 0.55], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Absence', values: { mode: 3, threshold: 0.45, softness: 0.1, trail: 0, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } },
+    { name: 'Slow vanish', values: { mode: 3, threshold: 0.5, softness: 0.15, trail: 0.7, color: [0.95, 0.92, 0.85, 1], trailColor: [1, 1, 1, 1], fit: 0 } }
   ],
   // ── Collage (a wall of films cut up) ──
   'gen-collage': [

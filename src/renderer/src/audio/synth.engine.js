@@ -39,8 +39,8 @@
 //   s.noteOff(id)           the thing stopped or left : its voice releases.
 //   s.setMods(id, m)        the picture patchbay's result for that thing,
 //     sent ~30 times a second, smoothed by the engine (never zippers) :
-//     { vel,                  0..1 : continuous expression (about ±6 dB
-//                             around the strike's own velocity)
+//     { vel,                  0..1 : continuous expression, 0.5 = as struck
+//                             (about ±6 dB around the strike's own level)
 //       timbre, harmonics, morph, cutoff, reso, drive,
 //                             -1..1 : offsets around the config's values,
 //                             the sum clamped to 0..1
@@ -1894,7 +1894,7 @@ class OpsiaSynth {
     } else {
       v.tT = V[o]; v.tH = V[o + 1]; v.tM = V[o + 2]; v.tC = V[o + 3]; v.tR = V[o + 4]; v.tD = V[o + 5]
       v.tEnv = V[o + 6]; v.tPan = V[o + 7]; v.tBend = V[o + 8]
-      v.tExp = this.mtSet[o + 9] ? clamp(12 * (V[o + 9] - v.vel), -6, 6) : 0
+      v.tExp = this.mtSet[o + 9] ? clamp(12 * (V[o + 9] - 0.5), -6, 6) : 0
     }
     v.modId = id
     if (snap) {

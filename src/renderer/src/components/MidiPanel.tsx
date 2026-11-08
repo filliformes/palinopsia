@@ -350,7 +350,7 @@ export function MidiPanel(): JSX.Element {
               {computerRows.length > 0 && (
                 <Group
                   title="this computer"
-                  hint="This computer's mappings : every session on it (kept apart from session files). Greyed : a mapping of this session on the same input stands in for it while this session is on."
+                  hint="This computer's mappings : every session on it (kept apart from session files). Grayed : a mapping of this session on the same input stands in for it while this session is on."
                   action={{ label: 'move all to session', title: "Move every one of this computer's mappings into this session (saved with it, gone from this computer)", run: () => { moveAll(); showToast("This computer's mappings moved into the session (save it to keep them)", 'ok') } }}
                 >
                   {computerRows.map((r) => (
@@ -504,7 +504,7 @@ function ReplyRow({ host, n, reply, set }: { host: string; n: number; reply?: { 
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
         className="input text-right tabular-nums"
         style={{ width: PORT_W, height: 16, fontSize: 10, padding: '0 3px', boxSizing: 'content-box' }}
-        title="The UDP port this controller listens on (TouchOSC : its incoming port). Empty : no answers"
+        title="The UDP port this controller listens on (its incoming port). Empty : no answers"
       />
       <button
         onClick={() => set({ on: !(reply?.on ?? true) })}

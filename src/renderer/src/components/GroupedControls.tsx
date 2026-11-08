@@ -349,17 +349,15 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('draw', 0)) put(d, ['rate', 'speed', 'curve', 'length'], 'It only draws by hand.')
     if (isnt('draw', 1)) put(d, ['curve', 'length'], 'Only the wandering strokes curve and end.')
     if (isnt('draw', 3)) put(d, ['sens'], 'Only following the moving things has something to sense.')
+    if (is('draw', 3)) put(d, ['rate', 'speed'], 'Following the moving things : they set the pace.')
     if (isnt('brush', 5)) put(d, ['ribs', 'dash'], 'Only the ribbed metal has ribs and dashes.')
     if (isnt('brush', 6)) put(d, ['broken'], 'Only the ink breaks.')
-    if (isnt('brush', 8)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil brush has a rainbow, flakes and glints.')
     if (isnt('sideUse', 2)) put(d, ['dispersion', 'rim'], 'Only the glass (sidechain as glass) splits color and has a rim.')
     if (isnt('mirror', 4)) put(d, ['fold'], 'Only the mirror around has copies to count.')
     if (zero('edge')) put(d, ['edgeColor'], 'Edge glow is at 0.')
-    if (zero('film') && isnt('brush', 7)) put(d, ['filmThick'], 'No film : oil film is at 0 and the brush is not soap film.')
     if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
-    if (is('brush', 0) || is('brush', 6)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'This brush has no reflection to flow.')
     return d
   },
   'fx-dither': ({ is, isnt }) => {
@@ -404,17 +402,16 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('marks', 0)) put(d, ['markColor', 'markScale'], 'Marks is on none.')
     if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
     if (zero('ground')) put(d, ['skin'], 'Skin opacity is at 0 : only the hairs show.')
-    if (zero('whorl')) put(d, ['scale'], 'Whorls is at 0.')
     return d
   },
   // Sand Plate : the timer and the beat time the redraws; the tilt's angle needs a
   // tilt; a still plate leaves the width and the strays as they lie.
-  'gen-sandplate': ({ zero, is }) => {
+  'gen-sandplate': ({ zero, isnt }) => {
     const d: Why = {}
-    if (!is('sync', 0)) put(d, ['every'], 'Sync is on : the figure is redrawn on the beat.')
+    if (isnt('sync', 0)) put(d, ['every'], 'Sync is on : the figure is redrawn on the beat.')
     if (zero('tilt')) put(d, ['tiltAngle'], 'Tilt is at 0 : the plate lies level.')
     if (zero('warp')) put(d, ['wander'], 'Warp is at 0 : the plate is perfect, there is nothing to wander.')
-    if (zero('ground')) put(d, ['surface', 'plate', 'sheen'], 'Plate opacity is at 0 : only the sand shows.')
+    if (zero('ground')) put(d, ['plate', 'sheen'], 'Plate opacity is at 0 : only the sand shows.')
     return d
   },
   'gen-lattice': ({ zero, is }) => {

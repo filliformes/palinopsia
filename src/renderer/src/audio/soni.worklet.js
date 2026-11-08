@@ -909,7 +909,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         // its own sound, set at the strike (Picture Play shapes each hit; a read
         // head's takes the knobs as they are then), and a hold (TIE : the thing
         // `id` keeps it sounding until it lets go)
-        wave: 0, lpK: 1, fmIdx: 0, hold: false, id: -1, seen: 0 });
+        wave: 0, lpK: 1, fmIdx: 0, hold: false, id: -1, seen: 0, ampT: 0, panT: 0.5 });
     }
     this.sigPending = []; // scheduled onsets [{t0, freq, amp, pan}]
     this.sgDcL = 0; this.sgDcR = 0; // stolen grains' last samples, faded like Events'
@@ -1263,8 +1263,9 @@ class SoniProcessor extends AudioWorkletProcessor {
           g.seen = currentTime;
           let f = st[i + 1];
           if (Number.isFinite(f) && f > 0) { f = f < 20 ? 20 : f; while (f > sampleRate * 0.5) f *= 0.5; g.inc = f / sampleRate; }
-          if (Number.isFinite(st[i + 2])) g.amp = clampf(st[i + 2], 0, 1);
-          if (Number.isFinite(st[i + 3])) g.pan = clampf(st[i + 3], 0, 1);
+          // (targets : the grain glides there, they arrive ~30 times a second)
+          if (Number.isFinite(st[i + 2])) g.ampT = clampf(st[i + 2], 0, 1);
+          if (Number.isFinite(st[i + 3])) g.panT = clampf(st[i + 3], 0, 1);
           if (Number.isFinite(st[i + 4])) { const hz = 200 * Math.pow(100, clampf(st[i + 4], 0, 1)); g.lpK = 1 - Math.exp(-TAU * Math.min(hz, sampleRate * 0.5) / sampleRate); }
           if (Number.isFinite(st[i + 5])) g.fmIdx = clampf(st[i + 5], 0, 1) * 0.9;
         }
@@ -2215,7 +2216,7 @@ class SoniProcessor extends AudioWorkletProcessor {
           while (f > nyq) f *= 0.5;
           let w0 = Math.round((e.t0 - nowT) / dt);
           g.wait = w0 < 0 ? 0 : w0 > n - 1 ? n - 1 : w0;
-          g.on = true; g.born = this.block; g.phase = 0; g.inc = f * dt; g.amp = e.amp; g.pan = e.pan;
+          g.on = true; g.born = this.block; g.phase = 0; g.inc = f * dt; g.amp = e.amp; g.pan = e.pan; g.ampT = e.amp; g.panT = e.pan;
           g.age = 0; g.env = 1; g.fmPh = 0; g.lp = 0;
           if (e.wave === undefined) {
             // a read head's mark : the knobs as they are now
@@ -2252,8 +2253,19 @@ class SoniProcessor extends AudioWorkletProcessor {
         // a hold whose thing has gone quiet (no word for 1.5 s) : let it go
         if (g.hold && nowT - g.seen > 1.5) g.hold = false;
         const wg = wave === 5 ? 0.75 : wave === 7 ? 2.6 : wave === 2 ? 0.95 : wave === 4 ? 0.8 : 1;
-        let p = g.pan + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
-        const gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
+        // a TIE hold glides (~30 ms) to the level and place its thing last sent,
+        // ramped across the block : never a step
+        const a0 = g.amp, pa0 = g.pan;
+        if (g.hold) {
+          const kb = 1 - Math.exp(-n / (0.03 * sampleRate));
+          g.amp += (g.ampT - g.amp) * kb; g.pan += (g.panT - g.pan) * kb;
+        }
+        let p = pa0 + bias; p = p < 0 ? 0 : p > 1 ? 1 : p;
+        let p1 = g.pan + bias; p1 = p1 < 0 ? 0 : p1 > 1 ? 1 : p1;
+        let gL = g0 * panGL(p) * wg, gR = g0 * panGR(p) * wg;
+        const dgL = (g0 * panGL(p1) * wg - gL) / n, dgR = (g0 * panGR(p1) * wg - gR) / n;
+        let amp = a0;
+        const da = (g.amp - a0) / n;
         let lv = 0;
         for (let s = 0; s < n; s++) {
           if (g.wait > 0) { g.wait--; continue; }
@@ -2312,11 +2324,13 @@ class SoniProcessor extends AudioWorkletProcessor {
             }
             sig *= g.env;
           }
-          const v = sig * g.amp;
+          const v = sig * amp;
+          amp += da;
           g.phase += g.inc; if (g.phase >= 1) g.phase -= 1;
           // a held pip or ping waits at the top of its window
           if (!(g.hold && (wave === 0 || wave === 8) && g.age >= g.len * 0.5)) g.age++;
           L[s] += v * gL; R[s] += v * gR;
+          gL += dgL; gR += dgR;
           lv = v;
         }
         g.lastL = lv * gL; g.lastR = lv * gR;

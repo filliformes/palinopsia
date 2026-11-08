@@ -544,7 +544,7 @@ export function BodyPage({
                 on={cfg.tracker === 'room'}
                 label="Room"
                 onClick={() => patch({ tracker: cfg.tracker === 'room' ? 'close' : 'room', pose: true })}
-                title="Room tracker for the pose : every person in the frame, near or far, facing the camera or not (RTMO, on the graphics card). The nearest is the main person, the one the pose features, gestures and movement qualities read; the Room features count and place everyone. Off : MediaPipe's pose, one person within about 4 m who shows their face. Hands, Face and Silhouette stay MediaPipe's either way."
+                title="Room tracker for the pose : every person in the frame, near or far, facing the camera or not (a pose model on the graphics card). The nearest is the main person, the one the pose features, gestures and movement qualities read; the Room features count and place everyone. Off : MediaPipe's pose, one person within about 4 m who shows their face. Hands, Face and Silhouette stay MediaPipe's either way."
               />
               <Toggle on={cfg.face} label="Face" onClick={() => patch({ face: !cfg.face })} title="Track the face (blendshapes : jaw, smile, brow, blink, pucker + head yaw/pitch/roll). Heavier : enable when you want facial control." />
               <Toggle on={cfg.silhouette} label="Silhouette" onClick={() => patch({ silhouette: !cfg.silhouette, pose: cfg.pose || !cfg.silhouette })} title="Segment the body silhouette (rides the Pose model) into a 3×3 coverage grid : each zone is a continuous feature (for modulators) and an occlusion gesture 'cover …' (for rules). Cover a region with your shadow to fire it. Heavier : enable when you want screen-space control." />

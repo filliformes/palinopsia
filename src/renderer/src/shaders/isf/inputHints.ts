@@ -14,7 +14,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     softness: 'How soft the edge is : 0 is a hard cut, higher feathers it.',
     trail: 'Echoes : the body leaves fading copies of itself behind as it moves. 0 = none, 1 = several seconds.',
     color: 'Color and opacity of the shadow (shadow mode).',
-    trailColor: 'Matte mode : the color the echoes fade in behind the white body (white keeps the plain grey key; its opacity dims them).',
+    trailColor: 'Matte mode : the color the echoes fade in behind the white body (white keeps the plain gray key; its opacity dims them).',
     fit: 'Cover fills the frame with the camera image (cropping its edges); contain shows all of it, with empty bands.'
   },
   // ── Color, tone and geometry rack FX ─────────────────────────────────
@@ -976,7 +976,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     color: 'Color and opacity of the shadow (shadow mode). With a fill, the fill is multiplied by it : white leaves the fill as it is, a color tints it like glass.',
     shade: "With a fill : how much of the figure's own light and shadow is laid over it, so the body stays readable. 0 = a flat fill in the people's shape, 1 = the fill lit like the person (their mean brightness keeps the fill as it is, brighter and darker parts lift and deepen it).",
     trail: 'Echoes : the people leave fading copies of themselves behind as they move. 0 = none, 1 = several seconds. With a fill, each echo keeps the fill as it was (in hole mode the fill lingers in the picture where they passed).',
-    trailColor: 'Matte mode : the color the echoes fade in behind the white figures (white keeps the plain grey key; its opacity dims them).',
+    trailColor: 'Matte mode : the color the echoes fade in behind the white figures (white keeps the plain gray key; its opacity dims them).',
     over: 'Lay the result over the picture instead of on nothing : a shadow paints the figure onto the film, a cutout or a hole leaves its echoes over it.',
     mix: 'Dry/wet against the picture.'
   },

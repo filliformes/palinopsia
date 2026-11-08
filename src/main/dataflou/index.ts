@@ -202,7 +202,16 @@ function pushStatus(): void {
   win()?.webContents.send('dataflou:status', status())
 }
 
-async function configure(next: DfConfig): Promise<DfStatus> {
+// One configure at a time : two overlapping calls (React's double effect in dev, a fast
+// on / off) would each start a node, and the first would be lost still running.
+let configureOp: Promise<unknown> = Promise.resolve()
+function configure(next: DfConfig): Promise<DfStatus> {
+  const p = configureOp.then(() => configureNow(next))
+  configureOp = p.catch(() => undefined)
+  return p
+}
+
+async function configureNow(next: DfConfig): Promise<DfStatus> {
   const label = (next.label || 'palinopsia').trim().replace(/\s+/g, '-').slice(0, 32) || 'palinopsia'
   const universe = (next.universe || 'default').trim().slice(0, 32) || 'default'
   const want: DfConfig = { enabled: !!next.enabled, label, universe, actions: !!next.actions }

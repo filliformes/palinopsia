@@ -459,8 +459,10 @@ async function setSource(args: Record<string, unknown>): Promise<McpResult> {
   // "loop 2" : the Loop source, layer 2's picture
   const lp = String(args.shader ?? '').trim().toLowerCase().match(/^loop\s*:?\s*l?([1-4])$/)
   if (lp && layer !== 'bg') {
-    st().setSourceLoop(layer, slot, Number(lp[1]) - 1)
     const from = Number(lp[1]) - 1
+    const n = st().composition.layers.length
+    if (layer >= n || from >= n) fail(`This session has ${n} layers : "loop ${from + 1}" on L${layer + 1} is not there.`)
+    st().setSourceLoop(layer, slot, from)
     return { content: [text(`L${layer + 1}.${slot} now plays L${from + 1}'s picture (${from >= layer ? 'its last frame : a loop' : 'this frame : it is below'}).`)] }
   }
   const s = none ? null : findShader(args.shader, 'generator')

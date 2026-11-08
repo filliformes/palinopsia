@@ -156,7 +156,10 @@ class SilhouetteFinder {
   }
 
   private ensureWorker(): void {
-    if (this.worker || this.dead || this.status.state === 'failed') return
+    // (a failure is retried after a while : one bad load must not end every
+    // Silhouette effect until the app restarts)
+    if (this.worker || this.dead) return
+    if (this.status.state === 'failed' && performance.now() - this.failedAt < 30000) return
     try {
       const w = createBodyWorker()
       this.worker = w
@@ -174,11 +177,14 @@ class SilhouetteFinder {
     if (!this.idleTimer) this.idleTimer = setInterval(() => this.checkIdle(), 2000)
   }
 
+  private failedAt = 0
   private fail(msg: string): void {
     this.status.state = 'failed'
     this.status.error = msg
+    this.failedAt = performance.now()
     this.inFlight = null
     console.warn('[silhouette fx]', msg)
+    this.stopWorker() // (the dead worker is let go at once, not kept loaded)
   }
 
   /** Nobody drawing for a while : let the model go (it comes back on demand). */

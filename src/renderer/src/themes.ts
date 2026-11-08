@@ -464,7 +464,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'herringbone', name: 'Herringbone', family: 'Optical / Op-Art',
-    blurb: 'Tight woven greys haunted by ringing echoes.',
+    blurb: 'Tight woven grays haunted by ringing echoes.',
     world: 'parametric',
     palette: [INK, [0.2, 0.2, 0.22, 1], [0.8, 0.8, 0.78, 1]],
     sources: ['op-art', 'interference'],
@@ -842,7 +842,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'fog', name: 'Fog', family: 'Cinematic / Atmospheric',
-    blurb: 'A soft grey volume : one breathing mass under haze and blur.',
+    blurb: 'A soft gray volume : one breathing mass under haze and blur.',
     world: 'sublimated',
     palette: [K, [0.16, 0.18, 0.2, 1], [0.66, 0.68, 0.7, 1]],
     sources: ['membrane', 'swell', 'drift-field'],
@@ -930,7 +930,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'grid', name: 'Grid', family: 'Minimal / Structural',
-    blurb: 'Architectural greys : a breathing grid, quantised.',
+    blurb: 'Architectural grays : a breathing grid, quantised.',
     world: 'parametric',
     palette: [K, [0.2, 0.22, 0.24, 1], [0.78, 0.8, 0.82, 1]],
     sources: ['grid-drift', 'column-scan', 'contour', 'ten-print'],

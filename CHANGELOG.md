@@ -58,7 +58,7 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
     the dome the pattern lives in the azimuth and the distance from the zenith, so drops
     slide outward.
   - **Inflate glass, Relief glass** : **glass color split** (red bends least, blue most,
-    widest at the rim, after Orb, MIT) and **glass rim** (a bright edge where the glass
+    widest at the rim; the idea after Orb, MIT, no code taken) and **glass rim** (a bright edge where the glass
     turns away), both 0 by default; Inflate's preset **Prism glass**; every existing
     Relief / Inflate preset sets them to 0.
   - 10 Glass presets, 6 Rain presets, the chains **Behind Fluted Glass** and **Rainy
@@ -1484,6 +1484,68 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   518 px survived a cold relaunch; console errors 0.
 
 ### Fixed
+
+- **The release audit (11-08)** : five reviews of everything since v1.3.1 (control and
+  mapping, Sonify, the new sources, the engine, the UI and the release), no S1, every
+  finding fixed :
+  - **dataflou** : `configure` runs one at a time (two overlapping calls, React's double
+    effect in dev or a fast on / off, each started a node and the first was lost, still
+    on the mesh). The visualizer's server answers only this machine's own page : its Host
+    header and the WebSocket's origin must be `127.0.0.1` / `localhost` on its port
+    (another site in the browser could reach the mesh through it), a null byte in the path
+    is a 400.
+  - **MIDI** : a note's release always reaches the modulator inputs (it was dropped while
+    Learn was on, holding the envelope open); **learn** on a modulator input leaves a Learn
+    that was already on, on (it turned it off), and its stop clears only its target.
+  - **The Synth's velocity row** : the engine read the held `vel` as absolute where the
+    play side and Signal send it around 0.5 (as struck), so a fast thing came out 4.7 dB
+    down, a slow one 1.8 dB up, the range shrank from 8.7 to 2.2 dB and every note sat
+    2.4 dB low with the row at none. It reads `12 * (vel - 0.5)` now (the harness too); a
+    Steps re-strike counts its expression from that strike.
+  - **Score mode** : a new pass really ends every shape (they were matched again by
+    height, so a horizon held one note through every pass).
+  - **Signal Picture Play, TIE** : Signal's scale table is a new array only when its notes
+    change (a new array reads as a key change, so held grains slid instead of striking
+    while any Sonify control moved); held grains glide to their level and pan (~30 ms,
+    ramped across the block) instead of stepping 30 times a second.
+  - **Sonify** : MIDI Learn on Signal's rate while synced spans what plays (to 16);
+    `/opsia/sonify/synth/chorus` takes its names (`off`, `i`, `ii`); the Synth's engine
+    loads on its own catch, so a failure there leaves the rest of Sonify running.
+  - **Relief** : once the stroke log is full, the oldest stroke leaving it no longer
+    rebuilds the page on every stroke (a frame of up to 100K points, which wiped what the
+    wanderers drew); a rebuild fuses each stroke at its own logged size; the dome's melt
+    reads the material and color at the nearest texel (two brushes touching melted into a
+    third).
+  - **`pow()` of a negative base** (undefined in GLSL, NaN on some drivers : black) squared
+    by hand in the thin-film color, Sand Plate's black steel and the film damage scratches'
+    fringe; Glass and Inflate's glass clamp `1 - N.z`.
+  - **Inflate** : cavity darkens the glass too (the glass branch replaced the lit surface
+    after it).
+  - **The Inspector's gray-outs** : Relief's foil, film and flow controls no longer follow
+    the brush picked now (they shade every stroke of that material already drawn); rate
+    and speed gray out when following the moving things; Sand Plate's surface stays live
+    at plate opacity 0 (it sets the sand's grip) and `every` counts a modulated sync as on;
+    Fur's scale stays live at whorls 0 (it sizes the flow's bends).
+  - **Silhouette** : the source's presets all set the trail color (white where they set
+    none : after Matte comet, Key matte's echoes stayed red); the effect's model is retried
+    30 s after a failure, and the failed worker let go at once.
+  - **The loop's delay** : its programs are rebuilt after a GPU reset (the cache was keyed
+    on the context only, which a reset hands back with every program dead); its read-back
+    target is 8-bit (the ring is : 130 MB for a 4096 dome layer, not 200); an emptied
+    layer lets its ring go; echoes set in beats keep the beat at any global speed.
+  - **PANIC clears a layer's persisted frame** (a Loop source reads it back, so it was no
+    longer rewritten fresh : a self-loop or a Cross Loop survived PANIC), and the NaN
+    guard falls back to black when the source itself is the bad frame (it fell back to
+    the same NaN, every frame).
+  - A layer pasted from one that loops on itself loops on itself (it read the old layer);
+    the Agent refuses `loop N` past the session's layers (it reported success).
+  - Copy : "Grayed", "gray" in the tooltips and theme blurbs, no product names in the new
+    MIDI, OSC and Room tooltips.
+  - **Licenses** : `THIRD_PARTY_NOTICES.md` gains MediaPipe (with
+    `resources/mediapipe/LICENSE`, Apache-2.0), Holocloth (MIT, its full notice), d3's
+    ISC text and Orb (the idea only); the README's credits, counts (147 themes and Init,
+    61 effects, 30 native nodes) and the Glass rows (in the catalogue now) are brought up
+    to date; the OSC reference documents `loop N` for a source.
 
 - **Every layer reached the picture a frame late.** A layer's `texture()` returned
   `pp.out()` after persist had already swapped its ping-pong pair, so the blend stack and

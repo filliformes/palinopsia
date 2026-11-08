@@ -163,7 +163,10 @@ void main() {
     vec4 up = textureLod(uH, uv - down * px * 2.0, 0.0);
     float v = clamp(up.r * uMelt * 90.0, 0.0, 1.0);
     res = mix(c, up, v * 0.5);
-    res.gba = up.r > c.r ? up.gba : c.gba;
+    // (the material and color are indices : never blended, read at the nearest texel,
+    // or two brushes touching melt into a third on the dome's fractional offsets)
+    ivec2 upI = clamp(ivec2(floor((uv - down * px * 2.0) * RENDERSIZE)), ivec2(0), ivec2(RENDERSIZE) - 1);
+    res.gba = up.r > c.r ? texelFetch(uH, upI, 0).gba : c.gba;
     // and it softens as it runs
     vec4 nb = textureLod(uH, uv + vec2(px.x, 0.0), 0.0) + textureLod(uH, uv - vec2(px.x, 0.0), 0.0)
             + textureLod(uH, uv + vec2(0.0, px.y), 0.0) + textureLod(uH, uv - vec2(0.0, px.y), 0.0);
@@ -369,6 +372,8 @@ export class ReliefSource implements NativeGenerator {
   private pendingOps: readonly HandGestureLog[] | null = null
   private rawOps: readonly HandGestureLog[] | undefined = undefined
   private logN = 0
+  /** A rebuild's stroke size : it fuses as it was drawn (0 : the live knob). */
+  private fuseBase = 0
   private curMode = 0
   private cleared = false
   private compass: Prim[] = []
@@ -851,7 +856,7 @@ export class ReliefSource implements NativeGenerator {
 
   private combine(into: Target): void {
     const g = this.g
-    const fuse = this.baseSize() * (0.08 + 1.3 * Math.pow(Math.max(0, Math.min(1, num(this.inputs, 'fuse', 0.5))), 1.5))
+    const fuse = (this.fuseBase || this.baseSize()) * (0.08 + 1.3 * Math.pow(Math.max(0, Math.min(1, num(this.inputs, 'fuse', 0.5))), 1.5))
     this.combP.use().i1('uH', 0).i1('uS', 1).f2('RENDERSIZE', this.w, this.h)
       .f1('uMode', this.curMode).f1('uFuse', fuse).f1('uLevel', 0.018)
     g.bind(0, this.H![this.hi].tex)
@@ -883,6 +888,14 @@ export class ReliefSource implements NativeGenerator {
     // (a new empty log, and not just no log : Generate's blank page, whatever was drawn)
     const newPage = ops.length === 0 && this.rawOps !== undefined
     if (!newPage && grew && (ops.length === 0 || ops.length - prev.length <= 1) && this.logN >= ops.length) return
+    // the oldest left the full log (its cap) and at most our own new stroke came :
+    // the page keeps them, as it keeps what the wanderers drew (a rebuild here ran
+    // on every stroke, a frame of 100K points, and wiped what was never logged)
+    if (!newPage && ops.length && prev.length) {
+      const head = prev.indexOf(ops[0])
+      const kept = head > 0 ? prev.length - head : 0
+      if (head > 0 && ops.length - kept <= 1 && prev.slice(head).every((p, i) => ops[i] === p) && ops[ops.length - 1].id <= this.logN) return
+    }
     if (newPage) {
       // (what was being drawn stops too : its brush belongs to the last drawing)
       this.walkers.length = 0
@@ -898,6 +911,7 @@ export class ReliefSource implements NativeGenerator {
       const e = op.ev
       const [mat, color, mode, size, seed] = e
       this.curMode = mode
+      this.fuseBase = size
       this.inputs = { ...live, mirror: e[5], fold: e[6], chaos: e[7], convex: e[8], rough: e[9], ribs: e[10], dash: e[11], broken: e[12], fuse: e[13] }
       const x0 = e[HEAD], y0 = e[HEAD + 1]
       const st: Stroke = { x: x0, y: y0, along: 0, acc: 0, seed, mat, color, size, r: size, started: true, log: null, sinceDrop: 0, cx: x0, cy: y0, n: 0 }
@@ -914,6 +928,7 @@ export class ReliefSource implements NativeGenerator {
     }
     this.inputs = live
     this.curMode = keepMode
+    this.fuseBase = 0
   }
 
   render(targetFbo: WebGLFramebuffer, clockSec: number): void {

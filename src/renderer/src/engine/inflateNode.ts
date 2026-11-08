@@ -146,6 +146,21 @@ void main() {
   vec2 P = (vUV - 0.5) * uAspect;
   vec3 lit = shadeSurface(M, alb, N, uL, uAz, 0.3 + uGloss * 1.2, refl, reflAmt, uFilm, nm, P);
   float fr = 1.0;
+  if (uMat > 4.5 && uMat < 5.5) {
+    // glass : a picked layer bent by the shape, else the picture itself, the room on its shoulders
+    // red bends least, blue most (DISPERSION) : the split is widest at the rim, where
+    // the surface turns away (the idea after Orb, MIT; no code taken)
+    vec2 bo = N.xy * 0.14;
+    vec2 bur = vUV + bo * (1.0 - 0.3 * uDisp), bug = vUV + bo, bub = vUV + bo * (1.0 + 0.35 * uDisp);
+    vec3 bent = uHasSide > 0.5
+      ? vec3(texture(uSide, bur).r, texture(uSide, bug).g, texture(uSide, bub).b)
+      : vec3(texture(uHost, bur).r, texture(uHost, bug).g, texture(uHost, bub).b);
+    fr = pow(max(0.0, 1.0 - N.z), 3.0);
+    lit = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(vec3(0.0, 0.0, -1.0), N), uAz, P, N.z, 0.05) * (0.08 + 0.75 * fr);
+    // the rim : a bright thin edge where the glass turns away
+    lit += vec3(0.92, 0.96, 1.0) * pow(max(0.0, 1.0 - N.z), 4.0) * uRim * 0.9;
+  }
+  // (after the glass, which replaces the lit surface : its creases darken too)
   // cavity : the creases between swellings get less of the room (the slope's divergence :
   // a valley is positive)
   if (uCav > 0.0) {
@@ -153,20 +168,6 @@ void main() {
     float cur = (texture(uH, vUV + vec2(g.x, 0.0)).g - texture(uH, vUV - vec2(g.x, 0.0)).g) / (2.0 * g.x * uAspect.x)
               + (texture(uH, vUV + vec2(0.0, g.y)).b - texture(uH, vUV - vec2(0.0, g.y)).b) / (2.0 * g.y * uAspect.y);
     lit *= 1.0 - uCav * 0.8 * clamp(cur * uVolume * 0.06, 0.0, 1.0);
-  }
-  if (uMat > 4.5 && uMat < 5.5) {
-    // glass : a picked layer bent by the shape, else the picture itself, the room on its shoulders
-    // red bends least, blue most (DISPERSION) : the split is widest at the rim, where
-    // the surface turns away (after Orb, MIT)
-    vec2 bo = N.xy * 0.14;
-    vec2 bur = vUV + bo * (1.0 - 0.3 * uDisp), bug = vUV + bo, bub = vUV + bo * (1.0 + 0.35 * uDisp);
-    vec3 bent = uHasSide > 0.5
-      ? vec3(texture(uSide, bur).r, texture(uSide, bug).g, texture(uSide, bub).b)
-      : vec3(texture(uHost, bur).r, texture(uHost, bug).g, texture(uHost, bub).b);
-    fr = pow(1.0 - N.z, 3.0);
-    lit = bent * (0.86 + 0.2 * N.z) + roomAt(reflect(vec3(0.0, 0.0, -1.0), N), uAz, P, N.z, 0.05) * (0.08 + 0.75 * fr);
-    // the rim : a bright thin edge where the glass turns away
-    lit += vec3(0.92, 0.96, 1.0) * pow(1.0 - N.z, 4.0) * uRim * 0.9;
   }
   // the shadow it throws on what is outside it
   float sh = 0.0;

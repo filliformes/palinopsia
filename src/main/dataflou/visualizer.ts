@@ -79,13 +79,26 @@ function countChanged(): void {
   if (n && !timer) tick()
 }
 
+/** Only this machine's own page : another site in the browser (or a name rebound to
+ *  127.0.0.1) must not reach the mesh through it. */
+const ownHost = (h: string | undefined): boolean => h === `127.0.0.1:${port}` || h === `localhost:${port}`
+const ownOrigin = (o: string | undefined): boolean => o === `http://127.0.0.1:${port}` || o === `http://localhost:${port}`
+
 function serveFile(req: http.IncomingMessage, res: http.ServerResponse): void {
+  if (!ownHost(req.headers.host)) {
+    res.writeHead(403).end()
+    return
+  }
   const root = resolve(visualizerDir())
   let p = '/'
   try {
     p = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname)
   } catch {
     /* a malformed path : the index */
+  }
+  if (p.includes('\0')) {
+    res.writeHead(400).end()
+    return
   }
   if (p.endsWith('/')) p += 'index.html'
   const file = resolve(join(root, normalize(p)))
@@ -149,7 +162,7 @@ async function start(): Promise<void> {
   })
   port = (s.address() as { port: number }).port
   server = s
-  wss = new WebSocketServer({ server: s, path: '/ws' })
+  wss = new WebSocketServer({ server: s, path: '/ws', verifyClient: (info: { origin: string; req: http.IncomingMessage }) => ownOrigin(info.origin) && ownHost(info.req.headers.host) })
   wss.on('connection', (ws) => {
     ws.on('message', (d) => onMessage(ws, String(d)))
     ws.on('close', () => countChanged())

@@ -1677,6 +1677,8 @@ interface StoreState {
   deleteLayerPreset: (presetId: string) => void
   // Volatile layer clipboard : copy one layer's whole state, paste onto another.
   copiedLayer: LayerState | null
+  /** The layer it was copied from (a Loop source on itself stays a loop when pasted). */
+  copiedLayerFrom: number
   copyLayer: (layer: number) => void
   pasteLayer: (layer: number) => void
   // Right-side panel view : Layers strips, the compact Mixer (M key), or the
@@ -2991,17 +2993,24 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
 
   copiedLayer: null,
+  copiedLayerFrom: -1,
   copyLayer: (layer) =>
     set((s) => {
       const l = s.composition.layers[layer]
       if (!l) return s
       // Deep snapshot so later edits to the source layer don't mutate the copy.
-      return { copiedLayer: structuredClone(l) }
+      return { copiedLayer: structuredClone(l), copiedLayerFrom: layer }
     }),
   pasteLayer: (layer) =>
     set((s) => {
       const src = s.copiedLayer
       if (!src || layerHeld(s, layer)) return s
+      // a Loop source on its own layer reads the layer it is pasted on (else a copy, not a loop)
+      const from = s.copiedLayerFrom
+      const reLoop = (sl: SourceSlot | null): SourceSlot | null =>
+        sl && sl.kind === 'feedback' && sl.feedbackLayer === from && from !== layer
+          ? { ...sl, feedbackLayer: layer, mediaId: `layer:${layer}`, mediaName: `L${layer + 1}'s picture` }
+          : sl
       const composition = {
         ...s.composition,
         layers: updateLayer(s.composition.layers, layer, (l) => ({
@@ -3009,6 +3018,8 @@ export const useStore = create<StoreState>((set, get) => ({
           // Keep the target's identity; fresh FX ids so the mod-matrix can't
           // alias between the copied layer and this one (same as presets).
           id: l.id,
+          sourceA: reLoop(structuredClone(src.sourceA)) as SourceSlot,
+          sourceB: reLoop(src.sourceB ? structuredClone(src.sourceB) : null),
           sourceAFx: src.sourceAFx.map((f) => ({ ...f, id: uid() })),
           sourceBFx: src.sourceBFx.map((f) => ({ ...f, id: uid() })),
           fx: src.fx.map((f) => ({ ...f, id: uid() })),
@@ -4066,7 +4077,8 @@ export const useStore = create<StoreState>((set, get) => ({
       return { midiMap, ...one, ...done }
     }),
   learnOnce: null,
-  learnModInput: (id) => set({ midiLearnMode: true, midiLearnTarget: id, learnOnce: id }),
+  // (learn once only when Learn was off : a Learn already on stays on after the binding)
+  learnModInput: (id) => set((s) => ({ midiLearnMode: true, midiLearnTarget: id, learnOnce: s.midiLearnMode && !s.learnOnce ? null : id })),
   forgetModInput: (id) => {
     const st = get()
     for (const scope of ['computer', 'session'] as const) {

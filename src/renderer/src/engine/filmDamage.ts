@@ -234,7 +234,8 @@ void main(){
       float gap = smoothstep(0.2, 0.32, n1(t * 0.55, sd + 5u));
       float taper = smoothstep(0.0, 0.35, t) * smoothstep(0.0, 0.35, b.w - s);
       float cov = clamp(min(dx - lo, hi - dx) / px + 0.5, 0.0, 1.0) * min(1.0, max(hi - lo, 0.0) / px);
-      float lobe = wv > px ? exp(-pow((d - 1.4 * wv) / (0.6 * wv), 2.0)) * 0.18 : 0.0; // faint fringe
+      float lq = (d - 1.4 * wv) / max(0.6 * wv, 1e-6); // (squared by hand : pow() of a negative is undefined)
+      float lobe = wv > px ? exp(-lq * lq) * 0.18 : 0.0; // faint fringe
       float amt = str * gap * taper;
       int ty = int(b.y + 0.5);
       float dp = cc.y * 3.0;

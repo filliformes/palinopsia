@@ -205,7 +205,7 @@ export function OscPanel(): JSX.Element {
             </div>
             <div
               className="font-mono text-[9px] leading-relaxed text-muted"
-              title="Any address outside /opsia (a TouchOSC layout, a Max patch, a phone) : turn on MIDI Learn, click a control, move the controller's. Its mappings, ranges and reply ports are in the MIDI section's list."
+              title="Any address outside /opsia (a phone or tablet layout, a patch, another program) : turn on MIDI Learn, click a control, move the controller's. Its mappings, ranges and reply ports are in the MIDI section's list."
             >
               any other address : <span className="text-text">OSC Learn</span> (MIDI Learn, then move it)
             </div>

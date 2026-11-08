@@ -375,7 +375,7 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox, lane = false }: {
           <Row label="reads" hint="When the picture is read">
             <Seg
               options={['color', 'cuts'] as const} value={ks.picSource} onChange={(v) => p({ picSource: v })}
-              title={(v) => (v === 'color' ? "On the clock : the picture's color and brightness choose the key (a grey picture keeps its root)" : 'At each scene cut (the whole picture changing at once), a new key read off the new picture')}
+              title={(v) => (v === 'color' ? "On the clock : the picture's color and brightness choose the key (a gray picture keeps its root)" : 'At each scene cut (the whole picture changing at once), a new key read off the new picture')}
             />
           </Row>
           <RangeRow

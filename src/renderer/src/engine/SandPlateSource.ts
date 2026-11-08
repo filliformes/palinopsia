@@ -306,7 +306,8 @@ vec3 surface(vec2 P, vec2 F, vec2 L, out float mirror) {
     // black steel : a near-black sheet, faintly brushed, one soft wash of light
     float br = streak(P, fine * 0.3);
     vec3 c = uPlateCol * (0.72 + 0.5 * big) * (0.97 + 0.06 * br);
-    float wash = exp(-pow(dot(F, vec2(-L.y, L.x)) * 1.5, 2.0));
+    float wq = dot(F, vec2(-L.y, L.x)) * 1.5; // (squared by hand : pow() of a negative is undefined)
+    float wash = exp(-wq * wq);
     return c + uSheen * wash * (0.018 + 0.012 * br) * (vec3(0.8, 0.86, 1.0) + uPlateCol * 4.0);
   }
   if (s < 1.5) {
