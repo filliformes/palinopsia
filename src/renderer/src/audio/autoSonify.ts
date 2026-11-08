@@ -62,7 +62,7 @@ const AFFINITY: Array<[RegExp, Voice, number]> = [
   // they color a set rather than demote its anchor.
   [/^(lowercase)$/, 'signal', 4],
   [/^(ten-print|grid-drift|slabs|shapes|op-art|column-scan)$/, 'signal', 2],
-  [/^(fx-pixelmask|fx-threshold|fx-dither|fx-posterize|fx-pixelate)$/, 'signal', 2]
+  [/^(fx-pixelmask|fx-threshold|fx-dither|fx-halftone|fx-riso|fx-posterize|fx-pixelate)$/, 'signal', 2]
 ]
 
 function scoreId(id: string | null | undefined, into: Map<Voice, number>, weightMul = 1): void {

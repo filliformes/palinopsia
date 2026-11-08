@@ -15,6 +15,32 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Print : Dither grows nine patterns and an ink, Halftone and Riso are new** (Vincent :
+  "build #7 : Dither, halftone and print"). A new picker group, **Print**.
+  - **Dither** (`fx/Dither.fs`, same id, the old defaults : 4x4 Bayer per channel) :
+    **pattern** Bayer 2x2 / 4x4 / 8x8 (the 8x8 from the 4x4 recursed, no table), blue noise
+    (white noise minus its 8 neighbors' mean, spread back to even through a tanh of its
+    bell : interleaved-gradient noise drew diagonal stripes), white noise boiling on an
+    integrated phase, clustered dots, line screen, cross-hatch (their thresholds remapped to
+    an even spread : area share for the dots, 1 - (1 - m)^2 for the hatch, or the midtones
+    print dark), and the diffusion look (local contrast, then the even threshold : a serial
+    error diffusion can't be one fragment pass). **color** : colors / gray / ink on paper;
+    **angle**; **boil**. Every existing preset sets the new controls to the old defaults.
+  - **Halftone** (`fx/Halftone.fs`) : a turned grid, each cell's tone read at its middle,
+    the dot of that coverage in five shapes (the size-for-coverage law per shape; round dots
+    close up to solid past 72% as on press), each pixel taking its own cell's and its four
+    neighbors' dots. Modes : ink on paper, two inks (dark + saturated part), CMYK (the
+    classic separation, 15 / 75 / 0 / 45, process inks multiplied on the paper, plates slipped
+    by **misregister**), color dots of light on black. **dot gain**, **soft**, **grit**.
+  - **Riso** (`fx/Riso.fs`) : two or three spot inks; the separation a few rounds of
+    non-negative least squares on the inks' absorbances per pixel; each plate its own
+    misregistration (dealt by **seed**, wandering by **drift**), its own screen (grain, dots,
+    lines at its own angle), ink **starve** in patches and drum streaks, multiply overprint
+    on paper with its **tooth**.
+  - Presets (Dither +11, Halftone 12, Riso 9), the chains **Newsprint**, **CMYK Press**,
+    **Riso Zine**, **Ink on Paper**, the theme **Print Shop** (Living Surfaces), Inspector
+    groups and grey-outs, Sonify's automatic routing hears them as signal.
+
 - **The glass family : Glass, Rain on Glass, and a color split for Inflate's and Relief's
   glass** (Vincent : "#4 : A glass family"). A new picker group, **Glass**.
   - **Glass** (`fx/Glass.fs`, ISF) : a height per pattern (fluted columns, reeds, rippled

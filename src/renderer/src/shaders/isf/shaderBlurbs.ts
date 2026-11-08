@@ -42,6 +42,10 @@ export const SHADER_BLURBS: Record<string, string> = {
   // ── Stylize ──────────────────────────────────────────────────────────
   'fx-dither':
     'Reduces the image to very few tones, then uses a fine grid of dots to fake the shades in between. It is how old newspapers and early computers showed gradients. Gives a crisp, printed texture rather than a smooth blur.',
+  'fx-halftone':
+    'The picture as a printed screen of dots : one ink on paper, two inks, or CMYK with every plate at its own angle and slightly out of register, or its own colors as dots of light on black.',
+  'fx-riso':
+    'The picture printed on a risograph : separated into two or three spot inks, each plate grainy and slightly out of register, starved of ink in patches, overprinted on paper.',
   'fx-pixelate':
     'Reduces the picture to square blocks of one color each, so detail disappears into a coarse mosaic. Each block takes its center pixel by default, which sparkles as detail moves; the average control calms it. The blocks stay properly square regardless of the frame shape. Pairs naturally with Posterize and Dither for a fully digital-looking treatment.',
   'fx-edge':
