@@ -1691,8 +1691,12 @@ export class ISFLayer {
     return kind === 'layer' ? this.rackLayer : kind === 'sourceA' ? this.rackA : kind === 'sourceB' ? this.rackB : this.rackLoop;
   }
 
-  /** The persisted (post-feedback) frame : what the blend stack composites. */
-  texture(): WebGLTexture { return this.pp.out(); }
+  /** The persisted (post-feedback) frame : what the blend stack composites.
+   *  `read()`, not `out()` : persist swaps right after it draws, so by the time
+   *  anything reads the layer, `out()` is the buffer from the frame BEFORE (it
+   *  was : every layer reached the stack and every sidechain a frame late).
+   *  Before this frame's persist, read() is the last frame : the newest there is. */
+  texture(): WebGLTexture { return this.pp.read(); }
 
   /** PANIC : flush this layer's self-feeding buffers — the three FX racks' native
    *  nodes and the reaction-diffusion feedback ping-pong (dropped, recreated black
