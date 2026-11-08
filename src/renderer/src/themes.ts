@@ -1260,6 +1260,19 @@ export const THEMES: Theme[] = [
     motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
+    id: 'print-shop', name: 'Print Shop', family: 'Living Surfaces',
+    blurb: 'The picture run off a press : newsprint dots, CMYK slipping out of register, riso inks starved on the drum, a dithered ink on paper.',
+    world: 'parametric',
+    palette: [[0.08, 0.08, 0.1, 1], [0.5, 0.48, 0.45, 1], [0.95, 0.93, 0.88, 1]],
+    sources: ['organic', 'shapes', 'congeal', 'filaments', 'dye-field', 'gen-text'],
+    stackFx: [['fx-halftone', 'fx-riso', 'fx-dither']],
+    presets: { 'fx-halftone': ['Newsprint', 'CMYK', 'Cheap CMYK', 'Two inks', 'Line screen', 'Comic'], 'fx-riso': ['Pink and blue', 'Three inks', 'Teal and orange', 'Black and red', 'Riso dots', 'Worn drum'], 'fx-dither': ['Ink on paper', 'Diffused print', 'Line engraving', 'Cross-hatch', 'Blueprint'] },
+    layerFx: [],
+    blends: ['normal', 'multiply'], layers: [1, 1], useB: 0.4, feedback: 0, density: 0.5, drift: 0.15,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 }
+  }),
+  mk({
     id: 'glasshouse', name: 'Glasshouse', family: 'Living Surfaces',
     blurb: 'A soft world seen through glass : fluted, reeded, cathedral or rained on, the color split at every edge.',
     world: 'sublimated',

@@ -51,6 +51,8 @@ import differential from './Differential.fs?raw'
 import solidColor from './SolidColor.fs?raw'
 import posterize from './fx/Posterize.fs?raw'
 import dither from './fx/Dither.fs?raw'
+import halftone from './fx/Halftone.fs?raw'
+import riso from './fx/Riso.fs?raw'
 import chromaShift from './fx/ChromaShift.fs?raw'
 import pixelate from './fx/Pixelate.fs?raw'
 import displace from './fx/Displace.fs?raw'
@@ -2048,7 +2050,15 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-dither', name: 'Dither', category: 'FX', source: dither,
-    curated: { levels: [2, 5], scale: [1, 4], amount: [0.6, 1] }
+    curated: { levels: [2, 5], scale: [1, 4], amount: [0.6, 1], pattern: [0, 8], color: [0, 2], angle: [0, 3.1416], boil: [0, 0.3] }
+  },
+  {
+    id: 'fx-halftone', name: 'Halftone', category: 'FX', source: halftone,
+    curated: { mode: [0, 3], cell: [5, 18], angle: [0, 1.5708], shape: [0, 4], gain: [-0.1, 0.25], soft: [0.05, 0.45], grit: [0, 0.5], misreg: [0, 0.4], amount: [0.85, 1] }
+  },
+  {
+    id: 'fx-riso', name: 'Riso', category: 'FX', source: riso,
+    curated: { inks: [2, 3], screen: [0, 2], cell: [2, 6], contrast: [0.9, 1.4], misreg: [0.1, 0.6], drift: [0, 0.4], seed: [0, 100], starve: [0.1, 0.5], tooth: [0.1, 0.5], amount: [0.85, 1] }
   },
   {
     id: 'fx-chroma-shift', name: 'Chroma Shift', category: 'FX', source: chromaShift,

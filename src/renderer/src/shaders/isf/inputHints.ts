@@ -1102,7 +1102,43 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   'fx-dither': {
     levels: 'Tones per color channel (whole numbers : 2 = pure on / off).',
     scale: 'Dot cell size in 1080p pixels, rounded to whole pixels (it scales with the output).',
-    amount: 'Dry/wet : 0 = the untouched picture, 1 = fully dithered.'
+    amount: 'Dry/wet : 0 = the untouched picture, 1 = fully dithered.',
+    pattern: 'How the steps break up : Bayer 2x2 / 4x4 / 8x8 (ordered, coarse to fine), blue noise (even, no pattern), white noise (grainy; BOIL re-rolls it), clustered dots (a halftone), a line screen, a cross-hatch, or the diffusion look (even grain, crisp detail).',
+    color: 'Colors (each channel on its own), gray levels, or ink on paper (the two colors below).',
+    ink: 'Ink on paper : the darkest tone.',
+    paper: 'Ink on paper : the lightest tone.',
+    angle: 'Turns the clustered dots, the lines and the hatch.',
+    boil: 'White noise : how fast the grain re-rolls (0 holds it still).'
+  },
+  'fx-halftone': {
+    mode: 'One ink on paper, two inks (the dark and the color), CMYK (four plates at their own angles), or the picture\'s own colors as dots of light on black.',
+    cell: 'The dot pitch, in 1080p pixels.',
+    angle: 'Turns the screen (CMYK keeps its plates 30 degrees apart, turned together).',
+    shape: 'The dot : round, square, diamond, a line, an ellipse.',
+    gain: 'Swells (or thins) the dots as wet ink does : the midtones darken.',
+    soft: 'How soft the dot edges are.',
+    grit: 'Ragged dot edges, as on rough paper.',
+    misreg: 'The plates slip apart (CMYK and two inks).',
+    ink: 'The ink (the dark plate in two inks).',
+    ink2: 'Two inks : the second ink, the color.',
+    paper: 'The paper.',
+    amount: 'Dry/wet.'
+  },
+  'fx-riso': {
+    inks: 'Two or three spot inks.',
+    ink1: 'The first ink.',
+    ink2: 'The second ink.',
+    ink3: 'The third ink (three inks).',
+    screen: 'Each plate\'s screen : the riso\'s own grain, dots, or lines (each plate at its own angle).',
+    cell: 'The grain or dot size, in 1080p pixels.',
+    contrast: 'How hard the picture is pushed before it is separated.',
+    misreg: 'How far the plates sit out of register.',
+    drift: 'How fast they wander.',
+    seed: 'Deals another print : the plates fall elsewhere, the ink runs short elsewhere.',
+    starve: 'Ink running short : pale patches, streaks along the drum.',
+    paper: 'The paper.',
+    tooth: 'The paper\'s own grain.',
+    amount: 'Dry/wet.'
   },
   'fx-threshold': {
     soft: 'Width of the transition around the level : 0 = a hard edge.',

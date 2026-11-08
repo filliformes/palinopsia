@@ -859,6 +859,27 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Print : the whole picture printed ──
+  {
+    name: 'Newsprint', group: 'Relief',
+    fx: [{ shaderId: 'fx-halftone', inputs: {mode: 0, cell: 7, angle: 0.785, shape: 0, gain: 0.08, soft: 0.2, grit: 0.3, misreg: 0.15, ink: [0.08, 0.08, 0.1, 1], ink2: [0.86, 0.24, 0.2, 1], paper: [0.95, 0.93, 0.88, 1], amount: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'CMYK Press', group: 'Relief',
+    fx: [{ shaderId: 'fx-halftone', inputs: {mode: 2, cell: 8, angle: 0.785, shape: 0, gain: 0.08, soft: 0.2, grit: 0.2, misreg: 0.3, ink: [0.08, 0.08, 0.1, 1], ink2: [0.86, 0.24, 0.2, 1], paper: [0.95, 0.93, 0.88, 1], amount: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1.05, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Riso Zine', group: 'Relief',
+    fx: [{ shaderId: 'fx-riso', inputs: {inks: 2, ink1: [1, 0.28, 0.55, 1], ink2: [0, 0.47, 0.75, 1], ink3: [1, 0.91, 0, 1], screen: 0, cell: 3, contrast: 1.1, misreg: 0.35, drift: 0.15, seed: 7, starve: 0.3, paper: [0.95, 0.93, 0.88, 1], tooth: 0.3, amount: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Ink on Paper', group: 'Relief',
+    fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Glass : the whole picture behind a pane ──
   {
     name: 'Behind Fluted Glass', group: 'Relief',

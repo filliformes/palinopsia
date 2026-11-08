@@ -172,6 +172,19 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('rain', 'drops', 'size', 'slide', 'trails'),
     g('glass', 'fog', 'bend', 'shine', 'tint')
   ],
+  // Print : the screen · the inks
+  'fx-dither': [
+    g('screen', 'pattern', 'levels', 'scale', 'angle', 'boil'),
+    g('color', 'color', 'ink', 'paper', 'amount')
+  ],
+  'fx-halftone': [
+    g('screen', 'mode', 'cell', 'angle', 'shape', 'gain', 'soft', 'grit'),
+    g('inks', 'ink', 'ink2', 'paper', 'misreg', 'amount')
+  ],
+  'fx-riso': [
+    g('inks', 'inks', 'ink1', 'ink2', 'ink3', 'paper', 'contrast', 'amount'),
+    g('print', 'screen', 'cell', 'misreg', 'drift', 'seed', 'starve', 'tooth')
+  ],
   'fx-thinfilm': [
     g('film', 'thickness', 'follow', 'lean', 'ior', 'keep'),
     g('currents', 'swirl', 'scale', 'rate', 'amount')
@@ -347,6 +360,26 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
     if (is('brush', 0) || is('brush', 6)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'This brush has no reflection to flow.')
+    return d
+  },
+  'fx-dither': ({ is, isnt }) => {
+    const d: Why = {}
+    if (isnt('color', 2)) put(d, ['ink', 'paper'], 'Only ink on paper uses the two colors.')
+    if (isnt('pattern', 5) && isnt('pattern', 6) && isnt('pattern', 7)) put(d, ['angle'], 'Only the clustered dots, the lines and the hatch turn.')
+    if (isnt('pattern', 4)) put(d, ['boil'], 'Only the white noise boils.')
+    return d
+  },
+  'fx-halftone': ({ is, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 1)) put(d, ['ink2'], 'Only two inks has a second ink.')
+    if (is('mode', 2) || is('mode', 3)) put(d, ['ink'], 'CMYK prints its own process inks; the color dots are the picture\'s.')
+    if (is('mode', 3)) put(d, ['paper'], 'The color dots sit on black.')
+    if (is('mode', 0) || is('mode', 3)) put(d, ['misreg'], 'One plate : nothing to slip apart.')
+    return d
+  },
+  'fx-riso': ({ isnt }) => {
+    const d: Why = {}
+    if (isnt('inks', 3)) put(d, ['ink3'], 'Two inks : the third is not printed.')
     return d
   },
   'node-drape': ({ is, isnt }) => {
