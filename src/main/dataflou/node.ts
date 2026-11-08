@@ -899,6 +899,7 @@ export class DataflouNode {
       declareBytes: this.declSize,
       actions: 0,
       actionsDropped: 0,
+      companion: null,
       visualizer: this.visualizerClients,
       visualizerAvailable: false
     }

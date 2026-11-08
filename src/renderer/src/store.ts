@@ -277,7 +277,9 @@ function loadDataflou(): DfConfig {
         enabled: !!j.enabled,
         label: typeof j.label === 'string' && j.label.trim() ? j.label.slice(0, 32) : DF_DEFAULT_CONFIG.label,
         universe: typeof j.universe === 'string' && j.universe.trim() ? j.universe.slice(0, 32) : DF_DEFAULT_CONFIG.universe,
-        actions: !!j.actions
+        // (on for everyone once : it first shipped off, and every action belongs
+        // on the mesh; `v` 2 marks a choice made since)
+        actions: (j as { v?: number }).v === 2 ? !!j.actions : true
       }
     }
   } catch {
@@ -4696,7 +4698,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const dataflou = { ...s.dataflou, ...patch }
       try {
-        localStorage.setItem('opsia.dataflou', JSON.stringify(dataflou))
+        localStorage.setItem('opsia.dataflou', JSON.stringify({ ...dataflou, v: 2 }))
       } catch {
         /* a full quota must never break an edit */
       }

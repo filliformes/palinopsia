@@ -3653,19 +3653,31 @@ left out, as the core's own terse DECLARE does) :
 | ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
-**actions** (beside the universe, off by default) adds every action of the Body rule list
-as a destination too : the layers' moves, Randomize, scenes, Worlds, Generate, the Macro
-knobs and modulators, Feel, tempo and key, the Sonify voices, the transport, the output,
-your own Body rules and the triggers of what is loaded, under `act/<heading>/<action>`
-(`act/l1/mute`, `act/scene/3`, `act/sonify/voice-8`, `act/feel/density-up`...). Each is a
-trigger : it fires once as it goes on (0.5 or more), and again only after it went off. The
-list follows the session (a new scene, a rule, an effect with a trigger) and the other
-nodes see the new tree a moment later. About 280 actions in a fresh session make the tree
-about 26 KB : fine between computers (a frame stops at 32 KB; a session that would pass it
-leaves its last actions out, and the section says how many), too big for a microcontroller
-node, so leave them off on a universe that has one (the section warns past 8 KB). A
-reference C++ node keeps the first 128 entries of a tree : it sees all of the above, not
-the actions.
+**actions** (beside the universe, on by default) adds every action of the Body rule list
+as a destination too, all of them : the layers' moves, Randomize, scenes, Worlds, Generate,
+the Macro knobs and modulators, Feel, tempo and key, the Audio Layer, the Sonify voices, the
+transport, the output, the session, your own Body rules and the triggers of what is loaded,
+under `act/<heading>/<action>` (`act/l1/mute`, `act/scene/3`, `act/sonify/voice-8`,
+`act/feel/density-up`...). Each is a trigger : it fires once as it goes on (0.5 or more), and
+again only after it went off. The list follows the session (a new scene, a rule, an effect
+with a trigger) and the other nodes see the new tree a moment later.
+
+One node's tree travels in one frame, and a frame stops at 32 KB : the whole list does not
+fit in one. So Palinopsia runs **two nodes** while the actions are on. The first, under your
+name, carries the destinations and sources above and the actions that are always there (the
+layers, the Background, Randomize, the effects' chains, Generate, Macro, Feel, tempo and
+sound, Sonify, the transport, the output, the session) : about 240 actions, 23 KB. The
+second, `<name>-session`, carries the ones that follow the session : the scenes, the Worlds,
+the modulators, the Body rules and the triggers of what is loaded (120 scenes and 40 rules
+make about 270 actions, 20 KB). Each heading always lands on the same node and the second
+node keeps the same identity from run to run, so a wire to an action never moves; its wires
+are kept like the first node's. The section counts both (and says if a list ever outgrew
+its frame) and leaves the second node out of the other nodes. Turning **actions** off
+stops it and has every node forget it.
+
+Too big for a microcontroller node (it takes 8 KB frames, and the section warns past it) :
+turn **actions** off on a universe that has one. A reference C++ node keeps the first 128
+entries of a tree : it sees all of the destinations and sources above, not the actions.
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1
 here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own destinations

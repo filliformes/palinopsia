@@ -24,7 +24,7 @@ const SIGNAL_BY_PATH = new Map<string, string>([
 
 const EMPTY: DfStatus = {
   running: false, error: null, sku: '', label: '', universe: '', address: '', tcpPort: 0, udpPort: 0,
-  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, actions: 0, actionsDropped: 0,
+  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, actions: 0, actionsDropped: 0, companion: null,
   visualizer: 0, visualizerAvailable: false
 }
 

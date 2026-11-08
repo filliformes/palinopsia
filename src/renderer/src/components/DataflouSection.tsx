@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { dataflouBind, openDataflouVisualizer, useDataflouStatus } from '../dataflou'
 import { showToast } from './Toast'
-import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, type DfNodeView, type DfParam } from '@shared/dataflou'
+import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfNodeView, type DfParam } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -34,7 +34,8 @@ export function DataflouSection(): JSX.Element {
   useEffect(() => setName(cfg.label), [cfg.label])
   useEffect(() => setUniv(cfg.universe), [cfg.universe])
 
-  const others = st.nodes.filter((n) => !n.local)
+  // (our session node is ours : not one of the others)
+  const others = st.nodes.filter((n) => !n.local && n.sku !== st.companion?.sku)
   const online = others.filter((n) => n.online).length
   const nameOf = (sku: string): string => (sku === st.sku ? st.label || 'palinopsia' : st.nodes.find((n) => n.sku === sku)?.label ?? sku.slice(0, 8))
   const connections = st.nodes.flatMap((n) =>
@@ -108,9 +109,10 @@ export function DataflouSection(): JSX.Element {
               onClick={() => setCfg({ actions: !cfg.actions })}
               className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] ${cfg.actions ? 'border-accent/60 text-accent' : 'border-border text-muted hover:text-text'}`}
               title={
-                'Every action of the Body rule list (scenes, layers, Randomize, Sonify voices, the transport, your rules...) as a destination, ' +
-                'a trigger each under act/ : it fires once as it goes on. The list follows the session. ' +
-                'Off by default : the tree then grows past what a small board (Teensy, ESP32) takes, so keep it off on a mesh that has one.'
+                'Every action of the Body rule list as a destination, a trigger each under act/ : it fires once as it goes on. ' +
+                'The layers, Randomize, Generate, Macro, Feel, tempo and sound, Sonify, the transport and the output on this node; ' +
+                'the scenes, Worlds, modulators, Body rules and the triggers of what is loaded (they follow the session) on a second node, ' +
+                `${dfSessionLabel(cfg.label)}. On by default. Turn it off on a mesh that has a small board (Teensy, M5) : the trees then grow past what it takes.`
               }
             >
               actions : {cfg.actions ? 'on' : 'off'}
@@ -145,6 +147,14 @@ export function DataflouSection(): JSX.Element {
                   <>
                     {' '}
                     + <span className="text-text">{st.actions}</span> actions from the Body rule list
+                    {st.companion && (
+                      <>
+                        {' '}
+                        (<span className="text-text">{st.actions - st.companion.actions}</span> here,{' '}
+                        <span className="text-text">{st.companion.actions}</span> on <span className="text-accent">{st.companion.label}</span> : the scenes, Worlds,
+                        modulators, Body rules and loaded triggers)
+                      </>
+                    )}
                   </>
                 )}
                 {st.actionsDropped > 0 && <span className="text-danger"> ({st.actionsDropped} left out : too many for one frame)</span>}
@@ -184,7 +194,7 @@ export function DataflouSection(): JSX.Element {
                   <span className="font-mono text-[9px] text-muted">nothing wired yet : open a node above to wire it to Palinopsia</span>
                 )}
                 {connections.map(({ node, dest, src }) => {
-                  const ours = node.local || src.sku === st.sku
+                  const ours = node.local || node.sku === st.companion?.sku || src.sku === st.sku
                   return (
                     <div key={`${node.sku}/${dest}<${src.sku}/${src.path}`} className="flex min-w-0 items-center gap-1 font-mono text-[9px]">
                       <span className={`min-w-0 truncate ${ours ? 'text-text' : 'text-muted'}`} title={`${nameOf(src.sku)}/${src.path} → ${node.label}/${dest}`}>
