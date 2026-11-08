@@ -283,7 +283,11 @@ size, the frame rate and the big preview's switch. They stay quiet until your mo
 column's tabs, the lens a slider becomes while you hold it, `Ctrl+K` and the messages) sits
 above the canvas, so it is never in the outputs, NDI or recordings. Every button keeps
 its shape with a little of it too, the dropdowns and the chips with them : a lit rim, a sheen
-fading down, a shade at the foot (no see-through there, so it costs nothing). Turn it off with
+fading down, a shade at the foot (no see-through there, so it costs nothing). The sections
+get a gentler version (the layer cards, the Inspector, Master FX, the Mixer, Feel, the
+finishing units, the Connect sections, the pages' cards : a lit top edge, a glow that fades
+within the first lines, a soft lift; the long bars their top edge only), and the right
+column's selected tab is the only one in a glass capsule. Turn it off with
 **interface glass** in the **performance** tab (plain dark chips, remembered on this
 computer); an installation runs without it. A slider's line is a string while you hold it : it
 bends toward your hand and rings when you let go, and the left capsule's scene name scrambles into

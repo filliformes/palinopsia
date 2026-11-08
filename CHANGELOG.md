@@ -998,6 +998,16 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **The sections get a gentler glass than the buttons** (Vincent : "add something like this to
+  the other sections, like the Inspector and Master FX sections, all the layers (including BG
+  and AU), and other sections [...] just so I can see where it can go"; then "merge it all").
+  One rule in styles.css on every rounded, bordered box in a panel color (the layer cards BG,
+  L1-L4, AU, the Inspector, Master FX, the Mixer and its columns, Feel, the finishing units, the
+  Connect sections, the pages' cards) : a lit top edge, a glow fading within the first 90 px
+  whatever the height, a soft lift; the top bar, the modulation strip, the bottom bar and the
+  Connect sections take their top edge only. The previews (black) stay out; `.no-sheen` opts
+  out; plain with interface glass off. Test copy : 11 boxes in the main view, Mixer 10, Feel
+  13, finishing 8.
 - **Sonify's families are boxes that hold their voices** (Vincent : "the header sections are
   smaller than the different sonify modes inside; it's confusing visually. Can you propose
   something more logical" : he picked A, a box per family, over a title per family or a
