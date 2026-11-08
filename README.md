@@ -1522,10 +1522,18 @@ button is the privacy tell while it runs (over a full-page view that hides the t
 Sonify, Output, World, Sequence or Resolume, a pulsing red **BODY** pip in the lower
 right corner takes over, a click opens the Body page). The
 tracker uses a dedicated low-res capture, independent of any webcam layer. The
-MediaPipe models run on **their own thread** : the picture only hands each camera
-frame over (about 0.1 ms) and reads back the landmarks, so tracking never slows the
-render (on a machine where that thread cannot start, they run on the main thread as
-before). The models ship inside the app, so it works offline and in kiosk.
+MediaPipe models run on **the processor, each on a thread of its own** (hands · pose
+and silhouette · face, side by side on separate cores) : the picture only hands each
+camera frame over and reads back the landmarks. They stay off the graphics card on
+purpose : there, every detection waits for the whole card, the picture's frames
+included, and slowed both (on a heavy picture, the models fell to 5-7 updates a
+second, each 150 ms late; on the processor, 12-13 a second, 40-80 ms late, for the
+same frame rate, and 30 a second with a light picture). The tracking runs on its own
+clock, so a covered or minimized window (the output over it on the same screen) keeps
+tracking. The Motion field reads its frames on a thread of its own too, and the Body
+page's meters move without redrawing the page. (On a machine where those threads
+cannot start, the models run on the main thread as before.) The models ship inside
+the app, so it works offline and in kiosk.
 
 **In a window of its own.** Right-click the **Body** button, **Body in a window** : the
 whole page opens in its own window (titled *Palinopsia · Body*), to keep the camera
@@ -1768,7 +1776,9 @@ across the frame), `peopleX` (where the group stands, left to right), `nearestX`
 gestures in **Presence** : **person in** and **person out**, when the head count goes up
 or down and holds for a moment. The preview draws every person, the main one in blue
 with its number, the others in violet, and the header says how many and how long the
-model takes (about 35 ms a frame on an RTX 4070, beside the picture : the render keeps
+model takes (about 35 ms a frame on an RTX 4070, at most 10 frames a second, the people
+eased between them : it is a real load for the graphics card, about 10 frames a second
+off a picture already near its limit, so turn it on when the room needs it; the render keeps
 its 60 fps). Hands, Face and Silhouette stay MediaPipe's, so they still want someone
 close; Room on turns Pose on, and Room off goes back to MediaPipe's pose. The model is
 Apache-2.0 and its runtime MIT (see `THIRD_PARTY_NOTICES.md`).

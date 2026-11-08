@@ -8,7 +8,7 @@
 // (or two combined) fires an action and/or an OSC bang (/body/<name>). No fixed
 // per-gesture map.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BodyControlConfig, BodyFeature, BodyGesture, GestureAction, GestureRule } from '@shared/types'
 import { BODY_FEATURE_GROUPS } from '@shared/types'
 import { bodyTracker } from '../engine/bodyTracker'
@@ -150,7 +150,6 @@ export function BodyPage({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
-  const [vals, setVals] = useState<Record<string, number>>({})
   const [live, setLive] = useState({ running: false, hands: false, pose: false, face: false, error: null as string | null })
   const [room, setRoom] = useState(() => roomTracker.status())
   // The last gesture that fired + whether it's fresh (lights up briefly).
@@ -181,10 +180,17 @@ export function BodyPage({
     // on the frames of the window the page is in (it may have its own)
     const view = ownerWindow(rootRef.current)
     let raf = 0
+    // Redraw only when something it shows changed : a new camera frame, a tracked
+    // frame, the Room's people (the page used to redraw on every display frame).
+    let lastKey = ''
     const draw = (): void => {
       raf = view.requestAnimationFrame(draw)
       const canvas = canvasRef.current
       if (!canvas) return
+      const vid = bodyTracker.preview().video
+      const key = `${vid ? vid.currentTime : -1}|${bodyTracker.version}|${roomTracker.version}|${canvas.width}x${canvas.height}`
+      if (key === lastKey) return
+      lastKey = key
       const g = canvas.getContext('2d')
       if (!g) return
       const W = canvas.width, H = canvas.height
@@ -298,19 +304,26 @@ export function BodyPage({
       }
     }
     raf = view.requestAnimationFrame(draw)
+    // The page's own state, set only when it changed (each set re-renders the whole
+    // page; the meters update themselves, see FeatureMeters).
     const monitor = window.setInterval(() => {
-      const all = bodyBus.all()
-      setVals({ ...all })
       const s = bodyTracker.status(); const b = bodyBus.status()
-      setLive({ running: s.running, hands: b.hands, pose: b.pose, face: b.face, error: s.error })
-      setRoom(roomTracker.status())
+      setLive((p) => (p.running === s.running && p.hands === b.hands && p.pose === b.pose && p.face === b.face && p.error === s.error ? p : { running: s.running, hands: b.hands, pose: b.pose, face: b.face, error: s.error }))
+      const r = roomTracker.status()
+      setRoom((p) => (p.ready === r.ready && p.error === r.error && p.ep === r.ep && p.people === r.people && Math.round(p.ms / 5) === Math.round(r.ms / 5) ? p : r))
       const lg = bodyBus.lastGesture()
-      setCur(lg ? { g: lg.g, fresh: lg.ageMs < 700 } : null)
+      const nc = lg ? { g: lg.g, fresh: lg.ageMs < 700 } : null
+      setCur((p) => (p?.g === nc?.g && p?.fresh === nc?.fresh ? p : nc))
       const lr = bodyBus.lastRule()
-      setCurRule(lr ? { id: lr.id, fresh: lr.ageMs < 700 } : null)
+      const nr = lr ? { id: lr.id, fresh: lr.ageMs < 700 } : null
+      setCurRule((p) => (p?.id === nr?.id && p?.fresh === nr?.fresh ? p : nr))
     }, 90)
     return () => { view.cancelAnimationFrame(raf); window.clearInterval(monitor) }
   }, [])
+
+  // The meters' → : a stable callback (FeatureMeters never re-renders for it).
+  const routeRef = useRef<(k: BodyFeature, alt: boolean) => void>(() => {})
+  const route = useCallback((k: BodyFeature, alt: boolean) => routeRef.current(k, alt), [])
 
   // Route a feature into the first free modulator slot (quick-bind : then the
   // user binds it to params with the standard M buttons). Slots are a fixed bank.
@@ -337,6 +350,7 @@ export function BodyPage({
     const at = (bc.clutchAt ?? CLUTCH_AT_DEFAULT).toFixed(2)
     showToast(`Modulator ${n + 1} (${bc.feature}) now follows only while ${feature} is ${bc.clutchInvert ? 'below' : 'above'} ${at}, and holds otherwise`, 'ok', 6000)
   }
+  routeRef.current = (k, alt) => (alt ? toClutch(k) : toSlot(k))
 
   // Rule builder actions. Rules live in bodyControl.rules (machine-local).
   const comboSym = (mode: 'together' | 'then'): string => (mode === 'then' ? '→' : '+')
@@ -606,36 +620,7 @@ export function BodyPage({
               (never fewer than the names and numbers need), so it reads the
               same at every UI zoom. */}
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            {FEATURE_GROUPS.map((grp) => (
-              <SectionRow
-                key={grp.title}
-                word={grp.title.toUpperCase()}
-                color={grp.color}
-                tint={grp.color + '12'}
-                top="mt-[2px]"
-                title={`${grp.title} : ${grp.hint}. Live 0..1 values; → routes one into a free modulator slot.`}
-              >
-                <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(196px, 1fr))' }}>
-                  {grp.keys.map((k) => {
-                    const v = vals[k] ?? 0
-                    return (
-                      <div key={k} className="flex min-w-0 items-center gap-1.5">
-                        <span className="w-[92px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{featureLabel(k)}</span>
-                        <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
-                          <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(v * 100)}%`, background: grp.color }} />
-                        </div>
-                        <span className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">{v.toFixed(2)}</span>
-                        <button
-                          onClick={(e) => (e.altKey ? toClutch(k) : toSlot(k))}
-                          className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
-                          title={`Route ${k} into the first free modulator slot. Alt+click : make it the clutch of the body modulator routed last (it then follows only while ${k} is past its threshold, and holds otherwise)`}
-                        >→</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </SectionRow>
-            ))}
+            <FeatureMeters route={route} />
             <p className="px-1 text-[10px] leading-snug text-muted">
               Live 0..1 values off the body bus. <span className="text-text">→</span> routes one into a free modulator slot (then bind it with a param’s <span className="text-text">M</span> button); <span className="text-text">Alt+click</span> it to make that feature the clutch of the modulator routed last (it follows only while the clutch is past its threshold, else holds). Every feature is also selectable in any modulator set to <span className="text-text">body</span> (Modulation : D).
             </p>
@@ -811,6 +796,67 @@ export function BodyPage({
 // One section of the page : its word in the left margin (MarginLabel, as the
 // layer strip's IN / MIX / FX / OUT), the content beside it, on a faint panel
 // of its color. A long name breaks onto two lines in the 60 px margin.
+/** The live feature monitor : every feature's meter, built once and moved by
+ *  direct writes ten times a second, so the page never re-renders for them (it
+ *  used to, whole, at that rate : most of what the open page cost the app). */
+const FeatureMeters = memo(function FeatureMeters({ route }: { route: (k: BodyFeature, alt: boolean) => void }): JSX.Element {
+  const bars = useRef(new Map<BodyFeature, HTMLDivElement>())
+  const nums = useRef(new Map<BodyFeature, HTMLSpanElement>())
+  useEffect(() => {
+    const shown = new Map<BodyFeature, number>()
+    const tick = (): void => {
+      const all = bodyBus.all()
+      for (const [k, bar] of bars.current) {
+        const v = all[k] ?? 0
+        const q = Math.round(v * 100)
+        if (shown.get(k) === q) continue
+        shown.set(k, q)
+        bar.style.width = `${q}%`
+        const n = nums.current.get(k)
+        if (n) n.textContent = v.toFixed(2)
+      }
+    }
+    tick()
+    const t = window.setInterval(tick, 90)
+    return () => window.clearInterval(t)
+  }, [])
+  return (
+    <>
+      {FEATURE_GROUPS.map((grp) => (
+        <SectionRow
+          key={grp.title}
+          word={grp.title.toUpperCase()}
+          color={grp.color}
+          tint={grp.color + '12'}
+          top="mt-[2px]"
+          title={`${grp.title} : ${grp.hint}. Live 0..1 values; → routes one into a free modulator slot.`}
+        >
+          <div className="grid gap-x-4 gap-y-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(196px, 1fr))' }}>
+            {grp.keys.map((k) => (
+              <div key={k} className="flex min-w-0 items-center gap-1.5">
+                <span className="w-[92px] shrink-0 truncate font-mono text-[10px] text-muted" title={k}>{featureLabel(k)}</span>
+                <div className="relative h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-panel3/70">
+                  <div
+                    ref={(el) => { if (el) bars.current.set(k, el); else bars.current.delete(k) }}
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{ width: '0%', background: grp.color }}
+                  />
+                </div>
+                <span ref={(el) => { if (el) nums.current.set(k, el); else nums.current.delete(k) }} className="w-8 shrink-0 text-right font-mono text-[10px] text-text/80">0.00</span>
+                <button
+                  onClick={(e) => route(k, e.altKey)}
+                  className="shrink-0 rounded border border-border bg-panel3/70 px-1 font-mono text-[10px] text-muted hover:border-accent hover:text-accent"
+                  title={`Route ${k} into the first free modulator slot. Alt+click : make it the clutch of the body modulator routed last (it then follows only while ${k} is past its threshold, and holds otherwise)`}
+                >→</button>
+              </div>
+            ))}
+          </div>
+        </SectionRow>
+      ))}
+    </>
+  )
+})
+
 function SectionRow({
   word,
   color,

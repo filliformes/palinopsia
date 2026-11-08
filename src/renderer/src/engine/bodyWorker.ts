@@ -4,6 +4,14 @@
 // is busy, since each detection waits for its GPU results : a heavy session fell
 // from 60 to 7-21 fps with the camera on.
 //
+// The models run on the PROCESSOR (XNNPACK), not the graphics card. On the card
+// each detection reads its results back, and every read waits for the whole GPU
+// queue, the picture's frames included : under a heavy picture (4 layers, A + B,
+// 60 fps with headroom) any one model took it to 47 fps and the models themselves
+// slowed to 40-145 ms a frame. On the processor the same picture held 56-60 fps
+// and the models took 20-40 ms each. bodyTracker.ts runs one worker per model
+// (hands · pose and silhouette · face), side by side on separate cores.
+//
 // The worker is a CLASSIC worker built from the self-contained workerMain()
 // below (a blob URL) : MediaPipe's loader pulls its wasm glue with importScripts,
 // which module workers lack, and a blob classic worker behaves the same in the dev
@@ -44,12 +52,13 @@ function workerMain(): void {
 
   const fail = (e: any): void => g.postMessage({ t: 'error', msg: String((e && e.message) || e) })
 
-  // GPU first (WebGL in the worker's own OffscreenCanvas), the CPU when it can't.
+  // The processor first (see the top : the GPU stalls the picture), the GPU (WebGL
+  // in the worker's own OffscreenCanvas) only when the processor path won't build.
   const make = async (Kind: any, model: string, extra: any, runningMode = 'VIDEO'): Promise<any> => {
     try {
-      return await Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'GPU' }, runningMode, ...extra })
+      return await Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'CPU' }, runningMode, ...extra })
     } catch {
-      return Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'CPU' }, runningMode, ...extra })
+      return Kind.createFromOptions(fileset, { baseOptions: { modelAssetPath: model, delegate: 'GPU' }, runningMode, ...extra })
     }
   }
   const close = (x: any): void => { try { if (x) x.close() } catch { /* gone */ } }

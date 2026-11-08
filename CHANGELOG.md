@@ -1044,6 +1044,40 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **Body tracking stops slowing the picture down** (Vincent : "using the Body features while
+  generating visuals considerably seem to slow down the app. Can you look into how to deeply
+  optimize Body"). Measured first, with the test copy on a fake camera and then on his own
+  webcam with him in front of it (his OK), on a heavy picture (4 layers, A + B : Oil Cloud,
+  Cloud Study, Fluid, Fur, Relief, Physarum...) :
+  - **The models on the processor, one worker per model.** `bodyWorker.ts` now builds every
+    landmarker with the CPU delegate first (the GPU only if that fails) : on the graphics card
+    each detection reads its results back and waits for the whole GPU queue, the picture's
+    frames included (one model took a 60 fps picture to 47; all three ran 140-230 ms a frame,
+    5 a second). `bodyTracker.ts` runs a LANE per model (hands · pose + silhouette · face),
+    created when first asked for, kept while the camera runs, frames joined per camera frame
+    (`join`, one `process()` per frame as before, a lane's hiccup drops that frame). On his
+    webcam : 12-13 tracked frames a second, 40-80 ms each, against 6-7 at ~150 ms, for the
+    same frame rate (54-56 with Body, 60 without); with a light picture 30 a second (the
+    camera's rate), lanes 23 ms. MediaPipe's web runtime still uploads each frame to the
+    card and reads it back, so a near-limit picture still loses ~5 fps with all three on.
+  - **Its own clock.** The loop ran on the window's animation frames : a window that doesn't
+    paint (covered, minimized, the output over it on the same screen) got one a second, and
+    the tracking fell to one a second. Now a 4 ms timer (the windows are never throttled);
+    minimized, 20 tracked frames a second (Hi-res repeats stay at the display rate).
+  - **Motion off the main thread.** `workers/flowWorker.ts` : the camera frame is scaled to
+    64 × 48 on the card (`createImageBitmap` resize) and read back in the worker; the main
+    thread's synchronous readback caused a 400 ms stall under load. Main-thread fallback kept.
+  - **The Body page.** Its meters (`FeatureMeters`) move by direct writes : the whole page
+    re-rendered 11 times a second for them (open, it cost 8 fps and half the main thread;
+    now 1.5 fps). The preview redraws only on a new camera frame, a tracked frame or the
+    Room's people moving (`version` on both trackers), and the page's own state is set only
+    when it changed.
+  - **Room at most 10 frames a second**, its easing per second (`EASE_HZ`) so the people
+    still glide : unthrottled it took a 60 fps picture to 45 (60-200 ms a frame under load);
+    capped at 12, to 50. Still the heaviest Body option, said so in the README.
+  The Silhouette effect's own worker (silhouetteNode) uses the same bodyWorker, so it moves to
+  the processor too. `__perfRates` (fps, backlog skips) joins the test hooks.
+
 - **The sections get a gentler glass than the buttons** (Vincent : "add something like this to
   the other sections, like the Inspector and Master FX sections, all the layers (including BG
   and AU), and other sections [...] just so I can see where it can go"; then "merge it all").
