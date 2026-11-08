@@ -204,7 +204,7 @@
         <p class="hint"><span class="mono">chmod +x</span> the AppImage, then run it.</p>
       </div>
     </div>
-    <div class="note">Or build it yourself: <span class="mono">npm install</span>, <span class="mono">npm run fetch:depth</span> (the depth AI, once), then <span class="mono">npm run dev</span>. The whole app is on <a href="https://github.com/filliformes/palinopsia">GitHub</a>, free software under the GPL (version 3 or later).</div>
+    <div class="note">Or build it yourself: <span class="mono">npm install</span>, <span class="mono">npm run fetch:depth</span> and <span class="mono">npm run fetch:pose</span> (the depth AI and the Room tracker, once), then <span class="mono">npm run dev</span>. The whole app is on <a href="https://github.com/filliformes/palinopsia">GitHub</a>, free software under the GPL (version 3 or later).</div>
   </section>
 
   <section>
@@ -236,7 +236,7 @@
       <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
       <li>In a layer's <b>IN</b> step, click its <b>A</b> button (or pick another source from the menu beside it) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
       <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the <b>Morph</b> time, live: set it long and one scene slowly becomes the next.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 126 recipes, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 147 recipes and a blank Init, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
     </ol>
     <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it. Looking for something? <kbd>Ctrl</kbd>+<kbd>K</kbd> finds any effect, source, preset or control as you type.</div>
   </section>
@@ -427,12 +427,32 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (47 sources, 56 effects, 28 native nodes, 125 Generate recipes, the modulation matrix, the sequencers, the 11 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.1.md">1.3.1 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (50 sources, 61 effects, 30 native nodes, 147 Generate recipes, the modulation matrix, the sequencers, the 12 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.2.md">1.3.2 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <hr class="soft">
 
-  <details class="news" id="new-131" open>
+  <details class="news" id="new-132" open>
+    <summary><h2>New in 1.3.2</h2></summary>
+    <p class="section-lede">Surfaces, a synth and the loop. Draw in materials with real volume, blow any layer up into shape, grow fur, sing figures into sand and hang your picture on a cloth you grab; finish it in foil, glass or print. Sonify gets a synth the picture plays, and a layer's feedback gets effects of its own.</p>
+    <ul class="new">
+      <li><b>Relief</b>, a new source : a drawing in materials with real volume (plasticine, molten metal, carved metal, ink, soap film, foil), lit live, drawn by hand or drawing itself : wandering, by compass, or following what moves.</li>
+      <li><b>Inflate</b> blows any layer up into volume, so text, a logo or a silhouette comes out as live chrome, clay or glass; <b>Fur</b> grows real hairs you can brush; <b>Sand Plate</b> sings figures into sand on a vibrating plate; <b>Thin Film</b> turns the picture into a soap film.</li>
+      <li><b>Drape</b> : your picture printed on a sheet of cloth you grab on the preview (or pinch in front of the camera) and let fall. It hangs like a curtain, streams like a flag or floats like a bedsheet.</li>
+      <li><b>Foil, glass and print</b> : a holographic <b>foil</b> for Relief, Inflate and Drape; <b>Glass</b> (fluted, reeded, hammered, prism) and <b>Rain on Glass</b>; <b>Dither</b> with nine patterns and an ink on paper, <b>Halftone</b> (newsprint to CMYK) and <b>Riso</b>.</li>
+      <li><b>Effects inside the feedback loop</b> : a layer's feedback has its own <b>Loop</b> rack, so its effects compound on every pass, a <b>delay</b> (in milliseconds or beats) that brings the loop back later, and the <b>Loop</b> source, so one layer can play another's picture and loops can feed each other.</li>
+      <li><b>Sonify has a Synth</b> : eight engines, eight voices, played by the moving things in the picture through a patchbay of what they are (speed, size, color, height), with 24 factory sounds. <b>Signal</b> can be played by the picture the same way.</li>
+      <li><b>Body tracking for a room</b> : turn on <b>Room</b> and the Body page follows everyone in the frame, near or far, facing the camera or not.</li>
+      <li><b>A MIDI or OSC control can be a modulator</b>, or take any modulator over and glide back when you let go; <b>OSC Learn</b> plays Palinopsia from any controller in its own addresses, and your mappings can be saved with a session.</li>
+      <li><b>Black</b> : one button (key <kbd>.</kbd>) fades the whole show, sound included, to black and back.</li>
+      <li><b>The Seq page holds every sequencer</b>, one lane each under one transport, with the live picture above them; <b>every color can be modulated</b>.</li>
+      <li><b>A liquid glass interface</b> : glass capsules in the preview's corners, slim round sliders that bend like a string, and a sheen on every button.</li>
+      <li><b>The dataflou mesh</b> : a visualizer button shows the whole mesh, and every Body rule action can be played from it. <b>Init</b>, the first entry of Generate, is a blank session to start from.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.2.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-131">
     <summary><h2>New in 1.3.1</h2></summary>
     <p class="section-lede">Paint, hands and steps. A release for playing with your hands : paint floated on water that you drop with a click or a pinch, a camera that reads your fingers, and a step sequencer with conditions and swing.</p>
     <ul class="new">
