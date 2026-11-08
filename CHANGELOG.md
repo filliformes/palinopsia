@@ -3,7 +3,7 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## Unreleased
+## v1.3.2 — 2026-11-08
 
 **The bar sliders are set aside, banked** (Vincent, 11-02 : "go back to the old sliders
 UI, but still keep all this work in bank so it's not lost and I can work on it more
