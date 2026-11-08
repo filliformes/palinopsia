@@ -74,6 +74,7 @@ import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } fro
 import { HARMONY_GLSL, MEANS_FS, abSwatches, abSwatchWanted } from './abHarmony';
 import { GridReadback } from './gridReadback';
 import { BLEND_MODES, LOOP_BLENDS } from '@shared/types';
+import { LOOP_DELAY_MAX_MS, LoopDelayRing } from './loopDelay';
 export type { BlendMode };
 
 // Each layer's Import Audio file and where it was, as the last frame left it :
@@ -460,6 +461,19 @@ void main(){
   }
   o = vec4(c.rgb, a);
 }`;
+
+/** A layer's loop delay in seconds : beats on the tempo when synced, else its
+ *  milliseconds, capped at LOOP_DELAY_MAX_MS. */
+function loopDelaySec(l: { loopDelay?: number; loopSync?: number }, bpm: number): number {
+  const ms = (l.loopSync ?? 0) > 0 ? ((l.loopSync ?? 0) * 60000) / Math.max(1, bpm) : l.loopDelay ?? 0;
+  return Number.isFinite(ms) ? Math.max(0, Math.min(LOOP_DELAY_MAX_MS, ms)) / 1000 : 0;
+}
+
+/** The layer a Loop source plays (its own layer if the index is gone). */
+function loopFromOf(s: { feedbackLayer?: number }, own: number, n: number): number {
+  const k = s.feedbackLayer;
+  return typeof k === 'number' && Number.isInteger(k) && k >= 0 && k < n ? k : own;
+}
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
   const mk = (t: number, s: string) => {
@@ -997,6 +1011,13 @@ export class ISFLayer {
   feedbackAmount = 0;
   /** How the returning picture meets the new frame (LOOP_BLENDS index). */
   loopBlend = 0;
+  /** The loop's delay, seconds (0 : the last frame comes back). */
+  loopDelaySec = 0;
+  /** The ring of past frames the delay reads (lazy; freed after a while unused). */
+  delay: LoopDelayRing | null = null;
+  /** A Loop source : the layer each slot plays the picture of (null : not one). */
+  loopFromA: number | null = null;
+  loopFromB: number | null = null;
   /** A/B mix depth : 0 = A only. Ignored while B is empty. */
   sourceMix = 0;
   /** How B combines with A before the crossfade. */
@@ -1513,8 +1534,8 @@ export class ISFLayer {
     (slot === 'A' ? this.audioA : this.audioB)?.setInput(name, value); // modulation on the waveform / volume
   }
 
-  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.natB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null || this.audioB !== null; }
-  private hasA(): boolean { return this.isfA !== null || this.videoA !== null || this.captureA !== null || this.hiveA !== null || this.textA !== null || this.paramA !== null || this.natA !== null || this.silA !== null || this.collageA !== null || this.assembleA !== null || this.audioA !== null; }
+  hasB(): boolean { return this.isfB !== null || this.videoB !== null || this.captureB !== null || this.hiveB !== null || this.textB !== null || this.paramB !== null || this.natB !== null || this.silB !== null || this.collageB !== null || this.assembleB !== null || this.audioB !== null || this.loopFromB !== null; }
+  private hasA(): boolean { return this.isfA !== null || this.videoA !== null || this.captureA !== null || this.hiveA !== null || this.textA !== null || this.paramA !== null || this.natA !== null || this.silA !== null || this.collageA !== null || this.assembleA !== null || this.audioA !== null || this.loopFromA !== null; }
 
   // An empty layer (no source, no effect switched on, no trail) draws transparent
   // black every frame : a clear, a persist and a blend that changes nothing (the
@@ -1557,6 +1578,22 @@ export class ISFLayer {
     const hive = slot === 'A' ? this.hiveA : this.hiveB;
     const text = slot === 'A' ? this.textA : this.textB;
     const param = slot === 'A' ? this.paramA : this.paramB;
+
+    // A Loop source : another layer's picture (its last frame for this layer or
+    // one above : a loop; this frame for one below), read as a sidechain is (a
+    // muted layer still renders while it is read).
+    const loopFrom = slot === 'A' ? this.loopFromA : this.loopFromB;
+    if (loopFrom !== null) {
+      const tex = sidechainTex ? sidechainTex({ kind: 'layer', layer: loopFrom }) : null;
+      if (tex && this.shared.blitXform) {
+        this.shared.blitXform(tex, scratch.fbo, { ...IDENTITY_FRAMING, fit: 'stretch' });
+      } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fbo);
+        gl.viewport(0, 0, this.w, this.h);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      return;
+    }
 
     // Native text: rasterized glyphs × (sidechain material | solid colour).
     if (text) {
@@ -1707,6 +1744,7 @@ export class ISFLayer {
     this.rackB.flushNodes();
     this.rackLayer.flushNodes();
     this.rackLoop.flushNodes();
+    this.delay?.reset(); // the loop's stored echoes
     this.silA?.flush(); // silhouette echoes
     this.silB?.flush();
     if (this.reagent) { this.reagent.dispose(this.shared.gl); this.reagent = null; }
@@ -1787,6 +1825,8 @@ export class ISFLayer {
     this.rackB.dispose();
     this.rackLayer.dispose();
     this.rackLoop.dispose();
+    this.delay?.dispose();
+    this.delay = null;
     this.pp.dispose(gl);
     disposeTarget(gl, this.scratchA);
     disposeTarget(gl, this.scratchB);
@@ -3150,6 +3190,9 @@ export class Compositor {
       L.solo = l.solo;
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
       L.loopBlend = Math.max(0, LOOP_BLENDS.indexOf(l.loopBlend ?? 'mix'));
+      L.loopDelaySec = l.feedback ? loopDelaySec(l, this.bpm) : 0;
+      L.loopFromA = l.sourceA.kind === 'feedback' ? loopFromOf(l.sourceA, i, this.layers.length) : null;
+      L.loopFromB = l.sourceB?.kind === 'feedback' ? loopFromOf(l.sourceB, i, this.layers.length) : null;
       L.sourceMix = l.sourceMix;
       L.sourceBlend = l.sourceBlend ?? 'normal';
       L.harmony = l.harmony ?? 0;
@@ -3542,7 +3585,7 @@ export class Compositor {
 
   /** pp.write() = the loop blend of src and the returning picture (`loop`, the
    *  Loop rack's output, else pp.read() : the plain last frame), then swap. */
-  private persist(L: ISFLayer, src: WebGLTexture, loop: WebGLTexture | null = null) {
+  private persist(L: ISFLayer, src: WebGLTexture, loop: WebGLTexture | null = null, room = false) {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, L.pp.write());
@@ -3551,7 +3594,7 @@ export class Compositor {
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uPSrc, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loop ?? L.pp.read()); gl.uniform1i(this.uPPrev, 1);
     gl.uniform1i(this.uPMode, L.feedbackAmount > 0 ? L.loopBlend : 0);
-    gl.uniform1i(this.uPRoom, loop ? 1 : 0);
+    gl.uniform1i(this.uPRoom, room ? 1 : 0);
     // Cap just below 1 so trails always decay : infinite persistence is the
     // blooming failure mode the brief warns about.
     gl.uniform1f(this.uPAmt, Math.min(L.feedbackAmount, 0.97));
@@ -3661,14 +3704,31 @@ export class Compositor {
         // The Loop rack : the returning picture through its effects, on every
         // pass, so they compound. It runs through the same chain buffers, so
         // the new frame waits off-chain.
+        // With a delay, what returns is the frame from that long ago (a ring of
+        // past frames, its own target : the chain buffers stay untouched).
         let loop: WebGLTexture | null = null;
-        if (L.feedbackAmount > 0 && L.rackLoop.hasEnabled()) {
+        const delaying = L.feedbackAmount > 0 && L.loopDelaySec > 0;
+        if (delaying) {
+          if (!L.delay || L.delay.w !== this.w || L.delay.h !== this.h) {
+            L.delay?.dispose();
+            L.delay = new LoopDelayRing(gl, this.vao, this.w, this.h);
+          }
+          loop = L.delay.read(Math.abs(dtSec), L.loopDelaySec);
+        } else if (L.delay) {
+          // a delay sweeping through 0 must not reallocate on every crossing
+          L.delay.idle += Math.abs(rawDt);
+          if (L.delay.idle > 3) { L.delay.dispose(); L.delay = null; }
+        }
+        const racked = L.feedbackAmount > 0 && L.rackLoop.hasEnabled();
+        if (racked) {
           this.copyInto(this.loopHold.fbo, sig);
           sig = this.loopHold.tex;
           gl.bindVertexArray(null);
-          loop = L.rackLoop.apply(L.pp.read(), this.chain, layerCtx);
+          loop = L.rackLoop.apply(loop ?? L.pp.read(), this.chain, layerCtx);
         }
-        this.persist(L, sig, loop);
+        this.persist(L, sig, loop, racked);
+        // (after the swap, read() is the frame just made)
+        if (delaying) L.delay?.write(L.pp.read(), L.loopDelaySec);
       } catch (e) {
         this.shared.redirect.redirect = null;
         console.error(`[render] layer ${li} skipped this frame:`, e);

@@ -226,6 +226,7 @@ function lerpComposition(a: CompositionState, b: CompositionState, k: number): C
         sourceBFx: lerpFx(al.sourceBFx, bl.sourceBFx, k),
         fx: lerpFx(al.fx, bl.fx, k),
         loopFx: lerpFx(al.loopFx ?? [], bl.loopFx ?? [], k),
+        loopDelay: lerpN(al.loopDelay ?? 0, bl.loopDelay ?? 0, k),
         harmony: lerpN(al.harmony ?? 0, bl.harmony ?? 0, k),
         mask: lerpMask(al.mask, bl.mask, k),
         coupling:
@@ -374,6 +375,7 @@ const sameLayer = (a: LayerState, b: LayerState): boolean =>
   fxSwitchKey(a.fx) === fxSwitchKey(b.fx) &&
   fxSwitchKey(a.loopFx ?? []) === fxSwitchKey(b.loopFx ?? []) &&
   (a.loopBlend ?? 'mix') === (b.loopBlend ?? 'mix') &&
+  (a.loopSync ?? 0) === (b.loopSync ?? 0) &&
   a.blend === b.blend &&
   a.sourceBlend === b.sourceBlend &&
   !!a.mute === !!b.mute &&

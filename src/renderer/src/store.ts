@@ -39,7 +39,8 @@ import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
-import { LOOP_BLENDS, type LoopBlend } from '@shared/types'
+import { LOOP_BLENDS, LOOP_SYNCS, type LoopBlend } from '@shared/types'
+import { LOOP_DELAY_MAX_MS } from './engine/loopDelay'
 import { isLayerRackKind, LAYER_RACK_PROP, layerRackOf } from './layerRack'
 import { LOOP_RECIPE_BY_ID, LOOP_START } from './loopRecipes'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
@@ -1191,6 +1192,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       fx: l.fx ?? [],
       loopFx: l.loopFx ?? [],
       ...(l.loopBlend && !LOOP_BLENDS.includes(l.loopBlend) ? { loopBlend: undefined } : {}),
+      ...(l.loopDelay !== undefined && !(Number.isFinite(l.loopDelay) && l.loopDelay >= 0) ? { loopDelay: undefined } : {}),
+      ...(l.loopSync !== undefined && !LOOP_SYNCS.includes(l.loopSync) ? { loopSync: undefined } : {}),
       coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' },
       mask: { ...makeDefaultMask(), ...(l.mask ?? {}) }
     })),
@@ -1373,6 +1376,12 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
       : [...pool.filter((id) => id !== 'gen-collage'), 'organic', 'dye-field', 'swell']
   const makeSlot = (i: number, pool: string[]): SourceSlot => {
     const id = pickOf(pool)
+    // 'loop:<n>' : a Loop source, layer n's picture (a theme's two monitors facing)
+    const lp = /^loop:(\d)$/.exec(id)
+    if (lp) {
+      const from = Number(lp[1])
+      return { kind: 'feedback', shaderId: null, inputs: {}, feedbackLayer: from, mediaId: `layer:${from}`, mediaName: `L${from + 1}'s picture` }
+    }
     const inputs = pickedInputs(id)
     // Colony above another layer grows on a transparent ground (lichen on the rock).
     if (id === 'colony' && i > 0) inputs.ground = 1
@@ -1402,8 +1411,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     }
     const pool = playable(theme.stack?.[i]?.length ? theme.stack[i] : theme.sources)
     l.sourceA = makeSlot(i, pool)
-    if (R() < theme.useB) {
-      l.sourceB = makeSlot(i, playable(theme.sources))
+    const poolB = theme.stackB?.[i]
+    if (poolB?.length || R() < theme.useB) {
+      l.sourceB = makeSlot(i, playable(poolB?.length ? poolB : theme.sources))
       l.sourceMix = rr(0.3, 0.7)
       l.sourceBlend = pickOf(theme.mixBlends ?? (['normal', 'screen', 'difference', 'multiply'] as BlendMode[]))
       l.harmony = rr(-0.4, 0.5) // matched … clashing (abHarmony.ts)
@@ -1549,6 +1559,13 @@ interface StoreState {
   /** A ready loop (loopRecipes.ts) on this layer : its Loop rack, its blend and
    *  its amount, feedback on. One undo step; the loop's pinned effects stay. */
   applyLoopRecipe: (layer: number, recipeId: string) => void
+  /** The loop's delay in milliseconds (0 : the last frame comes back). */
+  setLoopDelay: (layer: number, ms: number) => void
+  /** The loop's delay in beats on the tempo (a LOOP_SYNCS value; 0 : free, the ms). */
+  setLoopSync: (layer: number, beats: number) => void
+  /** A Loop source : this slot plays layer `from`'s picture (its last frame when
+   *  it is this layer or one above : a loop). The slot's rack stays. */
+  setSourceLoop: (layer: number, slot: 'A' | 'B', from: number) => void
   setSourceMix: (layer: number, v: number) => void
   setHarmony: (layer: number, v: number) => void
   setCoupling: (layer: number, partial: Partial<LayerCoupling>) => void
@@ -3087,6 +3104,42 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
+  setLoopDelay: (layer, ms) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          loopDelay: Number.isFinite(ms) ? Math.max(0, Math.min(LOOP_DELAY_MAX_MS, Math.round(ms))) : 0
+        }))
+      }
+    })),
+  setLoopSync: (layer, beats) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, loopSync: LOOP_SYNCS.includes(beats) ? beats : 0 }))
+      }
+    })),
+  setSourceLoop: (layer, slot, from) =>
+    set((s) => {
+      const n = s.composition.layers.length
+      if (!Number.isInteger(from) || from < 0 || from >= n) return {}
+      const lp: SourceSlot = { kind: 'feedback', shaderId: null, inputs: {}, feedbackLayer: from, mediaId: `layer:${from}`, mediaName: `L${from + 1}'s picture` }
+      return {
+        ...swapSlot(
+          s,
+          {
+            ...s.composition,
+            layers: updateLayer(s.composition.layers, layer, (l) => (slot === 'A' ? { ...l, sourceA: lp } : { ...l, sourceB: lp }))
+          },
+          layer,
+          slot,
+          slotOf(s.composition, layer, slot)
+        ),
+        selection: { type: 'source', layer, slot }
+      }
+    }),
   applyLoopRecipe: (layer, recipeId) =>
     set((s) => {
       const r = LOOP_RECIPE_BY_ID[recipeId]
@@ -3097,7 +3150,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const composition = keepPinnedUnits(
         {
           ...s.composition,
-          layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, loopFx: next, loopBlend: r.blend, feedback: true, feedbackAmount: r.amount }))
+          layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, loopFx: next, loopBlend: r.blend, feedback: true, feedbackAmount: r.amount, loopDelay: r.delay ?? 0, loopSync: r.sync ?? 0 }))
         },
         s.composition,
         s.pins

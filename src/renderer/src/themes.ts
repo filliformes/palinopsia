@@ -68,6 +68,9 @@ export interface Theme {
   /** Per-layer source pools, bottom layer first, overriding `sources` on those
    *  layers (rock under lichen, paper under the burn). */
   stack?: string[][]
+  /** Per-layer source B pools, bottom layer first : a layer with one always gets
+   *  a B from it ('loop:<n>' : the Loop source, layer n's picture). */
+  stackB?: string[][]
   /** Per-layer effects, bottom layer first, that CLOSE that layer's rack (one
    *  drawn from each pool) : the effect a theme cannot do without, e.g. the
    *  Perspective that lays a line field on a plane. Kept out of `layerFx`, whose
@@ -589,7 +592,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'tunnel', name: 'Tunnel', family: 'Feedback / Afterimage',
-    loops: ['tunnel', 'echo-key', 'rise'],
+    loops: ['tunnel', 'echo-key', 'rise', 'beat-echo'],
     blurb: 'A feedback tunnel that wanders off-centre : never a fixed mandala.',
     world: 'musical',
     palette: [K, [0.1, 0.14, 0.3, 1], [0.7, 0.8, 1.0, 1]],
@@ -608,8 +611,24 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], drift: 0.4, coalesce: 0.5
   }),
   mk({
+    id: 'cross-loop', name: 'Cross Loop', family: 'Feedback / Afterimage',
+    blurb: 'Two monitors facing each other : each layer plays the other\'s picture, smaller and turned, frames inside frames.',
+    world: 'synthetic',
+    palette: [K, [0.08, 0.09, 0.14, 1], [0.66, 0.7, 0.78, 1]],
+    // (full-frame sources : a sparse one on black hides the nesting; no rack
+    // effect that compounds, a grade run again on every pass climbs to white)
+    sources: ['organic', 'congeal', 'shapes', 'filaments', 'dye-field'],
+    stack: [['organic', 'congeal', 'shapes', 'filaments', 'dye-field'], ['loop:0']],
+    stackB: [['loop:1'], []],
+    stackFx: [[], ['fx-transform']],
+    pickInputs: { 'fx-transform': { zoom: [0.62, 0.7, 0.78], rotate: [0.12, -0.18, 0.3, -0.07], posX: [0.04, -0.06, 0.08], wrap: [0] } },
+    mixBlends: ['normal', 'screen'],
+    layerFx: [],
+    blends: ['screen', 'lighten'], useB: 0, feedback: 0.3, layers: [2, 2], drift: 0.35, coalesce: 0.5
+  }),
+  mk({
     id: 'echo-chamber', name: 'Echo Chamber', family: 'Feedback / Afterimage',
-    loops: ['echo-key', 'tunnel', 'drip'],
+    loops: ['echo-key', 'tunnel', 'drip', 'slow-echo', 'beat-echo'],
     blurb: 'Trails that pulse with a captured rhythm : temporal convolution echoes.',
     world: 'sublimated',
     palette: [K, [0.12, 0.18, 0.22, 1], [0.7, 0.82, 0.8, 1]],

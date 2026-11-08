@@ -27,6 +27,9 @@ export interface LoopRecipe {
   amount: number
   /** The Loop rack, in order (inputs on top of each effect's defaults). */
   fx: Array<{ shaderId: string; inputs: Values; opacity?: number }>
+  /** The loop's delay : milliseconds, or beats on the tempo (sync, wins). */
+  delay?: number
+  sync?: number
 }
 
 export const LOOP_RECIPES: LoopRecipe[] = [
@@ -91,6 +94,19 @@ export const LOOP_RECIPES: LoopRecipe[] = [
     id: 'xor-bloom', name: 'XOR bloom', blend: 'xor', amount: 0.8,
     blurb: 'Digital XOR against a turning loop : shimmering, stepped edges that bloom where things move',
     fx: [{ shaderId: 'fx-transform', inputs: { zoom: 1.01, rotate: -0.012, posX: -0.002, posY: 0.0015, wrap: 0 } }]
+  },
+  {
+    id: 'beat-echo', name: 'Beat echo', blend: 'lighten', amount: 0.8, sync: 0.5,
+    blurb: 'Every eighth note an echo, each one a little smaller and off to the side : copies falling away on the beat',
+    fx: [{ shaderId: 'fx-transform', inputs: { zoom: 0.82, posX: 0.03, posY: 0.012, wrap: 0 } }]
+  },
+  {
+    id: 'slow-echo', name: 'Slow echo', blend: 'screen', amount: 0.7, delay: 400,
+    blurb: 'An echo every 0.4 s, grown a little, turned a little, its color moved on : ghosts that bloom outward',
+    fx: [
+      { shaderId: 'fx-transform', inputs: { zoom: 1.12, rotate: 0.18, posX: -0.02, wrap: 0 } },
+      { shaderId: 'fx-hue-rotate', inputs: { shift: 0.03, byLuma: 0, rate: 0 } }
+    ]
   },
   {
     id: 'burn', name: 'Burn', blend: 'multiply', amount: 0.75,

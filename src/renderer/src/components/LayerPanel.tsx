@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
 import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
-import { DEFAULT_LAYER_VARY, LOOP_BLENDS, type LoopBlend } from '@shared/types'
+import { DEFAULT_LAYER_VARY, LOOP_BLENDS, LOOP_SYNCS, LOOP_SYNC_NAMES, type LoopBlend } from '@shared/types'
+import { LOOP_DELAY_MAX_MS } from '../engine/loopDelay'
 import { LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
 import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
 import { BlendSelect } from './BlendSelect'
@@ -49,6 +50,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
   const setLoopBlend = useStore((s) => s.setLoopBlend)
   const applyLoopRecipe = useStore((s) => s.applyLoopRecipe)
+  const setLoopDelay = useStore((s) => s.setLoopDelay)
+  const setLoopSync = useStore((s) => s.setLoopSync)
+  const bpm = useStore((s) => s.composition.bpm)
   const setSourceMix = useStore((s) => s.setSourceMix)
   const couplingOn = useStore((s) => s.couplingOn)
   const setRightView = useStore((s) => s.setRightView)
@@ -85,6 +89,9 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const loopFx = layer.loopFx ?? []
   const loopOn = loopFx.filter((f) => f.enabled).length
   const recipe = loopRecipeOf(loopFx, layer.loopBlend)
+  // the loop's delay as it plays : beats on the tempo when synced, else its ms
+  const loopSync = layer.loopSync ?? 0
+  const delayMs = loopSync > 0 ? Math.min(LOOP_DELAY_MAX_MS, Math.round((loopSync * 60000) / Math.max(1, bpm || 120))) : layer.loopDelay ?? 0
   const [savePrompt, setSavePrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [flashing, flash] = useFlash()
@@ -581,6 +588,44 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                         ))}
                       </select>
                     </Row>
+                    {/* when the loop comes back : the last frame (0), milliseconds, or beats */}
+                    <Row label="DELAY">
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        value={Math.sqrt(delayMs / LOOP_DELAY_MAX_MS)}
+                        onChange={(e) => {
+                          if (loopSync > 0) setLoopSync(index, 0)
+                          setLoopDelay(index, Number(e.target.value) ** 2 * LOOP_DELAY_MAX_MS)
+                        }}
+                        onDoubleClick={() => { setLoopSync(index, 0); setLoopDelay(index, 0) }}
+                        className={`min-w-0 flex-1 ${loopSync > 0 ? 'accent-accent2' : 'accent-accent'} ${layer.feedback ? '' : 'opacity-40'}`}
+                        title={delayMs > 0 ? `The loop comes back ${delayMs} ms later${loopSync > 0 ? ` (${LOOP_SYNC_NAMES[LOOP_SYNCS.indexOf(loopSync)]} at ${Math.round(bpm || 120)} BPM)` : ''} : echoes, each pass that far apart. Double-click : none` : 'No delay : the last frame comes back (drag for echoes)'}
+                      />
+                      <div className={`shrink-0 ${layer.feedback ? '' : 'opacity-40'}`}>
+                        <BoundedNumberInput
+                          value={delayMs}
+                          min={0}
+                          max={LOOP_DELAY_MAX_MS}
+                          onChange={(v) => { if (loopSync > 0) setLoopSync(index, 0); setLoopDelay(index, v) }}
+                          className={`input w-[3.2rem] px-1 py-0.5 text-right text-[11px] ${loopSync > 0 ? 'text-accent2' : ''}`}
+                        />
+                      </div>
+                      <select
+                        className={`input select-compact w-[4.2rem] shrink-0 text-[11px] ${layer.feedback ? '' : 'opacity-40'}`}
+                        value={loopSync}
+                        onChange={(e) => setLoopSync(index, Number(e.target.value))}
+                        title="The delay in beats on the tempo (Link too), or free (the milliseconds)"
+                      >
+                        {LOOP_SYNCS.map((b, k) => (
+                          <option key={b} value={b}>
+                            {k === 0 ? 'ms' : LOOP_SYNC_NAMES[k]}
+                          </option>
+                        ))}
+                      </select>
+                    </Row>
                     <Indented>
                       <div className={`flex min-h-[22px] min-w-0 items-center ${layer.feedback ? '' : 'opacity-40'}`} title={layer.feedback ? undefined : 'Feedback is off : the loop sleeps until it is on'}>
                         <FxChips
@@ -973,6 +1018,7 @@ function SourceRow({
   onPickHive: (host: string, port: number) => void
 }): JSX.Element {
   const userGens = useStore((s) => s.userShaders).filter((u) => u.category === 'Generator')
+  const layerCount = useStore((s) => s.composition.layers.length)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
@@ -1040,9 +1086,13 @@ function SourceRow({
   const isCapture = sourceKind === 'capture'
   const isHive = sourceKind === 'hive'
   const isAsm = sourceKind === 'assemble'
+  const isLoop = sourceKind === 'feedback'
+  const hostLayer = 'layer' in scope ? scope.layer : 0
   // The select's value: a generator id, or a sentinel for the active video /
   // capture / assemble source, or '' for none.
-  const value = isAudio
+  const value = isLoop
+    ? `__loop_${mediaId?.startsWith('layer:') ? Number(mediaId.slice(6)) : hostLayer}__`
+    : isAudio
     ? '__audio__'
     : isAsm
     ? '__assemble__'
@@ -1059,7 +1109,7 @@ function SourceRow({
               ? '__cap_ndi__'
             : '__cap_screen__'
         : (shaderId ?? '')
-  const active = isVideo || isAudio || isCapture || isHive || isAsm || !!shaderId
+  const active = isVideo || isAudio || isCapture || isHive || isAsm || isLoop || !!shaderId
   return (
     <>
       <div
@@ -1156,6 +1206,19 @@ function SourceRow({
             { value: '__cap_ndi__', label: 'NDI Input…', prefix: '📶 ', group: 'live', title: 'An NDI® source on the network : a camera, a phone, OBS, NDI Tools, another Palinopsia' },
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
+            // A Loop source : a layer's picture (its last frame for this layer and
+            // the ones above : a loop through this slot's effects and the mix)
+            ...Array.from({ length: layerCount }, (_, k) => ({
+              value: `__loop_${k}__`,
+              label: k === hostLayer ? `L${k + 1}, this layer` : `L${k + 1}'s picture`,
+              prefix: '↻ ',
+              group: 'loops',
+              keywords: ['loop', 'feedback', 'layer', 'picture', 'reentry'],
+              title:
+                k >= hostLayer
+                  ? `Layer ${k + 1}'s last frame : a loop. Effects on this slot, the mix and the layer's own feedback all run again on every pass`
+                  : `Layer ${k + 1}'s picture as it is this frame (it is below : no loop unless it reads this layer back)`
+            })),
             // The body silhouette joins the live entries, then living matter, then
             // analog video, then every other generator.
             ...userGens.map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: `One of your shaders (the Source Editor, ${SOURCE_EDITOR_KEY})` })),
@@ -1185,6 +1248,10 @@ function SourceRow({
               const ly = 'layer' in scope ? scope.layer : 0
               if (!placeAssemblage(ly, scope.kind === 'sourceB' ? 'B' : 'A'))
                 showToast('No assemblage yet : make one from a folder of films in the assemble tab (E).', 'warn', 6000)
+            }
+            else if (v.startsWith('__loop_')) {
+              const from = Number(v.slice(7, -2))
+              if (scope.kind === 'sourceA' || scope.kind === 'sourceB') useStore.getState().setSourceLoop(scope.layer, scope.kind === 'sourceA' ? 'A' : 'B', from)
             }
             else if (v !== '__video__' && v !== '__assemble__' && v !== '__audio__') onPick(v || null)
           }}

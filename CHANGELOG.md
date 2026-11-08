@@ -15,6 +15,32 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The loop's delay, and the Loop source** (Vincent : "build 3 and 4", the rest of the
+  loop plan).
+  - **Delay** (`LayerState.loopDelay` ms, `loopSync` beats : `LOOP_SYNCS` free, 1/16, 1/8,
+    1/4, 1/2, 1 bar; sync wins, on the tempo / Link). `engine/loopDelay.ts` : a ring of 32
+    past frames in an RGBA8 texture array, about half the layer's size inside a 64 MB budget
+    (725 x 725 a slot at a 4096 dome), each slot timed; one is written every delay / 30 s so
+    the ring always spans the delay, and the two slots around now - delay are crossfaded
+    into a full-size target that replaces `pp.read()` as what returns (the Loop rack runs on
+    it). Global clock (a layer's Speed leaves it alone : beats stay on the beat), lazy,
+    freed 3 s after the delay goes back to 0, reset by PANIC. Each echo comes back through
+    the small ring : it softens a little per pass (a tape echo). DELAY row in the drawer
+    (slider squared over 0..4000 ms, ms box, beat menu), OSC `loopdelay` / `loopsync`, the
+    Agent's `loop_delay` / `loop_sync`, morph eases the ms, a sync change hands over. Two
+    recipes : **Beat echo** (1/8, lighten, shrinking off center) and **Slow echo** (400 ms,
+    screen, growing and turning, hue moving); Tunnel and Echo Chamber themes deal them.
+  - **Loop source** : the `SourceKind 'feedback'` types.ts had declared since phase 2 and
+    nothing implemented. A slot plays a layer's picture (`feedbackLayer`, mirrored in
+    `mediaId: 'layer:<i>'` so it compares and morphs like any slot), read through the
+    sidechain resolver (a muted layer still renders while read) and blitted as is : its own
+    layer or one above is the last frame (a loop through the slot's rack, the mix, the layer
+    FX and the layer's feedback), one below is this frame. Source menu group **loops** (`↻`),
+    an Inspector note, OSC / the Agent `loop 2`, Generate pools take `loop:<n>` and a theme's
+    new `stackB` (per-layer B pools); new theme **Cross Loop** : layer 1 plays layer 2 on its
+    B while layer 2 plays layer 1 smaller and turned (two monitors facing each other). Never
+    dealt by the dice. Dome : a same-size copy of another layer, nothing to project.
+
 - **The Loop rack : effects inside a layer's feedback** (Vincent, after the borrowing
   audit of 15 sites and Hex Composer : "build the feedback loop rack first"). A layer's
   feedback was a persistence mix AFTER its racks (`persist` : mix(new, last, amount)), so
@@ -1363,6 +1389,13 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   518 px survived a cold relaunch; console errors 0.
 
 ### Fixed
+
+- **Every layer reached the picture a frame late.** A layer's `texture()` returned
+  `pp.out()` after persist had already swapped its ping-pong pair, so the blend stack and
+  every sidechain read the frame before the newest : 16 ms more latency on everything, the
+  camera included (found while building the Loop source; measured : a solid color changed
+  between two renders still showed the old one). It now returns `pp.read()`, the frame just
+  made (and, before this frame's persist, the last one).
 
 - **A modulator on the Synth's sense did nothing.** The chip was there and its value
   moved, but the player reads the sense off the config, which never saw it : it reaches

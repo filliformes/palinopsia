@@ -690,16 +690,18 @@ export function randomizeRack(which: 'A' | 'B' | 'layer'): FxInstance[] {
  *  ready loop (loopRecipes.ts), the rest the plain trail. Never random values :
  *  in a loop they compound, and a dealt zoom of 1.3 empties the layer in a
  *  second. */
-export function loopFromRecipe(r: LoopRecipe): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount'> {
+export function loopFromRecipe(r: LoopRecipe): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount' | 'loopDelay' | 'loopSync'> {
   return {
+    loopDelay: r.delay ?? 0,
+    loopSync: r.sync ?? 0,
     loopFx: r.fx.map((f) => ({ id: uid(), shaderId: f.shaderId, enabled: true, inputs: { ...f.inputs }, ...(f.opacity !== undefined ? { opacity: f.opacity } : {}) })),
     loopBlend: r.blend,
     feedbackAmount: r.amount
   }
 }
-function randomLoop(feedback: boolean, amount: number): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount'> {
+function randomLoop(feedback: boolean, amount: number): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount' | 'loopDelay' | 'loopSync'> {
   if (feedback && chance(0.35)) return loopFromRecipe(pick(LOOP_RECIPES))
-  return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount }
+  return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount, loopDelay: 0, loopSync: 0 }
 }
 
 export function randomizeSingleLayer(l: LayerState): LayerState {

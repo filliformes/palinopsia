@@ -9,6 +9,7 @@ import { useStore } from '../store'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, type IsfShader } from '../shaders/isf'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { canHostFx } from '../fxScopes'
+import { LOOP_SYNCS, LOOP_SYNC_NAMES } from '@shared/types'
 import { BLEND_MODES, LOOP_BLENDS, type BlendMode, type FxInstance, type FxScope, type LoopBlend, type SourceSlot } from '@shared/types'
 import type { McpContent, McpResult } from '@shared/mcpTools'
 import { oscLeafList, resetOscEdge, routeOsc } from '../oscInput'
@@ -335,7 +336,12 @@ function getState(args: Record<string, unknown>): McpResult {
     if (l.mute) o.mute = true
     if (l.solo) o.solo = true
     if (l.speed !== 1) o.speed = r3(l.speed)
-    if (l.feedback) { o.feedback = true; o.trail = r3(l.feedbackAmount); if ((l.loopBlend ?? 'mix') !== 'mix') o.loop_blend = l.loopBlend }
+    if (l.feedback) {
+      o.feedback = true; o.trail = r3(l.feedbackAmount)
+      if ((l.loopBlend ?? 'mix') !== 'mix') o.loop_blend = l.loopBlend
+      if ((l.loopSync ?? 0) > 0) o.loop_sync = LOOP_SYNC_NAMES[LOOP_SYNCS.indexOf(l.loopSync ?? 0)]
+      else if ((l.loopDelay ?? 0) > 0) o.loop_delay = l.loopDelay
+    }
     if (l.harmony) o.harmony = r3(l.harmony)
     const fx = rackInfo(scopeOf('layer'), controls)
     const afx = rackInfo(scopeOf('sourceA'), controls)
@@ -450,6 +456,13 @@ async function setSource(args: Record<string, unknown>): Promise<McpResult> {
   const layer = layerArg(args.layer)
   const none = String(args.shader ?? '').trim().toLowerCase() === 'none'
   const slot = String(args.slot ?? 'A').toUpperCase() === 'B' ? 'B' : 'A'
+  // "loop 2" : the Loop source, layer 2's picture
+  const lp = String(args.shader ?? '').trim().toLowerCase().match(/^loop\s*:?\s*l?([1-4])$/)
+  if (lp && layer !== 'bg') {
+    st().setSourceLoop(layer, slot, Number(lp[1]) - 1)
+    const from = Number(lp[1]) - 1
+    return { content: [text(`L${layer + 1}.${slot} now plays L${from + 1}'s picture (${from >= layer ? 'its last frame : a loop' : 'this frame : it is below'}).`)] }
+  }
   const s = none ? null : findShader(args.shader, 'generator')
   const addr = layer === 'bg' ? 'bg' : `L${layer + 1}.${slot}`
   const vals = s && args.values !== undefined && args.values !== null ? resolveValues(s.id, args.values, addr) : null
@@ -514,6 +527,16 @@ function setLayer(args: Record<string, unknown>): McpResult {
   if (sp !== undefined) { s.setLayerSpeed(layer, sp); done.push('speed') }
   if (typeof args.feedback === 'boolean' && args.feedback !== l.feedback) { s.toggleFeedback(layer); done.push('feedback') }
   if (tr !== undefined) { s.setFeedbackAmount(layer, tr); done.push('trail') }
+  if (args.loop_delay !== undefined) {
+    const ms = Number(args.loop_delay)
+    if (!Number.isFinite(ms)) fail('loop_delay is milliseconds, 0-4000.')
+    s.setLoopSync(layer, 0); s.setLoopDelay(layer, ms); done.push('loop_delay')
+  }
+  if (args.loop_sync !== undefined) {
+    const k = LOOP_SYNC_NAMES.indexOf(String(args.loop_sync).trim().toLowerCase())
+    if (k < 0) fail(`“${String(args.loop_sync)}” is not a loop sync : ${LOOP_SYNC_NAMES.join(', ')}.`)
+    s.setLoopSync(layer, LOOP_SYNCS[k]); done.push('loop_sync')
+  }
   if (args.loop_blend !== undefined) {
     const lb = String(args.loop_blend).trim().toLowerCase() as LoopBlend
     if (!LOOP_BLENDS.includes(lb)) fail(`“${String(args.loop_blend)}” is not a loop blend : ${LOOP_BLENDS.join(', ')}.`)

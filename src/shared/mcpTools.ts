@@ -94,7 +94,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'set_source',
     title: 'Put a source on a layer',
     description:
-      'Play a generator on a layer\'s source slot A or B, or on the background (layer "bg"). "none" empties the slot (B, or the background). Optional starting values for its controls.',
+      'Play a generator on a layer\'s source slot A or B, or on the background (layer "bg"). "none" empties the slot (B, or the background). "loop 2" plays layer 2\'s picture instead (the Loop source : its last frame when it is this layer or one above, so the slot\'s effects, the mix and the layer run on it again on every pass). Optional starting values for its controls.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -116,7 +116,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'set_layer',
     title: 'Set a layer',
     description:
-      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1 (how much of each pass comes back), loop_blend (how the returning picture meets the new frame : mix add screen lighten darken multiply difference xor key), harmony -1 to 1 (the colors of B set against those of A : -1 matched to the hue of A, 0 untouched, 1 on its complement). The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
+      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1 (how much of each pass comes back), loop_blend (how the returning picture meets the new frame : mix add screen lighten darken multiply difference xor key), loop_delay (ms 0-4000 : the loop comes back that much later, echoes) or loop_sync (free 1/16 1/8 1/4 1/2 "1 bar" on the tempo), harmony -1 to 1 (the colors of B set against those of A : -1 matched to the hue of A, 0 untouched, 1 on its complement). The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -131,6 +131,8 @@ export const MCP_TOOLS: McpToolDef[] = [
         feedback: { type: 'boolean' },
         trail: { type: 'number' },
         loop_blend: { type: 'string', description: 'mix add screen lighten darken multiply difference xor key' },
+        loop_delay: { type: 'number', description: 'Milliseconds, 0-4000 (0 : the last frame comes back).' },
+        loop_sync: { type: 'string', description: 'free 1/16 1/8 1/4 1/2 "1 bar" (beats on the tempo; free : loop_delay).' },
         harmony: { type: 'number' },
         depth: { type: 'number' },
         group: { type: 'boolean' }
