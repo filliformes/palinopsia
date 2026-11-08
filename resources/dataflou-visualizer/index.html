@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>dataflou visualizer</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="status">connecting... <span id="ver" style="color:#555"></span>
+        <span id="perf-toggle" title="High performance mode (p): stop streaming remote values and periodic updates to this page">high performance: off</span></div>
+    <div id="main-layout">
+        <div id="vis"></div>
+    </div>
+    <script src="lib/d3.v7.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

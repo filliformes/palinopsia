@@ -9,9 +9,9 @@
 // when that project is not there, its imports are answered by a small stand-in
 // (scripts/dataflou-visualizer-atelier-stub.ts) and the page runs without the panel.
 //
-// The output is NOT committed for now : the page belongs to the dataflou project,
-// whose repository carries no license yet. It is git-ignored until its author
-// agrees to it travelling with Palinopsia.
+// The output is committed and ships with the app : the page belongs to the
+// dataflou project and travels with Palinopsia with its author's permission
+// (2026-11-07; see THIRD_PARTY_NOTICES.md). Rebuild it when dataflou's page changes.
 
 import { build } from 'esbuild'
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
@@ -57,7 +57,8 @@ try {
 writeFileSync(
   join(out, 'SOURCE.md'),
   `# dataflou mesh visualizer\n\nThe dataflou project's web visualizer, by Alexandre Burton (Artificiel), built from\n` +
-    `${web} at commit ${commit}${withAtelier ? '' : ', without the Atelier editor panel (that project was not there)'}.\n` +
-    `Served by Palinopsia (src/main/dataflou/visualizer.ts). Not part of Palinopsia's own code.\n`
+    `the dataflou repository's web/ folder at commit ${commit}${withAtelier ? '' : ', without the Atelier editor panel (that project was not there)'}.\n` +
+    `Served by Palinopsia (src/main/dataflou/visualizer.ts). Not part of Palinopsia's own code : it travels\n` +
+    `with Palinopsia with its author's permission (see THIRD_PARTY_NOTICES.md). d3 (lib/) : ISC License, Mike Bostock.\n`
 )
 console.log(`visualizer built into ${out} from ${web} @ ${commit}${withAtelier ? '' : ' (Atelier panel left out)'}`)

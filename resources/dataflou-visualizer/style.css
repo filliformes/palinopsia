@@ -1,0 +1,972 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    background: #0d0d0d;
+    color: #ccc;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+#status {
+    position: fixed;
+    top: 12px;
+    left: 16px;
+    font-size: 11px;
+    color: #555;
+    z-index: 10;
+    letter-spacing: 0.05em;
+}
+
+#status.connected {
+    color: #4a9;
+}
+
+#status.error {
+    color: #c44;
+}
+
+#perf-toggle {
+    margin-left: 10px;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
+}
+
+#perf-toggle:hover {
+    color: #999;
+}
+
+#perf-toggle.active {
+    color: #ffc000;
+}
+
+#fps-indicator {
+    color: #444;
+}
+
+#main-layout {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#vis {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+}
+
+.node-arc {
+    stroke: #1a1a1a;
+    stroke-width: 1;
+    cursor: grab;
+}
+
+.node-arc.offline {
+    opacity: 0.3;
+}
+
+/* F4: thin 1px group arcs */
+.group-arc {
+    fill: none;
+    stroke-width: 1;
+    opacity: 0.4;
+}
+
+.param-shape {
+    stroke: #444;
+    stroke-width: 0.5;
+}
+
+.param-shape.param-highlight {
+    stroke: #c44;
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 3px rgba(200, 50, 50, 0.5));
+}
+
+.param-shape.drag-target {
+    stroke: #4fc3f7;
+    stroke-width: 2;
+    filter: drop-shadow(0 0 4px rgba(79, 195, 247, 0.6));
+}
+
+.param-shape.grabbable {
+    stroke: #4fc3f7;
+    stroke-width: 1;
+    stroke-dasharray: 1.5 1.5;
+    cursor: pointer;
+}
+
+.param-shape.param-error {
+    cursor: default;
+}
+
+.param-shape.mode-discrete {
+    stroke-dasharray: 2 1.5;
+}
+
+.param-shape.mode-polling {
+    stroke-dasharray: 0.5 1.5;
+}
+
+.param-shape.access-rw {
+    stroke-width: 1;
+}
+
+@keyframes data-flash {
+    0%   { filter: drop-shadow(0 0 4px rgba(255, 240, 80, 0.9)); }
+    100% { filter: none; }
+}
+
+.param-shape.data-flash {
+    animation: data-flash 0.4s ease-out;
+}
+
+.param-shape.offline {
+    fill: #222 !important;
+    stroke: #1a1a1a;
+}
+
+.ground-tick {
+    stroke: #888;
+    stroke-width: 0.6;
+}
+
+.node-label {
+    font-size: 9px;
+    fill: #aaa;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.node-label.local {
+    text-decoration: underline;
+}
+
+.node-label.offline {
+    fill: #444;
+}
+
+/* "identify" message: a node asked to be identified (duration = IDENTIFY_MS) */
+@keyframes node-identify {
+    0%, 33%, 66%  { fill: #ffe14d; filter: drop-shadow(0 0 6px rgba(255, 225, 77, 0.9)); }
+    16%, 50%, 83% { fill: #fff; filter: drop-shadow(0 0 2px rgba(255, 225, 77, 0.4)); }
+    100%          { filter: none; }
+}
+
+.node-label.node-identify,
+body.graphite .node-label.node-identify {
+    animation: node-identify 2.4s ease-out;
+    font-weight: bold;
+}
+
+.group-label {
+    font-size: 7px;
+    fill: #666;
+    letter-spacing: 0.1em;
+}
+
+.group-label.depth-1 {
+    font-size: 6px;
+    fill: #555;
+}
+
+.group-label.depth-2 {
+    font-size: 5.5px;
+    fill: #4a4a4a;
+}
+
+.param-label {
+    font-size: 6px;
+    fill: #777;
+    letter-spacing: 0.05em;
+}
+
+.param-label.offline {
+    fill: #383838;
+}
+
+.param-value {
+    fill: #555;
+}
+
+.connections path {
+    pointer-events: none;
+}
+
+.conn-label {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    pointer-events: none;
+}
+
+.conn-endpoint {
+    pointer-events: none;
+}
+
+.conn-ticks {
+    pointer-events: none;
+}
+
+.conn-glow-aura {
+    pointer-events: none;
+    fill: none;
+}
+
+.conn-rail-2 {
+    pointer-events: none;
+}
+
+/* Graphite drawing mode — white background, grayscale rendering */
+body.graphite {
+    background: #f0ede8;
+    color: #333;
+}
+
+body.graphite #status {
+    color: #999;
+}
+
+body.graphite #status.connected {
+    color: #666;
+}
+
+body.graphite .node-label {
+    fill: #222;
+}
+
+body.graphite .node-label.offline {
+    fill: #aaa;
+}
+
+body.graphite .group-label {
+    fill: #444;
+}
+
+body.graphite .group-label.depth-1 {
+    fill: #555;
+}
+
+body.graphite .group-label.depth-2 {
+    fill: #666;
+}
+
+body.graphite .param-label {
+    fill: #333;
+}
+
+body.graphite .param-label.offline {
+    fill: #bbb;
+}
+
+body.graphite .param-value {
+    fill: #555;
+}
+
+body.graphite .conn-label {
+    fill: #555;
+}
+
+body.graphite .empty-msg {
+    fill: #999;
+}
+
+body.graphite .ground-tick {
+    stroke: #666;
+}
+
+body.graphite .collapsed-label {
+    fill: #888 !important;
+}
+
+.param-tooltip {
+    position: absolute;
+    background: rgba(26, 26, 26, 0.82);
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #ccc;
+    pointer-events: none;
+    z-index: 20;
+    max-width: 260px;
+    line-height: 1.3;
+}
+
+.param-tooltip .tt-name {
+    font-size: 12px;
+    color: #fff;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.param-tooltip .tt-path {
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+.param-tooltip table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.param-tooltip td {
+    padding: 1px 6px 1px 0;
+    font-size: 10px;
+}
+
+.param-tooltip td:first-child {
+    color: #888;
+    white-space: nowrap;
+}
+
+.param-tooltip td:last-child {
+    color: #bbb;
+}
+
+.param-label.param-error {
+    fill: #c44;
+}
+
+.empty-msg {
+    fill: #333;
+    font-size: 14px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+
+/* F1: Expanded tooltip hit zone on param labels */
+.param-label-hit {
+    pointer-events: auto;
+    cursor: default;
+}
+
+/* F7: Connection activity glow animation */
+@keyframes conn-pulse {
+    0%   { filter: url(#conn-glow); opacity: 0.9; stroke-width: 2.5; }
+    100% { filter: none; opacity: 0.5; stroke-width: 1.0; }
+}
+
+.sub-line.conn-active {
+    animation: conn-pulse 0.6s ease-out;
+}
+
+.sub-line.sub-line-target {
+    animation: none !important;
+    stroke: #c44 !important;
+    stroke-width: 3.5 !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 4px rgba(200, 50, 50, 0.6));
+}
+
+/* F6: Debug overlay */
+#debug-overlay {
+    display: none;
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #ccc;
+    font: 300 7px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    padding: 8px 12px;
+    border-radius: 6px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    letter-spacing: 0.03em;
+}
+
+#debug-overlay .dest-header {
+    text-align: right;
+    color: #fff;
+    border-bottom: 1px solid #444;
+    padding: 4px 0 2px;
+    font-weight: 400;
+}
+
+#debug-overlay .src-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+#debug-overlay .dst-band {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+#debug-overlay tr[data-sub] {
+    cursor: pointer;
+    position: relative;
+}
+
+#debug-overlay tr[data-sub]:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* F8: Connection refusal toast */
+.connection-toast {
+    position: absolute;
+    background: rgba(200, 50, 50, 0.9);
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 30;
+    transition: opacity 0.5s;
+}
+
+.connection-toast.fading {
+    opacity: 0;
+}
+
+/* F2: Param editor tooltip */
+.param-tooltip.editing {
+    pointer-events: auto;
+    background: rgba(26, 26, 26, 0.95);
+    border-color: #4fc3f7;
+    max-width: 320px;
+    cursor: grab;
+}
+
+.param-tooltip.editing input,
+.param-tooltip.editing select,
+.param-tooltip.editing button {
+    cursor: auto;
+}
+
+.param-tooltip .tt-save-btn {
+    float: right;
+    background: #2a6b3a;
+    color: #ccc;
+    border: 1px solid #3a8a4a;
+    border-radius: 3px;
+    padding: 1px 8px;
+    font: 9px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    cursor: pointer;
+}
+
+.param-tooltip .tt-save-btn:hover {
+    background: #3a8a4a;
+    color: #fff;
+}
+
+.param-tooltip input,
+.param-tooltip select {
+    background: #222;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 2px 4px;
+    font: 10px monospace;
+    border-radius: 2px;
+}
+
+.param-tooltip .tt-hint {
+    font-size: 9px;
+    color: #555;
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* Editor layout */
+.param-tooltip .tt-editor {
+    margin-top: 6px;
+    border-top: 1px solid #333;
+    padding-top: 6px;
+}
+
+.param-tooltip .tt-val-row,
+.param-tooltip .tt-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.param-tooltip .tt-meta-label {
+    font-size: 9px;
+    color: #888;
+    min-width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.param-tooltip .tt-val-slider {
+    flex: 1;
+    height: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    border-radius: 2px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.param-tooltip .tt-val-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 12px;
+    background: #4fc3f7;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.param-tooltip .tt-val-num {
+    font-size: 9px;
+    color: #8cf;
+    min-width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.param-tooltip .tt-val-unit {
+    font-size: 8px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.param-tooltip .tt-val-text {
+    flex: 1;
+    width: auto;
+}
+
+.param-tooltip .tt-meta-input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+}
+
+.param-tooltip select {
+    padding: 1px 2px;
+}
+
+.param-tooltip .tt-actions {
+    border-top: 1px solid #333;
+    margin-top: 6px;
+    padding-top: 6px;
+    text-align: right;
+}
+
+.param-tooltip .tt-delete-btn {
+    background: #8b2020;
+    color: #ccc;
+    border: 1px solid #a33;
+    border-radius: 3px;
+    padding: 1px 8px;
+    font: 9px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    cursor: pointer;
+}
+
+.param-tooltip .tt-delete-btn:hover {
+    background: #a33;
+    color: #fff;
+}
+
+.param-tooltip .tt-create-btn {
+    background: #2a5a8b;
+    color: #ccc;
+    border: 1px solid #3a7ab0;
+    border-radius: 3px;
+    padding: 1px 8px;
+    font: 9px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    cursor: pointer;
+}
+
+.param-tooltip .tt-create-btn:hover {
+    background: #3a7ab0;
+    color: #fff;
+}
+
+.param-tooltip .tt-cancel-btn {
+    background: #444;
+    color: #aaa;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 1px 8px;
+    font: 9px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    cursor: pointer;
+}
+
+.param-tooltip .tt-cancel-btn:hover {
+    background: #555;
+    color: #ccc;
+}
+
+.param-hit {
+    opacity: 0;
+}
+
+.param-hit:hover {
+    opacity: 0.15;
+}
+
+.group-hit {
+    opacity: 0;
+}
+
+.group-hit:hover {
+    opacity: 0.1;
+}
+
+.add-param-btn:hover {
+    opacity: 0.9 !important;
+    stroke: #fff !important;
+}
+
+.collapsed-dot:hover {
+    opacity: 1 !important;
+    stroke-width: 2 !important;
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.3));
+}
+
+.collapsed-label {
+    font-style: italic;
+    fill: #666 !important;
+}
+
+/* Flush confirmation dialog */
+.confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.confirm-dialog {
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 16px 20px;
+    min-width: 260px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.confirm-msg {
+    font-size: 12px;
+    color: #ccc;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+
+.confirm-btns {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.confirm-cancel,
+.confirm-ok {
+    font: 11px 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    border-radius: 3px;
+    padding: 4px 14px;
+    cursor: pointer;
+    border: 1px solid;
+}
+
+.confirm-cancel {
+    background: #333;
+    color: #aaa;
+    border-color: #555;
+}
+
+.confirm-cancel:hover {
+    background: #444;
+    color: #ccc;
+}
+
+.confirm-ok {
+    background: #8b2020;
+    color: #ccc;
+    border-color: #a33;
+}
+
+.confirm-ok:hover {
+    background: #a33;
+    color: #fff;
+}
+
+/* --- Line check dashboard --- */
+
+.dashboard-panel {
+    position: absolute;
+    background: rgba(26, 26, 26, 0.92);
+    border: 1px solid #333;
+    border-radius: 6px;
+    width: 250px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 20;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: #ccc;
+    font-size: 11px;
+}
+
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-bottom: 1px solid #333;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dashboard-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #aaa;
+    letter-spacing: 0.05em;
+}
+
+.dashboard-spacer {
+    flex: 1;
+}
+
+.dashboard-close {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.dashboard-close:hover {
+    color: #ccc;
+}
+
+.dashboard-body {
+    padding: 6px 10px;
+}
+
+.dashboard-row {
+    margin-bottom: 6px;
+}
+
+.dashboard-label-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.dashboard-label {
+    font-size: 9px;
+    color: #888;
+    letter-spacing: 0.03em;
+}
+
+.dashboard-badge {
+    font-size: 8px;
+    font-weight: 600;
+    padding: 0 3px;
+    border-radius: 2px;
+    line-height: 1.4;
+}
+
+.badge-d {
+    background: #ed7d31;
+    color: #000;
+}
+
+.badge-a {
+    background: #70ad47;
+    color: #000;
+}
+
+.dashboard-widget {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dashboard-slider {
+    flex: 1;
+    height: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #333;
+    border-radius: 2px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.dashboard-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 12px;
+    background: #4fc3f7;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.dashboard-num {
+    font-size: 9px;
+    color: #8cf;
+    min-width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.dashboard-unit {
+    font-size: 8px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.dashboard-check {
+    cursor: pointer;
+}
+
+.dashboard-text {
+    flex: 1;
+    background: #222;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 2px 4px;
+    font: 10px monospace;
+    border-radius: 2px;
+    width: auto;
+    min-width: 0;
+}
+
+.dashboard-vec-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.dashboard-vec-label {
+    font-size: 8px;
+    color: #666;
+    min-width: 8px;
+}
+
+.dashboard-value-only {
+    font-size: 10px;
+    color: #666;
+}
+
+.dashboard-empty {
+    color: #555;
+    font-size: 10px;
+    text-align: center;
+    padding: 8px 0;
+}
+
+.dashboard-disabled .dashboard-widget {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Dashboard SVG icon */
+.dashboard-icon {
+    fill: #333;
+    stroke: #4fc3f7;
+    stroke-width: 0.6;
+    opacity: 0.6;
+}
+
+.dashboard-icon:hover {
+    opacity: 1;
+    fill: #1a2a33;
+    stroke: #4fc3f7;
+    stroke-width: 1;
+}
+
+.dashboard-icon.active {
+    fill: #4fc3f7;
+    stroke: #4fc3f7;
+    opacity: 0.9;
+}
+
+.dashboard-icon-label {
+    fill: #4fc3f7;
+    opacity: 0.5;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.dashboard-icon-label.active {
+    opacity: 0.9;
+}
+
+/* Graphite overrides */
+body.graphite .dashboard-panel {
+    background: rgba(240, 237, 232, 0.95);
+    border-color: #bbb;
+    color: #333;
+}
+
+body.graphite .dashboard-header {
+    border-bottom-color: #bbb;
+}
+
+body.graphite .dashboard-title {
+    color: #333;
+}
+
+body.graphite .dashboard-close {
+    color: #999;
+}
+
+body.graphite .dashboard-close:hover {
+    color: #333;
+}
+
+body.graphite .dashboard-label {
+    color: #555;
+}
+
+body.graphite .dashboard-slider {
+    background: #ccc;
+}
+
+body.graphite .dashboard-slider::-webkit-slider-thumb {
+    background: #666;
+}
+
+body.graphite .dashboard-num {
+    color: #444;
+}
+
+body.graphite .dashboard-text {
+    background: #e8e5e0;
+    border-color: #bbb;
+    color: #333;
+}
+
+body.graphite .dashboard-value-only {
+    color: #888;
+}
+

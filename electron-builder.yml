@@ -59,6 +59,11 @@ extraResources:
   # build only (Electron 44 / Chromium always has wasm SIMD).
   - from: resources/mediapipe
     to: mediapipe
+  # The dataflou mesh visualizer page (the dataflou section's "visualizer"),
+  # served by main/dataflou/visualizer.ts; built by `npm run build:visualizer`
+  # from a dataflou checkout, committed, and carried with its author's permission.
+  - from: resources/dataflou-visualizer
+    to: dataflou-visualizer
   # The AI depth engine : Transformers.js, its WebAssembly runtime and Depth
   # Anything V2 Small (fp16 for WebGPU, 8-bit for the WebAssembly fallback),
   # about 95 MB, fetched pinned and hash-checked by `npm run fetch:depth` (CI runs

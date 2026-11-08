@@ -3634,10 +3634,10 @@ tab has the whole setup :
   wire to cut it. Palinopsia serves it itself, on this computer only (127.0.0.1), from its
   view of the mesh, the way dataflou's own nodes serve it; while a page is open every
   other node's parameters stream to it, and the button shows how many pages are open.
-  For now the page is built from a dataflou checkout beside this repo
-  (`npm run build:visualizer`, or give the path to its `web/` folder) and is not in the
-  released app : it ships once its author agrees. Its editor panel needs dataflou's
-  sibling Atelier project; without it the page runs without that panel.
+  The page travels with Palinopsia with its author's permission (credited in
+  `THIRD_PARTY_NOTICES.md`); `npm run build:visualizer` rebuilds it from a dataflou checkout
+  beside this repo (or give the path to its `web/` folder). Its editor panel needs
+  dataflou's sibling Atelier project; without it the page runs without that panel.
 
 What Palinopsia declares (119 entries, 7.1 KB, small enough for microcontroller
 nodes, whose frames stop at 8 KB; a field whose value is every decoder's default is

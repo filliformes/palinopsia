@@ -20,6 +20,19 @@ The networking library Ableton Link is built on, asio 1.38.2 (standalone),
 Copyright (c) 2003-2025 Christopher M. Kohlhoff. Boost Software License 1.0
 (`native/link/sdk/asio/LICENSE_1_0.txt`).
 
+## The dataflou mesh visualizer (`resources/dataflou-visualizer`)
+
+The page the dataflou section's **visualizer** button opens is the dataflou
+project's own web visualizer, by **Alexandre Burton** (Artificiel), built from
+its repository (`web/`, commit 4561df8 of 2026-11-03) by
+`scripts/build-dataflou-visualizer.mjs`, without its Atelier editor panel.
+Palinopsia serves it (`src/main/dataflou/visualizer.ts`) but it is not part of
+Palinopsia's own code and not under its license : it is included with its
+author's permission (2026-11-07). All rights remain with its author.
+
+- **d3** 7.9.0 (`resources/dataflou-visualizer/lib/d3.v7.min.js`,
+  https://d3js.org), Copyright 2010-2023 Mike Bostock. ISC License.
+
 ## The AI depth engine (`resources/depth`)
 
 **depth: AI** (the Performance tab's picture section) runs the works below. They ship inside every build in

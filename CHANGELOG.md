@@ -31,9 +31,10 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   source while a page is open. `scripts/build-dataflou-visualizer.mjs` (`npm run
   build:visualizer [web folder]`) builds the page from a dataflou checkout, answering the
   editor panel's imports from the Atelier project (not on this computer) with a stand-in.
-  The built page is git-ignored and not in electron-builder's resources : dataflou's
-  repository has no license yet, so it ships once its author agrees (Vincent's call : bundle
-  it, ask him). Measured in the test copy with a second node : 10 snapshots a second, the
+  The built page is committed (`resources/dataflou-visualizer`) and ships in every build
+  (electron-builder `extraResources`), included with its author's permission (Vincent,
+  2026-11-07 : "Alex is ok with me including the code in my app"), credited in
+  `THIRD_PARTY_NOTICES.md` with d3 (ISC). Measured in the test copy with a second node : 10 snapshots a second, the
   other node's moving value live in them, a wire made from the socket shown at once and
   Palinopsia's density following it, unwired, a delete refused with its toast; the page in a
   browser drew both nodes (`web v57 · core v8 (Palinopsia)`).
