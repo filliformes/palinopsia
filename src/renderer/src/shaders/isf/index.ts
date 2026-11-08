@@ -896,6 +896,44 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { cuts: [0.3, 0.9], pulse: [0, 1], refresh: [0.1, 0.6], bloom: [0, 0.6], drop: [0, 0.3], quality: [0.25, 0.75], size: [0, 3], mix: [0.8, 1] }
   },
   {
+    // Native (engine/drapeNode.ts) : a Verlet cloth printed with the picture, grabbed on
+    // the preview (the mouse, a Body pinch), pushed by the wind, the sound, the Room.
+    id: 'node-drape',
+    name: 'Drape',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Drape : whatever enters is printed on a sheet of cloth you can grab. Drag it on the preview (or pinch it with the Body page\'s pinch = click) and let it fall. HANG pins its top edge (a curtain, a banner), FLAG one side (in the wind), FLOAT none (a sheet drifting in the air, always coming back). The wind pushes on the folds and comes in gusts, the sound\'s hits poke it, the Room\'s people press into it where they stand. Printed on cloth, satin, plastic or chrome, its folds shaded; around it, nothing (BEHIND brings the picture back there).',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['hang', 'flag', 'float'], DEFAULT: 0, LABEL: 'mode' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.3, MAX: 1.3, DEFAULT: 0.9, LABEL: 'size' },
+        { NAME: 'crumple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'crumple' },
+        { NAME: 'gravity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'gravity' },
+        { NAME: 'wind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'wind' },
+        { NAME: 'gust', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'gusts' },
+        { NAME: 'stiffness', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'stiffness' },
+        { NAME: 'damping', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'damping' },
+        { NAME: 'grab', TYPE: 'float', MIN: 0.03, MAX: 0.5, DEFAULT: 0.15, LABEL: 'grab size' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound pokes' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people press' },
+        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['cloth', 'satin', 'plastic', 'chrome'], DEFAULT: 0, LABEL: 'material' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.08, 0.08, 0.09, 1], LABEL: 'cloth color' },
+        { NAME: 'sheen', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'sheen' },
+        { NAME: 'folds', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'fold shadow' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.15, LABEL: 'view tilt' },
+        { NAME: 'behind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'behind' },
+        { NAME: 'poke', TYPE: 'event', LABEL: 'poke' },
+        { NAME: 'reset', TYPE: 'event', LABEL: 'reset' }
+      ]
+    })}*/`,
+    curated: { mode: [0, 2], size: [0.7, 1.05], crumple: [0.1, 0.6], gravity: [0.3, 0.7], wind: [0.1, 0.6], gust: [0.3, 0.8], stiffness: [0.5, 0.9], damping: [0.15, 0.4], grab: [0.1, 0.25], audio: [0, 0.4], people: [0, 0], material: [0, 1], sheen: [0.3, 0.8], folds: [0.4, 0.8], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], tilt: [-0.1, 0.35], behind: [0, 0] }
+  },
+  {
     // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
     // lit with Relief's materials.
     id: 'node-inflate',

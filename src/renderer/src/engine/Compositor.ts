@@ -789,6 +789,11 @@ class FxRack {
 
   constructor(private shared: SharedGL) {}
 
+  /** A unit's native node (null : an ISF unit, or not there). */
+  nodeOf(instId: string): ConvNode | null {
+    return this.index.get(instId)?.node ?? null;
+  }
+
   /** A shader's source changed under the same id : its units load it again on
    *  the next sync (they only reload on an id change otherwise). */
   forget(shaderId: string): void {
@@ -2288,6 +2293,13 @@ export class Compositor {
   /** Sonify's Collage voice : every Collage wall in the composition (layers A/B
    *  and the background), each with how visible it is (layer opacity, mute /
    *  solo, the A/B mix) so a hidden wall falls silent and a fading one fades. */
+  /** An effect unit that takes the pointer (Drape), by its rack and id (pointerInput.ts). */
+  pointerFx(scope: FxScope, instId: string): { pointer: (ev: import('./nativeGenerators').SourcePointer) => void; pointerHint?: () => string } | null {
+    const rack = scope.kind === 'master' ? this.masterRack : scope.kind === 'background' ? this.bgRack : this.layers[scope.layer]?.rackFor(scope.kind);
+    const n = rack?.nodeOf(instId) as unknown as { pointer?: (ev: import('./nativeGenerators').SourcePointer) => void; pointerHint?: () => string } | null;
+    return n && typeof n.pointer === 'function' ? (n as { pointer: (ev: import('./nativeGenerators').SourcePointer) => void; pointerHint?: () => string }) : null;
+  }
+
   /** A layer slot's or the Background's registry engine (pointerInput.ts). */
   pointerEngine(t: { layer: number; slot: 'A' | 'B' } | 'bg'): import('./nativeGenerators').NativeGenerator | null {
     if (t === 'bg') return this.bgNat?.src ?? null;

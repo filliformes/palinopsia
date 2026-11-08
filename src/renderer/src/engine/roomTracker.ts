@@ -282,3 +282,14 @@ class RoomTracker {
 }
 
 export const roomTracker = new RoomTracker()
+
+// The Body page's mirror setting, as the tracker last read it : what an engine
+// placing the people in the picture (Drape pressing the cloth) needs to agree
+// with the features.
+let mirrorNow = true
+export function roomMirror(): boolean {
+  return mirrorNow
+}
+export function setRoomMirror(m: boolean): void {
+  mirrorNow = m
+}

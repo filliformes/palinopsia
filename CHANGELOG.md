@@ -15,6 +15,33 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Drape, a new effect : the picture on a cloth you grab** (Vincent, after the borrowing
+  audit : "build #3 : Drape : a live layer on a cloth you grab (make it an FX)").
+  `engine/drapeNode.ts`, native node `node-drape`, any rack. A Verlet cloth on the CPU
+  adapted from Holocloth by Dmitry Kurash (MIT, credited in the file) : 44 points across,
+  structural / shear / bend constraints at 1 / 0.85 / 0.35, a fixed 1/120 s step (at most 4
+  a frame, on the rack's clock : a frozen layer holds its folds), 3-14 projection passes
+  by stiffness, the grab re-applied after each (every point near the hit pulled toward
+  the pointer by a smoothstep of its distance, keeping its offset), fold occlusion from
+  how far the neighbors' mean sits in front of a point. Ours : hang / flag / float (top
+  edge, left side or nothing pinned; float springs back to its rest), gravity, wind on
+  each point's normal plus drag along it (a flag streams off its pole), gusts, the sound's
+  onsets poking a random place, the Room's people pressing into it (their boxes, the Body
+  page's mirror via `roomMirror()`), a gentle crumple at the start and on reset. Drawn
+  as a mesh four times finer than the sim, each vertex a Catmull-Rom blend of 16 sim points
+  from RGBA32F textures (positions, normals + fold), lit as cloth (wrapped light, sheen at
+  the turning edges), satin, or Relief's plastic / chrome, the back of the sheet the print
+  faint; 4x MSAA (the shared buffer), resolved into its own RGBA8 then un-premultiplied
+  into the chain (an RGBA8 multisample can't resolve into the half-float chain). Square
+  under dome fill. **Effects can take the pointer now** : `pointerInput.ts` routes the
+  mouse and Body pinches to the selected effect, else the Master's, else from the top
+  layer down its effects before its sources (`Compositor.pointerFx`, `FxRack.nodeOf`);
+  an effect's gesture is live, never logged. 12 presets (Curtain, Banner, Flag, Storm
+  flag, Bedsheet, Satin curtain, Black cloth, Chrome sheet, Plastic wrap, Room curtain,
+  Beat cloth, Hung over the picture), master chains Hung Picture and Picture in the Wind,
+  the theme **Drapery** (Living Surfaces), Inspector groups (sheet / forces / look).
+  Measured on the test copy : 60 fps at 1920 x 1080 and under dome fill at 4096.
+
 - **The loop's delay, and the Loop source** (Vincent : "build 3 and 4", the rest of the
   loop plan).
   - **Delay** (`LayerState.loopDelay` ms, `loopSync` beats : `LOOP_SYNCS` free, 1/16, 1/8,

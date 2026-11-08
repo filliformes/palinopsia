@@ -74,6 +74,27 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     keep: 'How much of the picture’s own light shows through the colors : 0 = the film alone, 1 = an oil slick on the picture.',
     amount: 'How much of the effect.'
   },
+  'node-drape': {
+    mode: 'Hang : the top edge pinned (a curtain, a banner). Flag : the left side pinned, in the wind. Float : nothing pinned, the sheet drifts and always comes back.',
+    size: 'How much of the frame the sheet covers. Changing it hangs a fresh sheet.',
+    crumple: 'How creased the sheet starts (and after a reset).',
+    gravity: 'How hard it falls. Float ignores it.',
+    wind: 'How hard the wind pushes on the folds.',
+    gust: 'How much the wind comes and goes along the sheet.',
+    stiffness: 'Soft and stretchy, or crisp and tight.',
+    damping: 'How fast it settles : low keeps swinging, high is heavy cloth.',
+    grab: 'How much of the cloth a grab takes, around the point you hold.',
+    audio: 'The sound\'s hits poke the cloth (each onset, a random place).',
+    people: 'The Room\'s people press into the cloth where they stand (turn Room on in the Body page).',
+    material: 'Cloth (matte), satin (a soft shine), plastic, chrome.',
+    color: 'The cloth where the picture is transparent.',
+    sheen: 'The soft light at the edges of the folds turning away.',
+    folds: 'How dark the creases get.',
+    tilt: 'Look at the sheet from a little below (up) or above (down).',
+    behind: 'The picture itself, behind the sheet. 0 = nothing around it.',
+    poke: 'A push in a random place.',
+    reset: 'A fresh sheet, flat and creased again.'
+  },
   'node-inflate': {
     flow: 'Turns what it reflects from the still room into bands of light running across the surface by themselves. 0 = the room as before.',
     flowSpeed: 'How fast the bands run, and which way. 0 holds them still.',

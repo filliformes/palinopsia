@@ -26,6 +26,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Cuts the picture into just two tones at a brightness you pick, with a softness control for how hard the edge is. Everything above the line goes white, everything below goes black. Put a Palette after it to turn those two tones into any two colors, or switch on the alpha key to keep the colors and cut the dark side away to transparency.',
   'fx-thinfilm':
     'The picture as the thickness of a soap film or an oil slick : every thickness gives back its own color, in the orders every bubble shows, slowly running in currents of its own.',
+  'node-drape':
+    'The picture printed on a sheet of cloth you grab on the preview : it hangs like a curtain, flies like a flag or floats, the wind and the sound move it, people in the Room press into it.',
   'node-inflate':
     'Blows the layer up into volume : its shape gets a real height, rounded in from its edges, lit as clay, plastic, metal, chrome, soap film or glass, live. Text or a silhouette comes out as liquid chrome.',
   'fx-solarize':

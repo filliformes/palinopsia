@@ -152,6 +152,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('key', 'keyMode', 'keyThresh', 'keySoft', 'border', 'borderHue')
   ],
   // Silhouette (effect) : how the people are found · how they look · how it lands
+  // Drape : the sheet · what moves it · how it looks
+  'node-drape': [
+    g('sheet', 'mode', 'size', 'crumple', 'stiffness', 'damping', 'grab'),
+    g('forces', 'gravity', 'wind', 'gust', 'audio', 'people', 'poke', 'reset'),
+    g('look', 'material', 'color', 'sheen', 'folds', 'lightAngle', 'lightHeight', 'tilt', 'behind')
+  ],
   'node-inflate': [
     g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
     g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick'),
@@ -330,6 +336,12 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
     if (is('brush', 0) || is('brush', 6)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'This brush has no reflection to flow.')
+    return d
+  },
+  'node-drape': ({ is, isnt }) => {
+    const d: Why = {}
+    if (is('mode', 2)) put(d, ['gravity'], 'Float has no gravity : the sheet drifts and comes back.')
+    if (isnt('material', 0) && isnt('material', 1)) put(d, ['sheen'], 'Sheen is the cloth\'s : plastic and chrome shine their own way.')
     return d
   },
   'node-inflate': ({ zero, is, isnt }) => {

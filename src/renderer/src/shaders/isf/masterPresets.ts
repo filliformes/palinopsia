@@ -837,6 +837,21 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
   },
+  // ── Drape : the whole picture on a cloth you grab ──
+  {
+    name: 'Hung Picture', group: 'Relief',
+    fx: [
+      { shaderId: 'node-drape', inputs: {mode: 0, size: 0.85, crumple: 0.25, gravity: 0.5, wind: 0.2, gust: 0.5, stiffness: 0.7, damping: 0.25, grab: 0.15, audio: 0, people: 0, material: 1, color: [0.03, 0.03, 0.035, 1], sheen: 0.6, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.15, behind: 0} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Picture in the Wind', group: 'Relief',
+    fx: [
+      { shaderId: 'node-drape', inputs: {mode: 1, size: 0.8, crumple: 0.1, gravity: 0.25, wind: 0.7, gust: 0.7, stiffness: 0.7, damping: 0.15, grab: 0.15, audio: 0, people: 0, material: 0, color: [0.08, 0.08, 0.09, 1], sheen: 0.5, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.1, behind: 0} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',

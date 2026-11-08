@@ -8,9 +8,12 @@
 //   shows it (letterboxed in its box, then the keystone, the output transform or
 //   the domemaster : engine/pointerMap.ts), through getBoundingClientRect (the UI
 //   zoom is a CSS zoom : never devicePixelRatio).
-// - It goes to the source SELECTED in the Inspector when that one takes the
-//   pointer, else to the topmost visible layer whose source takes it, the
+// - It goes to the source or effect SELECTED in the Inspector when that one
+//   takes the pointer, else to what takes it on top : the Master FX (Drape over
+//   the whole picture), then from the topmost visible layer down, its effects
+//   (layer, loop, sources : they sit over the sources) then its sources, the
 //   Background last. Chosen when the pointer goes down, kept until it lets go.
+//   An effect's gesture is live (never logged).
 // - A mouse gesture is one undo step : it joins the slot's hand-made log when it
 //   ends (the session and its scenes reopen the same picture). A body gesture is
 //   live, like the automatic drops : a performer's hours of pinches would flood
@@ -25,10 +28,15 @@ import { SHADER_BY_ID } from './shaders/isf'
 import type { Compositor } from './engine/Compositor'
 import type { NativeGenerator } from './engine/nativeGenerators'
 import { displayToFrame, frameToDisplay } from './engine/pointerMap'
-import type { HandGestureLog } from '@shared/types'
+import type { FxInstance, FxScope, HandGestureLog } from '@shared/types'
+import { layerRackOf } from './layerRack'
 
-type Target = { layer: number; slot: 'A' | 'B' } | 'bg'
-interface Active { t: Target; eng: NativeGenerator; shaderId: string; moved: boolean; x0: number; y0: number }
+type SrcTarget = { layer: number; slot: 'A' | 'B' } | 'bg'
+type FxTarget = { fx: FxScope; instId: string }
+type Target = SrcTarget | FxTarget
+type Taker = Pick<NativeGenerator, 'pointer' | 'pointerHint' | 'status'>
+interface Active { t: Target; eng: Taker; shaderId: string; moved: boolean; x0: number; y0: number }
+const isFx = (t: Target): t is FxTarget => typeof t === 'object' && 'fx' in t
 
 /** The mouse's pointer id; each hand has its own (HAND_PID + 0 left, + 1 right). */
 export const MOUSE_PID = 1
@@ -66,14 +74,40 @@ export const pointerView = {
 }
 
 /** The status line of the source a hint is about (drops, points), polled by the overlay. */
-let hintEngine: NativeGenerator | null = null
+let hintEngine: Taker | null = null
 export function hintStatus(): string {
   return hintEngine?.status?.() ?? ''
 }
 
 // ── Which source takes the pointer ──────────────────────────────────────
 
-function engineAt(comp: Compositor, t: Target): { eng: NativeGenerator; shaderId: string } | null {
+/** What takes the pointer at a target now (an effect unit or a slot's engine). */
+function takerOf(comp: Compositor, t: Target): Taker | null {
+  if (isFx(t)) return comp.pointerFx(t.fx, t.instId)
+  return comp.pointerEngine(t)
+}
+
+function rackUnits(fx: FxScope): FxInstance[] {
+  const c = useStore.getState().composition
+  if (fx.kind === 'master') return c.master
+  if (fx.kind === 'background') return c.background?.fx ?? []
+  const l = c.layers[fx.layer]
+  return l ? layerRackOf(l, fx.kind) : []
+}
+
+/** The first enabled unit of a rack that takes the pointer (the last one : it is on top). */
+function fxIn(comp: Compositor, fx: FxScope): { t: Target; eng: Taker; shaderId: string } | null {
+  const units = rackUnits(fx)
+  for (let i = units.length - 1; i >= 0; i--) {
+    const u = units[i]
+    if (!u.enabled || !u.shaderId) continue
+    const eng = comp.pointerFx(fx, u.id)
+    if (eng) return { t: { fx, instId: u.id }, eng, shaderId: u.shaderId }
+  }
+  return null
+}
+
+function engineAt(comp: Compositor, t: SrcTarget): { eng: Taker; shaderId: string } | null {
   const c = useStore.getState().composition
   const src = t === 'bg' ? c.background?.source : t.slot === 'A' ? c.layers[t.layer]?.sourceA : c.layers[t.layer]?.sourceB
   if (!src || src.kind !== 'generator' || !src.shaderId) return null
@@ -81,13 +115,17 @@ function engineAt(comp: Compositor, t: Target): { eng: NativeGenerator; shaderId
   return eng && eng.pointer ? { eng, shaderId: src.shaderId } : null
 }
 
-function findTarget(): { t: Target; eng: NativeGenerator; shaderId: string } | null {
+function findTarget(): { t: Target; eng: Taker; shaderId: string } | null {
   const comp = getComp()
   if (!comp) return null
   const st = useStore.getState()
   const sel = st.selection
-  // the selected source first
-  if (sel?.type === 'source') {
+  // the selected effect or source first
+  if (sel?.type === 'fx') {
+    const eng = comp.pointerFx(sel.scope, sel.instId)
+    const u = rackUnits(sel.scope).find((x) => x.id === sel.instId)
+    if (eng && u?.shaderId && u.enabled) return { t: { fx: sel.scope, instId: sel.instId }, eng, shaderId: u.shaderId }
+  } else if (sel?.type === 'source') {
     const t = { layer: sel.layer, slot: sel.slot }
     const e = engineAt(comp, t)
     if (e) return { t, ...e }
@@ -95,12 +133,21 @@ function findTarget(): { t: Target; eng: NativeGenerator; shaderId: string } | n
     const e = engineAt(comp, 'bg')
     if (e) return { t: 'bg', ...e }
   }
-  // then the topmost visible layer whose source takes it (the slot that shows most first)
+  // then the Master FX : it is over everything
+  const m = fxIn(comp, { kind: 'master' })
+  if (m) return m
+  // then the topmost visible layer : its effects (they sit over its sources), then
+  // the source that shows most
   const layers = st.composition.layers
   const anySolo = layers.some((l) => l.solo)
   for (let i = layers.length - 1; i >= 0; i--) {
     const l = layers[i]
     if ((anySolo ? !l.solo : l.mute) || !(l.opacity > 0)) continue
+    for (const kind of ['layer', 'loop', 'sourceA', 'sourceB'] as const) {
+      if (kind === 'loop' && !l.feedback) continue
+      const f = fxIn(comp, { kind, layer: i })
+      if (f) return f
+    }
     const mix = l.sourceB ? l.sourceMix : 0
     const order: Array<'A' | 'B'> = mix > 0.5 ? ['B', 'A'] : ['A', 'B']
     for (const slot of order) {
@@ -113,18 +160,22 @@ function findTarget(): { t: Target; eng: NativeGenerator; shaderId: string } | n
   }
   const bg = st.composition.background
   if (bg && bg.opacity > 0) {
+    const f = fxIn(comp, { kind: 'background' })
+    if (f) return f
     const e = engineAt(comp, 'bg')
     if (e) return { t: 'bg', ...e }
   }
   return null
 }
 
+const fxWhere = (s: FxScope): string =>
+  s.kind === 'master' ? 'Master FX' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${s.kind === 'layer' ? 'FX' : s.kind === 'loop' ? 'loop' : s.kind === 'sourceA' ? 'A fx' : 'B fx'}`
 const where = (t: Target, shaderId: string): string =>
-  `${t === 'bg' ? 'Background' : `L${t.layer + 1} ${t.slot}`} · ${SHADER_BY_ID[shaderId]?.name ?? shaderId}`
+  `${isFx(t) ? fxWhere(t.fx) : t === 'bg' ? 'Background' : `L${t.layer + 1} ${t.slot}`} · ${SHADER_BY_ID[shaderId]?.name ?? shaderId}`
 
 // ── Pointers ────────────────────────────────────────────────────────────
 
-function commitFor(t: Target, shaderId: string): (e: HandGestureLog) => void {
+function commitFor(t: SrcTarget, shaderId: string): (e: HandGestureLog) => void {
   return (entry) => {
     // its own undo step : whatever was settling closes first
     commitNow()
@@ -143,7 +194,7 @@ function down(pid: number, u: number, v: number, mods: { shift?: boolean; alt?: 
   const f = findTarget()
   if (!f) return false
   active.set(pid, { ...f, moved: false, x0: u, y0: v })
-  f.eng.pointer!({ phase: 'down', pid, u, v, shift: mods.shift, alt: mods.alt, commit: log ? commitFor(f.t, f.shaderId) : undefined })
+  f.eng.pointer!({ phase: 'down', pid, u, v, shift: mods.shift, alt: mods.alt, commit: log && !isFx(f.t) ? commitFor(f.t, f.shaderId) : undefined })
   return true
 }
 
@@ -156,7 +207,7 @@ function move(pid: number, u: number, v: number, dead: number, aspect: number): 
   }
   // the slot changed under the gesture (another source, a scene) : it ends there
   const comp = getComp()
-  if (!comp || comp.pointerEngine(a.t) !== a.eng) { active.delete(pid); return }
+  if (!comp || takerOf(comp, a.t) !== a.eng) { active.delete(pid); return }
   a.eng.pointer!({ phase: 'move', pid, u, v })
 }
 
@@ -165,7 +216,7 @@ function release(pid: number, phase: 'up' | 'cancel'): void {
   if (!a) return
   active.delete(pid)
   const comp = getComp()
-  if (comp && comp.pointerEngine(a.t) === a.eng) a.eng.pointer!({ phase, pid, u: a.x0, v: a.y0 })
+  if (comp && takerOf(comp, a.t) === a.eng) a.eng.pointer!({ phase, pid, u: a.x0, v: a.y0 })
 }
 
 const frameAspect = (): number => getComp()?.displayState().aspect ?? 16 / 9
@@ -293,7 +344,7 @@ export function setHandCursors(c: HandCursor[]): void {
 // ── Remote events (OSC, actions) ────────────────────────────────────────
 
 /** A drop / sprinkle / clear sent to a slot's engine directly (live, not logged). */
-export function sourceEvent(t: Target, name: string, args: number[]): boolean {
+export function sourceEvent(t: SrcTarget, name: string, args: number[]): boolean {
   const comp = getComp()
   const eng = comp?.pointerEngine(t)
   if (!eng?.event) return false

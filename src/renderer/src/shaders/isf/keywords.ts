@@ -90,6 +90,7 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-slit-buffer': ['slit scan', 'freeze', 'smear', 'time', 'capture'],
   'fx-smear': ['smear', 'pixel sort', 'streak', 'drag', 'blur'],
   'fx-thinfilm': ['thin film', 'soap', 'bubble', 'oil', 'slick', 'iridescent', 'interference', 'rainbow', 'color', 'pearl'],
+  'node-drape': ['drape', 'cloth', 'fabric', 'sheet', 'curtain', 'flag', 'banner', 'grab', 'wind', 'textile', 'satin', '3d', 'physics', 'bedsheet', 'projection'],
   'node-inflate': ['flowing', 'mercury', 'liquid metal', 'prism', 'inflate', 'puff', 'balloon', 'chrome', 'liquid', 'metal', '3d', 'relief', 'emboss', 'bevel', 'glass', 'clay', 'plastic', 'soap', 'text', 'logo'],
   'fx-solarize': ['solarize', 'invert', 'distortion', 'contrast', 'psychedelic'],
   'fx-streak': ['streak', 'motion blur', 'drag', 'smear', 'blur'],

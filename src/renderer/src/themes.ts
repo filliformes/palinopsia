@@ -611,6 +611,18 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], drift: 0.4, coalesce: 0.5
   }),
   mk({
+    id: 'drapery', name: 'Drapery', family: 'Living Surfaces',
+    blurb: 'A picture hung on cloth in a draft : curtains, banners and sheets that sway, crease and catch the light.',
+    world: 'sublimated',
+    palette: [K, [0.1, 0.08, 0.1, 1], [0.78, 0.7, 0.66, 1]],
+    sources: ['organic', 'congeal', 'dye-field', 'filaments', 'shapes'],
+    stackFx: [['node-drape']],
+    presets: { 'node-drape': ['Curtain', 'Satin curtain', 'Black cloth', 'Banner', 'Bedsheet', 'Flag'] },
+    pickInputs: { 'node-drape': { behind: [0], people: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
     id: 'cross-loop', name: 'Cross Loop', family: 'Feedback / Afterimage',
     blurb: 'Two monitors facing each other : each layer plays the other\'s picture, smaller and turned, frames inside frames.',
     world: 'synthetic',
