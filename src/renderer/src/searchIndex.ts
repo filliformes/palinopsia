@@ -19,6 +19,7 @@
 //  · a control : its unit in the Inspector (or its strip, the Mixer, the
 //    Macro bar), scrolled to and flashed.
 
+import { LOOP_RECIPES } from './loopRecipes'
 import type { FxInstance, FxScope, ModTarget, SourceSlot } from '@shared/types'
 import { FX_OPACITY_INPUT } from '@shared/types'
 import { useStore, type Selection } from './store'
@@ -109,7 +110,7 @@ function rackWhere(scope: FxScope): string {
   if (scope.kind === 'master') return 'the master FX'
   if (scope.kind === 'background') return 'the Background FX'
   const n = scope.layer + 1
-  return scope.kind === 'layer' ? `L${n} FX` : `L${n} ${scope.kind === 'sourceA' ? 'A' : 'B'} FX`
+  return scope.kind === 'layer' ? `L${n} FX` : scope.kind === 'loop' ? `L${n} loop` : `L${n} ${scope.kind === 'sourceA' ? 'A' : 'B'} FX`
 }
 
 interface GenTarget {
@@ -138,7 +139,7 @@ function genTarget(s: St, bgOk: boolean): GenTarget {
   }
   if (sel?.type === 'fx' && sel.scope.kind !== 'master' && sel.scope.kind !== 'background') {
     const li = sel.scope.layer
-    if (sel.scope.kind !== 'layer') return slotTarget(li, sel.scope.kind === 'sourceA' ? 'A' : 'B', "the selected effect's source")
+    if (sel.scope.kind === 'sourceA' || sel.scope.kind === 'sourceB') return slotTarget(li, sel.scope.kind === 'sourceA' ? 'A' : 'B', "the selected effect's source")
     const l = layers[li]
     if (l && !isEmpty(l.sourceA) && isEmpty(l.sourceB)) return slotTarget(li, 'B', 'the selected layer, B is free')
     return slotTarget(li, 'A', 'the selected layer')
@@ -232,7 +233,8 @@ function allUnits(s: St): UnitInfo[] {
     const scopes: Array<[FxScope, FxInstance[]]> = [
       [{ kind: 'sourceA', layer: i }, l.sourceAFx],
       [{ kind: 'sourceB', layer: i }, l.sourceBFx],
-      [{ kind: 'layer', layer: i }, l.fx]
+      [{ kind: 'layer', layer: i }, l.fx],
+      [{ kind: 'loop', layer: i }, l.loopFx ?? []]
     ]
     for (const [scope, fx] of scopes) rack(scope, fx, () => rackWhere(scope).replace(/^the /, ''), i)
   })
@@ -513,6 +515,20 @@ function presetItems(s: St, units: UnitInfo[]): SearchItem[] {
       run: () => {
         useStore.getState().applyLayerPreset(li, p.id)
         showToast(`Layer preset · ${p.name} : L${li + 1}`)
+      }
+    })
+  // Ready loops (the Loop rack's recipes) : onto the selection's layer, else L1
+  for (const r of LOOP_RECIPES)
+    out.push({
+      key: `loop:${r.id}`,
+      kind: 'preset',
+      label: r.name,
+      group: 'loops',
+      keywords: ['loop', 'feedback', 'trail', r.blend],
+      hint: `inside L${li + 1}'s feedback${selLayer === null ? ' (no layer selected)' : ' (the selected layer)'} : ${r.blurb}`,
+      run: () => {
+        useStore.getState().applyLoopRecipe(li, r.id)
+        showToast(`Loop · ${r.name} : L${li + 1}`)
       }
     })
   for (const p of s.mixerPresets)

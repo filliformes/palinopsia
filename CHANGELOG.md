@@ -15,6 +15,56 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The Loop rack : effects inside a layer's feedback** (Vincent, after the borrowing
+  audit of 15 sites and Hex Composer : "build the feedback loop rack first"). A layer's
+  feedback was a persistence mix AFTER its racks (`persist` : mix(new, last, amount)), so
+  nothing compounded; only the Feedback node had a loop inside, with fixed controls.
+  - **A fourth rack per layer**, `LayerState.loopFx` / `FxScope { kind: 'loop' }`
+    (`layerRack.ts` maps the four racks for every reader : store, modulation, Macro
+    smoothing, OSC, pins, morph, surface, search, Sonify's auto routing, the Agent, the
+    Inspector, the Modulation panel). The engine runs it on `pp.read()` (the last
+    persisted frame) on every pass, the new frame parked off the chain buffers in
+    `loopHold`, then `persist` blends the two. Any effect goes in (`canHostFx` treats it as
+    a layer rack); one added by hand takes `LOOP_START` values (Transform 1% zoom and a
+    small turn, Hue Rotate 0.01...). It sleeps while feedback is off. The Out stage's
+    feedback drawer : TRAIL, then LOOP (blend + recipe), then the rack's chips; the tab
+    reads `fb 0.92 ↻` while effects run inside.
+  - **Loop blends** (`LayerState.loopBlend`, `LOOP_BLENDS`) : mix (the old trail, the
+    default, unchanged), add, screen, lighten, darken, multiply, difference, XOR, key.
+    out = mix(new, combine(new, loop), amount), clamped to 0..1 for all but mix (add would
+    climb the half-float buffer for ever). Difference and XOR are negative feedback : on a
+    still picture they flip between the picture and black every frame, so they settle over
+    two frames (measured : the flash limiter never engages). Key lets the loop through the
+    new picture's dark and transparent parts.
+  - **The dark room** : while the Loop rack runs, a part of the loop its effects left
+    empty (a Transform zoomed out) counts as the dark room around the monitor where the new
+    frame is there (`q.a = max(q.a, s.a)`). Without it a shrinking loop leaked its empty
+    border inward on every pass and the whole layer went transparent (seen on Tunnel).
+    Plain trails are untouched.
+  - **Recipes** (`loopRecipes.ts`, 11) : Spiral, Tunnel, Echo key, Hue drift, Melt, Swirl,
+    Drip, Rise, Chroma trail, XOR bloom, Burn, each a rack + blend + amount; the turning
+    ones carry a tiny pan that sets their vortex off center, the two strongest a faint slow
+    Displace (the house rule : never a centered mandala). From the drawer, `Ctrl+K`
+    (**loops**, onto the selected layer), the Agent's `set_layer` / `add_effect`, Generate
+    and the dice. A Contours loop (Edge inside) was tried and dropped : each pass draws the
+    edges of the last pass's edges, the line count doubles and it turns to static in a
+    second, threshold or not.
+  - **Generate** : a theme's `loops` (+ `loopChance`) deals one to a layer that feeds back;
+    Raw Feedback, Tunnel, Recursion, Echo Chamber, Palinopsia, Persistence, Wobbulator,
+    Phosphor Burn, Meltwater and Melt carry some, and a new theme, **Monitor Loop**
+    (Feedback / Afterimage), always does. The layer dice deal a recipe a third of the time
+    they turn feedback on (never random values : they compound). Vary leaves loops alone.
+  - **Everywhere else** : OSC `/opsia/layer{n}/loopblend` (advertised and mirrored) and
+    `/opsia/layer{n}/loop/fx/{i}/{input}`; Body rule / dataflou actions **loop FX on/off**
+    and **next loop blend** (`act:layer:<i>:loop|loopblend`), the loop's triggers
+    (`act:fx:loop:<i>:…`); the Agent's racks `L1.loop`, units `L1.loop.fx.1`,
+    `set_layer loop_blend`, `get_state` `loop_fx` / `loop_blend`; right-click an effect :
+    **Copy to Layer N's Loop**; pins, scenes, morph (a changed loop rack or blend hands over
+    by crossfade), the Metasurface, undo, sessions (old ones load with an empty Loop rack and
+    the mix blend : unchanged).
+  - Measured on the test copy (1920 x 1080, RTX 4070) : every recipe at 60 fps, the same as
+    without the loop, the flash limiter never engaged.
+
 - **Room : the Body page's pose for everyone in the frame** (Vincent : "improving the
   BODY tracking recognition", then "build it with the Apache 2.0 model, so it doesn't
   fuck with my licensing"). MediaPipe's pose is single-person, close range (about 4 m)

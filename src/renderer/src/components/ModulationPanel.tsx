@@ -31,6 +31,7 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { usePin } from './Pin'
 import { modPin, PIN_WORDS } from '../persist'
+import { layerRackOf } from '../layerRack'
 
 // The type menu, in families (a new type goes in the one it belongs to) :
 // shapes in time, patterns on a clock, chance, gestures with a body of their
@@ -1828,15 +1829,10 @@ function MatrixSummary(): JSX.Element {
         ? composition.master.find((f) => f.id === t.instId)
         : t.scope.kind === 'background'
           ? composition.background?.fx.find((f) => f.id === t.instId)
-          : (t.scope.kind === 'layer'
-              ? composition.layers[t.scope.layer]?.fx
-              : t.scope.kind === 'sourceA'
-                ? composition.layers[t.scope.layer]?.sourceAFx
-                : composition.layers[t.scope.layer]?.sourceBFx
-            )?.find((f) => f.id === t.instId)
+          : (composition.layers[t.scope.layer] ? layerRackOf(composition.layers[t.scope.layer], t.scope.kind) : undefined)?.find((f) => f.id === t.instId)
     const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
     const where =
-      t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}`
+      t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}${t.scope.kind === 'loop' ? ' loop' : ''}`
     const inputLabel = t.input === FX_OPACITY_INPUT ? 'opacity' : t.input
     return `${where}·${fxName} ${inputLabel}${part}`
   }

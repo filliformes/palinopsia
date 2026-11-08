@@ -51,6 +51,7 @@ import { FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_MAX_DESTS } from '@shared/t
 import { controlKey, modTargetKey } from './modKey'
 import { SHADER_BY_ID } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
+import { isLayerRackKind, LAYER_RACK_PROP, LAYER_RACK_SHORT, layerRackOf } from './layerRack'
 
 export const layerPin = (i: number): string => `layer:${i}`
 export const layerSpeedPin = (i: number): string => `lay:${i}:speed`
@@ -116,7 +117,7 @@ function parsePin(key: string): Pin | null {
       }
       const layer = idx(p[2])
       const instId = p.slice(3).join(':')
-      if ((p[1] !== 'layer' && p[1] !== 'sourceA' && p[1] !== 'sourceB') || layer < 0 || !instId) return null
+      if (!isLayerRackKind(p[1]) || layer < 0 || !instId) return null
       return { k: 'unit', scope: { kind: p[1], layer }, instId }
     }
     case 'bgsrc':
@@ -137,7 +138,7 @@ function parsePin(key: string): Pin | null {
         return p[2] && p[3] ? { k: 'fx', scope: { kind: p[1] }, instId: p[2], input: p.slice(3).join(':') } : null
       }
       const layer = idx(p[2])
-      if ((p[1] !== 'layer' && p[1] !== 'sourceA' && p[1] !== 'sourceB') || layer < 0 || !p[3] || !p[4]) return null
+      if (!isLayerRackKind(p[1]) || layer < 0 || !p[3] || !p[4]) return null
       return { k: 'fx', scope: { kind: p[1], layer }, instId: p[3], input: p.slice(4).join(':') }
     }
   }
@@ -147,7 +148,7 @@ function parsePin(key: string): Pin | null {
 // The layer a mod target belongs to (-1 : none, the master, the background...).
 function layerOf(t: ModTarget): number {
   if (t.kind === 'source' || t.kind === 'layer') return t.layer
-  if (t.kind === 'fx' && (t.scope.kind === 'layer' || t.scope.kind === 'sourceA' || t.scope.kind === 'sourceB')) return t.scope.layer
+  if (t.kind === 'fx' && isLayerRackKind(t.scope.kind)) return (t.scope as { layer: number }).layer
   return -1
 }
 
@@ -158,13 +159,13 @@ function chainOf(c: CompositionState, s: FxScope): FxInstance[] | undefined {
   if (s.kind === 'master') return c.master
   if (s.kind === 'background') return c.background?.fx
   const l = c.layers[s.layer]
-  return s.kind === 'layer' ? l?.fx : s.kind === 'sourceA' ? l?.sourceAFx : l?.sourceBFx
+  return l && layerRackOf(l, s.kind)
 }
 
 function withChain(c: CompositionState, s: FxScope, fx: FxInstance[]): CompositionState {
   if (s.kind === 'master') return { ...c, master: fx }
   if (s.kind === 'background') return c.background ? { ...c, background: { ...c.background, fx } } : c
-  const prop = s.kind === 'layer' ? 'fx' : s.kind === 'sourceA' ? 'sourceAFx' : 'sourceBFx'
+  const prop = LAYER_RACK_PROP[s.kind]
   return { ...c, layers: c.layers.map((l, i) => (i === s.layer ? { ...l, [prop]: fx } : l)) }
 }
 
@@ -548,7 +549,7 @@ function hostsRack(c: CompositionState, s: FxScope): boolean {
   if (s.kind === 'master') return true
   if (s.kind === 'background') return !!c.background
   const l = c.layers[s.layer]
-  if (!l || s.kind === 'layer') return !!l
+  if (!l || s.kind === 'layer' || s.kind === 'loop') return !!l
   const slot = s.kind === 'sourceA' ? l.sourceA : l.sourceB
   return !!slot && slot.kind !== 'none'
 }
@@ -639,7 +640,7 @@ export function describePin(key: string, live: CompositionState): { label: strin
 }
 
 const rackWords = (s: FxScope): string =>
-  s.kind === 'master' ? 'Master' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${s.kind === 'layer' ? 'FX' : s.kind === 'sourceA' ? 'A fx' : 'B fx'}`
+  s.kind === 'master' ? 'Master' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${LAYER_RACK_SHORT[s.kind]}`
 
 // What a slot plays, in a word or two : its generator, its film, else its kind
 function slotWords(s: SourceSlot | null | undefined): string {

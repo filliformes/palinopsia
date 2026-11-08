@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyles'
 import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
-import { DEFAULT_LAYER_VARY } from '@shared/types'
+import { DEFAULT_LAYER_VARY, LOOP_BLENDS, type LoopBlend } from '@shared/types'
+import { LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
 import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
 import { BlendSelect } from './BlendSelect'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
@@ -46,6 +47,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const toggleSolo = useStore((s) => s.toggleSolo)
   const toggleFeedback = useStore((s) => s.toggleFeedback)
   const setFeedbackAmount = useStore((s) => s.setFeedbackAmount)
+  const setLoopBlend = useStore((s) => s.setLoopBlend)
+  const applyLoopRecipe = useStore((s) => s.applyLoopRecipe)
   const setSourceMix = useStore((s) => s.setSourceMix)
   const couplingOn = useStore((s) => s.couplingOn)
   const setRightView = useStore((s) => s.setRightView)
@@ -77,6 +80,11 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number; slot?: 'A' | 'B' } | null>(null)
   // Which OUT drawer is open (blend, mask, feedback) : one at a time.
   const [outTab, setOutTab] = useState<OutTab | null>(null)
+  // the effects running inside this layer's feedback, and the ready loop it is (if one)
+  // (a scene saved before the Loop rack holds none)
+  const loopFx = layer.loopFx ?? []
+  const loopOn = loopFx.filter((f) => f.enabled).length
+  const recipe = loopRecipeOf(loopFx, layer.loopBlend)
   const [savePrompt, setSavePrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [flashing, flash] = useFlash()
@@ -267,7 +275,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
             label="FB"
             active={layer.feedback}
             onClick={() => toggleFeedback(index)}
-            title="Feedback : this layer samples its own previous frame (trails; their length in the feedback tab)"
+            title="Feedback : this layer samples its own previous frame (trails; their length, the effects inside the loop and how it comes back in the feedback tab)"
           />
           <span className="relative inline-flex">
             <MidiLearnOverlay id={`rand:layer:${index}`} />
@@ -460,7 +468,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   [
                     ['blend', blendLabel(layer.blend), blendBound],
                     ['mask', layer.mask.mode > 0 ? `mask ${MASK_MODES[layer.mask.mode] ?? 'none'}${layer.mask.invert ? ' inv' : ''}` : 'no mask', false],
-                    ['feedback', layer.feedback ? `fb ${layer.feedbackAmount.toFixed(2)}` : 'fb off', false]
+                    ['feedback', layer.feedback ? `fb ${layer.feedbackAmount.toFixed(2)}${loopOn > 0 ? ' ↻' : ''}` : 'fb off', false]
                   ] as Array<[OutTab, string, boolean]>
                 ).map(([k, text, mod]) => (
                   <button
@@ -477,7 +485,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                             ? 'text-text hover:bg-panel3/60'
                             : 'text-muted hover:bg-panel3/60 hover:text-text'
                     }`}
-                    title={`${k === 'blend' ? 'Blend : how this layer lands on the layers below' : k === 'mask' ? 'Mask : where this layer shows : its own brightness, a fade, or a window' : 'Feedback : trails, the layer samples its own previous frame'} (click to ${outTab === k ? 'close' : 'open'})`}
+                    title={`${k === 'blend' ? 'Blend : how this layer lands on the layers below' : k === 'mask' ? 'Mask : where this layer shows : its own brightness, a fade, or a window' : `Feedback : trails, the layer samples its own previous frame${loopOn > 0 ? ` (↻ ${loopOn} effect${loopOn === 1 ? '' : 's'} inside the loop)` : ''}`} (click to ${outTab === k ? 'close' : 'open'})`}
                   >
                     {k === 'blend' && mod ? (
                       <span
@@ -513,7 +521,8 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   )}
                   {outTab === 'mask' && <MaskControls index={index} mask={layer.mask} />}
                   {outTab === 'feedback' && (
-                    // on or off, the same row : the trail stays put, asleep while off
+                    <>
+                    {/* on or off, the same row : the trail stays put, asleep while off */}
                     <Row label="TRAIL">
                       <ToggleChip
                         label={layer.feedback ? 'on' : 'off'}
@@ -541,6 +550,52 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                         />
                       </div>
                     </Row>
+                    {/* The loop : how the returning picture meets the new frame, a
+                        ready loop, then the effects it runs through on every pass */}
+                    <Row label="LOOP">
+                      <select
+                        className={`input select-compact min-w-0 flex-1 text-[11px] ${layer.feedback ? '' : 'opacity-40'}`}
+                        value={layer.loopBlend ?? 'mix'}
+                        onChange={(e) => setLoopBlend(index, e.target.value as LoopBlend)}
+                        title={`How the returning picture meets the new frame : ${LOOP_BLEND_WORDS[layer.loopBlend ?? 'mix']}`}
+                      >
+                        {LOOP_BLENDS.map((m) => (
+                          <option key={m} value={m} title={LOOP_BLEND_WORDS[m]}>
+                            {m === 'xor' ? 'XOR' : m}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={`input select-compact min-w-0 flex-1 text-[11px] ${layer.feedback ? '' : 'opacity-40'}`}
+                        value={recipe?.id ?? ''}
+                        onChange={(e) => e.target.value && applyLoopRecipe(index, e.target.value)}
+                        title={recipe ? `${recipe.name} : ${recipe.blurb}` : 'A ready loop : its effects, its blend and its amount (feedback turns on)'}
+                      >
+                        <option value="" disabled>
+                          {loopFx.length ? 'own loop' : 'recipes'}
+                        </option>
+                        {LOOP_RECIPES.map((r) => (
+                          <option key={r.id} value={r.id} title={r.blurb}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Row>
+                    <Indented>
+                      <div className={`flex min-h-[22px] min-w-0 items-center ${layer.feedback ? '' : 'opacity-40'}`} title={layer.feedback ? undefined : 'Feedback is off : the loop sleeps until it is on'}>
+                        <FxChips
+                          scope={{ kind: 'loop', layer: index }}
+                          fx={loopFx}
+                          leading={
+                            <>
+                              <FxAddSelect scope={{ kind: 'loop', layer: index }} className="w-[3.4rem] shrink-0" />
+                              {loopFx.length > 0 && <ChainSwitch scope={{ kind: 'loop', layer: index }} fx={loopFx} />}
+                            </>
+                          }
+                        />
+                      </div>
+                    </Indented>
+                    </>
                   )}
                 </div>
               )}
@@ -645,6 +700,19 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
       )}
     </div>
   )
+}
+
+// What each loop blend does, for the menu's tooltip
+const LOOP_BLEND_WORDS: Record<LoopBlend, string> = {
+  mix: 'the plain trail, the two mixed by the amount',
+  add: 'added : the loop builds up toward white',
+  screen: 'screened : brighter, softer than add',
+  lighten: 'the brighter of the two : bright parts linger',
+  darken: 'the darker of the two : shadows linger',
+  multiply: 'multiplied : the loop burns the picture darker',
+  difference: 'the difference : edges and moving things glow, still parts settle',
+  xor: 'digital XOR : stepped, shimmering edges where things move',
+  key: 'the loop shows only through the dark and transparent parts of the new picture'
 }
 
 function ToggleChip({

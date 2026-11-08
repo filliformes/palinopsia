@@ -58,7 +58,8 @@ export function canHostFx(scope: FxScope, shaderId: string | null | undefined): 
   const addable = FX_SHADERS.some((f) => f.id === shaderId) || NATIVE_NODES.some((f) => f.id === shaderId)
   if (!addable) return false
   if (!def.native) return true
-  if (scope.kind === 'layer') return true
+  // the Loop rack runs inside its layer, with the layer's node context
+  if (scope.kind === 'layer' || scope.kind === 'loop') return true
   if (SELF_CONTAINED.has(shaderId)) return true
   return scope.kind === 'master' && shaderId === 'node-parallax'
 }
@@ -68,6 +69,7 @@ export function rackName(scope: FxScope): string {
   if (scope.kind === 'master') return 'the Master FX'
   if (scope.kind === 'background') return 'the Background FX'
   const n = scope.layer + 1
+  if (scope.kind === 'loop') return `Layer ${n}'s Loop`
   return scope.kind === 'layer' ? `Layer ${n} FX` : `Layer ${n} source ${scope.kind === 'sourceA' ? 'A' : 'B'} FX`
 }
 

@@ -31,6 +31,7 @@ import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
 import { randomSteps } from './engine/stepSeq'
+import { LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
 
 export type RandomizeScope =
   | 'all'
@@ -685,8 +686,25 @@ export function randomizeRack(which: 'A' | 'B' | 'layer'): FxInstance[] {
   return randomRack(LAYER_RACK, false, [], true)
 }
 
+/** A layer's loop for the dice : a third of the layers that feed back get a
+ *  ready loop (loopRecipes.ts), the rest the plain trail. Never random values :
+ *  in a loop they compound, and a dealt zoom of 1.3 empties the layer in a
+ *  second. */
+export function loopFromRecipe(r: LoopRecipe): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount'> {
+  return {
+    loopFx: r.fx.map((f) => ({ id: uid(), shaderId: f.shaderId, enabled: true, inputs: { ...f.inputs }, ...(f.opacity !== undefined ? { opacity: f.opacity } : {}) })),
+    loopBlend: r.blend,
+    feedbackAmount: r.amount
+  }
+}
+function randomLoop(feedback: boolean, amount: number): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount'> {
+  if (feedback && chance(0.35)) return loopFromRecipe(pick(LOOP_RECIPES))
+  return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount }
+}
+
 export function randomizeSingleLayer(l: LayerState): LayerState {
   const withB = chance(0.25)
+  const feedback = chance(0.3)
   return {
     ...l,
     sourceA: randomSlot(),
@@ -697,8 +715,8 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
     sourceBlend: withB ? pick(MIX_BLENDS) : l.sourceBlend,
     blend: pick(BLENDS),
-    feedback: chance(0.3),
-    feedbackAmount: range(0.3, 0.8),
+    feedback,
+    ...randomLoop(feedback, range(0.3, 0.8)),
     mute: false,
     mask: randomMask()
   }
@@ -893,13 +911,14 @@ function randomizeStructural(
       }
       if (doLayer) {
         const hasSource = !!layer.sourceA.shaderId || !!layer.sourceB?.shaderId
+        const feedback = hasSource ? chance(0.3) : false
         layer = {
           ...layer,
           fx: hasSource ? randomRack(LAYER_RACK, false, [], true) : [],
           blend: pick(BLENDS),
           opacity: range(0.55, 1),
-          feedback: hasSource ? chance(0.3) : false,
-          feedbackAmount: range(0.3, 0.8),
+          feedback,
+          ...randomLoop(feedback, range(0.3, 0.8)),
           sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix,
           speed: range(0.5, 1.5), // gentle : extreme speeds are a manual move
           mask: hasSource ? randomMask() : layer.mask
@@ -1177,6 +1196,7 @@ export function randomizeComposition(
     collect(l.fx)
     collect(l.sourceAFx)
     collect(l.sourceBFx)
+    collect(l.loopFx)
   }
   const modMatrix = mixed.modMatrix.filter(
     (a) => a.target.kind !== 'fx' || fxIds.has(a.target.instId)

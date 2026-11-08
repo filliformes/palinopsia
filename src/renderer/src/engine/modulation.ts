@@ -30,6 +30,7 @@ import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
 import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_VOICES } from '@shared/spatial'
+import { layerRackOf } from '../layerRack'
 
 const TWO_PI = Math.PI * 2
 // The 60fps reference frame time (ms). The picture / audio one-pole followers
@@ -1614,11 +1615,7 @@ function storedInputOf(c: CompositionState, t: import('@shared/types').ModTarget
       ? c.master
       : s.kind === 'background'
         ? c.background?.fx
-        : s.kind === 'layer'
-          ? c.layers[s.layer]?.fx
-          : s.kind === 'sourceA'
-            ? c.layers[s.layer]?.sourceAFx
-            : c.layers[s.layer]?.sourceBFx
+        : c.layers[s.layer] && layerRackOf(c.layers[s.layer], s.kind)
   return arr?.find((f) => f.id === t.instId)?.inputs[t.input]
 }
 
@@ -1944,11 +1941,7 @@ export function writeModTarget(
         ? c.master
         : s.kind === 'background'
           ? c.background?.fx
-          : s.kind === 'layer'
-            ? c.layers[s.layer]?.fx
-            : s.kind === 'sourceA'
-              ? c.layers[s.layer]?.sourceAFx
-              : c.layers[s.layer]?.sourceBFx
+          : c.layers[s.layer] && layerRackOf(c.layers[s.layer], s.kind)
     shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
   }
   if (!shaderId) return
@@ -2229,12 +2222,7 @@ export function applyModulation(
       } else if (scope.kind !== 'master') {
         const layer = c.layers[scope.layer]
         if (!layer) continue
-        arr =
-          scope.kind === 'layer'
-            ? layer.fx
-            : scope.kind === 'sourceA'
-              ? layer.sourceAFx
-              : layer.sourceBFx
+        arr = layerRackOf(layer, scope.kind)
       }
       const inst = arr.find((f) => f.id === instId)
       if (!inst?.shaderId) continue

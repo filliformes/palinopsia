@@ -393,7 +393,8 @@ typical layer takes about a third less height than before. Each of the **4 layer
 | **Opacity** | Header slider (0–1; double-click → 1). |
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
 | **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
-| **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `fb off` or its trail, `fb 0.85`). |
+| **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `fb off` or its trail, `fb 0.85`, with a `↻` when effects run inside the loop). |
+| **Loop** (`LOOP`) | Under the trail, the layer's **Loop rack** : effects that run on the **returning picture** (the last frame) on every pass, before it meets the new frame, so they **compound**, like a camera pointed at its own monitor with a mixer in between. A 1% zoom becomes a tunnel, a small turn a spiral, a hue nudge a slow drift of color. Any effect goes in (the sidechain nodes too); one put in by hand starts gentle (Transform at a 1% zoom and a small turn, Hue Rotate at 0.01 : the layer's defaults would do nothing or strobe). The **loop blend** says how the return meets the new frame : **mix** (the plain trail, as before), **add**, **screen**, **lighten** (bright parts linger), **darken**, **multiply** (the loop burns darker), **difference**, **XOR** (digital, stepped edges), **key** (the loop shows only through the new picture's dark and transparent parts : the studio feedback key). Difference and XOR settle over two frames, so a still picture never strobes. **Recipes** : ready loops, each with its blend and amount (feedback turns on) : Spiral, Tunnel, Echo key, Hue drift, Melt, Swirl, Drip, Rise, Chroma trail, XOR bloom, Burn; the turning ones sit off center (never a mandala). Where the loop's effects leave the picture empty (a zoom out), the empty part is the dark room around the monitor, not a hole in the layer. The trail's amount is how much of each pass comes back. The loop sleeps while feedback is off; Vary leaves it alone (a jittered zoom empties the layer in a second). Copy an effect into a layer's loop from its right-click menu; `Ctrl+K` lists the recipes (**loops**, onto the selected layer); the Agent addresses it `L1.loop` / `L1.loop.fx.1`; the Generate theme **Monitor Loop** and ten others deal loops, the layer dice a third of the time it turns feedback on. |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.
@@ -2991,10 +2992,12 @@ Two gestures mined from the EYESY lineage run through the field generators:
 
 ### Where FX live
 
-There are **five effect racks**: **Source-A FX** and **Source-B FX** (one under each
-source slot), **Layer FX**, **Master FX**, and **Background FX**.
+There are **six effect racks**: **Source-A FX** and **Source-B FX** (one under each
+source slot), **Layer FX**, the layer's **Loop** (inside its feedback : its effects
+compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**, and
+**Background FX**.
 
-- **Any standard ISF effect below can be placed in any of the five racks** : placement is not restricted by effect, and your own effects from the
+- **Any standard ISF effect below can be placed in any of the six racks** : placement is not restricted by effect, and your own effects from the
   [Source Editor](#source-editor--your-own-shaders-alte) (**my shaders**, first in the
   picker) go anywhere too. The picker is the same everywhere, grouped by
   family : **Analog** (the video signal's own faults : NTSC, Tracking, Sync Loss, Decay,
@@ -3432,7 +3435,9 @@ another protocol and is not shown.
 | `…/opacity` | f | Layer opacity (0..1) |
 | `…/speed` | f | Layer speed (0..1 → 0..20×) |
 | `…/mix` | f | A/B source mix |
-| `…/trail` | f | Feedback trail amount |
+| `…/trail` | f | Feedback trail amount (with a Loop rack : how much of each pass comes back) |
+| `…/loopblend` | i / f / s | How the returning picture meets the new frame : `mix·add·screen·lighten·darken·multiply·difference·xor·key` (index, 0..1, or name) |
+| `…/loop/fx/{i}/{input}` | f · color · point2D | A Loop-rack unit input (the effects inside the layer's feedback) |
 | `…/blend` | i / f / s | Layer blend mode (index, 0..1 across 19, or name) |
 | `…/sourceblend` | i / f / s | A/B blend mode |
 | `…/mute` · `…/solo` · `…/feedback` | bool | Toggles (≥ 0.5) |

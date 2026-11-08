@@ -250,7 +250,8 @@ export function blendComposition(base: CompositionState, contribs: Contrib[]): C
         sourceB: bl.sourceB ? blendSlot(bl.sourceB, contribs, (c) => c.layers[i]?.sourceB) : bl.sourceB,
         sourceAFx: blendFx(bl.sourceAFx, contribs, (c) => c.layers[i]?.sourceAFx ?? []),
         sourceBFx: blendFx(bl.sourceBFx, contribs, (c) => c.layers[i]?.sourceBFx ?? []),
-        fx: blendFx(bl.fx, contribs, (c) => c.layers[i]?.fx ?? [])
+        fx: blendFx(bl.fx, contribs, (c) => c.layers[i]?.fx ?? []),
+        loopFx: blendFx(bl.loopFx ?? [], contribs, (c) => c.layers[i]?.loopFx ?? [])
       })
     ),
     background: base.background

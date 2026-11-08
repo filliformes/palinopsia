@@ -9,7 +9,7 @@ import { useStore } from '../store'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, type IsfShader } from '../shaders/isf'
 import { inputsForShader, type IsfInputDesc } from '../shaders/isf/inputs'
 import { canHostFx } from '../fxScopes'
-import { BLEND_MODES, type BlendMode, type FxInstance, type FxScope, type SourceSlot } from '@shared/types'
+import { BLEND_MODES, LOOP_BLENDS, type BlendMode, type FxInstance, type FxScope, type LoopBlend, type SourceSlot } from '@shared/types'
 import type { McpContent, McpResult } from '@shared/mcpTools'
 import { oscLeafList, resetOscEdge, routeOsc } from '../oscInput'
 import { outputCanvas } from '../engine/outputCanvas'
@@ -138,13 +138,15 @@ function rackOf(scope: FxScope): FxInstance[] {
       return c.layers[scope.layer]?.sourceAFx ?? []
     case 'sourceB':
       return c.layers[scope.layer]?.sourceBFx ?? []
+    case 'loop':
+      return c.layers[scope.layer]?.loopFx ?? []
   }
 }
 function rackName(scope: FxScope): string {
   if (scope.kind === 'master') return 'master'
   if (scope.kind === 'background') return 'bg'
   const L = `L${scope.layer + 1}`
-  return scope.kind === 'layer' ? L : `${L}.${scope.kind === 'sourceA' ? 'A' : 'B'}`
+  return scope.kind === 'layer' ? L : `${L}.${scope.kind === 'sourceA' ? 'A' : scope.kind === 'sourceB' ? 'B' : 'loop'}`
 }
 const fxAddr = (scope: FxScope, i: number): string => `${rackName(scope)}.fx.${i + 1}`
 
@@ -155,7 +157,8 @@ function parseRack(q: unknown): FxScope {
   if (s === 'bg' || s === 'background') return { kind: 'background' }
   if ((m = s.match(/^(?:l|layer)([1-4])$/))) return { kind: 'layer', layer: Number(m[1]) - 1 }
   if ((m = s.match(/^(?:l|layer)([1-4])\.([ab])$/))) return { kind: m[2] === 'a' ? 'sourceA' : 'sourceB', layer: Number(m[1]) - 1 }
-  return fail(`“${String(q)}” is not a rack : L1, L1.A, L1.B, master or bg.`)
+  if ((m = s.match(/^(?:l|layer)([1-4])\.loop$/))) return { kind: 'loop', layer: Number(m[1]) - 1 }
+  return fail(`“${String(q)}” is not a rack : L1, L1.A, L1.B, L1.loop, master or bg.`)
 }
 
 function parseUnit(q: unknown): Unit {
@@ -179,7 +182,8 @@ function parseUnit(q: unknown): Unit {
   else if ((m = s.match(/^(?:bg|background)\.fx\.(\d+)$/))) { scope = { kind: 'background' }; n = Number(m[1]) }
   else if ((m = s.match(/^(?:l|layer)([1-4])\.fx\.(\d+)$/))) { scope = { kind: 'layer', layer: Number(m[1]) - 1 }; n = Number(m[2]) }
   else if ((m = s.match(/^(?:l|layer)([1-4])\.([ab])\.fx\.(\d+)$/))) { scope = { kind: m[2] === 'a' ? 'sourceA' : 'sourceB', layer: Number(m[1]) - 1 }; n = Number(m[3]) }
-  if (!scope) return fail(`“${raw}” is not a unit : L1.A, L1.B, L1.fx.2, L1.A.fx.1, master.fx.1, master.vibe, master.context, master.finalizer, bg, bg.fx.1.`)
+  else if ((m = s.match(/^(?:l|layer)([1-4])\.loop\.fx\.(\d+)$/))) { scope = { kind: 'loop', layer: Number(m[1]) - 1 }; n = Number(m[2]) }
+  if (!scope) return fail(`“${raw}” is not a unit : L1.A, L1.B, L1.fx.2, L1.A.fx.1, L1.loop.fx.1, master.fx.1, master.vibe, master.context, master.finalizer, bg, bg.fx.1.`)
   const rack = rackOf(scope)
   const inst = rack[n - 1]
   if (!inst) fail(`${rackName(scope)} has ${rack.length} effect${rack.length === 1 ? '' : 's'} : there is no #${n}.`)
@@ -319,7 +323,7 @@ function getState(args: Record<string, unknown>): McpResult {
   const c = s.composition
   const world = s.worlds.find((w) => w.id === s.world)
   const layers = c.layers.map((l, i) => {
-    const scopeOf = (kind: 'layer' | 'sourceA' | 'sourceB'): FxScope => ({ kind, layer: i })
+    const scopeOf = (kind: 'layer' | 'sourceA' | 'sourceB' | 'loop'): FxScope => ({ kind, layer: i })
     const o: Record<string, unknown> = {
       layer: i + 1,
       opacity: r3(l.opacity),
@@ -331,7 +335,7 @@ function getState(args: Record<string, unknown>): McpResult {
     if (l.mute) o.mute = true
     if (l.solo) o.solo = true
     if (l.speed !== 1) o.speed = r3(l.speed)
-    if (l.feedback) { o.feedback = true; o.trail = r3(l.feedbackAmount) }
+    if (l.feedback) { o.feedback = true; o.trail = r3(l.feedbackAmount); if ((l.loopBlend ?? 'mix') !== 'mix') o.loop_blend = l.loopBlend }
     if (l.harmony) o.harmony = r3(l.harmony)
     const fx = rackInfo(scopeOf('layer'), controls)
     const afx = rackInfo(scopeOf('sourceA'), controls)
@@ -339,6 +343,8 @@ function getState(args: Record<string, unknown>): McpResult {
     if (fx.length) o.fx = fx
     if (afx.length) o.A_fx = afx
     if (bfx.length) o.B_fx = bfx
+    const lfx = rackInfo(scopeOf('loop'), controls)
+    if (lfx.length) o.loop_fx = lfx
     return o
   })
   const bg = c.background
@@ -508,6 +514,11 @@ function setLayer(args: Record<string, unknown>): McpResult {
   if (sp !== undefined) { s.setLayerSpeed(layer, sp); done.push('speed') }
   if (typeof args.feedback === 'boolean' && args.feedback !== l.feedback) { s.toggleFeedback(layer); done.push('feedback') }
   if (tr !== undefined) { s.setFeedbackAmount(layer, tr); done.push('trail') }
+  if (args.loop_blend !== undefined) {
+    const lb = String(args.loop_blend).trim().toLowerCase() as LoopBlend
+    if (!LOOP_BLENDS.includes(lb)) fail(`“${String(args.loop_blend)}” is not a loop blend : ${LOOP_BLENDS.join(', ')}.`)
+    s.setLoopBlend(layer, lb); done.push('loop_blend')
+  }
   if (h !== undefined) { s.setHarmony(layer, h); done.push('harmony') }
   return { content: [text(`L${layer + 1} : set ${done.join(', ') || 'nothing'}.`)] }
 }

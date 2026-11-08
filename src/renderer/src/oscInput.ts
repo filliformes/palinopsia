@@ -98,7 +98,7 @@ import { resolumeLearn } from './resolume'
 import { controlBus } from './engine/controlBus'
 import { oscLearn } from './oscLearn'
 import type { BlendMode, CouplingMode, AudioFeature, FxScope, OscInEvent, OscQueryLeaf } from '@shared/types'
-import { BLEND_MODES, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
+import { BLEND_MODES, LOOP_BLENDS, BODY_FEATURES, BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { BG_SOURCES } from './bgPresets'
 import { bodyBus } from './engine/bodyIn'
 import { videoKey, videoSeekRequests } from './engine/videoState'
@@ -129,6 +129,7 @@ import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
 import { seqTransportPlay, seqTransportPlaying, seqTransportStop } from './engine/ruleSeq'
 import { sourceEvent } from './pointerInput'
+import { layerRackOf } from './layerRack'
 
 type Args = OscInEvent['args']
 // Sonify : the voices that read the picture (they have a tap), each voice's
@@ -230,7 +231,7 @@ function fxAt(scope: FxScope, i: number): { id: string; shaderId: string; inputs
   else {
     const l = c.layers[scope.layer]
     if (!l) return null
-    arr = scope.kind === 'layer' ? l.fx : scope.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
+    arr = layerRackOf(l, scope.kind)
   }
   const u = arr[i]
   return u && u.shaderId ? { id: u.id, shaderId: u.shaderId, inputs: u.inputs } : null
@@ -373,6 +374,19 @@ function route(address: string, args: Args, host = ''): void {
         return
       }
 
+      // The Loop rack's effects : /opsia/layerN/loop/fx/{i}/{input}
+      if (ctl === 'loop' && segs[4] === 'fx') {
+        const fi = parseInt(segs[5], 10) - 1
+        const input = segs[6]
+        if (!input || fi < 0) return
+        const scope: FxScope = { kind: 'loop', layer: li }
+        const u = fxAt(scope, fi)
+        if (!u) return
+        const v = resolveOrPart(u.shaderId, input, segs[7], u.inputs[input], args)
+        if (v !== null) st.setFxInput(scope, u.id, input, v)
+        return
+      }
+
       if (ctl === 'fx') {
         const fi = parseInt(segs[4], 10) - 1
         const input = segs[5]
@@ -481,6 +495,7 @@ function route(address: string, args: Args, host = ''): void {
         case 'mute': st.patchLayer(li, { mute: n >= 0.5 }); return
         case 'solo': st.patchLayer(li, { solo: n >= 0.5 }); return
         case 'feedback': st.patchLayer(li, { feedback: n >= 0.5 }); return
+        case 'loopblend': { const m = enumFrom(args, LOOP_BLENDS); if (m) st.setLoopBlend(li, m); return }
         default: return
       }
     }
@@ -1376,6 +1391,8 @@ function enumerateLeaves(): Leaf[] {
     add(`/opsia/layer${n}/mute`, 0, 1, l?.mute ? 1 : 0, 'Mute (>= 0.5)')
     add(`/opsia/layer${n}/solo`, 0, 1, l?.solo ? 1 : 0, 'Solo (>= 0.5)')
     add(`/opsia/layer${n}/feedback`, 0, 1, l?.feedback ? 1 : 0, 'Feedback on (>= 0.5)')
+    const lbi = Math.max(0, LOOP_BLENDS.indexOf(l?.loopBlend ?? 'mix'))
+    add(`/opsia/layer${n}/loopblend`, 0, 1, lbi / (LOOP_BLENDS.length - 1), 'How the returning picture meets the new frame (index: mix·add·screen·lighten·darken·multiply·difference·xor·key)')
     add(`/opsia/layer${n}/vary`, 0, 1, 0, 'Vary this layer : a variant at its own amount (trigger)', false)
     const cm = Math.max(0, COUPLING_MODES.indexOf(l?.coupling?.mode ?? 'off'))
     add(`/opsia/layer${n}/coupling/mode`, 0, 1, cm / (COUPLING_MODES.length - 1), 'A/B coupling mode (index: off·lean·hocket·cut·gate·drift)')
