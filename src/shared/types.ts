@@ -269,7 +269,16 @@ export interface LayerState {
   solo: boolean
   feedback: boolean // does this layer sample its own previous frame
   // Trail persistence when feedback is on: 0 = none, →1 = long decay trails.
+  // With a Loop rack it is the loop's level : how much of each pass comes back.
   feedbackAmount: number
+  // The Loop rack : effects on the RETURNING picture. While feedback is on, the
+  // layer's previous frame runs through them on every pass before it meets the
+  // new frame, so they compound (a small turn becomes a spiral, a hue nudge a
+  // rainbow drift). Asleep while feedback is off.
+  loopFx: FxInstance[]
+  // How the returning picture meets the new frame (LOOP_BLENDS). Absent : 'mix',
+  // the plain trail every session before the Loop rack had.
+  loopBlend?: LoopBlend
   // A/B source crossfade : 0 = A only, 1 = B only. Ignored while B is empty.
   sourceMix: number
   // How B combines with A before the crossfade: out = mix(A, blend(A,B), mix).
@@ -289,6 +298,12 @@ export interface LayerState {
   // beyond blend + opacity (luma / gradient / shape). Applied in the blend pass.
   mask: LayerMask
 }
+
+// How a layer's feedback loop meets the new frame. Each one is out =
+// mix(new, combine(new, loop), amount) : 'mix' is the plain trail, 'key' lets
+// the loop through only where the new picture is dark or transparent.
+export type LoopBlend = 'mix' | 'add' | 'screen' | 'lighten' | 'darken' | 'multiply' | 'difference' | 'xor' | 'key'
+export const LOOP_BLENDS: LoopBlend[] = ['mix', 'add', 'screen', 'lighten', 'darken', 'multiply', 'difference', 'xor', 'key']
 
 // A spatial mask on a layer's stack contribution. mode : 0 none · 1 luma (the
 // layer's own luminance window) · 2 gradient (a linear fade) · 3 shape (box↔ellipse
@@ -912,7 +927,8 @@ export const FX_OPACITY_INPUT = '__opacity'
 export type FxScope =
   | { kind: 'master' }
   | { kind: 'background' }
-  | { kind: 'layer' | 'sourceA' | 'sourceB'; layer: number }
+  // 'loop' : the layer's Loop rack (effects inside its feedback).
+  | { kind: 'layer' | 'sourceA' | 'sourceB' | 'loop'; layer: number }
 
 // How a modulator combines with the parameter's base value:
 //  - 'multiply' (default for new bindings): VCA-style : the base is scaled by

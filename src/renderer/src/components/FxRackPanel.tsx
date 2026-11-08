@@ -54,7 +54,7 @@ export function FxAddSelect({ scope, className = '' }: { scope: FxScope; classNa
   const [over, setOver] = useState(false)
   // Which nodes a rack can host is `canHostFx` : one rule, shared with paste.
   const groups =
-    scope.kind === 'layer'
+    scope.kind === 'layer' || scope.kind === 'loop'
       ? FX_GROUPS
       : FX_GROUPS.map((g) => ({
           ...g,

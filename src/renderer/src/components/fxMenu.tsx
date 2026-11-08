@@ -99,6 +99,8 @@ export function useFxMenuItems(
     for (let l = 0; l < layerCount; l++) {
       if (!(scope.kind === 'layer' && scope.layer === l)) targets.push({ kind: 'layer', layer: l })
     }
+    // and this layer's Loop rack (from its FX or sources), or back out of it
+    if ('layer' in scope && scope.kind !== 'loop') targets.push({ kind: 'loop', layer: scope.layer })
     const name = SHADER_BY_ID[shaderId ?? '']?.name ?? shaderId ?? 'effect'
     for (const to of targets) {
       items.push({

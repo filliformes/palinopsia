@@ -3,7 +3,7 @@
  * ----------------------------------------------------------------------------
  * The heart of the visual instrument. Per-frame signal chain (brief §4):
  *
- *   SOURCE A ─ rackA ─┐
+ *   SOURCE A ─ rackA ─┐                       ┌── loop rack ◄── last frame
  *                     ├─ MIX ─ layer rack ─ PERSIST(feedback) ─┐
  *   SOURCE B ─ rackB ─┘                                        ├─ blend stack
  *                                            (×4 layers) ──────┘      │
@@ -16,7 +16,9 @@
  *   frame lands in its OWN ping-pong pair (so the shared buffers are free for
  *   the next layer), which doubles as the feedback source.
  * - PERSIST = mix(fresh, previous, amount): decay-register trails (never
- *   additive bloom : brief §1), capped below infinite persistence.
+ *   additive bloom : brief §1), capped below infinite persistence. The Loop
+ *   rack runs on `previous` first (effects that compound on every pass), and
+ *   the Loop blend can swap the mix for add, lighten, XOR, a key...
  * - Hot-swap principle (brief §1): loading/swapping shaders preserves the
  *   ping-pong buffers : trails survive the swap, never a reset to black.
  * - VAO discipline: the ISF runtime owns the default VAO (WebGL1-style
@@ -71,7 +73,7 @@ import { OUT_IDENTITY, OUTX_MOD_RANGE } from '@shared/outXform';
 import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } from './frameCapture';
 import { HARMONY_GLSL, MEANS_FS, abSwatches, abSwatchWanted } from './abHarmony';
 import { GridReadback } from './gridReadback';
-import { BLEND_MODES } from '@shared/types';
+import { BLEND_MODES, LOOP_BLENDS } from '@shared/types';
 export type { BlendMode };
 
 // Each layer's Import Audio file and where it was, as the last frame left it :
@@ -217,14 +219,48 @@ void main(){
 // Feedback persist: fresh frame smeared with the layer's previous frame.
 // mix() (not add) keeps trails in the decay register : they always converge
 // back to the fresh image instead of blooming toward white (brief §1).
+// The Loop blends (LOOP_BLENDS) : out = mix(new, combine(new, loop), amount).
+// Every mode but mix is clamped to 0..1 (an add loop would otherwise climb the
+// half-float buffer for ever). Difference and XOR are a negative feedback : on a
+// still picture they flip between the picture and black on every frame (a
+// strobe), so they settle over two frames instead : they pattern where things
+// move and turn, and stay calm where nothing does.
 const PERSIST_FS = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
 uniform sampler2D src;    // this frame's processed layer output
-uniform sampler2D prev;   // this layer's previous persisted frame
+uniform sampler2D prev;   // the returning picture : the last frame, through the Loop rack
 uniform float amount;     // 0 = plain copy, →1 = long trails
+uniform int mode;         // LOOP_BLENDS index
+uniform bool room;        // the Loop rack ran : what it left empty is the dark room
 void main(){
-  vec4 p = mix(texture(src, uv), texture(prev, uv), amount);
+  vec4 s = texture(src, uv), q = texture(prev, uv);
+  // A camera at its monitor : where the new frame is there, a part of the loop
+  // its effects left empty (a Transform zoomed out) is the dark room around the
+  // screen, not a hole in the layer. Without it a shrinking loop leaked the
+  // empty border inward on every pass and the whole layer went transparent.
+  if (room) q.a = max(q.a, s.a);
+  vec4 p;
+  if (mode == 0) p = mix(s, q, amount);
+  else {
+    vec3 a = clamp(s.rgb, 0.0, 1.0), b = clamp(q.rgb, 0.0, 1.0), c;
+    float k = amount;
+    if (mode == 1) c = a + b;
+    else if (mode == 2) c = 1.0 - (1.0 - a) * (1.0 - b);
+    else if (mode == 3) c = max(a, b);
+    else if (mode == 4) c = min(a, b);
+    else if (mode == 5) c = a * b;
+    else if (mode == 6) c = abs(a - b);
+    else if (mode == 7) c = vec3(ivec3(a * 255.0 + 0.5) ^ ivec3(b * 255.0 + 0.5)) / 255.0;
+    else {
+      // key : the loop shows through the new picture's dark and transparent parts
+      c = b;
+      k = amount * (1.0 - s.a * smoothstep(0.06, 0.24, dot(a, vec3(0.299, 0.587, 0.114))));
+    }
+    vec3 r = mix(a, c, k);
+    if (mode == 6 || mode == 7) r = mix(r, b, 0.5);
+    p = vec4(clamp(r, 0.0, 1.0), mix(s.a, max(s.a, q.a), amount));
+  }
   // NaN/Inf guard: a single bad frame from any source would otherwise lock the
   // feedback buffer forever (NaN self-perpetuates through prev, and feedback
   // survives shader swaps). Fall back to the live source when the trail is bad.
@@ -959,6 +995,8 @@ export class ISFLayer {
   solo = false;
   /** 0 = no feedback (plain copy) · →1 = long decay trails. */
   feedbackAmount = 0;
+  /** How the returning picture meets the new frame (LOOP_BLENDS index). */
+  loopBlend = 0;
   /** A/B mix depth : 0 = A only. Ignored while B is empty. */
   sourceMix = 0;
   /** How B combines with A before the crossfade. */
@@ -1084,6 +1122,8 @@ export class ISFLayer {
   rackA: FxRack;
   rackB: FxRack;
   rackLayer: FxRack;
+  // The Loop rack : runs on the returning picture (last frame) every pass.
+  rackLoop: FxRack;
   scratchA: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   scratchB: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Consume/Reagent competition field (lazy : only when the A/B mix uses 'consume').
@@ -1105,6 +1145,7 @@ export class ISFLayer {
     this.rackA = new FxRack(shared);
     this.rackB = new FxRack(shared);
     this.rackLayer = new FxRack(shared);
+    this.rackLoop = new FxRack(shared);
   }
 
   /** Load/swap/clear a source shader. Feedback buffers survive (brief §1).
@@ -1119,6 +1160,7 @@ export class ISFLayer {
     this.rackA.forget(id);
     this.rackB.forget(id);
     this.rackLayer.forget(id);
+    this.rackLoop.forget(id);
   }
 
   setShader(slot: 'A' | 'B', id: string | null, source: string | null): void {
@@ -1500,6 +1542,7 @@ export class ISFLayer {
     this.rackA.setTime(t);
     this.rackB.setTime(t);
     this.rackLayer.setTime(t);
+    this.rackLoop.setTime(t);
   }
 
   /** Draw a source (ISF generator, video frame, or native text) into its
@@ -1643,6 +1686,11 @@ export class ISFLayer {
     return scratch.tex;
   }
 
+  /** One of the layer's four racks, by the FxScope kind that names it. */
+  rackFor(kind: 'layer' | 'sourceA' | 'sourceB' | 'loop'): FxRack {
+    return kind === 'layer' ? this.rackLayer : kind === 'sourceA' ? this.rackA : kind === 'sourceB' ? this.rackB : this.rackLoop;
+  }
+
   /** The persisted (post-feedback) frame : what the blend stack composites. */
   texture(): WebGLTexture { return this.pp.out(); }
 
@@ -1654,6 +1702,7 @@ export class ISFLayer {
     this.rackA.flushNodes();
     this.rackB.flushNodes();
     this.rackLayer.flushNodes();
+    this.rackLoop.flushNodes();
     this.silA?.flush(); // silhouette echoes
     this.silB?.flush();
     if (this.reagent) { this.reagent.dispose(this.shared.gl); this.reagent = null; }
@@ -1733,6 +1782,7 @@ export class ISFLayer {
     this.rackA.dispose();
     this.rackB.dispose();
     this.rackLayer.dispose();
+    this.rackLoop.dispose();
     this.pp.dispose(gl);
     disposeTarget(gl, this.scratchA);
     disposeTarget(gl, this.scratchB);
@@ -1852,6 +1902,8 @@ export class Compositor {
   // Off-chain hold for source A's post-rack signal while source B's rack runs
   // (both racks share one ChainBuffers, so B could otherwise clobber A).
   private abHold!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
+  // The layer's new frame parked while its Loop rack runs through the chain.
+  private loopHold!: { fbo: WebGLFramebuffer; tex: WebGLTexture };
   // Dedicated dry/wet ping-pong for per-FX opacity (kept off the main chain).
   private fxOpac: [{ fbo: WebGLFramebuffer; tex: WebGLTexture }, { fbo: WebGLFramebuffer; tex: WebGLTexture }] | null = null;
   private fxOpacI = 0;
@@ -1916,6 +1968,8 @@ export class Compositor {
   private uMask: Record<string, WebGLUniformLocation | null> = {};
   private uPSrc: WebGLUniformLocation; private uPPrev: WebGLUniformLocation;
   private uPAmt: WebGLUniformLocation;
+  private uPMode: WebGLUniformLocation;
+  private uPRoom: WebGLUniformLocation;
   private uMA: WebGLUniformLocation; private uMB: WebGLUniformLocation;
   private uMX: WebGLUniformLocation; private uMMode: WebGLUniformLocation;
   private uMBHue!: WebGLUniformLocation; private uMState!: WebGLUniformLocation;
@@ -2003,6 +2057,8 @@ export class Compositor {
     this.uPSrc  = gl.getUniformLocation(this.persistProg, 'src')!;
     this.uPPrev = gl.getUniformLocation(this.persistProg, 'prev')!;
     this.uPAmt  = gl.getUniformLocation(this.persistProg, 'amount')!;
+    this.uPMode = gl.getUniformLocation(this.persistProg, 'mode')!;
+    this.uPRoom = gl.getUniformLocation(this.persistProg, 'room')!;
 
     this.mixProg = compile(gl, QUAD_VS, MIX_FS);
     this.uMA = gl.getUniformLocation(this.mixProg, 'a')!;
@@ -2071,6 +2127,7 @@ export class Compositor {
     this.chain = new ChainBuffers(gl, w, h);
     this.mixTarget = makeTarget(gl, w, h);
     this.abHold = makeTarget(gl, w, h);
+    this.loopHold = makeTarget(gl, w, h);
     this.bgScratch = makeTarget(gl, w, h);
     this.bgFill = makeTarget(gl, w, h);
     this.snapshot = makeTarget(gl, w, h);
@@ -3088,6 +3145,7 @@ export class Compositor {
       L.mute = l.mute;
       L.solo = l.solo;
       L.feedbackAmount = l.feedback ? l.feedbackAmount : 0;
+      L.loopBlend = Math.max(0, LOOP_BLENDS.indexOf(l.loopBlend ?? 'mix'));
       L.sourceMix = l.sourceMix;
       L.sourceBlend = l.sourceBlend ?? 'normal';
       L.harmony = l.harmony ?? 0;
@@ -3099,6 +3157,7 @@ export class Compositor {
       L.rackA.sync(l.sourceAFx, sourceById);
       L.rackB.sync(l.sourceBFx, sourceById);
       L.rackLayer.sync(l.fx, sourceById);
+      L.rackLoop.sync(l.loopFx ?? [], sourceById);
     }
     this.masterRack.sync(c.master, sourceById);
 
@@ -3274,9 +3333,7 @@ export class Compositor {
     }
     const L = this.layers[scope.layer];
     if (!L) return;
-    const rack =
-      scope.kind === 'layer' ? L.rackLayer : scope.kind === 'sourceA' ? L.rackA : L.rackB;
-    rack.setUnitInput(instId, name, value);
+    L.rackFor(scope.kind).setUnitInput(instId, name, value);
   }
 
   /** Direct write to the Background slab's source ISF input (modulation path).
@@ -3296,8 +3353,7 @@ export class Compositor {
     if (scope.kind === 'background') { this.bgRack.setUnitOpacity(instId, value); return; }
     const L = this.layers[scope.layer];
     if (!L) return;
-    const rack = scope.kind === 'layer' ? L.rackLayer : scope.kind === 'sourceA' ? L.rackA : L.rackB;
-    rack.setUnitOpacity(instId, value);
+    L.rackFor(scope.kind).setUnitOpacity(instId, value);
   }
 
   /** Live override of a layer's own compositor controls : opacity, A-B source
@@ -3480,15 +3536,18 @@ export class Compositor {
     return this.mixTarget.tex;
   }
 
-  /** pp.write() = mix(src, pp.read(), feedbackAmount), then swap. */
-  private persist(L: ISFLayer, src: WebGLTexture) {
+  /** pp.write() = the loop blend of src and the returning picture (`loop`, the
+   *  Loop rack's output, else pp.read() : the plain last frame), then swap. */
+  private persist(L: ISFLayer, src: WebGLTexture, loop: WebGLTexture | null = null) {
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.bindFramebuffer(gl.FRAMEBUFFER, L.pp.write());
     gl.viewport(0, 0, this.w, this.h);
     gl.useProgram(this.persistProg);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src); gl.uniform1i(this.uPSrc, 0);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, L.pp.read()); gl.uniform1i(this.uPPrev, 1);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, loop ?? L.pp.read()); gl.uniform1i(this.uPPrev, 1);
+    gl.uniform1i(this.uPMode, L.feedbackAmount > 0 ? L.loopBlend : 0);
+    gl.uniform1i(this.uPRoom, loop ? 1 : 0);
     // Cap just below 1 so trails always decay : infinite persistence is the
     // blooming failure mode the brief warns about.
     gl.uniform1f(this.uPAmt, Math.min(L.feedbackAmount, 0.97));
@@ -3595,7 +3654,17 @@ export class Compositor {
         }
         gl.bindVertexArray(null);
         sig = L.rackLayer.apply(sig, this.chain, layerCtx);
-        this.persist(L, sig);
+        // The Loop rack : the returning picture through its effects, on every
+        // pass, so they compound. It runs through the same chain buffers, so
+        // the new frame waits off-chain.
+        let loop: WebGLTexture | null = null;
+        if (L.feedbackAmount > 0 && L.rackLoop.hasEnabled()) {
+          this.copyInto(this.loopHold.fbo, sig);
+          sig = this.loopHold.tex;
+          gl.bindVertexArray(null);
+          loop = L.rackLoop.apply(L.pp.read(), this.chain, layerCtx);
+        }
+        this.persist(L, sig, loop);
       } catch (e) {
         this.shared.redirect.redirect = null;
         console.error(`[render] layer ${li} skipped this frame:`, e);
@@ -3984,6 +4053,7 @@ export class Compositor {
     this.chain.dispose(gl);
     disposeTarget(gl, this.mixTarget);
     disposeTarget(gl, this.abHold);
+    disposeTarget(gl, this.loopHold);
     disposeTarget(gl, this.meansTarget);
     for (const c of this.abSwatchCaps.values()) c.dispose();
     this.abSwatchCaps.clear();

@@ -3,10 +3,11 @@
 // and the calls the page answers can never drift apart.
 //
 // Addresses, the same everywhere :
-//   a unit (its controls)  L1.A · L1.B · L1.fx.2 · L1.A.fx.1 · master.fx.1 ·
-//                          master.vibe · master.context · master.finalizer ·
-//                          bg · bg.fx.1      (layers 1-4, effects counted from 1)
-//   a rack (its effects)   L1 · L1.A · L1.B · master · bg
+//   a unit (its controls)  L1.A · L1.B · L1.fx.2 · L1.A.fx.1 · L1.loop.fx.1 ·
+//                          master.fx.1 · master.vibe · master.context ·
+//                          master.finalizer · bg · bg.fx.1
+//                          (layers 1-4, effects counted from 1)
+//   a rack (its effects)   L1 · L1.A · L1.B · L1.loop · master · bg
 
 export interface McpToolDef {
   name: string
@@ -22,11 +23,11 @@ export interface McpToolDef {
 const unit = {
   type: 'string',
   description:
-    'Which unit : L1.A / L1.B (a layer\'s sources), L1.fx.2 (layer 1\'s 2nd effect), L1.A.fx.1 (an effect on source A), master.fx.1, master.vibe, master.context, master.finalizer, bg (the background source), bg.fx.1. Layers are 1-4, effects count from 1.'
+    'Which unit : L1.A / L1.B (a layer\'s sources), L1.fx.2 (layer 1\'s 2nd effect), L1.A.fx.1 (an effect on source A), L1.loop.fx.1 (an effect inside layer 1\'s feedback loop), master.fx.1, master.vibe, master.context, master.finalizer, bg (the background source), bg.fx.1. Layers are 1-4, effects count from 1.'
 }
 const rack = {
   type: 'string',
-  description: 'Which effect rack : L1 (the layer, after its sources mix), L1.A / L1.B (one source, before the mix), master (the whole picture), bg (the background).'
+  description: 'Which effect rack : L1 (the layer, after its sources mix), L1.A / L1.B (one source, before the mix), L1.loop (inside the layer\'s feedback : the last frame runs through it on every pass, so its effects compound; it plays only while the layer\'s feedback is on), master (the whole picture), bg (the background).'
 }
 const values = {
   type: 'object',
@@ -115,7 +116,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     name: 'set_layer',
     title: 'Set a layer',
     description:
-      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1, harmony -1 to 1 (the colors of B set against those of A : -1 matched to the hue of A, 0 untouched, 1 on its complement). The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
+      'A layer\'s own settings : opacity 0-1, blend (against the layers below), mix 0-1 (A to B), source_blend (how B meets A), mute, solo, speed (its clock, 1 = real time, 0-4), feedback (sample its own last frame) and trail 0-1 (how much of each pass comes back), loop_blend (how the returning picture meets the new frame : mix add screen lighten darken multiply difference xor key), harmony -1 to 1 (the colors of B set against those of A : -1 matched to the hue of A, 0 untouched, 1 on its complement). The background takes opacity, speed, depth (its shadow) and group (true : the layers composite alone over it).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -129,6 +130,7 @@ export const MCP_TOOLS: McpToolDef[] = [
         speed: { type: 'number' },
         feedback: { type: 'boolean' },
         trail: { type: 'number' },
+        loop_blend: { type: 'string', description: 'mix add screen lighten darken multiply difference xor key' },
         harmony: { type: 'number' },
         depth: { type: 'number' },
         group: { type: 'boolean' }
@@ -158,7 +160,7 @@ export const MCP_TOOLS: McpToolDef[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        unit: { type: 'string', description: 'The effect : L1.fx.2, L1.A.fx.1, master.fx.1, bg.fx.1.' },
+        unit: { type: 'string', description: 'The effect : L1.fx.2, L1.A.fx.1, L1.loop.fx.1, master.fx.1, bg.fx.1.' },
         enabled: { type: 'boolean' },
         mix: { type: 'number' },
         position: { type: 'number', description: 'Move it here (1 = first).' },

@@ -19,10 +19,10 @@
 //     names itself "(gone)" and does nothing.
 //
 // Ids :
-//   act:layer:<i>:<mute|solo|fx|fb|freeze|next|prev|rand|ab|blend|vary|punch>
+//   act:layer:<i>:<mute|solo|fx|fb|loop|loopblend|freeze|next|prev|rand|ab|blend|vary|punch>
 //   act:layer:<i>:<opoff|opfull|optoggle|opup|opdown> · act:bg:<the same five>   opacity
 //   act:fx:<rack>:<shader>:<input>   an effect's trigger (rack : master,
-//                                     background, layer:<i>, sourceA:<i>, sourceB:<i>)
+//                                     background, layer:<i>, sourceA:<i>, sourceB:<i>, loop:<i>)
 //   act:src:<i>:<A|B>:<shader>:<input> · act:bgsrc:<shader>:<input>   a source's trigger
 //   act:chain:<next|prev|rand> · act:finishing
 //   act:scene:rand
@@ -40,7 +40,7 @@
 //   act:out:<shot|turn|spin|flipx|flipy|reset>
 
 import type { FxInstance, FxScope, LayerState, SourceSlot } from '@shared/types'
-import { BLEND_MODES } from '@shared/types'
+import { BLEND_MODES, LOOP_BLENDS } from '@shared/types'
 import { useStore, FEEL_NEUTRAL } from './store'
 import { layerPin, layerSpeedPin, modPin, slotPin, isPinnedTarget } from './persist'
 import { DICE_SOURCES, randomizeInputs } from './randomize'
@@ -58,6 +58,7 @@ import { captureScreenshot } from './recorder'
 import { outputCanvas } from './engine/outputCanvas'
 import { runSilently } from './undo'
 import { showToast } from './components/Toast'
+import { isLayerRackKind, LAYER_RACK_SHORT, layerRackOf, type LayerRackKind } from './layerRack'
 
 type St = ReturnType<typeof useStore.getState>
 const get = (): St => useStore.getState()
@@ -134,7 +135,7 @@ function opacityTo(key: string, cur: number, v: OpVerb): number {
   return Math.max(0, Math.min(1, to))
 }
 
-const LAYER_VERBS = ['mute', 'solo', 'fx', 'fb', 'freeze', 'next', 'prev', 'rand', 'ab', 'blend', 'vary', 'punch', ...OP_VERBS] as const
+const LAYER_VERBS = ['mute', 'solo', 'fx', 'fb', 'loop', 'loopblend', 'freeze', 'next', 'prev', 'rand', 'ab', 'blend', 'vary', 'punch', ...OP_VERBS] as const
 type LayerVerb = (typeof LAYER_VERBS)[number]
 type PlainLayerVerb = Exclude<LayerVerb, OpVerb>
 const LAYER_WORDS: Record<PlainLayerVerb, { label: string; verb: (n: number) => string; token: string; title: string }> = {
@@ -142,6 +143,8 @@ const LAYER_WORDS: Record<PlainLayerVerb, { label: string; verb: (n: number) => 
   solo: { label: 'solo on/off', verb: (n) => `solos layer ${n}`, token: 'Solo', title: 'Solos the layer, or lets the others back' },
   fx: { label: 'FX on/off', verb: (n) => `switches layer ${n}’s FX`, token: 'Fx', title: 'Turns all the layer’s effects off, or all back on (its rack’s power switch)' },
   fb: { label: 'feedback on/off', verb: (n) => `switches layer ${n}’s feedback`, token: 'Fb', title: 'Turns the layer’s feedback (its trails) on or off' },
+  loop: { label: 'loop FX on/off', verb: (n) => `switches layer ${n}’s loop effects`, token: 'Loop', title: 'Turns all the effects inside the layer’s feedback loop off, or all back on (the Loop rack’s power switch)' },
+  loopblend: { label: 'next loop blend', verb: (n) => `steps layer ${n}’s loop blend`, token: 'LoopBlend', title: 'The next way the returning picture meets the new frame (mix, add, screen, lighten, darken, multiply, difference, XOR, key)' },
   freeze: { label: 'freeze / run', verb: (n) => `freezes layer ${n}`, token: 'Frz', title: 'Stops the layer’s time (its speed to 0) while the others run on; again, back to its speed' },
   next: { label: 'next source', verb: (n) => `steps layer ${n}’s source`, token: 'Src', title: 'The next source in the picker’s order, on the side you see (A, or B when the mix leans to it), at its own look. The dice’s pool : never one that needs you (text, films, the camera)' },
   prev: { label: 'previous source', verb: (n) => `steps layer ${n}’s source back`, token: 'SrcBack', title: 'The previous source in the picker’s order, on the side you see' },
@@ -262,6 +265,15 @@ function fireLayer(i: number, v: LayerVerb): void {
       st.toggleRackChain({ kind: 'layer', layer: i })
       return
     case 'fb': st.toggleFeedback(i); return
+    case 'loop':
+      if (st.pins.some((k) => k.startsWith(`fxunit:loop:${i}:`))) { say(`An effect in L${i + 1}'s loop is persistent : the action leaves its rack`); return }
+      st.toggleRackChain({ kind: 'loop', layer: i })
+      return
+    case 'loopblend': {
+      const k = LOOP_BLENDS.indexOf(l.loopBlend ?? 'mix')
+      st.setLoopBlend(i, LOOP_BLENDS[(k + 1) % LOOP_BLENDS.length])
+      return
+    }
     case 'freeze':
       if (l.speed > 0) { frozenAt.set(i, l.speed); st.setLayerSpeed(i, 0) }
       else { st.setLayerSpeed(i, frozenAt.get(i) ?? 1); frozenAt.delete(i) }
@@ -294,12 +306,12 @@ function fireBgOpacity(v: OpVerb): void {
 
 // ── Triggers : every event input loaded (an effect's grab / clear, a source's reseed) ──
 
-type RackKey = 'master' | 'background' | `${'layer' | 'sourceA' | 'sourceB'}:${number}`
+type RackKey = 'master' | 'background' | `${LayerRackKind}:${number}`
 function scopeOf(rack: string): FxScope | null {
   if (rack === 'master' || rack === 'background') return { kind: rack }
   const [k, n] = rack.split(':')
   const layer = Number(n)
-  if ((k === 'layer' || k === 'sourceA' || k === 'sourceB') && Number.isInteger(layer) && layer >= 0) return { kind: k, layer }
+  if (isLayerRackKind(k) && Number.isInteger(layer) && layer >= 0) return { kind: k, layer }
   return null
 }
 function chainOf(st: St, s: FxScope): FxInstance[] {
@@ -308,10 +320,10 @@ function chainOf(st: St, s: FxScope): FxInstance[] {
   if (s.kind === 'background') return c.background?.fx ?? []
   const l = c.layers[s.layer]
   if (!l) return []
-  return s.kind === 'layer' ? l.fx : s.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
+  return layerRackOf(l, s.kind)
 }
 const rackWords = (s: FxScope): string =>
-  s.kind === 'master' ? 'Master' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${s.kind === 'layer' ? 'FX' : s.kind === 'sourceA' ? 'A fx' : 'B fx'}`
+  s.kind === 'master' ? 'Master' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${LAYER_RACK_SHORT[s.kind]}`
 const shaderName = (id: string): string => SHADER_BY_ID[id]?.name ?? id
 const eventsOf = (shaderId: string | null | undefined): Array<{ name: string; label: string }> =>
   shaderId && SHADER_BY_ID[shaderId] ? inputsForShader(shaderId).filter((d) => d.type === 'event').map((d) => ({ name: d.name, label: d.label.replace(/\s*▸\s*$/, '') })) : []
@@ -813,7 +825,7 @@ export function actionIds(st: St = get()): string[] {
       const s = slot === 'A' ? l.sourceA : l.sourceB
       if (s?.shaderId) for (const e of eventsOf(s.shaderId)) add(`act:src:${i}:${slot}:${s.shaderId}:${e.name}`)
     }
-    racks.push(`sourceA:${i}`, `sourceB:${i}`, `layer:${i}`)
+    racks.push(`sourceA:${i}`, `sourceB:${i}`, `layer:${i}`, `loop:${i}`)
   })
   const bg = c.background?.source?.shaderId
   if (bg) for (const e of eventsOf(bg)) add(`act:bgsrc:${bg}:${e.name}`)

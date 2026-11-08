@@ -39,6 +39,9 @@ import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
+import { LOOP_BLENDS, type LoopBlend } from '@shared/types'
+import { isLayerRackKind, LAYER_RACK_PROP, layerRackOf } from './layerRack'
+import { LOOP_RECIPE_BY_ID, LOOP_START } from './loopRecipes'
 import { defaultResolumeMap, resoCatalogue, RESO_SNAPSHOTS } from '@shared/resolume'
 import type { DomeConfig } from '@shared/dome'
 import type { NdiConfig, NdiStatus } from '@shared/ndi'
@@ -151,6 +154,7 @@ import {
   randomizeInputs,
   jitterLayer,
   randomizeRack,
+  loopFromRecipe,
   randomizeSingleLayer,
   seedRandomStart,
   themedMotion,
@@ -388,6 +392,7 @@ function makeLayer(sourceShaderId: string | null = null): LayerState {
     sourceAFx: [],
     sourceBFx: [],
     fx: [],
+    loopFx: [],
     blend: 'add',
     opacity: 1,
     mute: false,
@@ -803,11 +808,7 @@ function fxChainOf(st: { composition: CompositionState }, s: FxScope): FxInstanc
     ? st.composition.master
     : s.kind === 'background'
       ? st.composition.background?.fx
-      : s.kind === 'layer'
-        ? st.composition.layers[s.layer]?.fx
-        : s.kind === 'sourceA'
-          ? st.composition.layers[s.layer]?.sourceAFx
-          : st.composition.layers[s.layer]?.sourceBFx
+      : st.composition.layers[s.layer] && layerRackOf(st.composition.layers[s.layer], s.kind)
 }
 
 /** The ISF input a mod target drives : its shader, the stored inputs and the
@@ -1188,6 +1189,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
       sourceAFx: l.sourceAFx ?? [],
       sourceBFx: l.sourceBFx ?? [],
       fx: l.fx ?? [],
+      loopFx: l.loopFx ?? [],
+      ...(l.loopBlend && !LOOP_BLENDS.includes(l.loopBlend) ? { loopBlend: undefined } : {}),
       coupling: l.coupling ?? { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'transient' },
       mask: { ...makeDefaultMask(), ...(l.mask ?? {}) }
     })),
@@ -1423,6 +1426,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     if (theme.muted?.includes(i)) l.mute = true // seen only through what reads it
     l.feedback = R() < theme.feedback
     l.feedbackAmount = rr(0.4, 0.75)
+    // a loop of the theme's : effects that compound inside the feedback
+    const loop = l.feedback && theme.loops?.length && R() < (theme.loopChance ?? 0.6) ? LOOP_RECIPE_BY_ID[pickOf(theme.loops)] : undefined
+    if (loop) Object.assign(l, loopFromRecipe(loop))
     l.speed = rr(0.6, 1.6)
     return l
   })
@@ -1539,6 +1545,10 @@ interface StoreState {
   toggleSolo: (layer: number) => void
   toggleFeedback: (layer: number) => void
   setFeedbackAmount: (layer: number, v: number) => void
+  setLoopBlend: (layer: number, mode: LoopBlend) => void
+  /** A ready loop (loopRecipes.ts) on this layer : its Loop rack, its blend and
+   *  its amount, feedback on. One undo step; the loop's pinned effects stay. */
+  applyLoopRecipe: (layer: number, recipeId: string) => void
   setSourceMix: (layer: number, v: number) => void
   setHarmony: (layer: number, v: number) => void
   setCoupling: (layer: number, partial: Partial<LayerCoupling>) => void
@@ -2482,11 +2492,7 @@ export function targetAlive(c: CompositionState, t: ModTarget, al?: AudioLayerSt
         ? c.master
         : s.kind === 'background'
           ? c.background?.fx
-          : s.kind === 'layer'
-            ? c.layers[s.layer]?.fx
-            : s.kind === 'sourceA'
-              ? c.layers[s.layer]?.sourceAFx
-              : c.layers[s.layer]?.sourceBFx
+          : c.layers[s.layer] && layerRackOf(c.layers[s.layer], s.kind)
     return !!arr?.some((f) => f.id === t.instId)
   }
   if (t.kind === 'source') {
@@ -2523,8 +2529,8 @@ function dropLayerTargets(c: CompositionState, layer: number): CompositionState 
     (t) =>
       (t.kind === 'source' && t.layer === layer) ||
       (t.kind === 'fx' &&
-        (t.scope.kind === 'layer' || t.scope.kind === 'sourceA' || t.scope.kind === 'sourceB') &&
-        t.scope.layer === layer)
+        isLayerRackKind(t.scope.kind) &&
+        (t.scope as { layer: number }).layer === layer)
   )
 }
 
@@ -2585,8 +2591,7 @@ export function fxArrayFor(c: CompositionState, scope: FxScope): FxInstance[] {
   if (scope.kind === 'background') return c.background?.fx ?? []
   const l = c.layers[scope.layer]
   if (!l) return []
-  if (scope.kind === 'layer') return l.fx
-  return scope.kind === 'sourceA' ? l.sourceAFx : l.sourceBFx
+  return layerRackOf(l, scope.kind)
 }
 
 /** updateLayer, but returns a whole CompositionState (one layer rewritten). */
@@ -2612,9 +2617,7 @@ function updateFxArray(
   return {
     ...c,
     layers: updateLayer(c.layers, scope.layer, (l) => {
-      if (scope.kind === 'layer') return { ...l, fx: fn(l.fx) }
-      if (scope.kind === 'sourceA') return { ...l, sourceAFx: fn(l.sourceAFx) }
-      return { ...l, sourceBFx: fn(l.sourceBFx) }
+      return { ...l, [LAYER_RACK_PROP[scope.kind]]: fn(layerRackOf(l, scope.kind)) }
     })
   }
 }
@@ -2955,7 +2958,8 @@ export const useStore = create<StoreState>((set, get) => ({
           id: l.id,
           sourceAFx: p.layer.sourceAFx.map((f) => ({ ...f, id: uid() })),
           sourceBFx: p.layer.sourceBFx.map((f) => ({ ...f, id: uid() })),
-          fx: p.layer.fx.map((f) => ({ ...f, id: uid() }))
+          fx: p.layer.fx.map((f) => ({ ...f, id: uid() })),
+          loopFx: (p.layer.loopFx ?? []).map((f) => ({ ...f, id: uid() }))
         }))
       }
       // The layer's instrument is replaced : drop its now-orphaned patching
@@ -2990,7 +2994,8 @@ export const useStore = create<StoreState>((set, get) => ({
           id: l.id,
           sourceAFx: src.sourceAFx.map((f) => ({ ...f, id: uid() })),
           sourceBFx: src.sourceBFx.map((f) => ({ ...f, id: uid() })),
-          fx: src.fx.map((f) => ({ ...f, id: uid() }))
+          fx: src.fx.map((f) => ({ ...f, id: uid() })),
+          loopFx: (src.loopFx ?? []).map((f) => ({ ...f, id: uid() }))
         }))
       }
       // Pasting replaces this layer's instrument : drop its orphaned patching.
@@ -3072,6 +3077,35 @@ export const useStore = create<StoreState>((set, get) => ({
         }))
       }
     })),
+  setLoopBlend: (layer, mode) =>
+    set((s) => ({
+      composition: {
+        ...s.composition,
+        layers: updateLayer(s.composition.layers, layer, (l) => ({
+          ...l,
+          loopBlend: LOOP_BLENDS.includes(mode) ? mode : 'mix'
+        }))
+      }
+    })),
+  applyLoopRecipe: (layer, recipeId) =>
+    set((s) => {
+      const r = LOOP_RECIPE_BY_ID[recipeId]
+      const cur = s.composition.layers[layer]
+      if (!r || !cur || layerHeld(s, layer)) return {}
+      const old = cur.loopFx ?? []
+      const next: FxInstance[] = r.fx.map((f) => ({ id: uid(), shaderId: f.shaderId, enabled: true, inputs: { ...f.inputs }, ...(f.opacity !== undefined ? { opacity: f.opacity } : {}) }))
+      const composition = keepPinnedUnits(
+        {
+          ...s.composition,
+          layers: updateLayer(s.composition.layers, layer, (l) => ({ ...l, loopFx: next, loopBlend: r.blend, feedback: true, feedbackAmount: r.amount }))
+        },
+        s.composition,
+        s.pins
+      )
+      const dealt = new Set(fxArrayFor(composition, { kind: 'loop', layer }).map((f) => f.id))
+      const gone = new Set(old.filter((f) => !dealt.has(f.id)).map((f) => f.id))
+      return { composition: keep(s, dropTargets(composition, (t) => t.kind === 'fx' && gone.has(t.instId))) }
+    }),
   setSourceShader: (layer, slot, shaderId) =>
     set((s) => {
       // Re-picking the SAME generator that is already in the slot is a no-op :
@@ -3640,7 +3674,9 @@ export const useStore = create<StoreState>((set, get) => ({
         composition: updateFxArray(s.composition, scope, (fx) => {
           // Locked units (the Vibe Palette) stay last : insert before them.
           const lockedAt = fx.findIndex((f) => f.locked)
-          const unit = { id: instId, shaderId, enabled: true, inputs: {} }
+          // in a loop an effect compounds on every pass : it starts gentle
+          const start = scope.kind === 'loop' ? LOOP_START[shaderId] : undefined
+          const unit = { id: instId, shaderId, enabled: true, inputs: start ? { ...start } : {} }
           if (lockedAt < 0) return [...fx, unit]
           const next = [...fx]
           next.splice(lockedAt, 0, unit)

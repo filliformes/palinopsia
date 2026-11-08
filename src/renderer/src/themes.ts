@@ -45,6 +45,11 @@ export interface Theme {
   useB: number
   /** Chance a layer runs its own feedback (0..1). */
   feedback: number
+  /** Loop recipes (loopRecipes.ts) a layer that feeds back may run : its Loop
+   *  rack, its blend and its amount. */
+  loops?: string[]
+  /** Chance a layer that feeds back takes one of `loops` (default 0.6). */
+  loopChance?: number
   // Field macros (0.5 neutral) + temperament (0 off) targets.
   density: number
   gestureTexture: number
@@ -244,6 +249,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'wobbulator', name: 'Wobbulator', family: 'Analog Video Synthesis',
+    loops: ['melt', 'swirl'],
     blurb: 'One oscillator folded back through a wandering feedback loop.',
     world: 'musical',
     palette: [K, [0.1, 0.2, 0.45, 1], [0.7, 0.85, 1.0, 1]],
@@ -253,6 +259,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'phosphor-burn', name: 'Phosphor Burn', family: 'Analog Video Synthesis',
+    loops: ['rise', 'echo-key'],
     blurb: 'Amber afterglow burnt into the tube : oscillators + phosphene + trails.',
     world: 'sublimated',
     palette: [K, [0.35, 0.18, 0.02, 1], [1.0, 0.7, 0.2, 1]],
@@ -262,6 +269,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'raw-feedback', name: 'Raw Feedback', family: 'Analog Video Synthesis',
+    loops: ['spiral', 'tunnel', 'swirl', 'xor-bloom'],
     blurb: 'A camera pointed at its own monitor : the feedback engine at the edge of chaos.',
     world: 'synthetic',
     palette: [K, [0.06, 0.14, 0.16, 1], [0.55, 0.75, 0.72, 1]],
@@ -571,6 +579,7 @@ export const THEMES: Theme[] = [
   // ── Feedback / Afterimage ─────────────────────────────────────────────
   mk({
     id: 'palinopsia', name: 'Palinopsia', family: 'Feedback / Afterimage',
+    loops: ['melt', 'drip', 'rise'],
     blurb: 'The namesake : a bright stimulus burns a complementary ghost that lingers.',
     world: 'sublimated',
     palette: [K, [0.18, 0.05, 0.28, 1], [0.5, 0.85, 0.75, 1]],
@@ -580,6 +589,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'tunnel', name: 'Tunnel', family: 'Feedback / Afterimage',
+    loops: ['tunnel', 'echo-key', 'rise'],
     blurb: 'A feedback tunnel that wanders off-centre : never a fixed mandala.',
     world: 'musical',
     palette: [K, [0.1, 0.14, 0.3, 1], [0.7, 0.8, 1.0, 1]],
@@ -588,7 +598,18 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-feedback'], blends: ['screen', 'add'], feedback: 0.6, drift: 0.5, layers: [1, 2]
   }),
   mk({
+    id: 'monitor-loop', name: 'Monitor Loop', family: 'Feedback / Afterimage',
+    loops: ['spiral', 'tunnel', 'echo-key', 'swirl', 'rise', 'melt'], loopChance: 1,
+    blurb: 'A camera at its own monitor with effects in the loop : each pass turns, shrinks or melts the last.',
+    world: 'synthetic',
+    palette: [K, [0.07, 0.1, 0.16, 1], [0.62, 0.72, 0.82, 1]],
+    sources: ['organic', 'shapes', 'particle-drift', 'congeal', 'filaments'],
+    layerFx: ['fx-grade', 'fx-sharpen'],
+    blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], drift: 0.4, coalesce: 0.5
+  }),
+  mk({
     id: 'echo-chamber', name: 'Echo Chamber', family: 'Feedback / Afterimage',
+    loops: ['echo-key', 'tunnel', 'drip'],
     blurb: 'Trails that pulse with a captured rhythm : temporal convolution echoes.',
     world: 'sublimated',
     palette: [K, [0.12, 0.18, 0.22, 1], [0.7, 0.82, 0.8, 1]],
@@ -598,6 +619,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'persistence', name: 'Persistence', family: 'Feedback / Afterimage',
+    loops: ['echo-key', 'melt', 'drip'],
     blurb: 'Long-exposure light painting : the brightest pixels smear and decay.',
     world: 'sublimated',
     palette: [K, [0.3, 0.16, 0.04, 1], [1.0, 0.85, 0.5, 1]],
@@ -607,6 +629,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'recursion', name: 'Recursion', family: 'Feedback / Afterimage',
+    loops: ['tunnel', 'echo-key'],
     blurb: 'A shape cascading inward through an off-centre zoom : a spiral, not a kaleidoscope.',
     world: 'musical',
     palette: [K, [0.16, 0.06, 0.2, 1], [0.8, 0.75, 0.9, 1]],
@@ -929,6 +952,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'melt', name: 'Melt', family: 'Datamosh & Compression',
+    loops: ['melt'],
     blurb: 'The datamosh bloom : new motion drags the old texture, figures melt into a soup of colour.',
     world: 'sublimated',
     palette: [K, [0.4, 0.08, 0.35, 1], [0.1, 0.5, 0.55, 1], [0.95, 0.8, 0.5, 1]],
@@ -1718,6 +1742,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'meltwater', name: 'Meltwater', family: 'Feedback / Afterimage',
+    loops: ['melt', 'drip'],
     blurb: 'The picture softens only at its own edges and the seams slowly walk : contours dissolving in place.',
     world: 'sublimated',
     palette: [K, [0.08, 0.14, 0.16, 1], [0.5, 0.68, 0.66, 1]],

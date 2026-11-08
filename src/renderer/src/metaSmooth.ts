@@ -29,6 +29,7 @@ import { isPinnedTarget } from './persist'
 import { auSpan, auTargetAlive, auValueOf } from '@shared/auMod'
 import { AUDIO_LAYER } from './audio/audioLayer'
 import { videoKey, videoSeekRequests } from './engine/videoState'
+import { layerRackOf } from './layerRack'
 
 const knobDisplay: number[] = []
 const tweens: Array<{ from: number; to: number; startedAt: number; ms: number; dice: boolean } | null> = []
@@ -169,11 +170,7 @@ function applyDest(target: ModTarget, shaped: number): void {
         ? c.master
         : s.kind === 'background'
           ? c.background?.fx
-          : s.kind === 'layer'
-            ? c.layers[s.layer]?.fx
-            : s.kind === 'sourceA'
-              ? c.layers[s.layer]?.sourceAFx
-              : c.layers[s.layer]?.sourceBFx
+          : c.layers[s.layer] && layerRackOf(c.layers[s.layer], s.kind)
     const unit = arr?.find((f) => f.id === target.instId)
     shaderId = unit?.shaderId ?? null
     inputs = unit?.inputs

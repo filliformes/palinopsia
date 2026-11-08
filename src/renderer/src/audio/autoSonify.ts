@@ -110,6 +110,7 @@ export function suggestSonify(c: CompositionState, cur: SoniConfig): SoniConfig 
       rack(l.sourceAFx, mine, 0.8)
       rack(l.sourceBFx, mine, 0.5)
       rack(l.fx, mine, 1)
+      if (l.feedback) rack(l.loopFx ?? [], mine, 1)
       if (l.feedback && l.feedbackAmount > 0.2) mine.set('orbit', (mine.get('orbit') ?? 0) + 2)
     }
     perLayer.push(mine)

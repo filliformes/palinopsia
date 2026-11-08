@@ -38,6 +38,7 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerInspectorRandomize } from '../commands'
 import { TEXT_FONTS, textFontWeightRange } from '../textFonts'
 import { applyVibeColor } from '../vibeColor'
+import { layerRackOf } from '../layerRack'
 
 // Text source : grey the weight dial when the chosen face has a single weight
 // (the engine clamps the weight into each face's real range).
@@ -61,7 +62,8 @@ const SCOPE_LABEL: Record<FxScope['kind'], string> = {
   background: 'background fx',
   layer: 'layer fx',
   sourceA: 'src A fx',
-  sourceB: 'src B fx'
+  sourceB: 'src B fx',
+  loop: 'loop fx'
 }
 
 // The native nodes that read OTHER layers, and how each input is labelled. The
@@ -324,12 +326,7 @@ export function Inspector(): JSX.Element {
     else {
       const layer = composition.layers[scope.layer]
       if (layer) {
-        arr =
-          scope.kind === 'layer'
-            ? layer.fx
-            : scope.kind === 'sourceA'
-              ? layer.sourceAFx
-              : layer.sourceBFx
+        arr = layerRackOf(layer, scope.kind)
       }
     }
     const inst = arr.find((f) => f.id === instId)
@@ -347,7 +344,7 @@ export function Inspector(): JSX.Element {
       // Only the nodes that READ another layer get pickers; the self-contained
       // nodes ignore a sidechain, so showing one for them is misleading.
       const roles = NODE_INPUTS[inst.shaderId]
-      if (roles && (scope.kind === 'layer' || !roles[0].layerOnly)) {
+      if (roles && (scope.kind === 'layer' || scope.kind === 'loop' || !roles[0].layerOnly)) {
         const sc = scope
         const hostLayer = 'layer' in scope ? scope.layer : -1
         nodeSidechains = roles.map((role, i) => ({
