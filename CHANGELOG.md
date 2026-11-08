@@ -81,6 +81,26 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   bytes (a desktop frame stops at 32,768) : past it the last actions are left out and the
   section says how many; it warns past 8 KB (microcontroller nodes). A reference C++ node keeps
   the first 128 entries (its store stops adding when full), so the actions go last.
+  Then ALL of them, on by default (Vincent, 11-08 : "You didn't add all the body rule dropdown
+  menu entries to the dataflou-controllable parameters... do it. I want them all there", "I
+  want all the layers controls, transport, sonify, generate, audio, etc..."). The switch
+  shipped off, so only the fixed tree showed, and a real session's list outgrows one frame.
+  `DF_DEFAULT_CONFIG.actions` is now true and a stored config from before turns it on once
+  (`v: 2` marks a choice made since). The list is split by heading over two nodes :
+  `DF_SESSION_GROUPS` (Scenes, Worlds, Triggers, Modulators, Body rules : the headings that
+  follow the session) go to a second node, `<label>-session` (`dfSessionLabel`), started
+  beside the first (`syncCompanion`, one step at a time) with a SKU made from ours (a sha1
+  shaped as a UUID, the same every run) and its own saved bindings
+  (`bindings-<universe>-session.json`); the fixed headings stay on the first node at the same
+  paths, so a wire to them is kept. Each tree is fitted on its own (`fit`), each node re-declares
+  only when its share changed, both feed the same value buffer. `DfStatus.companion`; the
+  section counts both, keeps the second node out of the network list, and the switch's
+  tooltip says which headings live where. Turning the actions off stops the second node and
+  FLUSHes it (no offline ghost). Measured on universe `opsia-test-dfall` : a fresh session
+  242 actions here (23.8 KB) + 34 there (2.9 KB); with 120 scenes and 40 rules, 516 actions,
+  none left out (23.8 KB + 20.4 KB). A trigger set over the mesh on the second node (the
+  visualizer's `set_value` : SETVAL from the first) turned modulator 1 on; `act/l1/mute`
+  on the first muted layer 1. Off / on / node off clean, no console error.
 - **Liquid glass on the interface, slim sliders** (Vincent : "propose how to integrate Liquid
   Glass, used sparingly, so it looks a bit more slick and modern, less LLM-style"; "I want
   Glass+quiet sliders"; on the thin ones : "I liked it better without thin sliders, the UI was

@@ -72,22 +72,43 @@ export interface DfStatus {
   rxPerSec: number // UDP values received per second
   txPerSec: number // UDP values sent per second
   declareBytes: number // our whole tree, as one DECLARE frame
-  actions: number // the actions on the mesh now (0 when they are off)
-  actionsDropped: number // actions left out : the tree would have been too big
+  actions: number // the actions on the mesh now, on both our nodes (0 when they are off)
+  actionsDropped: number // actions left out : a tree would have been too big
+  // our second node, carrying the actions that follow the session (null when off)
+  companion: DfCompanion | null
   visualizer: number // visualizer pages open on this node now
   visualizerAvailable: boolean // does this build carry the visualizer page ?
+}
+
+/** Palinopsia's second node : the session's actions (see DF_SESSION_GROUPS). */
+export interface DfCompanion {
+  sku: string
+  label: string
+  running: boolean
+  actions: number
+  actionsDropped: number
+  declareBytes: number
 }
 
 export interface DfConfig {
   enabled: boolean
   label: string
   universe: string
-  // Every action of the Body rule picker as a destination too (act/...). Off by
-  // default : the tree then outgrows what a small board (Teensy, ESP32) takes.
+  // Every action of the Body rule picker as a destination too (act/...). On by
+  // default; off for a mesh with a small board (Teensy, M5) : the trees then
+  // outgrow what it takes.
   actions: boolean
 }
 
-export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', actions: false }
+export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', actions: true }
+
+// The Body rule picker's headings whose entries follow the session (its scenes,
+// its Worlds, its modulators, its rules, the triggers of what is loaded). They
+// ride on a second node, `<label>-session`, so the first keeps a tree of a steady
+// size under one frame, every heading always lands on the same node, and a wire
+// to an action never moves. Any heading not named here is fixed : the first node.
+export const DF_SESSION_GROUPS: ReadonlySet<string> = new Set(['Scenes', 'Worlds', 'Triggers (what is loaded)', 'Modulators', 'Body rules'])
+export const dfSessionLabel = (label: string): string => `${label.slice(0, 24)}-session`
 
 /** One action of the Body rule picker, as the renderer hands it to the node. */
 export interface DfAction {
@@ -260,8 +281,9 @@ function param(path: string, label: string, p: Partial<DfParam>): DfParam {
 
 /** The tree Palinopsia declares : groups before their children, depth first.
  *  The actions come last : a reference node keeps the first 128 entries of a
- *  tree, so it still sees the whole of the rest. */
-export function palinopsiaTree(actions: DfAction[] = []): DfParam[] {
+ *  tree, so it still sees the whole of the rest. `fixed` false : the actions
+ *  alone (the session node's tree). */
+export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[] {
   const out: DfParam[] = []
   const groups = new Set<string>()
   const groupLabel = new Map<string, string>()
@@ -276,7 +298,7 @@ export function palinopsiaTree(actions: DfAction[] = []): DfParam[] {
       out.push(param(g, label, { kind: 'group', rate: 0, flow: 'source', access: 'read', mode: 'discrete' }))
     }
   }
-  for (const d of DF_DESTS) {
+  for (const d of fixed ? DF_DESTS : []) {
     addGroups(d.path)
     out.push(param(d.path, d.label, {
       type: d.type,
@@ -286,7 +308,7 @@ export function palinopsiaTree(actions: DfAction[] = []): DfParam[] {
       rate: d.type === 'bool' ? 0 : 60
     }))
   }
-  for (const s of DF_SOURCES) {
+  for (const s of fixed ? DF_SOURCES : []) {
     addGroups(s.path)
     out.push(param(s.path, s.label, { flow: 'source', access: 'read', rate: 30 }))
   }
