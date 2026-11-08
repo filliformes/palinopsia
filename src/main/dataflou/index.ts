@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DataflouNode } from './node'
 import { encodeDeclare } from './protocol'
+import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged } from './visualizer'
 import { DF_DECLARE_MAX, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue } from '@shared/dataflou'
 import { log } from '../log'
 
@@ -53,12 +54,14 @@ function loadSubs(universe: string): Record<string, DfSub[]> {
   }
 }
 
+let visClients = 0
+
 function status(): DfStatus {
-  if (node) return { ...node.status(), actions: actionsOn, actionsDropped }
+  if (node) return { ...node.status(), actions: actionsOn, actionsDropped, visualizer: visClients, visualizerAvailable: visualizerAvailable() }
   return {
     running: false, error: lastError, sku: '', label: config?.label ?? '', universe: config?.universe ?? '',
     address: '', tcpPort: 0, udpPort: 0, nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0,
-    declareBytes: 0, actions: 0, actionsDropped: 0
+    declareBytes: 0, actions: 0, actionsDropped: 0, visualizer: visClients, visualizerAvailable: visualizerAvailable()
   }
 }
 
@@ -131,6 +134,8 @@ async function configure(next: DfConfig): Promise<DfStatus> {
     try {
       await n.start()
       node = n
+      n.visualizerClients = visClients
+      visualizerNodeChanged()
       log('info', `[dataflou] on the mesh as ${label} (universe ${universe}), DECLARE ${n.declareBytes()} bytes`)
     } catch (e) {
       lastError = (e as Error).message
@@ -146,6 +151,18 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   win = getWindow
   ipcMain.handle('dataflou:configure', (_e, cfg: DfConfig) => configure(cfg).catch((e: Error) => ({ ...status(), error: e.message })))
   ipcMain.handle('dataflou:status', () => status())
+  // The mesh visualizer, in the browser (its server starts on the first click).
+  ipcMain.handle('dataflou:visualizer', (_e, open?: boolean) =>
+    openVisualizer(
+      () => node,
+      (n) => {
+        visClients = n
+        if (node) node.visualizerClients = n
+        statusDirty = true
+      },
+      open !== false
+    )
+  )
   // The Body rule picker's actions (sent when they change : a scene, a rule, an
   // effect added). The tree follows only while the actions are on.
   ipcMain.on('dataflou:actions', (_e, list: unknown) => {
@@ -185,6 +202,7 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   }, 16)
   app.on('will-quit', () => {
     clearInterval(t)
+    stopVisualizer()
     node?.stop()
     node = null
   })

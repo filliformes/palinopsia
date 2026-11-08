@@ -28,6 +28,71 @@ const KEEPALIVE_MS = 15_000
 const KEEPALIVE_TIMEOUT_MS = 30_000
 const MAX_FRAME = 1 << 20
 const MAX_SUBS = 4
+const MAX_MONITORS = 256 // the visualizer's live values : at most this many remote params
+const MONITOR_RATE_HZ = 10
+
+/** The mesh as the visualizer page reads it (the reference VisServer's snapshot). */
+export interface VisParam {
+  kind: 'param'
+  name: string
+  label: string
+  type: string
+  value: DfValue | null
+  unit: string
+  mode: string
+  flow: string
+  access: string
+  rate: number
+  range: { min: number; max: number; init: number }
+  subs: Array<{ sku: string; path: string }>
+}
+export interface VisGroup {
+  kind: 'group'
+  name: string
+  label: string
+  children: Array<VisGroup | VisParam>
+}
+export interface VisNode {
+  sku: string
+  label: string
+  product: string
+  version: number
+  online: boolean
+  is_local: boolean
+  state: string
+  params: VisGroup
+}
+
+function visTree(params: DfParam[], valueOf: (path: string) => DfValue | null, subs: Map<string, DfSub[]>): VisGroup {
+  const root: VisGroup = { kind: 'group', name: 'root', label: '', children: [] }
+  const groups = new Map<string, VisGroup>([['', root]])
+  const groupAt = (path: string): VisGroup => {
+    const had = groups.get(path)
+    if (had) return had
+    const cut = path.lastIndexOf('/')
+    const g: VisGroup = { kind: 'group', name: path.slice(cut + 1), label: path.slice(cut + 1), children: [] }
+    groupAt(cut < 0 ? '' : path.slice(0, cut)).children.push(g)
+    groups.set(path, g)
+    return g
+  }
+  for (const p of params) {
+    const cut = p.path.lastIndexOf('/')
+    const parent = groupAt(cut < 0 ? '' : p.path.slice(0, cut))
+    const name = p.path.slice(cut + 1)
+    if (p.kind === 'group') {
+      const g = groupAt(p.path)
+      g.label = p.label || name
+      continue
+    }
+    if (p.kind !== 'param') continue
+    parent.children.push({
+      kind: 'param', name, label: p.label || name, type: p.type, value: valueOf(p.path), unit: p.unit, mode: p.mode, flow: p.flow,
+      access: p.access, rate: p.rate, range: { min: p.min, max: p.max, init: p.init },
+      subs: (subs.get(p.path) ?? []).map((s) => ({ sku: s.sku, path: s.path }))
+    })
+  }
+  return root
+}
 const CORE_VER = '8' // the dataflou core version this node speaks (include/dataflou/version.h)
 
 interface Peer {
@@ -97,6 +162,15 @@ export class DataflouNode {
   private params: DfParam[]
   private savedSubs: Record<string, DfSub[]>
   private declSize = 0
+  // the visualizer : what arrived on our destinations, the remote values its
+  // monitors stream, and those monitors (asked only while a page is open)
+  private lastIn = new Map<string, DfValue>()
+  private remoteVals = new Map<string, DfValue>()
+  private hashes = new Map<number, string>()
+  private monitorOn = false
+  private monitors: DfSub[] = []
+  private lastMonitorKeepalive = 0
+  visualizerClients = 0
   private byPath = new Map<string, DfParam>()
   private values = new Map<string, DfValue>()
   private subs = new Map<string, DfSub[]>()
@@ -229,6 +303,7 @@ export class DataflouNode {
         lastKeepalive = now
         this.sendAllStreamRequests()
       }
+      this.pollMonitors(now)
       this.rxPerSec = this.rx
       this.txPerSec = this.tx
       this.rx = 0
@@ -513,7 +588,7 @@ export class DataflouNode {
         const p = this.byPath.get(m.path)
         if (!p || p.kind !== 'param' || p.flow === 'source') break
         const value = m.type === 'bool' && p.type === 'number' ? (m.value ? p.max : p.min) : p.type === 'bool' ? !!(typeof m.value === 'number' ? m.value >= 0.5 : m.value) : m.value
-        this.host.onValues([{ path: m.path, value, type: p.type }])
+        this.deliver([{ path: m.path, value, type: p.type }])
         break
       }
       case 'STREAMREQ': {
@@ -669,14 +744,16 @@ export class DataflouNode {
       this.udp.send(pkt, t.destUdpPort, t.destAddress)
       this.tx++
     }
-    if (local.length) this.host.onValues(local)
+    if (local.length) this.deliver(local)
   }
 
   private onUdp(m: Buffer, from: string): void {
     const pkt = decodeStreamPacket(m)
     if (!pkt) return
     const out: Array<{ path: string; value: DfValue; type: DfType }> = []
+    const srcSku = this.skuOfHash(pkt.skuHash)
     for (const e of pkt.entries) {
+      if (srcSku) this.remoteVals.set(`${srcSku}\n${e.path}`, e.value)
       for (const [dest, list] of this.subs) {
         for (const s of list) {
           if (s.path !== e.path || crc32Sku(s.sku) !== pkt.skuHash) continue
@@ -689,7 +766,95 @@ export class DataflouNode {
       }
     }
     void from
-    if (out.length) this.host.onValues(out)
+    if (out.length) this.deliver(out)
+  }
+
+  /** Values for our destinations, to the app (and kept for the visualizer). */
+  private deliver(list: Array<{ path: string; value: DfValue; type: DfType }>): void {
+    for (const v of list) this.lastIn.set(v.path, v.value)
+    this.host.onValues(list)
+  }
+
+  private skuOfHash(h: number): string | null {
+    const had = this.hashes.get(h)
+    if (had) return had
+    for (const sku of this.world.keys()) {
+      const x = crc32Sku(sku)
+      this.hashes.set(x, sku)
+      if (x === h) return sku
+    }
+    return null
+  }
+
+  // ── the visualizer ────────────────────────────────────────────────
+
+  sku(): string {
+    return this.identity.sku
+  }
+
+  /** The page sets a value : ours plays like any value arriving; another
+   *  node's goes to it. */
+  setFromVisualizer(sku: string, path: string, value: DfValue): boolean {
+    if (sku !== this.identity.sku) return this.setRemote(sku, path, value)
+    const p = this.byPath.get(path)
+    if (!p || p.kind !== 'param' || p.flow === 'source') return false
+    this.deliver([{ path, value, type: p.type }])
+    return true
+  }
+
+  /** While a visualizer page is open, every remote param streams to us (the
+   *  reference node's monitors : a STREAMREQ with no destination path). */
+  setMonitoring(on: boolean): void {
+    if (on === this.monitorOn) return
+    this.monitorOn = on
+    if (on) this.pollMonitors(Date.now())
+    else {
+      for (const m of this.monitors) this.stopMonitor(m)
+      this.monitors = []
+    }
+  }
+
+  private stopMonitor(m: DfSub): void {
+    const peer = this.peerOf(m.sku)
+    if (peer) this.send(peer, encodeStreamStop(++this.seq, this.identity.sku, m.path, '', this.identity.sku))
+  }
+
+  private pollMonitors(now: number): void {
+    if (!this.monitorOn || !this.running) return
+    const keepalive = now - this.lastMonitorKeepalive >= KEEPALIVE_MS
+    const wanted: DfSub[] = []
+    for (const [sku, w] of this.world) {
+      if (w.local || !w.online || !this.peerOf(sku)) continue
+      for (const p of w.params) {
+        if (p.kind !== 'param' || wanted.length >= MAX_MONITORS) continue
+        wanted.push({ sku, path: p.path })
+      }
+    }
+    const key = (m: DfSub): string => `${m.sku}\n${m.path}`
+    const had = new Set(this.monitors.map(key))
+    const want = new Set(wanted.map(key))
+    for (const m of this.monitors) if (!want.has(key(m))) this.stopMonitor(m)
+    for (const m of wanted) {
+      if (!keepalive && had.has(key(m))) continue
+      const peer = this.peerOf(m.sku)
+      if (peer) this.send(peer, encodeStreamRequest(++this.seq, this.identity.sku, m.path, '', this.identity.sku, this.udpPort, MONITOR_RATE_HZ))
+    }
+    this.monitors = wanted
+    if (keepalive) this.lastMonitorKeepalive = now
+  }
+
+  /** Every node of the mesh, its tree, its values and its wires, for the page. */
+  visNodes(): VisNode[] {
+    const out: VisNode[] = []
+    for (const [sku, w] of this.world) {
+      const valueOf = (path: string): DfValue | null =>
+        w.local ? this.values.get(path) ?? this.lastIn.get(path) ?? null : this.remoteVals.get(`${sku}\n${path}`) ?? null
+      out.push({
+        sku, label: w.identity.label, product: w.identity.product, version: w.identity.version,
+        online: w.local || w.online, is_local: w.local, state: w.identity.state, params: visTree(w.params, valueOf, w.subs)
+      })
+    }
+    return out
   }
 
   // ── the monitor ─────────────────────────────────────────────────────────
@@ -733,7 +898,9 @@ export class DataflouNode {
       txPerSec: this.txPerSec,
       declareBytes: this.declSize,
       actions: 0,
-      actionsDropped: 0
+      actionsDropped: 0,
+      visualizer: this.visualizerClients,
+      visualizerAvailable: false
     }
   }
 }

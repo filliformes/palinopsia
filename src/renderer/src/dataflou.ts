@@ -24,7 +24,8 @@ const SIGNAL_BY_PATH = new Map<string, string>([
 
 const EMPTY: DfStatus = {
   running: false, error: null, sku: '', label: '', universe: '', address: '', tcpPort: 0, udpPort: 0,
-  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, actions: 0, actionsDropped: 0
+  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, actions: 0, actionsDropped: 0,
+  visualizer: 0, visualizerAvailable: false
 }
 
 // ── the actions : every entry of the Body rule picker, a trigger each ──
@@ -140,7 +141,9 @@ export function initDataflou(): () => void {
   }, 1500)
   const t = window.setInterval(() => {
     if (!status.running) return
-    const paths = Object.keys(status.listeners)
+    // every source while a visualizer page is open (it shows them all live),
+    // else only the ones some node listens to
+    const paths = status.visualizer > 0 ? [...SIGNAL_BY_PATH.keys()] : Object.keys(status.listeners)
     if (!paths.length) return
     const out: Record<string, DfValue> = {}
     for (const p of paths) {
@@ -158,6 +161,11 @@ export function initDataflou(): () => void {
     window.clearInterval(t)
     window.clearInterval(ta)
   }
+}
+
+/** Open the mesh visualizer in the browser. */
+export async function openDataflouVisualizer(): Promise<{ ok: boolean; error?: string }> {
+  return window.api.dataflouVisualizer()
 }
 
 /** Bind a destination (any node's) to a source (any node's). */

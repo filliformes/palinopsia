@@ -8,7 +8,8 @@
 
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
-import { dataflouBind, useDataflouStatus } from '../dataflou'
+import { dataflouBind, openDataflouVisualizer, useDataflouStatus } from '../dataflou'
+import { showToast } from './Toast'
 import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, type DfNodeView, type DfParam } from '@shared/dataflou'
 
 const OUR_SOURCES = [
@@ -84,7 +85,7 @@ export function DataflouSection(): JSX.Element {
 
       {!collapsed && (
         <>
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
             <span className="font-mono text-[9px] uppercase text-muted">name</span>
             <input
               value={name}
@@ -113,6 +114,24 @@ export function DataflouSection(): JSX.Element {
               }
             >
               actions : {cfg.actions ? 'on' : 'off'}
+            </button>
+            <button
+              onClick={() =>
+                void openDataflouVisualizer().then((r) => {
+                  if (!r.ok) showToast(r.error ?? 'The visualizer could not open', 'warn')
+                })
+              }
+              disabled={!st.running || !st.visualizerAvailable}
+              className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] disabled:opacity-40 ${st.visualizer > 0 ? 'border-accent2/60 text-accent2' : 'border-border text-muted hover:text-text'}`}
+              title={
+                !st.visualizerAvailable
+                  ? 'This build does not carry the mesh visualizer'
+                  : st.running
+                    ? 'The mesh visualizer in your browser : every node as a colored arc of its parameters, the wires between them, the values live. Drag a source onto a destination to wire them. Served by Palinopsia on this computer only.'
+                    : 'Join the mesh first'
+              }
+            >
+              visualizer ↗{st.visualizer > 0 ? ` (${st.visualizer})` : ''}
             </button>
           </div>
           <div className="font-mono text-[9px] leading-relaxed text-muted">

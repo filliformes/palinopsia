@@ -77,6 +77,8 @@ cp -r "$ROOT/resources/mediapipe" "$OUT/resources/"
 # The AI depth engine (Depth AI, about 95 MB) once `npm run fetch:depth` has
 # filled it : copied the same way. Without it the copy says the files are missing.
 [ -d "$ROOT/resources/depth" ] && cp -r "$ROOT/resources/depth" "$OUT/resources/"
+# the dataflou mesh visualizer page, when built (npm run build:visualizer)
+[ -d "$ROOT/resources/dataflou-visualizer" ] && cp -r "$ROOT/resources/dataflou-visualizer" "$OUT/resources/"
 # The native addons built in this checkout (Ableton Link, Spout…) : copied where
 # the app looks for them (its own folder's native/<name>/build/Release).
 for d in "$ROOT"/native/*/build/Release; do
