@@ -852,6 +852,13 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
   },
+  {
+    name: 'Foil Everything', group: 'Relief',
+    fx: [
+      { shaderId: 'node-inflate', inputs: { from: 1, threshold: 0.35, puff: 0.5, round: 0.9, volume: 0.5, material: 6, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.3, flow: 0, flowSpeed: 0.3, bands: 3, split: 0.35, ripple: 0.3, rainbow: 0.4, flakes: 180, glint: 0.6, cavity: 0.35, mix: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',

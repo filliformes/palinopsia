@@ -1243,6 +1243,23 @@ export const THEMES: Theme[] = [
     motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
   }),
   mk({
+    id: 'holo-foil', name: 'Holo Foil', family: 'Living Surfaces',
+    blurb: 'Words and shapes pressed in holographic foil : silver that turns to color at an angle, flakes that flash as the lamp goes round.',
+    world: 'parametric',
+    palette: [[0.02, 0.02, 0.025, 1], [0.32, 0.32, 0.36, 1], [0.94, 0.94, 0.97, 1]],
+    sources: ['gen-text', 'shapes', 'organic'],
+    stackFx: [['node-inflate']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'node-inflate': ['Silver foil', 'Holo foil'] },
+    pickInputs: { 'node-inflate': { from: [0, 1], threshold: [0.45], orbit: [0.25, 0.4, -0.3] }, 'gen-text': { size: [0.25, 0.33, 0.42], posX: [-0.08, 0, 0.08], posY: [-0.08, 0, 0.08], angle: [-0.12, 0, 0.12], drift: [0, 0.04] } },
+    layerFx: [],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(flow|bands|draw|mode|brush|mirror|fold|follow|colorPick|sideUse|side|groundOp|audio|ribs|material|from|bloom|lift|haze)$' }
+  }),
+  mk({
     id: 'oil-on-water', name: 'Oil on Water', family: 'Living Surfaces',
     blurb: "A slick of thin film over a slow dark ground : every thickness its own color, drifting in currents.",
     world: 'parametric',

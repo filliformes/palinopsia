@@ -93,8 +93,8 @@ void main() {
     float spec = pow(max(0.0, dot(N, H)), mix(8.0, 48.0, satin)) * mix(0.05, 0.4, satin) * (0.4 + uSheen);
     c = a * (0.16 + 0.88 * wrap * wrap) + sheen * (0.25 + 0.6 * a) * mix(0.5, 1.0, satin) + spec;
   } else {
-    // plastic, chrome : Relief's own
-    float M = uMat < 2.5 ? 3.0 : 4.0;
+    // plastic, chrome, foil : Relief's own
+    float M = uMat < 2.5 ? 3.0 : uMat < 3.5 ? 4.0 : 7.0;
     c = shadeSurface(M, a, N, uL, uAz, 0.9, vec3(0.0), 0.0, 0.0, 0.0, vUV);
   }
   // the folds : what sits deep in a crease gets less light
@@ -650,7 +650,10 @@ export class DrapeNode implements ConvNode {
     gl.uniform3f(this.u(P, 'uL'), Math.cos(la) / ln, Math.sin(la) / ln, lz / ln)
     const cl = Array.isArray(I.color) ? I.color : [0.08, 0.08, 0.09, 1]
     gl.uniform3f(this.u(P, 'uCloth'), cl[0], cl[1], cl[2])
-    gl.uniform1f(this.u(P, 'uMat'), Math.round(clamp(num(I.material, 0), 0, 3)))
+    gl.uniform1f(this.u(P, 'uMat'), Math.round(clamp(num(I.material, 0), 0, 4)))
+    gl.uniform1f(this.u(P, 'uFoilSat'), clamp(num(I.rainbow, 0.25), 0, 1))
+    gl.uniform1f(this.u(P, 'uFoilScale'), clamp(num(I.flakes, 220), 20, 400))
+    gl.uniform1f(this.u(P, 'uFoilGlint'), clamp(num(I.glint, 0.5), 0, 1))
     gl.uniform1f(this.u(P, 'uSheen'), clamp(num(I.sheen, 0.5), 0, 1))
     gl.uniform1f(this.u(P, 'uFolds'), clamp(num(I.folds, 0.6), 0, 1))
     gl.uniform1f(this.u(P, 'uAz'), la)

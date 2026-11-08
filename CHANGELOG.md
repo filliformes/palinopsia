@@ -15,6 +15,25 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **Foil and cavity, for Relief, Inflate and Drape** (Vincent : "#13 : Foil and finishes for
+  Relief and Inflate"). `reliefShade.ts` gains material 7, a holographic foil after
+  Holocloth's (MIT, credited) : flakes as cells of the frame (`uFoilScale` per frame height),
+  each tilted a little its own way; the diffraction hue from the surface's own angle, the
+  lamp and the place (so the rainbow runs in bands over the folds, a flake only nudging it);
+  sparse glints gated by angle (`uFoilGlint`), firing as the lamp orbits; and the key move,
+  the metal's color tinted by the rainbow so the reflections themselves go iridescent;
+  `uFoilSat` 0 is a silver holo (the rainbow is a knob, 0.25 by default). Inflate : material
+  **foil** (6); Relief : brush **foil** (8), a thin sheet pressed flat and crinkled (dents
+  give its creases); Drape : material **foil** (4). New controls **foil rainbow**, **foil
+  flakes**, **foil glints**, grayed out unless the foil is picked. **cavity** (Relief and
+  Inflate, 0 by default : every saved look stays as it was) : the height's curvature darkens
+  the creases (Relief : the Laplacian over the slope's own taps; Inflate : the divergence of
+  the slope), measured on Relief clay : the joints and crossings go dark, a little grain
+  catching in the cracks. Presets : Relief **Silver foil**, **Holo foil**, **Deep clay**;
+  Inflate **Silver foil**, **Holo foil**, **Deep chrome**; Drape **Foil sheet**; every
+  existing Relief / Inflate / Drape preset now sets the new controls to their defaults
+  (presets merge). The chain **Foil Everything**, the theme **Holo Foil** (Living Surfaces).
+
 - **Drape, a new effect : the picture on a cloth you grab** (Vincent, after the borrowing
   audit : "build #3 : Drape : a live layer on a cloth you grab (make it an FX)").
   `engine/drapeNode.ts`, native node `node-drape`, any rack. A Verlet cloth on the CPU

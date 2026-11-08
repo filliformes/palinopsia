@@ -90,12 +90,19 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     color: 'The cloth where the picture is transparent.',
     sheen: 'The soft light at the edges of the folds turning away.',
     folds: 'How dark the creases get.',
+    rainbow: 'How much rainbow the foil throws : 0 is a silver holo, 1 every color as it turns.',
+    flakes: 'How fine the foil\'s flakes are (across the frame\'s height) : few and coarse, or a fine glitter.',
+    glint: 'How many flakes flash at their own angle as the light moves.',
     tilt: 'Look at the sheet from a little below (up) or above (down).',
     behind: 'The picture itself, behind the sheet. 0 = nothing around it.',
     poke: 'A push in a random place.',
     reset: 'A fresh sheet, flat and creased again.'
   },
   'node-inflate': {
+    rainbow: 'How much rainbow the foil throws : 0 is a silver holo, 1 every color as it turns.',
+    flakes: 'How fine the foil\'s flakes are (across the frame\'s height) : few and coarse, or a fine glitter.',
+    glint: 'How many flakes flash at their own angle as the light moves.',
+    cavity: 'Darkens the creases between swellings : the shape reads deeper.',
     flow: 'Turns what it reflects from the still room into bands of light running across the surface by themselves. 0 = the room as before.',
     flowSpeed: 'How fast the bands run, and which way. 0 holds them still.',
     bands: 'How many bands : a few wide ones low, a tight chrome ripple high.',
@@ -600,6 +607,10 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     birth: 'Fire a birth now (bind it to the beat) : a new form grows out of the old one in about half a second.'
   },
   'gen-relief': {
+    rainbow: 'The foil brush : how much rainbow it throws, 0 is a silver holo.',
+    flakes: 'The foil brush : how fine its flakes are.',
+    glint: 'The foil brush : how many flakes flash as the light moves.',
+    cavity: 'Darkens the creases where strokes meet and the lines pressed in : the drawing reads deeper.',
     draw: 'Who draws, besides you : nobody, wandering strokes, a compass building circles and rules, the moving things in the layer picked as SIDECHAIN, or its outlines.',
     rate: 'How many strokes run at once, by themselves.',
     speed: 'How fast they draw.',
