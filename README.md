@@ -130,6 +130,7 @@ The papers, books and standards the instrument draws on are listed in
 ```bash
 npm install
 npm run fetch:depth  # the AI depth engine into resources/depth (once, about 95 MB)
+npm run fetch:pose   # the Body page's Room tracker into resources/pose (once, about 63 MB)
 npm run dev          # electron-vite dev (edits hot-reload into the running app)
 npm run typecheck    # tsc : node + web projects (both must be green)
 npm run build        # electron-vite build (bundle only)
@@ -161,6 +162,15 @@ skips what is already there and writes a manifest last; `npm run fetch:depth -- 
 only verifies. The build copies the verified files into the app (`extraResources`), and
 CI runs the script before every build (cached). Without them the app runs, and Depth AI
 asks for the fetch.
+
+**The Room tracker** (the Body page's pose for everyone in the frame) ships the same way.
+`npm run fetch:pose` (`scripts/fetch-pose.mjs`) downloads onnxruntime-web 1.30.0's WebGPU
+build from cdn.jsdelivr.net, RTMO-s (OpenMMLab MMPose, Apache-2.0 : the ONNX export
+OpenMMLab publishes on download.openmmlab.com, its `end2end.onnx` taken out of the zip) and
+both license texts into `resources/pose` (git-ignored, about 63 MB), checks every file and
+the zip against their SHA-256, follows no redirect and writes a manifest last; `-- --check`
+only verifies. The build copies them into the app and CI fetches them before every build
+(cached). Without them the app runs, and with Room on the Body page's header says what to fetch.
 
 NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
 `npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
@@ -1538,7 +1548,8 @@ picker.
 **TRACK** (one distributed line): **Hands** (21 landmarks per hand, up to two)
 · **Pose** (33-point whole body) · **Face** (ARKit blendshapes: jaw, smile, brow,
 blink, pucker + head yaw/pitch/roll) · **Silhouette** (the pose segmentation mask
-reduced to a 3×3 zone grid; heavier) · **Motion** (the camera's motion field, no body
+reduced to a 3×3 zone grid; heavier) · **Room** (the pose of everyone in the frame,
+near or far : below) · **Motion** (the camera's motion field, no body
 model; cheap) · **Mirror** (selfie view) · **Pinch = click** (each hand's pinch plays on
 the picture like a click on the preview, below) · **Hi-res** (track on every display frame
 instead of once per new camera frame : for a fast camera, at about twice the cost) ·
@@ -1569,7 +1580,7 @@ lean / sway / motion-energy / arm-span / stance / weight, the movement qualities
 the face blendshapes and head pose, and (with Silhouette on) each of the nine **zone
 coverages** `zoneTL…zoneBR` plus whole-frame `bodyCover`. The **feature monitor** shows
 them live, one row per body region, its name in the margin in the region's color (Hands ·
-Hand shape · Pose · Face · Silhouette · Motion field · Movement qualities · Presence), as many columns as
+Hand shape · Pose · Face · Silhouette · Motion field · Movement qualities · Room · Presence), as many columns as
 the width holds; its **→**
 routes one into the first free modulator slot as a `body` modulator, ready to bind to
 any parameter with a param's **M** button (exactly like an LFO); **Alt+click** a **→**
@@ -1741,6 +1752,26 @@ lengths, so a dancer far from the camera reads like one close to it, and the cam
 own jitter is learned in the first moments and taken off, so a still body reads still.
 Fluidity and directness hold their last value while the body is still. Gestures :
 **impulse** (a burst out of calm) and **freeze** (a quick stop held still).
+
+**Room** swaps the pose tracker for one made for a room rather than a webcam on a desk.
+MediaPipe's pose follows one person, within about 4 m, who shows their face; the Room
+tracker (RTMO-s, a one-stage multi-person pose model, run on the graphics card through
+WebGPU, its own thread) finds **everyone** in the frame, near or far, from the back or the
+side, small in a wide shot, and follows each one with a number from frame to frame. The
+**main person** is the biggest in the frame, the nearest (with a little give, so two
+people of about the same size don't trade places every frame) : every pose feature,
+pose gesture and movement quality reads that person, exactly as they read MediaPipe's
+one. The **Room** features count and place everyone : `peopleCount` (how many, a
+person counting for 1/8, so eight fill it), `peopleSpread` (how far apart they stand
+across the frame), `peopleX` (where the group stands, left to right), `nearestX` and
+`nearestSize` (where the main person stands and how big they are : how close). Two
+gestures in **Presence** : **person in** and **person out**, when the head count goes up
+or down and holds for a moment. The preview draws every person, the main one in blue
+with its number, the others in violet, and the header says how many and how long the
+model takes (about 35 ms a frame on an RTX 4070, beside the picture : the render keeps
+its 60 fps). Hands, Face and Silhouette stay MediaPipe's, so they still want someone
+close; Room on turns Pose on, and Room off goes back to MediaPipe's pose. The model is
+Apache-2.0 and its runtime MIT (see `THIRD_PARTY_NOTICES.md`).
 
 With **OSC out** on in the app, every body feature also streams as
 `/opsia/body/<feature>` while the camera runs (the hand-shape ones too, such as

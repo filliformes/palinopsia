@@ -63,6 +63,17 @@ jobs:
           key: depth-${{ runner.os }}-${{ hashFiles('scripts/fetch-depth.mjs') }}
       - name: Fetch the depth engine
         run: npm run fetch:depth
+      # The Room tracker (onnxruntime-web 1.30.0 + RTMO-s : about 63 MB, pinned and
+      # hash-checked) ships inside the app the same way.
+      - name: Cache the Room tracker
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/pose
+            !resources/pose/README.md
+          key: pose-${{ runner.os }}-${{ hashFiles('scripts/fetch-pose.mjs') }}
+      - name: Fetch the Room tracker
+        run: npm run fetch:pose
       - name: Build Spout addon (Windows only)
         if: matrix.platform == 'win'
         shell: bash

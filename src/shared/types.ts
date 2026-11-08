@@ -464,6 +464,12 @@ export type BodyFeature =
   | 'moveSuddenness' // 0 sustained .. 1 sudden
   | 'moveDirectness' // 0 wandering (circles, meanders) .. 1 straight to the point
   | 'moveSymmetry' // 0 lopsided .. 1 left and right mirror each other
+  // The room (the Room tracker, engine/roomTracker.ts : everyone in the frame)
+  | 'peopleCount' // how many people : 0 nobody, 1/8 each, 1 eight or more
+  | 'peopleSpread' // how far apart they stand, left to right : 0 together (or alone), 1 the whole width
+  | 'peopleX' // where the crowd is, its middle left to right 0..1
+  | 'nearestX' // where the nearest person is, left to right 0..1
+  | 'nearestSize' // how near the nearest person is : the height they fill 0..1
   // Presence gates (smoothed 0..1)
   | 'bodyPresent'
   | 'handsPresent'
@@ -487,6 +493,7 @@ export const BODY_FEATURE_GROUPS: Array<{ title: string; keys: BodyFeature[] }> 
   { title: 'Silhouette (zones)', keys: ['zoneTL', 'zoneTC', 'zoneTR', 'zoneML', 'zoneMC', 'zoneMR', 'zoneBL', 'zoneBC', 'zoneBR', 'bodyCover'] },
   { title: 'Motion field', keys: ['flowEnergy', 'flowX', 'flowY', 'flowDivergence', 'flowCurl', 'flowCoherence', 'flowCenterX', 'flowCenterY', 'flowArea'] },
   { title: 'Movement qualities', keys: ['moveEnergy', 'moveExpansion', 'moveFluidity', 'moveSuddenness', 'moveDirectness', 'moveSymmetry'] },
+  { title: 'Room', keys: ['peopleCount', 'peopleSpread', 'peopleX', 'nearestX', 'nearestSize'] },
   { title: 'Presence', keys: ['bodyPresent', 'handsPresent', 'facePresent'] }
 ]
 export const BODY_FEATURES: BodyFeature[] = BODY_FEATURE_GROUPS.flatMap((g) => g.keys)
@@ -517,6 +524,8 @@ export type BodyGesture =
   // so a one-frame detection drop can't false-fire). The installation trigger :
   // someone walks in → fire ; the room empties → reset.
   | 'bodyEnter' | 'bodyLeave' | 'handsEnter' | 'handsLeave' | 'faceEnter' | 'faceLeave'
+  // The room (the Room tracker) : one more person, one fewer (held a moment)
+  | 'personEnter' | 'personLeave'
   // Motion field (the Motion toggle) : a sweep one way, an approach or a withdrawal,
   // a turn, and the room going still after moving (the stillness itself fires).
   | 'swipeLeft' | 'swipeRight' | 'swipeUp' | 'swipeDown'
@@ -538,7 +547,7 @@ export const BODY_GESTURES: BodyGesture[] = [
   'headLeft', 'headRight', 'headUp', 'headDown', 'tiltLeft', 'tiltRight',
   'holdHandsUp', 'holdPinchLeft', 'holdPinchRight', 'holdArmsWide', 'holdMouthOpen',
   'coverTL', 'coverTC', 'coverTR', 'coverML', 'coverMC', 'coverMR', 'coverBL', 'coverBC', 'coverBR',
-  'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave',
+  'bodyEnter', 'bodyLeave', 'handsEnter', 'handsLeave', 'faceEnter', 'faceLeave', 'personEnter', 'personLeave',
   'swipeLeft', 'swipeRight', 'swipeUp', 'swipeDown', 'approach', 'withdraw', 'spinCW', 'spinCCW', 'stillness',
   'impulse', 'freeze',
   'fistLeft', 'fistRight', 'openLeft', 'openRight', 'pointLeft', 'pointRight',
@@ -590,6 +599,10 @@ export interface BodyControlConfig {
   deviceId: string | null // chosen videoinput, or null = default camera
   hands: boolean // run the HandLandmarker
   pose: boolean // run the PoseLandmarker
+  // Who reads the pose : 'close' MediaPipe (one person, within about 4 m, face in
+  // view; the default) or 'room' (engine/roomTracker.ts : RTMO, everyone in the
+  // frame, near or far, from any side). Hands, face and the silhouette stay MediaPipe's.
+  tracker?: 'close' | 'room'
   face: boolean // run the FaceLandmarker (blendshapes + head pose)
   silhouette: boolean // run the pose segmentation mask → 3×3 zone coverage features + occlusion gestures (needs pose; heavier)
   flow: boolean // read the camera's motion field (optical flow) → flow features + swipe / approach / spin / stillness gestures (no model : cheap)
