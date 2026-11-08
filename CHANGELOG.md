@@ -1006,7 +1006,9 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 - **Every button gets a little liquid glass** (Vincent, first on the bottom bar : "keeping the
   same button shapes, but adding a little liquid glass feel to those buttons ? No need for
   see-through stuff that slows the UI"; then : "I find it a bit bizarre to only have liquid
-  glass in the lower toolbar. Can you put some on ALL the buttons in ALL the app"). One rule in
+  glass in the lower toolbar. Can you put some on ALL the buttons in ALL the app"; after a feel
+  test : "an in-between [...] it's nice that they pop out, but it's a bit too much now", so about
+  half the first sheen; and the tab row lost its own capsule behind the tabs). One rule in
   styles.css : a lit top rim, a sheen fading down over each control's own color, a shade at
   its foot, a softer press, on what looks like a button (`.btn`, `.btn-accent`, a bordered,
   filled or `.input` button, every dropdown, the effect and modulation chips, `.chip`); list

@@ -1312,12 +1312,14 @@ html[data-glass='off'] .glass {
    its shadows come first. A compact dropdown's chevron rides on top as its own layer (the
    --sheen-arrow variables, set by .select-compact). Plain with interface glass off; .no-sheen
    opts out. */
+/* (half of the bottom bar's first sheen : "an in-between [...] it's nice that they pop out,
+   but it's a bit too much now") */
 :root {
-  --sheen: linear-gradient(180deg, rgb(255 255 255 / 0.08) 0%, rgb(255 255 255 / 0.02) 50%, rgb(0 0 0 / 0.08) 100%);
-  --sheen-hover: linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, rgb(255 255 255 / 0.035) 50%, rgb(0 0 0 / 0.06) 100%);
-  --sheen-press: linear-gradient(180deg, rgb(0 0 0 / 0.1) 0%, rgb(255 255 255 / 0.03) 100%);
-  --sheen-rim: inset 0 1px 0 rgb(255 255 255 / 0.12), inset 0 -1px 0 rgb(0 0 0 / 0.22), 0 1px 2px rgb(0 0 0 / 0.25);
-  --sheen-rim-press: inset 0 1px 2px rgb(0 0 0 / 0.3);
+  --sheen: linear-gradient(180deg, rgb(255 255 255 / 0.045) 0%, rgb(255 255 255 / 0.012) 50%, rgb(0 0 0 / 0.045) 100%);
+  --sheen-hover: linear-gradient(180deg, rgb(255 255 255 / 0.075) 0%, rgb(255 255 255 / 0.02) 50%, rgb(0 0 0 / 0.035) 100%);
+  --sheen-press: linear-gradient(180deg, rgb(0 0 0 / 0.07) 0%, rgb(255 255 255 / 0.02) 100%);
+  --sheen-rim: inset 0 1px 0 rgb(255 255 255 / 0.07), inset 0 -1px 0 rgb(0 0 0 / 0.13), 0 1px 1px rgb(0 0 0 / 0.15);
+  --sheen-rim-press: inset 0 1px 2px rgb(0 0 0 / 0.22);
 }
 .select-compact {
   --sheen-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
@@ -1426,9 +1428,10 @@ html[data-glass='off'] .glass-panel-head {
   pointer-events: none;
   overflow: visible;
 }
+/* the right column's tab row : each tab is its own little capsule now (the button sheen), so
+   the row has no capsule behind them ("we don't need a background capsule behind the tabs") */
 .tab-track {
-  background: rgb(var(--c-text) / 0.045);
-  border-radius: 11px;
+  background: transparent;
 }
 
 /* A MAIN control's slider (the Sonify Synth's TIMBRE / HARMONICS / MORPH) : a
