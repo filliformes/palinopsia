@@ -91,8 +91,12 @@ const v4addr = (a: string | undefined): string => (a ?? '').replace(/^::ffff:/, 
 export class DataflouNode {
   private identity: DfIdentity
   private readonly universe: string
-  private declVersion = 1
+  // Seconds since 2024 : a restart always declares a newer version than the
+  // last run did, so a node that only hears of us by gossip takes the new tree.
+  private declVersion = Math.max(1, Math.floor((Date.now() - 1_704_067_200_000) / 1000))
   private params: DfParam[]
+  private savedSubs: Record<string, DfSub[]>
+  private declSize = 0
   private byPath = new Map<string, DfParam>()
   private values = new Map<string, DfValue>()
   private subs = new Map<string, DfSub[]>()
@@ -122,11 +126,38 @@ export class DataflouNode {
     this.universe = cfg.universe
     this.params = cfg.params
     for (const p of cfg.params) this.byPath.set(p.path, p)
-    for (const [k, v] of Object.entries(cfg.subs ?? {})) {
+    this.savedSubs = cfg.subs ?? {}
+    this.restoreSubs()
+    this.skuHash = crc32Sku(cfg.sku)
+    this.declSize = this.declareBytes()
+  }
+
+  /** The saved bindings that end on a destination we have now (an action comes
+   *  back : so does the wire that played it). */
+  private restoreSubs(): void {
+    for (const [k, v] of Object.entries(this.savedSubs)) {
+      if (this.subs.has(k)) continue
       const p = this.byPath.get(k)
       if (p && p.kind === 'param' && p.flow !== 'source' && Array.isArray(v)) this.subs.set(k, v.slice(0, MAX_SUBS))
     }
-    this.skuHash = crc32Sku(cfg.sku)
+  }
+
+  /** A new tree (the actions changed) : a newer declaration, sent to every peer
+   *  now; gossip carries it to the rest. */
+  setParams(params: DfParam[]): void {
+    this.params = params
+    this.byPath = new Map(params.map((p) => [p.path, p]))
+    this.restoreSubs()
+    this.declVersion++
+    this.declSize = this.declareBytes()
+    const me = this.world.get(this.identity.sku)
+    if (me) {
+      me.params = params
+      me.byPath = this.byPath
+      me.declVersion = this.declVersion
+      if (this.running) for (const p of this.peers) if (p.helloReceived) this.sendDeclare(p, me)
+    }
+    this.host.onChange()
   }
 
   // ── lifecycle ───────────────────────────────────────────────────────────
@@ -397,8 +428,8 @@ export class DataflouNode {
   }
 
   /** Our own DECLARE size (the tree must stay small for microcontroller nodes). */
-  declareBytes(): number {
-    return encodeDeclare(0, this.identity.sku, this.identity.sku, this.declVersion, this.identity, this.params).length
+  declareBytes(params: DfParam[] = this.params): number {
+    return encodeDeclare(0, this.identity.sku, this.identity.sku, this.declVersion, this.identity, params).length
   }
 
   private syncMissing(peer: Peer, theirs: Map<string, number>): void {
@@ -699,7 +730,10 @@ export class DataflouNode {
       nodes,
       listeners,
       rxPerSec: this.rxPerSec,
-      txPerSec: this.txPerSec
+      txPerSec: this.txPerSec,
+      declareBytes: this.declSize,
+      actions: 0,
+      actionsDropped: 0
     }
   }
 }

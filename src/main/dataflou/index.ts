@@ -8,7 +8,8 @@ import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DataflouNode } from './node'
-import { palinopsiaTree, type DfConfig, type DfStatus, type DfSub, type DfValue } from '@shared/dataflou'
+import { encodeDeclare } from './protocol'
+import { DF_DECLARE_MAX, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue } from '@shared/dataflou'
 import { log } from '../log'
 
 let node: DataflouNode | null = null
@@ -18,6 +19,11 @@ let win: () => BrowserWindow | null = () => null
 let inBuffer: Array<{ path: string; value: DfValue }> = []
 let statusDirty = false
 let lastStatusAt = 0
+// The Body rule picker's actions, as the renderer last listed them; how many of
+// them the tree carries now, and how many it had to leave out.
+let actions: DfAction[] = []
+let actionsOn = 0
+let actionsDropped = 0
 
 const dir = (): string => {
   const d = join(app.getPath('userData'), 'dataflou')
@@ -48,11 +54,35 @@ function loadSubs(universe: string): Record<string, DfSub[]> {
 }
 
 function status(): DfStatus {
-  if (node) return node.status()
+  if (node) return { ...node.status(), actions: actionsOn, actionsDropped }
   return {
     running: false, error: lastError, sku: '', label: config?.label ?? '', universe: config?.universe ?? '',
-    address: '', tcpPort: 0, udpPort: 0, nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0
+    address: '', tcpPort: 0, udpPort: 0, nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0,
+    declareBytes: 0, actions: 0, actionsDropped: 0
   }
+}
+
+/** The tree to declare : the fixed one, then as many of the actions (in the
+ *  picker's order) as fit in one frame a desktop node takes. */
+function tree(): DfParam[] {
+  const want = config?.actions ? actions : []
+  const id = { sku: '00000000-0000-0000-0000-000000000000', label: config?.label ?? 'palinopsia', product: 'Palinopsia', version: 1, state: 'active' }
+  const size = (n: number): number => encodeDeclare(0, id.sku, id.sku, 2 ** 31, id, palinopsiaTree(want.slice(0, n))).length
+  let n = want.length
+  if (n && size(n) > DF_DECLARE_MAX) {
+    let lo = 0
+    let hi = n
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2)
+      if (size(mid) <= DF_DECLARE_MAX) lo = mid
+      else hi = mid - 1
+    }
+    n = lo
+  }
+  if (n < want.length) log('warn', `[dataflou] ${want.length - n} actions left out : the tree would pass ${DF_DECLARE_MAX} bytes`)
+  actionsOn = n
+  actionsDropped = want.length - n
+  return palinopsiaTree(want.slice(0, n))
 }
 
 function pushStatus(): void {
@@ -64,16 +94,23 @@ function pushStatus(): void {
 async function configure(next: DfConfig): Promise<DfStatus> {
   const label = (next.label || 'palinopsia').trim().replace(/\s+/g, '-').slice(0, 32) || 'palinopsia'
   const universe = (next.universe || 'default').trim().slice(0, 32) || 'default'
-  const want: DfConfig = { enabled: !!next.enabled, label, universe }
+  const want: DfConfig = { enabled: !!next.enabled, label, universe, actions: !!next.actions }
   const same = config && config.enabled === want.enabled && config.label === want.label && config.universe === want.universe
+  const actionsChanged = !!config && config.actions !== want.actions
   config = want
-  if (same && (node || !want.enabled)) return status()
+  if (same && node) {
+    // only the actions turned on or off : a new tree, no new connection
+    if (actionsChanged) node.setParams(tree())
+    pushStatus()
+    return status()
+  }
+  if (same && !want.enabled) return status()
   node?.stop()
   node = null
   lastError = null
   if (want.enabled) {
     const n = new DataflouNode(
-      { sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: palinopsiaTree(), subs: loadSubs(universe) },
+      { sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe) },
       {
         log: (m) => console.log(`[dataflou] ${m}`),
         onValues: (vs) => {
@@ -109,6 +146,21 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   win = getWindow
   ipcMain.handle('dataflou:configure', (_e, cfg: DfConfig) => configure(cfg).catch((e: Error) => ({ ...status(), error: e.message })))
   ipcMain.handle('dataflou:status', () => status())
+  // The Body rule picker's actions (sent when they change : a scene, a rule, an
+  // effect added). The tree follows only while the actions are on.
+  ipcMain.on('dataflou:actions', (_e, list: unknown) => {
+    if (!Array.isArray(list)) return
+    const str = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length < 200
+    const next = list
+      .filter((a): a is DfAction => !!a && str(a.id) && str(a.path) && str(a.label) && str(a.group) && a.path.startsWith('act/'))
+      .slice(0, 1000)
+    const before = JSON.stringify(actions)
+    actions = next
+    if (node && config?.actions && JSON.stringify(next) !== before) {
+      node.setParams(tree())
+      log('info', `[dataflou] ${actionsOn} actions on the mesh, DECLARE ${node.declareBytes()} bytes`)
+    }
+  })
   // Our sources' values, sampled by the renderer (only the ones someone listens to).
   ipcMain.on('dataflou:values', (_e, values: Record<string, DfValue>) => {
     if (node && values && typeof values === 'object') node.setValues(values)

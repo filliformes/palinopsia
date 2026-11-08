@@ -15,6 +15,23 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Added
 
+- **The Body rule list on the dataflou mesh** (Vincent : "the dropdown selector for creating a
+  BODY rule : I want these options as dataflou destinations in Palinopsia"). **actions** in the
+  dataflou section (`DfConfig.actions`, off by default) declares every entry of
+  `triggerOptions()` as a bool destination `act/<heading>/<id>` (`dfActionPath` : short heading
+  segments, the id's redundant start stripped, 1-based numbers, 32-character segments with a
+  hash past that, built from the id so renaming a scene or a rule never cuts a wire); fired by
+  `fireTrigger` on the rising edge. The renderer re-lists them every 1.5 s and hands main the
+  list when it changed; `DataflouNode.setParams` declares the new tree (a newer version, sent to
+  every peer, saved bindings restored for paths that come back). The first declaration
+  version is now seconds since 2024, so a restart is always newer than the last run for nodes
+  that only know us by gossip. Measured with a second node of our own class on universe
+  `opsia-test` : 119 entries / 7,139 bytes off, 415 / 26,329 on (276 actions, 19 headings);
+  density up by its path fired on the rise, again after an off, not twice while on; a new
+  scene showed as `act/scene/1` within the 1.5 s; off took them all away. Capped at 31,500
+  bytes (a desktop frame stops at 32,768) : past it the last actions are left out and the
+  section says how many; it warns past 8 KB (microcontroller nodes). A reference C++ node keeps
+  the first 128 entries (its store stops adding when full), so the actions go last.
 - **Liquid glass on the interface, slim sliders** (Vincent : "propose how to integrate Liquid
   Glass, used sparingly, so it looks a bit more slick and modern, less LLM-style"; "I want
   Glass+quiet sliders"; on the thin ones : "I liked it better without thin sliders, the UI was
@@ -957,6 +974,17 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
   rows identical. A color cell keeps a float cell's height (38 px).
 
 ### Changed
+
+- **The Source Editor lists every ISF shader, A to Z** (Vincent : "make sure all shaders
+  (sources and fx) are there, and always classify them in alphabetical order"). Vibe Palette,
+  Context and Finalizer were missing (kept out of `FX_SHADERS` so a rack can't load a second);
+  each list (my shaders, generators, effects) is sorted by name. Measured in the test build :
+  34 generators, 60 effects, all in order. The native nodes have no ISF code to open.
+- **The bottom bar's buttons get a little liquid glass** (Vincent : "keeping the same button
+  shapes, but adding a little liquid glass feel to those buttons ? No need for see-through
+  stuff that slows the UI"). `.bar-glass` on the Transport : a lit top rim, a sheen fading down
+  over each button's own color, a shade at its foot, a softer press; plain with interface
+  glass off. No backdrop filter : nothing is sampled.
 
 - **Sonify's voices in five families, the Synth between Chord and Collage** (Vincent :
   "Synth should be between Chord and Collage in the Sonify modules order. Also : if

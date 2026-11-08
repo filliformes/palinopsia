@@ -71,15 +71,95 @@ export interface DfStatus {
   listeners: Record<string, string[]>
   rxPerSec: number // UDP values received per second
   txPerSec: number // UDP values sent per second
+  declareBytes: number // our whole tree, as one DECLARE frame
+  actions: number // the actions on the mesh now (0 when they are off)
+  actionsDropped: number // actions left out : the tree would have been too big
 }
 
 export interface DfConfig {
   enabled: boolean
   label: string
   universe: string
+  // Every action of the Body rule picker as a destination too (act/...). Off by
+  // default : the tree then outgrows what a small board (Teensy, ESP32) takes.
+  actions: boolean
 }
 
-export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default' }
+export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', actions: false }
+
+/** One action of the Body rule picker, as the renderer hands it to the node. */
+export interface DfAction {
+  id: string // the trigger id (midi.ts fireTrigger)
+  path: string // act/<group>/<name>
+  label: string
+  group: string // the picker's heading
+}
+
+// A desktop node takes frames up to 32 KB (32 768 bytes); the actions stop short.
+export const DF_DECLARE_MAX = 31_500
+// What the smallest boards take (their receive buffer is 8 KB, the length in it).
+export const DF_DECLARE_SMALL = 8_000
+
+const segOf = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'x'
+
+function hash6(s: string): string {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619)
+  return (h >>> 0).toString(36).slice(0, 6)
+}
+
+/** A path segment : dataflou names are at most 32 characters, with no spaces. */
+function seg32(s: string, from: string): string {
+  const t = segOf(s)
+  return t.length <= 32 ? t : `${t.slice(0, 25)}-${hash6(from)}`
+}
+
+// Each heading's short path, and the start of an id it makes redundant (layer-1
+// under l1, meta under macro...) : the whole tree must fit in one frame.
+const ACT_GROUPS: Record<string, { seg: string; strip?: RegExp }> = {
+  Randomize: { seg: 'rand', strip: /^(rand|fire)-/ },
+  'Layer 1': { seg: 'l1', strip: /^layer-1-/ },
+  'Layer 2': { seg: 'l2', strip: /^layer-2-/ },
+  'Layer 3': { seg: 'l3', strip: /^layer-3-/ },
+  'Layer 4': { seg: 'l4', strip: /^layer-4-/ },
+  Background: { seg: 'bg', strip: /^bg-/ },
+  'Triggers (what is loaded)': { seg: 'trig' },
+  Effects: { seg: 'fx' },
+  Scenes: { seg: 'scene', strip: /^scene-/ },
+  Worlds: { seg: 'world', strip: /^world-/ },
+  Generate: { seg: 'gen', strip: /^gen-/ },
+  Macro: { seg: 'macro', strip: /^meta-/ },
+  Modulators: { seg: 'mod', strip: /^mod-/ },
+  'Body rules': { seg: 'rule', strip: /^rule-/ },
+  Feel: { seg: 'feel', strip: /^feel-/ },
+  'Tempo and sound': { seg: 'tempo' },
+  Sonify: { seg: 'sonify', strip: /^sonify-/ },
+  Transport: { seg: 'transport', strip: /^fire-/ },
+  Output: { seg: 'out', strip: /^out-/ },
+  Session: { seg: 'session', strip: /^session-/ }
+}
+
+/** Where an action lives on the mesh : act/<its heading>/<its id>, short. Built
+ *  from the id, never the label : renaming a scene or a rule must not cut a wire.
+ *  `taken` (the paths given so far) keeps a stripped name from landing on another. */
+export function dfActionPath(id: string, group: string, taken?: Set<string>): string {
+  const g = ACT_GROUPS[group]
+  const gseg = g?.seg ?? seg32(group, group)
+  const full = segOf(
+    id
+      .replace(/^act:/, '')
+      // 1-based like the interface (the ids count layers, scenes, voices from 0)
+      .replace(/^(layer|rand:layer|src|scene|sonify:voice|mod|meta):(\d+)/, (_m, a: string, n: string) => `${a}:${Number(n) + 1}`)
+  )
+  const short = g?.strip ? full.replace(g.strip, '') : full
+  const pick = (n: string): string => `act/${gseg}/${n.length <= 32 ? n : `${n.slice(0, 25)}-${hash6(id)}`}`
+  const p = short ? pick(short) : pick(full)
+  return taken?.has(p) ? pick(full) : p
+}
 
 // ── Palinopsia's tree ─────────────────────────────────────────────────────
 // Kept small on purpose : the whole DECLARE must stay well under 8 KB, since
@@ -164,7 +244,8 @@ export const DF_SOURCES: DfSource[] = [
 const GROUP_LABELS: Record<string, string> = {
   meta: 'Macro knobs', layer: 'Layers', feel: 'Feel', scene: 'Scenes',
   bg: 'Background', randomize: 'Randomize', output: 'Output transform',
-  audio: 'Audio in', vision: 'Picture', body: 'Body', mod: 'Modulators'
+  audio: 'Audio in', vision: 'Picture', body: 'Body', mod: 'Modulators',
+  act: 'Actions (the Body rule list)'
 }
 
 function param(path: string, label: string, p: Partial<DfParam>): DfParam {
@@ -175,17 +256,22 @@ function param(path: string, label: string, p: Partial<DfParam>): DfParam {
   }
 }
 
-/** The tree Palinopsia declares : groups before their children, depth first. */
-export function palinopsiaTree(): DfParam[] {
+/** The tree Palinopsia declares : groups before their children, depth first.
+ *  The actions come last : a reference node keeps the first 128 entries of a
+ *  tree, so it still sees the whole of the rest. */
+export function palinopsiaTree(actions: DfAction[] = []): DfParam[] {
   const out: DfParam[] = []
   const groups = new Set<string>()
+  const groupLabel = new Map<string, string>()
+  for (const a of actions) groupLabel.set(a.path.slice(0, a.path.lastIndexOf('/')), a.group)
   const addGroups = (path: string): void => {
     const segs = path.split('/')
     for (let i = 1; i < segs.length; i++) {
       const g = segs.slice(0, i).join('/')
       if (groups.has(g)) continue
       groups.add(g)
-      out.push(param(g, GROUP_LABELS[g] ?? (/^layer\/\d$/.test(g) ? `Layer ${g.slice(6)}` : g), { kind: 'group', rate: 0, flow: 'source', access: 'read', mode: 'discrete' }))
+      const label = GROUP_LABELS[g] ?? groupLabel.get(g) ?? (/^layer\/\d$/.test(g) ? `Layer ${g.slice(6)}` : g)
+      out.push(param(g, label, { kind: 'group', rate: 0, flow: 'source', access: 'read', mode: 'discrete' }))
     }
   }
   for (const d of DF_DESTS) {
@@ -201,6 +287,11 @@ export function palinopsiaTree(): DfParam[] {
   for (const s of DF_SOURCES) {
     addGroups(s.path)
     out.push(param(s.path, s.label, { flow: 'source', access: 'read', rate: 30 }))
+  }
+  // a trigger each : fires once when it goes on (>= 0.5), like OSC's triggers
+  for (const a of actions) {
+    addGroups(a.path)
+    out.push(param(a.path, a.label, { type: 'bool', mode: 'discrete', flow: 'destination', access: 'write', rate: 0, min: 0, max: 1 }))
   }
   return out
 }

@@ -276,7 +276,8 @@ function loadDataflou(): DfConfig {
       return {
         enabled: !!j.enabled,
         label: typeof j.label === 'string' && j.label.trim() ? j.label.slice(0, 32) : DF_DEFAULT_CONFIG.label,
-        universe: typeof j.universe === 'string' && j.universe.trim() ? j.universe.slice(0, 32) : DF_DEFAULT_CONFIG.universe
+        universe: typeof j.universe === 'string' && j.universe.trim() ? j.universe.slice(0, 32) : DF_DEFAULT_CONFIG.universe,
+        actions: !!j.actions
       }
     }
   } catch {
