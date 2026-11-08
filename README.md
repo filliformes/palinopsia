@@ -281,9 +281,13 @@ instead.
 left, the scene (its arrows step through the bank) and the Morph time; at the right, the output's
 size, the frame rate and the big preview's switch. They stay quiet until your mouse comes near. **Interface glass** (the capsules, the lens on the right
 column's tabs, the lens a slider becomes while you hold it, `Ctrl+K` and the messages) sits
-above the canvas, so it is never in the outputs, NDI or recordings. The bottom bar's buttons
-keep their shapes with a little of it too : a lit rim, a sheen fading down, a shade at the
-foot (no see-through there, so it costs nothing). Turn it off with
+above the canvas, so it is never in the outputs, NDI or recordings. Every button keeps
+its shape with a little of it too, the dropdowns and the chips with them : a lit rim, a sheen
+fading down, a shade at the foot (no see-through there, so it costs nothing). The sections
+get a gentler version (the layer cards, the Inspector, Master FX, the Mixer, Feel, the
+finishing units, the Connect sections, the pages' cards : a lit top edge, a glow that fades
+within the first lines, a soft lift; the long bars their top edge only), and the right
+column's selected tab is the only one in a glass capsule. Turn it off with
 **interface glass** in the **performance** tab (plain dark chips, remembered on this
 computer); an installation runs without it. A slider's line is a string while you hold it : it
 bends toward your hand and rings when you let go, and the left capsule's scene name scrambles into
@@ -2125,9 +2129,10 @@ and closing the window closes the page (the sound plays on, as when the page clo
 the app). It is never remembered : the next time, Sonify opens in the app.
 
 **The twelve voices** (each one lineage of the sonification literature), shown in
-**five families**, each a colored header over its cards (click it : the cards fold to
-it and keep playing; the header says which of its voices are on) and a colored edge on
-every card, the mixer strip and the sequencer's column too :
+**five families**, each a box that holds its voices, its left edge in the family's color
+and its head bigger than the cards inside (click the head : the box folds to it and the
+voices keep playing; the head says which of them are on), the color on the mixer strip
+and the sequencer's column too :
 **spectrum** (blue : Spectra, Filter : the frame as frequencies), **wave** (red :
 Orbit, Raster, Transmission : the pixels are the sound itself), **hits** (amber :
 Flow, Events, Signal : what moves or stands out fires sounds), **notes** (violet :

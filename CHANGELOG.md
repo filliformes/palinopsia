@@ -998,16 +998,52 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **The sections get a gentler glass than the buttons** (Vincent : "add something like this to
+  the other sections, like the Inspector and Master FX sections, all the layers (including BG
+  and AU), and other sections [...] just so I can see where it can go"; then "merge it all").
+  One rule in styles.css on every rounded, bordered box in a panel color (the layer cards BG,
+  L1-L4, AU, the Inspector, Master FX, the Mixer and its columns, Feel, the finishing units, the
+  Connect sections, the pages' cards) : a lit top edge, a glow fading within the first 90 px
+  whatever the height, a soft lift; the top bar, the modulation strip, the bottom bar and the
+  Connect sections take their top edge only. The previews (black) stay out; `.no-sheen` opts
+  out; plain with interface glass off. Test copy : 11 boxes in the main view, Mixer 10, Feel
+  13, finishing 8.
+- **Sonify's families are boxes that hold their voices** (Vincent : "the header sections are
+  smaller than the different sonify modes inside; it's confusing visually. Can you propose
+  something more logical" : he picked A, a box per family, over a title per family or a
+  colored band, mocked on the real page). `VoiceGroup` is one box (rounded, the family's color
+  as a 3 px left edge) with the head inside it at the family size (`SectionHead size="family"` :
+  32 px, a 12.5 px title instead of 9 px, the chevron and the voices-on summary bigger too);
+  the cards inside drop their own colored edge (the `FamilyColor` context is gone) and sit a
+  little darker than the box (`InFamily` in sonifyUi.tsx). Under 280 px the box loses its inner
+  margin : with it, six cards spilled at 240 (dice, octave pickers); without, none. Overflow
+  sweep with every voice on at 240 / 260 / 280 / 300 / 320 / 400 / 640 : nothing out of a card.
 - **The Source Editor lists every ISF shader, A to Z** (Vincent : "make sure all shaders
   (sources and fx) are there, and always classify them in alphabetical order"). Vibe Palette,
   Context and Finalizer were missing (kept out of `FX_SHADERS` so a rack can't load a second);
   each list (my shaders, generators, effects) is sorted by name. Measured in the test build :
   34 generators, 60 effects, all in order. The native nodes have no ISF code to open.
-- **The bottom bar's buttons get a little liquid glass** (Vincent : "keeping the same button
-  shapes, but adding a little liquid glass feel to those buttons ? No need for see-through
-  stuff that slows the UI"). `.bar-glass` on the Transport : a lit top rim, a sheen fading down
-  over each button's own color, a shade at its foot, a softer press; plain with interface
-  glass off. No backdrop filter : nothing is sampled.
+- **Every button gets a little liquid glass** (Vincent, first on the bottom bar : "keeping the
+  same button shapes, but adding a little liquid glass feel to those buttons ? No need for
+  see-through stuff that slows the UI"; then : "I find it a bit bizarre to only have liquid
+  glass in the lower toolbar. Can you put some on ALL the buttons in ALL the app"; after a feel
+  test : "an in-between [...] it's nice that they pop out, but it's a bit too much now", so about
+  half the first sheen; the tab row lost its own capsule behind the tabs, and the tabs their
+  own capsules : "keep the liquid glass capsule only on the selected tab", its sliding lens). The
+  bottom bar's resting buttons now read in the full text color like the top bar's ("it doesn't
+  pop as well as the buttons on the top toolbar" : they used the muted idle style, which the
+  layers' A / B keep to mark an empty slot). One rule in
+  styles.css : a lit top rim, a sheen fading down over each control's own color, a shade at
+  its foot, a softer press, on what looks like a button (`.btn`, `.btn-accent`, a bordered,
+  filled or `.input` button, every dropdown, the effect and modulation chips, `.chip`); list
+  rows, bare icons and the glass pieces keep their look, `.no-sheen` opts out. A ring keeps its
+  shadows (the Tailwind ring variables come first); a compact dropdown's chevron rides on top
+  as its own layer (`--sheen-arrow*`, set by `.select-compact`). Plain with interface glass
+  off. The Mixer's small dropdowns lose an inline `backgroundImage: 'none'` left from an old
+  chevron (nothing draws one there now) so they take it too. No backdrop filter : nothing is
+  sampled. Measured in the test copy : 144 of the 186
+  visible controls of the main view take it (the rest : section arrows, the capsules' own
+  glass, the text inside chips), 0 with glass off.
 
 - **Sonify's voices in five families, the Synth between Chord and Collage** (Vincent :
   "Synth should be between Chord and Collage in the Sonify modules order. Also : if

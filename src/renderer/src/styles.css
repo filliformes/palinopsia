@@ -1303,22 +1303,58 @@ input[type='range'][style*='vertical']:not(.soni-main)::-webkit-slider-thumb {
 html[data-glass='off'] .glass {
   background: rgb(14 14 16 / 0.78);
 }
-/* The bottom bar's buttons : a little liquid glass, the same shapes. A lit rim along the top, a
-   sheen fading down over the button's own color, a shade at its foot. Nothing behind them is
-   sampled, so it costs nothing to draw. Plain buttons with interface glass off. */
-html:not([data-glass='off']) .bar-glass button.border {
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.08) 0%, rgb(255 255 255 / 0.02) 50%, rgb(0 0 0 / 0.08) 100%);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    inset 0 -1px 0 rgb(0 0 0 / 0.22),
-    0 1px 2px rgb(0 0 0 / 0.25);
+/* Every button : a little liquid glass, the same shapes (Vincent : "put some on ALL the buttons
+   in ALL the app"). A lit rim along the top, a sheen fading down over the button's own color, a
+   shade at its foot, a softer press. Nothing behind them is sampled, so it costs nothing to draw.
+   Only what looks like a button : the button classes, a bordered or filled button, a dropdown
+   (a real one or a button dressed as one), the chips (an effect's, a modulation's); list rows,
+   bare icons and the glass pieces keep their look. A ring (an active toggle, the focus) stays :
+   its shadows come first. A compact dropdown's chevron rides on top as its own layer (the
+   --sheen-arrow variables, set by .select-compact). Plain with interface glass off; .no-sheen
+   opts out. */
+/* (half of the bottom bar's first sheen : "an in-between [...] it's nice that they pop out,
+   but it's a bit too much now") */
+:root {
+  --sheen: linear-gradient(180deg, rgb(255 255 255 / 0.045) 0%, rgb(255 255 255 / 0.012) 50%, rgb(0 0 0 / 0.045) 100%);
+  --sheen-hover: linear-gradient(180deg, rgb(255 255 255 / 0.075) 0%, rgb(255 255 255 / 0.02) 50%, rgb(0 0 0 / 0.035) 100%);
+  --sheen-press: linear-gradient(180deg, rgb(0 0 0 / 0.07) 0%, rgb(255 255 255 / 0.02) 100%);
+  --sheen-rim: inset 0 1px 0 rgb(255 255 255 / 0.07), inset 0 -1px 0 rgb(0 0 0 / 0.13), 0 1px 1px rgb(0 0 0 / 0.15);
+  --sheen-rim-press: inset 0 1px 2px rgb(0 0 0 / 0.22);
 }
-html:not([data-glass='off']) .bar-glass button.border:hover:not(:disabled) {
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, rgb(255 255 255 / 0.035) 50%, rgb(0 0 0 / 0.06) 100%);
+.select-compact {
+  --sheen-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  --sheen-arrow-size: 8px 5px;
+  --sheen-arrow-pos: right 5px center;
 }
-html:not([data-glass='off']) .bar-glass button.border:active:not(:disabled) {
-  background-image: linear-gradient(180deg, rgb(0 0 0 / 0.1) 0%, rgb(255 255 255 / 0.03) 100%);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+html:not([data-glass='off']) :is(button:is(.btn, .btn-accent, .border, .input, [class^='bg-'], [class*=' bg-']), select, span:is([class*='cursor-grab'], [class*='cursor-pointer']).border, .chip):not([class*='bg-transparent'], .no-sheen, .glass *, .glass-panel *, .cm-editor *, [role='option'], [role='menuitem']) {
+  background-image: var(--sheen-arrow, none), var(--sheen);
+  background-size: var(--sheen-arrow-size, auto), auto;
+  background-position: var(--sheen-arrow-pos, 0 0), 0 0;
+  background-repeat: no-repeat, no-repeat;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--sheen-rim);
+}
+html:not([data-glass='off']) :is(button:is(.btn, .btn-accent, .border, .input, [class^='bg-'], [class*=' bg-']), select, span:is([class*='cursor-grab'], [class*='cursor-pointer']).border, .chip):not([class*='bg-transparent'], .no-sheen, .glass *, .glass-panel *, .cm-editor *, [role='option'], [role='menuitem']):hover:not(:disabled) {
+  background-image: var(--sheen-arrow, none), var(--sheen-hover);
+}
+html:not([data-glass='off']) :is(button:is(.btn, .btn-accent, .border, .input, [class^='bg-'], [class*=' bg-']), select, span:is([class*='cursor-grab'], [class*='cursor-pointer']).border, .chip):not([class*='bg-transparent'], .no-sheen, .glass *, .glass-panel *, .cm-editor *, [role='option'], [role='menuitem']):active:not(:disabled) {
+  background-image: var(--sheen-arrow, none), var(--sheen-press);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--sheen-rim-press);
+}
+/* The sections, a gentler glass than the buttons (Vincent : "add something like this to the
+   other sections, like the Inspector and Master FX sections, all the layers (including BG and
+   AU), and other sections [...] just so I can see where it can go") : a lit top edge, a glow
+   that fades within the first few lines whatever the panel's height, a soft lift. Every
+   rounded, bordered box in a panel color (the layer cards, the Inspector, Master FX, the
+   Mixer, Feel, the finishing units, the Connect sections, the pages' cards) and the long
+   bars (the top bar, the modulation strip, the bottom bar, a Connect section) : their top
+   edge only. The previews (black) stay out; .no-sheen opts out; plain with interface glass off. */
+html:not([data-glass='off']) :is(div, section, aside).border:is(.rounded, .rounded-md, .rounded-lg, .rounded-xl):is([class^='bg-panel'], [class*=' bg-panel']):not(.no-sheen, .glass *, .glass-panel, .glass-panel *) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.03) 0, rgb(255 255 255 / 0.01) 26px, rgb(255 255 255 / 0) 90px);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), inset 0 1px 0 rgb(255 255 255 / 0.055), 0 1px 3px rgb(0 0 0 / 0.2);
+}
+html:not([data-glass='off']) :is(header, div.border-t.border-border:is(.bg-panel, .bg-panel2)):not(.no-sheen, .glass *, .glass-panel *) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025) 0, rgb(255 255 255 / 0) 24px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045);
 }
 /* the capsules in the preview's corners : small and quiet, the picture leads. A hand near one
    brings it forward. */
@@ -1408,9 +1444,10 @@ html[data-glass='off'] .glass-panel-head {
   pointer-events: none;
   overflow: visible;
 }
+/* the right column's tab row : each tab is its own little capsule now (the button sheen), so
+   the row has no capsule behind them ("we don't need a background capsule behind the tabs") */
 .tab-track {
-  background: rgb(var(--c-text) / 0.045);
-  border-radius: 11px;
+  background: transparent;
 }
 
 /* A MAIN control's slider (the Sonify Synth's TIMBRE / HARMONICS / MORPH) : a

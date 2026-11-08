@@ -310,7 +310,6 @@ function MixerColumn({
         <div className="contents" data-ctl={`mix:${index}:sourceBlend`}>
         <BlendSelect
           className="input w-full appearance-none !px-1 !py-0.5 text-center !text-[9px]"
-          style={{ backgroundImage: 'none' }}
           value={l.sourceBlend}
           onChange={(m) => setSourceBlend(index, m)}
           title="How B meets A : the crossfader below is what this mode makes of it"
@@ -412,7 +411,6 @@ function MixerColumn({
         <select
           data-ctl={`mix:${index}:coupling`}
           className={`input w-full appearance-none !px-0.5 !py-0.5 text-center !text-[9px] ${coupled ? 'text-accent' : ''}`}
-          style={{ backgroundImage: 'none' }}
           value={l.coupling.mode}
           onChange={(e) => setCoupling(index, { mode: e.target.value as CouplingMode })}
           title={COUPLING_TITLE}
@@ -427,7 +425,6 @@ function MixerColumn({
           <select
             data-ctl={`mix:${index}:feature`}
             className="input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
-            style={{ backgroundImage: 'none' }}
             value={l.coupling.feature}
             onChange={(e) => setCoupling(index, { feature: e.target.value as AudioFeature })}
             title="What in the sound drives it (transient and flux read best)"
@@ -442,7 +439,6 @@ function MixerColumn({
           {l.coupling.feature === 'band' && !cplOff && (
             <select
               className="input min-w-0 flex-1 appearance-none !px-0.5 !py-0.5 text-center !text-[9px]"
-              style={{ backgroundImage: 'none' }}
               value={l.coupling.band ?? 0}
               onChange={(e) => setCoupling(index, { band: Number(e.target.value) })}
               title="Which band of the spectrum (1 : the lowest)"
@@ -497,7 +493,6 @@ function MixerColumn({
       <PinZone pin={modTargetKey({ kind: 'layer', layer: index, field: 'blend' })} label={`L${index + 1} blend`}>
       <BlendSelect
         className={`input w-full shrink-0 appearance-none !px-1 !py-0.5 text-center !text-[9px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
-        style={{ backgroundImage: 'none' }}
         value={l.blend}
         onChange={(m) => setBlend(index, m)}
         liveKey={blendBound ? keyOf('blend') : undefined}

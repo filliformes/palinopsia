@@ -447,7 +447,7 @@ export function SectionedControls({
  *  bar's tint (a panel on another background picks one that shows on it). Keys
  *  fold it only from the bar itself (a key typed into a control in it stays
  *  the control's). */
-export function SectionHead({ title, color, folded, onToggle, right, lead, bar = 'bg-panel2/60 hover:bg-panel2', hint, wrap }: {
+export function SectionHead({ title, color, folded, onToggle, right, lead, bar = 'bg-panel2/60 hover:bg-panel2', hint, wrap, size = 'bar' }: {
   title: string
   color: string
   folded: boolean
@@ -459,7 +459,11 @@ export function SectionHead({ title, color, folded, onToggle, right, lead, bar =
   hint?: string
   /** The lead may take a line of its own (a narrow panel) rather than shrink. */
   wrap?: boolean
+  /** 'family' : the head of a box that holds cards (the Sonify families), bigger than
+   *  the cards' own titles so the parent reads as the parent. */
+  size?: 'bar' | 'family'
 }): JSX.Element {
+  const fam = size === 'family'
   return (
     <div
       role="button"
@@ -472,13 +476,13 @@ export function SectionHead({ title, color, folded, onToggle, right, lead, bar =
           onToggle()
         }
       }}
-      className={`flex min-h-[20px] cursor-pointer select-none items-center gap-1.5 border-t border-border px-2 py-0.5 ${wrap ? 'flex-wrap gap-y-0.5' : ''} ${bar}`}
+      className={`flex cursor-pointer select-none items-center gap-1.5 ${fam ? 'min-h-[32px] px-2.5 py-1' : 'min-h-[20px] border-t border-border px-2 py-0.5'} ${wrap ? 'flex-wrap gap-y-0.5' : ''} ${bar}`}
       title={hint ?? (folded ? `Show ${title}` : `Fold ${title}`)}
     >
-      <span className="w-2.5 shrink-0 font-mono text-[9px]" style={{ color }}>
+      <span className={`shrink-0 font-mono ${fam ? 'w-3 text-[11px]' : 'w-2.5 text-[9px]'}`} style={{ color }}>
         {folded ? '▸' : '▾'}
       </span>
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color }}>
+      <span className={`shrink-0 font-mono uppercase tracking-[0.12em] ${fam ? 'text-[12.5px] font-semibold' : 'text-[9px]'}`} style={{ color }}>
         {title}
       </span>
       {lead ?? <div className="min-w-0 flex-1" />}

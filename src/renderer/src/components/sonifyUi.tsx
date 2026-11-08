@@ -4,7 +4,7 @@
 // readout, a −/+ stepper and the little icon buttons (dice, reset). The Voices
 // view is the reference look : change it here, every view follows.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { registerLiveOverlay } from './liveOverlay'
@@ -221,6 +221,9 @@ export function Row({ label, children, hint, wrap, fit }: { label: string; child
 /** The voice card : a pill (on / off, play / stop), the title, its ⓘ, then the
  *  card's own buttons on the right. `open` shows the body (a voice hides it
  *  while off; a sequencer keeps it open to be edited while stopped). */
+/** Inside a Sonify family's box : the cards sit a little darker than the box. */
+export const InFamily = createContext(false)
+
 export function Shell({
   title, hint, on, onToggle, toggleText = ['● on', '○ off'], toggleTitle, midiId, lead, right, open, roomy, space, foot, collapsed = false, onCollapse, edge, children
 }: {
@@ -248,8 +251,9 @@ export function Shell({
   children?: ReactNode
 }): JSX.Element {
   const gap = space !== undefined && !collapsed ? spaceGap(space) : undefined
+  const inFamily = useContext(InFamily)
   return (
-    <section className={`rounded border transition-colors ${roomy ? 'px-3 pt-2.5 pb-1' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'}`} style={edge ? { borderLeftWidth: 2, borderLeftColor: edge } : undefined}>
+    <section className={`rounded border transition-colors ${roomy ? 'px-3 pt-2.5 pb-1' : 'px-2 py-1.5'} ${on ? 'border-accent/40 bg-panel2' : inFamily ? 'border-border bg-panel/60' : 'border-border bg-panel2/40'}`} style={edge ? { borderLeftWidth: 2, borderLeftColor: edge } : undefined}>
       <div className={`flex min-w-0 items-center gap-2 ${collapsed ? (roomy ? 'mb-1.5' : '') : roomy ? 'mb-2.5' : 'mb-1'}`} style={gap !== undefined ? { marginBottom: Math.max(6, gap + 2) } : undefined}>
         {onCollapse && (
           <button onClick={onCollapse} className="-mr-1 shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-accent" title={collapsed ? `Show the ${title}` : `Fold the ${title} to its header (it keeps playing)`}>
