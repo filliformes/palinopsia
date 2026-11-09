@@ -338,6 +338,8 @@ const SELF_NODE_IDS = [
   'node-lumablur', 'node-gooey', 'node-lookup'
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
+/** The effects a blind rack is dealt from (the convolution nodes join the layer rack). */
+export const DICE_FX_IDS = (): string[] => [...FX_SHADERS, ...SELF_NODES].map((f) => f.id)
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
 
 /** Build a rack of n DISTINCT random FX, each with randomized params.
@@ -398,15 +400,27 @@ const TYPE_POOL: ModulatorType[] = [
   'euclid', 'turing', 'cellular', 'steps'
 ]
 
+// What steps (holds, then jumps) : a jump 8 times a second is a flicker, not a
+// rhythm, so stepped clocks run on 1/4 to 2 bars (free : at most 1.5 Hz); smooth
+// shapes keep 1/8 up and 4 Hz.
+const STEPPED_TYPES = new Set<ModulatorType>(['sh', 'random', 'arp', 'euclid', 'turing', 'cellular', 'steps'])
+const STEPPED_SHAPES = new Set<LfoShape>(['square', 'rndStep', 'spastic', 'sawtooth'])
+function diceClock(type: ModulatorType, shape: LfoShape): Pick<ModulatorConfig, 'type' | 'shape' | 'sync' | 'rateHz' | 'divisionIdx'> {
+  const stepped = STEPPED_TYPES.has(type) || (type === 'lfo' && STEPPED_SHAPES.has(shape))
+  return {
+    type,
+    shape,
+    sync: chance(0.35) ? 'bpm' : 'free',
+    rateHz: Math.pow(10, range(Math.log10(0.05), Math.log10(stepped ? 1.5 : 4))),
+    divisionIdx: Math.floor(range(stepped ? 5 : 4, stepped ? 10 : 9))
+  }
+}
+
 function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfig {
   return {
     ...base,
     enabled,
-    type: pick(TYPE_POOL),
-    sync: chance(0.35) ? 'bpm' : 'free',
-    rateHz: Math.pow(10, range(Math.log10(0.05), Math.log10(4))),
-    divisionIdx: Math.floor(range(3, 9)),
-    shape: pick(RAND_SHAPES),
+    ...diceClock(pick(TYPE_POOL), pick(RAND_SHAPES)),
     curve: chance(0.5) ? pick(RAND_CURVES) : 'linear',
     ramp: { ...base.ramp, rampMs: range(500, 20000), curvePct: range(-80, 80), mode: 'loop' },
     adsr: {
@@ -474,6 +488,77 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
   return out
 }
 
+/** The float targets a DICE may move (the random matrix, a random Macro bank) :
+ *  never a seed or a flip (every swing would reshuffle or invert the whole frame,
+ *  a strobe the flash limiter then grids), never the pinned finalizers (Vibe,
+ *  Finalizer : the user's look, and the Finalizer's opacity fades the show). */
+export function diceTargets(c: CompositionState): ModTarget[] {
+  const lockedIds = new Set(c.master.filter((f) => f.locked).map((f) => f.id))
+  return collectFloatTargets(c).filter(
+    (t) =>
+      !MOTION_SKIP.test('input' in t ? String(t.input) : '') &&
+      !(t.kind === 'fx' && t.scope.kind === 'master' && lockedIds.has(t.instId))
+  )
+}
+
+/** The span a target's curated (dice) range covers inside its declared range,
+ *  0..1 : what a Macro knob position puts it in its tasteful zone. */
+function curated01(c: CompositionState, t: ModTarget): [number, number] {
+  let shaderId: string | null = null
+  if (t.kind === 'source') {
+    const l = c.layers[t.layer]
+    shaderId = (t.slot === 'A' ? l?.sourceA : l?.sourceB)?.shaderId ?? null
+  } else if (t.kind === 'fx') {
+    const s = t.scope
+    const arr =
+      s.kind === 'master' ? c.master
+        : s.kind === 'background' ? c.background?.fx
+          : s.kind === 'layer' ? c.layers[s.layer]?.fx
+            : s.kind === 'sourceA' ? c.layers[s.layer]?.sourceAFx
+              : s.kind === 'sourceB' ? c.layers[s.layer]?.sourceBFx
+                : c.layers[s.layer]?.loopFx
+    shaderId = arr?.find((f) => f.id === t.instId)?.shaderId ?? null
+  }
+  if (!shaderId || !('input' in t)) return [0, 1]
+  const d = inputsForShader(shaderId).find((x) => x.name === t.input)
+  if (!d || d.type !== 'float') return [0, 1]
+  const dl = typeof d.min === 'number' ? d.min : 0, dh = typeof d.max === 'number' ? d.max : 1
+  if (dh <= dl) return [0, 1]
+  const [lo, hi] = curatedRange(shaderId, d.name, [dl, dh])
+  return [Math.max(0, (lo - dl) / (dh - dl)), Math.min(1, (hi - dl) / (dh - dl))]
+}
+
+/** A fresh Macro bank : each knob gets one to four destinations no other knob
+ *  holds (two knobs on one input fight), from what a dice may move, and a
+ *  position that puts every one of them inside its curated range (a knob maps
+ *  over the whole declared range : a blind position threw a dozen inputs to
+ *  their extremes at once). Turning the knob is where the extremes live. */
+export function randomMetaKnobs(c: CompositionState): CompositionState['metaKnobs'] {
+  const pool = diceTargets(c)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  return c.metaKnobs.map((k) => {
+    const want = 1 + drawCount([0.3, 0.35, 0.25, 0.1]) // 1..4
+    const destinations: ModTarget[] = []
+    let lo = 0, hi = 1
+    for (let i = 0; i < pool.length && destinations.length < want; ) {
+      const [a, b] = curated01(c, pool[i])
+      const nlo = Math.max(lo, a), nhi = Math.min(hi, b)
+      // only while the knob still has a usable zone where all of them sit well
+      if (nhi - nlo >= 0.12 || destinations.length === 0) {
+        destinations.push(pool[i])
+        lo = destinations.length === 1 ? a : nlo
+        hi = destinations.length === 1 ? b : nhi
+        pool.splice(i, 1)
+      } else i++
+    }
+    const value = destinations.length ? range(lo, hi) : rnd()
+    return { ...k, destinations, value }
+  })
+}
+
 function targetKey(t: ModTarget): string {
   if (t.kind === 'source') return `src:${t.layer}:${t.slot}:${t.input}`
   if (t.kind === 'bgSource') return `bgsrc:${t.input}`
@@ -502,7 +587,7 @@ function targetOnLayer(t: ModTarget, li: number): boolean {
  *  assignment — a random draw that leaves a layer untargeted reads as a static,
  *  lifeless scene (the "Randomize feels dead" report). */
 function randomMatrix(c: CompositionState): ModAssignment[] {
-  const targets = collectFloatTargets(c)
+  const targets = diceTargets(c)
   if (targets.length === 0) return []
   const out: ModAssignment[] = []
   const used = new Set<string>()
@@ -644,6 +729,93 @@ const BLENDS = [
 // stateful Consume). They work on layers too, but a blind layer draw keeps to the
 // per-pixel modes : a relation mode depends on what happens to sit below.
 const MIX_BLENDS = [...BLENDS, 'weave', 'lumakey', 'consume'] as const
+type Blend = (typeof MIX_BLENDS)[number]
+
+// A layer's GROUND decides which modes it can carry over the stack below it.
+// Measured (11-08 : every dice source alone, four curated draws each, the median
+// pixel) : most draw light on near-black, the house ground; these give a lit one
+// (median above 0.3) ...
+const LIT_GROUND = new Set<string>([
+  'gen-marble', 'gen-physarum', 'dye-field', 'gen-veins', 'scan', 'ground', 'solid-color',
+  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane'
+])
+// ... and these a mid one (0.15 to 0.3).
+const MID_GROUND = new Set<string>([
+  'sync-osc', 'slit-scan', 'op-art', 'ramps', 'swell', 'interference', 'erosion', 'colony', 'drift-field'
+])
+type Ground = 'dark' | 'mid' | 'lit'
+const groundOf = (s: SourceSlot | null | undefined): Ground =>
+  !s?.shaderId ? 'dark' : LIT_GROUND.has(s.shaderId) ? 'lit' : MID_GROUND.has(s.shaderId) ? 'mid' : 'dark'
+// Effects that light a layer's ground whatever its source draws : the prints lay
+// it on paper, Thin Film turns it all to film, Threshold to two tones (line art
+// through a Riso under an add blend washed the stack out to white).
+const GROUND_FX: Record<string, (f: FxInstance) => Ground | null> = {
+  'fx-riso': () => 'lit',
+  'fx-thinfilm': () => 'lit',
+  'fx-halftone': (f) => (f.inputs.mode === 3 ? null : 'lit'), // (3 : dots of light on black)
+  'fx-dither': (f) => (f.inputs.color === 2 ? 'mid' : null), // (ink on paper)
+  'fx-threshold': () => 'mid'
+}
+const RANK: Record<Ground, number> = { dark: 0, mid: 1, lit: 2 }
+/** A layer's own picture : both its sources together, then what its effects do. */
+function layerGround(l: LayerState): Ground {
+  const a = groundOf(l.sourceA)
+  let g: Ground = !l.sourceB?.shaderId ? a : a === groundOf(l.sourceB) ? a : 'mid'
+  for (const f of [...l.sourceAFx, ...l.sourceBFx, ...l.fx]) {
+    const lit = f.enabled !== false && f.shaderId ? GROUND_FX[f.shaderId]?.(f) : null
+    if (lit && RANK[lit] > RANK[g]) g = lit
+  }
+  return g
+}
+// Over a BLACK ground these leave the stack below as it was (subtract takes
+// nothing away where the layer is black) ...
+const DARK_OK: readonly Blend[] = ['add', 'subtract', 'screen', 'lighten', 'difference', 'exclusion', 'wrap', 'lightercolor']
+// ... a LIT ground needs the modes that multiply, darken, contrast or cover (an
+// additive mode over a lit ground washes the stack out to white, 50 add included :
+// past half its opacity it adds the whole layer on the faded stack), ...
+const LIT_OK: readonly Blend[] = ['normal', 'multiply', 'darken', 'overlay', 'softlight', 'hardlight', 'difference', 'exclusion']
+// ... a MID ground the ones that hold either way.
+const MID_OK: readonly Blend[] = ['screen', 'lighten', 'difference', 'exclusion', 'overlay', 'softlight', 'lightercolor']
+// Blind, every other pairing blacked or bleached the stack : 11 of 120 presses
+// of Randomize All came out all black, nearly each through a multiply, darken,
+// overlay, normal or 50 add on an upper layer drawing lines on black.
+const OK_FOR: Record<Ground, readonly Blend[]> = { dark: DARK_OK, mid: MID_OK, lit: LIT_OK }
+// The A/B mix (B is the top) may also use the relation modes, which hold either way.
+const RELATION: readonly Blend[] = ['weave', 'lumakey', 'consume']
+/** A blend for a layer above another, the one its ground can carry. */
+const stackBlend = (l: LayerState): LayerState['blend'] => pick(OK_FOR[layerGround(l)]) as LayerState['blend']
+/** The A/B mix : B over A, the same rule, or a relation mode. */
+const mixBlend = (b: SourceSlot | null | undefined): LayerState['sourceBlend'] =>
+  pick([...OK_FOR[groundOf(b)], ...RELATION]) as LayerState['sourceBlend']
+
+/** After a deal : the first visible layer takes a stack-safe mode at a solid
+ *  opacity (it sits on the background), every layer above it a mode its ground
+ *  can carry, every A/B mix the same. Only a pairing that would black or bleach
+ *  the stack is changed. */
+// The first visible layer sits on the background : any of these over a dark ground;
+// a lit one covers it (an additive one over a lit ground, on a tinted background,
+// came out white), a mid one covers or lightens.
+const BOTTOM_OK: Record<Ground, readonly string[]> = {
+  dark: ['normal', 'add', 'screen', 'lighten'],
+  mid: ['normal', 'screen', 'lighten'],
+  lit: ['normal']
+}
+function safeStack(layers: LayerState[]): LayerState[] {
+  const on = (l: LayerState): boolean => (!!l.sourceA.shaderId || !!l.sourceB?.shaderId) && !l.mute
+  const fi = layers.findIndex(on)
+  return layers.map((l, i) => {
+    if (!on(l)) return l
+    let out = l
+    if (l.sourceB?.shaderId && ![...OK_FOR[groundOf(l.sourceB)], ...RELATION].includes(l.sourceBlend as Blend)) out = { ...out, sourceBlend: mixBlend(l.sourceB) }
+    if (i === fi) {
+      const ok = BOTTOM_OK[layerGround(out)]
+      if (!ok.includes(out.blend)) out = { ...out, blend: pick(ok) as LayerState['blend'] }
+      return { ...out, opacity: Math.max(out.opacity, 0.75) }
+    }
+    if (!OK_FOR[layerGround(out)].includes(out.blend as Blend)) out = { ...out, blend: stackBlend(out) }
+    return out
+  })
+}
 
 // Occasionally give a layer a spatial mask (mostly none). Keeps the register
 // matte : gentle softness, generous shape size, so it windows rather than hides.
@@ -699,26 +871,32 @@ export function loopFromRecipe(r: LoopRecipe): Pick<LayerState, 'loopFx' | 'loop
     feedbackAmount: r.amount
   }
 }
-function randomLoop(feedback: boolean, amount: number): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount' | 'loopDelay' | 'loopSync'> {
-  if (feedback && chance(0.35)) return loopFromRecipe(pick(LOOP_RECIPES))
+function randomLoop(feedback: boolean, amount: number, ground: Ground = 'dark'): Pick<LayerState, 'loopFx' | 'loopBlend' | 'feedbackAmount' | 'loopDelay' | 'loopSync'> {
+  // The loops that brighten (lighten, screen : 0.7 to 0.96 of each pass back) were
+  // made for light on black; over a lit or mid ground they climb to white in a
+  // second (a Rise on Swell over Solid Color came out white). Those layers take the
+  // mixing, keying, XOR and multiplying loops.
+  const pool = ground === 'dark' ? LOOP_RECIPES : LOOP_RECIPES.filter((r) => r.blend !== 'lighten' && r.blend !== 'screen')
+  if (feedback && chance(0.35) && pool.length) return loopFromRecipe(pick(pool))
   return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount, loopDelay: 0, loopSync: 0 }
 }
 
 export function randomizeSingleLayer(l: LayerState): LayerState {
   const withB = chance(0.25)
   const feedback = chance(0.3)
+  const A = randomSlot(), B = withB ? randomSlot() : null
   return {
     ...l,
-    sourceA: randomSlot(),
-    sourceB: withB ? randomSlot() : null,
+    sourceA: A,
+    sourceB: B,
     sourceAFx: randomRack(SOURCE_A_RACK),
     sourceBFx: withB ? randomRack(SOURCE_B_RACK) : [],
     fx: randomRack(LAYER_RACK, false, [], true),
     sourceMix: withB ? range(0.25, 0.75) : l.sourceMix,
-    sourceBlend: withB ? pick(MIX_BLENDS) : l.sourceBlend,
-    blend: pick(BLENDS),
+    sourceBlend: withB ? mixBlend(B) : l.sourceBlend,
+    blend: stackBlend({ ...l, sourceA: A, sourceB: B }),
     feedback,
-    ...randomLoop(feedback, range(0.3, 0.8)),
+    ...randomLoop(feedback, range(0.3, 0.8), layerGround({ ...l, sourceA: A, sourceB: B })),
     mute: false,
     mask: randomMask()
   }
@@ -767,13 +945,16 @@ export function seedRandomStart(base: CompositionState): CompositionState {
   // of the picture : with one (New's random tint), the layer lets it show (it sat
   // under an opaque 'normal' and barely read) : mostly screen / lighten / add,
   // or 'normal' at an opacity that leaves it some air. With none, solid.
+  // A seed drawing on a lit ground covers the tint instead (an additive mode
+  // over both came out white), at an opacity that leaves the tint some air.
   const bgShows = !!base.background?.source.shaderId && (base.background.opacity ?? 1) > 0.05
+  const g0 = layerGround(l0)
   if (bgShows) {
-    const blend = pick(['screen', 'screen', 'screen', 'lighten', 'lighten', 'add', 'normal']) as LayerState['blend']
+    const blend = (g0 === 'lit' ? 'normal' : pick(g0 === 'mid' ? ['screen', 'lighten', 'normal'] : ['screen', 'screen', 'screen', 'lighten', 'lighten', 'add', 'normal'])) as LayerState['blend']
     l0 = { ...l0, blend, opacity: blend === 'normal' ? 0.6 + Math.random() * 0.2 : Math.max(l0.opacity, 0.85) }
   } else {
-    const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
-    if (!SAFE_BOTTOM.includes(l0.blend)) l0 = { ...l0, blend: pick(SAFE_BOTTOM) as LayerState['blend'] }
+    const ok = BOTTOM_OK[g0]
+    if (!ok.includes(l0.blend)) l0 = { ...l0, blend: pick(ok) as LayerState['blend'] }
     l0 = { ...l0, opacity: Math.max(l0.opacity, 0.85) }
   }
   let next: CompositionState = {
@@ -803,6 +984,49 @@ export function seedRandomStart(base: CompositionState): CompositionState {
   }
   next = { ...next, modMatrix: randomMatrix(next) }
   return next
+}
+
+// How many effects a whole draw carries, all racks together (index = count).
+// Measured on 120 presses of Randomize All : the racks dealt one by one
+// stacked 13.5 effects on average (up to 25), and a picture through that many
+// degrading passes went to mud or black about one press in three, and three-
+// and four-layer draws dropped below 50 fps half the time. Most presses now
+// carry four to eight; a dense one is still possible.
+const DRAW_BUDGET = [0, 0, 0, 0.04, 0.1, 0.16, 0.2, 0.18, 0.13, 0.09, 0.06, 0.04]
+// The master chain when the whole instrument is dealt (index = count) : it runs
+// over everything, so it stays short; alone (Randomize Master FX) it may run long.
+const MASTER_IN_ALL = [0.15, 0.3, 0.3, 0.17, 0.08]
+const MASTER_ALONE = [0, 0.15, 0.25, 0.25, 0.18, 0.1, 0.07]
+
+/** Trim a dealt composition to `budget` effects : one at a time, from the
+ *  fullest rack (the second voices' racks first, the master last), so no rack
+ *  is emptied while another still holds several. Pinned units never go. */
+function trimToBudget(c: CompositionState, budget: number): CompositionState {
+  type Rack = { get: () => FxInstance[]; set: (fx: FxInstance[]) => void; weight: number }
+  const layers = c.layers.map((l) => ({ ...l }))
+  let master = c.master
+  const racks: Rack[] = []
+  layers.forEach((l) => {
+    racks.push({ get: () => l.sourceBFx, set: (fx) => (l.sourceBFx = fx), weight: 1.3 })
+    racks.push({ get: () => l.sourceAFx, set: (fx) => (l.sourceAFx = fx), weight: 1.1 })
+    racks.push({ get: () => l.fx, set: (fx) => (l.fx = fx), weight: 1 })
+  })
+  racks.push({ get: () => master.filter((f) => !f.locked), set: (fx) => (master = [...fx, ...master.filter((f) => f.locked)]), weight: 0.8 })
+  const count = (): number => racks.reduce((n, r) => n + r.get().length, 0)
+  for (let guard = 0; count() > budget && guard < 64; guard++) {
+    let best: Rack | null = null, bestScore = -1
+    for (const r of racks) {
+      const n = r.get().length
+      if (!n) continue
+      const s = n * r.weight + rnd() * 0.5
+      if (s > bestScore) { bestScore = s; best = r }
+    }
+    if (!best) break
+    const fx = best.get().slice()
+    fx.splice(Math.floor(rnd() * fx.length), 1)
+    best.set(fx)
+  }
+  return { ...c, layers, master }
 }
 
 function randomizeStructural(
@@ -838,11 +1062,12 @@ function randomizeStructural(
   if (scope === 'sourcefxonly') {
     return {
       ...c,
-      layers: c.layers.map((l) => ({
+      // (a print or a film dealt under an additive blend : the blend made safe)
+      layers: safeStack(c.layers.map((l) => ({
         ...l,
         sourceAFx: slotActive(l.sourceA) ? randomRack(SOURCE_A_RACK) : l.sourceAFx,
         sourceBFx: slotActive(l.sourceB) ? randomRack(SOURCE_B_RACK) : l.sourceBFx
-      }))
+      })))
     }
   }
 
@@ -850,10 +1075,10 @@ function randomizeStructural(
   if (scope === 'layerfxonly') {
     return {
       ...c,
-      layers: c.layers.map((l) => ({
+      layers: safeStack(c.layers.map((l) => ({
         ...l,
         fx: slotActive(l.sourceA) || slotActive(l.sourceB) ? randomRack(LAYER_RACK, false, [], true) : l.fx
-      }))
+      })))
     }
   }
 
@@ -891,13 +1116,14 @@ function randomizeStructural(
         if (active) {
           anyActive = true
           const withB = chance(0.25)
+          const B = withB ? randomSlot() : null
           layer = {
             ...layer,
             sourceA: randomSlot(),
-            sourceB: withB ? randomSlot() : null,
+            sourceB: B,
             sourceBFx: withB ? layer.sourceBFx : [],
             sourceMix: withB ? range(0.25, 0.75) : layer.sourceMix,
-            sourceBlend: withB ? pick(MIX_BLENDS) : layer.sourceBlend,
+            sourceBlend: withB ? mixBlend(B) : layer.sourceBlend,
             mute: false
           }
         } else {
@@ -917,10 +1143,10 @@ function randomizeStructural(
         layer = {
           ...layer,
           fx: hasSource ? randomRack(LAYER_RACK, false, [], true) : [],
-          blend: pick(BLENDS),
+          blend: stackBlend(layer),
           opacity: range(0.55, 1),
           feedback,
-          ...randomLoop(feedback, range(0.3, 0.8)),
+          ...randomLoop(feedback, range(0.3, 0.8), layerGround(layer)),
           sourceMix: layer.sourceB?.shaderId ? range(0.2, 0.8) : layer.sourceMix,
           speed: range(0.5, 1.5), // gentle : extreme speeds are a manual move
           mask: hasSource ? randomMask() : layer.mask
@@ -947,23 +1173,9 @@ function randomizeStructural(
     }
     // The stack's FIRST visible layer sits directly on the background : a dark
     // blend there (multiply / darken / subtract...) is the classic black-window
-    // draw. When the dice rolled the blends, force the bottom voice to a
-    // stack-safe mode and a solid opacity so the scene always reads.
-    if (doLayer) {
-      const SAFE_BOTTOM = ['normal', 'add', 'screen', 'lighten']
-      const fi = layers.findIndex((l) => (!!l.sourceA.shaderId || !!l.sourceB?.shaderId) && !l.mute)
-      if (fi >= 0) {
-        layers = layers.map((l, i) =>
-          i === fi
-            ? {
-                ...l,
-                blend: SAFE_BOTTOM.includes(l.blend) ? l.blend : (pick(SAFE_BOTTOM) as LayerState['blend']),
-                opacity: Math.max(l.opacity, 0.75)
-              }
-            : l
-        )
-      }
-    }
+    // draw; above it, a mode the layer's ground cannot carry blacks the stack.
+    // Made safe at the end of the deal (after the effect budget : what the layer
+    // ends up carrying counts too).
     next = { ...next, layers }
   }
 
@@ -972,18 +1184,33 @@ function randomizeStructural(
     // Palette is the user's look, and Context (depth) is too intense to re-roll.
     // Threshold is excluded from the MASTER pool: on a whole near-black
     // composition it can gate the entire output to black (the black-window
-    // report); it stays available in layer/source racks where it carves.
+    // report); it stays available in layer/source racks where it carves. Edge
+    // too : the edges of the whole picture are mostly black (one of the black
+    // draws of the 11-08 sweep).
     const locked = next.master.filter((f) => f.locked)
+    // The habit of closing the chain on a Palette or a Grade, only without the
+    // Vibe : the Vibe Palette already unifies the color after it, and a second
+    // ramp before it flattened the picture (the palette draws had the lowest
+    // contrast of the 11-08 sweep).
+    const vibeOn = locked.some((f) => f.shaderId === 'fx-vibe' && f.enabled !== false)
     next = {
       ...next,
       // Up to 8 distinct effects (index = count); peak around 3–4, long tail
       // out to a full 8-deep master chain.
       master: [
-        ...randomRack([0, 0.12, 0.16, 0.18, 0.16, 0.14, 0.1, 0.08, 0.06], true, ['fx-threshold']),
+        ...randomRack(scope === 'all' ? MASTER_IN_ALL : MASTER_ALONE, !vibeOn, ['fx-threshold', 'fx-edge']),
         ...locked
       ]
     }
   }
+
+  // The whole instrument dealt at once : a budget of effects over all its racks
+  // (before the matrix, which binds what is left).
+  if (scope === 'all') next = trimToBudget(next, drawCount(DRAW_BUDGET))
+  // Then every blend the dealt layer cannot carry is made safe : whenever the dice
+  // changed its sources, its blends or its racks (new sources under kept blends,
+  // a Riso dealt under an add blend). Only those change.
+  if (doSources || doSourceFx || doLayer) next = { ...next, layers: safeStack(next.layers) }
 
   if (doMods) {
     // STRUCTURAL: enable a random number of modulators (2–5), fully re-roll

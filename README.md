@@ -921,6 +921,10 @@ fine, double-click resets), with a destination count, a rename, an output **curv
 the bottom of the dial, what the knob sends **now** through its curve (`0.00` to `1.00`),
 live as you drag, as it glides, from MIDI or a modulator (in the modulated color then). Each knob
 can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
+**Randomize Macro Knobs** deals a fresh bank : one to four destinations per knob that
+no other knob holds, never a seed, a flip or the pinned Vibe and Finalizer, each knob
+set where every one of its destinations sits inside its curated range (a knob spans
+the whole declared range, so turning it is where the extremes are).
 
 The **`⊞ XY` toggle** (Macro title bar) turns **knobs 13–16 into two XY
 performance pads** (knob 13/14 drive pad 1's X/Y, 15/16 pad 2's) for
@@ -2850,7 +2854,10 @@ and its timing travel in the session. Drivable over OSC too: **`/opsia/surface/p
 **Randomize** is structural: it doesn't just re-roll parameters, it rebuilds its
 targets : picks generators per layer, builds FX racks of random length (up to four
 effects on each source and on the layer), enables
-2–5 modulators and rolls a fresh mod-matrix. Every float draw comes from the
+2–5 modulators and rolls a fresh mod-matrix. **Randomize All** deals a budget of
+effects over all its racks together (most presses four to eight, a dense one now and
+then; the master chain stays at four or fewer : alone, Randomize Master FX may run to
+six), so a press never stacks a dozen degrading passes. Every float draw comes from the
 shader's **curated aesthetic sub-range**; colors stay matte.
 
 Scopes (the `▾` next to the button): **All · Sources · Source Parameters ·
@@ -2864,17 +2871,37 @@ see the [OSC table](#inbound-control--instrument).
 
 Built-in guarantees so a roll always *plays*:
 
-- **Never black:** at least **two layers** come up active, and the stack's bottom
-  visible layer is forced to a stack-safe blend (normal/add/screen/lighten) at
-  solid opacity.
-- **Never static:** after the matrix roll, every active layer that ended up
-  untargeted receives one solid modulation assignment.
+- **Never black, never bleached:** at least **two layers** come up active, the stack's
+  bottom visible layer takes a stack-safe blend (normal/add/screen/lighten; normal
+  when it draws on a lit ground) at solid opacity, and every layer above it a blend
+  its **ground** can carry. Most sources
+  draw light on near-black : over them add, subtract, screen, lighten, difference,
+  exclusion, wrap or lighter color (a multiply, darken, overlay or normal there
+  blacked the whole stack below); the sources measured to give a lit ground (Marbling,
+  Physarum, Dye Field, Veins, Fur, Fluid, Mycelium, Solid Color, Scan, Ground,
+  Membrane, RGB Osc) take normal, multiply, darken, overlay, soft or hard light,
+  difference or exclusion (an additive one over them, 50 add included, washed the
+  stack out to white); mid grounds the ones that hold either way. An effect can light a ground too
+  (Riso, Thin Film, Halftone on paper; Dither on paper and Threshold make it mid). The
+  A/B mix follows the same rule, with the relation modes. Every scope that changes
+  sources, blends or racks applies it, and changes only a blend that would black or
+  bleach the stack. The ready loops that brighten (lighten, screen) go only to layers
+  drawing on black, and the master chain is never dealt Threshold or Edge (each can
+  turn the whole picture black), nor a closing Palette or Grade while the Vibe Palette
+  is on (two ramps flattened the picture).
+- **Never static, never a strobe:** after the matrix roll, every active layer that
+  ended up untargeted receives one solid modulation assignment. A dice never binds a
+  **seed** or a **flip** (each swing would reshuffle or invert the whole frame) nor the
+  pinned Vibe and Finalizer, and the modulators that step (sample and hold, random,
+  arp, euclid, turing, cellular, steps; square, sawtooth, random-step and spastic
+  LFOs) run at 1/4 to 2 bars or at most 1.5 Hz, the smooth ones from 1/8 or up to 4 Hz.
 - **Never blinding:** Finishing randomize holds brightness-critical params
   (levels, gamma, gains, bloom, haze) in tight neutral bands; the Flash-safety
   limiter guards the output regardless.
 - The Vibe Palette, Context, the Background, and World slot-8 routing survive
   every global roll. **Oil Cloud** and **Cloud Study** are never dealt (by Randomize or
-  the Background dice) : pick them by hand. Nor are **Codec Mosh** and **Field Store**
+  the Background dice) : pick them by hand, nor is **Grown** (its dice draws ran at
+  4 fps). **Lattice** and **Parametric** are dealt like any generator. Nor are **Codec Mosh** and **Field Store**
   (its reveal and protect modes can blank or hide a layer).
 - **Deliberate settings stay put:** anaglyph 3D, the film hold, the output shape, Vibe's
   chord mode, the film damage and Context's blur are never rolled (by Randomize, the

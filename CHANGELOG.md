@@ -1215,6 +1215,55 @@ back, the tree as it was at 53c1a76. Everything lives on the branch `bank/bars-u
 
 ### Changed
 
+- **Randomize, as good as it can be** (Vincent : "Make sure the Randomize functions are as
+  good as they can be (from the button)"). Measured, not guessed : 120 presses of
+  Randomize All in the test copy, each frame read back (brightness, contrast, the black
+  and white share, the brightest 1 %, motion, fps), then every dice source alone (4 draws
+  each) and every dealt effect alone (3 draws on Membrane), and Generate (60 themes) as
+  the reference for the house look. Before : 11 of 120 presses almost all black (16
+  mostly black), 46 under 52 fps (32 under 45), 12.8 effects a press (up to 24). After :
+  0 almost all black and 0 mostly black, 1 blown (temporal effects stacking up), 0 frozen, 0 under 52 fps, 6.3 effects a press (up to 11), median brightness 0.35 (Generate's 0.27), 0 errors; each of the 12 scopes fired 6 times from the real button (its menu, then the button) : every press changed the instrument, 0 errors, the Macro banks 1 to 4 destinations a knob, none shared, no seed.
+  - **Blends by ground** (`randomize.ts` `layerGround`, `safeStack`) : most sources draw
+    light on near-black (median pixel 0.02 to 0.06), so a multiply, darken, overlay, hard
+    light, normal or 50 add on an upper layer blacked the whole stack below it : the
+    cause of nearly every black draw. A layer above the first now takes a mode its ground
+    can carry : dark (add, subtract, screen, lighten, difference, exclusion, wrap, lighter
+    color), lit (normal, multiply, darken, overlay, soft / hard light, difference,
+    exclusion; an additive mode there washed out to white), mid (screen, lighten,
+    difference, exclusion, overlay, soft light, lighter color). The grounds are measured :
+    lit = Marbling, Physarum, Dye Field, Veins, Fur, Fluid, Mycelium, Solid Color, Scan,
+    Ground, Membrane, RGB Osc (median above 0.3); mid = Sync Osc, Slit-scan, Op-Art,
+    Ramps, Swell, Interference, Erosion, Colony, Drift Field. Effects light a ground too
+    (Riso, Thin Film, Halftone on paper; Dither on paper and Threshold : mid). The bottom
+    layer : normal / add / screen / lighten, normal alone on a lit ground; the A/B mix the
+    same rule plus the relation modes; New's seed the same. Applied by every scope that
+    changes sources, blends or racks, after the deal, changing only an unsafe pairing.
+  - **An effect budget for Randomize All** (`trimToBudget`, `DRAW_BUDGET`) : 3 to 11 over all
+    racks, most presses 4 to 8, trimmed from the fullest rack (second voices first, the
+    master last, pins kept). The master chain dealt with everything : 0 to 4
+    (`MASTER_IN_ALL`); Randomize Master FX alone : 1 to 6 (it ran to 8).
+  - **No strobes from the dice** : the random matrix and a random Macro bank never bind a
+    seed or a flip (`diceTargets`; Generate already skipped them) nor the pinned Vibe and
+    Finalizer (the Finalizer's opacity faded the show). Stepped modulators (S&H, random,
+    arp, euclid, turing, cellular, steps; square / saw / random-step / spastic LFOs) run
+    1/4 to 2 bars or at most 1.5 Hz (`diceClock`; 1/16 at 120 BPM was 8 jumps a second).
+  - **Randomize Macro Knobs** (`randomMetaKnobs`) : 1 to 4 destinations per knob (was 1 to
+    8), none shared between knobs, and each knob placed where every destination sits in
+    its curated range (a knob maps over the whole declared range, so a blind position threw
+    a dozen inputs to their extremes).
+  - **The master never gets Edge** (like Threshold : the edges of the whole picture are
+    mostly black), nor a closing Palette or Grade while the Vibe Palette is on (two ramps :
+    the flattest draws).
+  - **Loops** : the ready loops that brighten (lighten, screen; 0.7 to 0.96 of each pass
+    back) only on layers drawing on black : over a lit ground they climbed to white.
+  - **The pool** : Lattice and Parametric are dealt (they need nothing; 60 fps on their dice
+    draws); Grown stays out (its dice draws ran at 4 fps). Difference Bloom's dice keep
+    starts at 0.25 (a motion key on a slow source left the layer black, 3 draws of 3).
+  - **Randomize Sonification** keeps the 0.05 touch of room on the half of its presses that
+    leave the Reverb / Delay alone (it set the send to 0).
+  - Test hook `__rand` (test builds only) and `DICE_FX_IDS`; the probes live in the session
+    scratchpad (`rnd2.cjs` sweep, `rnd3.cjs` pieces alone, `rnd4.cjs` the real button).
+
 - **Body tracking stops slowing the picture down** (Vincent : "using the Body features while
   generating visuals considerably seem to slow down the app. Can you look into how to deeply
   optimize Body"). Measured first, with the test copy on a fake camera and then on his own

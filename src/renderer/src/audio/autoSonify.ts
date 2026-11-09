@@ -370,9 +370,10 @@ export function randomSonify(cur: SoniConfig): SoniConfig {
     signal: V('signal') as SoniConfig['signal'],
     chord: V('chord') as SoniConfig['chord'],
     synth: V('synth') as unknown as SoniConfig['synth'],
+    // (the other half keeps the touch of room every voice starts with : 0.05)
     fx: rnd() < 0.5
       ? { ...randomFx(cur.fx), send: r2(rr(0.2, 0.5)) }
-      : { ...cur.fx, send: 0 }
+      : { ...cur.fx, send: 0.05 }
   }
 }
 
