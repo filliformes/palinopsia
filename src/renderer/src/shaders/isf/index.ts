@@ -1584,6 +1584,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Parametric',
     category: 'Generator',
     native: true,
+    dice: true, // (a procedural signal without audio : needs nothing; measured 11-08)
     source: `/*${JSON.stringify({
       DESCRIPTION:
         'Parametric : a literal audio→image reading (a test-pattern raster). Draws the audio as a hard raster, a waveform trace, spectrum bars, or a scrolling spectrogram, on a log frequency axis (bass left, treble right). Local audio input gives the real spectrum and wave; OSC audio gives its six bands; with no audio it runs a test signal. Abstract by design : a raster/waveform/spectrogram, never an oscilloscope.',
@@ -1752,6 +1753,7 @@ export const GENERATORS: IsfShader[] = [
     name: 'Lattice',
     category: 'Generator',
     native: true,
+    dice: true, // (needs nothing; 60 fps on its dice draws, measured 11-08)
     source: `/*${JSON.stringify({
       DESCRIPTION:
         'Lattice : a lattice of points in space, seen through a moving camera. FORM lays them on a PLANE (a floor of dots seen from above), fills a VOLUME with them (a room of stars), lines a TUNNEL with them (flown down forever), or spreads them over a SPHERE, a TORUS or a spiral GALAXY the camera circles (FLY turns those, HEIGHT is the distance). COUNT is how many per side, SIZE how big, VARY lets a few grow large and bright, JITTER loosens the grid into a scatter. TILT, TURN, HEIGHT and LENS frame the camera, FLY carries it forward, SPIN turns it. Where the camera looks, a WELL sinks the plane into a funnel (in a volume it pulls the points into a knot), over REACH; RIPPLE rings out from it (RINGS of them, travelling at PACE), SWELL heaves the surface, AUDIO lifts it with the spectrum (bass at the heart), SIDECHAIN with another layer’s brightness. STREAK draws each point as the trail of the camera’s motion, FOG fades the distance. IRREGULAR turns every point into a shape of its own (ink drops, seeds, pollen, torn paper, slivers), EVOLVE morphs and tumbles them. Never additive : overlapping dots never pile up into a glow.',
@@ -2227,7 +2229,9 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-difference-bloom', name: 'Difference Bloom', category: 'FX', source: differenceBloom,
-    curated: { gain: [1.5, 6], spread: [0.004, 0.03], keep: [0, 0.4], hold: [0.05, 0.4], soft: [0, 1] }
+    // (keep from 0.25 : a motion key dealt onto a slow source left the layer black,
+    // 3 dice draws of 3 on Membrane; a ghost of the picture now stays behind the glow)
+    curated: { gain: [1.5, 6], spread: [0.004, 0.03], keep: [0.25, 0.6], hold: [0.05, 0.4], soft: [0, 1] }
   },
   {
     id: 'fx-triangle-flicker', name: 'Triangle Flicker', category: 'FX', source: triangleFlicker,

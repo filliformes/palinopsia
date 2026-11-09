@@ -150,6 +150,7 @@ function uniqueWorldName(worlds: World[], base: string): string {
 }
 import {
   collectFloatTargets,
+  randomMetaKnobs,
   randomizeBackground,
   randomizeComposition,
   randomizeInputs,
@@ -4007,22 +4008,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
   randomizeMetaBank: () =>
     set((s) => {
-      const targets = collectFloatTargets(s.composition)
-      const metaKnobs = s.composition.metaKnobs.map((k) => {
-        const value = Math.random()
-        if (targets.length === 0) return { ...k, value }
-        // 1..8 distinct destinations per knob (8 is META_MAX_DESTS).
-        const maxN = Math.min(META_MAX_DESTS, targets.length)
-        const n = 1 + Math.floor(Math.random() * maxN)
-        const pool = targets.slice()
-        const destinations: typeof k.destinations = []
-        for (let j = 0; j < n && pool.length > 0; j++) {
-          const idx = Math.floor(Math.random() * pool.length)
-          destinations.push(pool[idx])
-          pool.splice(idx, 1)
-        }
-        return { ...k, destinations, value }
-      })
+      // (randomize.ts : distinct destinations, never a seed or the pinned finalizers,
+      // a position inside every destination's curated range)
+      const metaKnobs = randomMetaKnobs(s.composition)
       return { composition: keep(s, { ...s.composition, metaKnobs }) }
     }),
   vibePresetName: null,
