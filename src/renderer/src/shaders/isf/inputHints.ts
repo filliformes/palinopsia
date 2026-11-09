@@ -98,6 +98,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     amount: 'How much of the effect.'
   },
   'node-drape': {
+    lightAngle: 'Where the lamp stands. Turn it and the light and the sheen slide across the folds.',
+    lightHeight: 'How high the lamp stands : low rakes across the folds, high lights the sheet from above.',
     mode: 'Hang : the top edge pinned (a curtain, a banner). Flag : the left side pinned, in the wind. Float : nothing pinned, the sheet drifts and always comes back.',
     size: 'How much of the frame the sheet covers. Changing it hangs a fresh sheet.',
     crumple: 'How creased the sheet starts (and after a reset).',

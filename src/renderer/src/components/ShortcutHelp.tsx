@@ -30,7 +30,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
       ['V', 'Big preview : fold the panels under it (and back)'],
-      ['Click the preview', 'Play on a source that takes a click (Marbling : a drop · hold : pour · drag : a trail; its comb tool : drag a stylus, ⇧-drag a five-tine comb) · Body’s Pinch = click : a pinch does the same']
+      ['Click the preview', 'Play on a source or effect that takes a click (Marbling : a drop · hold : pour · drag : a trail, its comb tool : drag a stylus, ⇧-drag a five-tine comb · Relief : drag to draw · Fur : drag to comb, click to part · Sand Plate : click rings it, drag a finger through the sand · Drape : grab the cloth, let go and it falls) · Body’s Pinch = click : a pinch does the same']
     ]
   },
   {
@@ -106,7 +106,8 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['Right-click Body, Seq or Sonify', 'The page in a window of its own'],
       ['Right-click the Master FX', 'Save the chain as one of yours (my chains) · rename or delete them'],
       ['Right-click Load', 'Add the picked session as scenes · its earlier versions · link a folder of sessions'],
-      ['A steps card', 'Drag : draw the bars · click : rest / play · right-click a step : its condition · hold FILL (⇧-click : keep it on)']
+      ['A steps card', 'Drag : draw the bars · click : rest / play · right-click a step : its condition · hold FILL (⇧-click : keep it on)'],
+      ['The rule timeline (Seq)', 'Drag a rule onto its row or draw : a block · drag it to move, its ends to resize (⇧ : finer) · Alt-drag : a copy · double-click or Enter : exact · Delete : remove · Ctrl wheel : zoom']
     ]
   },
   {

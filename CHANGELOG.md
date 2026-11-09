@@ -5,6 +5,21 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Docs
+
+- **The docs catch up with v1.3.2** (after publishing, the sweep) : six new gallery frames
+  from Generate (Liquid Metal, Clay Studio, Pelt, Singing Plate, Glasshouse, Print Shop :
+  README and site), the seven interface stills retaken on the liquid-glass interface (same
+  subjects and sizes; the Seq page, Sonify's families, the scene bank built from eight
+  themes), and an audit of every doc against the release : the README's catalogue counts
+  (50 sources, 30 nodes, 154 chains in eleven groups, 147 themes, 20 modulator types in six
+  families), the Glass and Print effect groups, the loops source group, the new themes and
+  chains, Ctrl+K's loops, the dome behavior of the new pieces, the Architecture map, the
+  guardrails; the site's hero figures (50 / 61 / 12 / 147), its Sonify, Modulation, Seq,
+  Body and click-to-play cards; the OSC reference's twelve voices; the cheat-sheet's
+  click-to-play row (Relief, Fur, Sand Plate, Drape) and the rule timeline's gestures; the
+  two hints Drape lacked (light angle, light height).
+
 ## v1.3.2 — 2026-11-08
 
 **The bar sliders are set aside, banked** (Vincent, 11-02 : "go back to the old sliders
