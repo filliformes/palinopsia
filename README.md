@@ -42,6 +42,8 @@ racks, palette, World and macro biases : in one click.
 | ![Gravity Well](docs/images/shot-gravity-well.jpg)<br>**Gravity Well** : a floor of points sinking into a funnel, ringing with ripples | ![Line Wall](docs/images/shot-line-wall.jpg)<br>**Line Wall** : machine-cut bars laid on a wall that runs off to the side | ![Crossing](docs/images/shot-crossing.jpg)<br>**Crossing** : full-height bars, each leaning its own way |
 | ![Oil Cloud](docs/images/shot-oil-cloud.jpg)<br>**Oil Cloud** : one billowing cloud, ray-traced and painted in oil, warm toward the light, cool in its folds | ![Orbit](docs/images/shot-orbit.jpg)<br>**Orbit** : a figure of points circled in space, here a ring rolling through itself | ![Oil Sky](docs/images/shot-oil-sky.jpg)<br>**Oil Sky** : a cloudscape painted in thick oil, the light low behind it |
 | ![Marbling](docs/images/shot-marbling.jpg)<br>**Marbling** : drops of paint floating on water, each new one pushing the others into rings | ![Marbled Paper](docs/images/shot-marbled-paper.jpg)<br>**Marbled Paper** : slow currents comb the paint into veins, like the endpapers of an old book | ![Night Bath](docs/images/shot-night-bath.jpg)<br>**Night Bath** : bright inks on dark water, carried along by currents and swirls |
+| ![Liquid Metal](docs/images/shot-liquid-metal.jpg)<br>**Liquid Metal** : strokes of molten chrome fusing where they cross, every reflection sliding along them as the lamp goes round | ![Clay Studio](docs/images/shot-clay-studio.jpg)<br>**Clay Studio** : rolls of modeling clay with real volume, laid on a pale table under one soft lamp | ![Pelt](docs/images/shot-pelt.jpg)<br>**Pelt** : a coat of real hairs under a studio lamp, breathing in a slow wind |
+| ![Singing Plate](docs/images/shot-singing-plate.jpg)<br>**Singing Plate** : sand on a vibrating plate, gathered on the still lines of the note it rings at | ![Glasshouse](docs/images/shot-glasshouse.jpg)<br>**Glasshouse** : a soft world seen through rained-on glass, the color split at every edge | ![Print Shop](docs/images/shot-print-shop.jpg)<br>**Print Shop** : the picture run off a press, its inks out of register on the screen |
 
 *(The first two rows are from v1.0.0, the third from v1.2.6 (Lattice, Perspective and
 Lowercase's slant, each straight from its Space theme), the last from v1.3.0 : the
@@ -62,12 +64,12 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
-- [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 19 modulator types in five families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
+- [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · light out (DMX/WLED) · installation · Flash safety
-- [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Orbit · Flow · Events · Synth · Raster · Transmission · Filter · Signal · Chord · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
+- [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (147 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
@@ -309,7 +311,8 @@ place when it changes; **interface motion** in the **performance** tab turns bot
 **sources**, **effects** (yours included), **parameters** of what is loaded (every
 control of every source and effect, each effect's dry/wet, the layer and Mixer
 controls, the Background's, the 16 Macro knobs), **presets** (each shader's, yours, the
-layer, Mixer and Background ones), **master chains**, **Generate themes**, the
+layer, Mixer and Background ones), **master chains**, **Generate themes**, the **loops**
+(the Loop rack's recipes, onto the selected layer), the
 **pages** and tabs, and **commands** (Randomize, Vary, Panic flush, Black, Freeze, Record,
 MIDI Learn, Fulldome, New, Open, Undo, Redo). Results come in groups, each row saying
 where it will land; a row that can't apply is greyed and says why. The keyword tags
@@ -2040,7 +2043,10 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   around, up to the zenith, sideways around the dome : **Ash** and **Optical Rain** fall
   outward, **Erosion** washes outward, **Streak**, **Light Trails** and
   **Murmuration**'s wind turn with each point's place, **Sync Loss** rolls outward with
-  ring-shaped tears, and **Tracking**'s band is a ring creeping up the walls. At the
+  ring-shaped tears, and **Tracking**'s band is a ring creeping up the walls.
+  **Rain on Glass**'s drops slide outward, **Fur** grows out from a crown at the zenith,
+  **Sand Plate** turns about the zenith (its tilt falls outward), **Relief**'s strokes melt
+  outward, and **Drape**'s sheet stays square. At the
   front they read as they do flat, and flat output is unchanged.
 - **Read through mipmaps, grain in the master's pixels** (any mapping) : where the
   mapping squeezes the frame (the full dome's four corner pinches, the panorama's zenith,
@@ -2725,16 +2731,20 @@ and bound to nothing : M1 a slow sine, M2 a triangle, M3 a square (on / off), M4
 (a rise and a drop), M5 random steps, M6 smooth random, M7 a looping envelope, M8 a slow
 ramp. The M beside any control binds one. It morphs in like any Generate; what you
 pinned and the session's mappings ride through, and Sonify is left as it is. Then a
-dropdown of **126 visual themes** in 18 families
+dropdown of **147 visual themes** in 18 families
 (Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
-Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage, **Frame Store** (Field
+Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage (Monitor Loop and Cross
+Loop : effects inside the feedback, two layers playing each other), **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
 motion broken into a pattern; Trail Crawl : bands of colour behind the motion; Store
 Zoom : a hardware zoom's uneven blocks), Cinematic/Atmospheric (Oil Sky : a cloudscape in
 thick oil, from Cloud Study), Retro Screen, Minimal/Structural, Datamosh &
 Compression (Codec Rot : a real video codec starved of keyframes, through Codec Mosh),
 **Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures, and
-paint on water from Marbling : Marbled Paper and Night Bath),
+paint on water from Marbling : Marbled Paper and Night Bath; Drapery, Liquid Metal, Mercury,
+Clay Studio, Engraver, Geometer, Soap Skin, Chrome Type, Holo Foil, Print Shop, Glasshouse and
+Oil on Water from Relief, Inflate, Drape, Thin Film, the glass and the print; Pelt, Big Cat,
+Gale and Furred Letters from Fur; Singing Plate, Listening Plate and Sand Over from Sand Plate),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
 overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
 out and piled at different heights in **Paste-Up**, or the people in them treated apart
@@ -2941,7 +2951,7 @@ Randomize sub-ranges and its own preset bank. Your own generators from the
 [Source Editor](#source-editor--your-own-shaders-alte) list first, under **my shaders**.
 
 <details>
-<summary><b>The full source catalogue (47)</b> (click to expand)</summary>
+<summary><b>The full source catalogue (50)</b> (click to expand)</summary>
 
 | Source | Description |
 |---|---|
@@ -3035,8 +3045,8 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
   Scanlines, CRT Screen, Rutt), **Blur**, **Codec** (datamosh and compression : Codec
   Mosh, Datamosh, Mosh Blocks, Compress, Databend, Byte Corrupt, Ringing), **Color**,
   **Convolution**, **Distortion**, **Feedback**, **Film** (Aperture, Grain), **Frame Store**
-  (Field Store, Shatter, Crawl, Store Zoom), **Glitch**, **Optical** (Phosphene, Pulfrich,
-  Optical Rain), **Stylize**, **Time** and **Utility**. Each unit has enable, dry/wet **opacity** (double-click → 1),
+  (Field Store, Shatter, Crawl, Store Zoom), **Glass** (Glass, Rain on Glass), **Glitch**,
+  **Optical** (Phosphene, Pulfrich, Optical Rain), **Print** (Dither, Halftone, Riso), **Stylize**, **Time** and **Utility**. Each unit has enable, dry/wet **opacity** (double-click → 1),
   drag-reorder, presets, a dice `⚄`, and a **reset `↺`** (the whole effect back to
   its defaults).
 - **Right-click any effect** (its chip, or its name in the Inspector) to **copy**
@@ -3060,8 +3070,8 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
   finishing units at its end; the chain's effects run underneath across the whole width,
   wrapping under the finishing too when the chain is long (an empty chain : one line).
 - **Master chain presets** : the `chain presets…` box in the Master FX strip replaces the
-  whole master chain with one of **134** designed chains and sets the Vibe to match (the
-  finalizers stay). The newer ones sit in eight groups : **Time & memory** (Réponse,
+  whole master chain with one of **154** designed chains and sets the Vibe to match (the
+  finalizers stay). The newer ones sit in eleven groups : **Time & memory** (Réponse,
   Sediment, Chronoscan, Eternalism, Afterimage, Decimate, Corrode, Feedback on the master
   bus), **Frame Store** (Field Store : Hard Memory, Sixteen Levels, Strobe Ghost; then
   Shatter, Crawl and Store Zoom, alone or in pairs), **Node recipes** (a node that reads another
@@ -3075,7 +3085,12 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
   dithered print) and **People** (the Silhouette effect on the whole picture : Shadow
   Play, its people blacked out like shadow puppets; Ghost Dancer, echoes of them left over
   the picture; Absence, the people taken out; Glass Bodies, translucent blue figures;
-  Outline, their contour drawn on black); they keep the scene's palette mix. The `chain on/off` pill beside
+  Outline, their contour drawn on black), **Relief** (the new surfaces on the whole picture :
+  Hung Picture and Picture in the Wind on Drape's cloth, Foil Everything, Newsprint, CMYK
+  Press, Riso Zine, Ink on Paper, Behind Fluted Glass, Rainy Window, Chrome Everything,
+  Flowing Picture, Oil on Everything, Soap Picture, Studio Relief), **Fur** (Studio Hide,
+  Flash Photo, Faded Rug) and **Sand plate** (Macro Plate, Blueprint, Wet Print); they keep
+  the scene's palette mix. The `chain on/off` pill beside
   it bypasses every master effect except the finalizers.
 - **Your own chains (my chains)** : right-click the Master FX strip (its empty space, or
   any effect's chip : its menu ends with the same entry) and choose **Save chain as
@@ -3092,7 +3107,7 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
 - **The source pickers have sections** : **Live** (imports, cameras, captures, network
   streams, and 👤 **Silhouette**, the body cut out of the room), **Organic** (living
   matter : reaction, growth, water, fire, ground), **Painted** (Oil Cloud, Cloud Study,
-  Marbling),
+  Marbling, Relief), **loops** (↻ : a layer's picture, the Loop source),
   **Analog** (the analog video-synth lineage : RGB Oscillators, Sync Osc, Slit Scan, Ramps,
   Column Scan, Differential, Interference), **Geometry** (lines, grids, dots and shapes :
   Contour, Direct Marks, Grid Drift, Lattice, Lowercase, Op-Art, Recurse, Shapes, Slabs,
@@ -3214,7 +3229,7 @@ labelled picker in the Inspector (**map**, **control**, **palette**; the three-i
 none is picked, so all five run in any rack.
 
 <details>
-<summary><b>The full node catalogue (28)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (30)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -3930,7 +3945,11 @@ src/
               MIDI learn share (actions.ts, listed by triggerCatalog.ts), the
               preview's clicks routed to a source (pointerInput.ts), your own
               master chains (userChains.ts), a session added as scenes
-              (sessionScenes.ts); the page windows in components/PageWindow.tsx
+              (sessionScenes.ts); the page windows in components/PageWindow.tsx;
+              the layer's four racks (layerRack.ts), the Loop rack's recipes
+              (loopRecipes.ts), Black (black.ts), OSC Learn and the learned
+              mappings (oscLearn.ts, mappingModel.ts), the interface glass
+              (glass.ts)
     engine/   Compositor (per-layer ISF → blend → stack), modulation engine
               (the steps sequencer's model in stepSeq.ts), audio bus, coupling,
               Feel macros + Proximity, macro-form sequencer,
@@ -3948,13 +3967,21 @@ src/
               World amount (worldAmount.ts), the clip player and the clip-sound
               reader (clipPlayer.ts, clipAudio.ts), strobe limiter, output shaper,
               the output transform (outXform.ts), PBR, the fulldome stage
-              (dome.ts), the capture rings that feed
+              (dome.ts), Relief, Fur and Sand Plate (ReliefSource.ts,
+              FurSource.ts, SandPlateSource.ts; their shared materials in
+              reliefShade.ts, their multisample buffer in sharedMsaa.ts), the
+              Drape, Inflate and Silhouette nodes (drapeNode.ts, inflateNode.ts,
+              silhouetteNode.ts), the loop's delay ring (loopDelay.ts), the Room
+              tracker (roomTracker.ts), the controller bus (controlBus.ts), color
+              parts (colorParts.ts), the body clutch (bodyClutch.ts), the rule
+              timeline (ruleSeq.ts), the capture rings that feed
               every output (frameCapture.ts) and the small readback rings that
               turn the picture back into control data : vision, Sonify taps,
               depth, light zones, the mark scanline (gridReadback.ts)
     workers/  off the render thread : Marbling's water (marbleWorker.ts), the depth
               model (depthWorker.ts), DXV3 frames (dxvWorker.ts), the projector
-              relay (streamRelay.ts)
+              relay (streamRelay.ts), the Room tracker's pose model (poseWorker.ts),
+              the Body camera's motion field (flowWorker.ts)
     shaders/  ISF .fs files + registry (curated ranges) + presets, shared GLSL pasted
               at an include line (lib/ : dome.glsl at `// @dome`, the Finalizer's
               grain finalGrain.glsl at `// @grain`, the organic point outlines of
@@ -3962,8 +3989,11 @@ src/
               shaders (userShaders.ts) and the compile + lint check the Source
               Editor and the Agent share (shaderCheck.ts)
     audio/    the Sonify engine : AudioWorklet + voice managers + auto-voice,
-              the Audio Layer (audioLayer.ts), and Space (space.ts : the voices
-              placed on speakers or sent as objects; the panning in shared/spatial.ts)
+              the Audio Layer (audioLayer.ts), Space (space.ts : the voices
+              placed on speakers or sent as objects; the panning in shared/spatial.ts),
+              the Synth (synth.engine.js in the worklet, its play side synthPlay.ts,
+              its factory sounds synthPatches.ts) and Signal's Picture Play
+              (signalPlay.ts)
     assemble/ the corpus matcher : descriptor costs, live matching, PCA map
     mcp/      the Agent's tools, run through the same store actions as the UI
   shared/     types shared across processes (incl. the descriptor definitions,
@@ -3999,7 +4029,8 @@ set : never an open-ended pile of knobs.
 
 *Not a clip-launcher VJ app · not a node patcher · not a timeline compositor · not a
 3D engine (Lattice and Perspective put points and planes in space through a fixed set of
-controls : there is no scene to build) · not defined by analog-video-synth emulation ·
+controls : there is no scene to build; Drape hangs the picture on one cloth, Relief and
+Inflate light a height, Fur grows one coat) · not defined by analog-video-synth emulation ·
 not cheap psychedelia.*
 
 ---
