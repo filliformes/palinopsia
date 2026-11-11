@@ -14,6 +14,27 @@ import type { LightOutput, LightTune } from '@shared/lights'
 import { setLightBaseOf } from './lightMods'
 import { lightBaseValue } from './lightStore'
 import { setPaletteSource } from './lightShows'
+import { bodyTracker } from '../engine/bodyTracker'
+
+/** The people the Body page tracks, on the picture (x, y 0..1, y down; r their
+ *  height in frame heights) : the Room tracker's everyone, or the one pose. */
+function peopleNow(): Array<{ x: number; y: number; r: number }> {
+  if (!bodyTracker.status().running) return []
+  const p = bodyTracker.preview()
+  const mx = (x: number): number => (p.mirror ? 1 - x : x)
+  const out: Array<{ x: number; y: number; r: number }> = []
+  if (p.people.length) {
+    for (const q of p.people) out.push({ x: mx((q.box[0] + q.box[2]) / 2), y: (q.box[1] + q.box[3]) / 2, r: Math.max(0.05, q.box[3] - q.box[1]) })
+  } else if (p.pose) {
+    let x0 = 1, x1 = 0, y0 = 1, y1 = 0, n = 0
+    for (const l of p.pose) {
+      if ((l.visibility ?? 1) < 0.5) continue
+      x0 = Math.min(x0, l.x); x1 = Math.max(x1, l.x); y0 = Math.min(y0, l.y); y1 = Math.max(y1, l.y); n++
+    }
+    if (n > 4) out.push({ x: mx((x0 + x1) / 2), y: (y0 + y1) / 2, r: Math.max(0.05, y1 - y0) })
+  }
+  return out
+}
 
 setLightBaseOf((fixture, field) => {
   const st = useStore.getState()
@@ -86,9 +107,16 @@ class LightRuntime {
     const list = [...srcs].sort((a, b) => a - b)
     if (list.length) comp.kickLights(list, W, H)
     if (st.lightFadeEpoch !== this.fadeEpoch) {
-      if (this.fadeEpoch >= 0) this.engine.beginFade(L.master.fadeSec)
+      if (this.fadeEpoch >= 0) this.engine.beginFade(st.lightFadeSec ?? L.master.fadeSec)
       this.fadeEpoch = st.lightFadeEpoch
     }
+    // the cues following on : the next one goes its follow time after this one is in
+    if (st.lightCueRun && st.lightCue) {
+      const sc = L.scenes.find((x) => x.id === st.lightCue)
+      if (sc?.follow && sc.follow > 0 && now - st.lightCueAt >= ((sc.fade ?? L.master.fadeSec) + sc.follow) * 1000) st.goLightCue(1)
+    }
+    const wantPeople = rig.fixtures.some((f) => L.looks[f.id]?.effect === 'presence')
+    const band = (i: number): number => Math.max(audioBus.feature('band', i * 2), audioBus.feature('band', i * 2 + 1))
     const tunes: Record<string, LightTune> = {}
     if (rig.tuneScope === 'look' && L.tunes) for (const f of rig.fixtures) if (L.tunes[f.id]) tunes[f.id] = L.tunes[f.id]
     const frame = this.engine.frame({
@@ -106,6 +134,8 @@ class LightRuntime {
       beats: soniBeats(),
       bpm: st.composition.bpm,
       audio: audioBus.feature('level'),
+      bands: [band(0), band(1), band(2)],
+      people: wantPeople ? peopleNow() : undefined,
       aspect: st.compW / Math.max(1, st.compH),
       identify: st.lightIdentify,
       groupLevels: L.groups,

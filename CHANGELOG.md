@@ -182,6 +182,42 @@ that CI builds into cross-platform releases.
     right by columns in zigzag, a rubber band, a row of 4, an overlap in the patch view
     (72 channels red) cleared by address in order, the test pattern, a room photo through
     the page's input.
+- **Lights, closer to the lighting world (4/4) : light by light, wings and fans, cues,
+  presence, the sound by band.**
+  - **Light by light** (`LightLook.order` : room / ltr / center / random / oddeven,
+    `wings` 1 to 4) : the fixtures with the same order and wings make a set, ranked (by
+    their middle from left to right, from the room's center, by a hash of their id, or
+    alternating), each at (rank + 0.5) / N, folded into mirrored wings. A chase or a
+    wave runs over that place (the whole light one step), a pulse ripples, a sparkle
+    twinkles whole lights, the beat becomes a step chase (one distinct place a flash).
+    The room order keeps everything as before.
+  - **Fan** (`LightLook.fan`, -180..180°, modulatable) : a hue turn of fan × (place -
+    0.5), the place along the order or across the room at the effect's direction (the
+    room's four corners projected); the color wheel's way, as the color's hue slider.
+  - **Presence** (effect `presence`) : 1 - depth + depth × the nearest person's
+    exp(-1.5 (d / near)²), the people from the Body page (the Room tracker's boxes, or
+    the pose's visible points; mirrored as the Body page is), read only while a light
+    uses it.
+  - **The sound by band** (`LightLook.band` : all / lows / mids / highs) : the six
+    bands paired, each smoothed (60 ms).
+  - **Cues** (`LightScene.fade / follow / link`; store `lightCue`, `lightCueAt`,
+    `lightCueRun`, `lightFadeSec`, `goLightCue`, `setLightCueRun`, `updateLightScene`) :
+    the light scenes are a cue list (`components/LightCues.tsx`, on the Lights page and
+    as the Seq page's **Light cues** lane, `SeqLaneId` 'lights' : the transport starts it
+    when a cue has a follow time). Each cue's own fade; while following, the next goes
+    its follow time after the cue is in; a Palinopsia scene's recall brings the cue tied
+    to it. MIDI `fire:lightsgo`, `fire:lightsback`, `fire:lightscues`; OSC
+    `/opsia/lights/go`, `back`, `cues`.
+  - **Fixed** : light scenes saved in the same millisecond (a script, OSC `save` twice)
+    took the same id, so a cue list could never move past them; a saved scene now gets
+    a random suffix, and a session's duplicate ids are made apart when it loads.
+  - Tested : 90 Node checks (9 new : the chase from the first light to the second left
+    to right, wings 2 lighting both ends together, from the center, the beat's step
+    chase, presence near a person, the lows against the highs, the fan's two ends turned
+    apart, the new fields sanitized, two cues with one id made apart). In the test copy :
+    three cues following on (the second at 1.43 s and the third at 2.89 s for a 0.4 s
+    fade and a 1 s follow), a Palinopsia scene bringing its cue, GO and back, the Seq
+    lane, six spots in a light-by-light chase with wings 2 and a fan.
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

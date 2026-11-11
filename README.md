@@ -1273,6 +1273,14 @@ folds to its header (it keeps playing folded).
   it again. Its play is
   MIDI learnable (`RULE timeline run`), and `/opsia/seq/rules` over OSC.
 
+- **Light cues** : the [Lights page](#lights--dmx-fixtures-on-the-picture-key-t)'s cue
+  list as a lane : the same cues (click one to bring it, ⚙ for its fade, its follow time
+  and its scene), **GO** and **◀ back**. Playing, the cues **follow on** : a cue with a
+  follow time hands over to the next one by itself, a cue without one waits for GO, and
+  after the last comes the first. Its own time : the fades and the follow times, in
+  seconds. The lane's play needs a cue with a follow time. MIDI learnable (`LIGHTS cues
+  follow on/off`), and `/opsia/lights/cues` over OSC.
+
 **Scenes : the auto-pilot.** An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
 (world) · **Synchrèse** (coupling) · **Espace-temps** · **Climat** (set in the tag
 editor : click a scene card ; **Climat** also takes a **◔ from picture** suggestion
@@ -2256,9 +2264,21 @@ with shows, light scenes of their own and a lighting console.
     **off**. A light reading the picture **reads** its patch as the **average** (calm,
     but a busy picture can go beige), **vivid** (its most colorful part : the lights
     keep the picture's colors) or **bright** (its brightest part); an **effect** over it (**chase** : a band running across the room,
-    **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud,
-    **beat** : a flash on the beat), and its **level**. **to all** gives every fixture
-    this look. Effects never change more than three times a second, at any rate and speed.
+    **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud (all of
+    it, or its **lows**, **mids** or **highs** : the floor spots on the kick, the bars on
+    the cymbals), **beat** : a flash on the beat, **presence** : lit near the people the
+    Body page tracks, dim away from them (**near** : how near; the Room tracker's
+    everyone, or the one pose)), and its **level**. **to all** gives every fixture this
+    look. Effects never change more than three times a second, at any rate and speed.
+    **travels** : an effect goes **through the room** (by where each pixel is, at a
+    **direction**) or **light by light**, as a lighting console spreads a phase over a
+    group : **left to right**, **from the center**, **at random** or **odd and even**
+    (the lights with the same order make one set, each light a step : a chase hops from
+    light to light, a pulse ripples, a sparkle twinkles whole lights, a beat becomes a
+    step chase, one light a beat). **wings** (2 to 4) fold the order into mirrored parts
+    (2 : from both ends to the middle). **fan** spreads a hue across the room or along
+    the order, from one end to the other (a positive fan climbs toward yellow, as the
+    hue slider does).
   - **Tuning** : brightness, contrast, gamma (LEDs are linear : 2 or so looks like the
     screen), saturation, hue, warmth (a white balance), a black floor, and a smoothing
     that calms a busy picture's flicker. Kept **on this computer** (it belongs to the
@@ -2283,9 +2303,16 @@ with shows, light scenes of their own and a lighting console.
   layer, Picture colors (the picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
   the beat, Sound reactive, Breathing, Night sparkle, Dark. They fit any room : their
   patterns run across the space, so each light takes its part from where it stands.
-- **Light scenes** : looks for the lights apart from Palinopsia's scenes : **+ save**,
-  click to bring one back (over the scene fade), double-click to rename. Saved with the
-  session, with the looks and the masters.
+- **Light cues** : looks for the lights apart from Palinopsia's scenes, played as a cue
+  list. **+ save** keeps what they show now (the looks, the masters, the group faders);
+  click a cue to bring it (over its fade), **GO** for the next (after the last : the
+  first), **◀ back** for the one before, double-click to rename. **⚙** on a cue : its own
+  **fade** (empty : the console's scene fade), **then** a follow time (while the cues
+  **follow** on, the next one goes that long after this one is in; 0 : it waits for
+  GO) and **with** a Palinopsia scene (recalling that scene brings this cue : the picture
+  and its lights together). The cue in now shows its progress. Saved with the session;
+  the [Seq page](#sequencer-key-q) has them as a lane. GO, back and follow take MIDI
+  Learn, and OSC (`/opsia/lights/go`, `back`, `cues`).
 - **The console** : **MASTER** (the grand master), **SPEED** (every effect's and
   gradient's clock), **SCENE FADE**, **BLACK TIME** and **BLACK** (every light down over
   the black time, and back), plus the master and the speed as sliders for a modulator.

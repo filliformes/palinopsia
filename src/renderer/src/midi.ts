@@ -111,7 +111,7 @@ function toggleSoniVoice(i: number): void {
 // key, Audio Layer and output lives in ./actions.ts (ids act:...), handed over
 // below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
-  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:lightsblack', 'fire:freeze', 'fire:record',
+  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:lightsblack', 'fire:lightsgo', 'fire:lightsback', 'fire:lightscues', 'fire:freeze', 'fire:record',
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:transport', 'fire:ruleseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
@@ -133,6 +133,9 @@ export function fireTrigger(id: string): void {
     case 'fire:flush': firePanic(); return
     case 'fire:black': st.setBlack('toggle'); return
     case 'fire:lightsblack': st.setLightsBlack(!st.lightsBlack); return
+    case 'fire:lightsgo': st.goLightCue(1); return
+    case 'fire:lightsback': st.goLightCue(-1); return
+    case 'fire:lightscues': st.setLightCueRun(!st.lightCueRun); return
     case 'fire:freeze': fireFreeze(); return
     case 'fire:record': fireRecordToggle(); return
     case 'fire:tap': tapTempo(); return
@@ -338,6 +341,12 @@ export function midiTargetLabel(id: string): string {
       return 'BLACK on/off'
     case 'fire:lightsblack':
       return 'LIGHTS black on/off'
+    case 'fire:lightsgo':
+      return 'LIGHTS cue GO'
+    case 'fire:lightsback':
+      return 'LIGHTS cue back'
+    case 'fire:lightscues':
+      return 'LIGHTS cues follow on/off'
     case 'fire:freeze':
       return 'FREEZE / hold'
     case 'fire:record':

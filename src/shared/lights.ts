@@ -18,7 +18,12 @@ export type LightKind = 'strip' | 'spot' | 'matrix' | 'ring'
 /** A matrix's first LED : the corner it starts in. */
 export type LightCorner = 'tl' | 'tr' | 'bl' | 'br'
 export type LightSourceKind = 'master' | 'layer' | 'color' | 'gradient' | 'off'
-export type LightEffect = 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat'
+export type LightEffect = 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat' | 'presence'
+/** How an effect (and a fan) travels : through the room by where each pixel is, or
+ *  light by light in an order, as a lighting console spreads a phase over a group. */
+export type LightOrder = 'room' | 'ltr' | 'center' | 'random' | 'oddeven'
+/** What the sound effect follows : the whole level, or one band of it. */
+export type LightBand = 'level' | 'low' | 'mid' | 'high'
 export type LightOutputKind = 'enttec' | 'artnet' | 'sacn' | 'wled'
 export type LightTuneScope = 'rig' | 'look'
 /** How a pixel reads the picture around it : the average of its patch, its most
@@ -102,6 +107,10 @@ export interface LightLook {
   width: number // 0.02..1 : a chase's band, a wave's length
   angle: number // degrees : the direction a chase or a wave travels
   level: number // 0..1 : this fixture's own fader
+  order: LightOrder // through the room, or light by light (left to right, from the center...)
+  wings: number // 1..4 : light by light, the order folded into mirrored parts
+  fan: number // -180..180 degrees : a hue spread across the room or the order
+  band: LightBand // the sound effect : the level or a band
 }
 
 export interface LightsMaster {
@@ -118,6 +127,10 @@ export interface LightScene {
   master?: { brightness: number; speed: number }
   groups?: Record<string, number> // the group faders
   tunes?: Record<string, LightTune> // when the tuning travels with the look
+  // as a cue :
+  fade?: number // its own fade in (s; absent : the console's scene fade)
+  follow?: number // the next cue goes this long after it is in (s; absent or 0 : waits for GO)
+  link?: string // a Palinopsia scene : recalling it brings this cue
 }
 
 /** Lights that play together : a fader of their own on the console (a submaster),
@@ -174,7 +187,8 @@ export const GRADIENT_DEFAULT: LightGradient = {
 
 export const LOOK_DEFAULT: LightLook = {
   source: 'master', layer: 0, sample: 'average', hue: 30, sat: 0.6, val: 1, gradient: GRADIENT_DEFAULT,
-  effect: 'none', rate: 0.5, depth: 0.6, width: 0.25, angle: 0, level: 1
+  effect: 'none', rate: 0.5, depth: 0.6, width: 0.25, angle: 0, level: 1,
+  order: 'room', wings: 1, fan: 0, band: 'level'
 }
 
 export const MASTER_DEFAULT: LightsMaster = { brightness: 1, speed: 1, blackSec: 2, fadeSec: 1.5 }
@@ -191,7 +205,7 @@ export const LAYOUTS = ['RGB', 'GRB', 'BRG', 'BGR', 'RGBW', 'GRBW', 'DRGB', 'D16
 export const GROUP_PREFIX = 'grp:'
 export type LightModField =
   | 'level' | 'hue' | 'sat' | 'val' | 'gradOffset' | 'gradAngle' | 'gradScale'
-  | 'rate' | 'depth' | 'width' | 'angle'
+  | 'rate' | 'depth' | 'width' | 'angle' | 'fan'
   | 'tuneBrightness' | 'tuneSaturation' | 'tuneHue' | 'tuneWarmth'
   | 'masterBrightness' | 'masterSpeed'
 export const LIGHT_MOD_RANGE: Record<LightModField, { min: number; max: number; label: string }> = {
@@ -206,6 +220,7 @@ export const LIGHT_MOD_RANGE: Record<LightModField, { min: number; max: number; 
   depth: { min: 0, max: 1, label: 'effect depth' },
   width: { min: 0.02, max: 1, label: 'effect width' },
   angle: { min: -180, max: 180, label: 'effect angle' },
+  fan: { min: -180, max: 180, label: 'fan' },
   tuneBrightness: { min: 0, max: 2, label: 'tune brightness' },
   tuneSaturation: { min: 0, max: 2, label: 'tune saturation' },
   tuneHue: { min: -180, max: 180, label: 'tune hue' },
@@ -231,7 +246,9 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (li
 export const KINDS: readonly LightKind[] = ['strip', 'spot', 'matrix', 'ring']
 export const CORNERS: readonly LightCorner[] = ['tl', 'tr', 'bl', 'br']
 export const SOURCES: readonly LightSourceKind[] = ['master', 'layer', 'color', 'gradient', 'off']
-export const EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat']
+export const EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat', 'presence']
+export const ORDERS: readonly LightOrder[] = ['room', 'ltr', 'center', 'random', 'oddeven']
+export const BANDS: readonly LightBand[] = ['level', 'low', 'mid', 'high']
 export const SAMPLES: readonly LightSample[] = ['average', 'vivid', 'bright']
 export const OUTPUT_KINDS: readonly LightOutputKind[] = ['enttec', 'artnet', 'sacn', 'wled']
 
@@ -381,7 +398,11 @@ export function sanitizeLook(raw: unknown): LightLook {
     depth: num(r.depth, d.depth, 0, 1),
     width: num(r.width, d.width, 0.02, 1),
     angle: num(r.angle, d.angle, -180, 180),
-    level: num(r.level, d.level, 0, 1)
+    level: num(r.level, d.level, 0, 1),
+    order: oneOf(r.order, ORDERS, d.order),
+    wings: Math.round(num(r.wings, d.wings, 1, 4)),
+    fan: num(r.fan, d.fan, -180, 180),
+    band: oneOf(r.band, BANDS, d.band)
   }
 }
 
@@ -416,9 +437,15 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
       looks: mapOf(o.looks, sanitizeLook),
       ...(o.master ? { master: { brightness: num(m.brightness, 1, 0, 1), speed: num(m.speed, 1, 0, 4) } } : {}),
       ...(o.groups ? { groups: mapOf(o.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
+      ...(typeof o.fade === 'number' ? { fade: num(o.fade, 1.5, 0, 60) } : {}),
+      ...(typeof o.follow === 'number' ? { follow: num(o.follow, 0, 0, 3600) } : {}),
+      ...(typeof o.link === 'string' && o.link ? { link: str(o.link, '', 80) } : {}),
       ...(o.tunes ? { tunes: mapOf(o.tunes, sanitizeTune) } : {})
     }
   })
+  // (ids unique : two cues with one id could never be told apart)
+  const seenIds = new Set<string>()
+  for (const sc of scenes) { while (seenIds.has(sc.id)) sc.id += 'x'; seenIds.add(sc.id) }
   return {
     looks: mapOf(r.looks, sanitizeLook),
     scenes,

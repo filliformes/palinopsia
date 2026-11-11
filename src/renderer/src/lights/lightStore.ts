@@ -42,6 +42,7 @@ export function lightBaseValue(rig: LightRig, L: LightsSession, fixture: string,
     case 'depth': return look.depth
     case 'width': return look.width
     case 'angle': return look.angle
+    case 'fan': return look.fan
     case 'tuneBrightness': return tune.brightness
     case 'tuneSaturation': return tune.saturation
     case 'tuneHue': return tune.hue

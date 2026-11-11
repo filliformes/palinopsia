@@ -11,7 +11,9 @@ import { useStore, modTargetKey } from '../store'
 import type { ModTarget } from '@shared/types'
 import {
   dipOf,
+  BANDS,
   EFFECTS,
+  ORDERS,
   fixtureChannels,
   fixturePixels,
   fixtureSpans,
@@ -24,7 +26,9 @@ import {
   LOOK_DEFAULT,
   SAMPLES,
   type LightCorner,
+  type LightBand,
   type LightEffect,
+  type LightOrder,
   type LightOutput,
   type LightSample,
   type LightFixture,
@@ -43,22 +47,28 @@ import { BUILTIN_PROFILES } from '@shared/lightProfiles'
 import { enttec } from '../lights/enttec'
 import { LIGHT_SHOWS } from '../lights/lightShows'
 import { AssignRow } from './AutoControls'
+import { LightCueButtons, LightCueList } from './LightCues'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const KIND_LABEL: Record<LightKind, string> = { strip: 'LED bar', ring: 'ring', spot: 'spot', matrix: 'matrix' }
 const OUT_LABEL: Record<LightOutputKind, string> = { enttec: 'Enttec USB Pro', artnet: 'Art-Net', sacn: 'sACN', wled: 'WLED' }
 const EFFECT_LABEL: Record<LightEffect, string> = {
-  none: 'none', chase: 'chase', wave: 'wave', pulse: 'pulse', sparkle: 'sparkle', audio: 'sound', beat: 'beat'
+  none: 'none', chase: 'chase', wave: 'wave', pulse: 'pulse', sparkle: 'sparkle', audio: 'sound', beat: 'beat', presence: 'presence'
 }
+const ORDER_LABEL: Record<LightOrder, string> = {
+  room: 'through the room', ltr: 'light by light, left to right', center: 'light by light, from the center', random: 'light by light, at random', oddeven: 'odd and even'
+}
+const BAND_LABEL: Record<LightBand, string> = { level: 'all', low: 'lows', mid: 'mids', high: 'highs' }
 const EFFECT_HINT: Record<LightEffect, string> = {
   none: 'No effect : the light as its source gives it.',
   chase: 'A band of light running across the room (angle : its direction, width : the band).',
   wave: 'Waves of light passing through the room (width : their length).',
   pulse: 'The whole fixture breathing.',
   sparkle: 'Pixels twinkling at random (rate : how often).',
-  audio: 'As bright as the sound is loud.',
-  beat: 'A flash on the beat (rate : flashes a beat).'
+  audio: 'As bright as the sound is loud (all of it, or its lows, mids or highs).',
+  beat: 'A flash on the beat (rate : flashes a beat). Light by light : a step chase, one place of the order on each flash.',
+  presence: 'Lit near the people the Body page tracks (width : how near), dim away from them. The camera must be on (Body page).'
 }
 
 const SAMPLE_HINT: Record<LightSample, string> = {
@@ -462,44 +472,15 @@ function ShowList(): JSX.Element {
 }
 
 function SceneList(): JSX.Element {
-  const scenes = useStore((s) => s.lightsSession.scenes)
   const save = useStore((s) => s.saveLightScene)
-  const recall = useStore((s) => s.recallLightScene)
-  const rename = useStore((s) => s.renameLightScene)
-  const del = useStore((s) => s.deleteLightScene)
-  const [editing, setEditing] = useState<string | null>(null)
   return (
     <Section
-      title="Light scenes"
-      info="Looks for the lights, apart from Palinopsia's scenes : save what they show now, click to bring one back (over the scene fade time), double-click to rename. Saved with the session."
-      actions={<button className={btn(false)} onClick={save} title="Save what the lights show now as a light scene">+ save</button>}
+      title="Light cues"
+      info="Looks for the lights, apart from Palinopsia's scenes, played as cues : save what they show now, click a cue to bring it (over its fade), GO for the next, back for the one before. ⚙ : its own fade, a follow time (while the cues follow on, the next one goes by itself) and the Palinopsia scene it goes with (recalling that scene brings it). Double-click to rename. Saved with the session; the Seq page has them as a lane."
+      actions={<button className={btn(false)} onClick={save} title="Save what the lights show now as a new cue">+ save</button>}
     >
-      {scenes.length === 0 && <p className="font-mono text-[10px] text-muted">None yet.</p>}
-      <div className="flex flex-col gap-0.5">
-        {scenes.map((sc, i) => (
-          <div key={sc.id} className="flex items-center gap-1">
-            {editing === sc.id ? (
-              <input
-                autoFocus
-                defaultValue={sc.name}
-                onBlur={(e) => { rename(sc.id, e.target.value); setEditing(null) }}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 font-mono text-[10px]"
-              />
-            ) : (
-              <button
-                onClick={() => recall(sc.id)}
-                onDoubleClick={() => setEditing(sc.id)}
-                className="min-w-0 flex-1 truncate rounded px-1.5 py-1 text-left font-mono text-[10px] hover:bg-panel3/60"
-                title="Click : bring it back · double-click : rename"
-              >
-                <span className="text-muted">{i + 1}</span> {sc.name}
-              </button>
-            )}
-            <button className="px-1 font-mono text-[11px] text-muted hover:text-red-400" onClick={() => del(sc.id)} title="Delete this light scene">×</button>
-          </div>
-        ))}
-      </div>
+      <LightCueButtons />
+      <LightCueList />
     </Section>
   )
 }
@@ -1278,14 +1259,38 @@ function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook;
           {EFFECTS.map((x) => <option key={x} value={x}>{EFFECT_LABEL[x]}</option>)}
         </select>
       </label>
+      {look.effect === 'audio' && (
+        <div className="flex items-center gap-1" title="What it follows : the whole sound, or its lows, mids or highs">
+          <span className="w-14 shrink-0 font-mono text-[10px] text-muted">follows</span>
+          {BANDS.map((b) => <button key={b} className={`flex-1 ${btn(look.band === b)}`} onClick={() => setLook({ band: b })}>{BAND_LABEL[b]}</button>)}
+        </div>
+      )}
       {look.effect !== 'none' && (
         <>
-          {look.effect !== 'audio' && S(look.effect === 'beat' ? 'per beat' : 'rate', 'rate', look.rate, 0, 4, 0.01, (v) => setLook({ rate: v }), 0.5, look.effect === 'beat' ? '' : ' Hz', 'Its speed (times the master speed). Never more than three changes a second, whatever you set.')}
+          {look.effect !== 'audio' && look.effect !== 'presence' && S(look.effect === 'beat' ? 'per beat' : 'rate', 'rate', look.rate, 0, 4, 0.01, (v) => setLook({ rate: v }), 0.5, look.effect === 'beat' ? '' : ' Hz', 'Its speed (times the master speed). Never more than three changes a second, whatever you set.')}
           {S('depth', 'depth', look.depth, 0, 1, 0.01, (v) => setLook({ depth: v }), 0.6)}
-          {(look.effect === 'chase' || look.effect === 'wave') && S('width', 'width', look.width, 0.02, 1, 0.01, (v) => setLook({ width: v }), 0.25)}
-          {(look.effect === 'chase' || look.effect === 'wave') && S('direction', 'angle', look.angle, -180, 180, 1, (v) => setLook({ angle: v }), 0, '°')}
+          {(look.effect === 'chase' || look.effect === 'wave' || look.effect === 'presence') && S(look.effect === 'presence' ? 'near' : 'width', 'width', look.width, 0.02, 1, 0.01, (v) => setLook({ width: v }), 0.25, '', look.effect === 'presence' ? 'How near a person lights it (in frame heights)' : look.order === 'room' ? 'The band (a chase) or the wavelength (a wave), across the room' : 'The band (a chase) or the wavelength (a wave), as a part of the order')}
         </>
       )}
+      {(['chase', 'wave', 'pulse', 'sparkle', 'beat'] as LightEffect[]).includes(look.effect) || look.fan !== 0 ? (
+        <>
+          <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title="How it travels : through the room (by where each pixel is, at an angle), or light by light in an order (each light a step, as a lighting console spreads a phase over a group). The lights with the same order make one set">
+            <span className="w-14 shrink-0">travels</span>
+            <select value={look.order} onChange={(e) => setLook({ order: e.target.value as LightOrder })} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text">
+              {ORDERS.map((o) => <option key={o} value={o}>{ORDER_LABEL[o]}</option>)}
+            </select>
+          </label>
+          {look.order === 'room'
+            ? (look.effect === 'chase' || look.effect === 'wave' || look.fan !== 0) && S('direction', 'angle', look.angle, -180, 180, 1, (v) => setLook({ angle: v }), 0, '°', 'The direction it travels across the room')
+            : look.order !== 'oddeven' && (
+              <div className="flex items-center gap-1" title="Wings : the order folded into mirrored parts (2 : from both ends to the middle and back, as a console's wings)">
+                <span className="w-14 shrink-0 font-mono text-[10px] text-muted">wings</span>
+                {[1, 2, 3, 4].map((w) => <button key={w} className={`flex-1 ${btn(look.wings === w)}`} onClick={() => setLook({ wings: w })}>{w}</button>)}
+              </div>
+            )}
+        </>
+      ) : null}
+      {S('fan', 'fan', look.fan, -180, 180, 1, (v) => setLook({ fan: v }), 0, '°', 'A fan : the hue spread across the room (or along the order), from one end to the other')}
       {S('level', 'level', look.level, 0, 1, 0.01, (v) => setLook({ level: v }), 1, '', "This fixture's own fader")}
     </Section>
   )

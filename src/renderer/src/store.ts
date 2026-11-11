@@ -1988,6 +1988,15 @@ interface StoreState {
   /** Every fixture picked on the map or in the list (the selected one among them) :
    *  a look, a tuning or a show goes to all of them; Shift / Ctrl + click adds. */
   lightPicked: string[]
+  /** The light scenes as cues : the one in now, when it went (performance.now()),
+   *  whether the cues follow on by themselves, and the fade the last one took. */
+  lightCue: string | null
+  lightCueAt: number
+  lightCueRun: boolean
+  lightFadeSec: number | null
+  goLightCue: (dir: 1 | -1) => void
+  setLightCueRun: (on: boolean) => void
+  updateLightScene: (id: string, patch: { fade?: number | null; follow?: number; link?: string | null }) => void
   /** The test pattern : when it started (performance.now()), null : off. */
   lightTest: number | null
   setLightTest: (on: boolean) => void
@@ -4879,8 +4888,11 @@ export const useStore = create<StoreState>((set, get) => ({
   saveLightScene: () =>
     set((s) => {
       const L = s.lightsSession
+      // (an id of its own even when several are saved in one millisecond : a script, OSC)
+      let sid = `ls${Date.now().toString(36)}${Math.floor(Math.random() * 46656).toString(36)}`
+      while (L.scenes.some((x) => x.id === sid)) sid += 'x'
       const scene = {
-        id: `ls${Date.now().toString(36)}`,
+        id: sid,
         name: `Light ${L.scenes.length + 1}`,
         looks: { ...L.looks },
         master: { brightness: L.master.brightness, speed: L.master.speed },
@@ -4903,12 +4915,15 @@ export const useStore = create<StoreState>((set, get) => ({
           ...(sc.groups ? { groups: { ...(L.groups ?? {}), ...sc.groups } } : {}),
           ...(sc.tunes && s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...sc.tunes } } : {})
         },
-        lightFadeEpoch: s.lightFadeEpoch + 1
+        lightFadeEpoch: s.lightFadeEpoch + 1,
+        lightFadeSec: sc.fade ?? null,
+        lightCue: sc.id,
+        lightCueAt: performance.now()
       }
     }),
   renameLightScene: (id, name) =>
     set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) || x.name } : x)) } })),
-  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) } })),
+  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: s.lightCue === id ? null : s.lightCue })),
   applyLightShow: (id, ids) =>
     set((s) => {
       const layers = s.composition.layers.map((l, i) => ((l.sourceA.shaderId || l.sourceA.kind !== 'none' || l.sourceB) && !l.mute ? i : -1)).filter((i) => i >= 0)
@@ -4916,7 +4931,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const on = ids && ids.length ? s.lightRig.fixtures.filter((f) => ids.includes(f.id)) : s.lightRig.fixtures
       const looks = showLooks(id, on, s.lightsSession.looks, layers)
       if (!looks) return s
-      return { lightsSession: { ...s.lightsSession, looks }, lightFadeEpoch: s.lightFadeEpoch + 1 }
+      return { lightsSession: { ...s.lightsSession, looks }, lightFadeEpoch: s.lightFadeEpoch + 1, lightFadeSec: null }
     }),
   lightFadeEpoch: 0,
   lightsBlack: false,
@@ -4926,6 +4941,38 @@ export const useStore = create<StoreState>((set, get) => ({
   lightSel: null,
   setLightSel: (id) => set({ lightSel: id, lightPicked: id ? [id] : [] }),
   lightPicked: [],
+  lightCue: null,
+  lightCueAt: 0,
+  lightCueRun: false,
+  lightFadeSec: null,
+  goLightCue: (dir) => {
+    const s = get()
+    const list = s.lightsSession.scenes
+    if (!list.length) return
+    const cur = list.findIndex((x) => x.id === s.lightCue)
+    const next = cur < 0 ? (dir > 0 ? 0 : list.length - 1) : (cur + dir + list.length) % list.length
+    s.recallLightScene(list[next].id)
+  },
+  setLightCueRun: (on) => {
+    if (on === get().lightCueRun) return
+    set({ lightCueRun: on })
+    // (playing from nothing : the first cue goes)
+    if (on && !get().lightsSession.scenes.some((x) => x.id === get().lightCue)) get().goLightCue(1)
+  },
+  updateLightScene: (id, patch) =>
+    set((s) => ({
+      lightsSession: {
+        ...s.lightsSession,
+        scenes: s.lightsSession.scenes.map((x) => {
+          if (x.id !== id) return x
+          const n = { ...x }
+          if (patch.fade !== undefined) { if (patch.fade === null) delete n.fade; else n.fade = Math.max(0, Math.min(60, patch.fade)) }
+          if (patch.follow !== undefined) n.follow = Math.max(0, Math.min(3600, patch.follow))
+          if (patch.link !== undefined) { if (!patch.link) delete n.link; else n.link = patch.link }
+          return n
+        })
+      }
+    })),
   lightTest: null,
   setLightTest: (on) => set({ lightTest: on ? performance.now() : null }),
   autoAddressLights: (out) =>
@@ -6057,6 +6104,12 @@ export const useStore = create<StoreState>((set, get) => ({
         const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
         queueMicrotask(() => { sonifyEngine.loadingSound(); useStore.getState().setSonify(next) })
       }
+      // a light cue tied to this scene goes with it
+      queueMicrotask(() => {
+        const st = useStore.getState()
+        const cue = st.lightsSession.scenes.find((c) => c.link === id)
+        if (cue) st.recallLightScene(cue.id)
+      })
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>

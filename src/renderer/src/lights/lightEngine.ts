@@ -24,6 +24,7 @@ import {
   type LightTune
 } from '@shared/lights'
 import { lightModKey, lightMods } from './lightMods'
+import { middleOf } from './lightStore'
 
 export interface LightGrid {
   w: number
@@ -42,6 +43,10 @@ export interface LightInputs {
   beats: number // a running beat count (the shared clock)
   bpm: number
   audio: number // 0..1 : the sound's level
+  bands?: number[] // 0..1 : the sound's low, mid and high
+  /** The people in the room (the Body page's tracking), on the picture : (x, y)
+   *  0..1 y down, r their size in frame heights. */
+  people?: Array<{ x: number; y: number; r: number }>
   aspect: number // the picture's width / height
   identify: string | null // a fixture flashed to find it in the room
   groupLevels?: Record<string, number> // each group's fader (absent : 1)
@@ -62,6 +67,19 @@ export interface LightFrame {
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+/** A color's hue turned by `deg` (YIQ : its brightness kept), in place. */
+function turnHue(c: number[], deg: number): void {
+  if (!deg) return
+  const a = (deg * Math.PI) / 180, hc = Math.cos(a), hs = Math.sin(a)
+  const r = c[0], g = c[1], b = c[2]
+  const y = 0.299 * r + 0.587 * g + 0.114 * b, i = 0.596 * r - 0.274 * g - 0.322 * b, q = 0.211 * r - 0.523 * g + 0.312 * b
+  const i2 = i * hc - q * hs, q2 = i * hs + q * hc
+  c[0] = y + 0.956 * i2 + 0.621 * q2
+  c[1] = y - 0.272 * i2 - 0.647 * q2
+  c[2] = y - 1.106 * i2 + 1.703 * q2
+}
+const idHash = (id: string): number => { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296 }
 const fract = (v: number): number => v - Math.floor(v)
 
 function hsv(h: number, s: number, v: number): [number, number, number] {
@@ -284,7 +302,7 @@ export class LightEngine {
   private blackLevel = 1 // 1 = lit, 0 = black
   private fadeT = 1 // a light scene's fade : 0..1
   private fadeSec = 0
-  private audioSm = 0
+  private audioSm = [0, 0, 0, 0] // level, low, mid, high
 
   /** A light scene is coming in : fade from what shows now over `sec`. */
   beginFade(sec: number): void {
@@ -330,7 +348,44 @@ export class LightEngine {
     this.blackLevel = inp.black ? Math.max(0, this.blackLevel - dt / bs) : Math.min(1, this.blackLevel + dt / bs)
     if (this.fadeT < 1) this.fadeT = this.fadeSec > 0 ? Math.min(1, this.fadeT + dt / this.fadeSec) : 1
     // the sound, smoothed (a level that jumps every frame flickers the room)
-    this.audioSm += (clamp01(inp.audio) - this.audioSm) * (1 - Math.exp(-dt / 0.06))
+    const aK = 1 - Math.exp(-dt / 0.06)
+    const aIn = [inp.audio, inp.bands?.[0] ?? inp.audio, inp.bands?.[1] ?? inp.audio, inp.bands?.[2] ?? inp.audio]
+    for (let k = 0; k < 4; k++) this.audioSm[k] += (clamp01(aIn[k]) - this.audioSm[k]) * aK
+    // light by light : each fixture's place in its order (the fixtures with the same
+    // order and wings make one set), and its step for a beat
+    const orderPos = new Map<string, { u: number; step: number; steps: number }>()
+    {
+      const sets = new Map<string, LightFixture[]>()
+      for (const f of inp.rig.fixtures) {
+        const lk = inp.looks[f.id] ?? LOOK_DEFAULT
+        if (lk.order === 'room') continue
+        const key = `${lk.order}|${lk.wings}`
+        let l = sets.get(key)
+        if (!l) { l = []; sets.set(key, l) }
+        l.push(f)
+      }
+      const asp0 = Math.max(0.1, inp.aspect)
+      for (const [key, list] of sets) {
+        const [order, w] = key.split('|')
+        const wings = Number(w) || 1
+        const mid = new Map(list.map((f) => [f.id, middleOf(f)]))
+        const sorted = list.slice().sort((a, b) => {
+          const [ax, ay] = mid.get(a.id)!, [bx, by] = mid.get(b.id)!
+          if (order === 'center') return Math.hypot((ax - 0.5) * asp0, ay - 0.5) - Math.hypot((bx - 0.5) * asp0, by - 0.5)
+          if (order === 'random') return idHash(a.id) - idHash(b.id)
+          return ax - bx || ay - by
+        })
+        const N = sorted.length
+        const us = sorted.map((_, rank) => {
+          if (order === 'oddeven') return (rank % 2) * 0.5
+          let u = (rank + 0.5) / N
+          if (wings > 1) { const v = u * wings, k = Math.floor(v), fr = v - k; u = k % 2 ? 1 - fr : fr }
+          return u
+        })
+        const distinct = [...new Set(us.map((u) => Math.round(u * 1000)))].sort((a, b) => a - b)
+        sorted.forEach((f, i) => orderPos.set(f.id, { u: us[i], step: distinct.indexOf(Math.round(us[i] * 1000)), steps: distinct.length }))
+      }
+    }
     // the beat : a flash on each, decaying
     const beatNow = inp.beats
     const out: LightFrame = { enttec: new Map(), net: [], colors: new Map(), overflow: new Set() }
@@ -372,7 +427,15 @@ export class LightEngine {
       // hue rotation (YIQ) for the tuning
       const hr = (tHue * Math.PI) / 180, hc = Math.cos(hr), hs = Math.sin(hr)
       const asp = Math.max(0.1, inp.aspect)
-      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * this.clock * rate)) : 1
+      const op = look.order !== 'room' ? orderPos.get(f.id) : undefined
+      const fan = mod(f.id, 'fan', look.fan)
+      // the room's extent along the effect's direction (a fan across the room)
+      let pLo = 0, pHi = 1
+      if (fan && !op) {
+        const ps = [0, asp * ca, sa, asp * ca + sa] // the room's four corners, projected
+        pLo = Math.min(...ps); pHi = Math.max(...ps)
+      }
+      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * (this.clock * rate - (op?.u ?? 0)))) : 1
       // the beat : every 1/rate beats (rate 0 : every beat), the flash decaying in a quarter of it
       let beatMul = 1
       if (look.effect === 'beat') {
@@ -380,11 +443,18 @@ export class LightEngine {
         const minBeats = (MAX_HZ > 0 ? 1 / MAX_HZ : 1) * (Math.max(1, inp.bpm) / 60)
         const every = Math.max(minBeats, rate > 0 ? 1 / rate : 1) // beats between flashes
         const idx = Math.floor(beatNow / every)
-        if (idx !== s.beatIdx) { s.beatIdx = idx; s.beatEnv = 1 }
+        // light by light : a step chase, one place of the order on each flash
+        if (idx !== s.beatIdx) { s.beatIdx = idx; if (!op || ((idx % op.steps) + op.steps) % op.steps === op.step) s.beatEnv = 1 }
         beatMul = 1 - depth + depth * s.beatEnv
         s.beatEnv *= Math.exp(-dt * 7)
       }
-      const audioMul = look.effect === 'audio' ? 1 - depth + depth * this.audioSm : 1
+      const audioMul = look.effect === 'audio' ? 1 - depth + depth * this.audioSm[look.band === 'low' ? 1 : look.band === 'mid' ? 2 : look.band === 'high' ? 3 : 0] : 1
+      const people = look.effect === 'presence' ? inp.people ?? [] : []
+      // (light by light, a sparkle is the whole light's)
+      if (look.effect === 'sparkle' && op) {
+        if (Math.random() < rate * dt * 0.5) s.spark[0] = 1
+        s.spark[0] *= Math.exp(-dt * 6)
+      }
       const colors = new Float32Array(n * 3)
       const ident = inp.identify === f.id
       for (let i = 0; i < n; i++) {
@@ -406,10 +476,17 @@ export class LightEngine {
             gradientAt(g.stops, t + gOff + this.clock * g.speed, tmp)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
           }
+          // a fan : the hue spread across the room (or along the order)
+          if (fan) {
+            const pos = op ? op.u : ((px * ca + y * sa) - pLo) / Math.max(1e-6, pHi - pLo)
+            tmp[0] = r; tmp[1] = gg; tmp[2] = b
+            turnHue(tmp, -fan * (pos - 0.5)) // (the color wheel's way : a positive fan climbs toward yellow)
+            r = Math.max(0, tmp[0]); gg = Math.max(0, tmp[1]); b = Math.max(0, tmp[2])
+          }
           // the effect, a multiplier on the light
           let m = pulse * beatMul * audioMul
           if (look.effect === 'chase' || look.effect === 'wave') {
-            const p = px * ca + y * sa
+            const p = op ? op.u : px * ca + y * sa
             if (look.effect === 'chase') {
               const d = fract(p - this.clock * rate) // 0..1 behind the head
               const band = Math.exp(-((Math.min(d, 1 - d) / width) ** 2) * 3)
@@ -419,9 +496,21 @@ export class LightEngine {
             }
           } else if (look.effect === 'sparkle') {
             // twinkles : a pixel lights at random (rate : how often), then decays
-            if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
-            s.spark[i] *= Math.exp(-dt * 6)
-            m *= 1 - depth + depth * s.spark[i]
+            if (op) m *= 1 - depth + depth * s.spark[0]
+            else {
+              if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
+              s.spark[i] *= Math.exp(-dt * 6)
+              m *= 1 - depth + depth * s.spark[i]
+            }
+          } else if (look.effect === 'presence') {
+            // lit near the people (width : how near), dim away from them
+            let near = 0
+            const rad = Math.max(0.02, width)
+            for (const pp of people) {
+              const d = Math.hypot((x - pp.x) * asp, y - pp.y) / rad
+              near = Math.max(near, Math.exp(-d * d * 1.5))
+            }
+            m *= 1 - depth + depth * near
           }
           m *= level
           r *= m; gg *= m; b *= m

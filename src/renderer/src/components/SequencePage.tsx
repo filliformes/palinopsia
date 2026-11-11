@@ -27,6 +27,7 @@ import { ownerWindow } from './ownerWindow'
 import { KeySeqDice, SonifyKeySequencer } from './SonifyKeySequencer'
 import { ModChip, SonifyAssign } from './SonifyPage'
 import { RuleLane, RulePosition } from './RuleLane'
+import { LightCueButtons, LightCueList, LightCueNow } from './LightCues'
 import {
   sequencerArcIntensity,
   sequencerArmed,
@@ -80,6 +81,8 @@ export function SequencePage({
   const ruleOn = useStore((s) => s.ruleSeqOn)
   const setRuleOn = useStore((s) => s.setRuleSeqOn)
   const hasBlocks = useStore((s) => s.ruleSeq.blocks.length > 0)
+  const cueRun = useStore((s) => s.lightCueRun)
+  const cueFollow = useStore((s) => s.lightsSession.scenes.some((c) => (c.follow ?? 0) > 0))
   const ruleTime = useStore((s) => s.ruleSeq.unit === 'time')
 
   return (
@@ -162,6 +165,22 @@ export function SequencePage({
             <RuleLane />
           </div>
         </Lane>
+        <Lane
+          id="lights"
+          title="Light cues"
+          hint="The Lights page's cues : each one a look for the lights with its own fade, a follow time and the Palinopsia scene it goes with. Playing, the cues follow on : a cue with a follow time hands over to the next one by itself (a cue without one waits for GO), and after the last comes the first. Its own time : the fades and follow times, in seconds."
+          on={cueRun}
+          onToggle={() => useStore.getState().setLightCueRun(!cueRun)}
+          toggleDisabled={!cueRun && !cueFollow}
+          toggleTitle={!cueFollow ? 'Give a cue a follow time first (⚙ on a cue)' : cueRun ? 'Stop following on (the lights stay as they are)' : 'Follow on from cue to cue'}
+          midiId="fire:lightscues"
+          status={<LightCueNow />}
+          right={<LightCueButtons />}
+        >
+          <div className="px-3 py-2">
+            <LightCueList row />
+          </div>
+        </Lane>
       </div>
     </div>
   )
@@ -171,10 +190,10 @@ export function SequencePage({
  *  its own time, the beat lanes together on bar 1, or on Ableton Link's next
  *  bar), stop them all; the shared clock's bar and beat; the tempo. */
 function SeqTransport(): JSX.Element {
-  const playing = useStore((s) => s.ruleSeqOn || s.soniKeySeq.on || (s.sequence.enabled && s.sequence.running))
+  const playing = useStore((s) => s.ruleSeqOn || s.soniKeySeq.on || (s.sequence.enabled && s.sequence.running) || s.lightCueRun)
   const canPlay = useStore((s) => {
     const a = s.seqLanes.arm
-    return (a.scenes && s.scenes.length > 1) || a.keys || (a.rules && s.ruleSeq.blocks.length > 0)
+    return (a.scenes && s.scenes.length > 1) || a.keys || (a.rules && s.ruleSeq.blocks.length > 0) || (a.lights && s.lightsSession.scenes.some((c) => (c.follow ?? 0) > 0))
   })
   const bpm = useStore((s) => s.composition.bpm)
   const posRef = useRef<HTMLSpanElement | null>(null)

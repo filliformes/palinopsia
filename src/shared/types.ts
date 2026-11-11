@@ -1210,7 +1210,7 @@ export interface RuleTimeline {
   loop: boolean // off : it plays the length once, then stops
   blocks: RuleBlock[]
 }
-export type SeqLaneId = 'scenes' | 'keys' | 'rules'
+export type SeqLaneId = 'scenes' | 'keys' | 'rules' | 'lights'
 /** What the Seq transport starts (session-scoped; an older file : all of them). */
 export interface SeqLanes {
   arm: Record<SeqLaneId, boolean>
