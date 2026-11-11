@@ -2188,16 +2188,24 @@ with shows, light scenes of their own and a lighting console.
     wide a patch each pixel averages, and **hold to identify** (it goes full white, to
     find it in the room).
   - **Patch** : its **output**, **universe** (network outputs) and **address**, and its
-    **channels** per pixel : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, RGBD, DRGBW, DRGBS,
-    RGBWAU, W, or your own (`R G B W A U D S X` or a number for a fixed value : a
-    dimmer `D` is sent full, a strobe `S` off). New fixtures are addressed after the
-    ones already there. A pixel never straddles two universes (170 RGB pixels to a
+    **channels** per pixel : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, D16RGB, RGBD, DRGBW,
+    D16RGBW, DRGBS, RGBWA, RGBWAU, W, L, L16, DCMY, or your own : `R G B W A U`, `C M Y`
+    (a subtractive mix), `L` (one channel of white : the luminance), `D` (a dimmer),
+    `S` (strobe, sent off), `X` (unused), a letter followed by `16` for two channels in
+    16 bits (`D16` : the dimmer and its fine channel), or a number for a channel held at
+    that value. **With a dimmer, the dimmer takes the light's level and the color goes
+    out at full strength** : the fades stay smooth down low (in 16 bits with `D16`, 65,536
+    steps instead of 256) and a dim color stays its color instead of drifting as its
+    channels run out of steps. New fixtures are addressed after the ones already there. A pixel never straddles two universes (170 RGB pixels to a
     universe, as pixel controllers expect); past an Enttec's 512 channels the rest is
     not sent and the patch says so.
   - **Look** : **picture** (the master where it sits), **layer** (L1 to L4, that
     layer's own picture), **color**, **gradient** (2 to 5 colors running across the
-    room at an angle, a scale, an offset and a drift, or **along** each fixture) or
-    **off**; an **effect** over it (**chase** : a band running across the room,
+    room at an angle, a scale, an offset and a drift, or **along** each fixture; **from
+    the picture** takes the picture's main colors, left to right as they sit in it) or
+    **off**. A light reading the picture **reads** its patch as the **average** (calm,
+    but a busy picture can go beige), **vivid** (its most colorful part : the lights
+    keep the picture's colors) or **bright** (its brightest part); an **effect** over it (**chase** : a band running across the room,
     **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud,
     **beat** : a flash on the beat), and its **level**. **to all** gives every fixture
     this look. Effects never change more than three times a second, at any rate and speed.
@@ -2215,9 +2223,12 @@ with shows, light scenes of their own and a lighting console.
   unplugged and plugged in again or the computer wakes up (every two seconds; **scan**
   looks at once). The fixtures and outputs are this computer's patch : they stay when you
   open another session. The old Output page's light grid comes over once, as a matrix
-  on its own output.
+  on its own output. Each output has a **delay** (0 to 1000 ms) : the lights answer at
+  once and a projector shows the picture two or three frames late, so about 40 ms keeps
+  them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
+  each frame, so the nodes that know it show all their universes at the same moment.
 - **Shows** : a look for every light at once, fading in : Follow the picture, Each its
-  layer, Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
+  layer, Picture colors (the picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
   the beat, Sound reactive, Breathing, Night sparkle, Dark. They fit any room : their
   patterns run across the space, so each light takes its part from where it stands.
 - **Light scenes** : looks for the lights apart from Palinopsia's scenes : **+ save**,

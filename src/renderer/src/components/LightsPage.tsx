@@ -15,7 +15,9 @@ import {
   LAYOUTS,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT,
+  SAMPLES,
   type LightEffect,
+  type LightSample,
   type LightFixture,
   type LightKind,
   type LightLook,
@@ -25,6 +27,7 @@ import {
   type LightTune
 } from '@shared/lights'
 import { lightRuntime } from '../lights/lightRuntime'
+import { paletteOf } from '../lights/lightEngine'
 import { enttec } from '../lights/enttec'
 import { LIGHT_SHOWS } from '../lights/lightShows'
 import { AssignRow } from './AutoControls'
@@ -44,6 +47,12 @@ const EFFECT_HINT: Record<LightEffect, string> = {
   sparkle: 'Pixels twinkling at random (rate : how often).',
   audio: 'As bright as the sound is loud.',
   beat: 'A flash on the beat (rate : flashes a beat).'
+}
+
+const SAMPLE_HINT: Record<LightSample, string> = {
+  average: 'The average of its patch of picture : calm, but a busy picture can go beige',
+  vivid: 'The most colorful part of its patch : the lights keep the picture\u2019s colors',
+  bright: 'The brightest part of its patch : the highlights carry, the dark stays dark'
 }
 
 const btn = (on: boolean): string =>
@@ -244,6 +253,29 @@ function OutputList(): JSX.Element {
               />
               <button className={btn(o.enabled)} onClick={() => update(o.id, { enabled: !o.enabled })} title="Send to this output">{o.enabled ? 'on' : 'off'}</button>
               <button className="px-1 font-mono text-[11px] text-muted hover:text-red-400" onClick={() => remove(o.id)} title="Remove this output (its fixtures wait, unpatched)">×</button>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted">
+              <label
+                className="flex items-center gap-1"
+                title="Held back this long before it goes out. The lights answer at once and a projector shows the picture two or three frames late : about 40 ms keeps them together (0 for lights alone)"
+              >
+                delay
+                <input
+                  type="number" min={0} max={1000} step={5} value={o.delay}
+                  onChange={(e) => update(o.id, { delay: Math.max(0, Math.min(1000, Math.round(Number(e.target.value) || 0))) })}
+                  className="w-12 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
+                />
+                ms
+              </label>
+              {o.kind === 'artnet' && (
+                <button
+                  className={btn(o.sync)}
+                  onClick={() => update(o.id, { sync: !o.sync })}
+                  title="An ArtSync after each frame : the nodes that know it show all their universes at the same moment (leave it off if a node stops or flickers)"
+                >
+                  sync
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted">
               <span className="shrink-0">{OUT_LABEL[o.kind]}</span>
@@ -679,7 +711,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
         <IdentifyButton id={f.id} />
       </Section>
 
-      <Section title="Patch" info="Where its channels go. Every pixel takes as many channels as its layout has letters : R G B W, A (amber), D (a dimmer, sent full), S (strobe, sent off), U (UV, off), X (unused), or a number for a fixed value.">
+      <Section title="Patch" info="Where its channels go. Every pixel takes as many channels as its layout has letters : R G B W, A (amber), C M Y (a subtractive mix), L (one channel of white : the luminance), D (a dimmer : it takes the level, the color goes out full), 16 after a letter for two channels in 16 bits (D16 : the dimmer and its fine channel), S (strobe, sent off), U (UV, off), X (unused), or a number for a channel held at that value.">
         <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
           <span className="w-14">output</span>
           <select value={f.out} onChange={(e) => upd({ out: e.target.value })} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text">
@@ -696,6 +728,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
           <select
             value={custom ? '__custom' : f.layout}
             onChange={(e) => upd({ layout: e.target.value === '__custom' ? 'D R G B S' : e.target.value })}
+            title="The channels of one pixel. With a dimmer (D, D16 in 16 bits) the dimmer takes the level and the color stays full : smoother fades down low"
             className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
           >
             {LAYOUTS.map((l) => <option key={l} value={l}>{l}</option>)}
@@ -707,7 +740,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
             value={f.layout}
             onChange={(e) => upd({ layout: e.target.value })}
             className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[10px]"
-            title="The channels of one pixel, in order : R G B W A D S U X, or a number (0..255) for a channel held at that value"
+            title="The channels of one pixel, in order : R G B W A U, C M Y, L, D, S, X, a letter followed by 16 for 16 bits (D16), or a number (0..255) for a channel held at that value"
           />
         )}
         <p className={`font-mono text-[9px] ${overflow ? 'text-red-400' : 'text-muted'}`}>
@@ -734,6 +767,16 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
         {look.source === 'layer' && (
           <div className="flex gap-1">
             {[0, 1, 2, 3].map((i) => <button key={i} className={`flex-1 ${btn(look.layer === i)}`} onClick={() => setLook({ layer: i })}>L{i + 1}</button>)}
+          </div>
+        )}
+        {(look.source === 'master' || look.source === 'layer') && (
+          <div className="flex items-center gap-1" title="How each pixel reads the picture around it">
+            <span className="w-14 shrink-0 font-mono text-[10px] text-muted">reads</span>
+            {SAMPLES.map((m) => (
+              <button key={m} className={`flex-1 ${btn(look.sample === m)}`} onClick={() => setLook({ sample: m })} title={SAMPLE_HINT[m]}>
+                {m}
+              </button>
+            ))}
           </div>
         )}
         {look.source === 'color' && (
@@ -794,6 +837,13 @@ function GradientEditor({ look, setLook, slider }: { look: LightLook; setLook: (
         ))}
         {g.stops.length < 5 && <button className={btn(false)} onClick={() => setG({ stops: [...g.stops, g.stops[g.stops.length - 1].slice()] })}>+</button>}
         {g.stops.length > 2 && <button className={btn(false)} onClick={() => setG({ stops: g.stops.slice(0, -1) })}>−</button>}
+        <button
+          className={btn(false)}
+          onClick={() => { const pal = paletteOf(lightRuntime.grid(-1), Math.max(3, g.stops.length)); if (pal) setG({ stops: pal }) }}
+          title="The picture's main colors now, left to right as they sit in it"
+        >
+          from the picture
+        </button>
         <button className={`ml-auto ${btn(g.along)}`} onClick={() => setG({ along: !g.along })} title="Along each fixture, from its first pixel to its last, instead of across the room">along</button>
       </div>
       {!g.along && slider('angle', 'gradAngle', g.angle, -180, 180, 1, (v) => setG({ angle: v }), 0, '°', 'The direction it runs across the room')}

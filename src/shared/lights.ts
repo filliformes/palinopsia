@@ -19,6 +19,9 @@ export type LightSourceKind = 'master' | 'layer' | 'color' | 'gradient' | 'off'
 export type LightEffect = 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat'
 export type LightOutputKind = 'enttec' | 'artnet' | 'sacn' | 'wled'
 export type LightTuneScope = 'rig' | 'look'
+/** How a pixel reads the picture around it : the average of its patch, its most
+ *  colorful part (a busy picture's average goes beige), or its brightest. */
+export type LightSample = 'average' | 'vivid' | 'bright'
 
 /** A grade for one physical light : how its LEDs render the color sent to them. */
 export interface LightTune {
@@ -62,6 +65,8 @@ export interface LightOutput {
   enabled: boolean
   host: string // network outputs ('' for sACN : multicast)
   index: number // enttec : which one when several are plugged in (0 = the first)
+  delay: number // 0..1000 ms : held back this long, so the lights land with a projector's picture
+  sync: boolean // Art-Net : an ArtSync after each frame (nodes that know it show every universe together)
 }
 
 export interface LightGradient {
@@ -77,6 +82,7 @@ export interface LightGradient {
 export interface LightLook {
   source: LightSourceKind
   layer: number // 0..3 when source is 'layer'
+  sample: LightSample // the picture : how each pixel reads its patch
   hue: number // color : 0..360
   sat: number // 0..1
   val: number // 0..1
@@ -130,7 +136,7 @@ export const GRADIENT_DEFAULT: LightGradient = {
 }
 
 export const LOOK_DEFAULT: LightLook = {
-  source: 'master', layer: 0, hue: 30, sat: 0.6, val: 1, gradient: GRADIENT_DEFAULT,
+  source: 'master', layer: 0, sample: 'average', hue: 30, sat: 0.6, val: 1, gradient: GRADIENT_DEFAULT,
   effect: 'none', rate: 0.5, depth: 0.6, width: 0.25, angle: 0, level: 1
 }
 
@@ -141,7 +147,7 @@ export const RIG_DEFAULT: LightRig = { fixtures: [], outputs: [], tuneScope: 'ri
 export const SESSION_DEFAULT: LightsSession = { looks: {}, scenes: [], master: MASTER_DEFAULT }
 
 /** Channel layouts offered in the menu (any other string of tokens works too). */
-export const LAYOUTS = ['RGB', 'GRB', 'BRG', 'BGR', 'RGBW', 'GRBW', 'DRGB', 'RGBD', 'DRGBW', 'DRGBS', 'RGBWAU', 'W'] as const
+export const LAYOUTS = ['RGB', 'GRB', 'BRG', 'BGR', 'RGBW', 'GRBW', 'DRGB', 'D16RGB', 'RGBD', 'DRGBW', 'D16RGBW', 'DRGBS', 'RGBWA', 'RGBWAU', 'W', 'L', 'L16', 'DCMY'] as const
 
 /** The sliders a modulator or a Macro knob can move (ranges = the sliders'). A
  *  target on the masters carries fixture ''. */
@@ -187,6 +193,7 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (li
 export const KINDS: readonly LightKind[] = ['strip', 'spot', 'matrix']
 export const SOURCES: readonly LightSourceKind[] = ['master', 'layer', 'color', 'gradient', 'off']
 export const EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat']
+export const SAMPLES: readonly LightSample[] = ['average', 'vivid', 'bright']
 export const OUTPUT_KINDS: readonly LightOutputKind[] = ['enttec', 'artnet', 'sacn', 'wled']
 
 export function sanitizeTune(raw: unknown): LightTune {
@@ -203,12 +210,17 @@ export function sanitizeTune(raw: unknown): LightTune {
   }
 }
 
-/** A layout's tokens (letters, or numbers for a fixed channel value). Empty or
- *  unreadable : RGB. */
+/** A layout's tokens : a letter (R G B W A U, C M Y, L the luminance, D a dimmer,
+ *  S strobe, X unused), the same followed by 16 for two channels (coarse and fine :
+ *  D16 is a dimmer and its fine channel), or a number for a channel held at that
+ *  value. Empty or unreadable : RGB. */
 export function layoutTokens(layout: string): string[] {
-  const t = (layout || '').toUpperCase().match(/[RGBWAUDSX]|\d{1,3}/g) ?? []
-  return t.length ? t.slice(0, 16) : ['R', 'G', 'B']
+  const t = (layout || '').toUpperCase().match(/[RGBWAUDSXCMYL](?:16)?|\d{1,3}/g) ?? []
+  return t.length ? t.slice(0, 24) : ['R', 'G', 'B']
 }
+/** The channels a token takes (a 16-bit one : two). */
+export const tokenWidth = (t: string): number => (t.length === 3 && t.endsWith('16') && t[0] >= 'A' && t[0] <= 'Z' ? 2 : 1)
+export const layoutChannels = (tokens: string[]): number => tokens.reduce((n, t) => n + tokenWidth(t), 0)
 
 export function sanitizeFixture(raw: unknown, i = 0): LightFixture {
   const r = obj(raw)
@@ -244,7 +256,9 @@ export function sanitizeOutput(raw: unknown, i = 0): LightOutput {
     kind,
     enabled: bool(r.enabled, true),
     host: str(r.host, '', 64).trim(),
-    index: Math.round(num(r.index, 0, 0, 7))
+    index: Math.round(num(r.index, 0, 0, 7)),
+    delay: Math.round(num(r.delay, 0, 0, 1000)),
+    sync: bool(r.sync, false)
   }
 }
 
@@ -283,6 +297,7 @@ export function sanitizeLook(raw: unknown): LightLook {
   return {
     source: oneOf(r.source, SOURCES, d.source),
     layer: Math.round(num(r.layer, 0, 0, 3)),
+    sample: oneOf(r.sample, SAMPLES, d.sample),
     hue: num(r.hue, d.hue, 0, 360),
     sat: num(r.sat, d.sat, 0, 1),
     val: num(r.val, d.val, 0, 1),
@@ -340,7 +355,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
 /** The DMX channels a fixture takes (its pixels times its layout). */
 export function fixtureChannels(f: LightFixture): number {
   const n = f.kind === 'spot' ? 1 : f.kind === 'matrix' ? f.cols * f.rows : f.pixels
-  return n * layoutTokens(f.layout).length
+  return n * layoutChannels(layoutTokens(f.layout))
 }
 
 /** The LEDs (pixels) a fixture drives. */

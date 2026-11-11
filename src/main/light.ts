@@ -12,10 +12,10 @@ const SACN_PORT = 5568
 const WLED_PORT = 21324
 
 export interface DmxPacket {
-  kind: 'artnet' | 'sacn' | 'wled'
+  kind: 'artnet' | 'sacn' | 'wled' | 'artsync'
   host: string
   universe: number
-  data: Uint8Array // 512 channels
+  data?: Uint8Array // 512 channels (none for an ArtSync)
 }
 
 export class DmxSender {
@@ -48,8 +48,13 @@ export class DmxSender {
     if (!Array.isArray(packets) || !packets.length) return
     const s = this.socket()
     if (!s) return
-    for (const p of packets.slice(0, 256)) {
-      if (!p || !(p.data instanceof Uint8Array)) continue
+    for (const p of packets.slice(0, 257)) {
+      if (!p) continue
+      if (p.kind === 'artsync') {
+        if (typeof p.host === 'string' && p.host) { try { this.artsync(s, p.host) } catch { /* a malformed host */ } }
+        continue
+      }
+      if (!(p.data instanceof Uint8Array)) continue
       try {
         if (p.kind === 'artnet' && p.host) this.artnet(s, p)
         else if (p.kind === 'sacn') this.sacn(s, p)
@@ -60,7 +65,19 @@ export class DmxSender {
     }
   }
 
+  /** ArtSync (OpSync) : the nodes that know it hold the universes they got and show
+   *  them all together on it (a node that stops getting it goes back to showing
+   *  each universe as it lands). */
+  private artsync(s: Socket, host: string): void {
+    const pkt = Buffer.alloc(14)
+    pkt.write('Art-Net\0', 0, 'latin1')
+    pkt.writeUInt16LE(0x5200, 8) // OpSync
+    pkt.writeUInt16BE(14, 10) // protocol version 14
+    s.send(pkt, ARTNET_PORT, host)
+  }
+
   private artnet(s: Socket, p: DmxPacket): void {
+    if (!p.data) return
     const uni = Math.max(0, Math.min(32767, p.universe | 0))
     const pkt = Buffer.alloc(18 + 512)
     pkt.write('Art-Net\0', 0, 'latin1')
@@ -78,6 +95,7 @@ export class DmxSender {
   /** E1.31 data packet : root, framing and DMP layers, 512 channels. Unicast to
    *  the host, or multicast to the universe's group when no host is set. */
   private sacn(s: Socket, p: DmxPacket): void {
+    if (!p.data) return
     const uni = Math.max(1, Math.min(63999, p.universe | 0 || 1))
     const pkt = Buffer.alloc(638)
     pkt.writeUInt16BE(0x0010, 0) // preamble size
@@ -111,6 +129,7 @@ export class DmxSender {
   /** WLED's DNRGB : a universe is 170 RGB LEDs (no LED straddles two), so
    *  universe u starts at LED u × 170. */
   private wled(s: Socket, p: DmxPacket): void {
+    if (!p.data) return
     const start = Math.max(0, p.universe | 0) * 170
     const pkt = Buffer.alloc(4 + 510)
     pkt[0] = 4 // DNRGB

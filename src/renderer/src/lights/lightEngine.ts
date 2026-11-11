@@ -10,7 +10,9 @@
 
 import {
   layoutTokens,
+  tokenWidth,
   LOOK_DEFAULT,
+  type LightSample,
   type LightFixture,
   type LightLook,
   type LightModField,
@@ -45,7 +47,7 @@ export interface LightInputs {
 /** A frame's DMX : Enttec buffers by device index, network universes by output. */
 export interface LightFrame {
   enttec: Map<number, Uint8Array>
-  net: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array }>
+  net: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array; out: string }>
   /** Per fixture, its pixels' final colors (0..1 RGB, interleaved) : the page draws them. */
   colors: Map<string, Float32Array>
   /** Channels past an Enttec's 512 (unpatched), by fixture : the page warns. */
@@ -116,19 +118,77 @@ function sampleAt(g: LightGrid, x: number, y: number, out: number[]): void {
   }
 }
 
-/** The picture around a point : a footprint of nine taps (`size`, frame heights). */
-function sampleArea(g: LightGrid, x: number, y: number, size: number, aspect: number, out: number[]): void {
+/** The picture around a point (`size` : its footprint, in frame heights). The
+ *  average : nine taps. Vivid and bright weigh 25 taps by how colorful (or how
+ *  bright) each is, so a few strong colors are not drowned in their neighbors. */
+const TMP = [0, 0, 0]
+function sampleArea(g: LightGrid, x: number, y: number, size: number, aspect: number, out: number[], mode: LightSample = 'average'): void {
   if (size < 0.004) { sampleAt(g, x, y, out); return }
-  const tmp = [0, 0, 0]
-  let r = 0, gg = 0, b = 0
-  const dx = size / Math.max(0.1, aspect), dy = size
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      sampleAt(g, x + i * dx, y + j * dy, tmp)
-      r += tmp[0]; gg += tmp[1]; b += tmp[2]
+  let r = 0, gg = 0, b = 0, wsum = 0
+  const k = mode === 'average' ? 1 : 2
+  const dx = size / Math.max(0.1, aspect) / k, dy = size / k
+  for (let j = -k; j <= k; j++) {
+    for (let i = -k; i <= k; i++) {
+      sampleAt(g, x + i * dx, y + j * dy, TMP)
+      let w = 1
+      if (mode === 'vivid') {
+        const c = Math.max(TMP[0], TMP[1], TMP[2]) - Math.min(TMP[0], TMP[1], TMP[2])
+        w = c * c * c + 1e-4
+      } else if (mode === 'bright') {
+        const l = 0.299 * TMP[0] + 0.587 * TMP[1] + 0.114 * TMP[2]
+        w = l * l * l * l + 1e-5
+      }
+      r += TMP[0] * w; gg += TMP[1] * w; b += TMP[2] * w; wsum += w
     }
   }
-  out[0] = r / 9; out[1] = gg / 9; out[2] = b / 9
+  out[0] = r / wsum; out[1] = gg / wsum; out[2] = b / wsum
+}
+
+/** The picture's main colors (2 to `n`), for a gradient : hues weighed by how much
+ *  of the picture has them and how colorful they are, a grey only when the picture
+ *  has little color, ordered from left to right as they sit in the picture (a
+ *  gradient across the room then follows it). Null : nothing lit to read. */
+export function paletteOf(g: LightGrid | null, n = 4): number[][] | null {
+  if (!g) return null
+  const BINS = 12
+  const acc = Array.from({ length: BINS + 1 }, () => ({ w: 0, r: 0, g: 0, b: 0, x: 0 }))
+  const c = [0, 0, 0]
+  // every cell of the grid (a click, not a frame : the small patches of color count)
+  for (let j = 0; j < g.h; j++) {
+    for (let i = 0; i < g.w; i++) {
+      const o = (j * g.w + i) * 4
+      c[0] = g.px[o] / 255; c[1] = g.px[o + 1] / 255; c[2] = g.px[o + 2] / 255
+      const x = (i + 0.5) / g.w
+      const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2])
+      if (mx < 0.06) continue
+      const ch = mx - mn
+      // (a grey counts little : a light is its color)
+      let bin = BINS, w = mx * 0.02
+      if (ch > 0.1) {
+        let h = 0
+        if (mx === c[0]) h = ((c[1] - c[2]) / ch + 6) % 6
+        else if (mx === c[1]) h = (c[2] - c[0]) / ch + 2
+        else h = (c[0] - c[1]) / ch + 4
+        bin = Math.min(BINS - 1, Math.floor((h / 6) * BINS))
+        w = ch * ch * mx
+      }
+      const a = acc[bin]
+      a.w += w; a.r += c[0] * w; a.g += c[1] * w; a.b += c[2] * w; a.x += x * w
+    }
+  }
+  const top = acc.filter((a) => a.w > 0).sort((p, q) => q.w - p.w)
+  if (!top.length) return null
+  const keep = top.filter((a, i) => i === 0 || a.w >= top[0].w * 0.04).slice(0, Math.max(2, Math.min(5, n)))
+  const stops = keep
+    .map((a) => ({ x: a.x / a.w, c: [a.r / a.w, a.g / a.w, a.b / a.w] }))
+    .sort((p, q) => p.x - q.x)
+    .map((s) => {
+      // each color at its full strength : the light is the color, the fader its level
+      const m = Math.max(s.c[0], s.c[1], s.c[2], 1e-6)
+      return s.c.map((v) => Math.min(1, v / m))
+    })
+  if (stops.length === 1) stops.push(stops[0].map((v) => v * 0.35))
+  return stops
 }
 
 /** A gradient's color at t (ping-pong : no seam where it wraps). */
@@ -266,7 +326,7 @@ export class LightEngine {
         let r = 0, gg = 0, b = 0
         if (ident) { r = gg = b = 1 } else {
           if (grid) {
-            sampleArea(grid, x, y, f.size, asp, tmp)
+            sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
           } else if (base) {
             r = base[0]; gg = base[1]; b = base[2]
@@ -345,7 +405,7 @@ export class LightEngine {
       if (!o) continue
       const uni = Number(key.slice(sep + 1))
       if (o.kind === 'enttec') out.enttec.set(o.index, data)
-      else out.net.push({ kind: o.kind, host: o.host, universe: uni, data })
+      else out.net.push({ kind: o.kind, host: o.host, universe: uni, data, out: o.id })
     }
     return out
   }
@@ -353,11 +413,17 @@ export class LightEngine {
   /** One fixture's colors into its output's universes, in its channel layout. A
    *  pixel never straddles two universes (pixel controllers expect it so) : one
    *  that would is moved to the next universe's first channel. An Enttec has one
-   *  universe : what goes past its 512 channels is dropped (and reported). */
+   *  universe : what goes past its 512 channels is dropped (and reported).
+   *  With a dimmer channel (D) the dimmer takes the light's level and the color
+   *  goes out at full strength : the fades stay smooth down low (in 16 bits with
+   *  D16) and a dim color stays its color. */
   private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, Uint8Array>, out: LightFrame): void {
     const tok = layoutTokens(f.layout)
-    const nt = tok.length
-    const hasW = tok.includes('W')
+    const wid = tok.map(tokenWidth)
+    let nt = 0
+    for (const w of wid) nt += w
+    const hasW = tok.some((t) => t[0] === 'W')
+    const hasD = tok.some((t) => t[0] === 'D')
     const n = colors.length / 3
     let uni = o.kind === 'enttec' ? 0 : f.universe
     let ch = f.address - 1
@@ -368,29 +434,47 @@ export class LightEngine {
       return b
     }
     let data = buf(uni)
-    const b255 = (v: number): number => Math.round(clamp01(v) * 255)
     for (let i = 0; i < n; i++) {
       if (ch + nt > 512) {
         if (o.kind === 'enttec') { out.overflow.add(f.id); break }
         uni++; ch = 0; data = buf(uni)
       }
       let r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+      let dim = 1
+      if (hasD) {
+        dim = Math.max(r, g, b)
+        if (dim > 1e-6) { r /= dim; g /= dim; b /= dim } else { r = g = b = 0; dim = 0 }
+      }
       let w = 0
       if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
-      for (let k = 0; k < nt; k++) {
+      let c = ch
+      for (let k = 0; k < tok.length; k++) {
         const t = tok[k]
         let v: number
-        switch (t) {
-          case 'R': v = b255(r); break
-          case 'G': v = b255(g); break
-          case 'B': v = b255(b); break
-          case 'W': v = b255(w); break
-          case 'A': v = b255(Math.min(r, g * 2) * 0.8); break // amber : from the warm part
-          case 'D': v = 255; break // a dimmer channel : open (the color carries the level)
+        switch (t[0]) {
+          case 'R': v = r; break
+          case 'G': v = g; break
+          case 'B': v = b; break
+          case 'W': v = w; break
+          case 'A': v = Math.min(r, g * 2) * 0.8; break // amber : from the warm part
+          case 'C': v = 1 - r; break // a subtractive mix : the color's complement
+          case 'M': v = 1 - g; break
+          case 'Y': v = 1 - b; break
+          case 'L': v = lum; break // one channel of white : its luminance
+          case 'D': v = dim; break
           case 'U': case 'S': case 'X': v = 0; break // UV, strobe, unused : off
-          default: v = Math.max(0, Math.min(255, Number(t) | 0)) // a fixed value
+          default: v = -1 // a fixed value
         }
-        data[ch + k] = v
+        if (v < 0) {
+          data[c++] = Math.max(0, Math.min(255, Number(t) | 0))
+        } else if (wid[k] === 2) {
+          const q = Math.round(clamp01(v) * 65535)
+          data[c++] = q >> 8
+          data[c++] = q & 0xff
+        } else {
+          data[c++] = Math.round(clamp01(v) * 255)
+        }
       }
       ch += nt
     }

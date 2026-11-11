@@ -68,6 +68,38 @@ that CI builds into cross-platform releases.
     breathing it (smoothed), a session round trip with its light scenes, the map's drags,
     an Enttec output with nothing plugged in (looking, no error). **Not verified : a real
     Enttec Pro** (none here).
+- **Lights, closer to the lighting world (1/4) : the dimmer, the picture's colors, the
+  output delay** (Vincent picked 1 to 12 of the 11-10 suggestions, from Resolume's DMX
+  output and ossia score).
+  - **The dimmer takes the level.** With a `D` in a layout the dimmer channel now carries
+    the light's level (the brightest of its three colors, after the tuning) and the
+    color goes out normalized to full, the same light on a linear fixture but with the
+    dimmer's resolution : smooth low fades, and a dim color that stays its color. Before,
+    `D` was held at 255 and the 8-bit color carried everything. **New tokens** : a
+    letter followed by `16` is two channels, coarse and fine (`D16`, `R16`... : the
+    dimmer in 65,536 steps), `C M Y` (a subtractive mix, the color's complement), `L`
+    (one channel of white : the luminance, for a dimmer-only or white fixture). New
+    layouts in the menu : D16RGB, D16RGBW, RGBWA, L, L16, DCMY. `tokenWidth` /
+    `layoutChannels` in shared/lights.ts; `fixtureChannels` counts 16-bit tokens twice.
+  - **How a pixel reads the picture** (`LightLook.sample`) : **average** (nine taps, as
+    before), **vivid** (25 taps weighed by chroma cubed : a few strong colors are not
+    drowned in a grey patch) or **bright** (weighed by luma to the fourth).
+  - **The picture's colors** : `paletteOf(grid)` reads every cell of the master's light
+    grid into twelve hue bins (weighed by chroma squared × value; greys count little),
+    keeps the bins over 4 % of the strongest (2 to 5), each at full strength, ordered by
+    where they sit from left to right. The gradient editor's **from the picture**, and
+    a new show **Picture colors**. The master is now always in the light readback (it
+    is the palette's source).
+  - **Output delay** (`LightOutput.delay`, 0..1000 ms, per output) : each output's frame
+    goes out that much later (an Enttec's and the network's alike), so the lights land
+    with a projector's picture; **sync** on an Art-Net output closes each frame with an
+    ArtSync (OpSync 0x5200, 14 bytes), new packet kind `artsync` in `DmxSender`.
+  - Tested : 37 Node checks (12 new : the dimmer at 0.5 and in 16 bits, a dim orange
+    keeping its color, L, L16, DCMY, the channel counts, vivid against average, bright,
+    the palette and an empty one, ArtSync received on 127.0.0.1). In the test copy : the
+    D16RGB spot on the wire at level 0.4 (102 102 / 0 0 255), one ArtSync per frame at 40
+    fps, the delay measured from a color change to its packet (2 to 18 ms at 0, 314 to
+    332 ms at 300), the palette read from the live readback of three themes.
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

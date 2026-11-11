@@ -8,16 +8,25 @@ import type { Compositor } from '../engine/Compositor'
 import { useStore } from '../store'
 import { audioBus } from '../engine/audioIn'
 import { soniBeats } from '../audio/soniClock'
-import { LightEngine, type LightFrame, type LightGrid } from './lightEngine'
+import { LightEngine, paletteOf, type LightFrame, type LightGrid } from './lightEngine'
 import { enttec } from './enttec'
-import type { LightTune } from '@shared/lights'
+import type { LightOutput, LightTune } from '@shared/lights'
 import { setLightBaseOf } from './lightMods'
 import { lightBaseValue } from './lightStore'
+import { setPaletteSource } from './lightShows'
 
 setLightBaseOf((fixture, field) => {
   const st = useStore.getState()
   return lightBaseValue(st.lightRig, st.lightsSession, fixture, field)
 })
+// (the Picture colors show, and the gradient's "from the picture" : the master's colors)
+setPaletteSource(() => paletteOf(lightRuntime.grid(-1), 4))
+
+/** Now, or `ms` later (an output's delay); dropped if the lights went off meanwhile. */
+function later(ms: number, fn: () => void): void {
+  if (ms <= 0) { fn(); return }
+  window.setTimeout(() => { if (useStore.getState().lightRig.on) fn() }, ms)
+}
 
 const W = 192
 const H = 108
@@ -59,9 +68,10 @@ class LightRuntime {
     // rig's fps : now + interval sent every other frame, 30 for a 40 Hz rig)
     const interval = 1000 / Math.max(10, Math.min(44, rig.fps))
     this.nextAt = Math.max(this.nextAt + interval, now - interval)
-    // the sources in use : the master, the layers the looks read
+    // the sources in use : the master (always : its colors make the palettes), the
+    // layers the looks read
     const L = st.lightsSession
-    const srcs = new Set<number>()
+    const srcs = new Set<number>([-1])
     for (const f of rig.fixtures) {
       const look = L.looks[f.id]
       const s = look?.source ?? 'master'
@@ -104,9 +114,30 @@ class LightRuntime {
     // out
     const used = new Set<number>()
     if (rig.on) {
-      for (const [index, data] of frame.enttec) { enttec.send(index, data); used.add(index) }
-      if (frame.net.length) {
-        try { window.api.lightDmx(frame.net) } catch { /* main not ready yet */ }
+      // each output on its own delay (a projector's lag); an Art-Net one with sync
+      // closes its frame with an ArtSync
+      const byOut = new Map<string, LightOutput>(rig.outputs.map((o) => [o.id, o]))
+      for (const o of rig.outputs) {
+        if (o.kind !== 'enttec' || !o.enabled) continue
+        const data = frame.enttec.get(o.index)
+        if (!data || used.has(o.index)) continue
+        used.add(o.index)
+        later(o.delay, () => enttec.send(o.index, data))
+      }
+      const groups = new Map<string, typeof frame.net>()
+      for (const p of frame.net) {
+        let g = groups.get(p.out)
+        if (!g) { g = []; groups.set(p.out, g) }
+        g.push(p)
+      }
+      for (const [id, packets] of groups) {
+        const o = byOut.get(id)
+        if (!o) continue
+        const list: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }> = packets
+        if (o.kind === 'artnet' && o.sync && o.host) list.push({ kind: 'artsync', host: o.host, universe: 0 })
+        later(o.delay, () => {
+          try { window.api.lightDmx(list) } catch { /* main not ready yet */ }
+        })
       }
       this.sentTimes.push(now)
     }
