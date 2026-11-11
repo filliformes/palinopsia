@@ -21,7 +21,7 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { controlKey } from '../modKey'
-import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound } from './AutoControls'
+import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound, useOnMacro } from './AutoControls'
 import { GroupedControls, CONTROL_GROUPS, groupDim } from './GroupedControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
@@ -395,11 +395,12 @@ export function Inspector(): JSX.Element {
   }
   const fxOpaKey = fxOpaTarget ? modTargetKey(fxOpaTarget) : null
   const fxOpaModulated = fxOpaBound.length > 0
+  const fxOpaMacro = useOnMacro(fxOpaKey)
   useEffect(() => {
     const el = fxOpaRef.current
-    if (!fxOpaModulated || !fxOpaKey || !el) return
+    if (!(fxOpaModulated || fxOpaMacro) || !fxOpaKey || !el) return
     return registerLiveOverlay({ el, key: fxOpaKey, format: (x) => String(x) })
-  }, [fxOpaModulated, fxOpaKey])
+  }, [fxOpaModulated, fxOpaMacro, fxOpaKey])
 
   // A stable identity for the preset picker : distinct per selected FX unit /
   // source slot / background, so it never bleeds an applied name between two

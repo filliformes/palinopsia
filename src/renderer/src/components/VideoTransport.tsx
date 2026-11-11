@@ -12,7 +12,7 @@ import { showToast } from './Toast'
 import { pathFromMediaUrl, playableVideoUrl } from './videoImport'
 import { clipAudio } from '../engine/clipAudio'
 import { modTargetKey, useStore } from '../store'
-import { AssignRow, useBound } from './AutoControls'
+import { AssignRow, useBound, useOnMacro } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { useModSlide } from './useModSlide'
 import { liveModValues } from '../engine/modulation'
@@ -177,9 +177,13 @@ export function VideoTransport({
   }
   const speedKey = modKey('speed'), inKey = modKey('loopIn'), outKey = modKey('loopOut'), volKey = modKey('vol')
   const speedMod = useBound(speedKey).length > 0
+  const speedMacro = useOnMacro(speedKey) // (the readout follows a Macro knob too)
+  const speedLive = speedMod || speedMacro
   const inMod = useBound(inKey).length > 0
   const outMod = useBound(outKey).length > 0
   const volMod = useBound(volKey).length > 0
+  const volMacro = useOnMacro(volKey)
+  const volLive = volMod || volMacro
   const speedRef = useRef<HTMLInputElement | null>(null)
   const speedTxtRef = useRef<HTMLSpanElement | null>(null)
   const regionRef = useRef<HTMLDivElement | null>(null)
@@ -189,7 +193,7 @@ export function VideoTransport({
   base.current = { speed, inN, outN }
   const speedSlide = useModSlide(speedMod, tFromSpeed(speed), 0, 1, (t) => set({ videoSpeed: speedFromT(t) }))
   useEffect(() => {
-    if (!speedMod || !speedKey) return
+    if (!speedLive || !speedKey) return
     const offs: Array<() => void> = []
     if (speedRef.current) offs.push(registerLiveOverlay({ el: speedRef.current, key: speedKey, format: (v) => String(tFromSpeed(v)) }))
     const txt = speedTxtRef.current
@@ -201,7 +205,7 @@ export function VideoTransport({
       offs.push(registerLiveOverlay({ key: speedKey, apply: show, idle: () => show(base.current.speed) }))
     }
     return () => offs.forEach((o) => o())
-  }, [speedMod, speedKey])
+  }, [speedLive, speedKey])
   useEffect(() => {
     const keys = [inMod ? inKey : null, outMod ? outKey : null].filter((k): k is string => !!k)
     if (!keys.length) return
@@ -505,7 +509,7 @@ export function VideoTransport({
         volume={ops ? ops.volume : audio ? (typeof state.inputs.volume === 'number' ? state.inputs.volume : 0.8) : state.videoVolume ?? 0}
         onVolume={(v) => (ops ? ops.setVolume(v) : audio ? useStore.getState().setSourceInput(layer, slot, 'volume', v) : set({ videoVolume: v }))}
         audio={audio}
-        modKey={volMod ? volKey : null}
+        modKey={volLive ? volKey : null}
       />
 
       {/* Granular : 3 seek-head voices scattering grains around the playhead.

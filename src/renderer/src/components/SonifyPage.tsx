@@ -250,7 +250,11 @@ function Slider({
   const modulated = useStore((st) =>
     modParam ? st.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param === modParam) : false
   )
-  const live = modulated && !modInactive
+  // (a Macro knob on it : the thumb follows the knob as it moves, like a modulator)
+  const onMacro = useStore((st) =>
+    modParam ? st.composition.metaKnobs.some((k) => k.destinations.some((d) => d.kind === 'sonify' && d.param === modParam)) : false
+  )
+  const live = (modulated || onMacro) && !modInactive
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (!live || !modParam || !ref.current) return
