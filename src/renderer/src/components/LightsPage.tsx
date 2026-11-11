@@ -207,11 +207,11 @@ function FixtureList(): JSX.Element {
   const toggle = useStore((s) => s.toggleLightPick)
   return (
     <Section title="Fixtures" info="Every light in the room. Add one, then place it on the map over the part of the picture it should take its light from. Shift or Ctrl + click picks several : a look, a tuning or a show then goes to all of them.">
-      <div className="flex gap-1">
-        <button className={`flex-1 ${btn(false)}`} onClick={() => add('strip')} title="An LED bar : a row of pixels along a line on the picture">+ bar</button>
-        <button className={`flex-1 ${btn(false)}`} onClick={() => add('spot')} title="A single light : a small RGB spot, a PAR, a wash">+ spot</button>
-        <button className={`flex-1 ${btn(false)}`} onClick={() => add('ring')} title="An LED ring : pixels around a circle">+ ring</button>
-        <button className={`flex-1 ${btn(false)}`} onClick={() => add('matrix')} title="An LED matrix : a grid of pixels over a rectangle of the picture">+ matrix</button>
+      <div className="grid grid-cols-2 gap-1">
+        <button className={btn(false)} onClick={() => add('strip')} title="An LED bar : a row of pixels along a line on the picture">+ bar</button>
+        <button className={btn(false)} onClick={() => add('spot')} title="A single light : a small RGB spot, a PAR, a wash">+ spot</button>
+        <button className={btn(false)} onClick={() => add('ring')} title="An LED ring : pixels around a circle">+ ring</button>
+        <button className={btn(false)} onClick={() => add('matrix')} title="An LED matrix : a grid of pixels over a rectangle of the picture">+ matrix</button>
       </div>
       {rig.fixtures.length === 0 && <p className="font-mono text-[10px] leading-snug text-muted">No fixtures yet. Add a bar, a spot or a matrix, then an output in Outputs.</p>}
       <div className="flex flex-col gap-0.5">
@@ -541,16 +541,6 @@ type Rect = { x: number; y: number; w: number; h: number }
 const PHOTO_KEY = 'opsia.lightPhoto'
 const loadPhoto = (): string | null => { try { return localStorage.getItem(PHOTO_KEY) } catch { return null } }
 
-/** A fixture's middle (its place for a rubber band, an alignment, an order). */
-function fixtureCenter(f: LightFixture): [number, number] {
-  if (f.kind === 'spot' || f.kind === 'ring') return [f.x0, f.y0]
-  if (f.kind === 'matrix') return [(f.x0 + f.x1) / 2, (f.y0 + f.y1) / 2]
-  const p = stripPath(f)
-  let x = 0, y = 0
-  for (let i = 0; i < p.length; i += 2) { x += p[i]; y += p[i + 1] }
-  return [x / (p.length / 2), y / (p.length / 2)]
-}
-
 function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
@@ -829,7 +819,7 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
       d.band.x1 = x; d.band.y1 = y
       const x0 = Math.min(d.sx, x), x1 = Math.max(d.sx, x), y0 = Math.min(d.sy, y), y1 = Math.max(d.sy, y)
       if (x1 - x0 < 0.005 && y1 - y0 < 0.005) return
-      const inside = st.lightRig.fixtures.filter((f) => { const [cx, cy] = fixtureCenter(f); return cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1 }).map((f) => f.id)
+      const inside = st.lightRig.fixtures.filter((f) => { const [cx, cy] = middleOf(f); return cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1 }).map((f) => f.id)
       st.setLightPicked([...new Set([...d.band.base, ...inside])])
       return
     }
