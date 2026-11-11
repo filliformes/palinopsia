@@ -5,6 +5,7 @@
 // modulation never re-renders React at 60 Hz.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import type { CompositionState, ModTarget } from '@shared/types'
 import type { ArpMode, AudioFeature, BodyFeature, ControlInputConfig, LfoShape, ModulatorConfig, ModulatorType, MotionShape, PhysicsMotion, StepCond, StepsConfig, TakeoverConfig, VisionFeature } from '@shared/types'
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DEFAULT_CONTROLLER, DEFAULT_TAKEOVER, DIVISIONS, modEngine } from '../engine/modulation'
@@ -1794,58 +1795,61 @@ function shapeSummary(s: import('@shared/types').ModShape): string {
   return `Shaped : ${parts.join(' · ')}`
 }
 
+/** A modulation or Macro destination in a few words (the chips of the Modulation
+ *  and Macro rows). */
+export function describeModTarget(t: ModTarget, composition: CompositionState): string {
+  // a color's part : its word after the color (tint hue)
+  const ch = partOf(t)
+  const part = ch ? ` ${PART_WORD[ch]}` : ''
+  if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}${part}`
+  if (t.kind === 'bgSource') return `BG ${t.input}${part}`
+  if (t.kind === 'meta') {
+    const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
+    return `MACRO K${t.knob + 1} (${name})`
+  }
+  if (t.kind === 'sonify') return t.param.startsWith('space.') ? `SPACE ${t.param.slice(6).replace('.', ' ')}` : `SONIFY ${t.param}`
+  if (t.kind === 'layer') {
+    // `vary` is a trigger, so it is named as one : the row fires on a
+    // crossing rather than holding a value, which the panel should not hide.
+    const f = t.field === 'mix' ? 'A/B mix' : t.field === 'harmony' ? 'A/B hue' : t.field === 'vary' ? 'vary ▸' : t.field
+    return `L${t.layer + 1} ${f}`
+  }
+  if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`
+  if (t.kind === 'dome') return `Dome ${DOME_MOD_RANGE[t.field].label}`
+  if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
+  if (t.kind === 'world') return 'World amount'
+  if (t.kind === 'au') return auLabel(t)
+  if (t.kind === 'light') {
+    const rig = useStore.getState().lightRig
+    if (t.fixture.startsWith('grp:')) {
+      const g = rig.groups.find((x) => `grp:${x.id}` === t.fixture)
+      return `${g ? g.name : 'Group'} fader`
+    }
+    const f = t.fixture ? rig.fixtures.find((x) => x.id === t.fixture) : null
+    return `${t.fixture ? (f ? f.name : 'Light') : 'Lights'} ${LIGHT_MOD_RANGE[t.field].label}`
+  }
+  const inst =
+    t.scope.kind === 'master'
+      ? composition.master.find((f) => f.id === t.instId)
+      : t.scope.kind === 'background'
+        ? composition.background?.fx.find((f) => f.id === t.instId)
+        : (composition.layers[t.scope.layer] ? layerRackOf(composition.layers[t.scope.layer], t.scope.kind) : undefined)?.find((f) => f.id === t.instId)
+  const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
+  const where =
+    t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}${t.scope.kind === 'loop' ? ' loop' : ''}`
+  const inputLabel = t.input === FX_OPACITY_INPUT ? 'opacity' : t.input
+  return `${where}·${fxName} ${inputLabel}${part}`
+}
+
 // ── Matrix summary : every assignment, with depth + remove ────────────
 function MatrixSummary(): JSX.Element {
   const matrix = useStore((s) => s.composition.modMatrix)
   const composition = useStore((s) => s.composition)
+  const describe = (a: (typeof matrix)[number]): string => describeModTarget(a.target, composition)
   const removeAssignment = useStore((s) => s.removeAssignment)
   const setAssignmentDepth = useStore((s) => s.setAssignmentDepth)
   const toggleAssignmentMuted = useStore((s) => s.toggleAssignmentMuted)
 
-  function describe(a: (typeof matrix)[number]): string {
-    const t = a.target
-    // a color's part : its word after the color (tint hue)
-    const ch = partOf(t)
-    const part = ch ? ` ${PART_WORD[ch]}` : ''
-    if (t.kind === 'source') return `L${t.layer + 1}·${t.slot} ${t.input}${part}`
-    if (t.kind === 'bgSource') return `BG ${t.input}${part}`
-    if (t.kind === 'meta') {
-      const name = composition.metaKnobs[t.knob]?.name ?? `Knob ${t.knob + 1}`
-      return `MACRO K${t.knob + 1} (${name})`
-    }
-    if (t.kind === 'sonify') return t.param.startsWith('space.') ? `SPACE ${t.param.slice(6).replace('.', ' ')}` : `SONIFY ${t.param}`
-    if (t.kind === 'layer') {
-      // `vary` is a trigger, so it is named as one : the row fires on a
-      // crossing rather than holding a value, which the panel should not hide.
-      const f = t.field === 'mix' ? 'A/B mix' : t.field === 'harmony' ? 'A/B hue' : t.field === 'vary' ? 'vary ▸' : t.field
-      return `L${t.layer + 1} ${f}`
-    }
-    if (t.kind === 'bg') return `BG ${t.field === 'depth' ? 'shadow' : t.field}`
-    if (t.kind === 'dome') return `Dome ${DOME_MOD_RANGE[t.field].label}`
-    if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
-    if (t.kind === 'world') return 'World amount'
-    if (t.kind === 'au') return auLabel(t)
-    if (t.kind === 'light') {
-      const rig = useStore.getState().lightRig
-      if (t.fixture.startsWith('grp:')) {
-        const g = rig.groups.find((x) => `grp:${x.id}` === t.fixture)
-        return `${g ? g.name : 'Group'} fader`
-      }
-      const f = t.fixture ? rig.fixtures.find((x) => x.id === t.fixture) : null
-      return `${t.fixture ? (f ? f.name : 'Light') : 'Lights'} ${LIGHT_MOD_RANGE[t.field].label}`
-    }
-    const inst =
-      t.scope.kind === 'master'
-        ? composition.master.find((f) => f.id === t.instId)
-        : t.scope.kind === 'background'
-          ? composition.background?.fx.find((f) => f.id === t.instId)
-          : (composition.layers[t.scope.layer] ? layerRackOf(composition.layers[t.scope.layer], t.scope.kind) : undefined)?.find((f) => f.id === t.instId)
-    const fxName = inst?.shaderId ? (SHADER_BY_ID[inst.shaderId]?.name ?? '?') : '?'
-    const where =
-      t.scope.kind === 'master' ? 'MST' : t.scope.kind === 'background' ? 'BG' : `L${t.scope.layer + 1}${t.scope.kind === 'loop' ? ' loop' : ''}`
-    const inputLabel = t.input === FX_OPACITY_INPUT ? 'opacity' : t.input
-    return `${where}·${fxName} ${inputLabel}${part}`
-  }
 
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">

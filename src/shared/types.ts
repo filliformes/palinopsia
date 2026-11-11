@@ -1066,6 +1066,11 @@ export interface MetaKnobState {
   curve: ModCurve // shapes the 0..1 before mapping to each target's range
   midiCc: { channel: number; number: number } | null
   destinations: ModTarget[] // max META_MAX_DESTS
+  // The knob's range (0..1 of each destination's own range) : the curved
+  // position lands between min and max, so a full turn sweeps only that part.
+  // min above max turns it the other way. Absent : 0 and 1 (older sessions).
+  min?: number
+  max?: number
 }
 
 // The Background slab : the stable ground UNDER the four layers. One source

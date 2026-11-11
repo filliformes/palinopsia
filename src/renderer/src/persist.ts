@@ -223,6 +223,7 @@ const sameDests = (a: readonly ModTarget[], b: readonly ModTarget[]): boolean =>
 const sameKnob = (a: MetaKnobState, b: MetaKnobState): boolean =>
   a === b ||
   (a.name === b.name && a.value === b.value && a.smoothMs === b.smoothMs && a.curve === b.curve &&
+    (a.min ?? 0) === (b.min ?? 0) && (a.max ?? 1) === (b.max ?? 1) &&
     (a.midiCc?.channel ?? -1) === (b.midiCc?.channel ?? -1) && (a.midiCc?.number ?? -1) === (b.midiCc?.number ?? -1) &&
     sameDests(a.destinations, b.destinations))
 

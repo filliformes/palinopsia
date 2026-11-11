@@ -923,10 +923,24 @@ Macro knob picked in `Ctrl+K` shows the row. `Ctrl+K` → **Macro knobs** toggle
 A flat bank of 16 macro knobs. Each tile is a 270° dial (drag vertically, Shift =
 fine, double-click resets), with a destination count, a rename, an output **curve**
 (linear / log / exp / eases / sigmoid / smoothstep / db / gamma / step / invert), a
-**CC** MIDI-learn, and an **M** button binding one modulator to the knob. In the gap at
-the bottom of the dial, what the knob sends **now** through its curve (`0.00` to `1.00`),
-live as you drag, as it glides, from MIDI or a modulator (in the modulated color then). Each knob
-can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
+**range**, a **CC** MIDI-learn, and an **M** button binding one modulator to the knob.
+In the gap at the bottom of the dial, what the knob sends **now** through its curve and
+its range (`0.00` to `1.00`), live as you drag, as it glides, from MIDI or a modulator
+(in the modulated color then). Each knob can drive up to 8 destinations.
+
+The **range** (under the curve : the order the value takes) is where a full turn of the
+knob lands, as a part of each destination's own range : min `0.25`, max `0.6` and the
+knob sweeps its destinations from a quarter to six tenths, the whole turn for just that
+part. Drag either end of the bar, or type the two numbers under it; double-click the bar
+for the full range again. Min above max turns the knob the other way. The destinations
+follow at once, whether the knob is at rest or moving, and the range travels with the
+session, its scenes and morphs (it glides with them). OSC : `/opsia/macro/n/min` and
+`/max`.
+
+**The capsules** along the Macro title bar show every destination in use, knob by
+knob (`K3 L1·A freq`), like the Modulation row's chips : what the knobs drive is in view
+even with the row folded. Point at a capsule and its knob lights up; **×** takes that
+destination off its knob. Under the name, how many destinations the knobs hold. `⚄` shuffles knob positions while keeping bindings.
 **Randomize Macro Knobs** deals a fresh bank : one to four destinations per knob that
 no other knob holds, never a seed, a flip or the pinned Vibe and Finalizer, each knob
 set where every one of its destinations sits inside its curated range (a knob spans
