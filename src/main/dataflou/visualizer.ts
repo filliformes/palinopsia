@@ -8,6 +8,7 @@
 // page can rewire the whole mesh.
 
 import http from 'http'
+import { networkInterfaces } from 'os'
 import { existsSync, readFile } from 'fs'
 import { extname, join, normalize, resolve, sep } from 'path'
 import { app, shell } from 'electron'
@@ -45,6 +46,32 @@ let timer: ReturnType<typeof setTimeout> | null = null
 let perf = false
 let nodeOf: () => DataflouNode | null = () => null
 let onClients: (n: number) => void = () => {}
+let onUniverse: (name: string) => void = () => {}
+
+/** This computer's IPv4 addresses, LAN first (no loopback, link-local or virtual
+ *  bridges), as the reference's status bar shows them. */
+function hostIps(): string[] {
+  const virt = /^(docker|veth|br-|virbr|vethernet|vmware|virtualbox|zerotier|tailscale)/i
+  const out: string[] = []
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    if (virt.test(name)) continue
+    for (const a of list ?? []) {
+      if (a.family !== 'IPv4' || a.internal || a.address.startsWith('169.254.')) continue
+      if (!out.includes(a.address)) out.push(a.address)
+    }
+  }
+  const lan = nodeOf()?.address
+  if (lan && out.includes(lan)) out.sort((a, b) => (a === lan ? -1 : b === lan ? 1 : 0))
+  return out
+}
+
+/** A universe name as the core takes it : 1 to 32 characters, none of / \ : * ? " < > | */
+const validUniverse = (s: string): boolean => s.length >= 1 && s.length <= 32 && !/[/\\:*?"<>|]/.test(s)
+
+/** The node serving the page applied a cue (from anyone), or its status changed. */
+export function visualizerScene(op: string, slot: number, state: string, skipped: number): void {
+  broadcast({ type: 'scene', op, slot, state, skipped })
+}
 
 const clients = (): WebSocket[] => (wss ? [...wss.clients].filter((c) => c.readyState === WebSocket.OPEN) : [])
 
@@ -60,7 +87,9 @@ function snapshot(): string {
     nodes: node ? node.visNodes() : [],
     clients: clients().length,
     core_version: '8 (Palinopsia)',
-    perf_mode: perf
+    perf_mode: perf,
+    ...(node ? { universe: node.universeName() } : {}),
+    host_ips: hostIps()
   })
 }
 
@@ -146,6 +175,26 @@ function onMessage(ws: WebSocket, raw: string): void {
       broadcast({ type: 'perf_mode', enabled: perf })
       countChanged()
       return
+    case 'scene': {
+      // cue the universe : every node applies its own slot (recall) or saves its
+      // own connections in it (store); the outcome comes back as a 'scene' message
+      const slot = typeof m.slot === 'number' && Number.isInteger(m.slot) ? m.slot : 0
+      const ok = node && slot >= 1 && slot <= 255 && (m.op === 'recall' ? node.sceneRecall(slot) : m.op === 'store' ? node.sceneStore(slot) : false)
+      if (!ok) toast(node ? 'That scene slot is not there (1 to 16)' : 'Palinopsia is not on the mesh')
+      return
+    }
+    case 'set_universe': {
+      // move the node to another universe : Palinopsia changes it in its own
+      // settings (the Connect tab shows it), the node starts again there
+      const name = str('universe').trim()
+      if (!validUniverse(name)) {
+        toast('Invalid universe name: 1-32 characters, none of / \\ : * ? " < > |')
+        return
+      }
+      if (name !== node?.universeName()) onUniverse(name)
+      broadcast({ type: 'universe', universe: name })
+      return
+    }
     case 'update_param':
     case 'add_param':
     case 'delete_param':
@@ -173,9 +222,10 @@ async function start(): Promise<void> {
 
 /** Open the page in the browser (starting its server the first time); `open`
  *  false only starts it and gives its address. */
-export async function openVisualizer(getNode: () => DataflouNode | null, clientsChanged: (n: number) => void, open = true): Promise<{ ok: boolean; url?: string; error?: string }> {
+export async function openVisualizer(getNode: () => DataflouNode | null, clientsChanged: (n: number) => void, open = true, universeWanted?: (name: string) => void): Promise<{ ok: boolean; url?: string; error?: string }> {
   nodeOf = getNode
   onClients = clientsChanged
+  if (universeWanted) onUniverse = universeWanted
   if (!visualizerAvailable()) return { ok: false, error: 'This build of Palinopsia does not carry the mesh visualizer' }
   try {
     if (!server) await start()

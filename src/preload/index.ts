@@ -102,6 +102,11 @@ const api: ExposedApi = {
     ipcRenderer.on('dataflou:in', h)
     return () => ipcRenderer.off('dataflou:in', h)
   },
+  onDataflouUniverse: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, name: string): void => cb(name)
+    ipcRenderer.on('dataflou:universe', h)
+    return () => ipcRenderer.off('dataflou:universe', h)
+  },
 
   // ── Ableton Link ─────────────────────────────────────────────────
   linkConfigure: (cfg) => ipcRenderer.invoke('link:configure', cfg),

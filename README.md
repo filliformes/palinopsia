@@ -4020,6 +4020,22 @@ tab has the whole setup :
   `THIRD_PARTY_NOTICES.md`); `npm run build:visualizer` rebuilds it from a dataflou checkout
   beside this repo (or give the path to its `web/` folder). Its editor panel needs
   dataflou's sibling Atelier project; without it the page runs without that panel.
+  The page's status bar shows this computer's address and the universe : picking another
+  universe there moves Palinopsia's node to it (the Connect tab follows). Its video inside
+  the ring needs dataflou's own NDI bridge (`ndi-pont`), not part of Palinopsia.
+
+**Scenes** (dataflou's own, not Palinopsia's scenes) : a scene is a state of the mesh's
+**connections**, recalled by a number, like a MIDI program change. Each node keeps its own
+part, its incoming connections, in 16 numbered slots; the universe shares only the cue.
+**store n** (from any node : the visualizer's **scenes** panel, a Max patch, another
+Palinopsia) makes every node online save its own connections in slot n; **recall n** makes
+every node apply its slot n (it removes the connections the slot lacks, then makes the
+ones it has). A node away during a recall catches up when it comes back; a node without
+slot n keeps its connections (**missing**); connections changed by hand after a recall
+read **modified**; a node that restarts in the same scene keeps its hand changes. Values
+are not in scenes (Palinopsia's own scenes and presets keep those). Palinopsia's two
+nodes (the main one and `-session`) each keep their own slots, per universe, beside the
+bindings in the app's `dataflou` folder.
 
 **When a node drops out and comes back** (a computer asleep, a cable pulled, the Wi-Fi
 gone for a moment), Palinopsia calls it back by itself : every node it lost without a

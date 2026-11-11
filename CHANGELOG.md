@@ -372,6 +372,29 @@ that CI builds into cross-platform releases.
   a modulated knob is left to its modulator). Sanitized on load, compared by the
   persistence gate, glided by morphs. OSC `/opsia/macro/{k}/min|max` (and in OSCQuery).
   Two more lines in the Macro row.
+- **dataflou : scenes, and the visualizer of 11-11** (Vincent : "integrate the new
+  dataflou packages (from the recently pulled repo) into a new version of Palinopsia").
+  The dataflou core (Alexandre Burton, 518c67f) added **scenes** : sets of connections
+  each node keeps for itself in 16 slots, recalled or stored by a cue the universe shares
+  (Lamport counter, then the CRC32 of the sender's sku, so concurrent cues converge),
+  relayed once by each node, carried by HELLO and DIGEST for late joiners, a node's
+  status (none / applied / modified / missing, its slots, skipped) in its DECLARE.
+  Palinopsia's TypeScript node now speaks it (`protocol.ts` : `scene` [slot, counter,
+  origin] on HELLO / DIGEST, `scene_status` on DECLARE, the SCENE message, as strict as
+  the core's decoder; `node.ts` : load / store / apply / merge, a restart in the same cue
+  does not re-apply, hand edits after a recall read modified), both nodes, slots per
+  universe in `dataflou/scenes-<universe>[-session].json`. The visualizer page rebuilt
+  from dataflou's web/ at 518c67f (scenes panel, universe selector, host address,
+  ip:port, undo / redo, NDI video through dataflou's own bridge); Palinopsia's server
+  answers what it now asks : `universe`, `host_ips`, each node's `address` / `port` /
+  `scene` in the snapshot, the `scene` message both ways, `set_universe` (the renderer
+  keeps the setting, so it changes it there and reconfigures). Tested : 21 checks
+  across three Palinopsia nodes (stores and recalls from both sides, hand edits, a late
+  joiner, a restart), the page's own scenes panel and universe switch on the test
+  copy. The reference C++ node at 518c67f does not run on this Windows PC (its Release
+  build aborts at start with 0xc0000409, a stack-buffer check; its Debug build hangs
+  before listening), so the cross-check against C++ is by code : an older core
+  ignores the SCENE message and the new keys and keeps the connection.
 
 ### Fixed
 

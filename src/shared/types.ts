@@ -1646,6 +1646,8 @@ export interface ExposedApi {
   dataflouForget: (sku: string) => Promise<boolean>
   onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
   onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
+  /** The mesh visualizer moved the node to another universe (the setting is ours to keep). */
+  onDataflouUniverse: (cb: (name: string) => void) => () => void
   // Ableton Link (src/main/link.ts)
   linkConfigure: (cfg: Partial<LinkConfig>) => Promise<LinkState>
   /** The state without configuring anything : at startup, is Link in this build? */

@@ -16,7 +16,8 @@ import { join } from 'path'
 import { DataflouNode } from './node'
 import { primaryIPv4 } from './mdns'
 import { encodeDeclare } from './protocol'
-import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged } from './visualizer'
+import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged, visualizerScene } from './visualizer'
+import type { SceneFile } from './node'
 import {
   DF_DECLARE_MAX, DF_SESSION_GROUPS, dfSessionLabel, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue
 } from '@shared/dataflou'
@@ -67,6 +68,27 @@ function sessionSku(): string {
 }
 
 const subsFile = (universe: string, which = ''): string => join(dir(), `bindings-${universe.replace(/[^\w.-]+/g, '_')}${which}.json`)
+
+// Scenes : each node's slots and cue state, per universe (changing universe
+// changes scenes, as on the reference).
+const scenesFile = (universe: string, which = ''): string => join(dir(), `scenes-${universe.replace(/[^\w.-]+/g, '_')}${which}.json`)
+
+function loadScenes(universe: string, which = ''): SceneFile | null {
+  try {
+    const j = JSON.parse(readFileSync(scenesFile(universe, which), 'utf8')) as SceneFile
+    return j && j.v === 1 ? j : null
+  } catch {
+    return null // none yet
+  }
+}
+
+function saveScenesTo(universe: string, which: string, s: SceneFile): void {
+  try {
+    writeFileSync(scenesFile(universe, which), JSON.stringify(s))
+  } catch (e) {
+    log('warn', `[dataflou] could not save the scenes : ${(e as Error).message}`)
+  }
+}
 
 function loadSubs(universe: string, which = ''): Record<string, DfSub[]> {
   try {
@@ -167,7 +189,7 @@ function syncCompanion(): Promise<void> {
     const universe = config.universe
     const label = dfSessionLabel(config.label)
     const n = new DataflouNode(
-      { sku: sessionSku(), label, universe, product: 'Palinopsia', version: 1, params: tree2(), subs: loadSubs(universe, '-session') },
+      { sku: sessionSku(), label, universe, product: 'Palinopsia', version: 1, params: tree2(), subs: loadSubs(universe, '-session'), scenes: loadScenes(universe, '-session') },
       {
         log: (m) => console.log(`[dataflou:session] ${m}`),
         onValues: (vs) => {
@@ -176,7 +198,8 @@ function syncCompanion(): Promise<void> {
         onChange: () => {
           statusDirty = true
         },
-        saveSubs: (subs) => saveSubsTo(universe, '-session', subs)
+        saveSubs: (subs) => saveSubsTo(universe, '-session', subs),
+        saveScenes: (s) => saveScenesTo(universe, '-session', s)
       }
     )
     try {
@@ -235,7 +258,7 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
   lastError = null
   if (want.enabled) {
     const n = new DataflouNode(
-      { sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe) },
+      { sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe), scenes: loadScenes(universe) },
       {
         log: (m) => console.log(`[dataflou] ${m}`),
         onValues: (vs) => {
@@ -244,7 +267,13 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
         onChange: () => {
           statusDirty = true
         },
-        saveSubs: (subs) => saveSubsTo(universe, '', subs)
+        saveSubs: (subs) => saveSubsTo(universe, '', subs),
+        saveScenes: (s) => saveScenesTo(universe, '', s),
+        // the page this node serves hears every cue it applies
+        onScene: (op, slot, st) => {
+          log('info', `[dataflou] scene ${op} ${slot} : ${st.state}${st.skipped ? `, ${st.skipped} skipped` : ''}`)
+          visualizerScene(op, slot, st.state, st.skipped)
+        }
       }
     )
     try {
@@ -277,7 +306,10 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
         if (node) node.visualizerClients = n
         statusDirty = true
       },
-      open !== false
+      open !== false,
+      // the page moves the node to another universe : the setting is the
+      // renderer's (it keeps it), so it changes it there and reconfigures
+      (name) => win()?.webContents.send('dataflou:universe', name)
     )
   )
   // The Body rule picker's actions (sent when they change : a scene, a rule, an

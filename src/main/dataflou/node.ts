@@ -24,7 +24,8 @@ import * as net from 'net'
 import * as dgram from 'dgram'
 import { DataflouMdns, primaryIPv4, type FoundService } from './mdns'
 import {
-  decodeMessage, encodeDeclare, encodeDigest, encodeFlush, encodeHello, encodeLeave, encodeSetValue,
+  decodeMessage, encodeDeclare, encodeDigest, encodeFlush, encodeHello, encodeLeave, encodeScene, encodeSetValue,
+  NO_CUE, NO_SCENE_STATUS, newerStamp, type SceneCue, type SceneStamp, type SceneState, type SceneStatus,
   encodeStreamRequest, encodeStreamStop, encodeSubAnnounce, encodeSubRequest, frame, type DfIdentity, type DfMsg
 } from './protocol'
 import { crc32Sku, decodeStreamPacket, encodeStreamPacket, type StreamEntry } from './stream'
@@ -68,6 +69,9 @@ export interface VisNode {
   online: boolean
   is_local: boolean
   state: string
+  address?: string // where this host reaches it (absent : no direct link)
+  port?: number // its mesh (TCP) port
+  scene: { current: number; state: SceneState; slots: number[]; skipped: number }
   params: VisGroup
 }
 
@@ -124,6 +128,21 @@ interface WorldNode {
   byPath: Map<string, DfParam>
   subs: Map<string, DfSub[]> // dest path → its sources
   address: string
+  scene: SceneStatus // what it declares about its scenes (ours : this.sceneStatus)
+}
+
+/** Scenes (the core's docs/scenes.md) : 16 slots, each our own incoming
+ *  connections (dest path, source sku, source path); the cue state beside them.
+ *  One file per universe and node. */
+export const MAX_SCENES = 16
+export interface SceneFile {
+  v: 1
+  cue: SceneCue
+  applied: SceneStamp
+  state: SceneState
+  skipped: number
+  clock: number
+  slots: Record<string, Array<[string, string, string]>>
 }
 
 interface StreamTarget {
@@ -148,6 +167,11 @@ export interface NodeHost {
   onChange(): void
   /** Persist our own bindings (local dest path → sources). */
   saveSubs(subs: Record<string, DfSub[]>): void
+  /** Persist our scenes (the slots and the cue state). */
+  saveScenes?(s: SceneFile): void
+  /** A cue was applied (recall), our connections saved in a slot (store), or our
+   *  status changed by itself (status : connections edited by hand). */
+  onScene?(op: 'recall' | 'store' | 'status', slot: number, st: SceneStatus): void
 }
 
 export interface NodeConfig {
@@ -158,6 +182,7 @@ export interface NodeConfig {
   version: number
   params: DfParam[]
   subs: Record<string, DfSub[]>
+  scenes?: SceneFile | null
 }
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -211,6 +236,15 @@ export class DataflouNode {
   private tx = 0
   private rxPerSec = 0
   private txPerSec = 0
+  // scenes : the universe's cue as we know it, the last one we applied, our
+  // status, the Lamport clock, the newest store per slot, the slots themselves
+  private sceneCue: SceneCue = NO_CUE
+  private sceneApplied: SceneStamp = { counter: 0, origin: 0 }
+  private sceneStatus: SceneStatus = NO_SCENE_STATUS
+  private sceneClock = 0
+  private sceneStored: SceneStamp[] = Array.from({ length: MAX_SCENES }, () => ({ counter: 0, origin: 0 }))
+  private sceneSlots = new Map<number, Array<[string, string, string]>>()
+  private applyingScene = false
 
   constructor(cfg: NodeConfig, private host: NodeHost) {
     this.identity = { sku: cfg.sku, label: cfg.label, product: cfg.product, version: cfg.version, state: 'active' }
@@ -220,6 +254,7 @@ export class DataflouNode {
     this.savedSubs = cfg.subs ?? {}
     this.restoreSubs()
     this.skuHash = crc32Sku(cfg.sku)
+    this.loadScenes(cfg.scenes ?? null)
     this.declSize = this.declareBytes()
   }
 
@@ -257,7 +292,7 @@ export class DataflouNode {
     if (this.running) return
     this.world.set(this.identity.sku, {
       identity: this.identity, declVersion: this.declVersion, local: true, online: true, lastSeen: Date.now(),
-      params: this.params, byPath: this.byPath, subs: this.subs, address: '127.0.0.1'
+      params: this.params, byPath: this.byPath, subs: this.subs, address: '127.0.0.1', scene: this.sceneStatus
     })
     // TCP on an ephemeral port, UDP on that port + 1 (dataflou's convention) :
     // when + 1 is taken, try another TCP port.
@@ -301,7 +336,7 @@ export class DataflouNode {
       this.reconnect(now)
       if (now - lastDigest >= DIGEST_MS) {
         lastDigest = now
-        for (const p of this.peers) if (p.helloReceived) this.send(p, encodeDigest(++this.seq, this.identity.sku, this.versions()))
+        for (const p of this.peers) if (p.helloReceived) this.send(p, encodeDigest(++this.seq, this.identity.sku, this.versions(), this.sceneCue))
       }
       if (now - lastKeepalive >= KEEPALIVE_MS) {
         lastKeepalive = now
@@ -569,16 +604,16 @@ export class DataflouNode {
   private sendHello(peer: Peer): void {
     if (peer.helloSent) return
     peer.helloSent = true
-    this.send(peer, encodeHello(++this.seq, this.identity.sku, this.identity, this.versions(), this.tcpPort))
+    this.send(peer, encodeHello(++this.seq, this.identity.sku, this.identity, this.versions(), this.tcpPort, this.sceneCue))
   }
 
   private sendDeclare(peer: Peer, w: WorldNode): void {
-    this.send(peer, encodeDeclare(++this.seq, this.identity.sku, w.identity.sku, w.declVersion, w.identity, w.params))
+    this.send(peer, encodeDeclare(++this.seq, this.identity.sku, w.identity.sku, w.declVersion, w.identity, w.params, w.local ? this.sceneStatus : w.scene))
   }
 
   /** Our own DECLARE size (the tree must stay small for microcontroller nodes). */
   declareBytes(params: DfParam[] = this.params): number {
-    return encodeDeclare(0, this.identity.sku, this.identity.sku, this.declVersion, this.identity, params).length
+    return encodeDeclare(0, this.identity.sku, this.identity.sku, this.declVersion, this.identity, params, this.sceneStatus).length
   }
 
   private syncMissing(peer: Peer, theirs: Map<string, number>): void {
@@ -600,7 +635,7 @@ export class DataflouNode {
         this.pending.delete(m.from)
         let w = this.world.get(m.from)
         if (!w) {
-          w = { identity: m.identity, declVersion: 0, local: false, online: true, lastSeen: now, params: [], byPath: new Map(), subs: new Map(), address: peer.address }
+          w = { identity: m.identity, declVersion: 0, local: false, online: true, lastSeen: now, params: [], byPath: new Map(), subs: new Map(), address: peer.address, scene: NO_SCENE_STATUS }
           this.world.set(m.from, w)
         }
         if (!w.local) {
@@ -617,13 +652,15 @@ export class DataflouNode {
         for (const [dest, list] of this.subs) for (const s of list) if (s.sku === m.from) this.sendStreamRequest(s, dest)
         this.host.log(`hello from ${m.identity.label} (${m.from})`)
         this.host.onChange()
+        // a recall made while we were away : apply it now
+        this.mergeCue(m.scene)
         break
       }
       case 'DECLARE': {
         if (m.about === this.identity.sku) break // our own tree, relayed back
         let w = this.world.get(m.about)
         if (!w) {
-          w = { identity: m.identity, declVersion: 0, local: false, online: false, lastSeen: now, params: [], byPath: new Map(), subs: new Map(), address: '' }
+          w = { identity: m.identity, declVersion: 0, local: false, online: false, lastSeen: now, params: [], byPath: new Map(), subs: new Map(), address: '', scene: NO_SCENE_STATUS }
           this.world.set(m.about, w)
         }
         if (m.declVersion > w.declVersion) {
@@ -631,6 +668,7 @@ export class DataflouNode {
           w.declVersion = m.declVersion
           w.params = m.params
           w.byPath = new Map(m.params.map((p) => [p.path, p]))
+          w.scene = m.sceneStatus
           if (m.about === m.from) {
             w.online = true
             w.address = peer.address
@@ -648,6 +686,10 @@ export class DataflouNode {
       }
       case 'DIGEST':
         this.syncMissing(peer, m.versions)
+        this.mergeCue(m.scene) // anti-entropy : a missed cue arrives within a digest
+        break
+      case 'SCENE':
+        this.handleScene(m.op, m.slot, { counter: m.counter, origin: m.origin }, peer)
         break
       case 'FLUSH':
         if (m.target !== this.identity.sku && this.world.delete(m.target)) this.host.onChange()
@@ -747,6 +789,7 @@ export class DataflouNode {
     this.announce(true, localPath, src)
     this.persist()
     this.host.onChange()
+    this.sceneTouched()
     return true
   }
 
@@ -765,6 +808,7 @@ export class DataflouNode {
     this.announce(false, localPath, { sku: srcSku, path: srcPath })
     this.persist()
     this.host.onChange()
+    this.sceneTouched()
     return true
   }
 
@@ -793,6 +837,196 @@ export class DataflouNode {
     const payload = encodeFlush(++this.seq, this.identity.sku, sku)
     for (const p of this.peers) if (p.helloReceived) this.send(p, payload)
     this.host.onChange()
+  }
+
+  // ── scenes ──────────────────────────────────────────────────────────────
+  // A scene is a state of the mesh's connections, recalled by a number. Each node
+  // keeps its own part (its incoming connections) in slot n and applies it when
+  // the universe cues n; the universe shares only the cue (MIDI program change :
+  // each synth recalls its own patch). See the dataflou core's docs/scenes.md.
+
+  private loadScenes(f: SceneFile | null): void {
+    this.sceneSlots.clear()
+    if (f && f.v === 1) {
+      const n = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x >>> 0 : 0)
+      this.sceneCue = { slot: n(f.cue?.slot) & 0xff, counter: n(f.cue?.counter), origin: n(f.cue?.origin) }
+      this.sceneApplied = { counter: n(f.applied?.counter), origin: n(f.applied?.origin) }
+      this.sceneClock = n(f.clock)
+      for (const [k, list] of Object.entries(f.slots ?? {})) {
+        const slot = Number(k)
+        if (!(slot >= 1 && slot <= MAX_SCENES) || !Array.isArray(list)) continue
+        this.sceneSlots.set(slot, list.filter((l) => Array.isArray(l) && l.length === 3 && l.every((x) => typeof x === 'string')))
+      }
+      const state: SceneState = (['none', 'applied', 'modified', 'missing'] as const).includes(f.state) ? f.state : 'none'
+      this.sceneStatus = { current: this.sceneCue.slot, state, slots: this.slotMask(), skipped: Math.min(255, n(f.skipped)) }
+    } else {
+      this.sceneCue = NO_CUE
+      this.sceneApplied = { counter: 0, origin: 0 }
+      this.sceneClock = 0
+      this.sceneStatus = NO_SCENE_STATUS
+    }
+  }
+
+  private slotMask(): number {
+    let m = 0
+    for (const n of this.sceneSlots.keys()) m |= 1 << (n - 1)
+    return m >>> 0
+  }
+
+  private persistScenes(): void {
+    this.host.saveScenes?.({
+      v: 1, cue: this.sceneCue, applied: this.sceneApplied, state: this.sceneStatus.state, skipped: this.sceneStatus.skipped,
+      clock: this.sceneClock, slots: Object.fromEntries([...this.sceneSlots].map(([k, v]) => [String(k), v]))
+    })
+  }
+
+  /** Our incoming connections now, as a slot holds them. */
+  private currentLinks(): Array<[string, string, string]> {
+    const out: Array<[string, string, string]> = []
+    for (const [dest, list] of this.subs) for (const s of list) out.push([dest, s.sku, s.path])
+    return out
+  }
+
+  private nextStamp(): SceneStamp {
+    this.sceneClock = (this.sceneClock + 1) >>> 0
+    return { counter: this.sceneClock, origin: this.skuHash }
+  }
+
+  /** Cue the universe : every node applies its own slot `slot`. */
+  sceneRecall(slot: number): boolean {
+    if (!(slot >= 1 && slot <= 255)) return false
+    this.handleScene('recall', slot, this.nextStamp(), null)
+    return true
+  }
+
+  /** Cue the universe : every node online saves its own connections in `slot`. */
+  sceneStore(slot: number): boolean {
+    if (!(slot >= 1 && slot <= MAX_SCENES)) return false
+    this.handleScene('store', slot, this.nextStamp(), null)
+    return true
+  }
+
+  sceneInfo(): { cue: SceneCue; status: SceneStatus } {
+    return { cue: this.sceneCue, status: this.sceneStatus }
+  }
+
+  /** A cue from us (from null) or a peer. Each node forwards a cue the first time
+   *  it sees it, so it reaches the whole universe even when the mesh is not fully
+   *  connected; a node that misses it gets it from a digest. */
+  private handleScene(op: 'recall' | 'store', slot: number, stamp: SceneStamp, from: Peer | null): void {
+    if (stamp.counter > this.sceneClock) this.sceneClock = stamp.counter
+    if (op === 'recall') {
+      if (!newerStamp(stamp, this.sceneCue)) return
+      this.host.log(`scene : recall ${slot}`)
+      this.sceneCue = { slot, counter: stamp.counter, origin: stamp.origin }
+      this.sendScene(op, slot, stamp, from)
+      this.applyScene()
+    } else {
+      // slots we cannot hold are neither stored nor forwarded
+      if (!(slot >= 1 && slot <= MAX_SCENES)) return
+      if (!newerStamp(stamp, this.sceneStored[slot - 1])) return
+      this.host.log(`scene : store ${slot}`)
+      this.sceneStored[slot - 1] = stamp
+      this.persistScenes() // (the clock)
+      this.sendScene(op, slot, stamp, from)
+      this.storeScene(slot)
+    }
+  }
+
+  private sendScene(op: 'recall' | 'store', slot: number, stamp: SceneStamp, except: Peer | null): void {
+    const payload = encodeScene(++this.seq, this.identity.sku, op, slot, stamp)
+    for (const p of this.peers) if (p !== except && p.helloReceived) this.send(p, payload)
+  }
+
+  /** The cue a HELLO or a DIGEST carries : a newer one is applied. */
+  private mergeCue(cue: SceneCue): void {
+    if (!cue.counter || !cue.slot) return
+    if (cue.counter > this.sceneClock) this.sceneClock = cue.counter
+    if (!newerStamp(cue, this.sceneCue)) return
+    this.host.log(`scene : catching up with recall ${cue.slot}`)
+    this.sceneCue = cue
+    this.applyScene()
+  }
+
+  /** Make our connections those of our slot of the current cue : remove the ones
+   *  it lacks, then make the ones it has (removing first frees room on a param
+   *  that changes source). One whose param of ours is gone is skipped; one whose
+   *  source is gone is made anyway, and resumes if it comes back. */
+  private applyScene(): void {
+    const slot = this.sceneCue.slot
+    this.sceneApplied = { counter: this.sceneCue.counter, origin: this.sceneCue.origin }
+    const st: SceneStatus = { ...this.sceneStatus, current: slot, skipped: 0 }
+    const want = this.sceneSlots.get(slot)
+    if (!want) {
+      this.host.log(`scene ${slot} : no slot here, connections kept`)
+      st.state = 'missing'
+      this.persistScenes()
+      this.setSceneStatus(st, 'recall', slot)
+      return
+    }
+    const key = (l: [string, string, string]): string => l.join('\n')
+    const have = this.currentLinks()
+    const wantKeys = new Set(want.map(key))
+    const haveKeys = new Set(have.map(key))
+    let removed = 0, added = 0, skipped = 0
+    this.applyingScene = true
+    try {
+      for (const l of have) if (!wantKeys.has(key(l)) && this.unsubscribe(l[0], l[1], l[2])) removed++
+      for (const l of want) {
+        if (haveKeys.has(key(l))) continue
+        if (this.subscribe(l[0], l[1], l[2])) added++
+        else skipped++
+      }
+    } finally {
+      this.applyingScene = false
+    }
+    this.host.log(`scene ${slot} applied : -${removed} +${added}, ${skipped} skipped`)
+    st.state = 'applied'
+    st.skipped = Math.min(255, skipped)
+    this.setSceneStatus(st, 'recall', slot)
+    this.persistScenes()
+  }
+
+  private storeScene(slot: number): void {
+    const links = this.currentLinks()
+    this.sceneSlots.set(slot, links)
+    this.host.log(`scene ${slot} stored : ${links.length} connections`)
+    const st: SceneStatus = { ...this.sceneStatus, slots: this.slotMask() }
+    // our connections are now our slot of the current scene
+    if (slot === this.sceneCue.slot) {
+      st.state = 'applied'
+      st.skipped = 0
+    }
+    this.setSceneStatus(st, 'store', slot)
+    this.persistScenes()
+  }
+
+  /** A connection made or removed by hand after a recall : modified. */
+  private sceneTouched(): void {
+    if (this.applyingScene || this.sceneStatus.state !== 'applied') return
+    this.setSceneStatus({ ...this.sceneStatus, state: 'modified' }, 'status', this.sceneStatus.current)
+    this.persistScenes()
+  }
+
+  private setSceneStatus(st: SceneStatus, op: 'recall' | 'store' | 'status', slot: number): void {
+    const s = this.sceneStatus
+    const changed = st.current !== s.current || st.state !== s.state || st.slots !== s.slots || st.skipped !== s.skipped
+    this.sceneStatus = st
+    const me = this.world.get(this.identity.sku)
+    if (me) me.scene = st
+    if (changed) this.redeclare() // the status travels in our declaration
+    if (changed || op !== 'status') this.host.onScene?.(op, slot, st)
+    this.host.onChange()
+  }
+
+  /** A newer declaration of the same tree (our scene status changed). */
+  private redeclare(): void {
+    this.declVersion++
+    this.declSize = this.declareBytes()
+    const me = this.world.get(this.identity.sku)
+    if (!me) return
+    me.declVersion = this.declVersion
+    if (this.running) for (const p of this.peers) if (p.helloReceived) this.sendDeclare(p, me)
   }
 
   // ── data plane ──────────────────────────────────────────────────────────
@@ -868,6 +1102,10 @@ export class DataflouNode {
 
   // ── the visualizer ────────────────────────────────────────────────
 
+  universeName(): string {
+    return this.universe
+  }
+
   sku(): string {
     return this.identity.sku
   }
@@ -929,9 +1167,21 @@ export class DataflouNode {
     for (const [sku, w] of this.world) {
       const valueOf = (path: string): DfValue | null =>
         w.local ? this.values.get(path) ?? this.lastIn.get(path) ?? null : this.remoteVals.get(`${sku}\n${path}`) ?? null
+      const st = w.local ? this.sceneStatus : w.scene
+      const slots: number[] = []
+      for (let n = 1; n <= 32; n++) if (st.slots & (1 << (n - 1))) slots.push(n)
+      // where we reach it : ourselves at our LAN address, a peer at its link (one
+      // on this machine reaches us over loopback : show the LAN address)
+      const peer = w.local ? null : this.peerOf(sku)
+      let address = w.local ? this.address : peer ? peer.address : ''
+      if (/^127\.|^::1$/.test(address) && this.address) address = this.address
+      const port = w.local ? this.tcpPort : peer ? peer.port : 0
       out.push({
         sku, label: w.identity.label, product: w.identity.product, version: w.identity.version,
-        online: w.local || w.online, is_local: w.local, state: w.identity.state, params: visTree(w.params, valueOf, w.subs)
+        online: w.local || w.online, is_local: w.local, state: w.identity.state,
+        ...(address ? { address } : {}), ...(port ? { port } : {}),
+        scene: { current: st.current, state: st.state, slots, skipped: st.skipped },
+        params: visTree(w.params, valueOf, w.subs)
       })
     }
     return out
