@@ -67,6 +67,7 @@
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
 //   /opsia/sonify/eq/preset                             s name | i n (a saved output EQ, 1-based; 0 / flat)
 //   /opsia/macro/{1..16}                               f 0..1 (drives the Macro knob; the old /opsia/meta/{n} still works)
+//   /opsia/macro/{1..16}/min|max                       f 0..1 (the knob's range : where a full turn lands)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger (at the Transport's intensity)
@@ -632,6 +633,11 @@ function route(address: string, args: Args, host = ''): void {
     case 'meta': {
       const k = parseInt(segs[2], 10) - 1
       if (!(k >= 0 && k < st.composition.metaKnobs.length)) return
+      // its range : /opsia/macro/{n}/min, /max
+      if (segs[3] === 'min' || segs[3] === 'max') {
+        if (Number.isFinite(n)) st.updateMetaKnob(k, { [segs[3]]: clamp01(n) })
+        return
+      }
       setKnobTarget(k, clamp01(n), st.composition.metaKnobs[k]?.smoothMs ?? 10)
       return
     }
@@ -1492,6 +1498,8 @@ function enumerateLeaves(): Leaf[] {
     const named = knob?.name && knob.name !== `Knob ${k}` ? ` : ${knob.name}` : ''
     add(`/opsia/macro/${k}`, 0, 1, knob?.value ?? 0, `Macro knob ${k}${named}`)
     out[out.length - 1].alias = `/opsia/meta/${k}`
+    add(`/opsia/macro/${k}/min`, 0, 1, knob?.min ?? 0, `Macro knob ${k} : the bottom of its range`)
+    add(`/opsia/macro/${k}/max`, 0, 1, knob?.max ?? 1, `Macro knob ${k} : the top of its range`)
   }
   // Sonify (the S page) : the core streamable set. Probe params normalize over
   // the same spans the mod-matrix uses.

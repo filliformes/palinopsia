@@ -357,6 +357,21 @@ that CI builds into cross-platform releases.
   elsewhere on unwired paths show for 10 s. `DataflouNode.io()` (main) counts per path in
   `deliver()` and per stream in the pump, rolled each second; `dataflou:io` IPC, polled at
   10 Hz only while the box is open (folding remembered in `opsia.dfData`).
+- **Macro : destination capsules and a range per knob** (Vincent : "add macro
+  destinations capsules (like on the top of the Modulation tab) to the Macro tab" and
+  "add a min max to the Macro knobs so I can use them to scale the data better"). The
+  Macro title bar carries a capsule per destination, knob by knob (`MacroDests` in
+  `MetaBar.tsx`; the label is the Modulation chips' own, hoisted to
+  `describeModTarget`), with the count under the name; a capsule lights its knob, **×**
+  takes the destination off. Each knob gets a **range** (`MetaKnobState.min` / `max`,
+  optional, 0..1 of each destination's range; min above max turns it the other way) :
+  a bar with two ends to drag and two numbers to type, under the curve. One `knobOut()`
+  (curve, then range) serves every path a knob takes (glides, the settle-time fan-out,
+  a modulator on the knob), so a drag, MIDI, OSC and a modulator land the same. The
+  destinations follow a range change at once (through the knob's own overlay at rest;
+  a modulated knob is left to its modulator). Sanitized on load, compared by the
+  persistence gate, glided by morphs. OSC `/opsia/macro/{k}/min|max` (and in OSCQuery).
+  Two more lines in the Macro row.
 
 ### Fixed
 

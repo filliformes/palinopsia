@@ -16,7 +16,7 @@
 import type { CompositionState, ModTarget } from '@shared/types'
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { withSonifyParam } from './audio/sonify'
-import { shapeCurve, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
+import { knobOut, inputValueFrom01, SONIFY_MOD_DESCS } from './engine/modulation'
 import { colorOf, withPart } from './engine/colorParts'
 import { inputsForShader } from './shaders/isf/inputs'
 import { useStore } from './store'
@@ -210,7 +210,7 @@ function settle(i: number, v01: number, dice = false): void {
   const knob = composition.metaKnobs[i]
   useStore.getState().setMetaValue(i, v01)
   if (!knob) return
-  const shaped = shapeCurve(v01, knob.curve)
+  const shaped = knobOut(knob, v01)
   for (const t of knob.destinations) if (!dice || !isPinnedTarget(t, pins)) applyDest(t, shaped)
 }
 

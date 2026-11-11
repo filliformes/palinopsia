@@ -1295,7 +1295,14 @@ export function normalizeComposition(c: CompositionState): CompositionState {
     // `destinations`) can't leave it undefined.
     metaKnobs: (() => {
       const k = c.metaKnobs ?? []
-      return makeDefaultMetaKnobs().map((d, i) => ({ ...d, ...(k[i] ?? {}) }))
+      // a range outside 0..1 (or not a number) : the full range
+      const r = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined)
+      return makeDefaultMetaKnobs().map((d, i) => {
+        const m = { ...d, ...(k[i] ?? {}) }
+        const min = r(m.min), max = r(m.max)
+        delete m.min; delete m.max
+        return { ...m, ...(min !== undefined && min !== 0 ? { min } : {}), ...(max !== undefined && max !== 1 ? { max } : {}) }
+      })
     })()
   })
 }
