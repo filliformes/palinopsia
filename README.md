@@ -2176,15 +2176,38 @@ it takes its light from, with or without the video in them, tuned to the physica
 with shows, light scenes of their own and a lighting console.
 
 - **Fixtures** : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
-  light : a small RGB spot, a PAR, a wash), **+ matrix** (a grid of pixels over a
-  rectangle). **Shift or Ctrl + click** (on the map or in the list) picks several : drag
-  one and they all move, the arrows and Delete act on all of them, and a look, a
-  tuning, a profile or a show goes to all of them (the inspector then says how many). Each is drawn on the **map** over the picture : drag it and it takes its
-  pixels from another part of the image, drag the ends of a bar or the corners of a matrix
-  to reshape it (Shift keeps a bar level or upright), the arrows nudge it (Shift :
-  farther), Delete removes it, Ctrl+D duplicates it. Each pixel shows, live, the color it
-  sends. Under the fixtures : the picture the selected one reads (its layer, or the
-  master), the master always, or only the room (a grid).
+  light : a small RGB spot, a PAR, a wash), **+ ring** (pixels around a circle),
+  **+ matrix** (a grid of pixels over a rectangle). Each is drawn on the **map** over the
+  picture : drag it and it takes its pixels from another part of the image, drag the
+  ends of a bar or the corners of a matrix to reshape it (Shift keeps a bar's end level
+  or upright), the arrows nudge it (Shift : farther), Delete removes it, Ctrl+D
+  duplicates it. **Double-click a bar to bend it there** (a strip following the
+  architecture : its LEDs stay evenly spaced along the bends), drag a bend to move it,
+  double-click it to take it away. A ring : drag it by its circle, its handle sets the
+  radius and where its first LED is. Each pixel shows, live, the color it sends, and a
+  dot marks each light's first LED (where the wire comes in).
+  - **Picking several** : **Shift or Ctrl + click** (on the map or in the list), or drag
+    a **rubber band** around them on an empty part of the map (Shift or Ctrl : added to
+    the picked ones). Drag one and they all move, the arrows and Delete act on all of
+    them, and a look, a tuning, a profile or a show goes to all of them (the inspector
+    then says how many). **Place** (in that inspector) : all **in a row** or **in a
+    column**, **spread across** or **down** evenly between the two outermost, **mirror**
+    left to right or top to bottom (a bar's first LED goes to the other side, as a
+    mirrored rig is wired).
+  - **A row of** N (one light's inspector) : it and its copies spread evenly across the
+    picture (or down), addressed one after the other and picked, ready to be a group.
+  - **Under the lights** : the picture the selected one reads (its layer, or the master),
+    the master always, only the room (a grid), or a **photo** of the room (or a plan of
+    the stage : **photo…**, kept on this computer) to place each light where it really
+    is, with the picture over it at the opacity you set.
+  - **test** : a line sweeps the room, red, then green, blue and white : every light shows
+    whether it is where the map says and whether its colors come in the right order. It
+    ignores the masters and Black.
+  - **patch** (beside **map**) : every universe in use, 512 channels each, every light in
+    its color. Click one to select it, drag it to another channel to readdress it;
+    channels two lights share are red and counted. **address in order** readdresses every
+    light of an output one after the other from channel 1 (one that would cross into the
+    next universe starts it; a long pixel bar flows over, as pixel controllers expect).
 - **Groups** : lights that play together. Pick some, **+ group** (or **make a group** in
   the inspector); click a group to pick its lights again, double-click to rename it,
   **set** to make it the lights picked now. Each group has a **fader** that dims its
@@ -2193,10 +2216,13 @@ with shows, light scenes of their own and a lighting console.
   Learn), in OSC (`/opsia/lights/group/<n or name>`). The groups are this computer's,
   their faders the session's (and the light scenes keep them).
 - **The inspector** (click a fixture) :
-  - **Fixture** : its name, kind, LEDs (or columns × rows, serpentine), reversed, how
-    wide a patch each pixel averages, and **hold to identify** (it goes full white, to
-    find it in the room).
-  - **Patch** : its **output**, **universe** (network outputs) and **address**, and the
+  - **Fixture** : its name, kind, LEDs (a bar's bends, **straighten**; a ring
+    **clockwise** or not), reversed, a matrix's columns × rows and its **wiring** : the
+    corner its **first LED** is in, **rows** or **columns**, **zigzag** or not (the 16
+    ways a panel is wired, its path drawn small), how wide a patch each pixel reads, and
+    **hold to identify** (it goes full white, to find it in the room).
+  - **Patch** : its **output**, **universe** (network outputs) and **address** (with the
+    **DIP** switches that set it, 1 to 9, for a light that has them), and the
     **light** it is : a **profile** that gives its channels in the right order and holds
     the ones it does not use where they do nothing. Built in : pixel strips (RGB, GRB,
     GRBW), LED bars with their own dimmer and strobe before RGB or RGBW pixels, RGB and
@@ -2247,7 +2273,9 @@ with shows, light scenes of their own and a lighting console.
   unplugged and plugged in again or the computer wakes up (every two seconds; **scan**
   looks at once). The fixtures and outputs are this computer's patch : they stay when you
   open another session. The old Output page's light grid comes over once, as a matrix
-  on its own output. Each output has a **delay** (0 to 1000 ms) : the lights answer at
+  on its own output. **find** (Art-Net, sACN, WLED) asks the network who is there (an
+  ArtPoll for Art-Net nodes, most sACN nodes answer it too; mDNS for WLED) : pick one
+  instead of typing its address. Each output has a **delay** (0 to 1000 ms) : the lights answer at
   once and a projector shows the picture two or three frames late, so about 40 ms keeps
   them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
   each frame, so the nodes that know it show all their universes at the same moment.

@@ -108,7 +108,8 @@ class LightRuntime {
       audio: audioBus.feature('level'),
       aspect: st.compW / Math.max(1, st.compH),
       identify: st.lightIdentify,
-      groupLevels: L.groups
+      groupLevels: L.groups,
+      test: st.lightTest !== null ? Math.max(0, now - st.lightTest) / 1000 : null
     })
     this.last = frame
     this.lastAt = now

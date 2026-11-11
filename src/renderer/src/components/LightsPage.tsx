@@ -10,9 +10,11 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent
 import { useStore, modTargetKey } from '../store'
 import type { ModTarget } from '@shared/types'
 import {
+  dipOf,
   EFFECTS,
   fixtureChannels,
   fixturePixels,
+  fixtureSpans,
   LAYOUTS,
   layoutTokens,
   tokenLabel,
@@ -21,7 +23,9 @@ import {
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT,
   SAMPLES,
+  type LightCorner,
   type LightEffect,
+  type LightOutput,
   type LightSample,
   type LightFixture,
   type LightKind,
@@ -32,7 +36,8 @@ import {
   type LightTune
 } from '@shared/lights'
 import { lightRuntime } from '../lights/lightRuntime'
-import { paletteOf } from '../lights/lightEngine'
+import { fixturePoints, matrixCells, paletteOf, stripPath } from '../lights/lightEngine'
+import { middleOf, shifted } from '../lights/lightStore'
 import { readOfl } from '../lights/ofl'
 import { BUILTIN_PROFILES } from '@shared/lightProfiles'
 import { enttec } from '../lights/enttec'
@@ -41,7 +46,7 @@ import { AssignRow } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
-const KIND_LABEL: Record<LightKind, string> = { strip: 'LED bar', spot: 'spot', matrix: 'matrix' }
+const KIND_LABEL: Record<LightKind, string> = { strip: 'LED bar', ring: 'ring', spot: 'spot', matrix: 'matrix' }
 const OUT_LABEL: Record<LightOutputKind, string> = { enttec: 'Enttec USB Pro', artnet: 'Art-Net', sacn: 'sACN', wled: 'WLED' }
 const EFFECT_LABEL: Record<LightEffect, string> = {
   none: 'none', chase: 'chase', wave: 'wave', pulse: 'pulse', sparkle: 'sparkle', audio: 'sound', beat: 'beat'
@@ -195,6 +200,7 @@ function FixtureList(): JSX.Element {
       <div className="flex gap-1">
         <button className={`flex-1 ${btn(false)}`} onClick={() => add('strip')} title="An LED bar : a row of pixels along a line on the picture">+ bar</button>
         <button className={`flex-1 ${btn(false)}`} onClick={() => add('spot')} title="A single light : a small RGB spot, a PAR, a wash">+ spot</button>
+        <button className={`flex-1 ${btn(false)}`} onClick={() => add('ring')} title="An LED ring : pixels around a circle">+ ring</button>
         <button className={`flex-1 ${btn(false)}`} onClick={() => add('matrix')} title="An LED matrix : a grid of pixels over a rectangle of the picture">+ matrix</button>
       </div>
       {rig.fixtures.length === 0 && <p className="font-mono text-[10px] leading-snug text-muted">No fixtures yet. Add a bar, a spot or a matrix, then an output in Outputs.</p>}
@@ -313,6 +319,18 @@ function OutputList(): JSX.Element {
   const add = useStore((s) => s.addLightOutput)
   const update = useStore((s) => s.updateLightOutput)
   const remove = useStore((s) => s.removeLightOutput)
+  const [found, setFound] = useState<Record<string, { busy: boolean; list: Array<{ ip: string; label: string }> } | undefined>>({})
+  const find = async (o: LightOutput): Promise<void> => {
+    setFound((x) => ({ ...x, [o.id]: { busy: true, list: x[o.id]?.list ?? [] } }))
+    let list: Array<{ ip: string; label: string }> = []
+    try {
+      const r = await window.api.lightDiscover()
+      list = o.kind === 'wled'
+        ? r.wled.map((w) => ({ ip: w.ip, label: w.name }))
+        : r.artnet.map((n) => ({ ip: n.ip, label: `${n.name || n.long || 'node'}${n.universes.length ? ` · universe ${n.universes.join(', ')}` : ''}` }))
+    } catch { /* main busy : nothing found */ }
+    setFound((x) => ({ ...x, [o.id]: { busy: false, list } }))
+  }
   const [, tick] = useState(0)
   useEffect(() => {
     const id = window.setInterval(() => tick((n) => n + 1), 700)
@@ -382,15 +400,39 @@ function OutputList(): JSX.Element {
                   <button className={btn(false)} onClick={() => enttec.rescan()} title="Look for the Pro again now">scan</button>
                 </>
               ) : (
-                <input
-                  value={o.host}
-                  placeholder={o.kind === 'sacn' ? 'multicast (or an IP)' : 'IP address'}
-                  onChange={(e) => update(o.id, { host: e.target.value })}
-                  className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-                  title={o.kind === 'sacn' ? 'Empty : multicast to each universe\'s group (239.255.x.y). An IP : sent to that device only.' : 'The device\'s IP address on this network'}
-                />
+                <>
+                  <input
+                    value={o.host}
+                    placeholder={o.kind === 'sacn' ? 'multicast (or an IP)' : 'IP address'}
+                    onChange={(e) => update(o.id, { host: e.target.value })}
+                    className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
+                    title={o.kind === 'sacn' ? 'Empty : multicast to each universe\'s group (239.255.x.y). An IP : sent to that device only.' : 'The device\'s IP address on this network'}
+                  />
+                  <button
+                    className={btn(!!found[o.id]?.busy)}
+                    onClick={() => void find(o)}
+                    title={o.kind === 'wled' ? 'Look for WLED controllers on the network (they answer by name)' : 'Ask the network which Art-Net nodes are there (most sACN nodes answer too) : pick one instead of typing its address'}
+                  >
+                    {found[o.id]?.busy ? '…' : 'find'}
+                  </button>
+                </>
               )}
             </div>
+            {found[o.id] && !found[o.id]!.busy && (
+              <div className="flex flex-col gap-0.5">
+                {found[o.id]!.list.length === 0 && <span className="font-mono text-[9px] text-muted">nothing answered (on this computer's networks)</span>}
+                {found[o.id]!.list.map((n) => (
+                  <button
+                    key={n.ip}
+                    onClick={() => { update(o.id, { host: n.ip }); setFound((x) => ({ ...x, [o.id]: undefined })) }}
+                    className={`truncate rounded px-1 py-0.5 text-left font-mono text-[9px] ${o.host === n.ip ? 'text-accent' : 'text-text hover:bg-panel3/60'}`}
+                    title="Send to this one"
+                  >
+                    {n.ip} · {n.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
@@ -506,28 +548,76 @@ function NoSelection(): JSX.Element {
 }
 
 // ── the map ──────────────────────────────────────────────────────────────────
-type Drag = { id: string; mode: 'move' | 'p0' | 'p1' | 'c01' | 'c10'; sx: number; sy: number; f: LightFixture; pid: number; group?: LightFixture[] }
+type DragMode = 'move' | 'p0' | 'p1' | 'c01' | 'c10' | 'bend' | 'band'
+type Drag = {
+  id: string; mode: DragMode; sx: number; sy: number; f: LightFixture | null; pid: number
+  group?: LightFixture[] // several picked : they move together
+  bend?: number // which bend
+  band?: { x1: number; y1: number; add: boolean; base: string[] } // a rubber band from (sx, sy)
+}
+type Rect = { x: number; y: number; w: number; h: number }
+
+const PHOTO_KEY = 'opsia.lightPhoto'
+const loadPhoto = (): string | null => { try { return localStorage.getItem(PHOTO_KEY) } catch { return null } }
+
+/** A fixture's middle (its place for a rubber band, an alignment, an order). */
+function fixtureCenter(f: LightFixture): [number, number] {
+  if (f.kind === 'spot' || f.kind === 'ring') return [f.x0, f.y0]
+  if (f.kind === 'matrix') return [(f.x0 + f.x1) / 2, (f.y0 + f.y1) / 2]
+  const p = stripPath(f)
+  let x = 0, y = 0
+  for (let i = 0; i < p.length; i += 2) { x += p[i]; y += p[i + 1] }
+  return [x / (p.length / 2), y / (p.length / 2)]
+}
 
 function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
   const boxRef = useRef<HTMLDivElement | null>(null)
   const compW = useStore((s) => s.compW)
   const compH = useStore((s) => s.compH)
-  const [backdrop, setBackdrop] = useState<'auto' | 'master' | 'room'>('auto')
+  const test = useStore((s) => s.lightTest)
+  const [view, setView] = useState<'map' | 'patch'>('map')
+  const [backdrop, setBackdrop] = useState<'auto' | 'master' | 'room' | 'photo'>('auto')
+  const [photoMix, setPhotoMix] = useState(0.35)
+  const [photo, setPhoto] = useState<string | null>(loadPhoto)
   const [labels, setLabels] = useState(true)
   const drag = useRef<Drag | null>(null)
+  const photoImg = useMemo(() => { if (!photo) return null; const im = new Image(); im.src = photo; return im }, [photo])
+  const photoFile = useRef<HTMLInputElement | null>(null)
   const layerCanvas = useMemo(() => document.createElement('canvas'), [])
   const aspect = compW / Math.max(1, compH)
 
   // the map's rect inside the canvas (the picture's proportions, centered)
-  const rectOf = (cw: number, ch: number): { x: number; y: number; w: number; h: number } => {
+  const rectOf = (cw: number, ch: number): Rect => {
     const pad = 24
     let w = cw - pad * 2, h = w / aspect
     if (h > ch - pad * 2) { h = ch - pad * 2; w = h * aspect }
     return { x: (cw - w) / 2, y: (ch - h) / 2, w, h }
   }
 
+  // a photo of the room, kept small on this computer
+  const onPhoto = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    const im = new Image()
+    im.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(im.width, im.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k)
+      c.getContext('2d')?.drawImage(im, 0, 0, c.width, c.height)
+      const data = c.toDataURL('image/jpeg', 0.82)
+      URL.revokeObjectURL(url)
+      try { localStorage.setItem(PHOTO_KEY, data) } catch { /* too big : for this run only */ }
+      setPhoto(data)
+      setBackdrop('photo')
+    }
+    im.src = url
+  }
+
   useEffect(() => {
+    if (view !== 'map') return
     let raf = 0
     const draw = (): void => {
       raf = requestAnimationFrame(draw)
@@ -547,12 +637,13 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
       const st = useStore.getState()
       const selF = st.lightRig.fixtures.find((f) => f.id === st.lightSel) ?? null
       const selLook = selF ? st.lightsSession.looks[selF.id] ?? LOOK_DEFAULT : null
-      // the backdrop : the picture the selected fixture reads (a layer's own), or the master
+      // the backdrop : the picture the selected fixture reads (a layer's own), the master, the room's photo
       g.fillStyle = '#000'
       g.fillRect(R.x, R.y, R.w, R.h)
-      const wantLayer = backdrop === 'auto' && selLook?.source === 'layer' ? selLook.layer : -1
-      if (backdrop !== 'room') {
+      const drawPicture = (alpha: number): void => {
+        const wantLayer = backdrop === 'auto' && selLook?.source === 'layer' ? selLook.layer : -1
         const grid = wantLayer >= 0 ? lightRuntime.grid(wantLayer) : null
+        g.globalAlpha = alpha
         if (grid) {
           if (layerCanvas.width !== grid.w || layerCanvas.height !== grid.h) { layerCanvas.width = grid.w; layerCanvas.height = grid.h }
           const lg = layerCanvas.getContext('2d')
@@ -565,16 +656,17 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
             for (let i = 3; i < img.data.length; i += 4) img.data[i] = 255
             lg.putImageData(img, 0, 0)
             g.imageSmoothingEnabled = true
-            g.globalAlpha = 0.85
             g.drawImage(layerCanvas, R.x, R.y, R.w, R.h)
-            g.globalAlpha = 1
           }
         } else if (canvasRef.current) {
-          g.globalAlpha = 0.85
           try { g.drawImage(canvasRef.current, R.x, R.y, R.w, R.h) } catch { /* not ready */ }
-          g.globalAlpha = 1
         }
+        g.globalAlpha = 1
       }
+      if (backdrop === 'photo') {
+        if (photoImg?.complete && photoImg.naturalWidth) { try { g.drawImage(photoImg, R.x, R.y, R.w, R.h) } catch { /* not ready */ } }
+        if (photoMix > 0.01) drawPicture(photoMix)
+      } else if (backdrop !== 'room') drawPicture(0.85)
       // a light grid over it (the room)
       g.strokeStyle = backdrop === 'room' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)'
       g.lineWidth = 1
@@ -587,79 +679,121 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
       g.strokeRect(R.x + 0.5, R.y + 0.5, R.w - 1, R.h - 1)
       // the fixtures
       const P = (x: number, y: number): [number, number] => [R.x + x * R.w, R.y + y * R.h]
+      const ORANGE = 'rgb(255,170,60)'
       for (const f of st.lightRig.fixtures) {
         const on = f.id === st.lightSel
         const also = !on && st.lightPicked.includes(f.id)
         const colors = lightRuntime.last?.colors.get(f.id)
         const col = (i: number): string => (colors && colors.length >= i * 3 + 3 ? `rgb(${show(colors[i * 3])},${show(colors[i * 3 + 1])},${show(colors[i * 3 + 2])})` : '#333')
         g.lineWidth = on || also ? 2 : 1
-        g.strokeStyle = on ? 'rgb(255,170,60)' : also ? 'rgba(255,170,60,0.6)' : 'rgba(255,255,255,0.55)'
+        g.strokeStyle = on ? ORANGE : also ? 'rgba(255,170,60,0.6)' : 'rgba(255,255,255,0.55)'
         if (f.kind === 'spot') {
           const [cx, cy] = P(f.x0, f.y0)
           const r = Math.max(7, f.size * R.h * 1.2)
           g.fillStyle = col(0)
           g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill(); g.stroke()
-        } else if (f.kind === 'matrix') {
-          const [ax, ay] = P(f.x0, f.y0), [bx, by] = P(f.x1, f.y1)
-          const cwid = (bx - ax) / f.cols, chei = (by - ay) / f.rows
-          // the colors in channel order : back to their cells
-          for (let r = 0; r < f.rows; r++) {
-            for (let c = 0; c < f.cols; c++) {
-              let k = r * f.cols + (f.serpentine && r % 2 === 1 ? f.cols - 1 - c : c)
-              if (f.reverse) k = f.cols * f.rows - 1 - k
+        } else {
+          const pts = fixturePoints(f, aspect)
+          const n = pts.length / 2
+          if (f.kind === 'matrix') {
+            const [ax, ay] = P(f.x0, f.y0), [bx, by] = P(f.x1, f.y1)
+            const cwid = Math.abs(bx - ax) / f.cols, chei = Math.abs(by - ay) / f.rows
+            for (let k = 0; k < n; k++) {
+              const [px, py] = P(pts[k * 2], pts[k * 2 + 1])
               g.fillStyle = col(k)
-              g.fillRect(ax + c * cwid + 1, ay + r * chei + 1, Math.max(1, cwid - 2), Math.max(1, chei - 2))
+              g.fillRect(px - cwid / 2 + 1, py - chei / 2 + 1, Math.max(1, cwid - 2), Math.max(1, chei - 2))
+            }
+            g.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay))
+          } else {
+            // the line (a strip through its bends, a ring around)
+            g.beginPath()
+            if (f.kind === 'ring') {
+              const [cx, cy] = P(f.x0, f.y0)
+              const r = Math.hypot((f.x1 - f.x0) * aspect, f.y1 - f.y0) * R.h
+              g.arc(cx, cy, Math.max(2, r), 0, Math.PI * 2)
+            } else {
+              const p = stripPath(f)
+              for (let i = 0; i < p.length; i += 2) { const [x, y] = P(p[i], p[i + 1]); if (i) g.lineTo(x, y); else g.moveTo(x, y) }
+            }
+            g.stroke()
+            let len = 0
+            for (let k = 1; k < n; k++) len += Math.hypot((pts[k * 2] - pts[k * 2 - 2]) * R.w, (pts[k * 2 + 1] - pts[k * 2 - 1]) * R.h)
+            const dot = Math.max(2, Math.min(9, (len / Math.max(1, n)) * 0.8))
+            const step = Math.max(1, Math.ceil(n / Math.max(1, len / 2.5)))
+            for (let k = 0; k < n; k += step) {
+              const [px, py] = P(pts[k * 2], pts[k * 2 + 1])
+              g.fillStyle = col(k)
+              g.fillRect(px - dot / 2, py - dot / 2, dot, dot)
             }
           }
-          g.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay))
-        } else {
-          const [ax, ay] = P(f.x0, f.y0), [bx, by] = P(f.x1, f.y1)
-          g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke()
-          const n = Math.max(1, f.pixels)
-          const len = Math.hypot(bx - ax, by - ay)
-          const dot = Math.max(2, Math.min(9, (len / n) * 0.8))
-          const step = Math.max(1, Math.ceil(n / Math.max(1, len / 2.5)))
-          for (let i = 0; i < n; i += step) {
-            const t = n === 1 ? 0.5 : i / (n - 1)
-            const u = f.reverse ? 1 - t : t
-            g.fillStyle = col(i)
-            g.fillRect(ax + u * (bx - ax) - dot / 2, ay + u * (by - ay) - dot / 2, dot, dot)
-          }
-          // the first LED's end, marked
-          const [fx, fy] = f.reverse ? [bx, by] : [ax, ay]
-          g.fillStyle = on ? 'rgb(255,170,60)' : 'rgba(255,255,255,0.7)'
+          // its first LED, marked (where the wire comes in)
+          const [fx, fy] = P(pts[0], pts[1])
+          g.fillStyle = on ? ORANGE : 'rgba(255,255,255,0.8)'
           g.beginPath(); g.arc(fx, fy, 3, 0, Math.PI * 2); g.fill()
         }
         if (on) {
-          g.fillStyle = 'rgb(255,170,60)'
-          const hs: Array<[number, number]> = f.kind === 'spot' ? [] : f.kind === 'matrix' ? [P(f.x0, f.y0), P(f.x1, f.y1), P(f.x1, f.y0), P(f.x0, f.y1)] : [P(f.x0, f.y0), P(f.x1, f.y1)]
+          g.fillStyle = ORANGE
+          const hs: Array<[number, number]> =
+            f.kind === 'spot' ? [] :
+              f.kind === 'matrix' ? [P(f.x0, f.y0), P(f.x1, f.y1), P(f.x1, f.y0), P(f.x0, f.y1)] :
+                f.kind === 'ring' ? [P(f.x0, f.y0), P(f.x1, f.y1)] :
+                  [P(f.x0, f.y0), P(f.x1, f.y1)]
           for (const [hx, hy] of hs) g.fillRect(hx - 4, hy - 4, 8, 8)
+          if (f.kind === 'strip') {
+            g.strokeStyle = ORANGE
+            g.lineWidth = 1.5
+            for (let i = 0; i < f.bends.length; i += 2) { const [hx, hy] = P(f.bends[i], f.bends[i + 1]); g.beginPath(); g.arc(hx, hy, 4.5, 0, Math.PI * 2); g.stroke() }
+          }
         }
         if (labels) {
-          const [lx, ly] = f.kind === 'spot' ? P(f.x0, f.y0) : P(Math.min(f.x0, f.x1), Math.min(f.y0, f.y1))
+          const [lx, ly] = f.kind === 'spot' || f.kind === 'ring' ? P(f.x0, f.y0) : P(Math.min(f.x0, f.x1), Math.min(f.y0, f.y1))
           g.font = '10px ui-monospace, monospace'
-          g.fillStyle = on ? 'rgb(255,170,60)' : 'rgba(255,255,255,0.75)'
+          g.fillStyle = on ? ORANGE : 'rgba(255,255,255,0.75)'
           g.fillText(f.name, lx + 2, ly - 8)
         }
+      }
+      // a rubber band being drawn
+      const d = drag.current
+      if (d?.mode === 'band' && d.band) {
+        const [ax, ay] = P(d.sx, d.sy), [bx, by] = P(d.band.x1, d.band.y1)
+        g.setLineDash([4, 3])
+        g.strokeStyle = ORANGE
+        g.lineWidth = 1
+        g.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay))
+        g.setLineDash([])
       }
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [backdrop, labels, aspect, canvasRef, layerCanvas])
+  }, [view, backdrop, photoMix, photoImg, labels, aspect, canvasRef, layerCanvas])
 
-  // pointer : select, move, reshape
-  const toMap = (e: RPointerEvent<HTMLCanvasElement>): [number, number, { x: number; y: number; w: number; h: number }] => {
+  // pointer : select, move, reshape, bend, a rubber band
+  const toMap = (e: { clientX: number; clientY: number }): [number, number, Rect] => {
     const cv = ref.current!
     const b = cv.getBoundingClientRect()
     const R = rectOf(b.width, b.height)
     return [(e.clientX - b.left - R.x) / R.w, (e.clientY - b.top - R.y) / R.h, R]
   }
-  const hit = (x: number, y: number, R: { w: number; h: number }): { f: LightFixture; mode: Drag['mode'] } | null => {
+  /** The nearest segment of a strip to a point : which, where along it, how far (px). */
+  const nearSeg = (f: LightFixture, x: number, y: number, R: Rect): { seg: number; t: number; d: number } => {
+    const p = stripPath(f)
+    let best = { seg: 0, t: 0, d: Infinity }
+    for (let s = 0; s < p.length / 2 - 1; s++) {
+      const ax = p[s * 2] * R.w, ay = p[s * 2 + 1] * R.h, bx = p[s * 2 + 2] * R.w, by = p[s * 2 + 3] * R.h, qx = x * R.w, qy = y * R.h
+      const vx = bx - ax, vy = by - ay
+      const t = Math.max(0, Math.min(1, ((qx - ax) * vx + (qy - ay) * vy) / Math.max(1e-6, vx * vx + vy * vy)))
+      const d = Math.hypot(qx - (ax + t * vx), qy - (ay + t * vy))
+      if (d < best.d) best = { seg: s, t, d }
+    }
+    return best
+  }
+  const hit = (x: number, y: number, R: Rect): { f: LightFixture; mode: DragMode; bend?: number } | null => {
     const st = useStore.getState()
     const px = (dx: number, dy: number): number => Math.hypot(dx * R.w, dy * R.h)
     const selF = st.lightRig.fixtures.find((f) => f.id === st.lightSel)
     if (selF && selF.kind !== 'spot') {
-      if (px(x - selF.x0, y - selF.y0) < 9) return { f: selF, mode: 'p0' }
+      if (selF.kind === 'strip') for (let i = 0; i < selF.bends.length; i += 2) if (px(x - selF.bends[i], y - selF.bends[i + 1]) < 8) return { f: selF, mode: 'bend', bend: i / 2 }
+      if (selF.kind !== 'ring' && px(x - selF.x0, y - selF.y0) < 9) return { f: selF, mode: 'p0' }
       if (px(x - selF.x1, y - selF.y1) < 9) return { f: selF, mode: 'p1' }
       if (selF.kind === 'matrix') {
         if (px(x - selF.x1, y - selF.y0) < 9) return { f: selF, mode: 'c10' }
@@ -673,13 +807,11 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
         if (px(x - f.x0, y - f.y0) < Math.max(9, f.size * R.h * 1.2)) return { f, mode: 'move' }
       } else if (f.kind === 'matrix') {
         if (x >= Math.min(f.x0, f.x1) && x <= Math.max(f.x0, f.x1) && y >= Math.min(f.y0, f.y1) && y <= Math.max(f.y0, f.y1)) return { f, mode: 'move' }
-      } else {
-        // distance to the segment, in pixels
-        const ax = f.x0 * R.w, ay = f.y0 * R.h, bx = f.x1 * R.w, by = f.y1 * R.h, qx = x * R.w, qy = y * R.h
-        const vx = bx - ax, vy = by - ay
-        const t = Math.max(0, Math.min(1, ((qx - ax) * vx + (qy - ay) * vy) / Math.max(1e-6, vx * vx + vy * vy)))
-        if (Math.hypot(qx - (ax + t * vx), qy - (ay + t * vy)) < 8) return { f, mode: 'move' }
-      }
+      } else if (f.kind === 'ring') {
+        const r = Math.hypot((f.x1 - f.x0) * aspect, f.y1 - f.y0) * R.h
+        const d = px(x - f.x0, y - f.y0)
+        if (d < 9 || Math.abs(d - r) < 8) return { f, mode: 'move' }
+      } else if (nearSeg(f, x, y, R).d < 8) return { f, mode: 'move' }
     }
     return null
   }
@@ -689,16 +821,21 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
     const h = hit(x, y, R)
     const st = useStore.getState()
     const mod = e.shiftKey || e.ctrlKey || e.metaKey
-    if (!h) { if (!mod) st.setLightSel(null); return }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    if (!h) {
+      // a rubber band : the lights inside are picked (Shift / Ctrl : added)
+      if (!mod) st.setLightSel(null)
+      drag.current = { id: '', mode: 'band', sx: x, sy: y, f: null, pid: e.pointerId, band: { x1: x, y1: y, add: mod, base: mod ? st.lightPicked : [] } }
+      return
+    }
     // Shift / Ctrl + click : one more picked (or one less)
     if (mod && h.mode === 'move') { st.toggleLightPick(h.f.id); return }
     // one of several picked : they all move with it
     const many = h.mode === 'move' && st.lightPicked.length > 1 && st.lightPicked.includes(h.f.id)
     if (many) useStore.setState({ lightSel: h.f.id })
     else st.setLightSel(h.f.id)
-    e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = {
-      id: h.f.id, mode: h.mode, sx: x, sy: y, f: h.f, pid: e.pointerId,
+      id: h.f.id, mode: h.mode, sx: x, sy: y, f: h.f, pid: e.pointerId, bend: h.bend,
       group: many ? st.lightRig.fixtures.filter((q) => st.lightPicked.includes(q.id)) : undefined
     }
   }
@@ -707,15 +844,31 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
     if (!d || e.pointerId !== d.pid) return
     let [x, y] = toMap(e)
     const st = useStore.getState()
-    const f = d.f
-    const dx = x - d.sx, dy = y - d.sy
-    if (d.mode === 'move') {
-      for (const q of d.group ?? [f]) st.updateLightFixture(q.id, { x0: q.x0 + dx, y0: q.y0 + dy, x1: q.x1 + dx, y1: q.y1 + dy })
+    if (d.mode === 'band' && d.band) {
+      d.band.x1 = x; d.band.y1 = y
+      const x0 = Math.min(d.sx, x), x1 = Math.max(d.sx, x), y0 = Math.min(d.sy, y), y1 = Math.max(d.sy, y)
+      if (x1 - x0 < 0.005 && y1 - y0 < 0.005) return
+      const inside = st.lightRig.fixtures.filter((f) => { const [cx, cy] = fixtureCenter(f); return cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1 }).map((f) => f.id)
+      st.setLightPicked([...new Set([...d.band.base, ...inside])])
       return
     }
-    // Shift : a bar's end kept level or upright
+    const f = d.f
+    if (!f) return
+    const dx = x - d.sx, dy = y - d.sy
+    if (d.mode === 'move') {
+      for (const q of d.group ?? [f]) st.updateLightFixture(q.id, { x0: q.x0 + dx, y0: q.y0 + dy, x1: q.x1 + dx, y1: q.y1 + dy, bends: q.bends.map((v, i) => v + (i % 2 ? dy : dx)) })
+      return
+    }
+    if (d.mode === 'bend' && d.bend !== undefined) {
+      const bends = f.bends.slice()
+      bends[d.bend * 2] = x; bends[d.bend * 2 + 1] = y
+      st.updateLightFixture(d.id, { bends })
+      return
+    }
+    // Shift : a bar's end kept level or upright (against its neighbor point)
     if (e.shiftKey && f.kind === 'strip') {
-      const ox = d.mode === 'p0' ? f.x1 : f.x0, oy = d.mode === 'p0' ? f.y1 : f.y0
+      const p = stripPath(f)
+      const ox = d.mode === 'p0' ? p[2] : p[p.length - 4], oy = d.mode === 'p0' ? p[3] : p[p.length - 3]
       if (Math.abs(x - ox) * aspect > Math.abs(y - oy)) y = oy
       else x = ox
     }
@@ -727,35 +880,183 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
   const onUp = (e: RPointerEvent<HTMLCanvasElement>): void => {
     if (drag.current?.pid === e.pointerId) drag.current = null
   }
+  // double-click a bar : a bend there; double-click a bend : gone
+  const onDouble = (e: RMouseEvent<HTMLCanvasElement>): void => {
+    const [x, y, R] = toMap(e)
+    const st = useStore.getState()
+    const h = hit(x, y, R)
+    if (!h || h.f.kind !== 'strip') return
+    if (h.mode === 'bend' && h.bend !== undefined) {
+      const bends = h.f.bends.slice()
+      bends.splice(h.bend * 2, 2)
+      st.updateLightFixture(h.f.id, { bends })
+      return
+    }
+    if (h.mode !== 'move' || h.f.bends.length >= 64) return
+    const s = nearSeg(h.f, x, y, R)
+    const bends = h.f.bends.slice()
+    bends.splice(s.seg * 2, 0, x, y)
+    st.setLightSel(h.f.id)
+    st.updateLightFixture(h.f.id, { bends })
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-1.5 border-b border-border px-3 py-1.5 font-mono text-[10px] text-muted">
-        <span>under the fixtures</span>
-        {(['auto', 'master', 'room'] as const).map((b) => (
-          <button
-            key={b}
-            className={btn(backdrop === b)}
-            onClick={() => setBackdrop(b)}
-            title={b === 'auto' ? "The picture the selected fixture reads (a layer's own, or the master)" : b === 'master' ? 'The master picture, always' : 'Only the room : a grid, no picture'}
-          >
-            {b === 'auto' ? 'its source' : b === 'master' ? 'master' : 'room'}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-3 py-1.5 font-mono text-[10px] text-muted">
+        {(['map', 'patch'] as const).map((v) => (
+          <button key={v} className={btn(view === v)} onClick={() => setView(v)} title={v === 'map' ? 'The lights on the picture' : 'The channels : every universe, each light where it is patched'}>
+            {v}
           </button>
         ))}
+        {view === 'map' && (
+          <>
+            <span className="ml-2">under the lights</span>
+            {(['auto', 'master', 'room', 'photo'] as const).map((b) => (
+              <button
+                key={b}
+                className={`${btn(backdrop === b)} disabled:opacity-40`}
+                disabled={b === 'photo' && !photo}
+                onClick={() => setBackdrop(b)}
+                title={b === 'auto' ? "The picture the selected light reads (a layer's own, or the master)" : b === 'master' ? 'The master picture, always' : b === 'room' ? 'Only the room : a grid, no picture' : 'A photo of the room : place each light where it really is'}
+              >
+                {b === 'auto' ? 'its source' : b}
+              </button>
+            ))}
+            <button className={btn(false)} onClick={() => photoFile.current?.click()} title="A photo of the room (or a plan of the stage) under the map, to place each light where it is : kept on this computer">photo…</button>
+            <input ref={photoFile} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+            {backdrop === 'photo' && (
+              <label className="flex items-center gap-1" title="The picture over the photo">
+                picture
+                <input type="range" min={0} max={1} step={0.01} value={photoMix} onChange={(e) => setPhotoMix(Number(e.target.value))} className="w-20 accent-accent" />
+              </label>
+            )}
+          </>
+        )}
         <div className="flex-1" />
-        <button className={btn(labels)} onClick={() => setLabels((v) => !v)}>names</button>
+        <button
+          className={btn(test !== null)}
+          onClick={() => useStore.getState().setLightTest(test === null)}
+          title="The test pattern : a line sweeps the room, red, then green, blue and white. Every light shows whether it is where the map says, and whether its colors come in the right order. It ignores the masters and Black"
+        >
+          {test !== null ? '◉ testing' : 'test'}
+        </button>
+        {view === 'map' && <button className={btn(labels)} onClick={() => setLabels((v) => !v)}>names</button>}
       </div>
-      <div ref={boxRef} className="relative min-h-0 flex-1">
-        <canvas
-          ref={ref}
-          className="absolute inset-0 cursor-crosshair"
-          style={{ touchAction: 'none' }}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
-        />
-      </div>
+      {view === 'map' ? (
+        <div ref={boxRef} className="relative min-h-0 flex-1">
+          <canvas
+            ref={ref}
+            className="absolute inset-0 cursor-crosshair"
+            style={{ touchAction: 'none' }}
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+            onDoubleClick={onDouble}
+          />
+        </div>
+      ) : (
+        <PatchView />
+      )}
+    </div>
+  )
+}
+
+// ── the patch : every universe in use, each light where its channels land ────
+const hueOf = (id: string): number => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360; return h }
+
+function PatchView(): JSX.Element {
+  const rig = useStore((s) => s.lightRig)
+  const sel = useStore((s) => s.lightSel)
+  const picked = useStore((s) => s.lightPicked)
+  const st = useStore.getState
+  const drag = useRef<{ id: string; off: number; uni: number; out: string } | null>(null)
+  const [hover, setHover] = useState<{ out: string; uni: number; ch: number } | null>(null)
+  // a drag let go anywhere ends (after a grid's own drop has read it)
+  useEffect(() => {
+    const up = (): void => { window.setTimeout(() => { drag.current = null }, 0) }
+    window.addEventListener('pointerup', up)
+    return () => window.removeEventListener('pointerup', up)
+  }, [])
+  // each output's universes : per channel, who is there
+  const blocks: Array<{ out: LightOutput; uni: number; cells: Array<string[]> }> = []
+  for (const o of rig.outputs) {
+    const by = new Map<number, Array<string[]>>()
+    for (const f of rig.fixtures) {
+      if (f.out !== o.id) continue
+      for (const sp of fixtureSpans(f, o.kind === 'enttec')) {
+        let cells = by.get(sp.universe)
+        if (!cells) { cells = Array.from({ length: 512 }, () => []); by.set(sp.universe, cells) }
+        for (let c = sp.from; c <= sp.to; c++) cells[c - 1].push(f.id)
+      }
+    }
+    if (!by.size) by.set(o.kind === 'enttec' ? 0 : 0, Array.from({ length: 512 }, () => []))
+    for (const [uni, cells] of [...by].sort((a, b) => a[0] - b[0])) blocks.push({ out: o, uni, cells })
+  }
+  const unpatched = rig.fixtures.filter((f) => !rig.outputs.some((o) => o.id === f.out))
+  const name = (id: string): string => rig.fixtures.find((f) => f.id === id)?.name ?? '?'
+  const overlaps = blocks.reduce((n, b) => n + b.cells.filter((c) => c.length > 1).length, 0)
+  const drop = (out: LightOutput, uni: number, ch: number): void => {
+    const d = drag.current
+    drag.current = null
+    if (!d || d.out !== out.id) return
+    const address = Math.max(1, Math.min(512, ch + 1 - d.off))
+    st().updateLightFixture(d.id, out.kind === 'enttec' ? { address } : { address, universe: uni })
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 font-mono text-[10px]">
+      <p className="text-muted">
+        Every universe in use, 512 channels each, every light in its color : click one to select it, drag it to another channel to readdress it (on an Enttec, within its one universe).
+        {overlaps > 0 ? <span className="text-red-400"> {overlaps} channel{overlaps === 1 ? '' : 's'} used by two lights (in red).</span> : ' No two lights share a channel.'}
+      </p>
+      {rig.outputs.length === 0 && <p className="text-muted">No outputs yet : add one on the left.</p>}
+      {blocks.map(({ out, uni, cells }) => (
+        <div key={`${out.id}|${uni}`} className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-text">{out.name}</span>
+            <span className="text-muted">{out.kind === 'enttec' ? 'its universe' : `universe ${uni}`} · {cells.filter((c) => c.length).length} of 512 used</span>
+            <div className="flex-1" />
+            <button
+              className={btn(false)}
+              onClick={() => st().autoAddressLights(out.id)}
+              title="Readdress every light on this output one after the other from channel 1, in their order now, none sharing a channel (a light that would cross a universe starts the next one)"
+            >
+              address in order
+            </button>
+          </div>
+          <div className="grid gap-px" style={{ gridTemplateColumns: 'repeat(32, minmax(0, 1fr))' }} onPointerUp={() => { if (drag.current && hover) drop(out, uni, hover.ch) }}>
+            {cells.map((who, i) => {
+              const id = who[0]
+              const first = id && (i === 0 || cells[i - 1][0] !== id)
+              const isSel = id === sel || (id && picked.includes(id))
+              const hot = hover && hover.out === out.id && hover.uni === uni && hover.ch === i
+              return (
+                <div
+                  key={i}
+                  onPointerDown={(e) => {
+                    if (!id) return
+                    e.preventDefault()
+                    st().setLightSel(id)
+                    let k = i
+                    while (k > 0 && cells[k - 1][0] === id) k--
+                    drag.current = { id, off: i - k, uni, out: out.id }
+                  }}
+                  onPointerEnter={() => setHover({ out: out.id, uni, ch: i })}
+                  title={`${i + 1}${who.length ? ` : ${who.map(name).join(', ')}` : ''}`}
+                  className={`relative h-4 overflow-hidden rounded-[2px] text-[8px] leading-4 ${id ? 'cursor-grab' : ''} ${hot && drag.current ? 'ring-1 ring-accent' : ''}`}
+                  style={{
+                    background: who.length > 1 ? 'rgba(239,68,68,0.85)' : id ? `hsla(${hueOf(id)}, 55%, ${isSel ? 55 : 38}%, 0.9)` : 'rgb(var(--c-panel2))',
+                    outline: isSel ? '1px solid rgb(255,170,60)' : undefined
+                  }}
+                >
+                  {first ? <span className="absolute left-0.5 top-0 whitespace-nowrap text-white">{name(id)}</span> : i % 32 === 0 ? <span className="absolute left-0.5 top-0 text-muted">{i + 1}</span> : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      {unpatched.length > 0 && <p className="text-muted">Not patched (no output) : {unpatched.map((f) => f.name).join(', ')}</p>}
     </div>
   )
 }
@@ -790,25 +1091,37 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
       >
         <input value={f.name} onChange={(e) => upd({ name: e.target.value })} className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[11px]" />
         <div className="flex gap-1">
-          {(['strip', 'spot', 'matrix'] as const).map((k) => (
-            <button key={k} className={`flex-1 ${btn(f.kind === k)}`} onClick={() => upd({ kind: k })}>{KIND_LABEL[k]}</button>
+          {(['strip', 'ring', 'spot', 'matrix'] as const).map((k) => (
+            <button key={k} className={`flex-1 ${btn(f.kind === k)}`} onClick={() => upd(k === 'ring' && f.kind !== 'ring' ? { kind: k, x1: f.x0 + 0.1, y1: f.y0 } : { kind: k })}>{KIND_LABEL[k]}</button>
           ))}
         </div>
+        {(f.kind === 'strip' || f.kind === 'ring') && (
+          <Num label="LEDs" value={f.pixels} min={1} max={2048} onChange={(v) => upd({ pixels: v })} title={f.kind === 'ring' ? 'How many pixels around the ring' : 'How many pixels the bar has (each takes the picture at its place along the line)'} />
+        )}
         {f.kind === 'strip' && (
-          <Num label="LEDs" value={f.pixels} min={1} max={2048} onChange={(v) => upd({ pixels: v })} title="How many pixels the bar has (each takes the picture at its place along the line)" />
+          <div className="flex items-center gap-1 font-mono text-[10px] text-muted">
+            <span className="min-w-0 flex-1 truncate" title="Double-click the bar on the map to bend it there; drag a bend to move it, double-click it to take it away">
+              {f.bends.length ? `${f.bends.length / 2} bend${f.bends.length > 2 ? 's' : ''}` : 'straight'} · double-click to bend
+            </span>
+            {f.bends.length > 0 && <button className={btn(false)} onClick={() => upd({ bends: [] })} title="Back to a straight line">straighten</button>}
+            <button className={btn(f.reverse)} onClick={() => upd({ reverse: !f.reverse })} title="The first LED at the other end">reversed</button>
+          </div>
+        )}
+        {f.kind === 'ring' && (
+          <button className={btn(f.reverse)} onClick={() => upd({ reverse: !f.reverse })} title="The LEDs run the other way round (its first LED stays at the handle : drag it to turn the ring)">
+            {f.reverse ? 'counterclockwise' : 'clockwise'}
+          </button>
         )}
         {f.kind === 'matrix' && (
-          <div className="flex gap-1.5">
-            <Num label="columns" value={f.cols} min={1} max={128} onChange={(v) => upd({ cols: v })} />
-            <Num label="rows" value={f.rows} min={1} max={128} onChange={(v) => upd({ rows: v })} />
-          </div>
+          <>
+            <div className="flex gap-1.5">
+              <Num label="columns" value={f.cols} min={1} max={128} onChange={(v) => upd({ cols: v })} />
+              <Num label="rows" value={f.rows} min={1} max={128} onChange={(v) => upd({ rows: v })} />
+            </div>
+            <MatrixWiring f={f} upd={upd} />
+          </>
         )}
-        {f.kind !== 'spot' && (
-          <div className="flex gap-1">
-            <button className={`flex-1 ${btn(f.reverse)}`} onClick={() => upd({ reverse: !f.reverse })} title="The first LED at the other end">reversed</button>
-            {f.kind === 'matrix' && <button className={`flex-1 ${btn(f.serpentine)}`} onClick={() => upd({ serpentine: !f.serpentine })} title="Wired back and forth, every other row reversed">serpentine</button>}
-          </div>
-        )}
+        {f.kind !== 'matrix' && <RowMaker f={f} />}
         {S('sampled', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
         <IdentifyButton id={f.id} />
       </Section>
@@ -825,6 +1138,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
           {out && out.kind !== 'enttec' && <Num label="universe" value={f.universe} min={0} max={32767} onChange={(v) => upd({ universe: v })} />}
           <Num label="address" value={f.address} min={1} max={512} onChange={(v) => upd({ address: v })} title="Its first DMX channel (1..512) : the light's own address (its menu or DIP switches)" />
         </div>
+        <Dip address={f.address} />
         <ProfilePicker ids={[f.id]} current={f.profile} />
         {!f.profile && (
           <>
@@ -908,6 +1222,7 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
         </div>
         <ProfilePicker ids={ids} current={f?.profile ?? ''} />
       </Section>
+      <PlaceSection ids={ids} />
       <LookSection ids={ids} look={look} slider={S} />
       <TuneSection ids={ids} tune={tune} slider={S} />
     </>
@@ -1058,6 +1373,111 @@ function ProfilePicker({ ids, current }: { ids: string[]; current: string }): JS
         </p>
       )}
     </>
+  )
+}
+
+/** How a matrix is wired : the corner its first LED is in, row by row or column
+ *  by column, zigzag or not (16 ways), with its path drawn small. */
+function MatrixWiring({ f, upd }: { f: LightFixture; upd: (p: Partial<LightFixture>) => void }): JSX.Element {
+  const cells = matrixCells({ ...f, reverse: false })
+  const W = 84, H = 56
+  const n = Math.min(cells.length / 2, 400)
+  const pts: string[] = []
+  for (let k = 0; k < n; k++) pts.push(`${((cells[k * 2] + 0.5) / f.cols) * W},${((cells[k * 2 + 1] + 0.5) / f.rows) * H}`)
+  const CORNER: Record<LightCorner, string> = { tl: '↖', tr: '↗', bl: '↙', br: '↘' }
+  return (
+    <div className="flex items-start gap-2" title="How the matrix is wired : where its first LED is, then row by row or column by column, zigzag (back and forth) or not">
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-[9px] text-muted">first LED</span>
+        <div className="grid grid-cols-2 gap-0.5">
+          {(['tl', 'tr', 'bl', 'br'] as LightCorner[]).map((c) => (
+            <button key={c} className={btn(f.start === c && !f.reverse)} onClick={() => upd({ start: c, reverse: false })}>{CORNER[c]}</button>
+          ))}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex gap-0.5">
+          <button className={`flex-1 ${btn(!f.byCols)}`} onClick={() => upd({ byCols: false })}>rows</button>
+          <button className={`flex-1 ${btn(f.byCols)}`} onClick={() => upd({ byCols: true })}>columns</button>
+        </div>
+        <button className={btn(f.serpentine)} onClick={() => upd({ serpentine: !f.serpentine })} title="Wired back and forth : every other row (or column) the other way">zigzag</button>
+      </div>
+      <svg width={W} height={H} className="shrink-0 rounded border border-border bg-panel">
+        <polyline points={pts.join(' ')} fill="none" stroke="rgb(var(--c-accent))" strokeWidth={1} strokeOpacity={0.8} />
+        {pts.length > 0 && <circle cx={Number(pts[0].split(',')[0])} cy={Number(pts[0].split(',')[1])} r={2.5} fill="rgb(var(--c-accent))" />}
+      </svg>
+    </div>
+  )
+}
+
+/** A row of this light : n of them across the picture (or down), addressed in turn. */
+function RowMaker({ f }: { f: LightFixture }): JSX.Element {
+  const [n, setN] = useState(4)
+  const add = useStore((s) => s.addLightRow)
+  return (
+    <div className="flex items-center gap-1 font-mono text-[10px] text-muted" title="A row of this light : it and its copies spread evenly across the picture (or down it), addressed one after the other, all picked (ready to be a group)">
+      <span className="shrink-0">a row of</span>
+      <input type="number" min={2} max={32} value={n} onChange={(e) => setN(Math.max(2, Math.min(32, Math.round(Number(e.target.value) || 2))))} className="w-10 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text" />
+      <button className={`flex-1 ${btn(false)}`} onClick={() => add(f.id, n, 'across')}>across</button>
+      <button className={`flex-1 ${btn(false)}`} onClick={() => add(f.id, n, 'down')}>down</button>
+    </div>
+  )
+}
+
+/** The DIP switches that set its address (on a light that has them). */
+function Dip({ address }: { address: number }): JSX.Element {
+  return (
+    <div className="flex items-end gap-1 font-mono text-[9px] text-muted" title="The DIP switches that set this address on a light that has them : 1 to 9, on (filled) = up. Its menu shows the address itself on most lights">
+      <span className="w-14 shrink-0">DIP</span>
+      {dipOf(address).map((on, i) => (
+        <span key={i} className="flex flex-col items-center gap-px">
+          <span className={`h-3 w-2 rounded-[1px] border ${on ? 'border-accent bg-accent' : 'border-border'}`} />
+          <span className="text-[7px] leading-none">{i + 1}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Several lights : put them in a row, a column, spread them, mirror them. */
+function PlaceSection({ ids }: { ids: string[] }): JSX.Element {
+  const place = (how: 'row' | 'col' | 'spreadx' | 'spready' | 'mirx' | 'miry'): void => {
+    const st = useStore.getState()
+    const list = st.lightRig.fixtures.filter((f) => ids.includes(f.id))
+    if (list.length < 2) return
+    const mids = list.map(middleOf)
+    if (how === 'row' || how === 'col') {
+      const k = how === 'row' ? 1 : 0
+      const avg = mids.reduce((a, m) => a + m[k], 0) / mids.length
+      list.forEach((f, i) => st.updateLightFixture(f.id, shifted(f, k ? 0 : avg - mids[i][0], k ? avg - mids[i][1] : 0)))
+    } else if (how === 'spreadx' || how === 'spready') {
+      const k = how === 'spreadx' ? 0 : 1
+      const order = list.map((f, i) => ({ f, m: mids[i][k] })).sort((p, q) => p.m - q.m)
+      const lo = order[0].m, hi = order[order.length - 1].m
+      order.forEach((o, i) => {
+        const want = lo + ((hi - lo) * i) / (order.length - 1)
+        st.updateLightFixture(o.f.id, shifted(o.f, k ? 0 : want - o.m, k ? want - o.m : 0))
+      })
+    } else {
+      const k = how === 'mirx' ? 0 : 1
+      const c = (Math.min(...mids.map((m) => m[k])) + Math.max(...mids.map((m) => m[k]))) / 2
+      const fl = (v: number): number => 2 * c - v
+      list.forEach((f) => st.updateLightFixture(f.id, k === 0
+        ? { x0: fl(f.x0), x1: fl(f.x1), bends: f.bends.map((v, i) => (i % 2 ? v : fl(v))) }
+        : { y0: fl(f.y0), y1: fl(f.y1), bends: f.bends.map((v, i) => (i % 2 ? fl(v) : v)) }))
+    }
+  }
+  return (
+    <Section title="Place" info="The picked lights on the map : all at one height (a row) or in one column, spread evenly between the two outermost, or mirrored around their middle (a bar's first LED goes to the other side, as a mirrored rig would be wired). Each takes its light from where it lands.">
+      <div className="grid grid-cols-2 gap-1">
+        <button className={btn(false)} onClick={() => place('row')} title="All at the same height">in a row</button>
+        <button className={btn(false)} onClick={() => place('col')} title="All in the same column">in a column</button>
+        <button className={btn(false)} onClick={() => place('spreadx')} title="Evenly from the leftmost to the rightmost">spread across</button>
+        <button className={btn(false)} onClick={() => place('spready')} title="Evenly from the highest to the lowest">spread down</button>
+        <button className={btn(false)} onClick={() => place('mirx')} title="Mirrored left to right around their middle">mirror ↔</button>
+        <button className={btn(false)} onClick={() => place('miry')} title="Mirrored top to bottom around their middle">mirror ↕</button>
+      </div>
+    </Section>
   )
 }
 

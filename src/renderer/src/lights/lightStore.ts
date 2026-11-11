@@ -4,6 +4,7 @@
 
 import {
   fixtureChannels,
+  fixtureSpans,
   RIG_DEFAULT,
   sanitizeFixture,
   sanitizeOutput,
@@ -133,10 +134,12 @@ export function newFixture(rig: LightRig, kind: LightKind): LightFixture {
       ? { x0: 0.2 + ((k * 0.17) % 0.6), y0: y, x1: 0, y1: 0, size: 0.05, pixels: 1, layout: 'DRGB' }
       : kind === 'matrix'
         ? { x0: 0.3, y0: 0.3, x1: 0.7, y1: 0.7, size: 0.04, cols: 8, rows: 8, layout: 'RGB' }
-        : { x0: 0.12, y0: y, x1: 0.88, y1: y, size: 0.025, pixels: 60, layout: 'RGB' }
+        : kind === 'ring'
+          ? { x0: 0.5, y0: 0.5, x1: 0.62, y1: 0.5, size: 0.025, pixels: 24, layout: 'RGB' }
+          : { x0: 0.12, y0: y, x1: 0.88, y1: y, size: 0.025, pixels: 60, layout: 'RGB' }
   const f = sanitizeFixture({
     id: uid('fx'),
-    name: `${kind === 'spot' ? 'Spot' : kind === 'matrix' ? 'Matrix' : 'Bar'} ${same + 1}`,
+    name: `${kind === 'spot' ? 'Spot' : kind === 'matrix' ? 'Matrix' : kind === 'ring' ? 'Ring' : 'Bar'} ${same + 1}`,
     kind,
     ...base,
     out,
@@ -155,4 +158,62 @@ export function duplicate(rig: LightRig, f: LightFixture): LightFixture {
   const d = sanitizeFixture({ ...f, id: uid('fx'), name: `${f.name} copy`, y0: Math.min(1, f.y0 + 0.06), y1: Math.min(1, f.y1 + 0.06) })
   d.address = nextAddress(rig, d.out, d.universe)
   return d
+}
+
+/** A fixture moved by (dx, dy), its bends with it. */
+export function shifted(f: LightFixture, dx: number, dy: number): Partial<LightFixture> {
+  return { x0: f.x0 + dx, y0: f.y0 + dy, x1: f.x1 + dx, y1: f.y1 + dy, bends: f.bends.map((v, i) => v + (i % 2 ? dy : dx)) }
+}
+
+/** A fixture's middle on the picture. */
+export function middleOf(f: LightFixture): [number, number] {
+  if (f.kind === 'spot' || f.kind === 'ring') return [f.x0, f.y0]
+  const p = [f.x0, f.y0, ...(f.kind === 'strip' ? f.bends : []), f.x1, f.y1]
+  let x = 0, y = 0
+  for (let i = 0; i < p.length; i += 2) { x += p[i]; y += p[i + 1] }
+  return [x / (p.length / 2), y / (p.length / 2)]
+}
+
+/** A row of `n` of this light, evenly across the picture (or down it) : the light
+ *  itself first, then its copies, addressed one after the other. */
+export function rowOf(rig: LightRig, f: LightFixture, n: number, dir: 'across' | 'down'): LightFixture[] {
+  const N = Math.max(2, Math.min(32, Math.round(n)))
+  const [cx, cy] = middleOf(f)
+  const at = (q: LightFixture, k: number): LightFixture => {
+    const t = (k + 0.5) / N
+    return { ...q, ...shifted(q, dir === 'across' ? t - cx : 0, dir === 'down' ? t - cy : 0) }
+  }
+  const out: LightFixture[] = [at(f, 0)]
+  let r: LightRig = { ...rig, fixtures: rig.fixtures.map((x) => (x.id === f.id ? out[0] : x)) }
+  const base = f.name.replace(/\s+\d+$/, '')
+  for (let k = 1; k < N; k++) {
+    const c = sanitizeFixture({ ...at(f, k), id: uid('fx'), name: `${base} ${k + 1}` })
+    c.address = nextAddress(r, c.out, c.universe)
+    r = { ...r, fixtures: [...r.fixtures, c] }
+    out.push(c)
+  }
+  return out
+}
+
+/** Every light on an output readdressed one after the other from channel 1, in
+ *  their order now, none sharing a channel; a light that would cross into the
+ *  next universe starts it (a long pixel bar flows over, as pixel controllers do). */
+export function addressedInOrder(rig: LightRig, out: string): LightFixture[] {
+  const o = rig.outputs.find((x) => x.id === out)
+  const enttec = o?.kind === 'enttec'
+  const list = rig.fixtures.filter((f) => f.out === out).sort((a, b) => (a.universe - b.universe) || (a.address - b.address))
+  let uni = enttec ? 0 : list[0]?.universe ?? 0
+  let ch = 0
+  const done: LightFixture[] = []
+  for (const f of list) {
+    const n = fixtureChannels(f)
+    if (!enttec && ch > 0 && ch + n > 512 && n <= 512) { uni++; ch = 0 }
+    if (!enttec && ch >= 512) { uni++; ch = 0 }
+    const g = { ...f, address: Math.min(512, ch + 1), universe: enttec ? f.universe : uni }
+    const spans = fixtureSpans(g, enttec)
+    const last = spans[spans.length - 1]
+    if (last) { if (!enttec) uni = last.universe; ch = last.to } else ch += n
+    done.push(g)
+  }
+  return done
 }

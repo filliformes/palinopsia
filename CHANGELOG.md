@@ -141,6 +141,47 @@ that CI builds into cross-platform releases.
     the group fader at 0.3 and its console knob, a built-in profile on a bar, an OFL
     file imported through the page's own file input (three modes, the channel map read
     out), the rig saved with its group and profiles.
+- **Lights, closer to the lighting world (3/4) : the patch view, the test pattern, finding
+  the nodes, bends and rings and the 16 matrix wirings, placing faster.**
+  - **Patch view** (map | patch) : every universe in use as a 32 × 16 grid, each light in
+    its color (hashed from its id), shared channels red and counted, click to select,
+    drag to readdress (`fixtureSpans` in shared/lights.ts : the engine's own block
+    placement, so the view and the bytes agree); **address in order** per output
+    (`addressedInOrder` : one after the other, a light that would cross starts the next
+    universe, a long pixel bar flows over). The inspector shows the **DIP** switches of
+    the address (`dipOf`).
+  - **The test pattern** (`lightTest`, the engine's `test`) : a line sweeping the room
+    diagonally at 0.35 passes a second, red, green, blue, white in turn, past the
+    masters, Black, the tuning and the smoothing.
+  - **Finding the nodes** (`discoverLights` in main/light.ts, IPC `light:discover`) : an
+    ArtPoll to every IPv4 broadcast (the socket on 6454 with reuseAddr, or any port),
+    ArtPollReplies read (`parseArtPollReply` : IP, names, the output ports' 15-bit
+    universes); WLED by mDNS (`_wled._tcp`, `wledFromResponse`). **find** on Art-Net,
+    sACN and WLED outputs.
+  - **Shapes** : `LightKind` 'ring' (a circle around (x0, y0), its first LED at (x1, y1),
+    round in the room's proportions, clockwise or not); a strip's `bends` (double-click
+    to add, drag, double-click to remove, straighten; LEDs evenly spaced by length in
+    the room : `fixturePoints(f, aspect)`, the aspect now in the engine's geometry
+    signature); a matrix's `start` corner and `byCols` with the zigzag : the 16 wirings
+    (`matrixCells`; the old `reverse` still reads as before), drawn as a small path in
+    the inspector. The map draws every kind from `fixturePoints`, and marks each light's
+    first LED.
+  - **Placing** : a rubber band on the empty map picks (Shift / Ctrl adds); **Place** for
+    several lights (in a row, in a column, spread across / down, mirror left-right /
+    top-bottom, bends included); **a row of N** across or down from one light
+    (`rowOf` : addressed in turn, picked); a **photo** of the room under the map
+    (downscaled to 1280 px JPEG, localStorage `opsia.lightPhoto`) with the picture over
+    it at an opacity.
+  - Tested : 81 Node checks (27 new : an L-shaped bar's LEDs evenly spaced and its
+    middle on the bend, a ring's radius, first LED and direction, the matrix wirings
+    including all 16 distinct, the spans of a long bar with a head and the engine's bytes
+    exactly on them, an Enttec's cut, address in order with a crossing, a row of 4 and
+    its addresses, DIP 37, the test pattern's red then green through Black, an
+    ArtPollReply, a WLED mDNS answer, the discovery finding a fake node on 127.0.0.2). In
+    the test copy : a bend by double-click and its drag, a matrix wired from the bottom
+    right by columns in zigzag, a rubber band, a row of 4, an overlap in the patch view
+    (72 channels red) cleared by address in order, the test pattern, a room photo through
+    the page's input.
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

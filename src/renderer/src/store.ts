@@ -74,7 +74,7 @@ import {
   type LightsSession,
   type LightTune
 } from '@shared/lights'
-import { duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig } from './lights/lightStore'
+import { addressedInOrder, duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
@@ -1988,6 +1988,13 @@ interface StoreState {
   /** Every fixture picked on the map or in the list (the selected one among them) :
    *  a look, a tuning or a show goes to all of them; Shift / Ctrl + click adds. */
   lightPicked: string[]
+  /** The test pattern : when it started (performance.now()), null : off. */
+  lightTest: number | null
+  setLightTest: (on: boolean) => void
+  /** Every light on an output readdressed one after the other (the patch view). */
+  autoAddressLights: (out: string) => void
+  /** A row of `n` of a light across the picture (or down it), addressed in turn. */
+  addLightRow: (id: string, n: number, dir: 'across' | 'down') => void
   toggleLightPick: (id: string) => void
   setLightPicked: (ids: string[]) => void
   addLightGroup: (members: string[], name?: string) => string
@@ -4919,6 +4926,25 @@ export const useStore = create<StoreState>((set, get) => ({
   lightSel: null,
   setLightSel: (id) => set({ lightSel: id, lightPicked: id ? [id] : [] }),
   lightPicked: [],
+  lightTest: null,
+  setLightTest: (on) => set({ lightTest: on ? performance.now() : null }),
+  autoAddressLights: (out) =>
+    set((s) => {
+      const done = new Map(addressedInOrder(s.lightRig, out).map((f) => [f.id, f]))
+      return { lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((f) => done.get(f.id) ?? f) }) }
+    }),
+  addLightRow: (id, n, dir) =>
+    set((s) => {
+      const f = s.lightRig.fixtures.find((x) => x.id === id)
+      if (!f) return s
+      const row = rowOf(s.lightRig, f, n, dir)
+      const byId = new Map(row.map((x) => [x.id, x]))
+      const fixtures = [...s.lightRig.fixtures.map((x) => byId.get(x.id) ?? x), ...row.filter((x) => !s.lightRig.fixtures.some((q) => q.id === x.id))]
+      const look = s.lightsSession.looks[id]
+      const looks = { ...s.lightsSession.looks }
+      if (look) for (const x of row) looks[x.id] = look
+      return { lightRig: persistRig({ ...s.lightRig, fixtures }), lightsSession: { ...s.lightsSession, looks }, lightPicked: row.map((x) => x.id), lightSel: id }
+    }),
   toggleLightPick: (id) =>
     set((s) => {
       if (s.lightPicked.includes(id)) {

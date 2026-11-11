@@ -45,6 +45,10 @@ export interface LightInputs {
   aspect: number // the picture's width / height
   identify: string | null // a fixture flashed to find it in the room
   groupLevels?: Record<string, number> // each group's fader (absent : 1)
+  /** The test pattern : seconds since it started (null : off). A line sweeps the
+   *  room, red, then green, blue, white : every light shows where it is and
+   *  whether its colors are in the right order. */
+  test?: number | null
 }
 
 /** A frame's DMX : Enttec buffers by device index, network universes by output. */
@@ -69,39 +73,91 @@ function hsv(h: number, s: number, v: number): [number, number, number] {
   return [r + m, g + m, b + m]
 }
 
-/** Each pixel's place on the picture (0..1, y down), in channel order. */
-export function fixturePoints(f: LightFixture): Float32Array {
+/** A matrix's cell (column, row from its top left) for each pixel, in channel
+ *  order : from its start corner, row by row or column by column, zigzag or not. */
+export function matrixCells(f: LightFixture): Int32Array {
+  const n = f.cols * f.rows
+  const out = new Int32Array(n * 2)
+  const right = f.start === 'tr' || f.start === 'br', bottom = f.start === 'bl' || f.start === 'br'
+  for (let k = 0; k < n; k++) {
+    let c: number, r: number
+    if (f.byCols) {
+      c = Math.floor(k / f.rows); r = k % f.rows
+      if (f.serpentine && c % 2 === 1) r = f.rows - 1 - r
+    } else {
+      r = Math.floor(k / f.cols); c = k % f.cols
+      if (f.serpentine && r % 2 === 1) c = f.cols - 1 - c
+    }
+    if (right) c = f.cols - 1 - c
+    if (bottom) r = f.rows - 1 - r
+    out[k * 2] = c; out[k * 2 + 1] = r
+  }
+  if (f.reverse) {
+    for (let i = 0, j = n - 1; i < j; i++, j--) {
+      const c = out[i * 2], r = out[i * 2 + 1]
+      out[i * 2] = out[j * 2]; out[i * 2 + 1] = out[j * 2 + 1]
+      out[j * 2] = c; out[j * 2 + 1] = r
+    }
+  }
+  return out
+}
+
+/** A strip's path : its ends and its bends, in order. */
+export function stripPath(f: LightFixture): number[] {
+  return [f.x0, f.y0, ...f.bends, f.x1, f.y1]
+}
+
+/** Each pixel's place on the picture (0..1, y down), in channel order. `aspect`
+ *  (the picture's width / height) keeps a bent strip's LEDs evenly spaced and a
+ *  ring round. */
+export function fixturePoints(f: LightFixture, aspect = 16 / 9): Float32Array {
   if (f.kind === 'spot') return new Float32Array([f.x0, f.y0])
+  const asp = Math.max(0.1, aspect)
   if (f.kind === 'matrix') {
     const n = f.cols * f.rows
+    const cells = matrixCells(f)
     const out = new Float32Array(n * 2)
-    let k = 0
-    for (let r = 0; r < f.rows; r++) {
-      for (let c = 0; c < f.cols; c++) {
-        const cc = f.serpentine && r % 2 === 1 ? f.cols - 1 - c : c
-        out[k++] = f.x0 + ((cc + 0.5) / f.cols) * (f.x1 - f.x0)
-        out[k++] = f.y0 + ((r + 0.5) / f.rows) * (f.y1 - f.y0)
-      }
+    for (let k = 0; k < n; k++) {
+      out[k * 2] = f.x0 + ((cells[k * 2] + 0.5) / f.cols) * (f.x1 - f.x0)
+      out[k * 2 + 1] = f.y0 + ((cells[k * 2 + 1] + 0.5) / f.rows) * (f.y1 - f.y0)
     }
-    if (f.reverse) reversePairs(out)
     return out
   }
   const n = Math.max(1, f.pixels)
   const out = new Float32Array(n * 2)
+  if (f.kind === 'ring') {
+    // a circle in the room's own proportions : its radius and its first LED's angle
+    const dx = (f.x1 - f.x0) * asp, dy = f.y1 - f.y0
+    const r = Math.hypot(dx, dy)
+    const a0 = Math.atan2(dy, dx)
+    const dir = f.reverse ? -1 : 1
+    for (let i = 0; i < n; i++) {
+      const a = a0 + dir * (2 * Math.PI * i) / n
+      out[i * 2] = f.x0 + (r * Math.cos(a)) / asp
+      out[i * 2 + 1] = f.y0 + r * Math.sin(a)
+    }
+    return out
+  }
+  // a strip : evenly along its path (through its bends), by length in the room
+  const p = stripPath(f)
+  const segs = p.length / 2 - 1
+  const len: number[] = []
+  let total = 0
+  for (let s = 0; s < segs; s++) {
+    const l = Math.hypot((p[s * 2 + 2] - p[s * 2]) * asp, p[s * 2 + 3] - p[s * 2 + 1])
+    len.push(l)
+    total += l
+  }
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0.5 : i / (n - 1)
-    const u = f.reverse ? 1 - t : t
-    out[i * 2] = f.x0 + u * (f.x1 - f.x0)
-    out[i * 2 + 1] = f.y0 + u * (f.y1 - f.y0)
+    let d = (f.reverse ? 1 - t : t) * total
+    let s = 0
+    while (s < segs - 1 && d > len[s]) { d -= len[s]; s++ }
+    const u = len[s] > 1e-9 ? Math.min(1, d / len[s]) : 0
+    out[i * 2] = p[s * 2] + u * (p[s * 2 + 2] - p[s * 2])
+    out[i * 2 + 1] = p[s * 2 + 1] + u * (p[s * 2 + 3] - p[s * 2 + 1])
   }
   return out
-}
-function reversePairs(a: Float32Array): void {
-  for (let i = 0, j = a.length - 2; i < j; i += 2, j -= 2) {
-    const x = a[i], y = a[i + 1]
-    a[i] = a[j]; a[i + 1] = a[j + 1]
-    a[j] = x; a[j + 1] = y
-  }
 }
 
 /** Bilinear read of a bottom-up RGBA8 grid at (x, y) (y down), 0..1 RGB. */
@@ -246,11 +302,11 @@ export class LightEngine {
     return this.blackLevel
   }
 
-  private stateOf(f: LightFixture): FixtureState {
-    const sig = `${f.kind}|${f.x0}|${f.y0}|${f.x1}|${f.y1}|${f.pixels}|${f.cols}|${f.rows}|${f.serpentine}|${f.reverse}`
+  private stateOf(f: LightFixture, aspect: number): FixtureState {
+    const sig = `${f.kind}|${f.x0}|${f.y0}|${f.x1}|${f.y1}|${f.pixels}|${f.cols}|${f.rows}|${f.serpentine}|${f.reverse}|${f.bends.join(',')}|${f.start}|${f.byCols}|${aspect.toFixed(3)}`
     let s = this.st.get(f.id)
     if (!s || s.sig !== sig) {
-      const pts = fixturePoints(f)
+      const pts = fixturePoints(f, aspect)
       const n = pts.length / 2
       s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0 }
       this.st.set(f.id, s)
@@ -284,9 +340,15 @@ export class LightEngine {
     const tmp = [0, 0, 0]
     const ease = (x: number): number => x * x * (3 - 2 * x)
 
+    // the test pattern : a line sweeping the room, one color a pass
+    const test = inp.test ?? null
+    const TEST_SPEED = 0.35 // passes a second
+    const tPass = test !== null ? Math.floor(test * TEST_SPEED) : 0
+    const tHead = test !== null ? fract(test * TEST_SPEED) * 1.3 - 0.15 : 0
+    const tCol = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1]][tPass % 4]
     for (const f of inp.rig.fixtures) {
       live.add(f.id)
-      const s = this.stateOf(f)
+      const s = this.stateOf(f, Math.max(0.1, inp.aspect))
       const look = inp.looks[f.id] ?? LOOK_DEFAULT
       const tune = inp.tunes[f.id] ?? f.tune
       const n = s.pts.length / 2
@@ -329,7 +391,11 @@ export class LightEngine {
         const x = s.pts[i * 2], y = s.pts[i * 2 + 1]
         const px = x * asp // the room's own proportions for patterns across it
         let r = 0, gg = 0, b = 0
-        if (ident) { r = gg = b = 1 } else {
+        if (ident) { r = gg = b = 1 } else if (test !== null) {
+          const pos = (x * asp + y) / (asp + 1)
+          const on = Math.abs(pos - tHead) < 0.045 ? 1 : 0
+          r = tCol[0] * on; gg = tCol[1] * on; b = tCol[2] * on
+        } else {
           if (grid) {
             sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
@@ -376,8 +442,8 @@ export class LightEngine {
           b = clamp01(b * tBright) ** tune.gamma
           r = tune.black + (1 - tune.black) * r; gg = tune.black + (1 - tune.black) * gg; b = tune.black + (1 - tune.black) * b
         }
-        // smoothing (identify is never smoothed : it must answer at once)
-        const k = ident ? 1 : smoothA
+        // smoothing (identify and the test are never smoothed : they must answer at once)
+        const k = ident || test !== null ? 1 : smoothA
         const o = i * 3
         s.cur[o] += (r - s.cur[o]) * k
         s.cur[o + 1] += (gg - s.cur[o + 1]) * k
@@ -389,7 +455,7 @@ export class LightEngine {
           fg = s.from[o + 1] + (fg - s.from[o + 1]) * e
           fb = s.from[o + 2] + (fb - s.from[o + 2]) * e
         }
-        const gm = ident ? 1 : grand * ease(this.blackLevel)
+        const gm = ident || test !== null ? 1 : grand * ease(this.blackLevel)
         colors[o] = fr * gm
         colors[o + 1] = fg * gm
         colors[o + 2] = fb * gm

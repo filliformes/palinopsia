@@ -14,7 +14,9 @@
 //
 // Positions are in the picture, 0..1, x to the right and y DOWN (as drawn).
 
-export type LightKind = 'strip' | 'spot' | 'matrix'
+export type LightKind = 'strip' | 'spot' | 'matrix' | 'ring'
+/** A matrix's first LED : the corner it starts in. */
+export type LightCorner = 'tl' | 'tr' | 'bl' | 'br'
 export type LightSourceKind = 'master' | 'layer' | 'color' | 'gradient' | 'off'
 export type LightEffect = 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat'
 export type LightOutputKind = 'enttec' | 'artnet' | 'sacn' | 'wled'
@@ -39,8 +41,9 @@ export interface LightFixture {
   id: string
   name: string
   kind: LightKind
-  // On the picture (0..1, y down). strip : a line from (x0,y0) to (x1,y1), its
-  // pixels spread along it; spot : a disc at (x0,y0); matrix : a rectangle.
+  // On the picture (0..1, y down). strip : a line from (x0,y0) to (x1,y1) (through
+  // its bends), its pixels spread along it; spot : a disc at (x0,y0); matrix : a
+  // rectangle; ring : a circle around (x0,y0), its first LED at (x1,y1).
   x0: number
   y0: number
   x1: number
@@ -49,8 +52,11 @@ export interface LightFixture {
   pixels: number // strip : its LEDs (1..2048); spot : 1
   cols: number // matrix
   rows: number
-  serpentine: boolean // matrix : wired back and forth
-  reverse: boolean // strip / matrix : the first LED at the other end
+  serpentine: boolean // matrix : wired back and forth (zigzag)
+  reverse: boolean // strip / ring : the first LED at the other end (the ring : the other way round)
+  bends: number[] // strip : the points it bends through, x y x y... (0..32 of them)
+  start: LightCorner // matrix : the corner its first LED is in
+  byCols: boolean // matrix : wired column by column instead of row by row
   layout: string // channels per pixel : RGB, GRB, RGBW, DRGB... (layoutTokens)
   head: string // channels sent once before the pixels (a bar's own dimmer and strobe : 'D S')
   tail: string // channels sent once after them
@@ -222,7 +228,8 @@ const rgb = (v: unknown, d: number[]): number[] =>
   Array.isArray(v) && v.length >= 3 ? [num(v[0], d[0], 0, 1), num(v[1], d[1], 0, 1), num(v[2], d[2], 0, 1)] : d.slice()
 const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d)
 
-export const KINDS: readonly LightKind[] = ['strip', 'spot', 'matrix']
+export const KINDS: readonly LightKind[] = ['strip', 'spot', 'matrix', 'ring']
+export const CORNERS: readonly LightCorner[] = ['tl', 'tr', 'bl', 'br']
 export const SOURCES: readonly LightSourceKind[] = ['master', 'layer', 'color', 'gradient', 'off']
 export const EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat']
 export const SAMPLES: readonly LightSample[] = ['average', 'vivid', 'bright']
@@ -259,7 +266,7 @@ export function sanitizeFixture(raw: unknown, i = 0): LightFixture {
   const kind = oneOf(r.kind, KINDS, 'strip')
   return {
     id: str(r.id, `fx${Date.now().toString(36)}${i}`, 40) || `fx${i}`,
-    name: str(r.name, kind === 'spot' ? 'Spot' : kind === 'matrix' ? 'Matrix' : 'LED bar', 40),
+    name: str(r.name, kind === 'spot' ? 'Spot' : kind === 'matrix' ? 'Matrix' : kind === 'ring' ? 'Ring' : 'LED bar', 40),
     kind,
     x0: num(r.x0, 0.2, -0.5, 1.5),
     y0: num(r.y0, 0.5, -0.5, 1.5),
@@ -271,6 +278,9 @@ export function sanitizeFixture(raw: unknown, i = 0): LightFixture {
     rows: Math.round(num(r.rows, 4, 1, 128)),
     serpentine: bool(r.serpentine, false),
     reverse: bool(r.reverse, false),
+    bends: (Array.isArray(r.bends) ? r.bends : []).slice(0, 64).map((v) => num(v, 0.5, -0.5, 1.5)).slice(0, Math.floor(Math.min(64, Array.isArray(r.bends) ? r.bends.length : 0) / 2) * 2),
+    start: oneOf(r.start, CORNERS, 'tl'),
+    byCols: bool(r.byCols, false),
     layout: str(r.layout, 'RGB', 96) || 'RGB',
     head: str(r.head, '', 256),
     tail: str(r.tail, '', 256),
@@ -420,7 +430,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
 
 /** The DMX channels a fixture takes (its pixels times its layout). */
 export function fixtureChannels(f: LightFixture): number {
-  const n = f.kind === 'spot' ? 1 : f.kind === 'matrix' ? f.cols * f.rows : f.pixels
+  const n = fixturePixels(f)
   return layoutChannels(layoutTokens(f.head, false)) + n * layoutChannels(layoutTokens(f.layout)) + layoutChannels(layoutTokens(f.tail, false))
 }
 
@@ -454,3 +464,34 @@ export function profilePatch(p: LightProfile): Partial<LightFixture> {
 export function fixturePixels(f: LightFixture): number {
   return f.kind === 'spot' ? 1 : f.kind === 'matrix' ? f.cols * f.rows : f.pixels
 }
+
+/** Where a fixture's channels land : its blocks (the head, each pixel, the tail)
+ *  laid from its address, a block that would straddle a universe moved to the
+ *  next one (an Enttec has one : what goes past 512 is cut). The same placement
+ *  the engine's patch makes. */
+export function fixtureSpans(f: LightFixture, enttec: boolean): Array<{ universe: number; from: number; to: number }> {
+  const head = layoutChannels(layoutTokens(f.head, false))
+  const pix = layoutChannels(layoutTokens(f.layout))
+  const tail = layoutChannels(layoutTokens(f.tail, false))
+  const blocks: number[] = []
+  if (head) blocks.push(head)
+  for (let i = fixturePixels(f); i > 0; i--) blocks.push(pix)
+  if (tail) blocks.push(tail)
+  const out: Array<{ universe: number; from: number; to: number }> = []
+  let uni = enttec ? 0 : f.universe
+  let ch = f.address - 1
+  let cur: { universe: number; from: number; to: number } | null = null
+  for (const w of blocks) {
+    if (ch + w > 512) {
+      if (enttec) break
+      uni++; ch = 0; cur = null
+    }
+    if (!cur) { cur = { universe: uni, from: ch + 1, to: ch }; out.push(cur) }
+    ch += w
+    cur.to = ch
+  }
+  return out
+}
+
+/** The DIP switches that set an address (switches 1 to 9 : 1, 2, 4... 256). */
+export const dipOf = (address: number): boolean[] => Array.from({ length: 9 }, (_, i) => ((address >> i) & 1) === 1)
