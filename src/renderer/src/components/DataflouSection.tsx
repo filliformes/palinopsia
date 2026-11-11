@@ -6,11 +6,11 @@
 // one to Palinopsia (or Palinopsia to it). The node runs in main
 // (src/main/dataflou); the value bridge is ../dataflou.ts.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { dataflouBind, openDataflouVisualizer, useDataflouStatus } from '../dataflou'
 import { showToast } from './Toast'
-import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfNodeView, type DfParam } from '@shared/dataflou'
+import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfValue } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -185,6 +185,9 @@ export function DataflouSection(): JSX.Element {
                 ))}
               </div>
 
+              {/* ── what flows in and out, live ── */}
+              <DataView running={st.running} />
+
               {/* ── the connections across the mesh ── */}
               <div className="flex min-w-0 flex-col gap-0.5 rounded border border-accent2/30 bg-panel2/40 p-1.5">
                 <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-accent2">
@@ -214,6 +217,117 @@ export function DataflouSection(): JSX.Element {
               </div>
             </>
           )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── the data view : what flows in and out, live ─────────────────────────────
+// Each of our destinations with what feeds it (in ↙) and each of our sources
+// someone streams (out ↗) : the value now, its last seconds as a line, where it
+// comes from or goes, how many a second. Asked of main ten times a second, only
+// while it is open.
+const HIST = 80
+function numOf(v: DfValue | null): number | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'boolean') return v ? 1 : 0
+  if (Array.isArray(v)) return v.length >= 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : typeof v[0] === 'number' ? v[0] : null
+  return null
+}
+function fmt(v: DfValue | null): string {
+  if (v === null || v === undefined) return '—'
+  if (typeof v === 'boolean') return v ? 'on' : 'off'
+  if (typeof v === 'number') return Math.abs(v) >= 100 ? v.toFixed(0) : String(Math.round(v * 1000) / 1000)
+  if (Array.isArray(v)) return v.length >= 3 ? `${v.slice(0, 3).join(' ')}` : v.join(' ')
+  return `"${String(v).slice(0, 24)}"`
+}
+function Spark({ pts }: { pts: number[] }): JSX.Element {
+  const W = 64, H = 14
+  if (pts.length < 2) return <svg width={W} height={H} />
+  let lo = Infinity, hi = -Infinity
+  for (const p of pts) { if (p < lo) lo = p; if (p > hi) hi = p }
+  const span = hi - lo || 1
+  const d = pts.map((p, i) => `${((i / (HIST - 1)) * W).toFixed(1)},${(H - 1 - ((p - lo) / span) * (H - 2)).toFixed(1)}`).join(' ')
+  return (
+    <svg width={W} height={H} className="shrink-0">
+      <polyline points={d} fill="none" stroke="rgb(var(--c-accent))" strokeWidth={1} />
+    </svg>
+  )
+}
+function DataView({ running }: { running: boolean }): JSX.Element {
+  const [open, setOpen] = useState<boolean>(() => { try { return localStorage.getItem('opsia.dfData') !== '0' } catch { return true } })
+  const [io, setIo] = useState<DfIo[]>([])
+  const hist = useRef(new Map<string, number[]>())
+  useEffect(() => {
+    try { localStorage.setItem('opsia.dfData', open ? '1' : '0') } catch { /* private */ }
+    if (!open || !running) return
+    let alive = true
+    const tick = (): void => {
+      void window.api.dataflouIo().then((list) => {
+        if (!alive) return
+        const keep = new Set<string>()
+        for (const n of list) {
+          for (const [dir, rows] of [['in', n.in], ['out', n.out]] as const) {
+            for (const r of rows) {
+              const k = `${n.sku}|${dir}|${r.path}|${r.peers.join(',')}`
+              keep.add(k)
+              const x = numOf(r.value)
+              if (x === null) continue
+              const h = hist.current.get(k) ?? []
+              h.push(x)
+              if (h.length > HIST) h.shift()
+              hist.current.set(k, h)
+            }
+          }
+        }
+        for (const k of [...hist.current.keys()]) if (!keep.has(k)) hist.current.delete(k)
+        setIo(list)
+      }).catch(() => { /* main busy : the next one */ })
+    }
+    tick()
+    const id = window.setInterval(tick, 100)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [open, running])
+  const total = io.reduce((n, x) => n + x.in.length + x.out.length, 0)
+  const row = (sku: string, dir: 'in' | 'out', r: DfIoRow): JSX.Element => {
+    const k = `${sku}|${dir}|${r.path}|${r.peers.join(',')}`
+    const stale = !r.live || r.ageMs === null || r.ageMs > 2000
+    const colour = Array.isArray(r.value) && r.value.length >= 3
+    return (
+      <div key={k} className={`flex min-w-0 items-center gap-1.5 font-mono text-[9px] ${stale ? 'text-muted' : 'text-text'}`}
+        title={`${dir === 'in' ? `${r.peers.join(', ')} → ${r.path}` : `${r.path} → ${r.peers.join(', ')}`}${r.ageMs !== null ? ` · last ${(r.ageMs / 1000).toFixed(1)} s ago` : ' · nothing yet'}${r.live ? '' : ' · not connected'}`}>
+        <span className={`w-3 shrink-0 ${dir === 'in' ? 'text-accent2' : 'text-accent'}`}>{dir === 'in' ? '↙' : '↗'}</span>
+        <span className="w-28 shrink-0 truncate">{r.label}</span>
+        {colour ? (
+          <span className="h-3 w-16 shrink-0 rounded-sm border border-border" style={{ background: `rgb(${(r.value as number[]).slice(0, 3).join(',')})` }} />
+        ) : (
+          <Spark pts={hist.current.get(k) ?? []} />
+        )}
+        <span className="w-14 shrink-0 truncate text-right">{fmt(r.value)}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : 'to '}{r.peers.join(', ')}</span>
+        <span className="w-9 shrink-0 text-right text-muted">{r.perSec}/s</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 rounded border border-border bg-panel2/40 p-1.5">
+      <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left" title="What flows in and out of Palinopsia on the mesh, live">
+        <span className={`font-mono text-[9px] text-muted transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-text">data</span>
+        <span className="font-mono text-[9px] text-muted">in ↙ · out ↗{open ? ` (${total})` : ''}</span>
+      </button>
+      {open && (
+        <>
+          {total === 0 && <span className="font-mono text-[9px] text-muted">nothing flows yet : wire a source to Palinopsia (or Palinopsia to a destination) and its values show here</span>}
+          {io.map((n) => (n.in.length || n.out.length ? (
+            <div key={n.sku} className="flex min-w-0 flex-col gap-0.5">
+              {io.length > 1 && <span className="font-mono text-[9px] text-muted">{n.label} · ↙ {n.rxPerSec}/s ↗ {n.txPerSec}/s</span>}
+              {n.in.map((r) => row(n.sku, 'in', r))}
+              {n.out.map((r) => row(n.sku, 'out', r))}
+            </div>
+          ) : null))}
         </>
       )}
     </div>

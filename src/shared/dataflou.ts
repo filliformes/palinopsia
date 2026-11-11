@@ -57,6 +57,26 @@ export interface DfNodeView {
   subs: Record<string, DfSub[]>
 }
 
+/** One row of the Connect tab's data view : a destination of ours and what feeds
+ *  it (in), or one of our sources and where it goes (out). */
+export interface DfIoRow {
+  path: string
+  label: string
+  value: DfValue | null // the last that arrived (in) / ours now (out)
+  peers: string[] // node/path : its sources (in) or its destination (out)
+  ageMs: number | null // since the last value (null : none yet)
+  perSec: number
+  live: boolean // connected to the node(s) it talks with
+}
+export interface DfIo {
+  sku: string
+  label: string
+  in: DfIoRow[]
+  out: DfIoRow[]
+  rxPerSec: number
+  txPerSec: number
+}
+
 export interface DfStatus {
   running: boolean
   error: string | null

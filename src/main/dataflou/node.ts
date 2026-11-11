@@ -11,6 +11,14 @@
 //     values travel as stream_codec packets and are mapped from the source's
 //     range onto the destination's.
 // Event-driven (sockets + timers) where the C++ core is polled; same protocol.
+//
+// Reconnection (ours, beyond the reference) : a node lost without saying goodbye
+// (a cable pulled, a computer asleep, its Wi-Fi dropped) is dialled again from the
+// last place mDNS saw it, every 2 s and then less often (up to 30 s) until it
+// answers. mDNS alone never brought it back : a service seen again unchanged
+// raises no new event, so only a restart of the other side (a new port) used to.
+// The computer waking, or its address changing, starts the announcements over
+// from where it now is (wake()).
 
 import * as net from 'net'
 import * as dgram from 'dgram'
@@ -20,7 +28,7 @@ import {
   encodeStreamRequest, encodeStreamStop, encodeSubAnnounce, encodeSubRequest, frame, type DfIdentity, type DfMsg
 } from './protocol'
 import { crc32Sku, decodeStreamPacket, encodeStreamPacket, type StreamEntry } from './stream'
-import type { DfNodeView, DfParam, DfStatus, DfSub, DfType, DfValue } from '@shared/dataflou'
+import type { DfIo, DfIoRow, DfNodeView, DfParam, DfStatus, DfSub, DfType, DfValue } from '@shared/dataflou'
 
 const DIGEST_MS = 10_000
 const PEER_TIMEOUT_MS = 30_000
@@ -128,6 +136,8 @@ interface StreamTarget {
   lastSent: number
   lastValue: DfValue | undefined
   lastRequest: number
+  sent?: number // values sent this second (the Connect tab's data view)
+  perSec?: number
 }
 
 export interface NodeHost {
@@ -177,6 +187,13 @@ export class DataflouNode {
   private world = new Map<string, WorldNode>()
   private peers: Peer[] = []
   private pending = new Map<string, { address: string; port: number; since: number }>()
+  // where mDNS last saw each node of our universe, and when to dial a lost one again
+  private known = new Map<string, { address: string; port: number }>()
+  private retry = new Map<string, { at: number; delay: number }>()
+  // what arrives on our destinations, per path : when, and how many a second
+  private inAt = new Map<string, number>()
+  private inCount = new Map<string, number>()
+  private inRate = new Map<string, number>()
   private targets: StreamTarget[] = []
   private seq = 0
   private server: net.Server | null = null
@@ -273,6 +290,40 @@ export class DataflouNode {
     this.running = true
 
     this.address = await primaryIPv4()
+    this.startMdns()
+
+    let lastDigest = Date.now()
+    let lastKeepalive = Date.now()
+    this.timers.push(setInterval(() => {
+      const now = Date.now()
+      this.checkTimeouts(now)
+      this.dialPending(now)
+      this.reconnect(now)
+      if (now - lastDigest >= DIGEST_MS) {
+        lastDigest = now
+        for (const p of this.peers) if (p.helloReceived) this.send(p, encodeDigest(++this.seq, this.identity.sku, this.versions()))
+      }
+      if (now - lastKeepalive >= KEEPALIVE_MS) {
+        lastKeepalive = now
+        this.sendAllStreamRequests()
+      }
+      this.pollMonitors(now)
+      this.inRate = this.inCount
+      this.inCount = new Map()
+      for (const t of this.targets) { t.perSec = t.sent ?? 0; t.sent = 0 }
+      this.rxPerSec = this.rx
+      this.txPerSec = this.tx
+      this.rx = 0
+      this.tx = 0
+    }, 1000))
+    // The send pump : each target at its own rate, a value when it moved (and
+    // again every half second, so a lost packet heals).
+    this.timers.push(setInterval(() => this.pump(Date.now()), 8))
+    this.host.log(`node ${this.identity.label} (${this.identity.sku}) on tcp ${this.tcpPort} · udp ${this.udpPort} · universe ${this.universe}`)
+    this.host.onChange()
+  }
+
+  private startMdns(): void {
     this.mdns = new DataflouMdns(
       (s) => this.onService(s),
       (inst) => this.onServiceDown(inst),
@@ -288,32 +339,51 @@ export class DataflouNode {
       { sku: this.identity.sku, ver: String(this.identity.version), core_ver: CORE_VER, univ: this.universe, started: String(Math.floor(Date.now() / 1000)) },
       this.address
     )
+  }
 
-    let lastDigest = Date.now()
-    let lastKeepalive = Date.now()
-    this.timers.push(setInterval(() => {
-      const now = Date.now()
-      this.checkTimeouts(now)
-      this.dialPending(now)
-      if (now - lastDigest >= DIGEST_MS) {
-        lastDigest = now
-        for (const p of this.peers) if (p.helloReceived) this.send(p, encodeDigest(++this.seq, this.identity.sku, this.versions()))
-      }
-      if (now - lastKeepalive >= KEEPALIVE_MS) {
-        lastKeepalive = now
-        this.sendAllStreamRequests()
-      }
-      this.pollMonitors(now)
-      this.rxPerSec = this.rx
-      this.txPerSec = this.tx
-      this.rx = 0
-      this.tx = 0
-    }, 1000))
-    // The send pump : each target at its own rate, a value when it moved (and
-    // again every half second, so a lost packet heals).
-    this.timers.push(setInterval(() => this.pump(Date.now()), 8))
-    this.host.log(`node ${this.identity.label} (${this.identity.sku}) on tcp ${this.tcpPort} · udp ${this.udpPort} · universe ${this.universe}`)
+  /** The computer woke up, or its address changed : the connections that went
+   *  quiet meanwhile are dead (the digests come every 10 s), the announcements
+   *  start over from the address we have now, every node we lost is dialled at
+   *  once and our sources are asked for again. */
+  async wake(why: string): Promise<void> {
+    if (!this.running) return
+    const now = Date.now()
+    for (const p of [...this.peers]) if (now - p.lastMsg > 15_000) this.dropPeer(p, true)
+    const addr = await primaryIPv4()
+    if (!this.running) return
+    if (addr !== this.address) this.host.log(`address ${this.address} -> ${addr}`)
+    this.address = addr
+    // (no goodbye : we never left, and a node that hears one lets us go)
+    this.mdns?.stop(false)
+    this.startMdns()
+    for (const r of this.retry.values()) { r.at = 0; r.delay = 1000 }
+    this.sendAllStreamRequests()
+    this.host.log(`${why} : looking for the mesh again`)
     this.host.onChange()
+  }
+
+  /** Our address now (the network watch compares it with this one). */
+  get announcedAddress(): string {
+    return this.address
+  }
+
+  /** Every node we know of and are not connected to, dialled again from where
+   *  mDNS last saw it : soon (the lower SKU first, as the protocol has it), then
+   *  less and less often (up to every 30 s) until it answers. */
+  private reconnect(now: number): void {
+    for (const [sku, k] of this.known) {
+      if (this.peers.some((p) => p.sku === sku) || this.pending.has(sku)) { this.retry.delete(sku); continue }
+      let r = this.retry.get(sku)
+      if (!r) {
+        r = { at: now + (this.identity.sku < sku ? 2000 : 6000), delay: 2000 }
+        this.retry.set(sku, r)
+        continue
+      }
+      if (now < r.at) continue
+      r.delay = Math.min(30_000, r.delay * 2)
+      r.at = now + r.delay
+      this.dial(sku, k.address, k.port)
+    }
   }
 
   stop(): void {
@@ -359,6 +429,8 @@ export class DataflouNode {
     if (sku) this.instances.set(s.instance, sku)
     if (!sku || !port || !address || sku === this.identity.sku) return
     if (univ !== this.universe) return
+    this.known.set(sku, { address, port })
+    this.retry.delete(sku)
     const existing = this.peers.find((p) => p.sku === sku)
     if (existing) {
       if (existing.port === port && existing.address === address) return
@@ -379,6 +451,8 @@ export class DataflouNode {
 
   private onServiceDown(instance: string): void {
     const sku = this.instances.get(instance) ?? ''
+    // it said goodbye (it closed, it left the mesh) : not one to call back
+    if (sku) { this.known.delete(sku); this.retry.delete(sku) }
     const w = sku ? this.world.get(sku) : undefined
     if (w && !w.local && w.online) {
       w.online = false
@@ -734,6 +808,7 @@ export class DataflouNode {
       if (t.lastValue === v && now - t.lastSent < 500) continue
       t.lastSent = now
       t.lastValue = v
+      t.sent = (t.sent ?? 0) + 1
       const p = this.byPath.get(t.localPath)!
       if (t.destSku === this.identity.sku) {
         const dest = this.byPath.get(t.destPath)
@@ -771,7 +846,12 @@ export class DataflouNode {
 
   /** Values for our destinations, to the app (and kept for the visualizer). */
   private deliver(list: Array<{ path: string; value: DfValue; type: DfType }>): void {
-    for (const v of list) this.lastIn.set(v.path, v.value)
+    const now = Date.now()
+    for (const v of list) {
+      this.lastIn.set(v.path, v.value)
+      this.inAt.set(v.path, now)
+      this.inCount.set(v.path, (this.inCount.get(v.path) ?? 0) + 1)
+    }
     this.host.onValues(list)
   }
 
@@ -858,6 +938,46 @@ export class DataflouNode {
   }
 
   // ── the monitor ─────────────────────────────────────────────────────────
+
+  /** What flows now (the Connect tab's data view) : each of our destinations with
+   *  its sources and the last value that arrived, each stream we send with its
+   *  value; how many a second, and how long since the last. */
+  io(): DfIo {
+    const now = Date.now()
+    const me = this.identity.sku
+    const name = (sku: string): string => (sku === me ? this.identity.label : this.world.get(sku)?.identity.label ?? sku.slice(0, 8))
+    const live = (sku: string): boolean => sku === me || !!this.peerOf(sku)
+    const inRows: DfIoRow[] = []
+    const seen = new Set<string>()
+    for (const [dest, list] of this.subs) {
+      seen.add(dest)
+      const at = this.inAt.get(dest)
+      inRows.push({
+        path: dest,
+        label: this.byPath.get(dest)?.label || dest,
+        value: this.lastIn.get(dest) ?? null,
+        peers: list.map((s) => `${name(s.sku)}/${s.path}`),
+        ageMs: at ? now - at : null,
+        perSec: this.inRate.get(dest) ?? 0,
+        live: list.some((s) => live(s.sku))
+      })
+    }
+    // values set from elsewhere (a SETVAL, the visualizer) on a path nothing is wired to
+    for (const [path, at] of this.inAt) {
+      if (seen.has(path) || now - at > 10_000) continue
+      inRows.push({ path, label: this.byPath.get(path)?.label || path, value: this.lastIn.get(path) ?? null, peers: ['set'], ageMs: now - at, perSec: this.inRate.get(path) ?? 0, live: true })
+    }
+    const outRows: DfIoRow[] = this.targets.map((t) => ({
+      path: t.localPath,
+      label: this.byPath.get(t.localPath)?.label || t.localPath,
+      value: this.values.get(t.localPath) ?? null,
+      peers: [`${name(t.destSku)}/${t.destPath}`],
+      ageMs: t.lastSent ? now - t.lastSent : null,
+      perSec: t.perSec ?? 0,
+      live: live(t.destSku)
+    }))
+    return { sku: me, label: this.identity.label, in: inRows, out: outRows, rxPerSec: this.rxPerSec, txPerSec: this.txPerSec }
+  }
 
   status(): DfStatus {
     const nodes: DfNodeView[] = []

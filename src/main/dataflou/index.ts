@@ -9,11 +9,12 @@
 // whole Body rule list does not fit in one; split by heading, every action is on
 // the mesh and each always lands on the same node.
 
-import { app, type BrowserWindow, ipcMain } from 'electron'
+import { app, type BrowserWindow, ipcMain, powerMonitor } from 'electron'
 import { createHash, randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DataflouNode } from './node'
+import { primaryIPv4 } from './mdns'
 import { encodeDeclare } from './protocol'
 import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged } from './visualizer'
 import {
@@ -307,6 +308,24 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle('dataflou:bind', (_e, a: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) =>
     node ? node.subscribeRemote(a.destSku, a.destPath, a.srcSku, a.srcPath, !!a.on) : false
   )
+  ipcMain.handle('dataflou:io', () => [node, node2].filter((n): n is DataflouNode => !!n).map((n) => n.io()))
+  // Back from sleep, or the network changed under us : each node looks for the
+  // mesh again (its lost peers dialled at once, mDNS from the address we have now).
+  const wakeAll = (why: string): void => {
+    void node?.wake(why)
+    void node2?.wake(why)
+  }
+  powerMonitor.on('resume', () => wakeAll('the computer woke up'))
+  powerMonitor.on('unlock-screen', () => wakeAll('the session was unlocked'))
+  let addrBusy = false
+  const watch = setInterval(() => {
+    if (!node || addrBusy) return
+    addrBusy = true
+    void primaryIPv4()
+      .then((a) => { if (node && a !== node.announcedAddress) wakeAll(`the network changed (${a})`) })
+      .finally(() => { addrBusy = false })
+  }, 10_000)
+  app.on('will-quit', () => clearInterval(watch))
   ipcMain.handle('dataflou:forget', (_e, s: string) => {
     node?.flush(s)
     return true

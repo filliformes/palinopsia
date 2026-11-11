@@ -134,12 +134,14 @@ export class DataflouMdns {
 
   private goodbye: () => void = () => {}
 
-  stop(): void {
+  /** `goodbye` false : started again at once (a wake, a new address), so no
+   *  goodbye that would have the others let us go. */
+  stop(goodbye = true): void {
     for (const t of this.timers) clearTimeout(t as ReturnType<typeof setTimeout>)
     for (const t of this.timers) clearInterval(t as ReturnType<typeof setInterval>)
     this.timers = []
     if (!this.mdns) return
-    this.goodbye()
+    if (goodbye) this.goodbye()
     const m = this.mdns
     this.mdns = null
     setTimeout(() => {

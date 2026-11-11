@@ -66,6 +66,32 @@ that CI builds into cross-platform releases.
     breathing it (smoothed), a session round trip with its light scenes, the map's drags,
     an Enttec output with nothing plugged in (looking, no error). **Not verified : a real
     Enttec Pro** (none here).
+- **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
+  visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
+  A **data** box in the Connect tab's dataflou section, above the connections : each of our
+  destinations a node feeds (↙, from node/path) and each source a node streams from us (↗,
+  to node/path), the value now, an 80-point sparkline (a swatch for colors), values a
+  second; grey after 2 s of silence or when the other node is gone; values SET from
+  elsewhere on unwired paths show for 10 s. `DataflouNode.io()` (main) counts per path in
+  `deliver()` and per stream in the pump, rolled each second; `dataflou:io` IPC, polled at
+  10 Hz only while the box is open (folding remembered in `opsia.dfData`).
+
+### Fixed
+
+- **dataflou : a node lost to a sleep or a disconnect comes back by itself** (Vincent :
+  "quand on se déconnecte/un ordi tombe en veille, la connexion se perd (on doit fermer et
+  ouvrir Max)"). The cause : mDNS raises no new event for a service seen again unchanged,
+  so a peer that timed out was never dialled again; only a restart of the other side (a new
+  port, a new announcement) brought it back, and the reference core never redials on its
+  own. Now the node remembers where mDNS last saw each node of its universe and redials a
+  lost one (the lower SKU after 2 s, the other after 6 s, then doubling up to every 30 s)
+  until it answers; a goodbye (the node closed or left) forgets it. On `powerMonitor`
+  resume / unlock-screen, or when the primary IPv4 changes (checked every 10 s), each node
+  drops peers silent for 15 s, restarts mDNS from the current address (no goodbye), redials
+  every lost node at once and re-sends its stream requests. Tested against a fake node in
+  Node with its own redial switched off (like Max's core), its sockets destroyed with no
+  goodbye : values flowed again after 7.2 s and 6.7 s. **Not verified : a real sleep with
+  Max** (to do on his machines).
 
 ### Docs
 
