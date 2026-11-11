@@ -218,6 +218,103 @@ that CI builds into cross-platform releases.
     three cues following on (the second at 1.43 s and the third at 2.89 s for a 0.4 s
     fade and a 1 s follow), a Palinopsia scene bringing its cue, GO and back, the Seq
     lane, six spots in a light-by-light chase with wings 2 and a fan.
+- **Lights : an audit, a first-time path, light setups, digital shows** (Vincent : "Run a
+  full audit of the new Lights section; make sure its UI is consistent with other sections,
+  and clear, useful and easy to use for a non-initiated person just wanting to set up a few
+  lights all connected together in a chain on an ENTTEC DMX USB PRO. And make some more
+  'digital arts' and experimental shows"; then "Make SURE the led bars work with this
+  model" (a 2-pack of 1 m, 90-LED, 30-zone RGB pixel bars, modes 3 / 5 / 8 / 90 / 94), "let
+  the lights setup be saved so I can reload a project visuals but switch light setup",
+  "the back button should read : back to Output").
+  - **Set up** (`SetupGuide`, the right panel with nothing selected) : five steps that tick
+    (the interface and the chain explained; a kind and a count, `addLightChain` /
+    `chainOf` : the Enttec output made if none, a row, addressed in turn; each light's
+    address with its DIP switches, shared channels flagged with a **fix**; the test; a
+    show). The header says in words whether the Enttec is found (`IfaceStatus`); the
+    Enttec row writes its state in full ("not found yet : plug it into a USB port").
+  - **The 30-zone bars** (`shared/lightProfiles.ts`) : `b:bar30-90` (30 × RGB),
+    `b:bar30-94` (30 × RGB then strobe, pattern, speed, background held at 0), `b:bar-5`
+    (D S R G B), `b:bar-8` (D R G B S 0 0 0), with a label per channel. The orders come
+    from the listing (30 zones of 3 RGB LEDs, modes 3 / 5 / 8 / 90 / 94) and the manual of
+    the same family's 12-zone bar (same menu and modes : 3 = R G B; 5 = dimmer, strobe,
+    R G B; 8 = dimmer, R G B, strobe, pattern, speed, background; N × 3 = the zones; N × 3
+    + 4 = the zones then strobe, pattern, speed, background). **Not verified on the bars
+    themselves** (none here) : the test pattern is the check.
+  - **Light setups** (`LightSetup`, `lightSetups` / `lightSetupName`, localStorage
+    `opsia.lightSetups`; `main/lightSetup.ts`, IPC `light:setupSave` / `light:setupOpen`,
+    `.opsialights`) : the rig and the session's lights by name; `applyLightSetup` keeps
+    the one it replaces first, clears the selection, the cue and the test.
+  - **The page in the app's terms** : sections with the Output page's info dot and filled
+    buttons, "Lights" for the list, "kind" for a light's profile, "area" for the sampled
+    patch, "picture" for the master backdrop, "CUE FADE", cues named "Cue N", **sending /
+    not sending**, **← back to Output** (it opens the Output page), show names that fit
+    (a wider column, "The picture"), each show with a swatch, in two groups.
+  - **Digital effects and shows** (`lights/lightFx.ts`) : afterimage (a slow trace of the
+    picture; where it moved on, the trace's complement), echo (a 10 Hz delay line, 0.3 to
+    8 s), sample and hold, eight colors (one bit a channel, a third of a second held),
+    glitch (blocks of primaries, negatives, displaced reads), tape head (the sampling
+    place slides, mirrored at the edges), automaton (elementary rules with their history
+    as a time-space diagram across the room, warm-started; light by light : a cell a
+    light), the Game of Life (a torus over the room, a heat trail, reseeded when it
+    settles), fireflies (mean-field coupled phases whose pull swells and falls over 45 s),
+    clouds (two octaves of value noise), binary count. Twelve shows : Afterimage, Echo,
+    Sample and hold, Eight colors, Glitch, Tape head, Rule 30, Triangles, Game of Life,
+    Fireflies, Cloud field, Binary count. `LightLook.rule`. A show now clears the order,
+    wings, fan and band the last one set.
+  - **Fixed, from two code reviews (55 findings read against the code)** :
+    - *Flash safety* : effect clocks were `clock × rate` with the master speed in both, so
+      speed 4 gave a pulse at 12 Hz, and any change of rate re-phased the effect. One
+      integrated phase per rate now (`phaseOf`, capped at 3 a second; a modulated rate
+      integrates its own). The beat effect never flashes twice within a third of a
+      second; the sound effect follows up in 70 ms and down in 330 ms (hi-hats no longer
+      flash it); a gradient's drift is capped.
+    - *sACN* : universe 0 was sent as 1 and collided with the real universe 1 : sACN now
+      counts from 1 (`firstUniverse`). Two outputs to one place share its universes
+      (buffers keyed by destination). WLED is sent as R G B on an LED boundary whatever
+      the layout. A universe past the last one is an overflow.
+    - *A last dark frame* : a destination that stops being fed gets one universe of zeros
+      (sending off, an output off or removed, the last light gone, quitting); the Enttec
+      link writes it even behind a frame in progress and closes after it.
+    - *The Enttec link* : a link closed while opening lets its port go (it used to keep
+      it : "already open" for ever); only the link whose port left reacts to a
+      disconnect; a delayed frame is dropped when its output went off.
+    - *Cues* : a cue stores every light and every group fader (one saved on the default
+      look could not bring it back); a fade begun during another starts from what the
+      room shows; a cue's grand master comes in over its fade; New and Open reset the cue
+      in play; follow needs a follow time and counts from when it is turned on; OSC `go`
+      / `back` / `save` fire on the rising edge.
+    - *Patching* : the next free address comes from the real channel spans (a long bar's
+      spill counted, the next universe when it would not fit : `nextSlot`); ids of lights
+      made together can no longer collide; a layout is never cut inside a token (128
+      tokens); a 4096-cell cap on a matrix; the patch view's click no longer readdresses,
+      and lists what does not fit.
+    - *Fixture files* : the pixel count comes from what the block repeats over; a fine
+      channel pairs only with its own coarse one; a combined dimmer / strobe is held
+      full; an unknown channel or an unreadable mode is left out and named instead of
+      held at 0; 16-bit defaults read as their coarse byte.
+    - *State* : a light dragged keeps what it shows (state kept when the pixel count is
+      unchanged); a fader at 0 is dark whatever the contrast and the floor; identify and
+      the test answer at once during a fade; a NaN from a modulator is ignored, and the
+      lights' tick has its own guard; stale source pictures are dropped; the lights of
+      the session are in undo; a removed light or group makes no empty undo step and its
+      bindings no longer count against the cap.
+    - *The page* : its keys no longer act under another page, Esc follows the app's
+      order, a new light is the one selected, the test and identify end when the page
+      closes, numbers and addresses are taken when typed whole, a kind change keeps a
+      sensible shape, a profile without a size keeps the light's own kind, nudges and
+      copies take a bar's bends along, an output with lights needs a second click to
+      remove, several lights can be patched to an output at once, the map's pointer is
+      right at any UI zoom, a click with a wobble moves nothing, one write a drag.
+  - Left for later (said, not built) : sACN multicast on every network interface (the
+    system's default one only), an output menu's undo, RDM (the Pro and these bars speak
+    it : the app could find the lights and set their addresses itself).
+  - Tested : 138 Node checks (48 new : the bars' four modes byte for byte, two bars on
+    one Enttec at 1 and 91, the test's red band along them; the speed cap; each digital
+    effect; sACN from 1; shared destinations; WLED; the next slot after a long bar; 32
+    ids; kind and profile changes; a dark fader; a fade inside a fade; a setup through
+    its text). In the test copy : the guide adding the bars from the Output page's LIGHTS
+    button, the test's band on the map, two setups switched, back to Output. **Not
+    verified : a real Enttec, the real bars.**
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

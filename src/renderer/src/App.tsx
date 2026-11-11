@@ -210,6 +210,8 @@ import { randomizeInputs, DICE_SOURCES, DICE_FX_IDS } from './randomize'
 import { lightRuntime } from './lights/lightRuntime'
 import { LightsPage } from './components/LightsPage'
 
+let lightsFaulted = false // the lights' tick threw once : logged once
+
 // Sonify's Assemblage voice : a clip's place on the Assemble map (its note, its pan)
 sonifyEngine.setUnitPlace(unitPlace)
 
@@ -1163,6 +1165,12 @@ export default function App(): JSX.Element {
           st.setSonifyPageOpen(false)
           return
         }
+        // (the Lights page sits over the Output page, under the others)
+        if (st.lightsPageOpen) {
+          e.preventDefault()
+          st.setLightsPageOpen(false)
+          return
+        }
         if (st.outputPageOpen && !st.outputPageWindow) {
           e.preventDefault()
           st.setOutputPageOpen(false)
@@ -1867,7 +1875,8 @@ export default function App(): JSX.Element {
         //     the engine makes the DMX frame, the Enttec Pros get it from here and
         //     the network outputs through main (lights/lightRuntime.ts).
         perfMeter.begin('lights')
-        lightRuntime.tick(comp!, now)
+        // (its own guard : a fault in the lights must not skip what follows it)
+        try { lightRuntime.tick(comp!, now) } catch (e) { if (!lightsFaulted) { lightsFaulted = true; console.error('[lights] tick', e) } }
         perfMeter.end('lights')
         // 4. Output window : the keystone it applies to the streamed frame (it
         //    draws our pixels; this is all it still reads of the render state).

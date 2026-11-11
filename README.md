@@ -2183,6 +2183,46 @@ DMX lights into Palinopsia : LED bars, spots and LED matrices, each placed on th
 it takes its light from, with or without the video in them, tuned to the physical light,
 with shows, light scenes of their own and a lighting console.
 
+**A few lights on an Enttec DMX USB Pro, from nothing.** With nothing selected, the right
+of the page is the **Set up** guide, five steps that tick as they are done :
+1. **Plug in the interface** : the Pro on a USB port (**+ my Enttec USB Pro**), then one
+   DMX cable from it to the first light's DMX IN, another from that light's DMX OUT to the
+   next, and so on : a chain. Every light hears everything and takes its own channels
+   from its address. The top of the page says in words whether the Pro is found (it is
+   looked for every two seconds, nothing to choose).
+2. **Add your lights** : the **kind** of light (how many channels, what each does : its
+   manual or its menu names its mode), **how many**, **add them** : they land in a row
+   across the picture, addressed one after the other.
+3. **Give each light its address** : the list shows the address to set on each light
+   itself (its menu, or its DIP switches, drawn up where filled). Two lights sharing
+   channels, or one past 512 : it says so, **fix** readdresses them in order.
+4. **Check them** : **test** sweeps a line through the room; each light should go red,
+   green, blue, then white, from left to right (a wrong color : its kind is another one;
+   dark : its address).
+5. **Play** : pick a show, or drag a light on the map : it takes the picture's colors
+   from where it sits.
+
+Click an empty part of the map to come back to the guide at any time.
+
+**The 90-LED bars of 30 zones** (the 1 m RGB pixel bars whose menu offers 3 / 5 / 8 / 90 /
+94 channels) are in the **kind** list, mode by mode : set the same mode on the bar's own
+menu. **30-zone RGB bar : 90 channels** is the one to take : every zone its own color
+from the picture, 90 channels a bar (two bars : addresses 1 and 91; five fit on one
+Enttec). **94 channels** is the same with the bar's strobe, pattern, speed and background
+after the zones, held at 0 so the zones play. **Bar as one light : 5 channels** (dimmer,
+strobe, red, green, blue) and **8 channels** (dimmer, red, green, blue, strobe, pattern,
+speed, background) make the whole bar one color; its 3-channel mode is **RGB light, 3
+channels**. The channel orders are those of this family of bars as their makers publish
+them : the **test** tells in a minute whether yours agrees.
+
+**Setups** (top of the left column) : a light setup is the whole page : the lights and
+where they are, the outputs, the groups, and what they show (looks, cues, masters). Give
+it a name and **save**; click one in the list to switch to it. The picture and the rest of
+the project stay as they are : one project's visuals, another room's lights. The setup
+you leave is kept under its own name first (or as "before <the new one>"), so nothing is
+lost. **save to a file…** and **open a file…** carry one to another computer (a
+`.opsialights` file).
+
 - **Fixtures** : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
   light : a small RGB spot, a PAR, a wash), **+ ring** (pixels around a circle),
   **+ matrix** (a grid of pixels over a rectangle). Each is drawn on the **map** over the
@@ -2279,6 +2319,21 @@ with shows, light scenes of their own and a lighting console.
     (2 : from both ends to the middle). **fan** spreads a hue across the room or along
     the order, from one end to the other (a positive fan climbs toward yellow, as the
     hue slider does).
+    The **digital** effects (second group of the menu) make the lights a small computer
+    of their own : **afterimage** (when the picture changes, the light flares the
+    complement of what was there, fading over **lasts**), **echo** (the source as it was
+    up to eight seconds ago), **sample and hold** (each pixel freezes the color it saw
+    and looks again now and then), **eight colors** (one bit a channel : red, green and
+    blue each fully on or off), **glitch** (blocks of pure primaries, negatives and
+    pieces read from the wrong place breaking in), **tape head** (the light reads the
+    picture at a place that slides across it : a still picture moves through the room),
+    **automaton** (a cellular automaton across the room, its past trailing behind it;
+    **rule** : 30 chaos, 90 triangles, 110 gliders, 150, 184, 22, 73, 45; light by light,
+    each light is a cell), **game of life** (on a grid over the room, reseeding itself
+    when it settles), **fireflies** (each pixel blinks at its own tempo, they fall into
+    step and drift apart again), **clouds** (a slow noise field) and **binary count**
+    (the lights count the beats in binary). The ⓘ beside the menu says what the one
+    chosen does.
   - **Tuning** : brightness, contrast, gamma (LEDs are linear : 2 or so looks like the
     screen), saturation, hue, warmth (a white balance), a black floor, and a smoothing
     that calms a busy picture's flicker. Kept **on this computer** (it belongs to the
@@ -2299,10 +2354,15 @@ with shows, light scenes of their own and a lighting console.
   once and a projector shows the picture two or three frames late, so about 40 ms keeps
   them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
   each frame, so the nodes that know it show all their universes at the same moment.
-- **Shows** : a look for every light at once, fading in : Follow the picture, Each its
-  layer, Picture colors (the picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
-  the beat, Sound reactive, Breathing, Night sparkle, Dark. They fit any room : their
-  patterns run across the space, so each light takes its part from where it stands.
+- **Shows** : a look for every light at once, fading in, each with a swatch of what it
+  looks like. **Classic** : Follow the picture, Each its layer, Picture colors (the
+  picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire,
+  Rainbow drift, White chase, Picture chase, On the beat, Sound reactive, Breathing,
+  Night sparkle, Dark. **Digital** : Afterimage, Echo, Sample and hold, Eight colors,
+  Glitch, Tape head, Rule 30, Triangles, Game of Life, Fireflies, Cloud field, Binary
+  count. They fit any room : their patterns run across the space, so each light takes
+  its part from where it stands. A show is a whole look : it clears the order, the wings
+  and the fan the last one set.
 - **Light cues** : looks for the lights apart from Palinopsia's scenes, played as a cue
   list. **+ save** keeps what they show now (the looks, the masters, the group faders);
   click a cue to bring it (over its fade), **GO** for the next (after the last : the
@@ -2318,8 +2378,13 @@ with shows, light scenes of their own and a lighting console.
   the black time, and back), plus the master and the speed as sliders for a modulator.
   Each knob and the Black button take **MIDI Learn**. The top bar's **■ Black** takes the
   lights down with the whole show.
-- **Lights on / off** (top of the page) : off, nothing is sent, and the page still shows
-  what they would do. The frame rate (10 to 44 a second, 40 by default) is in Settings.
+- **Sending / not sending** (top of the page) : off, nothing is sent, and the page still
+  shows what they would do. A light that stops being fed (sending off, its output off or
+  removed, the app quitting) gets **one last dark frame** : an Enttec repeats the last
+  frame it got for ever, so without it the room would stay lit in its last look. **← back
+  to Output** closes the page onto the Output page, where the **LIGHTS** button is. The
+  looks, the cues, the masters and the group faders are part of **undo** (Ctrl+Z after
+  "to all", a show, a deleted cue or New). The frame rate (10 to 44 a second, 40 by default) is in Settings.
 - **OSC** : `/opsia/lights/master`, `speed`, `fade`, `blacktime` (0..1), `black` and
   `on` (a value, or none to turn it over), `scene` (its number or name), `save`,
   `show` (a show's name). See the [OSC reference](docs/opsia-osc-reference.html).

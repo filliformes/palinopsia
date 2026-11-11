@@ -1236,9 +1236,10 @@ function route(address: string, args: Args, host = ''): void {
       else if (k === 'blacktime') st.setLightsMaster({ blackSec: Math.max(0, Math.min(1, n)) * 20 })
       else if (k === 'black') st.setLightsBlack(args.length ? n >= 0.5 : !st.lightsBlack)
       else if (k === 'on') st.setLightRig({ on: args.length ? n >= 0.5 : !st.lightRig.on })
-      else if (k === 'save') st.saveLightScene()
-      else if (k === 'go') st.goLightCue(1)
-      else if (k === 'back') st.goLightCue(-1)
+      // (triggers : a button sending 1 then 0 fires once)
+      else if (k === 'save') { if (!args.length || rising(address, n)) st.saveLightScene() }
+      else if (k === 'go') { if (!args.length || rising(address, n)) st.goLightCue(1) }
+      else if (k === 'back') { if (!args.length || rising(address, n)) st.goLightCue(-1) }
       else if (k === 'cues') st.setLightCueRun(args.length ? n >= 0.5 : !st.lightCueRun)
       else if (k === 'scene') {
         const s = firstStr(args)

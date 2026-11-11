@@ -12,8 +12,9 @@ const btn = (on: boolean): string =>
   }`
 
 /** GO, back, and the cues following on by themselves (MIDI Learn on each). */
-export function LightCueButtons(): JSX.Element {
+export function LightCueButtons({ lane = false }: { lane?: boolean }): JSX.Element {
   const run = useStore((s) => s.lightCueRun)
+  const can = useStore((s) => s.lightsSession.scenes.some((c) => (c.follow ?? 0) > 0))
   const n = useStore((s) => s.lightsSession.scenes.length)
   const st = useStore.getState
   return (
@@ -33,16 +34,20 @@ export function LightCueButtons(): JSX.Element {
           GO
         </button>
       </span>
-      <span className="relative">
-        <MidiLearnOverlay id="fire:lightscues" />
-        <button
-          className={btn(run)}
-          onClick={() => st().setLightCueRun(!run)}
-          title="Following on : a cue with a follow time hands over to the next one by itself (a cue without one waits for GO). The Seq page's transport starts and stops it too"
-        >
-          {run ? '◉ following' : 'follow'}
-        </button>
-      </span>
+      {/* (in the Seq lane, the lane's own play is this switch) */}
+      {!lane && (
+        <span className="relative">
+          <MidiLearnOverlay id="fire:lightscues" />
+          <button
+            className={`${btn(run)} disabled:opacity-40`}
+            disabled={!run && !can}
+            onClick={() => st().setLightCueRun(!run)}
+            title={can || run ? "Following on : a cue with a follow time hands over to the next one by itself (a cue without one waits for GO). The Seq page's transport starts and stops it too" : 'Give a cue a follow time first (⚙ on a cue : then)'}
+          >
+            {run ? '◉ following' : 'follow'}
+          </button>
+        </span>
+      )}
     </div>
   )
 }
@@ -52,6 +57,26 @@ export function LightCueNow(): JSX.Element {
   const cue = useStore((s) => s.lightsSession.scenes.find((c) => c.id === s.lightCue) ?? null)
   const i = useStore((s) => s.lightsSession.scenes.findIndex((c) => c.id === s.lightCue))
   return <span className="font-mono text-[10px] text-muted">{cue ? `cue ${i + 1} · ${cue.name}` : 'no cue yet'}</span>
+}
+
+/** Seconds typed whole ("2.5" is never read as "2" then "5") : taken on Enter or
+ *  when the box is left; empty : none. */
+function TimeBox({ value, placeholder, max, onCommit }: { value: number | null; placeholder: string; max: number; onCommit: (v: number | null) => void }): JSX.Element {
+  const [txt, setTxt] = useState<string | null>(null)
+  return (
+    <input
+      type="text" inputMode="decimal"
+      value={txt ?? (value === null ? '' : String(value))}
+      placeholder={placeholder}
+      onChange={(e) => setTxt(e.target.value)}
+      onBlur={() => {
+        if (txt !== null) { const n = Number(txt.replace(',', '.')); onCommit(txt.trim() === '' ? null : Number.isFinite(n) ? Math.max(0, Math.min(max, n)) : value) }
+        setTxt(null)
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); else if (e.key === 'Escape') { setTxt(null); e.stopPropagation() } }}
+      className="w-14 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
+    />
+  )
 }
 
 function Progress({ id }: { id: string }): JSX.Element | null {
@@ -122,23 +147,12 @@ export function LightCueList({ row = false }: { row?: boolean }): JSX.Element {
               <div className="flex flex-col gap-1 px-1.5 pb-1 font-mono text-[9px] text-muted">
                 <label className="flex items-center gap-1" title="How long it takes to come in (empty : the console's scene fade)">
                   <span className="w-12 shrink-0">fade</span>
-                  <input
-                    type="number" min={0} max={60} step={0.1}
-                    value={sc.fade ?? ''}
-                    placeholder={`${fadeDef.toFixed(1)}`}
-                    onChange={(e) => st().updateLightScene(sc.id, { fade: e.target.value === '' ? null : Number(e.target.value) })}
-                    className="w-14 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-                  />
+                  <TimeBox value={sc.fade ?? null} placeholder={fadeDef.toFixed(1)} max={60} onCommit={(v) => st().updateLightScene(sc.id, { fade: v })} />
                   s
                 </label>
                 <label className="flex items-center gap-1" title="Once it is in, the next cue goes this long after, by itself, while the cues follow on (0 : it waits for GO)">
                   <span className="w-12 shrink-0">then</span>
-                  <input
-                    type="number" min={0} max={3600} step={0.5}
-                    value={sc.follow ?? 0}
-                    onChange={(e) => st().updateLightScene(sc.id, { follow: Number(e.target.value) || 0 })}
-                    className="w-14 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-                  />
+                  <TimeBox value={sc.follow ?? 0} placeholder="0" max={3600} onCommit={(v) => st().updateLightScene(sc.id, { follow: v ?? 0 })} />
                   s {sc.follow ? 'to the next' : '(waits for GO)'}
                 </label>
                 <label className="flex items-center gap-1" title="A Palinopsia scene : recalling it brings this cue (its picture and its lights together)">

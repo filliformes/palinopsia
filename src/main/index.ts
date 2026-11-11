@@ -46,6 +46,7 @@ import { prepareNdi } from './ndi/prepare'
 import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
 import { DmxSender, discoverLights, type DmxPacket } from './light'
+import { openLightSetupFile, saveLightSetupFile } from './lightSetup'
 import { displayHz, samplePerf } from './perf'
 import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
@@ -1177,6 +1178,8 @@ app.whenReady().then(async () => {
   )
   // who is on the network : Art-Net nodes (ArtPoll) and WLED controllers (mDNS)
   safeHandle('light:discover', () => discoverLights())
+  safeHandle('light:setupSave', (_e, text, name) => saveLightSetupFile(mainWindow, text as string, name as string))
+  safeHandle('light:setupOpen', () => openLightSetupFile(mainWindow))
 
   // ---------- IPC: Kiosk / installation mode ----------
   safeHandle('kiosk:config', () => getKioskConfig())

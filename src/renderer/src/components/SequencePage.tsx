@@ -175,7 +175,7 @@ export function SequencePage({
           toggleTitle={!cueFollow ? 'Give a cue a follow time first (⚙ on a cue)' : cueRun ? 'Stop following on (the lights stay as they are)' : 'Follow on from cue to cue'}
           midiId="fire:lightscues"
           status={<LightCueNow />}
-          right={<LightCueButtons />}
+          right={<LightCueButtons lane />}
         >
           <div className="px-3 py-2">
             <LightCueList row />

@@ -1865,6 +1865,7 @@ export function writeModTarget(
   if (t.kind === 'light') {
     const r = LIGHT_MOD_RANGE[t.field]
     const value = r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min)
+    if (!Number.isFinite(value)) return
     liveModValues.set(liveKey(t), value)
     lightMods.set(lightModKey(t.fixture, t.field), value)
     return
@@ -2118,7 +2119,7 @@ export function applyModulation(
       if (base === null) continue // the fixture is gone
       const r = LIGHT_MOD_RANGE[a.target.field]
       const final = inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
-      if (final === null || typeof final !== 'number') continue
+      if (final === null || typeof final !== 'number' || !Number.isFinite(final)) continue
       liveModValues.set(liveKey(a.target), final)
       lightMods.set(lightModKey(a.target.fixture, a.target.field), final)
       continue

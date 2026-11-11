@@ -59,6 +59,9 @@ class EnttecLink {
   private busy = false
   private opening = false
   private retryAt = 0
+  private closed = false
+  private queued: Uint8Array | null = null // a frame that must go out after the one being written
+  private tail: Promise<void> = Promise.resolve()
 
   constructor(readonly index: number) {}
 
@@ -76,6 +79,8 @@ class EnttecLink {
       const p = ports[this.index]
       if (!p) { this.status = 'searching'; this.error = ports.length ? `only ${ports.length} plugged in` : 'none plugged in'; return }
       await p.open({ baudRate: 57600 })
+      // (closed while it was opening : the output was removed, the lights went off)
+      if (this.closed) { try { await p.close() } catch { /* gone */ } return }
       if (!p.writable) throw new Error('the port cannot be written')
       this.port = p
       this.writer = p.writable.getWriter()
@@ -97,22 +102,36 @@ class EnttecLink {
     this.writer = null
     this.port = null
     this.busy = false
+    this.queued = null
     try { w?.releaseLock() } catch { /* gone */ }
     try { await p?.close() } catch { /* gone */ }
   }
 
   /** Send a universe; opens (and reopens) on the way. Never waits : a write still
-   *  in progress skips this frame. */
-  send(dmx: Uint8Array): void {
+   *  in progress skips this frame, unless it `must` go out (a last dark frame) :
+   *  then it is written right after. */
+  send(dmx: Uint8Array, must = false): void {
+    if (this.closed) return
     if (!this.writer) {
       if (!this.opening && performance.now() >= this.retryAt) void this.open()
       return
     }
-    if (this.busy) return
-    this.busy = true
+    if (this.busy) { if (must) this.queued = dmx; return }
+    this.write(dmx)
+  }
+
+  private write(dmx: Uint8Array): void {
     const w = this.writer
-    w.write(enttecPacket(dmx)).then(
-      () => { this.busy = false; this.frames++ },
+    if (!w) return
+    this.busy = true
+    this.tail = w.write(enttecPacket(dmx)).then(
+      () => {
+        this.busy = false
+        this.frames++
+        const q = this.queued
+        this.queued = null
+        if (q && this.writer === w) this.write(q)
+      },
       (e: Error) => {
         // unplugged, asleep : close it and try again shortly
         this.status = 'error'
@@ -123,10 +142,18 @@ class EnttecLink {
     )
   }
 
-  /** Lights off, or the output removed : the port is let go. */
+  /** Lights off, or the output removed : what is being written (and a last frame
+   *  waiting behind it) goes out, then the port is let go. */
   async close(): Promise<void> {
+    this.closed = true
+    for (let k = 0; k < 2; k++) { try { await this.tail } catch { /* it failed : nothing to wait for */ } }
     await this.drop()
     this.status = 'off'
+  }
+
+  /** Its port is this one (a device that left). */
+  holds(p: unknown): boolean {
+    return !!p && this.port === p
   }
 
   /** A port that went away (unplugged, asleep). */
@@ -144,17 +171,23 @@ function watch(): void {
   watching = true
   // a Pro plugged back in : the links waiting for one look again soon
   s.addEventListener('connect', () => { for (const l of links.values()) if (l.status !== 'open') l.lost() })
-  s.addEventListener('disconnect', () => { for (const l of links.values()) l.lost() })
+  // (only the link whose port left : another serial device unplugged is nobody's)
+  s.addEventListener('disconnect', (ev) => { for (const l of links.values()) if (l.holds(ev.target)) l.lost() })
 }
 
 export const enttec = {
   supported: (): boolean => !!serial(),
-  /** Send `dmx` to the Pro at `index` (opened on demand). */
-  send(index: number, dmx: Uint8Array): void {
+  /** Send `dmx` to the Pro at `index` (opened on demand). `must` : a frame that
+   *  has to go out even behind one being written (the last, dark one). */
+  send(index: number, dmx: Uint8Array, must = false): void {
     watch()
     let l = links.get(index)
     if (!l) { l = new EnttecLink(index); links.set(index, l) }
-    l.send(dmx)
+    l.send(dmx, must)
+  },
+  /** A dark frame to the Pro at `index`, if it is open (never opens it for that). */
+  dark(index: number): void {
+    links.get(index)?.send(new Uint8Array(512), true)
   },
   /** Close the links no longer in use (an output removed, the lights off). */
   keepOnly(indices: Set<number>): void {
