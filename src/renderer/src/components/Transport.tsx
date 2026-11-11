@@ -100,7 +100,6 @@ export function Transport(): JSX.Element {
   const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const setSonifyPageOpen = useStore((s) => s.setSonifyPageOpen)
   const setOutputPageOpen = useStore((s) => s.setOutputPageOpen)
-  const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0 && s.lightRig.outputs.some((o) => o.enabled))
   const outputOn = useStore((s) => s.outputActive)
   // Right-click on Output : open it in a window beside the controls (the picture
   // the projector gets, the domemaster on the dome) to tweak while watching it.
@@ -426,15 +425,6 @@ export function Transport(): JSX.Element {
           title="Output & projection mapping : fullscreen output, keystone, record, NDI/Spout/Syphon/HIVE (O) : lights while the external output is on. Right-click : watch the Output in a window, or open this page in a window"
         >
           {outputOn ? '◉ Output' : '⛶ Output'}
-        </button>
-        {/* Lights : the DMX fixtures mapped on the picture (also T). Lights while
-            they send. */}
-        <button
-          onClick={() => useStore.getState().setLightsPageOpen(true)}
-          className={`${TBTN} ${lightsOn ? TBTN_LIT : TBTN_IDLE_ON}`}
-          title="Lights : DMX fixtures (LED bars, spots, matrices) placed on the picture, with shows, light scenes and a console (T). Lights while they send"
-        >
-          {lightsOn ? '◉ Lights' : 'Lights'}
         </button>
         {pageMenu && (
           <ContextMenu

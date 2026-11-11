@@ -56,8 +56,10 @@ that CI builds into cross-platform releases.
   - **Persistence** : the rig in localStorage (`opsia.lightRig`; the old `opsia.lights`
     grid migrated once into a matrix + its output), the look / scenes / masters in the
     session (`lights`; an older file : every light follows the picture; New clears them).
-  - The Output page's Lights section now opens the page; the Performance chip and its
-    meter row read the Lights. `LightConfig` and the zone grid are gone.
+  - The **LIGHTS** button in the Output page's header opens the page (lit while the lights
+    send; the bottom bar stays as it was : Vincent, "Lights n'a pas besoin d'être dans la
+    toolbar du bas"); the Output page's old light section is gone; the Performance chip and
+    its meter row read the Lights. `LightConfig` and the zone grid are gone.
   - Tested : 25 Node checks of the engine and the packets (colors and layouts, universes,
     the Enttec overflow, Black, master, sampling left / right and reversed, serpentine,
     sanitizers, the Enttec message, Art-Net and sACN received on 127.0.0.1); in the test

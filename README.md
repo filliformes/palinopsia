@@ -1911,8 +1911,8 @@ bottom:
   mild, it goes to **strong** (0.7) while the Fulldome output is on (a flash fills the
   whole view on a dome) and back to mild when the dome goes off; a level you set
   yourself, before or during, stays.
-- **Lights** : DMX lights have their own page now ([Lights](#lights--dmx-fixtures-on-the-picture-key-t), key `T`); the Output page's
-  Lights section opens it.
+- **Lights** : DMX lights have their own page now ([Lights](#lights--dmx-fixtures-on-the-picture-key-t), key `T`); the
+  **LIGHTS** button in this page's header opens it (lit while the lights send).
 - **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
   **fullscreen on a chosen display** on launch (or from the command line:
   `--kiosk [--session=<file>] [--display=<n>]`), with its sound playing if Sonify (or
@@ -2170,7 +2170,7 @@ or need to restart.
 
 ## Lights : DMX fixtures on the picture (key `T`)
 
-The **Lights** page (`T`, the **Lights** button in the bottom bar, `Ctrl+K` → Lights) brings
+The **Lights** page (`T`, the **LIGHTS** button in the Output page's header, `Ctrl+K` → Lights) brings
 DMX lights into Palinopsia : LED bars, spots and LED matrices, each placed on the picture
 it takes its light from, with or without the video in them, tuned to the physical light,
 with shows, light scenes of their own and a lighting console.
