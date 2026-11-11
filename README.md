@@ -9,7 +9,8 @@ rather than patched like a tool. It composites layers of shader synthesis and
 treated video through blend modes, per-source / per-layer / master ISF effect
 racks, a modulation brain, and a curated Randomize, into a fullscreen or
 network output, flat or under a dome. The picture also plays as sound (Sonify), in
-stereo or placed around a room of speakers, on its own or through SpatGRIS.
+stereo or placed around a room of speakers, on its own or through SpatGRIS, and lights
+the room : DMX lights placed on the picture take their colors from it (the Lights page).
 
 The afterglow of a feedback compositor *is* palinopsia : the name is a
 description, not a metaphor. The house voice is matte, glitchy, digital-arts
@@ -65,11 +66,11 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
-- [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
+- [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline · light cues) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · installation · Flash safety
-- [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`) : DMX fixtures (LED bars, spots, matrices) placed on the picture · Enttec USB Pro, Art-Net, sACN, WLED · looks, effects, tuning · shows · light scenes · the console
+- [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
 - [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (147 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
@@ -242,6 +243,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `C` / `Shift+C` | Open Context / cycle its presets |
 | `M` / `F` / `G` | Right column → Mixer / Finishing / **Feel** (Layers is the default view : `M` toggles Mixer↔Layers, or click the tab) |
 | `O` | Output / Mapping page (while it is in its own window : brings it forward) |
+| `T` | **Lights** page : DMX lights placed on the picture (also the **LIGHTS** button in the Output page's header) |
 | `W` | World editor |
 | `Q` | Sequence page (while it is in its own window : brings it forward) |
 | `S` | **Sonify** page (image-to-sound engine) (while it is in its own window : brings it forward) |
@@ -258,7 +260,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
 | `.` | **Black** : the whole show (picture and sound) to black over the Morph time; again, back (the top bar's ■ Black) |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close the Source Editor / Resolume / World / Sonify / Body / Output / Sequence. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
+| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close the Source Editor / Resolume / Body / Sequence / World / Sonify / Lights / Output. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
 | `Ctrl/Cmd+K` | **Search everything** : effects, sources, parameters, presets, master chains, Generate themes, pages and commands in one palette (again : close it; see [below](#search-everything-ctrlk)) |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session (the shader instead, while the Source Editor is open) |
@@ -1213,8 +1215,8 @@ each knob its curve, MIDI CC and destination count.*
 
 The home of everything the instrument sequences : one **lane** per sequencer, under
 **one transport**. Each lane keeps its own time (the scenes their dwell in seconds, the
-Sonify keys their rate, the Body rules their bars or minutes and seconds), and each
-folds to its header (it keeps playing folded).
+Sonify keys their rate, the Body rules their bars or minutes and seconds, the light cues
+their fades and follow times), and each folds to its header (it keeps playing folded).
 
 - **The live picture** sits under the transport, over every lane, and never scrolls
   away : the whole composition as it plays, so you watch what the sequencers do to it
@@ -1919,8 +1921,10 @@ bottom:
   mild, it goes to **strong** (0.7) while the Fulldome output is on (a flash fills the
   whole view on a dome) and back to mild when the dome goes off; a level you set
   yourself, before or during, stays.
-- **Lights** : DMX lights have their own page now ([Lights](#lights--dmx-fixtures-on-the-picture-key-t), key `T`); the
-  **LIGHTS** button in this page's header opens it (lit while the lights send).
+- **Lights** : DMX lights have their own page ([Lights](#lights--dmx-fixtures-on-the-picture-key-t),
+  key `T`) : set up, played and sent from there (an Enttec DMX USB Pro, Art-Net, sACN,
+  WLED). The **LIGHTS** button in this page's header opens it (lit while the lights
+  send), and its **← back to Output** comes back here.
 - **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
   **fullscreen on a chosen display** on launch (or from the command line:
   `--kiosk [--session=<file>] [--display=<n>]`), with its sound playing if Sonify (or
@@ -2179,9 +2183,9 @@ or need to restart.
 ## Lights : DMX fixtures on the picture (key `T`)
 
 The **Lights** page (`T`, the **LIGHTS** button in the Output page's header, `Ctrl+K` → Lights) brings
-DMX lights into Palinopsia : LED bars, spots and LED matrices, each placed on the picture
+DMX lights into Palinopsia : LED bars, spots, rings and LED matrices, each placed on the picture
 it takes its light from, with or without the video in them, tuned to the physical light,
-with shows, light scenes of their own and a lighting console.
+with shows, cues of their own and a lighting console.
 
 **A few lights on an Enttec DMX USB Pro, from nothing.** With nothing selected, the right
 of the page is the **Set up** guide, five steps that tick as they are done :
@@ -2235,7 +2239,7 @@ you leave is kept under its own name first (or as "before <the new one>"), so no
 lost. **save to a file…** and **open a file…** carry one to another computer (a
 `.opsialights` file).
 
-- **Fixtures** : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
+- **Lights** (the list, left) : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
   light : a small RGB spot, a PAR, a wash), **+ ring** (pixels around a circle),
   **+ matrix** (a grid of pixels over a rectangle). Each is drawn on the **map** over the
   picture : drag it and it takes its pixels from another part of the image, drag the
@@ -2274,20 +2278,22 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   lights together after their own level (a light in two groups gets both) : in its row
   (with an **M** for a modulator or a Macro knob), as a knob on the **console** (MIDI
   Learn), in OSC (`/opsia/lights/group/<n or name>`). The groups are this computer's,
-  their faders the session's (and the light scenes keep them).
-- **The inspector** (click a fixture) :
-  - **Fixture** : its name, kind, LEDs (a bar's bends, **straighten**; a ring
-    **clockwise** or not), reversed, a matrix's columns × rows and its **wiring** : the
+  their faders the session's (and the cues keep them).
+- **The inspector** (click a light) :
+  - **Light** : its name, its shape (bar, ring, spot, matrix), LEDs (a bar's bends,
+    **straighten**; a ring **clockwise** or not), reversed, a matrix's columns × rows and its **wiring** : the
     corner its **first LED** is in, **rows** or **columns**, **zigzag** or not (the 16
-    ways a panel is wired, its path drawn small), how wide a patch each pixel reads, and
+    ways a panel is wired, its path drawn small), its **area** (how wide a patch each
+    pixel reads), **a row of** N, and
     **hold to identify** (it goes full white, to find it in the room).
   - **Patch** : its **output**, **universe** (network outputs) and **address** (with the
-    **DIP** switches that set it, 1 to 9, for a light that has them), and the
-    **light** it is : a **profile** that gives its channels in the right order and holds
+    **DIP** switches that set it, 1 to 9, for a light that has them), and its
+    **kind** : a profile that gives its channels in the right order and holds
     the ones it does not use where they do nothing. Built in : pixel strips (RGB, GRB,
     GRBW), LED bars with their own dimmer and strobe before RGB or RGBW pixels, RGB and
     RGBW lights, dimmer + RGB (+ strobe, + white), RGBWA + UV, a 16-bit dimmer + RGBW,
-    dimmer + CMY, a plain dimmer (8 or 16 bits), an RGB panel. For a real light,
+    dimmer + CMY, a plain dimmer (8 or 16 bits), an RGB panel, and the 30-zone RGB bars
+    in four of their modes (above). For a real light,
     **import a fixture file** : find it on the Open Fixture Library
     (open-fixture-library.org), Download, OFL JSON, and import it : every mode of the
     light becomes a profile (pick the one the light is set to). Its intensity becomes the
@@ -2306,21 +2312,24 @@ lost. **save to a file…** and **open a file…** carry one to another computer
     that value. **With a dimmer, the dimmer takes the light's level and the color goes
     out at full strength** : the fades stay smooth down low (in 16 bits with `D16`, 65,536
     steps instead of 256) and a dim color stays its color instead of drifting as its
-    channels run out of steps. New fixtures are addressed after the ones already there. A pixel never straddles two universes (170 RGB pixels to a
-    universe, as pixel controllers expect); past an Enttec's 512 channels the rest is
-    not sent and the patch says so.
+    channels run out of steps. New lights are addressed after the ones already there
+    (a long pixel bar's spill into the next universe counted). A pixel never straddles
+    two universes (170 RGB pixels to a universe, as pixel controllers expect); past an
+    Enttec's 512 channels the rest is not sent and the patch says so. On a WLED output a
+    light always goes out as red, green and blue.
   - **Look** : **picture** (the master where it sits), **layer** (L1 to L4, that
     layer's own picture), **color**, **gradient** (2 to 5 colors running across the
-    room at an angle, a scale, an offset and a drift, or **along** each fixture; **from
+    room at an angle, a scale, an offset and a drift, or **along** each light; **from
     the picture** takes the picture's main colors, left to right as they sit in it) or
     **off**. A light reading the picture **reads** its patch as the **average** (calm,
     but a busy picture can go beige), **vivid** (its most colorful part : the lights
-    keep the picture's colors) or **bright** (its brightest part); an **effect** over it (**chase** : a band running across the room,
+    keep the picture's colors) or **bright** (its brightest part); an **effect** over it
+    (**chase** : a band running across the room,
     **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud (all of
     it, or its **lows**, **mids** or **highs** : the floor spots on the kick, the bars on
     the cymbals), **beat** : a flash on the beat, **presence** : lit near the people the
     Body page tracks, dim away from them (**near** : how near; the Room tracker's
-    everyone, or the one pose)), and its **level**. **to all** gives every fixture this
+    everyone, or the one pose)), and its **level**. **to all** gives every light this
     look. Effects never change more than three times a second, at any rate and speed.
     **travels** : an effect goes **through the room** (by where each pixel is, at a
     **direction**) or **light by light**, as a lighting console spreads a phase over a
@@ -2349,8 +2358,7 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   - **Tuning** : brightness, contrast, gamma (LEDs are linear : 2 or so looks like the
     screen), saturation, hue, warmth (a white balance), a black floor, and a smoothing
     that calms a busy picture's flicker. Kept **on this computer** (it belongs to the
-    light) or **with the look** (it travels with the session and the light scenes) :
-    Settings.
+    light) or **with the look** (it travels with the session and the cues) : Settings.
   - Every slider with an **M** takes a modulator or a Macro knob (the look's colors and
     gradient, the effect, the level, the tuning, the masters).
 - **Outputs** : **Enttec USB** (an Enttec DMX USB Pro or compatible, plugged in : one
@@ -2358,17 +2366,17 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   unicast to an IP, or multicast to each universe's group when left empty) and **WLED**
   (170 LEDs a universe). The Pro is found by itself, and comes back by itself when it is
   unplugged and plugged in again or the computer wakes up (every two seconds; **scan**
-  looks at once). The fixtures and outputs are this computer's patch : they stay when you
-  open another session. The old Output page's light grid comes over once, as a matrix
-  on its own output. **find** (Art-Net, sACN, WLED) asks the network who is there (an
+  looks at once). The lights and outputs are this computer's patch : they stay when you
+  open another session (a **setup**, above, carries them to another computer or another
+  room). The old Output page's light grid comes over once, as a matrix on its own output. **find** (Art-Net, sACN, WLED) asks the network who is there (an
   ArtPoll for Art-Net nodes, most sACN nodes answer it too; mDNS for WLED) : pick one
-  instead of typing its address. Each output has a **delay** (0 to 1000 ms) : the lights answer at
-  once and a projector shows the picture two or three frames late, so about 40 ms keeps
-  them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
+  instead of typing its address. Each output has a **delay** (0 to 1000 ms) : the lights
+  answer at once and a projector shows the picture two or three frames late, so about
+  40 ms keeps them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
   each frame, so the nodes that know it show all their universes at the same moment.
 - **Shows** : a look for every light at once, fading in, each with a swatch of what it
-  looks like. **Classic** : Follow the picture, Each its layer, Picture colors (the
-  picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire,
+  looks like. **Classic** : Follow the picture (its button : **The picture**), Each its
+  layer, Picture colors (the picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire,
   Rainbow drift, White chase, Picture chase, On the beat, Sound reactive, Breathing,
   Night sparkle, Dark. **Digital** : Afterimage, Echo, Sample and hold, Eight colors,
   Glitch, Tape head, Rule 30, Triangles, Game of Life, Fireflies, Cloud field, Binary
@@ -2379,7 +2387,7 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   list. **+ save** keeps what they show now (the looks, the masters, the group faders);
   click a cue to bring it (over its fade), **GO** for the next (after the last : the
   first), **◀ back** for the one before, double-click to rename. **⚙** on a cue : its own
-  **fade** (empty : the console's scene fade), **then** a follow time (while the cues
+  **fade** (empty : the console's **CUE FADE**), **then** a follow time (while the cues
   **follow** on, the next one goes that long after this one is in; 0 : it waits for
   GO) and **with** a Palinopsia scene (recalling that scene brings this cue : the picture
   and its lights together). The cue in now shows its progress. Saved with the session;
@@ -2394,23 +2402,28 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   gradient (offset, angle, scale, drift), effect (rate, depth, width, direction, fan),
   its **area** and its whole **tuning** (brightness, contrast, gamma, saturation, hue,
   warmth, black, smooth); a group's fader and grade; the masters.
-- **The console** : **MASTER** (the grand master), **SPEED** (every effect's and
-  gradient's clock), **BRIGHT**, **SATURATION** and **CONTRAST** (a grade on every light :
-  100% as it is, up to 200%; saturation 0 is white light), each also as a slider with an
-  **M** at the right, **SCENE FADE**, **BLACK TIME** and **BLACK** (every light down over
-  the black time, and back), plus the master and the speed as sliders for a modulator.
-  Each knob and the Black button take **MIDI Learn**. The top bar's **■ Black** takes the
-  lights down with the whole show.
+- **The console** (along the bottom) : **MASTER** (the grand master), **SPEED** (every
+  effect's and gradient's clock), **BRIGHT**, **SATURATION** and **CONTRAST** (a grade on
+  every light : 100% as it is, up to 200%; saturation 0 is white light), **CUE FADE**,
+  **BLACK TIME** and **BLACK** (every light down over the black time, and back), then a
+  knob for each group's fader. At the right, the master, the speed and the three grades
+  again as sliders with an **M**, for a modulator or a Macro knob. Each knob and the
+  Black button take **MIDI Learn**. The top bar's **■ Black** takes the lights down with
+  the whole show.
 - **Sending / not sending** (top of the page) : off, nothing is sent, and the page still
   shows what they would do. A light that stops being fed (sending off, its output off or
   removed, the app quitting) gets **one last dark frame** : an Enttec repeats the last
   frame it got for ever, so without it the room would stay lit in its last look. **← back
   to Output** closes the page onto the Output page, where the **LIGHTS** button is. The
   looks, the cues, the masters and the group faders are part of **undo** (Ctrl+Z after
-  "to all", a show, a deleted cue or New). The frame rate (10 to 44 a second, 40 by default) is in Settings.
-- **OSC** : `/opsia/lights/master`, `speed`, `fade`, `blacktime` (0..1), `black` and
-  `on` (a value, or none to turn it over), `scene` (its number or name), `save`,
-  `show` (a show's name). See the [OSC reference](docs/opsia-osc-reference.html).
+  "to all", a show, a deleted cue or New). The frame rate (10 to 44 a second, 40 by
+  default) is in Settings.
+- **OSC** : `/opsia/lights/master`, `speed`, `fade`, `blacktime`, `brightness`,
+  `saturation`, `contrast` (0..1), `black`, `on` and `cues` (a value, or none to turn it
+  over), `scene` (a cue by its number or name), `save` (a new cue of what shows now),
+  `go`, `back`, `show` (a show's name),
+  `group/<its number or name>` (its fader). See the
+  [OSC reference](docs/opsia-osc-reference.html).
 
 ## Sonify : image to sound (key `S`)
 
