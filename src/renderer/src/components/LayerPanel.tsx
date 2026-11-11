@@ -16,7 +16,7 @@ import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSectio
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { makeDefaultMask, modTargetKey, useStore } from '../store'
-import { AssignRow } from './AutoControls'
+import { AssignRow, useOnMacro } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { useModSlide } from './useModSlide'
 import { showToast } from './Toast'
@@ -111,6 +111,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const varyBound = boundFor('vary').length > 0
   const mixBound = boundFor('mix').length > 0
   const blendBound = boundFor('blend').length > 0
+  // a Macro knob on them : the slider follows the knob as it moves
+  const opacityMacro = useOnMacro(modTargetKey(layerTarget('opacity')))
+  const mixMacro = useOnMacro(modTargetKey(layerTarget('mix')))
+  const blendMacro = useOnMacro(modTargetKey(layerTarget('blend')))
   const hasB = !!layer.sourceB && layer.sourceB.kind !== 'none'
   const coupled = couplingOn && hasB && layer.coupling.mode !== 'off'
   const opacityRef = useRef<HTMLInputElement | null>(null)
@@ -125,13 +129,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   blendBase.current = layer.blend
   useEffect(() => {
     const offs: Array<() => void> = []
-    if (opacityBound && opacityRef.current)
+    if ((opacityBound || opacityMacro) && opacityRef.current)
       offs.push(registerLiveOverlay({ el: opacityRef.current, key: modTargetKey(layerTarget('opacity')), format: (x) => String(x) }))
-    if (mixBound && mixRef.current)
+    if ((mixBound || mixMacro) && mixRef.current)
       offs.push(registerLiveOverlay({ el: mixRef.current, key: modTargetKey(layerTarget('mix')), format: (x) => String(x) }))
     // (the blend menu in the drawer shows its live mode itself : BlendSelect)
     const tab = blendTabRef.current
-    if (blendBound && tab) {
+    if ((blendBound || blendMacro) && tab) {
       const show = (m: string): void => {
         if (tab.textContent !== m) tab.textContent = m
       }
@@ -139,7 +143,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
     }
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opacityBound, mixBound, blendBound, collapsed, index, outTab])
+  }, [opacityBound, mixBound, blendBound, opacityMacro, mixMacro, blendMacro, collapsed, index, outTab])
 
   // The M chip beside a layer control : accent when bound, accent2 while its
   // binding row is open. Right-click clears every modulation on that field.
@@ -518,7 +522,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                           className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
                           value={layer.blend}
                           onChange={(m) => setBlend(index, m)}
-                          liveKey={blendBound ? modTargetKey(layerTarget('blend')) : undefined}
+                          liveKey={blendBound || blendMacro ? modTargetKey(layerTarget('blend')) : undefined}
                         />
                         </PinZone>
                         {modChip('blend', 'blend mode')}

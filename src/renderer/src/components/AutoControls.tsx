@@ -58,6 +58,14 @@ export function useBound(targetKey: string | null): BoundAssignment[] {
   )
 }
 
+/** A Macro knob holds this control : while the knob moves (a drag, a glide,
+ *  MIDI, OSC) the control's live value is in the shared map, so its slider or
+ *  readout follows it like a modulated one (the store only settles at the end
+ *  of the gesture). */
+export function useOnMacro(targetKey: string | null | undefined): boolean {
+  return useStore((s) => !!targetKey && s.composition.metaKnobs.some((k) => k.destinations.some((d) => modTargetKey(d) === targetKey)))
+}
+
 // The M pill. Toggles the provider's mod-assign side panel. Highlights when
 // bound OR when its panel is active.
 export function ModButton({
@@ -450,6 +458,7 @@ function FloatControl({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
 
   // A MODULATED slider's thumb shows the live value, not the base. Grabbing it
   // used to set the base to wherever the modulator happened to be (and, in
@@ -487,9 +496,9 @@ function FloatControl({
   const sliderRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => {
     const el = sliderRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(x) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
 
   // Dense single-line layout (Finishing view): label · slider · M · number,
   // all on one row so the stack takes minimal vertical space.
@@ -525,7 +534,7 @@ function FloatControl({
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
               maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
+              liveKey={isModulated || onMacro ? (targetKey ?? undefined) : undefined}
               className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
@@ -551,7 +560,7 @@ function FloatControl({
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
               maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
+              liveKey={isModulated || onMacro ? (targetKey ?? undefined) : undefined}
               className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
@@ -909,10 +918,11 @@ function BoolControl({
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const isModulated = useBound(targetKey).length > 0
+  const onMacro = useOnMacro(targetKey)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     const el = btnRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     let last: boolean | null = null
     return registerLiveOverlay({
       key: targetKey,
@@ -929,7 +939,7 @@ function BoolControl({
         el.classList.toggle('ring-accent2/40', !live)
       }
     })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   if (inp.type === 'event' && dense) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">
@@ -1043,6 +1053,7 @@ function EnumControl({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
   // A modulated dropdown tracks the LIVE selection (the engine snaps enums to
   // declared values, so the live value always matches an <option>) and turns
   // accent2 like modulated sliders. React keeps rendering the BASE value; the
@@ -1050,9 +1061,9 @@ function EnumControl({
   const selRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   if (dense) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">
@@ -1124,12 +1135,13 @@ export function EnumSwitch({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
   const selRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   return (
     <span className="flex min-w-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
       <select

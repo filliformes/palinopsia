@@ -375,6 +375,19 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
+  move the macro knob mapped to a parameter, this parameter's slider doesnt update in
+  realtime, like when the Modulators are in use"). A knob's gesture plays engine-side
+  and only settles in the store at its end, so the slider sat still until the release;
+  the live value was in the shared map all along, but every control's live overlay
+  registered only for a MODULATOR binding. One `useOnMacro()` (AutoControls) now opens
+  it for a Macro destination too : the Inspector's sliders, toggles, menus and number
+  boxes, an FX's opacity, the layer strip's opacity / A-B mix / blend, the Background's
+  opacity / speed / shadow, a clip's speed and volume, the Audio Layer's sliders, the
+  Sonify page's and the key sequencer's Every (the Mixer, the Output page and Lights
+  already counted the knobs). Measured on the test copy : the layer opacity slider read
+  0.1, 0.2 … 1.0 through the drag while the stored value still read 0.5.
+
 - **dataflou : a node lost to a sleep or a disconnect comes back by itself** (Vincent :
   "quand on se déconnecte/un ordi tombe en veille, la connexion se perd (on doit fermer et
   ouvrir Max)"). The cause : mDNS raises no new event for a service seen again unchanged,
