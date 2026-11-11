@@ -390,8 +390,7 @@ that CI builds into cross-platform releases.
   click-to-play row (Relief, Fur, Sand Plate, Drape) and the rule timeline's gestures; the
   two hints Drape lacked (light angle, light height).
 - **The docs for v1.3.3, the Lights release** : the release notes written out (Lights :
-  setting up, playing, shows, cues, setups, outputs; dataflou; one slot held for RDM until
-  `feat-rdm` merges); the README's Lights section in the page's own words (lights, cues,
+  setting up, playing, shows, cues, setups, outputs; dataflou; RDM); the README's Lights section in the page's own words (lights, cues,
   kind, area, **CUE FADE**, the console's group knobs and sliders), `T` in the keyboard
   table, the Lights page in the intro, the contents, the Output page and the Seq lanes;
   the OSC reference's `/opsia/lights/brightness · saturation · contrast` row and its cue
