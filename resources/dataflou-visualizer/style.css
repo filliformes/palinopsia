@@ -48,6 +48,58 @@ body {
     color: #ffc000;
 }
 
+#host-ip {
+    margin-left: 10px;
+    color: #777;
+    cursor: pointer;
+    user-select: none;
+}
+
+#host-ip:hover {
+    color: #999;
+}
+
+.node-addr {
+    fill: #777;
+    letter-spacing: 0.08em;
+    pointer-events: auto;
+}
+
+.node-addr.offline {
+    fill: #444;
+}
+
+body.graphite .node-addr {
+    fill: #666;
+}
+
+#universe {
+    margin-left: 10px;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
+}
+
+#universe:hover {
+    color: #999;
+}
+
+#universe input {
+    font: inherit;
+    width: 14em;
+    padding: 0 4px;
+    color: #ccc;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    outline: none;
+}
+
+body.graphite #universe input {
+    color: #333;
+    background: #fff;
+    border-color: #bbb;
+}
+
 #fps-indicator {
     color: #444;
 }
@@ -358,8 +410,8 @@ body.graphite .collapsed-label {
 
 /* F7: Connection activity glow animation */
 @keyframes conn-pulse {
-    0%   { filter: url(#conn-glow); opacity: 0.9; stroke-width: 2.5; }
-    100% { filter: none; opacity: 0.5; stroke-width: 1.0; }
+    0%   { filter: url(#conn-glow); opacity: 0.9; stroke-width: calc(2.5px * var(--conn-w, 1)); }
+    100% { filter: none; opacity: 0.5; stroke-width: calc(1px * var(--conn-w, 1)); }
 }
 
 .sub-line.conn-active {
@@ -369,7 +421,7 @@ body.graphite .collapsed-label {
 .sub-line.sub-line-target {
     animation: none !important;
     stroke: #c44 !important;
-    stroke-width: 3.5 !important;
+    stroke-width: calc(3.5px * var(--conn-w, 1)) !important;
     opacity: 1 !important;
     filter: drop-shadow(0 0 4px rgba(200, 50, 50, 0.6));
 }
@@ -970,3 +1022,367 @@ body.graphite .dashboard-value-only {
     color: #888;
 }
 
+
+/* ===== Pandore hote test build: display layer (src/display.ts) ===== */
+
+/* The drag line / highlight sit under the cursor: let the param below receive it */
+.drag-line, .drop-highlight, .pull-segment { pointer-events: none; }
+
+/* Mesh-only view (T): every label, icon and overlay goes, the mesh stays */
+body.no-text #vis svg text,
+body.no-text .add-param-btn,
+body.no-text .atelier-icon,
+body.no-text .dashboard-icon,
+body.no-text #status,
+body.no-text .param-tooltip,
+body.no-text .dashboard-panel,
+body.no-text .connection-toast { display: none !important; }
+body.no-text #display-tab:not(.open),
+body.no-text #scenes-tab:not(.open) { opacity: 0.08; }
+body.no-text #display-tab:not(.open):hover,
+body.no-text #scenes-tab:not(.open):hover { opacity: 1; }
+body.cursor-idle, body.cursor-idle * { cursor: none !important; }
+
+#display-tab, #display-panel {
+    --dp-bg: 26 26 26; --dp-text: 204 204 204; --dp-muted: 119 119 119;
+    --dp-border: 51 51 51; --dp-accent: 79 195 247;
+}
+#display-tab {
+    position: fixed; right: 12px; bottom: 10px; z-index: 30;
+    background: rgb(var(--dp-bg) / 0.85); color: rgb(var(--dp-muted));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 4px;
+    font: inherit; font-size: 11px; letter-spacing: 0.05em;
+    padding: 3px 9px; cursor: pointer; transition: opacity 0.2s;
+}
+#display-tab:hover, #display-tab.open { color: rgb(var(--dp-text)); }
+#display-panel {
+    position: fixed; right: 12px; bottom: 38px; z-index: 30; width: 290px;
+    background: rgb(var(--dp-bg) / 0.94); color: rgb(var(--dp-text));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 6px;
+    padding: 10px 12px; font-size: 11px;
+}
+#display-panel .dp-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+#display-panel label { width: 96px; flex: none; color: rgb(var(--dp-muted)); }
+#display-panel select, #display-panel input[type=number] {
+    flex: 1; min-width: 0; background: rgb(var(--dp-text) / 0.07); color: inherit;
+    border: 1px solid rgb(var(--dp-border)); border-radius: 3px; padding: 2px 4px; font: inherit;
+}
+#display-panel input[type=number] { flex: 0 0 64px; }
+#display-panel input[type=range] { flex: 1; min-width: 0; accent-color: rgb(var(--dp-accent)); }
+#display-panel input[type=checkbox] { accent-color: rgb(var(--dp-accent)); }
+#display-panel [data-v] { width: 34px; text-align: right; color: rgb(var(--dp-muted)); }
+#display-panel kbd {
+    font: inherit; font-size: 9px; padding: 0 3px; border-radius: 2px;
+    border: 1px solid rgb(var(--dp-border)); color: rgb(var(--dp-muted));
+}
+#display-panel .dp-btns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+#display-panel button {
+    background: rgb(var(--dp-text) / 0.07); color: inherit; font: inherit; font-size: 10px;
+    border: 1px solid rgb(var(--dp-border)); border-radius: 3px; padding: 3px 7px; cursor: pointer;
+}
+#display-panel button:hover { border-color: rgb(var(--dp-accent)); }
+#display-panel .dp-hint { margin-top: 8px; font-size: 9px; color: rgb(var(--dp-muted)); line-height: 1.4; }
+
+/* Liquid glass (display tab, off by default) — material after Palinopsia's
+   .glass / .glass-panel / --sheen rules. The refraction itself is a backdrop
+   filter set from display.ts (Chromium); this frost + lit rim is the rest. */
+html[data-glass='on'] #display-panel,
+html[data-glass='on'] #scenes-panel {
+    background: rgb(var(--dp-bg) / 0.42);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
+    border: none;
+    border-radius: 16px;
+    padding: 12px 14px;
+    box-shadow:
+        inset 0 0 0 0.5px rgb(255 255 255 / 0.22),
+        inset 0 1px 0.5px -0.5px rgb(255 255 255 / 0.5),
+        inset 0 -1px 0.5px -0.5px rgb(255 255 255 / 0.14),
+        0 24px 70px rgb(0 0 0 / 0.55);
+}
+html[data-glass='on'] #display-tab,
+html[data-glass='on'] #scenes-tab {
+    color: rgb(255 255 255 / 0.9);
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+    background: rgb(14 14 16 / 0.42);
+    -webkit-backdrop-filter: blur(8px) saturate(1.5);
+    backdrop-filter: blur(8px) saturate(1.5);
+    border: none;
+    border-radius: 999px;
+    padding: 4px 12px;
+    box-shadow:
+        inset 0 0 0 0.5px rgb(255 255 255 / 0.26),
+        inset 0 1px 0.5px -0.5px rgb(255 255 255 / 0.55),
+        inset 0 -1px 0.5px -0.5px rgb(255 255 255 / 0.18),
+        0 1px 2px rgb(0 0 0 / 0.28),
+        0 6px 18px rgb(0 0 0 / 0.32);
+}
+html[data-glass='on'] #display-panel button,
+html[data-glass='on'] #display-panel select,
+html[data-glass='on'] #display-panel input[type=number] {
+    background-color: rgb(255 255 255 / 0.04);
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0.015) 50%, rgb(0 0 0 / 0.06) 100%);
+    border: none;
+    border-radius: 999px;
+    padding: 3px 9px;
+    box-shadow:
+        inset 0 0 0 0.5px rgb(255 255 255 / 0.18),
+        inset 0 1px 0 rgb(255 255 255 / 0.12),
+        inset 0 -1px 0 rgb(0 0 0 / 0.18),
+        0 1px 1px rgb(0 0 0 / 0.15);
+}
+html[data-glass='on'] #display-panel select option { background: rgb(var(--dp-bg)); }
+html[data-glass='on'] #display-panel button:hover {
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, rgb(255 255 255 / 0.03) 50%, rgb(0 0 0 / 0.04) 100%);
+}
+html[data-glass='on'] #display-panel button:active {
+    background-image: linear-gradient(180deg, rgb(0 0 0 / 0.1) 0%, rgb(255 255 255 / 0.03) 100%);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+}
+html[data-glass='on'] #display-panel kbd { border-color: rgb(255 255 255 / 0.2); }
+#display-panel .dp-keys { margin-top: 9px; font-size: 10px; }
+#display-panel .dp-keys summary { cursor: pointer; color: rgb(var(--dp-muted)); }
+#display-panel .dp-keys summary:hover { color: rgb(var(--dp-text)); }
+#display-panel .dp-kgroup { margin-top: 6px; }
+#display-panel .dp-khead {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: rgb(var(--dp-accent)); border-bottom: 1px solid rgb(var(--dp-border));
+    padding-bottom: 1px; margin-bottom: 2px;
+}
+#display-panel .dp-kgrid {
+    display: grid; grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
+    column-gap: 8px; row-gap: 1px; line-height: 1.35;
+}
+#display-panel .dp-kgrid > span { min-width: 0; overflow-wrap: anywhere; }
+#display-panel .dp-kgrid > span:nth-child(odd) { color: rgb(var(--dp-muted)); }
+#display-panel .dp-keys kbd { white-space: nowrap; }
+#display-panel { max-height: calc(100vh - 60px); overflow-y: auto; overflow-x: hidden; }
+/* "collapse over": a plain number box, no spinner arrows (type the value, ↑/↓ still step) */
+#display-panel input[type=number] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+    flex: 0 0 52px;
+    text-align: center;
+}
+#display-panel input[type=number]::-webkit-inner-spin-button,
+#display-panel input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ===== Ctrl+K search palette (src/search.ts) — after Palinopsia's .glass-panel ===== */
+#search-palette {
+    --dp-bg: 26 26 26; --dp-text: 204 204 204; --dp-muted: 119 119 119;
+    --dp-border: 51 51 51; --dp-accent: 79 195 247;
+    position: fixed; z-index: 40; left: 50%; top: 14vh; transform: translateX(-50%);
+    width: min(560px, calc(100vw - 32px));
+    background: rgb(var(--dp-bg) / 0.96); color: rgb(var(--dp-text));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 10px;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 0.55);
+    padding: 10px; font-size: 12px;
+}
+#search-palette input {
+    width: 100%; font: inherit; font-size: 14px; color: inherit;
+    background: rgb(var(--dp-text) / 0.07); border: 1px solid rgb(var(--dp-border));
+    border-radius: 6px; padding: 7px 10px; outline: none; user-select: text;
+}
+#search-palette input:focus { border-color: rgb(var(--dp-accent) / 0.7); }
+#search-palette .sp-mode { margin: 0 2px 7px; font-size: 11px; color: rgb(var(--dp-muted)); }
+#search-palette .sp-mode b { color: rgb(var(--dp-accent)); font-weight: 600; }
+#search-palette .sp-list { max-height: 52vh; overflow-y: auto; margin-top: 7px; }
+#search-palette .sp-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 4px 8px;
+    border-radius: 5px; cursor: pointer; white-space: nowrap;
+}
+#search-palette .sp-item.sel { background: rgb(var(--dp-accent) / 0.16); }
+#search-palette .sp-icon { width: 12px; flex: none; text-align: center; color: rgb(var(--dp-muted)); font-size: 10px; }
+#search-palette .sp-arrow { flex: none; color: rgb(var(--dp-accent)); }
+#search-palette .sp-label { flex: none; }
+#search-palette .sp-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: rgb(var(--dp-muted)); font-size: 10px; }
+#search-palette .sp-type { flex: none; color: rgb(var(--dp-muted)); font-size: 10px; }
+#search-palette .sp-dim, #search-palette .sp-empty { color: rgb(var(--dp-muted)); }
+#search-palette .sp-empty { padding: 8px; }
+#search-palette .sp-foot { margin-top: 8px; font-size: 10px; color: rgb(var(--dp-muted)); }
+#search-palette kbd {
+    font: inherit; font-size: 9px; padding: 0 3px; margin: 0 1px; border-radius: 2px;
+    border: 1px solid rgb(var(--dp-border)); color: rgb(var(--dp-muted));
+}
+html[data-glass='on'] #search-palette {
+    background: rgb(var(--dp-bg) / 0.58);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+    border: none; border-radius: 16px;
+    box-shadow:
+        inset 0 0 0 0.5px rgb(255 255 255 / 0.22),
+        inset 0 1px 0.5px -0.5px rgb(255 255 255 / 0.5),
+        inset 0 -1px 0.5px -0.5px rgb(255 255 255 / 0.14),
+        0 24px 70px rgb(0 0 0 / 0.55);
+}
+html[data-glass='on'] #search-palette input { border: none; border-radius: 999px; box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.18), inset 0 1px 2px rgb(0 0 0 / 0.3); }
+body.no-text #search-palette { display: none !important; }
+
+/* the "you are here" ring after Enter in the palette */
+@keyframes search-ping {
+    0%   { r: 3; opacity: 1; stroke-width: 2; }
+    70%  { r: 16; opacity: 0.5; stroke-width: 1; }
+    100% { r: 22; opacity: 0; stroke-width: 0.5; }
+}
+#vis .search-ping {
+    fill: none; stroke: #4fc3f7; pointer-events: none;
+    animation: search-ping 0.8s ease-out 3;
+}
+
+/* ===== Output window (#output): the mesh alone, view-only, follows the main window ===== */
+body.output-mode #status,
+body.output-mode #display-tab,
+body.output-mode #display-panel,
+body.output-mode #scenes-tab,
+body.output-mode #scenes-panel,
+body.output-mode #search-palette,
+body.output-mode #debug-overlay,
+body.output-mode #fps-indicator,
+body.output-mode .param-tooltip,
+body.output-mode .dashboard-panel,
+body.output-mode .connection-toast,
+body.output-mode .add-param-btn,
+body.output-mode .add-param-label,
+body.output-mode .atelier-icon,
+body.output-mode .atelier-icon-label,
+body.output-mode .dashboard-icon,
+body.output-mode .dashboard-icon-label,
+body.output-mode .drag-line,
+body.output-mode .drop-highlight,
+body.output-mode .pull-segment,
+body.output-mode .search-ping { display: none !important; }
+body.output-mode #vis { pointer-events: none; }
+body.output-mode, body.output-mode * { cursor: none !important; }
+#display-panel label.dp-inline { width: auto; display: flex; align-items: center; gap: 4px; color: rgb(var(--dp-text)); }
+
+/* Spring-loaded groups while dragging a connection (src/drag.ts springCheck):
+   collapsed groups hiding a compatible parameter glow; resting on one opens it */
+@keyframes drag-candidate-pulse { 0%, 100% { stroke-opacity: 0.35; } 50% { stroke-opacity: 1; } }
+#vis .collapsed-dot.drag-candidate-group {
+    stroke: #4fc3f7 !important; stroke-width: 1.5;
+    animation: drag-candidate-pulse 1.2s ease-in-out infinite;
+}
+#vis .collapsed-dot.drag-candidate-group.spring-arming,
+#vis .collapsed-hit.drag-candidate-group.spring-arming + * { stroke-width: 2.5; }
+/* the ring that fills while a group arms (SPRING_MS in drag.ts) */
+@keyframes spring-fill { from { stroke-dashoffset: var(--spring-len); } to { stroke-dashoffset: 0; } }
+#vis .spring-ring {
+    fill: none; stroke: #4fc3f7; stroke-width: 1.5; pointer-events: none;
+    animation-name: spring-fill; animation-timing-function: linear; animation-fill-mode: both;
+}
+body.output-mode .spring-ring, body.output-mode .drag-candidate-group { animation: none !important; }
+
+/* A link waiting for the mesh to confirm it (connections.ts drawPendingLinks) */
+@keyframes pending-march { to { stroke-dashoffset: -14; } }
+#vis .pending-link {
+    fill: none; stroke: #4fc3f7; opacity: 0.75; pointer-events: none;
+    stroke-dasharray: 4 3; animation: pending-march 0.6s linear infinite;
+}
+body.output-mode .pending-links { display: none; }
+/* label boxes (display.ts decorateLabels) never take the pointer; they go with the text */
+#vis .label-box { pointer-events: none; }
+body.no-text #vis .label-box { display: none; }
+
+/* ===== Undo / redo buttons in the status bar (src/actions.ts) ===== */
+#history-btns { margin-left: 10px; }
+#history-btns button {
+    font: inherit; font-size: 10px; letter-spacing: 0.05em; color: inherit;
+    background: none; border: 1px solid currentColor; border-radius: 3px;
+    padding: 0 5px; margin-right: 4px; cursor: pointer; opacity: 0.85;
+}
+#history-btns button:hover:not(:disabled) { opacity: 1; color: rgb(var(--dp-accent, 79 195 247)); }
+#history-btns button:disabled { opacity: 0.3; cursor: default; }
+#status:not(.connected) #history-btns { color: #777; }
+.connection-toast.info { background: rgba(30, 30, 30, 0.92); color: #ddd; border: 1px solid #444; white-space: nowrap; }
+
+body.output-mode #history-btns { display: none !important; }
+
+/* ---- video (NDI) inside the ring: settings › video, V ---- */
+.video-layer { pointer-events: none; overflow: visible; }
+.video-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    pointer-events: none;
+    user-select: none;
+    /* soft edge so the picture melts into the ring instead of a hard disc */
+    -webkit-mask-image: radial-gradient(circle closest-side, #000 88%, transparent 100%);
+    mask-image: radial-gradient(circle closest-side, #000 88%, transparent 100%);
+}
+
+/* settings panel: sections, toggle grid, one-line status (kept short: it must fit a small screen) */
+#display-panel .dp-head {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: rgb(var(--dp-accent)); border-bottom: 1px solid rgb(var(--dp-border));
+    padding-bottom: 1px; margin: 9px 0 3px;
+}
+#display-panel .dp-head:first-child { margin-top: 0; }
+#display-panel .dp-row { margin: 3px 0; }
+#display-panel label { width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#display-panel .dp-unit { color: rgb(var(--dp-muted)); }
+#display-panel .dp-checks { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; margin: 3px 0; }
+#display-panel label.dp-check {
+    width: auto; display: flex; align-items: center; gap: 4px; min-width: 0;
+    color: rgb(var(--dp-text)); cursor: pointer;
+}
+#display-panel label.dp-check .dp-count { width: auto; margin-left: 2px; }
+#display-panel .dp-status {
+    margin: 1px 0 0 98px; font-size: 10px; color: rgb(var(--dp-muted));
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#display-panel .dp-status:empty { display: none; }
+
+/* ===== Scenes (src/scenes.ts): bottom left, same material as the settings tab.
+   The panel sends cues and shows what each node declares; it stores nothing. ===== */
+#scenes-tab, #scenes-panel {
+    --dp-bg: 26 26 26; --dp-text: 204 204 204; --dp-muted: 119 119 119;
+    --dp-border: 51 51 51; --dp-accent: 79 195 247;
+}
+#scenes-tab {
+    position: fixed; left: 12px; bottom: 10px; z-index: 30;
+    background: rgb(var(--dp-bg) / 0.85); color: rgb(var(--dp-muted));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 4px;
+    font: inherit; font-size: 11px; letter-spacing: 0.05em;
+    padding: 3px 9px; cursor: pointer; transition: opacity 0.2s;
+}
+#scenes-tab:hover, #scenes-tab.open { color: rgb(var(--dp-text)); }
+#scenes-panel {
+    position: fixed; left: 12px; bottom: 38px; z-index: 30; width: 260px;
+    background: rgb(var(--dp-bg) / 0.94); color: rgb(var(--dp-text));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 6px;
+    padding: 10px 12px; font-size: 11px;
+}
+#scenes-panel button {
+    font: inherit; color: inherit; cursor: pointer;
+    background: transparent; border: 1px solid rgb(var(--dp-border)); border-radius: 4px;
+}
+#scenes-panel button:hover { border-color: rgb(var(--dp-accent) / 0.7); }
+#scenes-panel .sc-head { display: flex; align-items: center; gap: 8px; }
+#scenes-panel .sc-title { font-size: 12px; letter-spacing: 0.05em; flex: 1; }
+#scenes-panel .sc-store { font-size: 10px; padding: 2px 8px; color: rgb(var(--dp-muted)); }
+#scenes-panel.store-mode .sc-store { color: rgb(var(--dp-accent)); border-color: rgb(var(--dp-accent)); }
+#scenes-panel .sc-sum { margin-top: 3px; font-size: 10px; color: rgb(var(--dp-muted)); height: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#scenes-panel .sc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 8px 0 6px; }
+#scenes-panel .sc-slot {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 5px 0 4px; color: rgb(var(--dp-muted));
+}
+#scenes-panel .sc-slot b { font-size: 12px; font-weight: 600; }
+#scenes-panel .sc-slot small { font-size: 9px; opacity: 0.8; }
+#scenes-panel .sc-slot.held { color: rgb(var(--dp-text)); background: rgb(var(--dp-text) / 0.06); }
+#scenes-panel .sc-slot.current {
+    color: rgb(var(--dp-text)); border-color: rgb(var(--dp-accent));
+    box-shadow: inset 0 0 0 1px rgb(var(--dp-accent)); background: rgb(var(--dp-accent) / 0.16);
+}
+#scenes-panel.store-mode .sc-slot { border-style: dashed; }
+#scenes-panel .sc-nodes { height: 58px; overflow-y: auto; font-size: 10px; margin-bottom: 4px; }
+#scenes-panel .sc-st-ok span { color: rgb(var(--dp-muted)); }
+#scenes-panel .sc-node { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+#scenes-panel .sc-node span:last-child { color: rgb(var(--dp-muted)); text-align: right; }
+#scenes-panel .sc-st-missing span:last-child,
+#scenes-panel .sc-st-behind span:last-child { color: rgb(224 160 64); }
+#scenes-panel .sc-st-modified span:last-child { color: rgb(var(--dp-accent)); }
+#scenes-panel .sc-st-offline { opacity: 0.5; }
+#scenes-panel .sc-hint { font-size: 9px; color: rgb(var(--dp-muted)); line-height: 1.45; }
+html[data-glass='on'] #scenes-panel button { border-color: rgb(255 255 255 / 0.14); }

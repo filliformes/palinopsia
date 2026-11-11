@@ -135,6 +135,13 @@ export function initDataflou(): () => void {
   const offIn = window.api.onDataflouIn((batch) => {
     for (const v of batch) play(v.path, v.value)
   })
+  // the mesh visualizer's universe selector : the setting changes here (kept on
+  // this computer, shown in the Connect tab) and the node starts again there
+  const offUni = window.api.onDataflouUniverse((name) => {
+    if (typeof name !== 'string' || !name || name === useStore.getState().dataflou.universe) return
+    useStore.getState().setDataflou({ universe: name })
+    void applyDataflou()
+  })
   // the picker's list follows the session (scenes, rules, effects loaded)
   const ta = window.setInterval(() => {
     if (status.running) sendActions()
@@ -158,6 +165,7 @@ export function initDataflou(): () => void {
   return () => {
     offStatus()
     offIn()
+    offUni()
     window.clearInterval(t)
     window.clearInterval(ta)
   }
