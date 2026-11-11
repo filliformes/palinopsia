@@ -3795,6 +3795,13 @@ tab has the whole setup :
   (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
   wires that source to one of Palinopsia's destinations, **← Palinopsia…** feeds that
   destination from one of Palinopsia's sources.
+- **data** : what flows in and out, live. Each of Palinopsia's destinations a node feeds
+  (↙ : from which node and parameter) and each of its sources a node listens to (↗ : to
+  where), with the value now, its last seconds as a small line (a swatch for a color), and
+  how many values a second. A row goes grey when nothing has arrived for two seconds or
+  the other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a
+  SETVAL) show too, for ten seconds. Click **data** to fold it (remembered); it only asks
+  for the values while it is open.
 - **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
   the other nodes announce), with ✕ to unwire. The header shows the values received and
   sent per second.
@@ -3808,6 +3815,17 @@ tab has the whole setup :
   `THIRD_PARTY_NOTICES.md`); `npm run build:visualizer` rebuilds it from a dataflou checkout
   beside this repo (or give the path to its `web/` folder). Its editor panel needs
   dataflou's sibling Atelier project; without it the page runs without that panel.
+
+**When a node drops out and comes back** (a computer asleep, a cable pulled, the Wi-Fi
+gone for a moment), Palinopsia calls it back by itself : every node it lost without a
+goodbye is dialled again from where it was last seen, after a few seconds, then less and
+less often (up to every 30 s) until it answers, and the wires come back with it (values
+flow again within about seven seconds of the other side being reachable). Nothing to
+restart on either side, Max included : the other node does not need to call back itself.
+When this computer wakes up, or its network address changes, Palinopsia drops the
+connections that went quiet, announces itself again from its new address and calls every
+lost node at once. A node that leaves properly (it closes, or leaves the mesh) is not
+called back.
 
 What Palinopsia declares (119 entries, 7.1 KB, small enough for microcontroller
 nodes, whose frames stop at 8 KB; a field whose value is every decoder's default is

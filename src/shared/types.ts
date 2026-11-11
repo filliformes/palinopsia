@@ -1634,6 +1634,8 @@ export interface ExposedApi {
   dataflouActions: (list: import('./dataflou').DfAction[]) => void
   dataflouVisualizer: (open?: boolean) => Promise<{ ok: boolean; url?: string; error?: string }>
   dataflouStatus: () => Promise<import('./dataflou').DfStatus>
+  /** What flows now on our nodes (the data view : polled while it is open). */
+  dataflouIo: () => Promise<import('./dataflou').DfIo[]>
   dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
   dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>
   dataflouForget: (sku: string) => Promise<boolean>
