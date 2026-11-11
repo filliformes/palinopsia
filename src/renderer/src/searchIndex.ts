@@ -775,6 +775,7 @@ const PAGES: Array<{ id: string; label: string; key: string; hint: string; keywo
   { id: 'world', label: 'World', key: 'W', hint: 'the World editor : the mood, the coupling, the film', keywords: ['diegesis', 'mood'], open: (s) => s.setWorldPageOpen(true) },
   { id: 'sequence', label: 'Sequence', key: 'Q', hint: 'macro-form : the scenes over time', keywords: ['macro', 'form', 'scenes', 'sequencer'], open: (s) => s.setSequencePageOpen(true) },
   { id: 'sonify', label: 'Sonify', key: 'S', hint: 'the picture as sound : voices, mixer, sequencers, Space', keywords: ['sound', 'audio', 'voices', 'synth'], open: (s) => s.setSonifyPageOpen(true) },
+  { id: 'lights', label: 'Lights', key: 'T', hint: 'DMX fixtures on the picture : bars, spots, matrices, shows, light scenes', keywords: ['dmx', 'led', 'enttec', 'artnet', 'sacn', 'wled', 'fixture', 'light', 'strip', 'lighting'], open: (s) => s.setLightsPageOpen(true) },
   { id: 'body', label: 'Body', key: 'B', hint: 'embodied control : hands, pose, gestures', keywords: ['camera', 'pose', 'hands', 'gesture', 'tracking'], open: (s) => s.setBodyPageOpen(true) },
   { id: 'resolume', label: 'Resolume mapper', key: 'K', hint: 'signals to Resolume over OSC', keywords: ['osc', 'mapper'], open: (s) => s.setResolumePageOpen(true) },
   { id: 'editor', label: 'Source Editor', key: SOURCE_EDITOR_KEY, hint: 'write a shader of your own, or a copy of any one', keywords: ['shader', 'code', 'glsl', 'isf'], open: (s) => s.setSourceEditorOpen(true) }

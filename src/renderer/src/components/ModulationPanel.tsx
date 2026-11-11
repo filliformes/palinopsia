@@ -18,6 +18,7 @@ import { commitNow, runSilently } from '../undo'
 import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
+import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { auLabel } from '@shared/auMod'
 import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
@@ -1824,6 +1825,10 @@ function MatrixSummary(): JSX.Element {
     if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
     if (t.kind === 'world') return 'World amount'
     if (t.kind === 'au') return auLabel(t)
+    if (t.kind === 'light') {
+      const f = t.fixture ? useStore.getState().lightRig.fixtures.find((x) => x.id === t.fixture) : null
+      return `${t.fixture ? (f ? f.name : 'Light') : 'Lights'} ${LIGHT_MOD_RANGE[t.field].label}`
+    }
     const inst =
       t.scope.kind === 'master'
         ? composition.master.find((f) => f.id === t.instId)

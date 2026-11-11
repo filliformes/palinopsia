@@ -94,6 +94,7 @@
 //   /opsia/surface/wiggle {0..1}                         float : smooth wobble (→ 0..100 %)
 //   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
+import { LIGHT_SHOWS } from './lights/lightShows'
 import { resolumeLearn } from './resolume'
 import { controlBus } from './engine/controlBus'
 import { oscLearn } from './oscLearn'
@@ -1219,6 +1220,32 @@ function route(address: string, args: Args, host = ''): void {
       const key = `${which}:${mi}`
       if (segs[4] === 'note') controlBus.note(key, n > 0, n)
       else controlBus.set(key, n)
+      return
+    }
+
+    case 'lights': {
+      // The Lights page : /opsia/lights/master · speed (0..1 : ×0..4) · black (a
+      // value, or none to turn it over) · on · scene (its number, or its name) ·
+      // save (a light scene of what shows now) · show (a show's name or id) ·
+      // fade (0..1 : 0..20 s).
+      const k = segs[2]
+      if (k === 'master') st.setLightsMaster({ brightness: Math.max(0, Math.min(1, n)) })
+      else if (k === 'speed') st.setLightsMaster({ speed: Math.max(0, Math.min(1, n)) * 4 })
+      else if (k === 'fade') st.setLightsMaster({ fadeSec: Math.max(0, Math.min(1, n)) * 20 })
+      else if (k === 'blacktime') st.setLightsMaster({ blackSec: Math.max(0, Math.min(1, n)) * 20 })
+      else if (k === 'black') st.setLightsBlack(args.length ? n >= 0.5 : !st.lightsBlack)
+      else if (k === 'on') st.setLightRig({ on: args.length ? n >= 0.5 : !st.lightRig.on })
+      else if (k === 'save') st.saveLightScene()
+      else if (k === 'scene') {
+        const s = firstStr(args)
+        const list = st.lightsSession.scenes
+        const sc = s ? list.find((x) => x.name.toLowerCase() === s.trim().toLowerCase()) : list[Math.round(n) - 1]
+        if (sc) st.recallLightScene(sc.id)
+      } else if (k === 'show') {
+        const s = (firstStr(args) ?? '').trim().toLowerCase()
+        const sh = LIGHT_SHOWS.find((x) => x.id === s || x.name.toLowerCase() === s)
+        if (sh) st.applyLightShow(sh.id)
+      }
       return
     }
 

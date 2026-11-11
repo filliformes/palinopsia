@@ -31,7 +31,7 @@ import type {
   SidechainRef,
   SourceSlot,
   World, LightPath } from '@shared/types'
-import type { MetaKnobState, MidiBinding, LightConfig, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
+import type { MetaKnobState, MidiBinding, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
 import type { MappingScope, OscBinding, SessionMappings } from '@shared/types'
 import { sanitizeMidiMap, sanitizeOscMap, sessionMappingsOut } from './mappingModel'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
@@ -49,6 +49,29 @@ import type { NdiConfig, NdiStatus } from '@shared/ndi'
 import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
+import {
+  LIGHT_MOD_RANGE,
+  LOOK_DEFAULT as LIGHT_LOOK_DEFAULT,
+  SESSION_DEFAULT as LIGHTS_SESSION_DEFAULT,
+  sanitizeFixture,
+  sanitizeLightsSession,
+  sanitizeLook,
+  sanitizeMaster as sanitizeLightsMaster,
+  sanitizeOutput,
+  sanitizeRig,
+  sanitizeTune,
+  type LightFixture,
+  type LightKind,
+  type LightLook,
+  type LightOutput,
+  type LightOutputKind,
+  type LightRig,
+  type LightsMaster,
+  type LightsSession,
+  type LightTune
+} from '@shared/lights'
+import { duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig } from './lights/lightStore'
+import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
@@ -853,9 +876,15 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number; audioLayer?: AudioLayerState }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number; audioLayer?: AudioLayerState; lightRig?: LightRig; lightsSession?: LightsSession }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'light') {
+      const b = st.lightRig && st.lightsSession ? lightBaseValue(st.lightRig, st.lightsSession, t.fixture, t.field) : null
+      if (b === null) return 0.5
+      const r = LIGHT_MOD_RANGE[t.field]
+      return (b - r.min) / (r.max - r.min)
+    }
     if (t.kind === 'au') {
       // A pan at the center, a playhead (a place : a multiple of it means
       // little) : Replace, a swing a binding is heard at at once.
@@ -1922,8 +1951,38 @@ interface StoreState {
   shareRoute: { local: boolean; topDown: boolean }
   setShareActive: (on: boolean, route?: { local: boolean; topDown: boolean }) => void
   // Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted.
-  lights: LightConfig
-  setLights: (partial: Partial<LightConfig>) => void
+  // ── Lights (the Lights page, key T : shared/lights.ts, lights/) ──
+  /** The room : fixtures, their patch, the outputs (this computer). */
+  lightRig: LightRig
+  setLightRig: (patch: Partial<LightRig>) => void
+  addLightFixture: (kind: LightKind) => string
+  updateLightFixture: (id: string, patch: Partial<LightFixture>) => void
+  removeLightFixture: (id: string) => void
+  duplicateLightFixture: (id: string) => string | null
+  addLightOutput: (kind: LightOutputKind) => string
+  updateLightOutput: (id: string, patch: Partial<LightOutput>) => void
+  removeLightOutput: (id: string) => void
+  /** The piece : what each fixture shows, the masters, the light scenes (the session). */
+  lightsSession: LightsSession
+  setLightLook: (id: string, patch: Partial<LightLook>) => void
+  setLightLooks: (ids: string[], patch: Partial<LightLook>) => void
+  setLightTune: (id: string, patch: Partial<LightTune>) => void
+  setLightsMaster: (patch: Partial<LightsMaster>) => void
+  saveLightScene: () => void
+  recallLightScene: (id: string) => void
+  renameLightScene: (id: string, name: string) => void
+  deleteLightScene: (id: string) => void
+  applyLightShow: (id: string) => void
+  /** Bumped when the look should fade in (a light scene, a show) : the engine fades. */
+  lightFadeEpoch: number
+  lightsBlack: boolean
+  setLightsBlack: (on: boolean) => void
+  lightsPageOpen: boolean
+  setLightsPageOpen: (on: boolean) => void
+  lightSel: string | null
+  setLightSel: (id: string | null) => void
+  lightIdentify: string | null
+  identifyLight: (id: string | null) => void
   // Embodied control (MediaPipe Hands + Pose). Machine-local (a webcam is
   // machine-bound, like warp), persisted, NOT part of a session. The tracker
   // (engine/bodyTracker.ts) follows this; a `body` modulator reads the bus.
@@ -4696,20 +4755,143 @@ export const useStore = create<StoreState>((set, get) => ({
   shareActive: false,
   shareRoute: { local: false, topDown: false },
   setShareActive: (on, route) => set({ shareActive: on, shareRoute: on && route ? route : { local: false, topDown: false } }),
-  lights: (() => {
-    const def: LightConfig = {
-      enabled: false, protocol: 'artnet', host: '', cols: 8, rows: 1, order: 'rgb',
-      brightness: 1, gamma: 2.2, universe: 0, startChannel: 1, serpentine: false, fps: 40
-    }
-    try { return { ...def, ...JSON.parse(localStorage.getItem('opsia.lights') || '{}') } as LightConfig }
-    catch { return def }
-  })(),
-  setLights: (partial) =>
+  lightRig: loadRig(),
+  setLightRig: (patch) => set((s) => ({ lightRig: persistRig(sanitizeRig({ ...s.lightRig, ...patch })) })),
+  addLightFixture: (kind) => {
+    const f = newFixture(get().lightRig, kind)
+    set((s) => ({ lightRig: persistRig({ ...s.lightRig, fixtures: [...s.lightRig.fixtures, f] }), lightSel: f.id }))
+    return f.id
+  },
+  updateLightFixture: (id, patch) =>
+    set((s) => ({
+      lightRig: persistRig({
+        ...s.lightRig,
+        fixtures: s.lightRig.fixtures.map((f) => (f.id === id ? sanitizeFixture({ ...f, ...patch, id: f.id }) : f))
+      })
+    })),
+  removeLightFixture: (id) =>
     set((s) => {
-      const lights = { ...s.lights, ...partial }
-      localStorage.setItem('opsia.lights', JSON.stringify(lights))
-      return { lights } // pushed to main by an App effect watching `lights`
+      const looks = { ...s.lightsSession.looks }
+      delete looks[id]
+      // its modulation goes with it (a row left aimed at nothing eats the cap)
+      const gone = (t: ModTarget): boolean => t.kind === 'light' && t.fixture === id
+      const modMatrix = s.composition.modMatrix.filter((a) => !gone(a.target))
+      const metaKnobs = s.composition.metaKnobs.map((k) => (k.destinations.some(gone) ? { ...k, destinations: k.destinations.filter((d) => !gone(d)) } : k))
+      return {
+        composition: { ...s.composition, modMatrix, metaKnobs },
+        lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.filter((f) => f.id !== id) }),
+        lightsSession: { ...s.lightsSession, looks },
+        lightSel: s.lightSel === id ? null : s.lightSel
+      }
     }),
+  duplicateLightFixture: (id) => {
+    const s = get()
+    const f = s.lightRig.fixtures.find((x) => x.id === id)
+    if (!f) return null
+    const d = duplicate(s.lightRig, f)
+    const look = s.lightsSession.looks[id]
+    set({
+      lightRig: persistRig({ ...s.lightRig, fixtures: [...s.lightRig.fixtures, d] }),
+      lightsSession: look ? { ...s.lightsSession, looks: { ...s.lightsSession.looks, [d.id]: look } } : s.lightsSession,
+      lightSel: d.id
+    })
+    return d.id
+  },
+  addLightOutput: (kind) => {
+    const o = newOutput(get().lightRig, kind)
+    set((s) => ({
+      lightRig: persistRig({
+        ...s.lightRig,
+        outputs: [...s.lightRig.outputs, o],
+        // the first output : the fixtures waiting for one are patched to it
+        fixtures: s.lightRig.outputs.length ? s.lightRig.fixtures : s.lightRig.fixtures.map((f) => (f.out ? f : { ...f, out: o.id }))
+      })
+    }))
+    return o.id
+  },
+  updateLightOutput: (id, patch) =>
+    set((s) => ({
+      lightRig: persistRig({ ...s.lightRig, outputs: s.lightRig.outputs.map((o) => (o.id === id ? sanitizeOutput({ ...o, ...patch, id: o.id }) : o)) })
+    })),
+  removeLightOutput: (id) =>
+    set((s) => ({
+      lightRig: persistRig({
+        ...s.lightRig,
+        outputs: s.lightRig.outputs.filter((o) => o.id !== id),
+        fixtures: s.lightRig.fixtures.map((f) => (f.out === id ? { ...f, out: '' } : f))
+      })
+    })),
+  lightsSession: { ...LIGHTS_SESSION_DEFAULT },
+  setLightLook: (id, patch) => get().setLightLooks([id], patch),
+  setLightLooks: (ids, patch) =>
+    set((s) => {
+      const looks = { ...s.lightsSession.looks }
+      for (const id of ids) {
+        const cur = looks[id] ?? LIGHT_LOOK_DEFAULT
+        looks[id] = sanitizeLook({ ...cur, ...patch, gradient: patch.gradient ? { ...cur.gradient, ...patch.gradient } : cur.gradient })
+      }
+      return { lightsSession: { ...s.lightsSession, looks } }
+    }),
+  setLightTune: (id, patch) =>
+    set((s) => {
+      const f = s.lightRig.fixtures.find((x) => x.id === id)
+      if (!f) return s
+      if (s.lightRig.tuneScope === 'look') {
+        const cur = s.lightsSession.tunes?.[id] ?? f.tune
+        return { lightsSession: { ...s.lightsSession, tunes: { ...(s.lightsSession.tunes ?? {}), [id]: sanitizeTune({ ...cur, ...patch }) } } }
+      }
+      return {
+        lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((x) => (x.id === id ? { ...x, tune: sanitizeTune({ ...x.tune, ...patch }) } : x)) })
+      }
+    }),
+  setLightsMaster: (patch) => set((s) => ({ lightsSession: { ...s.lightsSession, master: sanitizeLightsMaster({ ...s.lightsSession.master, ...patch }) } })),
+  saveLightScene: () =>
+    set((s) => {
+      const L = s.lightsSession
+      const scene = {
+        id: `ls${Date.now().toString(36)}`,
+        name: `Light ${L.scenes.length + 1}`,
+        looks: { ...L.looks },
+        master: { brightness: L.master.brightness, speed: L.master.speed },
+        ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}) } } : {})
+      }
+      return { lightsSession: { ...L, scenes: [...L.scenes, scene] } }
+    }),
+  recallLightScene: (id) =>
+    set((s) => {
+      const L = s.lightsSession
+      const sc = L.scenes.find((x) => x.id === id)
+      if (!sc) return s
+      return {
+        lightsSession: {
+          ...L,
+          // (a fixture the scene does not know keeps its look)
+          looks: { ...L.looks, ...sc.looks },
+          master: sc.master ? { ...L.master, ...sc.master } : L.master,
+          ...(sc.tunes && s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...sc.tunes } } : {})
+        },
+        lightFadeEpoch: s.lightFadeEpoch + 1
+      }
+    }),
+  renameLightScene: (id, name) =>
+    set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) || x.name } : x)) } })),
+  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) } })),
+  applyLightShow: (id) =>
+    set((s) => {
+      const layers = s.composition.layers.map((l, i) => ((l.sourceA.shaderId || l.sourceA.kind !== 'none' || l.sourceB) && !l.mute ? i : -1)).filter((i) => i >= 0)
+      const looks = showLooks(id, s.lightRig.fixtures, s.lightsSession.looks, layers)
+      if (!looks) return s
+      return { lightsSession: { ...s.lightsSession, looks }, lightFadeEpoch: s.lightFadeEpoch + 1 }
+    }),
+  lightFadeEpoch: 0,
+  lightsBlack: false,
+  setLightsBlack: (on) => set({ lightsBlack: on }),
+  lightsPageOpen: false,
+  setLightsPageOpen: (on) => set({ lightsPageOpen: on }),
+  lightSel: null,
+  setLightSel: (id) => set({ lightSel: id }),
+  lightIdentify: null,
+  identifyLight: (id) => set({ lightIdentify: id }),
   bodyControl: (() => {
     const def: BodyControlConfig = {
       enabled: false, deviceId: null, hands: true, pose: true, face: false, silhouette: false, flow: false, mirror: true, hiRes: false,
@@ -6036,6 +6218,8 @@ export const useStore = create<StoreState>((set, get) => ({
         // A fresh slate : the frame where it belongs, the voices where they start.
         outXform: OUT_IDENTITY,
         outXformReset: s.outXformReset + 1,
+        lightsSession: { ...LIGHTS_SESSION_DEFAULT },
+        lightFadeEpoch: s.lightFadeEpoch + 1,
         space: persistSpace({ ...s.space, voices: defaultVoicePlaces() }),
         // and an empty Audio Layer (a live input it had closes)
         audioLayer: defaultAudioLayer(),
@@ -6280,6 +6464,8 @@ export const useStore = create<StoreState>((set, get) => ({
     // The output transform is the piece's : its own, or none (an older file must
     // not open turned the way the last piece was left).
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })
+    // The lights' look is the piece's (an older file : every light follows the picture).
+    set((st) => ({ lightsSession: sanitizeLightsSession(s.lights ?? null), lightFadeEpoch: st.lightFadeEpoch + 1 }))
     // Where the voices sit is the piece's too (an older file : where they start).
     set({ space: persistSpace({ ...get().space, voices: sanitizeVoicePlaces(s.spaceVoices ?? null) }) })
     // So is the Audio Layer's sound (an older file : none). Its live inputs come
@@ -6363,6 +6549,8 @@ export const useStore = create<StoreState>((set, get) => ({
       resolume: s.resolume,
       dome: { ...s.dome, grid: false }, // (the alignment grid is the room's, not the piece's)
       outXform: s.outXform,
+      // the lights' look, its scenes and masters (the rig itself is this computer's)
+      lights: s.lightsSession,
       spaceVoices: sessionSpaceVoices(s.space.voices),
       // your own shaders it plays (the composition, the scenes), with their source
       userShaders: (() => {

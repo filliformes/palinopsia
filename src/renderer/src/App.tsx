@@ -151,8 +151,6 @@ function logOnce(what: string, e: unknown): void {
 let lastDepthSample = 0 // throttles the depth-estimator frame readback (~11 Hz)
 let depthStatusShown = '' // the depth engine state last told (a toast when it is missing or fails)
 let lastVisionSample = 0 // throttles the vision-bus readback (~30 Hz)
-let lastLightSample = 0 // throttles the light-output zone readback (config fps cap)
-let lastLightsOn = false
 
 // Reveal a Finishing Touches sub-section: switch the right column to the
 // Finishing view and expand the relevant sub-row.
@@ -209,6 +207,8 @@ import { AUDIO_LAYER, audioLayer } from './audio/audioLayer'
 import { eqPresets } from './audio/eqPresets'
 import { AudioLayerPanel } from './components/AudioLayerPanel'
 import { randomizeInputs, DICE_SOURCES, DICE_FX_IDS } from './randomize'
+import { lightRuntime } from './lights/lightRuntime'
+import { LightsPage } from './components/LightsPage'
 
 // Sonify's Assemblage voice : a clip's place on the Assemble map (its note, its pan)
 sonifyEngine.setUnitPlace(unitPlace)
@@ -298,7 +298,7 @@ function RecPill(): JSX.Element | null {
 function BodyPip(): JSX.Element | null {
   const enabled = useStore((s) => s.bodyControl.enabled)
   const pageOpen = useStore((s) => s.bodyPageOpen)
-  const overPage = useStore((s) => (s.sonifyPageOpen && !s.sonifyPageWindow) || (s.outputPageOpen && !s.outputPageWindow) || s.worldPageOpen || (s.sequencePageOpen && !s.sequencePageWindow) || s.resolumePageOpen || s.sourceEditorOpen)
+  const overPage = useStore((s) => (s.sonifyPageOpen && !s.sonifyPageWindow) || (s.outputPageOpen && !s.outputPageWindow) || s.worldPageOpen || (s.sequencePageOpen && !s.sequencePageWindow) || s.resolumePageOpen || s.sourceEditorOpen || s.lightsPageOpen)
   const setPage = useStore((s) => s.setBodyPageOpen)
   const [live, setLive] = useState(false)
   useEffect(() => {
@@ -616,6 +616,7 @@ export default function App(): JSX.Element {
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const outputPageOpen = useStore((s) => s.outputPageOpen)
+  const lightsPageOpen = useStore((s) => s.lightsPageOpen)
   const outputPageWindow = useStore((s) => s.outputPageWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
@@ -654,14 +655,6 @@ export default function App(): JSX.Element {
   useEffect(() => {
     if (!shareActive) compositorRef.current?.captureRelease('share')
   }, [shareActive])
-
-  // ── Light output : push the (machine-local) config to main whenever it
-  //    changes, so the ArtNet/WLED sender always has the current mapping. The
-  //    zone frames themselves are shipped from the render loop below. ───────
-  const lights = useStore((s) => s.lights)
-  useEffect(() => {
-    try { window.api.lightConfig(lights) } catch { /* main not ready yet */ }
-  }, [lights])
 
   // ── Embodied control : drive the MediaPipe tracker from the (machine-local)
   //    bodyControl config, and route discrete gestures to actions. The tracker
@@ -1003,6 +996,13 @@ export default function App(): JSX.Element {
         st.setOutputPageOpen(st.outputPageWindow || !st.outputPageOpen)
         return
       }
+      // T: open/close the Lights page (DMX fixtures mapped on the picture).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 't') {
+        e.preventDefault()
+        const st = useStore.getState()
+        st.setLightsPageOpen(!st.lightsPageOpen)
+        return
+      }
       // W: open/close the World editor.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'w') {
         e.preventDefault()
@@ -1283,7 +1283,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS } })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1862,29 +1862,13 @@ export default function App(): JSX.Element {
             visionBus.setDepth(mean, Math.min(1, Math.sqrt(v / dr.data.length) * 3))
           }
         }
-        // 3e. Light output (image → room): mip-average the composite into a zone
-        //     grid and ship it to main's ArtNet/DMX · WLED sender. A grid is
-        //     queued at the config's fps cap (DMX tops out ~44 Hz; LEDs less) and
-        //     read back asynchronously (see gridReadback.ts) : it is shipped the
-        //     frame it lands, one or two after it was queued, so it is looked for
-        //     every frame and the cap only paces the queueing (collected on the
-        //     cap instead, a 1 Hz rig would run a whole second late). The
-        //     synchronous read this replaced drained the GPU pipeline on every
-        //     light frame, ~17 ms each on an integrated GPU.
-        if (st.lights.enabled) {
-          const lc = st.lights
-          perfMeter.begin('lights')
-          const z = comp!.takeZones()
-          if (z) window.api.lightFrame(z.cols, z.rows, z.px)
-          if (now - lastLightSample > 1000 / Math.max(1, Math.min(60, lc.fps || 40))) {
-            lastLightSample = now
-            comp!.kickZones(lc.cols, lc.rows)
-          }
-          perfMeter.end('lights')
-        } else if (lastLightsOn) {
-          comp!.dropZones() // switched off : nothing from before goes out when it is back on
-        }
-        lastLightsOn = st.lights.enabled
+        // 3e. Lights (the Lights page) : the fixtures sample the picture (a
+        //     readback collected the frame it lands, queued at the rig's fps),
+        //     the engine makes the DMX frame, the Enttec Pros get it from here and
+        //     the network outputs through main (lights/lightRuntime.ts).
+        perfMeter.begin('lights')
+        lightRuntime.tick(comp!, now)
+        perfMeter.end('lights')
         // 4. Output window : the keystone it applies to the streamed frame (it
         //    draws our pixels; this is all it still reads of the render state).
         //    Sent when it changes, and every half second for a window that just
@@ -2506,6 +2490,7 @@ export default function App(): JSX.Element {
       {/* ── Output / Mapping page : full-screen takeover (canvas keeps
              rendering underneath so the live mirror + engine never stop) ── */}
       {outputPageOpen && !outputPageWindow && <OutputPage canvasRef={canvasRef} />}
+      {lightsPageOpen && <LightsPage canvasRef={canvasRef} />}
       {sonifyPageOpen && !sonifyPageWindow && <SonifyPage canvasRef={canvasRef} />}
       {worldPageOpen && <WorldPage />}
       {sourceEditorOpen && <SourceEditor />}

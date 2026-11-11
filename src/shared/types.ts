@@ -924,6 +924,9 @@ export type ModTarget =
   // trim (shared/auMod.ts). A final override on the audio engine, each frame.
   | { kind: 'au'; slot?: undefined; field: import('./auMod').AuLayerModField }
   | { kind: 'au'; slot: 'A' | 'B'; field: import('./auMod').AuSlotModField }
+  // The Lights' sliders (shared/lights.ts LIGHT_MOD_RANGE) : a fixture's look and
+  // tuning, or the masters (fixture ''). A final override on the Lights engine.
+  | { kind: 'light'; fixture: string; field: import('./lights').LightModField }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).
@@ -1374,6 +1377,10 @@ export interface Session {
   // The output transform (the whole frame moved as one picture). Absent in older
   // files : they load at identity.
   outXform?: import('./outXform').OutXform
+  // The Lights' look : what each fixture shows, the masters, the light scenes
+  // (shared/lights.ts LightsSession). The rig itself is the computer's. Absent in
+  // older files : every light follows the picture.
+  lights?: unknown
   // Space : where each Sonify voice sits in the room (the venue setup itself,
   // speakers / objects / OSC, belongs to the computer, not the piece).
   spaceVoices?: Record<string, import('./spatial').VoicePlace>
@@ -1547,22 +1554,6 @@ export interface HiveStatus {
   error?: string
 }
 
-/** Light output (ArtNet/DMX · WLED). Machine-local (venue-specific), persisted
- *  to localStorage, pushed to main which owns the UDP senders (see main/light.ts). */
-export interface LightConfig {
-  enabled: boolean
-  protocol: 'artnet' | 'wled'
-  host: string
-  cols: number
-  rows: number
-  order: 'rgb' | 'grb' | 'brg' | 'bgr'
-  brightness: number
-  gamma: number
-  universe: number
-  startChannel: number
-  serpentine: boolean
-  fps: number
-}
 
 /** "Start with the computer" for an installation (main/autostart.ts). */
 export interface AutostartStatus {
@@ -1815,9 +1806,9 @@ export interface ExposedApi {
   platform: string
   shareSet: (on: boolean) => Promise<{ ok: boolean; local: boolean; topDown: boolean; error?: string }>
   shareFrame: (w: number, h: number, pixels: Uint8Array) => void
-  // Light output (ArtNet/DMX · WLED) : push config, then zone frames.
-  lightConfig: (cfg: LightConfig) => void
-  lightFrame: (cols: number, rows: number, pixels: Uint8Array) => void
+  // The Lights' network outputs : DMX universes for Art-Net, sACN, WLED (the
+  // Enttec USB Pro is driven from the renderer, through Web Serial).
+  lightDmx: (packets: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array }>) => void
   // Kiosk / installation mode : read the effective launch config; get/set the
   // persisted "enable on next restart" launch file; get the operator UI out.
   kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number; windowed?: boolean }>

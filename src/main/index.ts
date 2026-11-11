@@ -20,7 +20,7 @@ import {
 import { dirname, join } from 'path'
 import { pathToFileURL } from 'url'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import type { Session, LightConfig } from '@shared/types'
+import type { Session } from '@shared/types'
 import { PAGE_WINDOW_TITLES } from '@shared/types'
 import { OscSender } from './osc'
 import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
@@ -45,7 +45,7 @@ import { OutputSender } from './output'
 import { prepareNdi } from './ndi/prepare'
 import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
-import { LightSender } from './light'
+import { DmxSender, type DmxPacket } from './light'
 import { displayHz, samplePerf } from './perf'
 import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
@@ -126,7 +126,7 @@ app.on('child-process-gone', (_e, details) => {
 const oscSender = new OscSender()
 // Texture sharing : Spout / Syphon (NDI runs in the main window's preload, see ndi/).
 const outputSender = new OutputSender()
-const lightSender = new LightSender()
+const dmxSender = new DmxSender()
 
 // Kiosk / installation mode : boot straight to a session, fullscreen the output,
 // get the operator UI out of the way (renderer-driven, see the kiosk effect), and
@@ -361,7 +361,7 @@ function shutdown(): void {
   hiveDisconnectAll()
   hiveSendStop()
   outputSender.dispose()
-  lightSender.dispose()
+  dmxSender.dispose()
   // leave the Link session now : the installation's relaunch exits with
   // app.exit(), which skips will-quit (where Link would otherwise close)
   closeLink()
@@ -842,6 +842,17 @@ app.whenReady().then(async () => {
     cb(false)
   })
 
+  // The Lights' Enttec DMX USB Pro, through Web Serial : serial devices are
+  // granted (so navigator.serial.getPorts() lists every port without a prompt),
+  // and Chromium's port chooser is answered with the first FTDI port, the Pro's
+  // chip (no chooser window ever opens).
+  electronSession.defaultSession.setDevicePermissionHandler((details) => details.deviceType === 'serial')
+  electronSession.defaultSession.on('select-serial-port', (event, portList, _wc, callback) => {
+    event.preventDefault()
+    const ftdi = portList.find((p) => /^0*403$/i.test(String(p.vendorId ?? '')) || p.vendorId === '1027')
+    callback(ftdi ? ftdi.portId : portList[0]?.portId ?? '')
+  })
+
   // Screen capture: getDisplayMedia needs a source. Grant the primary display
   // (a source picker can come later). Webcam getUserMedia needs no handler.
   electronSession.defaultSession.setDisplayMediaRequestHandler(
@@ -1162,9 +1173,7 @@ app.whenReady().then(async () => {
   )
 
   // ---------- IPC: Light output (ArtNet/DMX · WLED) ----------
-  safeOn('light:config', (_e, cfg) => lightSender.setConfig(cfg as LightConfig | null))
-  safeOn('light:frame', (_e, cols, rows, pixels) =>
-    lightSender.send(cols as number, rows as number, pixels as Uint8Array)
+  safeOn('light:dmx', (_e, packets) => dmxSender.send(packets as DmxPacket[])
   )
 
   // ---------- IPC: Kiosk / installation mode ----------

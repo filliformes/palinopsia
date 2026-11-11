@@ -5,6 +5,68 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
+  nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
+  his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this
+  computer's, the LOOK the session's), `lights/lightEngine.ts` (pure CPU), `lightRuntime.ts`
+  (the render loop's side), `enttec.ts`, `lightShows.ts`, `lightStore.ts`, `lightMods.ts`,
+  `components/LightsPage.tsx`, `main/light.ts` (now `DmxSender`).
+  - **Fixtures** : LED bars (a line of N pixels), spots, matrices (cols × rows, serpentine),
+    placed on the picture (0..1, y down) and edited on the map over their source (drag the
+    body or the ends / corners, Shift keeps a bar level, arrows nudge, Delete, Ctrl+D);
+    each pixel drawn in the color it sends. Patch : output, universe, address (new ones
+    auto-addressed after the last), a channel layout per pixel (presets or tokens
+    `R G B W A U D S X` / a number); a pixel never straddles a universe (170 RGB a
+    universe); an Enttec's channels past 512 dropped and reported.
+  - **Sampling** : `Compositor.kickLights(srcs)` copies each source in use (the presented
+    master, or a layer's own `texture()`) into a 1024×576 mipmapped texture and reads them
+    all in one strip of 192×108 cells (`GridReadback.kickStrip`, asynchronous), so each
+    texel is a trilinear box average (no flicker from point samples on fine lines); each
+    pixel then averages nine taps over its `size`. Replaces `kickZones` / `takeZones`.
+  - **Looks** : picture / layer / color / gradient (2..5 stops, angle, scale, offset,
+    drift, or along the fixture; ping-pong, no seam) / off; effects chase, wave, pulse,
+    sparkle, sound (`audioBus.feature('level')`), beat (the shared beat clock
+    `soniBeats`), each capped at three changes a second at any rate and speed (the
+    beat : every other beat past 180 BPM); a level. Patterns run in the room's own
+    proportions (x × aspect).
+  - **Tuning** per fixture : brightness, contrast, gamma (default 2 : LEDs are linear),
+    saturation, hue (YIQ rotation), warmth, a black floor, smoothing (default 0.08 s);
+    kept in the rig or, with `tuneScope : 'look'`, in the session and the light scenes.
+  - **Masters** : grand master, speed, scene fade, Black (down over its time, eased); the
+    top bar's Black takes the lights down too. Light scenes fade in from what showed
+    (`lightFadeEpoch` → `LightEngine.beginFade`). 14 shows (`lightShows.ts`), spatial so
+    they fit any room.
+  - **Outputs** : the **Enttec DMX USB Pro** through **Web Serial** in the renderer (no
+    native module) : label 6 messages (`7E 06 len 00 data E7`), the Pro found among
+    `navigator.serial.getPorts()` by its FTDI 0403:6001 (main grants serial devices with
+    `setDevicePermissionHandler` and answers `select-serial-port`), reopened every 2 s
+    after an unplug or a sleep, a write in flight skips the frame. **Art-Net** (ArtDmx,
+    sequence 1..255), **sACN** (E1.31 data packets, a random CID per run, unicast or the
+    universe's multicast group) and **WLED** (DNRGB, universe u = LEDs from u × 170)
+    from main.
+  - **Modulation** : a new target `{ kind: 'light', fixture, field }` (`LIGHT_MOD_RANGE` :
+    the look's color and gradient, the effect, the level, four tuning fields, the master
+    and the speed; fixture '' for the masters) through every path (modulation, the Macro
+    knobs' commit, the matrix labels, the keys, Randomize's key, the base for the
+    multiply / replace pick); a removed fixture takes its rows and Macro destinations
+    with it. **MIDI Learn** : `lights:master` / `speed` / `fade` / `blacksec` and the
+    trigger `fire:lightsblack`. **OSC** `/opsia/lights/...`. **Ctrl+K** : Lights.
+  - **Persistence** : the rig in localStorage (`opsia.lightRig`; the old `opsia.lights`
+    grid migrated once into a matrix + its output), the look / scenes / masters in the
+    session (`lights`; an older file : every light follows the picture; New clears them).
+  - The Output page's Lights section now opens the page; the Performance chip and its
+    meter row read the Lights. `LightConfig` and the zone grid are gone.
+  - Tested : 25 Node checks of the engine and the packets (colors and layouts, universes,
+    the Enttec overflow, Black, master, sampling left / right and reversed, serpentine,
+    sanitizers, the Enttec message, Art-Net and sACN received on 127.0.0.1); in the test
+    copy : the rig across a restart, 40 frames a second sent for a 40 fps rig, Art-Net
+    packets out with the picture's colors, Black to 0, a 1 Hz square on a spot's level
+    breathing it (smoothed), a session round trip with its light scenes, the map's drags,
+    an Enttec output with nothing plugged in (looking, no error). **Not verified : a real
+    Enttec Pro** (none here).
+
 ### Docs
 
 - **The docs catch up with v1.3.2** (after publishing, the sweep) : six new gallery frames

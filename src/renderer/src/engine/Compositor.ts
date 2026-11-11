@@ -2505,73 +2505,81 @@ export class Compositor {
   }
   private syncPx = new Uint8Array(4);
 
-  /** LIGHT OUTPUT : reduce the presented composite to a cols×rows grid of zone
-   *  colors for DMX/ArtNet/WLED. Two cheap passes : copy the clean composite
-   *  into a mipmapped 256² source, then downscale it into the cols×rows target
-   *  so each output texel is a TRILINEAR (mip) box-average of its zone : a true
-   *  representative color, not a 4-tap point sample. cols*rows*4 bytes (tiny).
-   *
-   *  The readback is ASYNCHRONOUS (see gridReadback.ts) : kickZones() queues
-   *  this frame's grid, takeZones() hands back the newest one that has landed,
-   *  a frame or two later. The synchronous read this replaced drained the GPU
-   *  pipeline on every light frame, ~17 ms each on an integrated GPU, however
-   *  few zones it asked for. */
-  private zoneMipTex: WebGLTexture | null = null;
-  private zoneMipFbo: WebGLFramebuffer | null = null;
-  private zoneRead: GridReadback | null = null;
-  kickZones(cols: number, rows: number): boolean {
+  /** LIGHTS (the Lights page) : the pictures its fixtures sample, read back
+   *  small. Each source in use (-1 : the presented master; 0..3 : a layer's own
+   *  picture) is copied into a 1024×576 mipmapped texture, then all of them are
+   *  read in ONE strip of `w`×`h` cells, each texel a trilinear box average of its
+   *  patch (no flicker from point samples on fine lines). Asynchronous like every
+   *  readback here (gridReadback.ts) : kickLights() queues, takeLights() hands back
+   *  the newest strip that has landed, a frame or two later. A change of sources
+   *  drops what was in flight (it would be read against the new list). */
+  private lightMips = new Map<number, { tex: WebGLTexture; fbo: WebGLFramebuffer }>();
+  private lightRead: GridReadback | null = null;
+  private lightList = '';
+  private lightSrcs: number[] = [];
+  kickLights(srcs: number[], w = 192, h = 108): boolean {
     const gl = this.gl;
-    if (!this.lastPresent) return false;
-    cols = Math.max(1, Math.min(64, Math.round(cols)));
-    rows = Math.max(1, Math.min(64, Math.round(rows)));
-    if (!this.zoneRead) this.zoneRead = new GridReadback(gl);
-    // Every slot still in flight (the GPU is behind) : skip this grid, and skip
-    // pass 1 with it rather than draw it for a read that will not be queued.
-    if (this.zoneRead.full) return false;
-    const MIP = 256;
-    if (!this.zoneMipTex) {
-      this.zoneMipTex = gl.createTexture()!;
-      gl.bindTexture(gl.TEXTURE_2D, this.zoneMipTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, MIP, MIP, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      this.zoneMipFbo = gl.createFramebuffer()!;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneMipFbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.zoneMipTex, 0);
-    }
+    if (!this.lastPresent || !srcs.length) return false;
+    if (!this.lightRead) this.lightRead = new GridReadback(gl);
+    const key = srcs.join(',');
+    if (key !== this.lightList) { this.lightRead.dropInFlight(); this.lightList = key; this.lightSrcs = srcs.slice(); }
+    if (this.lightRead.full) return false;
+    const MW = 1024, MH = 576;
     gl.bindVertexArray(this.vao);
     gl.useProgram(this.copyProg);
     gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.uCTex, 0);
-    // Pass 1 : clean composite → mipmapped 256² source.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.zoneMipFbo);
-    gl.viewport(0, 0, MIP, MIP);
-    gl.bindTexture(gl.TEXTURE_2D, this.lastPresent);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    // Switch the render target OFF the mip texture BEFORE generating its mips
-    // (generateMipmap on a texture still attached to the bound FBO is a feedback
-    // hazard), then Pass 2 : mip source → cols×rows (trilinear = zone average),
-    // drawn by the ring into its own RGBA8 target and queued for the readback.
+    const texs: WebGLTexture[] = [];
+    for (const s of srcs) {
+      let m = this.lightMips.get(s);
+      if (!m) {
+        const tex = gl.createTexture()!;
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texStorage2D(gl.TEXTURE_2D, 11, gl.RGBA8, MW, MH);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fbo = gl.createFramebuffer()!;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        m = { tex, fbo };
+        this.lightMips.set(s, m);
+      }
+      const src = s < 0 ? this.lastPresent : this.layers[s]?.texture() ?? null;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, m.fbo);
+      gl.viewport(0, 0, MW, MH);
+      if (src) {
+        gl.bindTexture(gl.TEXTURE_2D, src);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      } else {
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+      texs.push(m.tex);
+    }
+    // off every target before the mips are made (a feedback hazard otherwise)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, this.zoneMipTex);
-    gl.generateMipmap(gl.TEXTURE_2D);
+    for (const t of texs) { gl.bindTexture(gl.TEXTURE_2D, t); gl.generateMipmap(gl.TEXTURE_2D); }
     gl.bindVertexArray(null);
-    return this.zoneRead.kick(cols, rows, this.zoneMipTex!, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
+    return this.lightRead.kickStrip(w, h, texs, this.copyProg, this.uCTex, this.vao, !this.paintingClock);
   }
 
-  /** The newest zone grid that has landed (null while none has). RGBA8,
-   *  bottom-up (row 0 = bottom of the frame). A reused buffer : send or copy it
-   *  before the next kick. */
-  takeZones(): { cols: number; rows: number; px: Uint8Array } | null {
-    const got = this.zoneRead?.takeLatest();
-    return got ? { cols: got.w, rows: got.h, px: got.grid } : null;
+  /** The newest strip that has landed, cut per source (RGBA8, bottom-up rows, the
+   *  buffers reused : read them before the next kick). Null while none has. */
+  takeLights(): { srcs: number[]; w: number; h: number; grids: Uint8Array[] } | null {
+    const got = this.lightRead?.takeLatest();
+    if (!got) return null;
+    const n = this.lightSrcs.length;
+    const h = Math.floor(got.h / Math.max(1, n));
+    const cell = got.w * h * 4;
+    const grids: Uint8Array[] = [];
+    for (let i = 0; i < n; i++) grids.push(got.grid.subarray(i * cell, (i + 1) * cell));
+    return { srcs: this.lightSrcs, w: got.w, h, grids };
   }
 
-  /** The light output was switched off : what it left in flight is a picture
-   *  from before, which must not go out first when it comes back on. */
-  dropZones(): void {
-    this.zoneRead?.dropInFlight();
+  /** The lights stopped : what is in flight is a picture from before. */
+  dropLights(): void {
+    this.lightRead?.dropInFlight();
   }
 
   /** PANIC FLUSH (bound to the `0` key) : empty every self-feeding buffer WITHOUT
@@ -4114,9 +4122,8 @@ export class Compositor {
     this.bgNat = null;
     this.bgRack.dispose();
     this.depthShadow?.dispose();
-    if (this.zoneMipTex) gl.deleteTexture(this.zoneMipTex);
-    if (this.zoneMipFbo) gl.deleteFramebuffer(this.zoneMipFbo);
-    this.zoneMipTex = null; this.zoneMipFbo = null;
+    for (const m of this.lightMips.values()) { gl.deleteTexture(m.tex); gl.deleteFramebuffer(m.fbo); }
+    this.lightMips.clear();
     for (const f of this.fences) { try { gl.deleteSync(f); } catch { /* lost */ } }
     this.fences = [];
     this.outputShape?.dispose();
@@ -4129,7 +4136,7 @@ export class Compositor {
     // Readback rings hold fences : drop them before the context goes.
     this.visionRead?.dispose(); this.visionRead = null;
     this.depthRead?.dispose(); this.depthRead = null;
-    this.zoneRead?.dispose(); this.zoneRead = null;
+    this.lightRead?.dispose(); this.lightRead = null;
     this.markRead?.dispose(); this.markRead = null;
     this.soniStrip?.dispose();
     this.soniStrip = null;
