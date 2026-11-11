@@ -315,6 +315,23 @@ that CI builds into cross-platform releases.
     its text). In the test copy : the guide adding the bars from the Output page's LIGHTS
     button, the test's band on the map, two setups switched, back to Output. **Not
     verified : a real Enttec, the real bars.**
+- **Lights : RDM, the lights answer back** (Vincent : "build RDM so the app finds the bars
+  and sets their addresses"). `lights/rdm.ts` : E1.20 packets (built, read, checksums),
+  the discovery's binary search over the 48-bit ids (DISC_UNIQUE_BRANCH, the answers
+  decoded, a clash split, MUTE / UN_MUTE; a clash that reads as a valid id is split when
+  no light answers its mute), DEVICE_INFO, labels, DMX_PERSONALITY(_DESCRIPTION),
+  DMX_START_ADDRESS, IDENTIFY_DEVICE, ACK_TIMER waited. Through the Enttec Pro's own
+  messages (`enttec.ts` : label 7 a request, 11 a discovery branch, 5 the answer after a
+  status byte, 12 nothing in time, 10 the serial number : our id is 454E:<serial>); the
+  link now reads (`EnttecReader`, a read loop closed with the port). The page : **Ask the
+  lights (RDM)** under the Set up guide (find, blink, mode, address, address in a row,
+  put on the map : `addLightsFromLine`, `profileForFootprint`). Tested : 21 Node checks
+  against a simulated line (six bars incl. far ids, one silent, one that will not stay
+  muted, 24 close ids, a NACK, an ACK_TIMER) and a simulated Pro (its labels, answers cut
+  in two, noise); in the test copy through the real Web Serial path with a fake Pro on
+  `navigator.serial` and two bars (found, one switched from 5CH to 90CH, addressed 1 and
+  91, blink on then off when the page closed, put on the map as 30-zone bars). **Not
+  verified : a real Pro, real lights.**
 - **Lights : more to modulate, a grade per group, three more masters** (Vincent : "I
   should be able to modulate more stuff inside the Lights section, especially in the
   Tuning section of the groups. Also : add more master controls, like master brightness,

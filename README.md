@@ -2215,6 +2215,18 @@ speed, background) make the whole bar one color; its 3-channel mode is **RGB lig
 channels**. The channel orders are those of this family of bars as their makers publish
 them : the **test** tells in a minute whether yours agrees.
 
+**Ask the lights (RDM)** (under the guide) : lights that speak RDM answer back over the
+DMX cable, through the Enttec DMX USB Pro. **ask the lights on the line** finds every one
+(a few seconds) and lists each with its name, its **mode** (how many channels it takes)
+and its **address**. From there : **blink** makes one flash to find it in the room (it
+stops when the page closes), the mode menu changes its mode (set the 30-zone bars to
+90CH), the address box sets its address, **address in a row** gives them addresses one
+after the other from 1 in the list's order (the arrows arrange it), **put on the map**
+adds them as lights at their own addresses, each of the kind its mode suggests (90 or 94
+channels : the 30-zone bar; 3, 4, 5 or 8 : the matching kinds; anything else holds its
+channels at 0 until you pick its kind). Lights that do not speak RDM do not answer : set
+those on their own menu.
+
 **Setups** (top of the left column) : a light setup is the whole page : the lights and
 where they are, the outputs, the groups, and what they show (looks, cues, masters). Give
 it a name and **save**; click one in the list to switch to it. The picture and the rest of
