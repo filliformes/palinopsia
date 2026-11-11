@@ -59,6 +59,9 @@ const FIELD_SETTERS: Record<string, (v: number) => void> = {
   // the Lights page's console
   'lights:master': (v) => useStore.getState().setLightsMaster({ brightness: v }),
   'lights:speed': (v) => useStore.getState().setLightsMaster({ speed: v * 4 }),
+  'lights:gain': (v) => useStore.getState().setLightsMaster({ gain: v * 2 }),
+  'lights:sat': (v) => useStore.getState().setLightsMaster({ saturation: v * 2 }),
+  'lights:contrast': (v) => useStore.getState().setLightsMaster({ contrast: v * 2 }),
   'lights:fade': (v) => useStore.getState().setLightsMaster({ fadeSec: v * 20 }),
   'lights:blacksec': (v) => useStore.getState().setLightsMaster({ blackSec: v * 20 })
 }
@@ -66,7 +69,7 @@ const FIELD_LABELS: Record<string, string> = {
   'field:density': 'DENSITY', 'field:gestureTexture': 'GESTURE↔TEXTURE', 'field:coalesce': 'COALESCE',
   'field:tonicity': 'TONICITY', 'field:drift': 'DRIFT', 'field:flow': 'FLOW↔INTERRUPT',
   'field:shutter': 'SHUTTER', 'field:superFlicker': 'SUPERIMPOSE',
-  'lights:master': 'LIGHTS master', 'lights:speed': 'LIGHTS speed', 'lights:fade': 'LIGHTS scene fade', 'lights:blacksec': 'LIGHTS black time'
+  'lights:master': 'LIGHTS master', 'lights:speed': 'LIGHTS speed', 'lights:gain': 'LIGHTS brightness', 'lights:sat': 'LIGHTS saturation', 'lights:contrast': 'LIGHTS contrast', 'lights:fade': 'LIGHTS scene fade', 'lights:blacksec': 'LIGHTS black time'
 }
 
 // Tap tempo from a pad : a rolling window of hit times → BPM (like the Transport).

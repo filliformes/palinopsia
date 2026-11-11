@@ -2373,8 +2373,19 @@ lost. **save to a file…** and **open a file…** carry one to another computer
   and its lights together). The cue in now shows its progress. Saved with the session;
   the [Seq page](#sequencer-key-q) has them as a lane. GO, back and follow take MIDI
   Learn, and OSC (`/opsia/lights/go`, `back`, `cues`).
+- **A group's grade** : click a group (its lights are picked) and the inspector opens
+  **Group · its name** : its fader, and a grade over each of its lights' own tuning
+  (**brightness**, **contrast** and **saturation** multiply, **hue** and **warmth** add).
+  Every slider there has an **M** : a modulator or a Macro knob moves the whole group
+  together. Saved with the session and the cues.
+- **What takes modulation** : every slider with an **M** : a light's level, color,
+  gradient (offset, angle, scale, drift), effect (rate, depth, width, direction, fan),
+  its **area** and its whole **tuning** (brightness, contrast, gamma, saturation, hue,
+  warmth, black, smooth); a group's fader and grade; the masters.
 - **The console** : **MASTER** (the grand master), **SPEED** (every effect's and
-  gradient's clock), **SCENE FADE**, **BLACK TIME** and **BLACK** (every light down over
+  gradient's clock), **BRIGHT**, **SATURATION** and **CONTRAST** (a grade on every light :
+  100% as it is, up to 200%; saturation 0 is white light), each also as a slider with an
+  **M** at the right, **SCENE FADE**, **BLACK TIME** and **BLACK** (every light down over
   the black time, and back), plus the master and the speed as sliders for a modulator.
   Each knob and the Black button take **MIDI Learn**. The top bar's **■ Black** takes the
   lights down with the whole show.

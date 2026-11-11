@@ -22,6 +22,7 @@ import {
   type LightOutput,
   type LightRig,
   type LightsMaster,
+  type GroupTune,
   type LightTune
 } from '@shared/lights'
 import { lightModKey, lightMods } from './lightMods'
@@ -52,6 +53,7 @@ export interface LightInputs {
   aspect: number // the picture's width / height
   identify: string | null // a fixture flashed to find it in the room
   groupLevels?: Record<string, number> // each group's fader (absent : 1)
+  groupTunes?: Record<string, GroupTune> // each group's grade (absent : neutral)
   /** The test pattern : seconds since it started (null : off). A line sweeps the
    *  room, red, then green, blue, white : every light shows where it is and
    *  whether its colors are in the right order. */
@@ -415,6 +417,7 @@ export class LightEngine {
     }
     const speed = mod('', 'masterSpeed', M.speed)
     const grand = mod('', 'masterBrightness', M.brightness)
+    const mGain = mod('', 'masterGain', M.gain ?? 1), mSat = mod('', 'masterSaturation', M.saturation ?? 1), mCon = mod('', 'masterContrast', M.contrast ?? 1)
     this.clock += dt * speed
     // Black : toward 0 over blackSec while on, back over the same time
     const bs = Math.max(0.001, M.blackSec)
@@ -511,11 +514,25 @@ export class LightEngine {
       const eAng = (mod(f.id, 'angle', look.angle) * Math.PI) / 180
       const ca = Math.cos(eAng), sa = Math.sin(eAng)
       const gca = Math.cos((gAng * Math.PI) / 180), gsa = Math.sin((gAng * Math.PI) / 180)
-      const tBright = mod(f.id, 'tuneBrightness', tune.brightness), tSat = mod(f.id, 'tuneSaturation', tune.saturation)
-      const tHue = mod(f.id, 'tuneHue', tune.hue), tWarm = mod(f.id, 'tuneWarmth', tune.warmth)
+      // its tuning, then the grades of its groups and the masters' over it
+      let tBright = mod(f.id, 'tuneBrightness', tune.brightness) * mGain, tSat = mod(f.id, 'tuneSaturation', tune.saturation) * mSat
+      let tHue = mod(f.id, 'tuneHue', tune.hue), tWarm = mod(f.id, 'tuneWarmth', tune.warmth)
+      let tCon = mod(f.id, 'tuneContrast', tune.contrast) * mCon
+      const tGamma = Math.max(0.2, mod(f.id, 'tuneGamma', tune.gamma)), tBlack = clamp01(mod(f.id, 'tuneBlack', tune.black)), tSmooth = mod(f.id, 'tuneSmooth', tune.smooth)
+      for (const gr of inp.rig.groups) {
+        if (!gr.members.includes(f.id)) continue
+        const gt = inp.groupTunes?.[gr.id]
+        const gid = GROUP_PREFIX + gr.id
+        tBright *= mod(gid, 'tuneBrightness', gt?.brightness ?? 1)
+        tCon *= mod(gid, 'tuneContrast', gt?.contrast ?? 1)
+        tSat *= mod(gid, 'tuneSaturation', gt?.saturation ?? 1)
+        tHue += mod(gid, 'tuneHue', gt?.hue ?? 0)
+        tWarm = Math.max(-1, Math.min(1, tWarm + mod(gid, 'tuneWarmth', gt?.warmth ?? 0)))
+      }
+      const area = mod(f.id, 'area', f.size)
       const grid = look.source === 'master' ? inp.grids.master : look.source === 'layer' ? inp.grids.layers[look.layer] ?? null : null
       const base = look.source === 'color' ? hsv(hue, sat, val) : null
-      const smoothA = tune.smooth > 0.001 ? 1 - Math.exp(-dt / tune.smooth) : 1
+      const smoothA = tSmooth > 0.001 ? 1 - Math.exp(-dt / tSmooth) : 1
       // hue rotation (YIQ) for the tuning
       const hr = (tHue * Math.PI) / 180, hc = Math.cos(hr), hs = Math.sin(hr)
       const asp = Math.max(0.1, inp.aspect)
@@ -528,7 +545,8 @@ export class LightEngine {
       const qLo = Math.min(0, qA, qB, qA + qB), qHi = Math.max(0, qA, qB, qA + qB)
       const pulse = E === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * (ph - (op?.u ?? 0)))) : 1
       // the gradient's own drift (never faster than a color a second and a half)
-      const gPh = look.source === 'gradient' && g.speed ? this.phaseOf(g.speed, 1.5, Math.max(0, speed), dt, inp.nowMs) : 0
+      const gSpeed = mod(f.id, 'gradSpeed', g.speed)
+      const gPh = look.source === 'gradient' && gSpeed ? this.phaseOf(gSpeed, 1.5, Math.max(0, speed), dt, inp.nowMs) : 0
       // a digital effect : its state, its shared field, what this frame needs
       let fx = s.fx
       if (STATEFUL.has(E)) { if (!fx || fx.kind !== E) fx = s.fx = makeFx(E, n) } else if (fx) fx = s.fx = undefined
@@ -616,14 +634,14 @@ export class LightEngine {
           if (grid) {
             if (E === 'scan' && depth > 0.001) {
               // the read head slides across the picture (a mirror at each edge)
-              sampleArea(grid, mirror01(x + (ca * travel) / asp), mirror01(y + sa * travel), f.size, asp, tmp, look.sample)
+              sampleArea(grid, mirror01(x + (ca * travel) / asp), mirror01(y + sa * travel), area, asp, tmp, look.sample)
               r = tmp[0]; gg = tmp[1]; b = tmp[2]
               if (depth < 0.999) {
-                sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
+                sampleArea(grid, x, y, area, asp, tmp, look.sample)
                 r = tmp[0] + (r - tmp[0]) * depth; gg = tmp[1] + (gg - tmp[1]) * depth; b = tmp[2] + (b - tmp[2]) * depth
               }
             } else {
-              sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
+              sampleArea(grid, x, y, area, asp, tmp, look.sample)
               r = tmp[0]; gg = tmp[1]; b = tmp[2]
             }
           } else if (base) {
@@ -750,11 +768,11 @@ export class LightEngine {
             b = yy - 1.106 * i2 + 1.703 * q2
           }
           r *= 1 + 0.3 * tWarm; b *= 1 - 0.3 * tWarm; gg *= 1 + 0.05 * tWarm
-          r = Math.max(0, (r - 0.5) * tune.contrast + 0.5) * m; gg = Math.max(0, (gg - 0.5) * tune.contrast + 0.5) * m; b = Math.max(0, (b - 0.5) * tune.contrast + 0.5) * m
-          r = clamp01(r * tBright) ** tune.gamma
-          gg = clamp01(gg * tBright) ** tune.gamma
-          b = clamp01(b * tBright) ** tune.gamma
-          const floor = tune.black * Math.min(1, m * 10)
+          r = Math.max(0, (r - 0.5) * tCon + 0.5) * m; gg = Math.max(0, (gg - 0.5) * tCon + 0.5) * m; b = Math.max(0, (b - 0.5) * tCon + 0.5) * m
+          r = clamp01(r * tBright) ** tGamma
+          gg = clamp01(gg * tBright) ** tGamma
+          b = clamp01(b * tBright) ** tGamma
+          const floor = tBlack * Math.min(1, m * 10)
           r = floor + (1 - floor) * r; gg = floor + (1 - floor) * gg; b = floor + (1 - floor) * b
         }
         // smoothing (identify and the test are never smoothed : they must answer at once)

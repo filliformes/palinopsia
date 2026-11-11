@@ -134,6 +134,23 @@ export interface LightsMaster {
   speed: number // 0..4 : every effect's and gradient's clock
   blackSec: number // 0..20 : how long Black takes
   fadeSec: number // 0..20 : how long a light scene takes to come in
+  gain: number // 0..2 : every light's brightness (a grade : 1 as it is; the grand master is the fader)
+  saturation: number // 0..2 : every light's saturation
+  contrast: number // 0..2 : every light's contrast
+}
+
+/** A group's grade, over its lights' own tuning (the session's, like its fader). */
+export interface GroupTune {
+  brightness: number // 0..2
+  contrast: number // 0..2
+  saturation: number // 0..2
+  hue: number // -180..180
+  warmth: number // -1..1
+}
+export const GROUP_TUNE_DEFAULT: GroupTune = { brightness: 1, contrast: 1, saturation: 1, hue: 0, warmth: 0 }
+export function sanitizeGroupTune(raw: unknown): GroupTune {
+  const r = obj(raw), d = GROUP_TUNE_DEFAULT
+  return { brightness: num(r.brightness, d.brightness, 0, 2), contrast: num(r.contrast, d.contrast, 0, 2), saturation: num(r.saturation, d.saturation, 0, 2), hue: num(r.hue, d.hue, -180, 180), warmth: num(r.warmth, d.warmth, -1, 1) }
 }
 
 export interface LightScene {
@@ -142,6 +159,7 @@ export interface LightScene {
   looks: Record<string, LightLook>
   master?: { brightness: number; speed: number }
   groups?: Record<string, number> // the group faders
+  groupTunes?: Record<string, GroupTune>
   tunes?: Record<string, LightTune> // when the tuning travels with the look
   // as a cue :
   fade?: number // its own fade in (s; absent : the console's scene fade)
@@ -189,6 +207,7 @@ export interface LightsSession {
   scenes: LightScene[]
   master: LightsMaster
   groups?: Record<string, number> // each group's fader (absent : 1)
+  groupTunes?: Record<string, GroupTune> // each group's grade (absent : neutral)
   tunes?: Record<string, LightTune>
 }
 
@@ -207,7 +226,7 @@ export const LOOK_DEFAULT: LightLook = {
   order: 'room', wings: 1, fan: 0, band: 'level', rule: 30
 }
 
-export const MASTER_DEFAULT: LightsMaster = { brightness: 1, speed: 1, blackSec: 2, fadeSec: 1.5 }
+export const MASTER_DEFAULT: LightsMaster = { brightness: 1, speed: 1, blackSec: 2, fadeSec: 1.5, gain: 1, saturation: 1, contrast: 1 }
 
 export const RIG_DEFAULT: LightRig = { fixtures: [], outputs: [], groups: [], profiles: [], tuneScope: 'rig', fps: 40, on: true }
 
@@ -222,8 +241,9 @@ export const GROUP_PREFIX = 'grp:'
 export type LightModField =
   | 'level' | 'hue' | 'sat' | 'val' | 'gradOffset' | 'gradAngle' | 'gradScale'
   | 'rate' | 'depth' | 'width' | 'angle' | 'fan'
-  | 'tuneBrightness' | 'tuneSaturation' | 'tuneHue' | 'tuneWarmth'
-  | 'masterBrightness' | 'masterSpeed'
+  | 'tuneBrightness' | 'tuneSaturation' | 'tuneHue' | 'tuneWarmth' | 'tuneContrast' | 'tuneGamma' | 'tuneBlack' | 'tuneSmooth'
+  | 'gradSpeed' | 'area'
+  | 'masterBrightness' | 'masterSpeed' | 'masterGain' | 'masterSaturation' | 'masterContrast'
 export const LIGHT_MOD_RANGE: Record<LightModField, { min: number; max: number; label: string }> = {
   level: { min: 0, max: 1, label: 'level' },
   hue: { min: 0, max: 360, label: 'hue' },
@@ -241,10 +261,21 @@ export const LIGHT_MOD_RANGE: Record<LightModField, { min: number; max: number; 
   tuneSaturation: { min: 0, max: 2, label: 'tune saturation' },
   tuneHue: { min: -180, max: 180, label: 'tune hue' },
   tuneWarmth: { min: -1, max: 1, label: 'tune warmth' },
+  tuneContrast: { min: 0, max: 2, label: 'tune contrast' },
+  tuneGamma: { min: 0.5, max: 3, label: 'tune gamma' },
+  tuneBlack: { min: 0, max: 0.3, label: 'tune black' },
+  tuneSmooth: { min: 0, max: 2, label: 'tune smooth' },
+  gradSpeed: { min: -2, max: 2, label: 'gradient drift' },
+  area: { min: 0, max: 0.3, label: 'area' },
   masterBrightness: { min: 0, max: 1, label: 'master' },
-  masterSpeed: { min: 0, max: 4, label: 'speed' }
+  masterSpeed: { min: 0, max: 4, label: 'speed' },
+  masterGain: { min: 0, max: 2, label: 'brightness' },
+  masterSaturation: { min: 0, max: 2, label: 'saturation' },
+  masterContrast: { min: 0, max: 2, label: 'contrast' }
 }
-export const LIGHT_MASTER_FIELDS: LightModField[] = ['masterBrightness', 'masterSpeed']
+export const LIGHT_MASTER_FIELDS: LightModField[] = ['masterBrightness', 'masterSpeed', 'masterGain', 'masterSaturation', 'masterContrast']
+/** What a group's grade lets a modulator move. */
+export const GROUP_TUNE_FIELDS: Partial<Record<LightModField, keyof GroupTune>> = { tuneBrightness: 'brightness', tuneContrast: 'contrast', tuneSaturation: 'saturation', tuneHue: 'hue', tuneWarmth: 'warmth' }
 
 // ── sanitizers (a file, a session, an older build : never trusted) ──────────
 
@@ -442,7 +473,10 @@ export function sanitizeMaster(raw: unknown): LightsMaster {
     brightness: num(r.brightness, d.brightness, 0, 1),
     speed: num(r.speed, d.speed, 0, 4),
     blackSec: num(r.blackSec, d.blackSec, 0, 20),
-    fadeSec: num(r.fadeSec, d.fadeSec, 0, 20)
+    fadeSec: num(r.fadeSec, d.fadeSec, 0, 20),
+    gain: num(r.gain, d.gain, 0, 2),
+    saturation: num(r.saturation, d.saturation, 0, 2),
+    contrast: num(r.contrast, d.contrast, 0, 2)
   }
 }
 
@@ -467,6 +501,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
       looks: mapOf(o.looks, sanitizeLook),
       ...(o.master ? { master: { brightness: num(m.brightness, 1, 0, 1), speed: num(m.speed, 1, 0, 4) } } : {}),
       ...(o.groups ? { groups: mapOf(o.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
+      ...(o.groupTunes ? { groupTunes: mapOf(o.groupTunes, sanitizeGroupTune, 64) } : {}),
       ...(typeof o.fade === 'number' ? { fade: num(o.fade, 1.5, 0, 60) } : {}),
       ...(typeof o.follow === 'number' ? { follow: num(o.follow, 0, 0, 3600) } : {}),
       ...(typeof o.link === 'string' && o.link ? { link: str(o.link, '', 80) } : {}),
@@ -481,6 +516,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
     scenes,
     master: sanitizeMaster(r.master),
     ...(r.groups ? { groups: mapOf(r.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
+    ...(r.groupTunes ? { groupTunes: mapOf(r.groupTunes, sanitizeGroupTune, 64) } : {}),
     ...(r.tunes ? { tunes: mapOf(r.tunes, sanitizeTune) } : {})
   }
 }

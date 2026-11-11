@@ -23,6 +23,8 @@ import {
   tokenLabel,
   tokenWidth,
   TUNE_DEFAULT,
+  GROUP_TUNE_DEFAULT,
+  LIGHT_MASTER_FIELDS,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT,
   SAMPLES,
@@ -1340,7 +1342,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
           </>
         )}
         {f.kind !== 'matrix' && <RowMaker f={f} />}
-        {S('area', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
+        {S('area', 'area', f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
         <IdentifyButton id={f.id} />
       </Section>
 
@@ -1449,6 +1451,7 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
         </label>
         <ProfilePicker ids={ids} current={f?.profile ?? ''} />
       </Section>
+      {same && <GroupTuneSection id={same.id} name={same.name} />}
       <PlaceSection ids={ids} />
       <LookSection ids={ids} look={look} slider={S} />
       <TuneSection ids={ids} tune={tune} slider={S} />
@@ -1557,6 +1560,33 @@ function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook;
   )
 }
 
+/** A group's own grade, over its lights' tuning : every slider takes a modulator
+ *  or a Macro knob (the whole group breathes, warms, drains of color together). */
+function GroupTuneSection({ id, name }: { id: string; name: string }): JSX.Element {
+  const t = useStore((s) => s.lightsSession.groupTunes?.[id]) ?? GROUP_TUNE_DEFAULT
+  const level = useStore((s) => s.lightsSession.groups?.[id]) ?? 1
+  const [openMod, setOpenMod] = useState<string | null>(null)
+  const st = useStore.getState
+  const set = (p: Partial<typeof t>): void => st().setLightGroupTune(id, p)
+  const G = (label: string, field: LightModField, value: number, min: number, max: number, step: number, on: (v: number) => void, reset: number, unit = '', title?: string): JSX.Element => (
+    <LightSlider key={label} label={label} fixture={`grp:${id}`} field={field} value={value} min={min} max={max} step={step} onChange={on} reset={reset} unit={unit} title={title} openMod={openMod} setOpenMod={setOpenMod} />
+  )
+  return (
+    <Section
+      title={`Group · ${name}`}
+      info="The group's own fader and grade, over each of its lights' tuning : brightness, contrast and saturation multiply, hue and warmth add. Every slider has an M : a modulator or a Macro knob moves the whole group together. Saved with the session and the cues."
+      actions={<button className={btn(false)} onClick={() => set({ ...GROUP_TUNE_DEFAULT })} title="Back to neutral">reset</button>}
+    >
+      {G('fader', 'level', level, 0, 1, 0.01, (v) => st().setLightGroupLevel(id, v), 1)}
+      {G('brightness', 'tuneBrightness', t.brightness, 0, 2, 0.01, (v) => set({ brightness: v }), 1)}
+      {G('contrast', 'tuneContrast', t.contrast, 0, 2, 0.01, (v) => set({ contrast: v }), 1)}
+      {G('saturation', 'tuneSaturation', t.saturation, 0, 2, 0.01, (v) => set({ saturation: v }), 1)}
+      {G('hue', 'tuneHue', t.hue, -180, 180, 1, (v) => set({ hue: v }), 0, '°')}
+      {G('warmth', 'tuneWarmth', t.warmth, -1, 1, 0.01, (v) => set({ warmth: v }), 0)}
+    </Section>
+  )
+}
+
 function TuneSection({ ids, tune, slider: S }: { ids: string[]; tune: LightTune; slider: SliderFn }): JSX.Element {
   const tuneScope = useStore((s) => s.lightRig.tuneScope)
   const setTune = (p: Partial<LightTune>): void => useStore.getState().setLightTunes(ids, p)
@@ -1567,13 +1597,13 @@ function TuneSection({ ids, tune, slider: S }: { ids: string[]; tune: LightTune;
       actions={<button className={btn(false)} onClick={() => setTune({ ...TUNE_DEFAULT })} title="Back to neutral">reset</button>}
     >
       {S('brightness', 'tuneBrightness', tune.brightness, 0, 2, 0.01, (v) => setTune({ brightness: v }), 1)}
-      {S('contrast', null, tune.contrast, 0, 2, 0.01, (v) => setTune({ contrast: v }), 1)}
-      {S('gamma', null, tune.gamma, 0.5, 3, 0.01, (v) => setTune({ gamma: v }), 2, '', 'LEDs are linear and the picture is not : 2 or so looks like the screen, lower is brighter in the shadows')}
+      {S('contrast', 'tuneContrast', tune.contrast, 0, 2, 0.01, (v) => setTune({ contrast: v }), 1)}
+      {S('gamma', 'tuneGamma', tune.gamma, 0.5, 3, 0.01, (v) => setTune({ gamma: v }), 2, '', 'LEDs are linear and the picture is not : 2 or so looks like the screen, lower is brighter in the shadows')}
       {S('saturation', 'tuneSaturation', tune.saturation, 0, 2, 0.01, (v) => setTune({ saturation: v }), 1)}
       {S('hue', 'tuneHue', tune.hue, -180, 180, 1, (v) => setTune({ hue: v }), 0, '°')}
       {S('warmth', 'tuneWarmth', tune.warmth, -1, 1, 0.01, (v) => setTune({ warmth: v }), 0, '', 'A white balance : cooler to warmer')}
-      {S('black', null, tune.black, 0, 0.3, 0.005, (v) => setTune({ black: v }), 0, '', 'A floor under the light (some LEDs flicker when almost off)')}
-      {S('smooth', null, tune.smooth, 0, 2, 0.01, (v) => setTune({ smooth: v }), 0.08, ' s', 'How slowly it follows (calms the flicker of a busy picture)')}
+      {S('black', 'tuneBlack', tune.black, 0, 0.3, 0.005, (v) => setTune({ black: v }), 0, '', 'A floor under the light (some LEDs flicker when almost off)')}
+      {S('smooth', 'tuneSmooth', tune.smooth, 0, 2, 0.01, (v) => setTune({ smooth: v }), 0.08, ' s', 'How slowly it follows (calms the flicker of a busy picture)')}
     </Section>
   )
 }
@@ -1808,7 +1838,7 @@ function GradientEditor({ look, setLook, slider }: { look: LightLook; setLook: (
       {!g.along && slider('angle', 'gradAngle', g.angle, -180, 180, 1, (v) => setG({ angle: v }), 0, '°', 'The direction it runs across the room')}
       {slider('scale', 'gradScale', g.scale, 0.1, 4, 0.01, (v) => setG({ scale: v }), 1, '', 'How many times it fits across')}
       {slider('offset', 'gradOffset', g.offset, 0, 1, 0.01, (v) => setG({ offset: v }), 0)}
-      {slider('drift', null, g.speed, -2, 2, 0.01, (v) => setG({ speed: v }), 0.05, '', 'It slides by itself (times the master speed)')}
+      {slider('drift', 'gradSpeed', g.speed, -2, 2, 0.01, (v) => setG({ speed: v }), 0.05, '', 'It slides by itself (times the master speed)')}
     </>
   )
 }
@@ -1889,7 +1919,7 @@ function LightSlider({
 }): JSX.Element {
   const modMatrix = useStore((s) => s.composition.modMatrix)
   const metaKnobs = useStore((s) => s.composition.metaKnobs)
-  const target: ModTarget | null = field ? { kind: 'light', fixture: field === 'masterBrightness' || field === 'masterSpeed' ? '' : fixture, field } : null
+  const target: ModTarget | null = field ? { kind: 'light', fixture: LIGHT_MASTER_FIELDS.includes(field) ? '' : fixture, field } : null
   const key = target ? modTargetKey(target) : ''
   const bound = target ? modMatrix.filter((a) => modTargetKey(a.target) === key) : []
   const onMeta = target ? metaKnobs.some((k) => k.destinations.some((d) => modTargetKey(d) === key)) : false
@@ -1956,6 +1986,9 @@ function Console(): JSX.Element {
       <div className="flex items-end gap-6 px-6 py-3">
         <Knob id="lights:master" label="MASTER" value={m.brightness} text={`${Math.round(m.brightness * 100)}%`} onChange={(v) => set({ brightness: v })} big def={1} title="The grand master : every light, after its own level" />
         <Knob id="lights:speed" label="SPEED" value={m.speed / 4} text={`${m.speed.toFixed(2)}×`} onChange={(v) => set({ speed: v * 4 })} def={0.25} title="Every effect's and gradient's clock (1× at a quarter turn)" />
+        <Knob id="lights:gain" label="BRIGHT" value={(m.gain ?? 1) / 2} text={`${Math.round((m.gain ?? 1) * 100)}%`} onChange={(v) => set({ gain: v * 2 })} def={0.5} title="Every light's brightness, as a grade (100% : as it is; over it, the dim parts come up). The MASTER is the fader" />
+        <Knob id="lights:sat" label="SATURATION" value={(m.saturation ?? 1) / 2} text={`${Math.round((m.saturation ?? 1) * 100)}%`} onChange={(v) => set({ saturation: v * 2 })} def={0.5} title="Every light's saturation (0 : white light, 100% : as it is, over it : more vivid)" />
+        <Knob id="lights:contrast" label="CONTRAST" value={(m.contrast ?? 1) / 2} text={`${Math.round((m.contrast ?? 1) * 100)}%`} onChange={(v) => set({ contrast: v * 2 })} def={0.5} title="Every light's contrast (100% : as it is)" />
         <Knob id="lights:fade" label="CUE FADE" value={m.fadeSec / 20} text={`${m.fadeSec.toFixed(1)} s`} onChange={(v) => set({ fadeSec: v * 20 })} def={0.075} title="How long a cue or a show takes to come in (a cue can have its own)" />
         <Knob id="lights:blacksec" label="BLACK TIME" value={m.blackSec / 20} text={`${m.blackSec.toFixed(1)} s`} onChange={(v) => set({ blackSec: v * 20 })} def={0.1} title="How long Black takes to go down (and to come back)" />
         <div className="flex flex-col items-center gap-1">
@@ -1993,6 +2026,9 @@ function Console(): JSX.Element {
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <LightSlider label="master" fixture="" field="masterBrightness" value={m.brightness} min={0} max={1} step={0.01} onChange={(v) => set({ brightness: v })} reset={1} openMod={openMod} setOpenMod={setOpenMod} title="The grand master, for a modulator or a Macro knob" />
           <LightSlider label="speed" fixture="" field="masterSpeed" value={m.speed} min={0} max={4} step={0.01} onChange={(v) => set({ speed: v })} reset={1} unit="×" openMod={openMod} setOpenMod={setOpenMod} title="The speed, for a modulator or a Macro knob" />
+          <LightSlider label="brightness" fixture="" field="masterGain" value={m.gain ?? 1} min={0} max={2} step={0.01} onChange={(v) => set({ gain: v })} reset={1} openMod={openMod} setOpenMod={setOpenMod} title="Every light's brightness, for a modulator or a Macro knob" />
+          <LightSlider label="saturation" fixture="" field="masterSaturation" value={m.saturation ?? 1} min={0} max={2} step={0.01} onChange={(v) => set({ saturation: v })} reset={1} openMod={openMod} setOpenMod={setOpenMod} title="Every light's saturation, for a modulator or a Macro knob" />
+          <LightSlider label="contrast" fixture="" field="masterContrast" value={m.contrast ?? 1} min={0} max={2} step={0.01} onChange={(v) => set({ contrast: v })} reset={1} openMod={openMod} setOpenMod={setOpenMod} title="Every light's contrast, for a modulator or a Macro knob" />
           {masterBound && <span className="font-mono text-[9px] text-accent2">the master is modulated</span>}
         </div>
       </div>
