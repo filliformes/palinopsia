@@ -144,7 +144,7 @@
   <div class="wrap">
     <span class="brand">Palinopsia<span class="dot">.</span></span>
     <a class="link" href="#download">Download</a>
-    <a class="link" href="#new-132">What's new</a>
+    <a class="link" href="#new-133">What's new</a>
     <a class="link" href="#quickstart">Quickstart</a>
     <a class="link" href="#highlights">Highlights</a>
     <a class="link" href="#faq">FAQ</a>
@@ -283,7 +283,7 @@
         <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
         <div class="body">
           <h3>Output &amp; mapping<span class="k">O</span></h3>
-          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and push the picture's color into the room over DMX / WLED, all behind a built-in flash-safety limiter. The page opens inside the app; right-click the Output button to open the output, or the whole page, in a window beside the controls.</p>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and light the room : DMX lights placed on the picture take their colors from it, on their own Lights page (<kbd>T</kbd>), out through an Enttec DMX USB Pro, Art-Net, sACN or WLED, all behind a built-in flash-safety limiter. The page opens inside the app; right-click the Output button to open the output, or the whole page, in a window beside the controls.</p>
         </div>
       </div>
       <div class="card">
@@ -433,12 +433,31 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (50 sources, 61 effects, 30 native nodes, 147 Generate recipes, the modulation matrix, the sequencers, the 12 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.2.md">1.3.2 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (50 sources, 61 effects, 30 native nodes, 147 Generate recipes, the modulation matrix, the sequencers, the 12 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.3.md">1.3.3 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <hr class="soft">
 
-  <details class="news" id="new-132" open>
+  <details class="news" id="new-133" open>
+    <summary><h2>New in 1.3.3</h2></summary>
+    <p class="section-lede">The Lights. DMX lights placed on the picture take their colors from it, so the room plays with the projection. Plug in an Enttec DMX USB Pro, follow five steps, and your lights are playing in minutes. And dataflou stays connected through a sleep.</p>
+    <ul class="new">
+      <li><b>A page for your lights</b> (key <kbd>T</kbd>, or <b>LIGHTS</b> on the Output page) : LED bars, spots, rings and panels, each dragged on the map over the part of the picture it takes its light from, every LED showing the color it sends.</li>
+      <li><b>Set up in five steps</b> : plug in the Enttec, say what lights you have and how many, set the address the page shows on each one, run the test, pick a show. Your kind of light from a list, or its file from the Open Fixture Library; the 30-zone RGB pixel bars are in the list.</li>
+      <!-- RDM : merge with feat-rdm -->
+      <li><b>Your lights find themselves (RDM)</b> : the page asks the lights on the DMX line what they are, shows their mode and address, makes one blink to find it, and sets addresses and modes from the page, through the Enttec DMX USB Pro.</li>
+      <li><b>A test and a patch you can see</b> : a line sweeps the room in red, green, blue and white to show what is wired wrong; every universe at a glance, overlaps in red, drag a light to readdress it.</li>
+      <li><b>The picture's colors, not its beige</b> : each light reads its part as the average, the most vivid or the brightest color, with smooth 16-bit fades on lights with a dimmer.</li>
+      <li><b>Effects that play like a console</b> : chases, waves, pulses, sparkle, the sound by band, the beat, the people in the room, traveling light by light with wings and fans; and <b>digital</b> ones (afterimage, echo, glitch, tape head, cellular automata, the Game of Life, fireflies).</li>
+      <li><b>27 shows</b> that fit any room, <b>groups</b> with a fader and a grade of their own, and a <b>console</b> : master, speed, brightness, saturation, contrast, cue fade and Black, all learning MIDI and taking modulators.</li>
+      <li><b>Cues</b> : GO and back, a fade and a follow time for each, a Palinopsia scene to go with, and a lane on the Seq page.</li>
+      <li><b>Light setups</b> : keep several by name or as a file, and switch rooms under the same project. Each output can wait a few milliseconds to land with the projector.</li>
+      <li><b>dataflou</b> : a computer that sleeps or drops off the network comes back by itself, and a <b>data</b> view shows what flows in and out, live.</li>
+    </ul>
+    <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.3.md">release notes</a>.</p>
+  </details>
+
+  <details class="news" id="new-132">
     <summary><h2>New in 1.3.2</h2></summary>
     <p class="section-lede">Surfaces, a synth and the loop. Draw in materials with real volume, blow any layer up into shape, grow fur, sing figures into sand and hang your picture on a cloth you grab; finish it in foil, glass or print. Sonify gets a synth the picture plays, and a layer's feedback gets effects of its own.</p>
     <ul class="new">
