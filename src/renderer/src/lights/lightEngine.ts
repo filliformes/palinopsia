@@ -1,0 +1,398 @@
+// The Lights engine : one DMX frame from the rig (the room), the looks (the piece)
+// and the picture. Pure CPU, run at the rig's fps (10..44 Hz) : for each fixture
+// its pixels' places on the picture, their colors (the picture sampled there, a
+// color, a gradient across the room), an effect over them, the fixture's level,
+// its tuning (a grade for that physical light), a smoothing, then the masters and
+// Black; the colors then land in their universes, in the fixture's channel layout.
+//
+// Sampled pictures come from the Compositor's light readback (Compositor.kickLights) :
+// RGBA8 grids, BOTTOM-UP rows, one per source in use (the master, the layers).
+
+import {
+  layoutTokens,
+  LOOK_DEFAULT,
+  type LightFixture,
+  type LightLook,
+  type LightModField,
+  type LightOutput,
+  type LightRig,
+  type LightsMaster,
+  type LightTune
+} from '@shared/lights'
+import { lightModKey, lightMods } from './lightMods'
+
+export interface LightGrid {
+  w: number
+  h: number
+  px: Uint8Array // RGBA8, bottom-up
+}
+
+export interface LightInputs {
+  rig: LightRig
+  looks: Record<string, LightLook>
+  tunes: Record<string, LightTune> // the tuning in force for each fixture
+  master: LightsMaster
+  black: boolean // Black is on (the light fades out over master.blackSec)
+  grids: { master: LightGrid | null; layers: Array<LightGrid | null> }
+  nowMs: number
+  beats: number // a running beat count (the shared clock)
+  bpm: number
+  audio: number // 0..1 : the sound's level
+  aspect: number // the picture's width / height
+  identify: string | null // a fixture flashed to find it in the room
+}
+
+/** A frame's DMX : Enttec buffers by device index, network universes by output. */
+export interface LightFrame {
+  enttec: Map<number, Uint8Array>
+  net: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array }>
+  /** Per fixture, its pixels' final colors (0..1 RGB, interleaved) : the page draws them. */
+  colors: Map<string, Float32Array>
+  /** Channels past an Enttec's 512 (unpatched), by fixture : the page warns. */
+  overflow: Set<string>
+}
+
+const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+const fract = (v: number): number => v - Math.floor(v)
+
+function hsv(h: number, s: number, v: number): [number, number, number] {
+  const hh = ((h % 360) + 360) % 360 / 60
+  const c = v * s
+  const x = c * (1 - Math.abs((hh % 2) - 1))
+  const m = v - c
+  const [r, g, b] = hh < 1 ? [c, x, 0] : hh < 2 ? [x, c, 0] : hh < 3 ? [0, c, x] : hh < 4 ? [0, x, c] : hh < 5 ? [x, 0, c] : [c, 0, x]
+  return [r + m, g + m, b + m]
+}
+
+/** Each pixel's place on the picture (0..1, y down), in channel order. */
+export function fixturePoints(f: LightFixture): Float32Array {
+  if (f.kind === 'spot') return new Float32Array([f.x0, f.y0])
+  if (f.kind === 'matrix') {
+    const n = f.cols * f.rows
+    const out = new Float32Array(n * 2)
+    let k = 0
+    for (let r = 0; r < f.rows; r++) {
+      for (let c = 0; c < f.cols; c++) {
+        const cc = f.serpentine && r % 2 === 1 ? f.cols - 1 - c : c
+        out[k++] = f.x0 + ((cc + 0.5) / f.cols) * (f.x1 - f.x0)
+        out[k++] = f.y0 + ((r + 0.5) / f.rows) * (f.y1 - f.y0)
+      }
+    }
+    if (f.reverse) reversePairs(out)
+    return out
+  }
+  const n = Math.max(1, f.pixels)
+  const out = new Float32Array(n * 2)
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0.5 : i / (n - 1)
+    const u = f.reverse ? 1 - t : t
+    out[i * 2] = f.x0 + u * (f.x1 - f.x0)
+    out[i * 2 + 1] = f.y0 + u * (f.y1 - f.y0)
+  }
+  return out
+}
+function reversePairs(a: Float32Array): void {
+  for (let i = 0, j = a.length - 2; i < j; i += 2, j -= 2) {
+    const x = a[i], y = a[i + 1]
+    a[i] = a[j]; a[i + 1] = a[j + 1]
+    a[j] = x; a[j + 1] = y
+  }
+}
+
+/** Bilinear read of a bottom-up RGBA8 grid at (x, y) (y down), 0..1 RGB. */
+function sampleAt(g: LightGrid, x: number, y: number, out: number[]): void {
+  const fx = clamp01(x) * g.w - 0.5
+  const fy = (1 - clamp01(y)) * g.h - 0.5
+  const x0 = Math.max(0, Math.min(g.w - 1, Math.floor(fx)))
+  const y0 = Math.max(0, Math.min(g.h - 1, Math.floor(fy)))
+  const x1 = Math.min(g.w - 1, x0 + 1)
+  const y1 = Math.min(g.h - 1, y0 + 1)
+  const tx = clamp01(fx - x0), ty = clamp01(fy - y0)
+  const p = g.px
+  for (let c = 0; c < 3; c++) {
+    const a = p[(y0 * g.w + x0) * 4 + c] * (1 - tx) + p[(y0 * g.w + x1) * 4 + c] * tx
+    const b = p[(y1 * g.w + x0) * 4 + c] * (1 - tx) + p[(y1 * g.w + x1) * 4 + c] * tx
+    out[c] = (a * (1 - ty) + b * ty) / 255
+  }
+}
+
+/** The picture around a point : a footprint of nine taps (`size`, frame heights). */
+function sampleArea(g: LightGrid, x: number, y: number, size: number, aspect: number, out: number[]): void {
+  if (size < 0.004) { sampleAt(g, x, y, out); return }
+  const tmp = [0, 0, 0]
+  let r = 0, gg = 0, b = 0
+  const dx = size / Math.max(0.1, aspect), dy = size
+  for (let j = -1; j <= 1; j++) {
+    for (let i = -1; i <= 1; i++) {
+      sampleAt(g, x + i * dx, y + j * dy, tmp)
+      r += tmp[0]; gg += tmp[1]; b += tmp[2]
+    }
+  }
+  out[0] = r / 9; out[1] = gg / 9; out[2] = b / 9
+}
+
+/** A gradient's color at t (ping-pong : no seam where it wraps). */
+function gradientAt(stops: number[][], t: number, out: number[]): void {
+  const u = 1 - Math.abs(2 * fract(t * 0.5) - 1) // 0..1..0 as t runs 0..2
+  const n = stops.length - 1
+  const f = u * n
+  const i = Math.min(n - 1, Math.floor(f))
+  const k = f - i
+  const a = stops[i], b = stops[i + 1]
+  out[0] = a[0] + (b[0] - a[0]) * k
+  out[1] = a[1] + (b[1] - a[1]) * k
+  out[2] = a[2] + (b[2] - a[2]) * k
+}
+
+// The effects stay under three changes a second at any rate and speed : the
+// common guidance for flashing light (the same as the picture's Flash safety).
+const MAX_HZ = 3
+
+interface FixtureState {
+  sig: string // its geometry : the points are rebuilt when it changes
+  pts: Float32Array
+  cur: Float32Array // the smoothed colors (before the masters)
+  spark: Float32Array // sparkle per pixel
+  from: Float32Array | null // a light scene's fade : where it came from
+  beatIdx: number // the beat effect : the last flash's count, and its envelope
+  beatEnv: number
+}
+
+export class LightEngine {
+  private st = new Map<string, FixtureState>()
+  private lastMs = 0
+  private clock = 0 // seconds, times the master speed (a speed change never jumps)
+  private blackLevel = 1 // 1 = lit, 0 = black
+  private fadeT = 1 // a light scene's fade : 0..1
+  private fadeSec = 0
+  private audioSm = 0
+
+  /** A light scene is coming in : fade from what shows now over `sec`. */
+  beginFade(sec: number): void {
+    this.fadeSec = Math.max(0, sec)
+    this.fadeT = this.fadeSec > 0 ? 0 : 1
+    for (const s of this.st.values()) s.from = s.cur.slice()
+  }
+
+  /** Back to lit at once (a panic, a new session). */
+  resetBlack(lit: boolean): void {
+    this.blackLevel = lit ? 1 : 0
+  }
+
+  get black01(): number {
+    return this.blackLevel
+  }
+
+  private stateOf(f: LightFixture): FixtureState {
+    const sig = `${f.kind}|${f.x0}|${f.y0}|${f.x1}|${f.y1}|${f.pixels}|${f.cols}|${f.rows}|${f.serpentine}|${f.reverse}`
+    let s = this.st.get(f.id)
+    if (!s || s.sig !== sig) {
+      const pts = fixturePoints(f)
+      const n = pts.length / 2
+      s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0 }
+      this.st.set(f.id, s)
+    }
+    return s
+  }
+
+  frame(inp: LightInputs): LightFrame {
+    const dt = this.lastMs ? Math.max(0, Math.min(0.25, (inp.nowMs - this.lastMs) / 1000)) : 1 / 40
+    this.lastMs = inp.nowMs
+    const M = inp.master
+    const mod = (fx: string, field: LightModField, base: number): number => {
+      const v = lightMods.get(lightModKey(fx, field))
+      return v === undefined ? base : v
+    }
+    const speed = mod('', 'masterSpeed', M.speed)
+    const grand = mod('', 'masterBrightness', M.brightness)
+    this.clock += dt * speed
+    // Black : toward 0 over blackSec while on, back over the same time
+    const bs = Math.max(0.001, M.blackSec)
+    this.blackLevel = inp.black ? Math.max(0, this.blackLevel - dt / bs) : Math.min(1, this.blackLevel + dt / bs)
+    if (this.fadeT < 1) this.fadeT = this.fadeSec > 0 ? Math.min(1, this.fadeT + dt / this.fadeSec) : 1
+    // the sound, smoothed (a level that jumps every frame flickers the room)
+    this.audioSm += (clamp01(inp.audio) - this.audioSm) * (1 - Math.exp(-dt / 0.06))
+    // the beat : a flash on each, decaying
+    const beatNow = inp.beats
+    const out: LightFrame = { enttec: new Map(), net: [], colors: new Map(), overflow: new Set() }
+    const outputs = new Map<string, LightOutput>(inp.rig.outputs.map((o) => [o.id, o]))
+    const universes = new Map<string, Uint8Array>() // `${outId}|${universe}`
+    const live = new Set<string>()
+    const tmp = [0, 0, 0]
+    const ease = (x: number): number => x * x * (3 - 2 * x)
+
+    for (const f of inp.rig.fixtures) {
+      live.add(f.id)
+      const s = this.stateOf(f)
+      const look = inp.looks[f.id] ?? LOOK_DEFAULT
+      const tune = inp.tunes[f.id] ?? f.tune
+      const n = s.pts.length / 2
+      const level = mod(f.id, 'level', look.level)
+      const hue = mod(f.id, 'hue', look.hue), sat = mod(f.id, 'sat', look.sat), val = mod(f.id, 'val', look.val)
+      const g = look.gradient
+      const gOff = mod(f.id, 'gradOffset', g.offset), gAng = mod(f.id, 'gradAngle', g.angle), gScale = mod(f.id, 'gradScale', g.scale)
+      const rate = Math.min(MAX_HZ, mod(f.id, 'rate', look.rate) * Math.max(0, speed))
+      const depth = clamp01(mod(f.id, 'depth', look.depth))
+      const width = Math.max(0.02, mod(f.id, 'width', look.width))
+      const eAng = (mod(f.id, 'angle', look.angle) * Math.PI) / 180
+      const ca = Math.cos(eAng), sa = Math.sin(eAng)
+      const gca = Math.cos((gAng * Math.PI) / 180), gsa = Math.sin((gAng * Math.PI) / 180)
+      const tBright = mod(f.id, 'tuneBrightness', tune.brightness), tSat = mod(f.id, 'tuneSaturation', tune.saturation)
+      const tHue = mod(f.id, 'tuneHue', tune.hue), tWarm = mod(f.id, 'tuneWarmth', tune.warmth)
+      const grid = look.source === 'master' ? inp.grids.master : look.source === 'layer' ? inp.grids.layers[look.layer] ?? null : null
+      const base = look.source === 'color' ? hsv(hue, sat, val) : null
+      const smoothA = tune.smooth > 0.001 ? 1 - Math.exp(-dt / tune.smooth) : 1
+      // hue rotation (YIQ) for the tuning
+      const hr = (tHue * Math.PI) / 180, hc = Math.cos(hr), hs = Math.sin(hr)
+      const asp = Math.max(0.1, inp.aspect)
+      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * this.clock * rate)) : 1
+      // the beat : every 1/rate beats (rate 0 : every beat), the flash decaying in a quarter of it
+      let beatMul = 1
+      if (look.effect === 'beat') {
+        // (never more than three flashes a second : at 180 BPM and over, every other beat)
+        const minBeats = (MAX_HZ > 0 ? 1 / MAX_HZ : 1) * (Math.max(1, inp.bpm) / 60)
+        const every = Math.max(minBeats, rate > 0 ? 1 / rate : 1) // beats between flashes
+        const idx = Math.floor(beatNow / every)
+        if (idx !== s.beatIdx) { s.beatIdx = idx; s.beatEnv = 1 }
+        beatMul = 1 - depth + depth * s.beatEnv
+        s.beatEnv *= Math.exp(-dt * 7)
+      }
+      const audioMul = look.effect === 'audio' ? 1 - depth + depth * this.audioSm : 1
+      const colors = new Float32Array(n * 3)
+      const ident = inp.identify === f.id
+      for (let i = 0; i < n; i++) {
+        const x = s.pts[i * 2], y = s.pts[i * 2 + 1]
+        const px = x * asp // the room's own proportions for patterns across it
+        let r = 0, gg = 0, b = 0
+        if (ident) { r = gg = b = 1 } else {
+          if (grid) {
+            sampleArea(grid, x, y, f.size, asp, tmp)
+            r = tmp[0]; gg = tmp[1]; b = tmp[2]
+          } else if (base) {
+            r = base[0]; gg = base[1]; b = base[2]
+          } else if (look.source === 'gradient') {
+            const t = g.along ? (n > 1 ? i / (n - 1) : 0.5) * gScale : (px * gca + y * gsa) * gScale
+            gradientAt(g.stops, t + gOff + this.clock * g.speed, tmp)
+            r = tmp[0]; gg = tmp[1]; b = tmp[2]
+          }
+          // the effect, a multiplier on the light
+          let m = pulse * beatMul * audioMul
+          if (look.effect === 'chase' || look.effect === 'wave') {
+            const p = px * ca + y * sa
+            if (look.effect === 'chase') {
+              const d = fract(p - this.clock * rate) // 0..1 behind the head
+              const band = Math.exp(-((Math.min(d, 1 - d) / width) ** 2) * 3)
+              m *= 1 - depth + depth * band
+            } else {
+              m *= 1 - depth * (0.5 - 0.5 * Math.sin(2 * Math.PI * (p / width - this.clock * rate)))
+            }
+          } else if (look.effect === 'sparkle') {
+            // twinkles : a pixel lights at random (rate : how often), then decays
+            if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
+            s.spark[i] *= Math.exp(-dt * 6)
+            m *= 1 - depth + depth * s.spark[i]
+          }
+          m *= level
+          r *= m; gg *= m; b *= m
+          // the tuning : saturation, hue, warmth, contrast, brightness, gamma, floor
+          const l = 0.299 * r + 0.587 * gg + 0.114 * b
+          r = l + (r - l) * tSat; gg = l + (gg - l) * tSat; b = l + (b - l) * tSat
+          if (tHue !== 0) {
+            const yy = l, ii = 0.596 * r - 0.274 * gg - 0.322 * b, qq = 0.211 * r - 0.523 * gg + 0.312 * b
+            const i2 = ii * hc - qq * hs, q2 = ii * hs + qq * hc
+            r = yy + 0.956 * i2 + 0.621 * q2
+            gg = yy - 0.272 * i2 - 0.647 * q2
+            b = yy - 1.106 * i2 + 1.703 * q2
+          }
+          r *= 1 + 0.3 * tWarm; b *= 1 - 0.3 * tWarm; gg *= 1 + 0.05 * tWarm
+          r = (r - 0.5) * tune.contrast + 0.5; gg = (gg - 0.5) * tune.contrast + 0.5; b = (b - 0.5) * tune.contrast + 0.5
+          r = clamp01(r * tBright) ** tune.gamma
+          gg = clamp01(gg * tBright) ** tune.gamma
+          b = clamp01(b * tBright) ** tune.gamma
+          r = tune.black + (1 - tune.black) * r; gg = tune.black + (1 - tune.black) * gg; b = tune.black + (1 - tune.black) * b
+        }
+        // smoothing (identify is never smoothed : it must answer at once)
+        const k = ident ? 1 : smoothA
+        const o = i * 3
+        s.cur[o] += (r - s.cur[o]) * k
+        s.cur[o + 1] += (gg - s.cur[o + 1]) * k
+        s.cur[o + 2] += (b - s.cur[o + 2]) * k
+        let fr = s.cur[o], fg = s.cur[o + 1], fb = s.cur[o + 2]
+        if (s.from && this.fadeT < 1 && s.from.length === s.cur.length) {
+          const e = ease(this.fadeT)
+          fr = s.from[o] + (fr - s.from[o]) * e
+          fg = s.from[o + 1] + (fg - s.from[o + 1]) * e
+          fb = s.from[o + 2] + (fb - s.from[o + 2]) * e
+        }
+        const gm = ident ? 1 : grand * ease(this.blackLevel)
+        colors[o] = fr * gm
+        colors[o + 1] = fg * gm
+        colors[o + 2] = fb * gm
+      }
+      out.colors.set(f.id, colors)
+      // into its universes
+      const o = outputs.get(f.out)
+      if (!o || !o.enabled || !inp.rig.on) continue
+      this.patch(f, o, colors, universes, out)
+    }
+    // fixtures gone from the rig : their state goes too
+    for (const id of [...this.st.keys()]) if (!live.has(id)) this.st.delete(id)
+    if (this.fadeT >= 1) for (const s of this.st.values()) s.from = null
+    // collect
+    for (const [key, data] of universes) {
+      const sep = key.lastIndexOf('|')
+      const o = outputs.get(key.slice(0, sep))
+      if (!o) continue
+      const uni = Number(key.slice(sep + 1))
+      if (o.kind === 'enttec') out.enttec.set(o.index, data)
+      else out.net.push({ kind: o.kind, host: o.host, universe: uni, data })
+    }
+    return out
+  }
+
+  /** One fixture's colors into its output's universes, in its channel layout. A
+   *  pixel never straddles two universes (pixel controllers expect it so) : one
+   *  that would is moved to the next universe's first channel. An Enttec has one
+   *  universe : what goes past its 512 channels is dropped (and reported). */
+  private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, Uint8Array>, out: LightFrame): void {
+    const tok = layoutTokens(f.layout)
+    const nt = tok.length
+    const hasW = tok.includes('W')
+    const n = colors.length / 3
+    let uni = o.kind === 'enttec' ? 0 : f.universe
+    let ch = f.address - 1
+    const buf = (u: number): Uint8Array => {
+      const key = `${o.id}|${u}`
+      let b = universes.get(key)
+      if (!b) { b = new Uint8Array(512); universes.set(key, b) }
+      return b
+    }
+    let data = buf(uni)
+    const b255 = (v: number): number => Math.round(clamp01(v) * 255)
+    for (let i = 0; i < n; i++) {
+      if (ch + nt > 512) {
+        if (o.kind === 'enttec') { out.overflow.add(f.id); break }
+        uni++; ch = 0; data = buf(uni)
+      }
+      let r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
+      let w = 0
+      if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
+      for (let k = 0; k < nt; k++) {
+        const t = tok[k]
+        let v: number
+        switch (t) {
+          case 'R': v = b255(r); break
+          case 'G': v = b255(g); break
+          case 'B': v = b255(b); break
+          case 'W': v = b255(w); break
+          case 'A': v = b255(Math.min(r, g * 2) * 0.8); break // amber : from the warm part
+          case 'D': v = 255; break // a dimmer channel : open (the color carries the level)
+          case 'U': case 'S': case 'X': v = 0; break // UV, strobe, unused : off
+          default: v = Math.max(0, Math.min(255, Number(t) | 0)) // a fixed value
+        }
+        data[ch + k] = v
+      }
+      ch += nt
+    }
+  }
+}

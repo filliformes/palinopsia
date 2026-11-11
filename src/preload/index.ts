@@ -263,9 +263,7 @@ const api: ExposedApi = {
   shareFrame: (w: number, h: number, pixels: Uint8Array) => ipcRenderer.send('share:frame', w, h, pixels),
 
   // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────
-  lightConfig: (cfg: unknown) => ipcRenderer.send('light:config', cfg),
-  lightFrame: (cols: number, rows: number, pixels: Uint8Array) =>
-    ipcRenderer.send('light:frame', cols, rows, pixels),
+  lightDmx: (packets: unknown) => ipcRenderer.send('light:dmx', packets),
 
   // ── Kiosk / installation mode ────────────────────────────────────
   kioskConfig: () => ipcRenderer.invoke('kiosk:config'),

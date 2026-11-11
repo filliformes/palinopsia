@@ -29,6 +29,8 @@ import { CLUTCH_AT_DEFAULT, CLUTCH_CATCH_EPS, CLUTCH_CATCH_MAX_MS, clutchEngaged
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX } from '@shared/types'
 import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
+import { LIGHT_MOD_RANGE } from '@shared/lights'
+import { lightBaseOf, lightModKey, lightMods } from '../lights/lightMods'
 import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_VOICES } from '@shared/spatial'
 import { layerRackOf } from '../layerRack'
 
@@ -1557,6 +1559,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'outx') return `outx:${t.field}`
   if (t.kind === 'world') return 'world:amount'
   if (t.kind === 'au') return t.slot ? `au:${t.slot}:${t.field}` : `au:${t.field}`
+  if (t.kind === 'light') return `light:${t.fixture}:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1858,6 +1861,14 @@ export function writeModTarget(
     setWorldAmountMod(v)
     return
   }
+  // A Lights slider : absolute over its span, onto the Lights engine.
+  if (t.kind === 'light') {
+    const r = LIGHT_MOD_RANGE[t.field]
+    const value = r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min)
+    liveModValues.set(liveKey(t), value)
+    lightMods.set(lightModKey(t.fixture, t.field), value)
+    return
+  }
   // An output-transform slider : absolute over its span.
   if (t.kind === 'outx') {
     const r = OUTX_MOD_RANGE[t.field]
@@ -2009,6 +2020,7 @@ export function applyModulation(
   // a removed mod-matrix assignment leaves a stale entry that liveOverlay keeps
   // writing into the slider forever, so the control never reverts to its base.
   liveModValues.clear()
+  lightMods.clear() // (a binding removed : its light goes back to its own value)
   colorFrame.clear()
   liveColorValues.clear()
   // Global modulation mute: with the maps cleared and no writes issued, the
@@ -2099,6 +2111,16 @@ export function applyModulation(
       const final = auValueOf(a.target.field, x)
       liveModValues.set(liveKey(a.target), final)
       setAuMod(a.target, final)
+      continue
+    }
+    if (a.target.kind === 'light') {
+      const base = lightBaseOf(a.target.fixture, a.target.field)
+      if (base === null) continue // the fixture is gone
+      const r = LIGHT_MOD_RANGE[a.target.field]
+      const final = inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number') continue
+      liveModValues.set(liveKey(a.target), final)
+      lightMods.set(lightModKey(a.target.fixture, a.target.field), final)
       continue
     }
     if (a.target.kind === 'outx') {

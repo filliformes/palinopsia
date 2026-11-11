@@ -80,8 +80,7 @@ export function OutputPage({
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const setShareActive = useStore((s) => s.setShareActive)
-  const lights = useStore((s) => s.lights)
-  const setLights = useStore((s) => s.setLights)
+  const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0)
   // Installation mode : a persisted "enable on next restart" launch config (main
   // owns kiosk.json). Load it once; toggling writes it back.
   const sessionPath = useStore((s) => s.sessionPath)
@@ -933,93 +932,12 @@ export function OutputPage({
           </Section>
 
           <Section
-            title="Lights (ArtNet / WLED)"
-            info="Samples the composite into a cols×rows zone grid and streams it as ArtNet/DMX (any console or LED controller) or WLED (DNRGB, port 21324). Set the fixture's IP; ArtNet spills across universes automatically. Machine-local (travels with the venue, not the session)."
-            defaultCollapsed={!lights.enabled}
+            title="Lights"
+            info="DMX lights have their own page now : LED bars, spots and matrices placed on the picture, each taking the master, a layer, a color or a gradient, tuned for its physical light, with light scenes, shows and a console of masters. Out through an Enttec DMX USB Pro, Art-Net, sACN or WLED."
           >
-
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => setLights({ enabled: !lights.enabled })}
-                className={`flex-1 ${btn(lights.enabled)}`}
-              >
-                Lights {lights.enabled ? 'on' : 'off'}
-              </button>
-              <button onClick={() => setLights({ protocol: 'artnet' })} className={btn(lights.protocol === 'artnet')}>
-                ArtNet
-              </button>
-              <button onClick={() => setLights({ protocol: 'wled' })} className={btn(lights.protocol === 'wled')}>
-                WLED
-              </button>
-            </div>
-            <label className="flex items-center justify-between gap-1 text-[11px] text-muted">
-              host
-              <input
-                value={lights.host}
-                onChange={(e) => setLights({ host: e.target.value })}
-                placeholder="192.168.1.50"
-                className="w-36 rounded bg-panel px-1 py-0.5 text-right font-mono text-[11px] text-fg"
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
-              <label className="flex items-center gap-1">cols
-                <input type="number" min={1} max={64} value={lights.cols}
-                  onChange={(e) => setLights({ cols: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
-                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 64, true)) }} />
-              </label>
-              <label className="flex items-center gap-1">rows
-                <input type="number" min={1} max={64} value={lights.rows}
-                  onChange={(e) => setLights({ rows: Math.max(1, Math.min(64, Number(e.target.value) || 1)) })}
-                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 64, true)) }} />
-              </label>
-              <label className="flex items-center gap-1">fps
-                <input type="number" min={1} max={60} value={lights.fps}
-                  onChange={(e) => setLights({ fps: Math.max(1, Math.min(60, Number(e.target.value) || 40)) })}
-                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 60, true)) }} />
-              </label>
-            </div>
-            <label className="flex items-center gap-2 text-[11px] text-muted">
-              bright
-              <input type="range" min={0} max={1} step={0.01} value={lights.brightness}
-                onChange={(e) => setLights({ brightness: Number(e.target.value) })} className="flex-1" />
-              <span className="w-8 text-right font-mono">{lights.brightness.toFixed(2)}</span>
-            </label>
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted">
-              <label className="flex items-center gap-1">gamma
-                <input type="number" min={0.5} max={3} step={0.1} value={lights.gamma}
-                  onChange={(e) => setLights({ gamma: Math.max(0.5, Math.min(3, Number(e.target.value) || 1)) })}
-                  className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(0.5, 3, false, 2)) }} />
-              </label>
-              <label className="flex items-center gap-1">
-                <input type="checkbox" checked={lights.serpentine}
-                  onChange={(e) => setLights({ serpentine: e.target.checked })} />
-                serpentine
-              </label>
-            </div>
-            {lights.protocol === 'artnet' && (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                <label className="flex items-center gap-1">universe
-                  <input type="number" min={0} max={32767} value={lights.universe}
-                    onChange={(e) => setLights({ universe: Math.max(0, Number(e.target.value) || 0) })}
-                    className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(0, 32767, true)) }} />
-                </label>
-                <label className="flex items-center gap-1">ch
-                  <input type="number" min={1} max={512} value={lights.startChannel}
-                    onChange={(e) => setLights({ startChannel: Math.max(1, Math.min(512, Number(e.target.value) || 1)) })}
-                    className="box-content rounded bg-panel px-1 py-0.5 text-right font-mono text-fg" style={{ width: numberBoxCh(numberBoxChars(1, 512, true)) }} />
-                </label>
-                <label className="flex items-center gap-1">order
-                  <select value={lights.order}
-                    onChange={(e) => setLights({ order: e.target.value as 'rgb' | 'grb' | 'brg' | 'bgr' })}
-                    className="rounded bg-panel px-1 py-0.5 font-mono text-fg">
-                    <option value="rgb">RGB</option>
-                    <option value="grb">GRB</option>
-                    <option value="brg">BRG</option>
-                    <option value="bgr">BGR</option>
-                  </select>
-                </label>
-              </div>
-            )}
+            <button onClick={() => useStore.getState().setLightsPageOpen(true)} className={`w-full ${btn(lightsOn)}`}>
+              {lightsOn ? '◉ ' : ''}Open the Lights page (T)
+            </button>
           </Section>
 
           <Section

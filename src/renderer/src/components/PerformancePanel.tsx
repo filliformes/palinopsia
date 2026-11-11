@@ -27,7 +27,7 @@ const CPU_ROWS: Array<{ key: string; label: string; desc: string }> = [
   { key: 'output', label: 'Output stream', desc: 'Reading the finished frame back and posting it to the output / projector window. Only non-zero while an output window is open ; grows with resolution.' },
   { key: 'vision', label: 'Vision return', desc: 'Downsampling the composited image and reducing it to features (brightness, motion, edges…) that drive `vision` / `homeostat` modulators and stream out over OSC. Only runs when something reads them.' },
   { key: 'depth', label: 'Depth engine', desc: 'Reading a small frame back for the depth model and taking in its map (~11 Hz); the model itself runs on its own thread, on the graphics card. Only with depth : AI (read by Parallax, Pulfrich and the depth focus of Luma Blur; its menu heads the picture section below).' },
-  { key: 'lights', label: 'Light output', desc: 'Mip-averaging the image into a zone grid and shipping it to the ArtNet/DMX · WLED sender. Only when Lights are on ; throttled to the light fps.' },
+  { key: 'lights', label: 'Lights', desc: 'The Lights page : reading back the pictures its fixtures sample, making the DMX frame and sending it (Enttec USB Pro, Art-Net, sACN, WLED). Only with fixtures and the lights on (or the page open) ; throttled to the rig fps.' },
   { key: 'mark', label: 'Mark signal', desc: 'Reading one line of the image and sending it over OSC as the drawn optical soundtrack (/opsia/av/mark-*). Only while MARK is on in the OSC OUT box ; about 30 times a second.' },
   { key: 'sonify', label: 'Sonify', desc: 'Sampling the image taps that feed the Sonify sound engine (image → sound). The voices themselves run on the audio thread.' },
   { key: 'audio', label: 'Audio ingest', desc: 'Analyzing the audio input into level / flux / transient / bands / pitch for audio-reactivity (plus the denoiser + monitor graph).' },
@@ -95,7 +95,7 @@ export function PerformancePanel(): JSX.Element {
   const renderScale = useStore((s) => s.renderScale)
   const layers = useStore((s) => s.composition.layers) as unknown as LayerLike[]
   const master = useStore((s) => s.composition.master)
-  const lights = useStore((s) => s.lights)
+  const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0)
   const body = useStore((s) => s.bodyControl)
   const ndi = useStore((s) => s.ndiActive)
   const spout = useStore((s) => s.shareActive)
@@ -229,7 +229,7 @@ export function PerformancePanel(): JSX.Element {
             {chip(ndi, 'NDI', 'NDI output is on : the full frame is read back and sent over the network each frame.')}
             {chip(spout, window.api.platform === 'darwin' ? 'Syphon' : 'Spout', 'Texture sharing is on : the frame is shared with other apps on this computer each frame.')}
             {chip(hiveOut, 'HIVE out', 'HIVE output is on : the frame is HEVC-encoded and fanned out over TCP.')}
-            {chip(lights.enabled, 'lights', 'Light output (ArtNet/DMX · WLED) is on : the image is reduced to a zone grid and sent over UDP.')}
+            {chip(lightsOn, 'lights', 'The lights are on : the fixtures sample the picture and DMX goes out (the Lights page, T).')}
             {chip(sonify.on, `Sonify ${soniVoices}v`, 'The Sonify sound engine (image → sound) is on. The number is how many voices are active.')}
             {chip(audioEnabled, 'audio', 'Audio ingest is on (analyzing an input for reactivity).')}
             {chip(audioMonitor, 'monitor', 'Input monitoring / passthrough is on (you hear the input through the output).')}

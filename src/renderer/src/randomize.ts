@@ -570,6 +570,7 @@ function targetKey(t: ModTarget): string {
   if (t.kind === 'outx') return `outx:${t.field}`
   if (t.kind === 'world') return 'world:amount'
   if (t.kind === 'au') return t.slot ? `au:${t.slot}:${t.field}` : `au:${t.field}`
+  if (t.kind === 'light') return `light:${t.fixture}:${t.field}`
   const s = t.scope
   return `fx:${s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`}:${t.instId}:${t.input}`
 }
