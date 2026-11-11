@@ -1811,6 +1811,9 @@ export interface ExposedApi {
   // The Lights' network outputs : DMX universes for Art-Net, sACN, WLED (the
   // Enttec USB Pro is driven from the renderer, through Web Serial).
   lightDmx: (packets: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }>) => void
+  /** A light setup to a file the user picks, and one read back (its text). */
+  lightSetupSave: (text: string, name: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+  lightSetupOpen: () => Promise<{ ok: boolean; text?: string; name?: string; error?: string }>
   /** Who is on the network (about 1.5 s) : Art-Net nodes and WLED controllers. */
   lightDiscover: () => Promise<{ artnet: Array<{ ip: string; name: string; long: string; universes: number[] }>; wled: Array<{ ip: string; name: string }> }>
   // Kiosk / installation mode : read the effective launch config; get/set the

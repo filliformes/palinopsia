@@ -287,9 +287,19 @@ export function sanitizeTune(raw: unknown): LightTune {
  *  S strobe, X unused), the same followed by 16 for two channels (coarse and fine :
  *  D16 is a dimmer and its fine channel), or a number for a channel held at that
  *  value. Empty or unreadable : RGB. */
+export const MAX_TOKENS = 128
+const rawTokens = (layout: string): string[] => (layout || '').toUpperCase().match(/[RGBWAUDSXCMYL](?:16)?|\d{1,3}/g) ?? []
 export function layoutTokens(layout: string, fallback = true): string[] {
-  const t = (layout || '').toUpperCase().match(/[RGBWAUDSXCMYL](?:16)?|\d{1,3}/g) ?? []
-  return t.length ? t.slice(0, 64) : fallback ? ['R', 'G', 'B'] : []
+  const t = rawTokens(layout)
+  return t.length ? t.slice(0, MAX_TOKENS) : fallback ? ['R', 'G', 'B'] : []
+}
+/** A layout as kept : as written ("RGB" stays "RGB"); one too long is cut after a
+ *  whole token, never in the middle of one ("128" never becomes "12"). */
+const tokenText = (v: unknown, fallback: string): string => {
+  const text = typeof v === 'string' ? v.trim() : ''
+  const t = rawTokens(text)
+  if (!t.length) return fallback
+  return t.length > MAX_TOKENS || text.length > 1024 ? t.slice(0, MAX_TOKENS).join(' ') : text
 }
 /** The channels a token takes (a 16-bit one : two). */
 export const tokenWidth = (t: string): number => (t.length === 3 && t.endsWith('16') && t[0] >= 'A' && t[0] <= 'Z' ? 2 : 1)
@@ -307,17 +317,19 @@ export function sanitizeFixture(raw: unknown, i = 0): LightFixture {
     x1: num(r.x1, 0.8, -0.5, 1.5),
     y1: num(r.y1, 0.5, -0.5, 1.5),
     size: num(r.size, 0.03, 0, 0.3),
-    pixels: kind === 'spot' ? 1 : Math.round(num(r.pixels, 30, 1, 2048)),
+    // (a spot keeps the count it had as a bar : fixturePixels says 1 for it)
+    pixels: Math.round(num(r.pixels, kind === 'spot' ? 1 : 30, 1, 2048)),
     cols: Math.round(num(r.cols, 8, 1, 128)),
-    rows: Math.round(num(r.rows, 4, 1, 128)),
+    // (4096 cells at most : a 128 × 128 matrix would take the render thread)
+    rows: Math.min(Math.round(num(r.rows, 4, 1, 128)), Math.max(1, Math.floor(4096 / Math.round(num(r.cols, 8, 1, 128))))),
     serpentine: bool(r.serpentine, false),
     reverse: bool(r.reverse, false),
     bends: (Array.isArray(r.bends) ? r.bends : []).slice(0, 64).map((v) => num(v, 0.5, -0.5, 1.5)).slice(0, Math.floor(Math.min(64, Array.isArray(r.bends) ? r.bends.length : 0) / 2) * 2),
     start: oneOf(r.start, CORNERS, 'tl'),
     byCols: bool(r.byCols, false),
-    layout: str(r.layout, 'RGB', 96) || 'RGB',
-    head: str(r.head, '', 256),
-    tail: str(r.tail, '', 256),
+    layout: tokenText(r.layout, 'RGB'),
+    head: tokenText(r.head, ''),
+    tail: tokenText(r.tail, ''),
     profile: str(r.profile, '', 80),
     out: str(r.out, '', 40),
     universe: Math.round(num(r.universe, 0, 0, 32767)),
@@ -348,9 +360,9 @@ export function sanitizeProfile(raw: unknown, i = 0): LightProfile {
     id: str(r.id, `pr${i}`, 80) || `pr${i}`,
     name: str(r.name, 'Fixture', 80) || 'Fixture',
     kind,
-    head: str(r.head, '', 256),
-    layout: str(r.layout, 'RGB', 96) || 'RGB',
-    tail: str(r.tail, '', 256),
+    head: tokenText(r.head, ''),
+    layout: tokenText(r.layout, 'RGB'),
+    tail: tokenText(r.tail, ''),
     ...(typeof r.pixels === 'number' ? { pixels: Math.round(num(r.pixels, 1, 1, 2048)) } : {}),
     ...(typeof r.cols === 'number' ? { cols: Math.round(num(r.cols, 1, 1, 128)) } : {}),
     ...(typeof r.rows === 'number' ? { rows: Math.round(num(r.rows, 1, 1, 128)) } : {}),
@@ -510,11 +522,15 @@ export function fixturePixels(f: LightFixture): number {
   return f.kind === 'spot' ? 1 : f.kind === 'matrix' ? f.cols * f.rows : f.pixels
 }
 
+/** The universe a fixture's first channel goes out on : an Enttec has one, sACN
+ *  counts from 1 (universe 0 does not exist there : it is sent as 1). */
+export const firstUniverse = (kind: LightOutputKind, universe: number): number => (kind === 'enttec' ? 0 : kind === 'sacn' ? Math.max(1, universe) : universe)
+
 /** Where a fixture's channels land : its blocks (the head, each pixel, the tail)
  *  laid from its address, a block that would straddle a universe moved to the
  *  next one (an Enttec has one : what goes past 512 is cut). The same placement
  *  the engine's patch makes. */
-export function fixtureSpans(f: LightFixture, enttec: boolean): Array<{ universe: number; from: number; to: number }> {
+export function fixtureSpans(f: LightFixture, enttec: boolean, sacn = false): Array<{ universe: number; from: number; to: number }> {
   const head = layoutChannels(layoutTokens(f.head, false))
   const pix = layoutChannels(layoutTokens(f.layout))
   const tail = layoutChannels(layoutTokens(f.tail, false))
@@ -523,7 +539,7 @@ export function fixtureSpans(f: LightFixture, enttec: boolean): Array<{ universe
   for (let i = fixturePixels(f); i > 0; i--) blocks.push(pix)
   if (tail) blocks.push(tail)
   const out: Array<{ universe: number; from: number; to: number }> = []
-  let uni = enttec ? 0 : f.universe
+  let uni = firstUniverse(enttec ? 'enttec' : sacn ? 'sacn' : 'artnet', f.universe)
   let ch = f.address - 1
   let cur: { universe: number; from: number; to: number } | null = null
   for (const w of blocks) {

@@ -266,6 +266,8 @@ const api: ExposedApi = {
   // ── Light output (ArtNet/DMX · WLED) ─────────────────────────────
   lightDmx: (packets: unknown) => ipcRenderer.send('light:dmx', packets),
   lightDiscover: () => ipcRenderer.invoke('light:discover'),
+  lightSetupSave: (text: string, name: string) => ipcRenderer.invoke('light:setupSave', text, name),
+  lightSetupOpen: () => ipcRenderer.invoke('light:setupOpen'),
 
   // ── Kiosk / installation mode ────────────────────────────────────
   kioskConfig: () => ipcRenderer.invoke('kiosk:config'),

@@ -9,6 +9,8 @@ export interface LightShow {
   id: string
   name: string
   blurb: string
+  /** A shorter name for its button (the name stays its name in OSC and the docs). */
+  label?: string
   /** The digital ones : automata, memory, glitches (the Shows section lists them apart). */
   digital?: boolean
   /** One to three colors that say what it looks like (its button's swatch); none : the picture's. */
@@ -30,7 +32,7 @@ const grad = (stops: number[][], over: Partial<LightLook['gradient']> = {}): Par
 })
 
 export const LIGHT_SHOWS: LightShow[] = [
-  { id: 'follow', name: 'Follow the picture', blurb: 'Every light takes the picture where it sits.', look: () => ({ source: 'master', effect: 'none', level: 1 }) },
+  { id: 'follow', name: 'Follow the picture', label: 'The picture', blurb: 'Every light takes the picture where it sits.', look: () => ({ source: 'master', effect: 'none', level: 1 }) },
   {
     id: 'layers', name: 'Each its layer', blurb: 'The playing layers dealt out from left to right : each light shows one.',
     look: (f, _i, all, layers) => {

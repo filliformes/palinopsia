@@ -7,6 +7,8 @@
 import { createSocket, type Socket } from 'dgram'
 import { randomBytes } from 'crypto'
 import { networkInterfaces } from 'os'
+import { isIP } from 'net'
+import { lookup } from 'dns'
 import makeMdns from 'multicast-dns'
 
 const ARTNET_PORT = 6454
@@ -25,6 +27,28 @@ export class DmxSender {
   private artSeq = 0
   private sacnSeq = new Map<number, number>()
   private readonly cid = randomBytes(16) // this sender's sACN identity, for this run
+  // A host written as a name (wled-bar.local) : looked up once, kept ten seconds.
+  // Never per packet : forty lookups a second and a universe would fill the
+  // thread pool main's own file work waits on.
+  private names = new Map<string, { ip: string; at: number; busy: boolean }>()
+
+  /** The address to send to : an IP as it is, a name through its last lookup
+   *  ('' : not known yet, this packet is skipped). */
+  private addr(host: string): string {
+    if (!host || isIP(host)) return host
+    const now = Date.now()
+    let e = this.names.get(host)
+    if (!e) { e = { ip: '', at: 0, busy: false }; this.names.set(host, e) }
+    if (!e.busy && now - e.at > 10_000) {
+      e.busy = true
+      const ent = e
+      try {
+        lookup(host, 4, (err, ip) => { ent.busy = false; ent.at = Date.now(); ent.ip = err ? '' : ip })
+      } catch { ent.busy = false; ent.at = now }
+    }
+    if (this.names.size > 64) this.names.clear()
+    return e.ip
+  }
 
   private socket(): Socket | null {
     if (this.sock) return this.sock
@@ -50,10 +74,12 @@ export class DmxSender {
     if (!Array.isArray(packets) || !packets.length) return
     const s = this.socket()
     if (!s) return
-    for (const p of packets.slice(0, 257)) {
-      if (!p) continue
+    for (const p0 of packets.slice(0, 257)) {
+      if (!p0 || typeof p0.host !== 'string') continue
+      const p = { ...p0, host: this.addr(p0.host.trim()) }
+      if (p0.host && !p.host) continue // a name not resolved yet
       if (p.kind === 'artsync') {
-        if (typeof p.host === 'string' && p.host) { try { this.artsync(s, p.host) } catch { /* a malformed host */ } }
+        if (p.host) { try { this.artsync(s, p.host) } catch { /* a malformed host */ } }
         continue
       }
       if (!(p.data instanceof Uint8Array)) continue

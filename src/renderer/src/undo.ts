@@ -57,6 +57,10 @@ interface Snapshot {
   // starts.
   ruleSeq: FullState['ruleSeq']
   seqLanes: FullState['seqLanes']
+  // The lights of the session : each light's look, the cues, the masters, the
+  // group faders (New and Open replace them; "to all", a show, a deleted cue are
+  // steps). The rig is this computer's and is not in it.
+  lightsSession: FullState['lightsSession']
 }
 
 function snap(): Snapshot {
@@ -83,7 +87,8 @@ function snap(): Snapshot {
     audioLayer: s.audioLayer,
     pins: s.pins,
     ruleSeq: s.ruleSeq,
-    seqLanes: s.seqLanes
+    seqLanes: s.seqLanes,
+    lightsSession: s.lightsSession
   }
 }
 
@@ -122,7 +127,8 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.audioLayer !== b.audioLayer ||
     a.pins !== b.pins ||
     a.ruleSeq !== b.ruleSeq ||
-    a.seqLanes !== b.seqLanes
+    a.seqLanes !== b.seqLanes ||
+    a.lightsSession !== b.lightsSession
   )
 }
 
@@ -169,7 +175,8 @@ function apply(s: Snapshot): void {
     audioLayerArmed: armed,
     pins: s.pins,
     ruleSeq: s.ruleSeq, // (saved on this machine by engine/ruleSeq.ts as it changes)
-    seqLanes: s.seqLanes
+    seqLanes: s.seqLanes,
+    lightsSession: s.lightsSession
   })
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
@@ -331,6 +338,7 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   if (a.sequence !== b.sequence) return 'sequencer'
   if (a.ruleSeq !== b.ruleSeq) return 'rule timeline'
   if (a.seqLanes !== b.seqLanes) return 'Seq transport'
+  if (a.lightsSession !== b.lightsSession) return 'lights'
   if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
   if (a.sonify !== b.sonify) return 'sonify'
   if (a.audioLayer !== b.audioLayer) return 'audio layer'

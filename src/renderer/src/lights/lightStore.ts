@@ -3,9 +3,11 @@
 // page : that one setting comes over once, as a matrix on its own output.
 
 import {
+  firstUniverse,
   fixtureChannels,
   fixtureSpans,
   profilePatch,
+  sanitizeLightsSession,
   RIG_DEFAULT,
   sanitizeFixture,
   sanitizeOutput,
@@ -115,16 +117,44 @@ export function loadRig(): LightRig {
   return { ...RIG_DEFAULT, fixtures: [], outputs: [] }
 }
 
-const uid = (p: string): string => `${p}${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
+const uid = (p: string): string => `${p}${Date.now().toString(36)}${Math.floor(Math.random() * 46656).toString(36)}`
+/** An id no light, output or group of the rig has (several made in one millisecond stay apart). */
+function freshId(rig: LightRig, p: string): string {
+  let id = uid(p)
+  while (rig.fixtures.some((f) => f.id === id) || rig.outputs.some((o) => o.id === id)) id = uid(p)
+  return id
+}
 
-/** The next free channel on an output's universe, after the fixtures already there. */
-export function nextAddress(rig: LightRig, out: string, universe: number): number {
-  let end = 0
+/** Where the next light of `channels` channels goes on an output : right after the
+ *  last channel in use there (the real one : a long pixel bar's spill into the next
+ *  universes counts), on the next universe when it would not fit in this one. An
+ *  Enttec has one universe : past its end, the address stays at 512 (the page says
+ *  it does not fit). */
+export function nextSlot(rig: LightRig, out: string, channels: number): { universe: number; address: number } {
+  const o = rig.outputs.find((x) => x.id === out)
+  const enttec = !o || o.kind === 'enttec'
+  let uni = firstUniverse(o?.kind ?? 'enttec', 0), end = 0, any = false
   for (const f of rig.fixtures) {
-    if (f.out !== out || f.universe !== universe) continue
-    end = Math.max(end, f.address - 1 + fixtureChannels(f))
+    if (f.out !== out) continue
+    const sp = fixtureSpans(f, enttec, o?.kind === 'sacn')
+    const last = sp[sp.length - 1]
+    if (!last) continue
+    if (!any || last.universe > uni || (last.universe === uni && last.to > end)) { uni = last.universe; end = last.to }
+    any = true
   }
-  return Math.min(512, end + 1)
+  if (enttec) return { universe: 0, address: Math.min(512, end + 1) }
+  if (end + channels > 512 && channels <= 512) return { universe: uni + 1, address: 1 }
+  if (end >= 512) return { universe: uni + 1, address: 1 }
+  return { universe: uni, address: end + 1 }
+}
+/** (kept for callers that only want the address on an Enttec) */
+export function nextAddress(rig: LightRig, out: string, _universe: number): number {
+  return nextSlot(rig, out, 1).address
+}
+/** A light put on its output's next free slot. */
+function slotted(rig: LightRig, f: LightFixture): LightFixture {
+  const sl = nextSlot(rig, f.out, fixtureChannels(f))
+  return { ...f, universe: sl.universe, address: sl.address }
 }
 
 export function newFixture(rig: LightRig, kind: LightKind): LightFixture {
@@ -141,26 +171,28 @@ export function newFixture(rig: LightRig, kind: LightKind): LightFixture {
           ? { x0: 0.5, y0: 0.5, x1: 0.62, y1: 0.5, size: 0.025, pixels: 24, layout: 'RGB' }
           : { x0: 0.12, y0: y, x1: 0.88, y1: y, size: 0.025, pixels: 60, layout: 'RGB' }
   const f = sanitizeFixture({
-    id: uid('fx'),
+    id: freshId(rig, 'fx'),
     name: `${kind === 'spot' ? 'Spot' : kind === 'matrix' ? 'Matrix' : kind === 'ring' ? 'Ring' : 'Bar'} ${same + 1}`,
     kind,
     ...base,
     out,
     universe: 0
   })
-  f.address = nextAddress(rig, out, 0)
-  return f
+  return slotted(rig, f)
 }
 
 export function newOutput(rig: LightRig, kind: LightOutputKind): LightOutput {
   const enttecs = rig.outputs.filter((o) => o.kind === 'enttec').length
-  return sanitizeOutput({ id: uid('out'), kind, index: kind === 'enttec' ? enttecs : 0, enabled: true })
+  // (the lowest Pro not taken : after one is removed, the count is someone's index)
+  let index = 0
+  if (kind === 'enttec') while (rig.outputs.some((o) => o.kind === 'enttec' && o.index === index)) index++
+  void enttecs
+  return sanitizeOutput({ id: freshId(rig, 'out'), kind, index, enabled: true })
 }
 
 export function duplicate(rig: LightRig, f: LightFixture): LightFixture {
-  const d = sanitizeFixture({ ...f, id: uid('fx'), name: `${f.name} copy`, y0: Math.min(1, f.y0 + 0.06), y1: Math.min(1, f.y1 + 0.06) })
-  d.address = nextAddress(rig, d.out, d.universe)
-  return d
+  const dy = Math.min(0.06, Math.max(0, 1 - Math.max(f.y0, f.y1)))
+  return slotted(rig, sanitizeFixture({ ...f, ...shifted(f, 0, dy || -0.06), id: freshId(rig, 'fx'), name: `${f.name} copy` }))
 }
 
 /** A fixture moved by (dx, dy), its bends with it. */
@@ -190,8 +222,7 @@ export function rowOf(rig: LightRig, f: LightFixture, n: number, dir: 'across' |
   let r: LightRig = { ...rig, fixtures: rig.fixtures.map((x) => (x.id === f.id ? out[0] : x)) }
   const base = f.name.replace(/\s+\d+$/, '')
   for (let k = 1; k < N; k++) {
-    const c = sanitizeFixture({ ...at(f, k), id: uid('fx'), name: `${base} ${k + 1}` })
-    c.address = nextAddress(r, c.out, c.universe)
+    const c = slotted(r, sanitizeFixture({ ...at(f, k), id: freshId(r, 'fx'), name: `${base} ${k + 1}` }))
     r = { ...r, fixtures: [...r.fixtures, c] }
     out.push(c)
   }
@@ -204,8 +235,9 @@ export function rowOf(rig: LightRig, f: LightFixture, n: number, dir: 'across' |
 export function addressedInOrder(rig: LightRig, out: string): LightFixture[] {
   const o = rig.outputs.find((x) => x.id === out)
   const enttec = o?.kind === 'enttec'
-  const list = rig.fixtures.filter((f) => f.out === out).sort((a, b) => (a.universe - b.universe) || (a.address - b.address))
-  let uni = enttec ? 0 : list[0]?.universe ?? 0
+  // (an Enttec hides the universe : by address alone there, as its lights are listed)
+  const list = rig.fixtures.filter((f) => f.out === out).sort((a, b) => (enttec ? 0 : a.universe - b.universe) || (a.address - b.address))
+  let uni = enttec ? 0 : firstUniverse(o?.kind ?? 'artnet', list[0]?.universe ?? 0)
   let ch = 0
   const done: LightFixture[] = []
   for (const f of list) {
@@ -213,7 +245,7 @@ export function addressedInOrder(rig: LightRig, out: string): LightFixture[] {
     if (!enttec && ch > 0 && ch + n > 512 && n <= 512) { uni++; ch = 0 }
     if (!enttec && ch >= 512) { uni++; ch = 0 }
     const g = { ...f, address: Math.min(512, ch + 1), universe: enttec ? f.universe : uni }
-    const spans = fixtureSpans(g, enttec)
+    const spans = fixtureSpans(g, enttec, o?.kind === 'sacn')
     const last = spans[spans.length - 1]
     if (last) { if (!enttec) uni = last.universe; ch = last.to } else ch += n
     done.push(g)
@@ -237,9 +269,72 @@ export function chainOf(rig: LightRig, profile: LightProfile, n: number): LightR
         : profile.kind === 'ring' ? { x0: t, y0: 0.5, x1: t + 0.3 / N, y1: 0.5 }
           : profile.kind === 'matrix' ? { x0: t - 0.4 / N, y0: 0.3, x1: t + 0.4 / N, y1: 0.7 }
             : { x0: t - 0.42 / N, y0: 0.62, x1: t + 0.42 / N, y1: 0.62 }
-    const f = sanitizeFixture({ ...base, ...profilePatch(profile), ...place, bends: [], out: out.id, universe: 0, name: `Light ${r.fixtures.length + 1}` })
-    f.address = nextAddress(r, out.id, 0)
+    const f = slotted(r, sanitizeFixture({ ...base, ...profilePatch(profile), ...place, bends: [], out: out.id, universe: 0, name: `Light ${r.fixtures.length + 1}` }))
     r = { ...r, fixtures: [...r.fixtures, f] }
   }
   return r
 }
+
+/** A light made another kind, with a shape that makes sense where it stands (a
+ *  spot has no second point : a bar or a matrix made from one is laid around it). */
+export function kindPatch(f: LightFixture, kind: LightKind): Partial<LightFixture> {
+  if (kind === f.kind) return {}
+  const p: Partial<LightFixture> = { kind, bends: [] }
+  const [cx, cy] = middleOf(f)
+  if (kind === 'spot') return { ...p, x0: cx, y0: cy }
+  if (kind === 'ring') return { ...p, x0: cx, y0: cy, x1: cx + 0.1, y1: cy, pixels: f.pixels >= 2 ? f.pixels : 24 }
+  const flat = f.kind === 'spot' || f.kind === 'ring'
+  if (kind === 'strip') return { ...p, ...(flat ? { x0: cx - 0.15, y0: cy, x1: cx + 0.15, y1: cy } : {}), pixels: f.pixels >= 2 ? f.pixels : 30 }
+  // a matrix : a real rectangle, its wiring starting over
+  const thin = Math.abs(f.x1 - f.x0) < 0.02 || Math.abs(f.y1 - f.y0) < 0.02
+  return { ...p, reverse: false, ...(flat || thin ? { x0: cx - 0.12, y0: cy - 0.12, x1: cx + 0.12, y1: cy + 0.12 } : {}) }
+}
+
+/** A profile on a light : its channels always; its kind and size only when it
+ *  says how many pixels it has (a bar of 30 zones), or when a single light is
+ *  given a pixel kind. A matrix given "pixel strip, GRB" stays a matrix. */
+export function withProfile(f: LightFixture, p: LightProfile): LightFixture {
+  const sized = !!(p.pixels || p.cols || p.rows)
+  const kind: LightKind = sized ? p.kind : f.kind === 'spot' && p.kind !== 'spot' ? p.kind : f.kind
+  return sanitizeFixture({
+    ...f,
+    ...kindPatch(f, kind),
+    profile: p.id, head: p.head, layout: p.layout, tail: p.tail,
+    ...(p.pixels ? { pixels: p.pixels } : {}), ...(p.cols ? { cols: p.cols } : {}), ...(p.rows ? { rows: p.rows } : {}),
+    id: f.id
+  })
+}
+
+// ── light setups : the rig and what the lights show, kept by name on this computer ──
+export interface LightSetup {
+  name: string
+  rig: LightRig
+  lights: LightsSession
+}
+const SETUPS_KEY = 'opsia.lightSetups'
+const SETUP_NAME_KEY = 'opsia.lightSetupName'
+
+/** A setup read from anywhere (a file, the list) : sanitized, or null. */
+export function readSetup(raw: unknown, fallbackName = 'Setup'): LightSetup | null {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
+  if (!o || !o.rig || typeof o.rig !== 'object') return null
+  return {
+    name: (typeof o.name === 'string' && o.name.trim().slice(0, 60)) || fallbackName,
+    rig: sanitizeRig(o.rig),
+    lights: sanitizeLightsSession(o.lights ?? null)
+  }
+}
+export function loadSetups(): LightSetup[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(SETUPS_KEY) || '[]') as unknown[]
+    return (Array.isArray(list) ? list : []).map((x) => readSetup(x)).filter((x): x is LightSetup => !!x).slice(0, 64)
+  } catch { return [] }
+}
+export function persistSetups(list: LightSetup[]): LightSetup[] {
+  try { localStorage.setItem(SETUPS_KEY, JSON.stringify(list)) } catch { /* quota : for this run */ }
+  return list
+}
+export const loadSetupName = (): string => { try { return localStorage.getItem(SETUP_NAME_KEY) || '' } catch { return '' } }
+export const persistSetupName = (n: string): string => { try { localStorage.setItem(SETUP_NAME_KEY, n) } catch { /* private */ } return n }
+/** A setup as the text of its file. */
+export const setupText = (s: LightSetup): string => JSON.stringify({ kind: 'palinopsia-light-setup', version: 1, ...s }, null, 1)

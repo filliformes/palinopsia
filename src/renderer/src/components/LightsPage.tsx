@@ -42,7 +42,7 @@ import {
 } from '@shared/lights'
 import { lightRuntime } from '../lights/lightRuntime'
 import { fixturePoints, matrixCells, paletteOf, stripPath } from '../lights/lightEngine'
-import { middleOf, shifted } from '../lights/lightStore'
+import { middleOf, readSetup, setupText, shifted } from '../lights/lightStore'
 import { readOfl } from '../lights/ofl'
 import { RULES } from '../lights/lightFx'
 import { BUILTIN_PROFILES } from '@shared/lightProfiles'
@@ -53,7 +53,7 @@ import { LightCueButtons, LightCueList } from './LightCues'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 
-const KIND_LABEL: Record<LightKind, string> = { strip: 'LED bar', ring: 'ring', spot: 'spot', matrix: 'matrix' }
+const KIND_LABEL: Record<LightKind, string> = { strip: 'bar', ring: 'ring', spot: 'spot', matrix: 'matrix' }
 const OUT_LABEL: Record<LightOutputKind, string> = { enttec: 'Enttec USB Pro', artnet: 'Art-Net', sacn: 'sACN', wled: 'WLED' }
 const EFFECT_LABEL: Record<LightEffect, string> = {
   none: 'none', chase: 'chase', wave: 'wave', pulse: 'pulse', sparkle: 'sparkle', audio: 'sound', beat: 'beat', presence: 'presence',
@@ -78,7 +78,7 @@ const EFFECT_HINT: Record<LightEffect, string> = {
   none: 'No effect : the light as its source gives it.',
   chase: 'A band of light running across the room (angle : its direction, width : the band).',
   wave: 'Waves of light passing through the room (width : their length).',
-  pulse: 'The whole fixture breathing.',
+  pulse: 'The whole light breathing.',
   sparkle: 'Pixels twinkling at random (rate : how often).',
   audio: 'As bright as the sound is loud (all of it, or its lows, mids or highs).',
   beat: 'A flash on the beat (rate : flashes a beat). Light by light : a step chase, one place of the order on each flash.',
@@ -137,7 +137,8 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const st = useStore.getState()
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); st.setLightsPageOpen(false); return }
+      // (a page opened over this one, or MIDI Learn : the keys are theirs)
+      if ((st.sonifyPageOpen && !st.sonifyPageWindow) || st.worldPageOpen || (st.sequencePageOpen && !st.sequencePageWindow) || (st.bodyPageOpen && !st.bodyPageWindow) || st.resolumePageOpen || st.sourceEditorOpen || st.midiLearn !== null) return
       const f = st.lightRig.fixtures.find((x) => x.id === st.lightSel)
       if (!f) return
       const ids = st.lightPicked.length ? st.lightPicked : [f.id]
@@ -148,10 +149,7 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       if (!d) return
       e.preventDefault()
       e.stopPropagation()
-      for (const id of ids) {
-        const x = st.lightRig.fixtures.find((q) => q.id === id)
-        if (x) st.updateLightFixture(id, { x0: x.x0 + d[0], y0: x.y0 + d[1], x1: x.x1 + d[0], y1: x.y1 + d[1] })
-      }
+      st.updateLightFixtures(st.lightRig.fixtures.filter((q) => ids.includes(q.id)).map((q) => [q.id, shifted(q, d[0], d[1])]))
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -164,14 +162,16 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
         <Status />
         <div className="flex-1" />
         <button
-          onClick={() => setOpen(false)}
+          onClick={() => { setOpen(false); if (!backToOutput && !useStore.getState().outputPageWindow) useStore.getState().setOutputPageOpen(true) }}
           className="rounded border border-border px-3 py-1 font-mono text-[11px] text-muted hover:text-accent"
+          title="Back to the Output page (where the LIGHTS button is)"
         >
-          {backToOutput ? '← back to output' : '← back to instrument'}
+          ← back to Output
         </button>
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-panel p-2">
+        <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-panel p-2">
+          <SetupList />
           <FixtureList />
           <OutputList />
           <GroupList />
@@ -183,7 +183,7 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           <MapView canvasRef={canvasRef} />
         </main>
         <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel p-2">
-          {picked.length > 1 ? <ManyInspector ids={picked} /> : selected ? <Inspector f={selected} /> : <SetupGuide />}
+          {picked.length > 1 ? <ManyInspector ids={picked} /> : selected ? <Inspector key={selected.id} f={selected} /> : <SetupGuide />}
         </aside>
       </div>
       <Console />
@@ -206,13 +206,13 @@ function Status(): JSX.Element {
       <button
         onClick={() => setRig({ on: !rig.on })}
         className={btn(rig.on)}
-        title="The lights send DMX (off : nothing goes out; the page still shows what they would do)"
+        title="Send to the lights. Off : nothing goes out (they get one last dark frame), and the page still shows what they would do"
       >
-        {rig.on ? '◉ lights on' : 'lights off'}
+        {rig.on ? '◉ sending' : 'not sending'}
       </button>
       <IfaceStatus />
       <span title="DMX frames sent in the last second, and the universes going out">
-        {!rig.fixtures.length ? 'no lights yet' : rig.on ? `${st.fps} frames a second · ${rig.fixtures.length} light${rig.fixtures.length === 1 ? '' : 's'}` : 'not sending'}
+        {!rig.fixtures.length ? 'no lights yet' : `${rig.on ? `${st.fps} frames a second · ` : ''}${rig.fixtures.length} light${rig.fixtures.length === 1 ? '' : 's'}`}
       </span>
     </div>
   )
@@ -252,7 +252,61 @@ function Section({ title, info, actions, children, defaultCollapsed = false }: {
   )
 }
 
-// ── the room : fixtures, outputs, shows, scenes, settings ────────────────────
+// ── the setups : the whole page by name, to switch rooms under one project ──
+function SetupList(): JSX.Element {
+  const setups = useStore((s) => s.lightSetups)
+  const cur = useStore((s) => s.lightSetupName)
+  const [name, setName] = useState(cur)
+  const [note, setNote] = useState('')
+  useEffect(() => setName(cur), [cur])
+  const st = useStore.getState
+  const toFile = async (): Promise<void> => {
+    const one = st().currentLightSetup(name.trim() || undefined)
+    const r = await window.api.lightSetupSave(setupText(one), one.name)
+    setNote(r.ok ? 'saved to a file' : r.error ? `not saved : ${r.error}` : '')
+  }
+  const fromFile = async (): Promise<void> => {
+    const r = await window.api.lightSetupOpen()
+    if (!r.ok || !r.text) { if (r.error) setNote(r.error); return }
+    let raw: unknown = null
+    try { raw = JSON.parse(r.text) } catch { /* not JSON */ }
+    const one = readSetup(raw, r.name || 'Setup')
+    if (!one) { setNote('that file is not a light setup'); return }
+    st().applyLightSetup(one)
+    setNote(`${one.name} : ${one.rig.fixtures.length} light${one.rig.fixtures.length === 1 ? '' : 's'}`)
+  }
+  return (
+    <Section
+      title={cur ? `Setup · ${cur}` : 'Setups'}
+      defaultCollapsed={setups.length === 0}
+      info="A light setup is this whole page : the lights and where they are, the outputs, the groups, and what they show (looks, cues, masters). Keep several by name and switch between them without touching the picture : one project's visuals, another room's lights. Loading one keeps the one it replaces under its own name first, so nothing is lost. As files too, to carry to another computer."
+    >
+      <div className="flex gap-1">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="a name for these lights" className="min-w-0 flex-1 rounded border border-border bg-panel px-1.5 py-1 font-mono text-[10px]" />
+        <button className={btn(false)} onClick={() => { st().saveLightSetup(name); setNote('') }} title="Keep the lights as they are now under this name (a name already there : replaced)">save</button>
+      </div>
+      {setups.map((x) => (
+        <div key={x.name} className="flex items-center gap-1">
+          <button
+            onClick={() => { st().loadLightSetup(x.name); setNote('') }}
+            className={`min-w-0 flex-1 truncate rounded px-1.5 py-1 text-left font-mono text-[10px] ${x.name === cur ? 'bg-accent/15 text-accent' : 'text-text hover:bg-panel3/60'}`}
+            title="Switch to this setup (the picture stays; the lights you leave are kept under their name)"
+          >
+            {x.name} <span className="text-muted">{x.rig.fixtures.length}</span>
+          </button>
+          <button className="px-1 font-mono text-[11px] text-muted hover:text-red-400" onClick={() => st().deleteLightSetup(x.name)} title="Forget this setup (the lights on the page stay)">×</button>
+        </div>
+      ))}
+      <div className="flex gap-1">
+        <button className={`flex-1 ${btn(false)}`} onClick={() => void fromFile()} title="Open a light setup file">open a file…</button>
+        <button className={`flex-1 ${btn(false)}`} onClick={() => void toFile()} title="Save these lights to a file (to carry to another computer)">save to a file…</button>
+      </div>
+      {note && <p className="font-mono text-[9px] leading-snug text-muted">{note}</p>}
+    </Section>
+  )
+}
+
+// ── the room : lights, outputs, shows, cues, settings ────────────────────
 function FixtureList(): JSX.Element {
   const rig = useStore((s) => s.lightRig)
   const sel = useStore((s) => s.lightSel)
@@ -385,6 +439,8 @@ function OutputList(): JSX.Element {
   const update = useStore((s) => s.updateLightOutput)
   const remove = useStore((s) => s.removeLightOutput)
   const [found, setFound] = useState<Record<string, { busy: boolean; list: Array<{ ip: string; label: string }> } | undefined>>({})
+  const [sure, setSure] = useState<string | null>(null)
+  const patched = useStore((s) => s.lightRig.fixtures)
   const find = async (o: LightOutput): Promise<void> => {
     setFound((x) => ({ ...x, [o.id]: { busy: true, list: x[o.id]?.list ?? [] } }))
     let list: Array<{ ip: string; label: string }> = []
@@ -422,7 +478,14 @@ function OutputList(): JSX.Element {
                 className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 font-mono text-[10px]"
               />
               <button className={btn(o.enabled)} onClick={() => update(o.id, { enabled: !o.enabled })} title="Send to this output">{o.enabled ? 'on' : 'off'}</button>
-              <button className="px-1 font-mono text-[11px] text-muted hover:text-red-400" onClick={() => remove(o.id)} title="Remove this output (its fixtures wait, unpatched)">×</button>
+              <button
+                className={`px-1 font-mono text-[11px] hover:text-red-400 ${sure === o.id ? 'text-red-400' : 'text-muted'}`}
+                onClick={() => { if (sure !== o.id && patched.some((f) => f.out === o.id)) setSure(o.id); else { remove(o.id); setSure(null) } }}
+                onBlur={() => setSure(null)}
+                title="Remove this output (its lights wait, unpatched). With lights on it : a second click"
+              >
+                {sure === o.id ? 'sure ?' : '×'}
+              </button>
             </div>
             <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted">
               <label
@@ -430,11 +493,7 @@ function OutputList(): JSX.Element {
                 title="Held back this long before it goes out. The lights answer at once and a projector shows the picture two or three frames late : about 40 ms keeps them together (0 for lights alone)"
               >
                 delay
-                <input
-                  type="number" min={0} max={1000} step={5} value={o.delay}
-                  onChange={(e) => update(o.id, { delay: Math.max(0, Math.min(1000, Math.round(Number(e.target.value) || 0))) })}
-                  className="w-12 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-                />
+                <NumBox value={o.delay} min={0} max={1000} onCommit={(v) => update(o.id, { delay: v })} className="w-12" />
                 ms
               </label>
               {o.kind === 'artnet' && (
@@ -459,17 +518,15 @@ function OutputList(): JSX.Element {
                       className="w-9 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
                     />
                   </label>
-                  <span className="min-w-0 flex-1 truncate" title={s?.error || ''}>
-                    {s?.status === 'open' ? `connected · ${s.frames} frames` : s?.status === 'unsupported' ? 'no serial ports here' : s?.status === 'error' ? `error : ${s.error}` : o.enabled ? `looking${s?.error ? ` (${s.error})` : ''}` : 'off'}
-                  </span>
-                  <button className={btn(false)} onClick={() => enttec.rescan()} title="Look for the Pro again now">scan</button>
+                  <div className="flex-1" />
+                  <button className={btn(false)} onClick={() => enttec.rescan()} title="Look for the Pro again now (it is looked for every two seconds anyway)">scan</button>
                 </>
               ) : (
                 <>
-                  <input
+                  <TextBox
                     value={o.host}
                     placeholder={o.kind === 'sacn' ? 'multicast (or an IP)' : 'IP address'}
-                    onChange={(e) => update(o.id, { host: e.target.value })}
+                    onCommit={(v) => update(o.id, { host: v })}
                     className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
                     title={o.kind === 'sacn' ? 'Empty : multicast to each universe\'s group (239.255.x.y). An IP : sent to that device only.' : 'The device\'s IP address on this network'}
                   />
@@ -483,6 +540,15 @@ function OutputList(): JSX.Element {
                 </>
               )}
             </div>
+            {o.kind === 'enttec' && (
+              <span className={`font-mono text-[9px] leading-snug ${s?.status === 'open' ? 'text-emerald-400' : s?.status === 'error' ? 'text-red-400' : 'text-muted'}`}>
+                {s?.status === 'open' ? `connected · ${s.frames} frames sent`
+                  : s?.status === 'unsupported' ? 'this build has no serial ports'
+                    : s?.status === 'error' ? `it would not open : ${s.error} (is another program using it ?)`
+                      : !o.enabled ? 'off'
+                        : s?.error === 'none plugged in' || !s?.error ? 'not found yet : plug it into a USB port' : `looking : ${s.error}`}
+              </span>
+            )}
             {found[o.id] && !found[o.id]!.busy && (
               <div className="flex flex-col gap-0.5">
                 {found[o.id]!.list.length === 0 && <span className="font-mono text-[9px] text-muted">nothing answered (on this computer's networks)</span>}
@@ -513,7 +579,7 @@ function ShowList(): JSX.Element {
   return (
     <Section
       title={some ? `Shows · to the ${picked.length} picked` : 'Shows'}
-      info="A look for every light at once, fading in over the scene fade time. Each one fits your room : its patterns run across the space, so every light takes its part from where it stands. With several lights picked (or a group), the show goes to them alone."
+      info="A look for every light at once, fading in over the cue fade time. Each one fits your room : its patterns run across the space, so every light takes its part from where it stands. With several lights picked (or a group), the show goes to them alone."
     >
       {([false, true] as const).map((dig) => (
         <div key={String(dig)} className="flex flex-col gap-1">
@@ -525,7 +591,7 @@ function ShowList(): JSX.Element {
                   className="h-2.5 w-2.5 shrink-0 rounded-full border border-border"
                   style={{ background: x.tint ? (x.tint.length > 1 ? `linear-gradient(90deg, ${x.tint.join(', ')})` : x.tint[0]) : 'conic-gradient(#e33, #ec3, #3c6, #36e, #c3c, #e33)' }}
                 />
-                <span className="min-w-0 flex-1 truncate">{x.name}</span>
+                <span className="min-w-0 flex-1 truncate">{x.label ?? x.name}</span>
               </button>
             ))}
           </div>
@@ -565,14 +631,14 @@ function Settings(): JSX.Element {
           <button
             className={`flex-1 ${btn(rig.tuneScope === 'rig')}`}
             onClick={() => setRig({ tuneScope: 'rig' })}
-            title="The tuning belongs to the lights themselves : it stays whatever session or light scene you open"
+            title="The tuning belongs to the lights themselves : it stays whatever session or cue you open"
           >
             on this computer
           </button>
           <button
             className={`flex-1 ${btn(rig.tuneScope === 'look')}`}
             onClick={() => setRig({ tuneScope: 'look' })}
-            title="The tuning travels with the session and the light scenes : each look brings its own"
+            title="The tuning travels with the session and the cues : each look brings its own"
           >
             with the look
           </button>
@@ -617,7 +683,7 @@ function SetupGuide(): JSX.Element {
   const used = new Map<string, number>()
   let clash = false
   for (const f of mine) {
-    const spans = fixtureSpans(f, out?.kind === 'enttec')
+    const spans = fixtureSpans(f, out?.kind === 'enttec', out?.kind === 'sacn')
     if (out?.kind === 'enttec' && f.address - 1 + fixtureChannels(f) > 512) clash = true
     for (const sp of spans) for (let c = sp.from; c <= sp.to; c++) { const k = `${sp.universe}|${c}`; if (used.has(k)) clash = true; used.set(k, 1) }
   }
@@ -645,7 +711,7 @@ function SetupGuide(): JSX.Element {
           </label>
           <div className="flex items-center gap-2 font-mono text-[10px] text-muted">
             <span className="w-12 shrink-0">how many</span>
-            <input type="number" min={1} max={32} value={count} onChange={(e) => setCount(Math.max(1, Math.min(32, Math.round(Number(e.target.value) || 1))))} className="w-12 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text" />
+            <NumBox value={count} min={1} max={32} onCommit={setCount} className="w-12" />
             <button className={`flex-1 ${btn(false)}`} onClick={() => st().addLightChain(p, count)} title="Add them in a row across the picture, addressed one after the other on the interface">add them</button>
           </div>
         </Step>
@@ -696,6 +762,7 @@ function SetupGuide(): JSX.Element {
 type DragMode = 'move' | 'p0' | 'p1' | 'c01' | 'c10' | 'bend' | 'band'
 type Drag = {
   id: string; mode: DragMode; sx: number; sy: number; f: LightFixture | null; pid: number
+  moved?: boolean // past the first three pixels : a click with a wobble moves nothing
   group?: LightFixture[] // several picked : they move together
   bend?: number // which bend
   band?: { x1: number; y1: number; add: boolean; base: string[] } // a rubber band from (sx, sy)
@@ -904,10 +971,13 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
 
   // pointer : select, move, reshape, bend, a rubber band
   const toMap = (e: { clientX: number; clientY: number }): [number, number, Rect] => {
+    // (the UI zoom scales the canvas on screen : the pointer back in its own pixels,
+    // where the map was drawn)
     const cv = ref.current!
     const b = cv.getBoundingClientRect()
-    const R = rectOf(b.width, b.height)
-    return [(e.clientX - b.left - R.x) / R.w, (e.clientY - b.top - R.y) / R.h, R]
+    const k = b.width > 0 ? cv.clientWidth / b.width : 1
+    const R = rectOf(cv.clientWidth, cv.clientHeight)
+    return [((e.clientX - b.left) * k - R.x) / R.w, ((e.clientY - b.top) * k - R.y) / R.h, R]
   }
   /** The nearest segment of a strip to a point : which, where along it, how far (px). */
   const nearSeg = (f: LightFixture, x: number, y: number, R: Rect): { seg: number; t: number; d: number } => {
@@ -977,7 +1047,7 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
   const onMove = (e: RPointerEvent<HTMLCanvasElement>): void => {
     const d = drag.current
     if (!d || e.pointerId !== d.pid) return
-    let [x, y] = toMap(e)
+    let [x, y, R] = toMap(e)
     const st = useStore.getState()
     if (d.mode === 'band' && d.band) {
       d.band.x1 = x; d.band.y1 = y
@@ -989,9 +1059,14 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
     }
     const f = d.f
     if (!f) return
-    const dx = x - d.sx, dy = y - d.sy
+    let dx = x - d.sx, dy = y - d.sy
+    if (!d.moved) { if (Math.hypot(dx * R.w, dy * R.h) < 3) return; d.moved = true }
     if (d.mode === 'move') {
-      for (const q of d.group ?? [f]) st.updateLightFixture(q.id, { x0: q.x0 + dx, y0: q.y0 + dy, x1: q.x1 + dx, y1: q.y1 + dy, bends: q.bends.map((v, i) => v + (i % 2 ? dy : dx)) })
+      // (its middle never leaves the picture by much : it can always be caught again)
+      const [mx, my] = middleOf(f)
+      dx = Math.max(-0.03, Math.min(1.03, mx + dx)) - mx
+      dy = Math.max(-0.03, Math.min(1.03, my + dy)) - my
+      st.updateLightFixtures((d.group ?? [f]).map((q) => [q.id, shifted(q, dx, dy)]))
       return
     }
     if (d.mode === 'bend' && d.bend !== undefined) {
@@ -1054,7 +1129,7 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
                 onClick={() => setBackdrop(b)}
                 title={b === 'auto' ? "The picture the selected light reads (a layer's own, or the master)" : b === 'master' ? 'The master picture, always' : b === 'room' ? 'Only the room : a grid, no picture' : 'A photo of the room : place each light where it really is'}
               >
-                {b === 'auto' ? 'its source' : b}
+                {b === 'auto' ? 'its source' : b === 'master' ? 'picture' : b}
               </button>
             ))}
             <button className={btn(false)} onClick={() => photoFile.current?.click()} title="A photo of the room (or a plan of the stage) under the map, to place each light where it is : kept on this computer">photo…</button>
@@ -1105,7 +1180,7 @@ function PatchView(): JSX.Element {
   const sel = useStore((s) => s.lightSel)
   const picked = useStore((s) => s.lightPicked)
   const st = useStore.getState
-  const drag = useRef<{ id: string; off: number; uni: number; out: string } | null>(null)
+  const drag = useRef<{ id: string; off: number; uni: number; out: string; at: number } | null>(null)
   const [hover, setHover] = useState<{ out: string; uni: number; ch: number } | null>(null)
   // a drag let go anywhere ends (after a grid's own drop has read it)
   useEffect(() => {
@@ -1119,7 +1194,7 @@ function PatchView(): JSX.Element {
     const by = new Map<number, Array<string[]>>()
     for (const f of rig.fixtures) {
       if (f.out !== o.id) continue
-      for (const sp of fixtureSpans(f, o.kind === 'enttec')) {
+      for (const sp of fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn')) {
         let cells = by.get(sp.universe)
         if (!cells) { cells = Array.from({ length: 512 }, () => []); by.set(sp.universe, cells) }
         for (let c = sp.from; c <= sp.to; c++) cells[c - 1].push(f.id)
@@ -1129,12 +1204,17 @@ function PatchView(): JSX.Element {
     for (const [uni, cells] of [...by].sort((a, b) => a[0] - b[0])) blocks.push({ out: o, uni, cells })
   }
   const unpatched = rig.fixtures.filter((f) => !rig.outputs.some((o) => o.id === f.out))
+  // lights whose channels do not all fit (past an Enttec's 512)
+  const cut = rig.fixtures.filter((f) => {
+    const o = rig.outputs.find((x) => x.id === f.out)
+    return !!o && fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn').reduce((n, sp) => n + sp.to - sp.from + 1, 0) < fixtureChannels(f)
+  })
   const name = (id: string): string => rig.fixtures.find((f) => f.id === id)?.name ?? '?'
   const overlaps = blocks.reduce((n, b) => n + b.cells.filter((c) => c.length > 1).length, 0)
   const drop = (out: LightOutput, uni: number, ch: number): void => {
     const d = drag.current
     drag.current = null
-    if (!d || d.out !== out.id) return
+    if (!d || d.out !== out.id || (uni === d.uni && ch === d.at)) return // (let go where it was pressed : a click)
     const address = Math.max(1, Math.min(512, ch + 1 - d.off))
     st().updateLightFixture(d.id, out.kind === 'enttec' ? { address } : { address, universe: uni })
   }
@@ -1172,9 +1252,10 @@ function PatchView(): JSX.Element {
                     if (!id) return
                     e.preventDefault()
                     st().setLightSel(id)
-                    let k = i
-                    while (k > 0 && cells[k - 1][0] === id) k--
-                    drag.current = { id, off: i - k, uni, out: out.id }
+                    // (dragged by its first universe's part only : the rest follows)
+                    const fx = rig.fixtures.find((q) => q.id === id)
+                    const first = fx ? fixtureSpans(fx, out.kind === 'enttec', out.kind === 'sacn')[0] : undefined
+                    drag.current = first && first.universe === uni && i + 1 >= first.from && i + 1 <= first.to ? { id, off: i + 1 - first.from, uni, out: out.id, at: i } : null
                   }}
                   onPointerEnter={() => setHover({ out: out.id, uni, ch: i })}
                   title={`${i + 1}${who.length ? ` : ${who.map(name).join(', ')}` : ''}`}
@@ -1191,6 +1272,7 @@ function PatchView(): JSX.Element {
           </div>
         </div>
       ))}
+      {cut.length > 0 && <p className="text-red-400">Past the 512 channels of the output, not (all) sent : {cut.map((f) => f.name).join(', ')}</p>}
       {unpatched.length > 0 && <p className="text-muted">Not patched (no output) : {unpatched.map((f) => f.name).join(', ')}</p>}
     </div>
   )
@@ -1208,7 +1290,8 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
   const out = outputs.find((o) => o.id === f.out)
   const ch = fixtureChannels(f)
   const overflow = out?.kind === 'enttec' && f.address - 1 + ch > 512
-  const custom = !(LAYOUTS as readonly string[]).includes(f.layout)
+  const [customOpen, setCustomOpen] = useState(false)
+  const custom = customOpen || !(LAYOUTS as readonly string[]).includes(f.layout)
   const [openMod, setOpenMod] = useState<string | null>(null)
   const S: SliderFn = (label, field, value, min, max, step, set, reset, unit = '', title, fmt) => (
     <LightSlider key={label} label={label} fixture={f.id} field={field} value={value} min={min} max={max} step={step} onChange={set} reset={reset} unit={unit} title={title} fmt={fmt} openMod={openMod} setOpenMod={setOpenMod} />
@@ -1216,7 +1299,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
   return (
     <>
       <Section
-        title="Fixture"
+        title="Light"
         actions={
           <div className="flex gap-1">
             <button className={btn(false)} onClick={() => st().duplicateLightFixture(f.id)} title="Duplicate (Ctrl+D)">dup</button>
@@ -1227,7 +1310,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
         <input value={f.name} onChange={(e) => upd({ name: e.target.value })} className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[11px]" />
         <div className="flex gap-1">
           {(['strip', 'ring', 'spot', 'matrix'] as const).map((k) => (
-            <button key={k} className={`flex-1 ${btn(f.kind === k)}`} onClick={() => upd(k === 'ring' && f.kind !== 'ring' ? { kind: k, x1: f.x0 + 0.1, y1: f.y0 } : { kind: k })}>{KIND_LABEL[k]}</button>
+            <button key={k} className={`flex-1 ${btn(f.kind === k)}`} onClick={() => st().setLightKind(f.id, k)}>{KIND_LABEL[k]}</button>
           ))}
         </div>
         {(f.kind === 'strip' || f.kind === 'ring') && (
@@ -1257,7 +1340,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
           </>
         )}
         {f.kind !== 'matrix' && <RowMaker f={f} />}
-        {S('sampled', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
+        {S('area', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
         <IdentifyButton id={f.id} />
       </Section>
 
@@ -1270,7 +1353,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
           </select>
         </label>
         <div className="flex gap-1.5">
-          {out && out.kind !== 'enttec' && <Num label="universe" value={f.universe} min={0} max={32767} onChange={(v) => upd({ universe: v })} />}
+          {out && out.kind !== 'enttec' && <Num label="universe" value={out.kind === 'sacn' ? Math.max(1, f.universe) : f.universe} min={out.kind === 'sacn' ? 1 : 0} max={32767} onChange={(v) => upd({ universe: v })} title="A universe is one DMX line of 512 channels. A network output carries many, by number (Art-Net and WLED from 0, sACN from 1) : the number set on the node's port" />}
           <Num label="address" value={f.address} min={1} max={512} onChange={(v) => upd({ address: v })} title="Its first DMX channel (1..512) : the light's own address (its menu or DIP switches)" />
         </div>
         <Dip address={f.address} />
@@ -1281,7 +1364,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
               <span className="w-14">channels</span>
               <select
                 value={custom ? '__custom' : f.layout}
-                onChange={(e) => upd({ layout: e.target.value === '__custom' ? 'D R G B S' : e.target.value })}
+                onChange={(e) => { if (e.target.value === '__custom') setCustomOpen(true); else { setCustomOpen(false); upd({ layout: e.target.value }) } }}
                 className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
                 title="The channels of one pixel. With a dimmer (D, D16 in 16 bits) the dimmer takes the level and the color stays full : smoother fades down low"
               >
@@ -1290,9 +1373,9 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
               </select>
             </label>
             {custom && (
-              <input
+              <TextBox
                 value={f.layout}
-                onChange={(e) => upd({ layout: e.target.value })}
+                onCommit={(v) => upd({ layout: v })}
                 className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[10px]"
                 title="The channels of one pixel, in order : R G B W A U, C M Y (a subtractive mix), L (one channel of white), D (a dimmer : it takes the level), S (strobe, off), X (unused), a letter followed by 16 for 16 bits (D16), or a number (0..255) for a channel held at that value"
               />
@@ -1300,16 +1383,17 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
             {f.kind !== 'spot' && (
               <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title="Channels sent once before the pixels (a bar's own dimmer and strobe : D S). A dimmer here is the whole bar's : it takes its brightest pixel, and the pixels go out relative to it">
                 <span className="w-14 shrink-0">before</span>
-                <input
+                <TextBox
                   value={f.head}
                   placeholder="none"
-                  onChange={(e) => upd({ head: e.target.value })}
+                  onCommit={(v) => upd({ head: v })}
                   className="min-w-0 flex-1 rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-text"
                 />
               </label>
             )}
           </>
         )}
+        {out?.kind === 'wled' && <p className="font-mono text-[9px] leading-snug text-muted">WLED takes red, green and blue for each LED, whatever the channels above say.</p>}
         <ChannelMap f={f} />
         <p className={`font-mono text-[9px] ${overflow ? 'text-red-400' : 'text-muted'}`}>
           {ch} channels · {out ? `ch ${f.address} to ${f.address + ch - 1}${out.kind !== 'enttec' && f.address - 1 + ch > 512 ? ' (continues in the next universes)' : ''}` : 'not patched : pick an output'}
@@ -1333,6 +1417,7 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
   const look = useStore((s) => s.lightsSession.looks[first]) ?? LOOK_DEFAULT
   const tune = useStore((s) => (s.lightRig.tuneScope === 'look' ? s.lightsSession.tunes?.[first] : null)) ?? f?.tune ?? TUNE_DEFAULT
   const groups = useStore((s) => s.lightRig.groups)
+  const outputs = useStore((s) => s.lightRig.outputs)
   const same = groups.find((g) => g.members.length === ids.length && g.members.every((m) => ids.includes(m)))
   // (many lights : the sliders take no modulation here, one light's or a group's do)
   const S: SliderFn = (label, _field, value, min, max, step, set, reset, unit = '', title, fmt) => (
@@ -1355,6 +1440,13 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
           )}
           <button className={btn(false)} onClick={() => st().setLightSel(first)} title="Back to the one selected">just this one</button>
         </div>
+        <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title="Patch them all to this output (their addresses stay : the patch view puts them in order)">
+          <span className="w-14 shrink-0">output</span>
+          <select value={f?.out ?? ''} onChange={(e) => st().updateLightFixtures(ids.map((id) => [id, { out: e.target.value }]))} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text">
+            <option value="">none</option>
+            {outputs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </label>
         <ProfilePicker ids={ids} current={f?.profile ?? ''} />
       </Section>
       <PlaceSection ids={ids} />
@@ -1369,7 +1461,7 @@ function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook;
   const setLook = (p: Partial<LightLook>): void => st().setLightLooks(ids, p)
   const ui = FX_UI[look.effect]
   return (
-    <Section title="Look" info="What it shows : the picture (the master or a layer) where it sits, a color, a gradient running across the room, or nothing; an effect over it, and its own level. Saved with the session and the light scenes.">
+    <Section title="Look" info="What it shows : the picture (the master or a layer) where it sits, a color, a gradient running across the room, or nothing; an effect over it, and its own level. Saved with the session and the cues.">
       <div className="flex flex-wrap gap-1">
         {(['master', 'layer', 'color', 'gradient', 'off'] as LightSourceKind[]).map((s) => (
           <button key={s} className={btn(look.source === s)} onClick={() => setLook({ source: s })}>
@@ -1379,7 +1471,7 @@ function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook;
         <button
           className="ml-auto rounded border border-border px-2 py-1 font-mono text-[10px] text-muted hover:text-accent"
           onClick={() => { const s = st(); s.setLightLooks(s.lightRig.fixtures.map((x) => x.id), { ...look }) }}
-          title="Give every fixture this look"
+          title="Give every light this look (Ctrl+Z brings the others back)"
         >
           to all
         </button>
@@ -1460,7 +1552,7 @@ function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook;
       ) : null}
       {(ui.dir || look.fan !== 0) && look.order === 'room' && S('direction', 'angle', look.angle, -180, 180, 1, (v) => setLook({ angle: v }), 0, '°', 'The direction it travels across the room')}
       {S('fan', 'fan', look.fan, -180, 180, 1, (v) => setLook({ fan: v }), 0, '°', 'A fan : the hue spread across the room (or along the order), from one end to the other')}
-      {S('level', 'level', look.level, 0, 1, 0.01, (v) => setLook({ level: v }), 1, '', "This fixture's own fader")}
+      {S('level', 'level', look.level, 0, 1, 0.01, (v) => setLook({ level: v }), 1, '', "This light's own fader")}
     </Section>
   )
 }
@@ -1471,7 +1563,7 @@ function TuneSection({ ids, tune, slider: S }: { ids: string[]; tune: LightTune;
   return (
     <Section
       title="Tuning"
-      info={`How this physical light renders what it is sent : a grade to match it to the room and to the other lights. ${tuneScope === 'rig' ? 'Kept on this computer (Settings : or with the look).' : 'Travels with the look : the session and the light scenes (Settings).'}`}
+      info={`How this physical light renders what it is sent : a grade to match it to the room and to the other lights. ${tuneScope === 'rig' ? 'Kept on this computer (Settings : or with the look).' : 'Travels with the look : the session and the cues (Settings).'}`}
       actions={<button className={btn(false)} onClick={() => setTune({ ...TUNE_DEFAULT })} title="Back to neutral">reset</button>}
     >
       {S('brightness', 'tuneBrightness', tune.brightness, 0, 2, 0.01, (v) => setTune({ brightness: v }), 1)}
@@ -1591,7 +1683,7 @@ function RowMaker({ f }: { f: LightFixture }): JSX.Element {
   return (
     <div className="flex items-center gap-1 font-mono text-[10px] text-muted" title="A row of this light : it and its copies spread evenly across the picture (or down it), addressed one after the other, all picked (ready to be a group)">
       <span className="shrink-0">a row of</span>
-      <input type="number" min={2} max={32} value={n} onChange={(e) => setN(Math.max(2, Math.min(32, Math.round(Number(e.target.value) || 2))))} className="w-10 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text" />
+      <NumBox value={n} min={2} max={32} onCommit={setN} className="w-10" />
       <button className={`flex-1 ${btn(false)}`} onClick={() => add(f.id, n, 'across')}>across</button>
       <button className={`flex-1 ${btn(false)}`} onClick={() => add(f.id, n, 'down')}>down</button>
     </div>
@@ -1731,10 +1823,49 @@ function IdentifyButton({ id }: { id: string }): JSX.Element {
       onPointerDown={() => set(id)}
       onPointerUp={() => set(null)}
       onPointerLeave={() => on && set(null)}
-      title="Hold : this fixture full white, to find it in the room (it ignores the masters and Black)"
+      title="Hold : this light full white, to find it in the room (it ignores the masters and Black)"
     >
       {on ? '◉ identifying' : 'hold to identify'}
     </button>
+  )
+}
+
+/** A number typed whole : taken on Enter or when the box is left (clamped then),
+ *  Esc gives it back. Never while it is being typed ("12" passes through "1"). */
+function NumBox({ value, min, max, onCommit, className = '', step }: { value: number; min: number; max: number; onCommit: (v: number) => void; className?: string; step?: number }): JSX.Element {
+  const [txt, setTxt] = useState<string | null>(null)
+  const commit = (): void => {
+    if (txt === null) return
+    const n = Number(txt)
+    if (txt.trim() !== '' && Number.isFinite(n)) onCommit(Math.max(min, Math.min(max, step && step < 1 ? n : Math.round(n))))
+    setTxt(null)
+  }
+  return (
+    <input
+      type="text" inputMode="numeric"
+      value={txt ?? String(value)}
+      onChange={(e) => setTxt(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); else if (e.key === 'Escape') { setTxt(null); e.stopPropagation() } }}
+      className={`rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text ${className}`}
+    />
+  )
+}
+
+/** A text taken on Enter or when the box is left (an address is never sent half typed). */
+function TextBox({ value, onCommit, className, placeholder, title }: { value: string; onCommit: (v: string) => void; className?: string; placeholder?: string; title?: string }): JSX.Element {
+  const [txt, setTxt] = useState<string | null>(null)
+  return (
+    <input
+      value={txt ?? value}
+      placeholder={placeholder}
+      title={title}
+      onChange={(e) => setTxt(e.target.value)}
+      onBlur={() => { if (txt !== null && txt !== value) onCommit(txt); setTxt(null) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); else if (e.key === 'Escape') { setTxt(null); e.stopPropagation() } }}
+      className={className}
+    />
   )
 }
 
@@ -1742,11 +1873,7 @@ function Num({ label, value, min, max, onChange, title }: { label: string; value
   return (
     <label className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-[10px] text-muted" title={title}>
       <span className="shrink-0">{label}</span>
-      <input
-        type="number" min={min} max={max} value={value}
-        onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, Math.round(n)))) }}
-        className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-      />
+      <NumBox value={value} min={min} max={max} onCommit={onChange} className="min-w-0 flex-1" />
     </label>
   )
 }
@@ -1783,6 +1910,7 @@ function LightSlider({
           ref={inputRef}
           type="range" min={min} max={max} step={step} value={value}
           onChange={(e) => onChange(Number(e.target.value))}
+          onPointerUp={(e) => e.currentTarget.blur()}
           onDoubleClick={() => reset !== undefined && onChange(reset)}
           className={`min-w-0 flex-1 ${modulated ? 'accent-accent2' : 'accent-accent'}`}
         />
@@ -1828,7 +1956,7 @@ function Console(): JSX.Element {
       <div className="flex items-end gap-6 px-6 py-3">
         <Knob id="lights:master" label="MASTER" value={m.brightness} text={`${Math.round(m.brightness * 100)}%`} onChange={(v) => set({ brightness: v })} big def={1} title="The grand master : every light, after its own level" />
         <Knob id="lights:speed" label="SPEED" value={m.speed / 4} text={`${m.speed.toFixed(2)}×`} onChange={(v) => set({ speed: v * 4 })} def={0.25} title="Every effect's and gradient's clock (1× at a quarter turn)" />
-        <Knob id="lights:fade" label="CUE FADE" value={m.fadeSec / 20} text={`${m.fadeSec.toFixed(1)} s`} onChange={(v) => set({ fadeSec: v * 20 })} def={0.075} title="How long a light scene or a show takes to come in" />
+        <Knob id="lights:fade" label="CUE FADE" value={m.fadeSec / 20} text={`${m.fadeSec.toFixed(1)} s`} onChange={(v) => set({ fadeSec: v * 20 })} def={0.075} title="How long a cue or a show takes to come in (a cue can have its own)" />
         <Knob id="lights:blacksec" label="BLACK TIME" value={m.blackSec / 20} text={`${m.blackSec.toFixed(1)} s`} onChange={(v) => set({ blackSec: v * 20 })} def={0.1} title="How long Black takes to go down (and to come back)" />
         <div className="flex flex-col items-center gap-1">
           <span className="relative">

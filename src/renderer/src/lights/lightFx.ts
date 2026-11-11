@@ -100,9 +100,12 @@ export class Automaton {
   private still = 0
   gen = 0
 
-  constructor(readonly rule: number, readonly cells: number, readonly hist = 40, private rnd: () => number = Math.random) {
+  /** `warm` : it starts with a past (its history already drawn), so a light that
+   *  reads an older generation is not left dark while the first ones grow. */
+  constructor(readonly rule: number, readonly cells: number, readonly hist = 40, private rnd: () => number = Math.random, warm = false) {
     this.rows = Array.from({ length: hist }, () => new Uint8Array(cells))
     this.seed(this.rows[0])
+    if (warm) for (let k = 0; k < hist; k++) this.step()
   }
 
   private seed(row: Uint8Array): void {

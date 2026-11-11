@@ -9,6 +9,7 @@
 // RGBA8 grids, BOTTOM-UP rows, one per source in use (the master, the layers).
 
 import {
+  firstUniverse,
   GROUP_PREFIX,
   layoutChannels,
   layoutTokens,
@@ -68,6 +69,7 @@ export interface LightFrame {
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+const ease01 = (x: number): number => x * x * (3 - 2 * x)
 
 /** A color's hue turned by `deg` (YIQ : its brightness kept), in place. */
 function turnHue(c: number[], deg: number): void {
@@ -294,6 +296,7 @@ interface FixtureState {
   from: Float32Array | null // a light scene's fade : where it came from
   beatIdx: number // the beat effect : the last flash's count, and its envelope
   beatEnv: number
+  beatAt: number // when it last flashed (s) : never two within a third of a second
   ph: number // its own effect phase, while its rate is modulated (cycles)
   phOwn: boolean
   fx?: FxState // a digital effect's state (lightFx.ts)
@@ -307,6 +310,8 @@ export class LightEngine {
   private fadeT = 1 // a light scene's fade : 0..1
   private fadeSec = 0
   private audioSm = [0, 0, 0, 0] // level, low, mid, high
+  private grandFrom = 1 // a cue's fade : the grand master it left from, and the one shown
+  private grandShown = 1
   private frameNo = 0
   // The effects' clocks : one phase per rate in use, moved on once a frame by
   // min(MAX_HZ, rate × the master speed). Lights with the same rate share it (a
@@ -351,9 +356,17 @@ export class LightEngine {
 
   /** A light scene is coming in : fade from what shows now over `sec`. */
   beginFade(sec: number): void {
+    // from what the room shows now : in the middle of another fade, that is the
+    // blend on its way, not the look it was heading to (no jump to the cue before)
+    const e = this.fadeT < 1 ? ease01(this.fadeT) : 1
+    for (const s of this.st.values()) {
+      const now = s.cur.slice()
+      if (e < 1 && s.from && s.from.length === now.length) for (let i = 0; i < now.length; i++) now[i] = s.from[i] + (now[i] - s.from[i]) * e
+      s.from = now
+    }
+    this.grandFrom = this.grandShown
     this.fadeSec = Math.max(0, sec)
     this.fadeT = this.fadeSec > 0 ? 0 : 1
-    for (const s of this.st.values()) s.from = s.cur.slice()
   }
 
   /** Back to lit at once (a panic, a new session). */
@@ -371,8 +384,13 @@ export class LightEngine {
     if (!s || s.sig !== sig) {
       const pts = fixturePoints(f, aspect)
       const n = pts.length / 2
-      s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0, ph: 0, phOwn: false }
-      this.st.set(f.id, s)
+      // moved or reshaped with the same pixels : it keeps what it shows (a light
+      // dragged during a show stays lit, its part of a fade goes on)
+      if (s && s.pts.length === pts.length) { s.sig = sig; s.pts = pts }
+      else {
+        s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0, beatAt: -1e9, ph: 0, phOwn: false }
+        this.st.set(f.id, s)
+      }
     }
     return s
   }
@@ -389,9 +407,11 @@ export class LightEngine {
       this.ffSum = [0, 0, 0]
     }
     const M = inp.master
+    const hasMods = lightMods.size > 0
     const mod = (fx: string, field: LightModField, base: number): number => {
+      if (!hasMods) return base
       const v = lightMods.get(lightModKey(fx, field))
-      return v === undefined ? base : v
+      return v === undefined || !Number.isFinite(v) ? base : v
     }
     const speed = mod('', 'masterSpeed', M.speed)
     const grand = mod('', 'masterBrightness', M.brightness)
@@ -400,10 +420,17 @@ export class LightEngine {
     const bs = Math.max(0.001, M.blackSec)
     this.blackLevel = inp.black ? Math.max(0, this.blackLevel - dt / bs) : Math.min(1, this.blackLevel + dt / bs)
     if (this.fadeT < 1) this.fadeT = this.fadeSec > 0 ? Math.min(1, this.fadeT + dt / this.fadeSec) : 1
-    // the sound, smoothed (a level that jumps every frame flickers the room)
-    const aK = 1 - Math.exp(-dt / 0.06)
+    // the grand master a cue brings comes in over the cue's fade, like its looks
+    const grandNow = this.fadeT < 1 ? this.grandFrom + (grand - this.grandFrom) * ease01(this.fadeT) : grand
+    this.grandShown = grandNow
+    // the sound, followed : up quickly, down over a third of a second (a hi-hat
+    // every eighth of a second holds the light up instead of flashing it)
+    const aUp = 1 - Math.exp(-dt / 0.07), aDown = 1 - Math.exp(-dt / 0.33)
     const aIn = [inp.audio, inp.bands?.[0] ?? inp.audio, inp.bands?.[1] ?? inp.audio, inp.bands?.[2] ?? inp.audio]
-    for (let k = 0; k < 4; k++) this.audioSm[k] += (clamp01(aIn[k]) - this.audioSm[k]) * aK
+    for (let k = 0; k < 4; k++) {
+      const v = Number.isFinite(aIn[k]) ? clamp01(aIn[k]) : 0
+      this.audioSm[k] += (v - this.audioSm[k]) * (v > this.audioSm[k] ? aUp : aDown)
+    }
     // light by light : each fixture's place in its order (the fixtures with the same
     // order and wings make one set), and its step for a beat
     const orderPos = new Map<string, { u: number; step: number; steps: number }>()
@@ -443,7 +470,8 @@ export class LightEngine {
     const beatNow = inp.beats
     const out: LightFrame = { enttec: new Map(), net: [], colors: new Map(), overflow: new Set() }
     const outputs = new Map<string, LightOutput>(inp.rig.outputs.map((o) => [o.id, o]))
-    const universes = new Map<string, Uint8Array>() // `${outId}|${universe}`
+    // (by where they go : two outputs to one place share its universes)
+    const universes = new Map<string, { data: Uint8Array; o: LightOutput; uni: number }>()
     const live = new Set<string>()
     const tmp = [0, 0, 0]
     const ease = (x: number): number => x * x * (3 - 2 * x)
@@ -510,7 +538,7 @@ export class LightEngine {
       if (E === 'automaton') {
         cellsN = op ? Math.max(16, op.steps) : Math.max(4, Math.min(64, Math.round(1 / cell)))
         const rule = look.rule
-        auto = this.fieldOf(`a|${rule}|${cellsN}`, () => new Automaton(rule, cellsN), rate, dt, inp.nowMs)
+        auto = this.fieldOf(`a|${rule}|${cellsN}`, () => new Automaton(rule, cellsN, 40, Math.random, true), rate, dt, inp.nowMs)
       } else if (E === 'life') {
         const gw = Math.max(8, Math.min(48, Math.round(1 / cell))), gh = Math.max(4, Math.round(gw / asp))
         life = this.fieldOf(`l|${gw}|${gh}`, () => new Life(gw, gh), rate, dt, inp.nowMs)
@@ -559,7 +587,11 @@ export class LightEngine {
         const every = Math.max(minBeats, rate > 0 ? 1 / rate : 1) // beats between flashes
         const idx = Math.floor(beatNow / every)
         // light by light : a step chase, one place of the order on each flash
-        if (idx !== s.beatIdx) { s.beatIdx = idx; if (!op || ((idx % op.steps) + op.steps) % op.steps === op.step) s.beatEnv = 1 }
+        // (and never two flashes within a third of a second, whatever moves the rate)
+        if (idx !== s.beatIdx) {
+          s.beatIdx = idx
+          if ((!op || ((idx % op.steps) + op.steps) % op.steps === op.step) && nowS - s.beatAt >= 1 / MAX_HZ - 0.02) { s.beatEnv = 1; s.beatAt = nowS }
+        }
         beatMul = 1 - depth + depth * s.beatEnv
         s.beatEnv *= Math.exp(-dt * 7)
       }
@@ -705,8 +737,9 @@ export class LightEngine {
             m *= 1 - depth + depth * near
           }
           m *= level
-          r *= m; gg *= m; b *= m
-          // the tuning : saturation, hue, warmth, contrast, brightness, gamma, floor
+          // the tuning : saturation, hue, warmth, contrast (on the color at full),
+          // then the effect and the fader, brightness, gamma, floor : a fader at 0
+          // is dark whatever the contrast and the floor
           const l = 0.299 * r + 0.587 * gg + 0.114 * b
           r = l + (r - l) * tSat; gg = l + (gg - l) * tSat; b = l + (b - l) * tSat
           if (tHue !== 0) {
@@ -717,11 +750,12 @@ export class LightEngine {
             b = yy - 1.106 * i2 + 1.703 * q2
           }
           r *= 1 + 0.3 * tWarm; b *= 1 - 0.3 * tWarm; gg *= 1 + 0.05 * tWarm
-          r = (r - 0.5) * tune.contrast + 0.5; gg = (gg - 0.5) * tune.contrast + 0.5; b = (b - 0.5) * tune.contrast + 0.5
+          r = Math.max(0, (r - 0.5) * tune.contrast + 0.5) * m; gg = Math.max(0, (gg - 0.5) * tune.contrast + 0.5) * m; b = Math.max(0, (b - 0.5) * tune.contrast + 0.5) * m
           r = clamp01(r * tBright) ** tune.gamma
           gg = clamp01(gg * tBright) ** tune.gamma
           b = clamp01(b * tBright) ** tune.gamma
-          r = tune.black + (1 - tune.black) * r; gg = tune.black + (1 - tune.black) * gg; b = tune.black + (1 - tune.black) * b
+          const floor = tune.black * Math.min(1, m * 10)
+          r = floor + (1 - floor) * r; gg = floor + (1 - floor) * gg; b = floor + (1 - floor) * b
         }
         // smoothing (identify and the test are never smoothed : they must answer at once)
         const k = ident || test !== null ? 1 : smoothA
@@ -730,13 +764,13 @@ export class LightEngine {
         s.cur[o + 1] += (gg - s.cur[o + 1]) * k
         s.cur[o + 2] += (b - s.cur[o + 2]) * k
         let fr = s.cur[o], fg = s.cur[o + 1], fb = s.cur[o + 2]
-        if (s.from && this.fadeT < 1 && s.from.length === s.cur.length) {
+        if (s.from && this.fadeT < 1 && s.from.length === s.cur.length && !ident && test === null) {
           const e = ease(this.fadeT)
           fr = s.from[o] + (fr - s.from[o]) * e
           fg = s.from[o + 1] + (fg - s.from[o + 1]) * e
           fb = s.from[o + 2] + (fb - s.from[o + 2]) * e
         }
-        const gm = ident || test !== null ? 1 : grand * ease(this.blackLevel)
+        const gm = ident || test !== null ? 1 : grandNow * ease(this.blackLevel)
         colors[o] = fr * gm
         colors[o + 1] = fg * gm
         colors[o + 2] = fb * gm
@@ -755,11 +789,7 @@ export class LightEngine {
     for (const [k, e] of this.fields) if (inp.nowMs - e.usedAt > 5000) this.fields.delete(k)
     if (this.fadeT >= 1) for (const s of this.st.values()) s.from = null
     // collect
-    for (const [key, data] of universes) {
-      const sep = key.lastIndexOf('|')
-      const o = outputs.get(key.slice(0, sep))
-      if (!o) continue
-      const uni = Number(key.slice(sep + 1))
+    for (const { data, o, uni } of universes.values()) {
       if (o.kind === 'enttec') out.enttec.set(o.index, data)
       else out.net.push({ kind: o.kind, host: o.host, universe: uni, data, out: o.id })
     }
@@ -775,12 +805,15 @@ export class LightEngine {
    *  fades stay smooth down low (in 16 bits with D16) and a dim color stays its
    *  color. A dimmer in the head is the whole fixture's (its brightest pixel),
    *  and its pixels then go out relative to it. */
-  private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, Uint8Array>, out: LightFrame): void {
-    const tok = layoutTokens(f.layout)
-    const head = layoutTokens(f.head, false)
-    const tail = layoutTokens(f.tail, false)
+  private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, { data: Uint8Array; o: LightOutput; uni: number }>, out: LightFrame): void {
+    // (WLED's realtime stream is RGB, three bytes an LED, whatever the layout says)
+    const wled = o.kind === 'wled'
+    const tok = wled ? ['R', 'G', 'B'] : layoutTokens(f.layout)
+    const head = wled ? [] : layoutTokens(f.head, false)
+    const tail = wled ? [] : layoutTokens(f.tail, false)
     const pixD = tok.some((t) => t[0] === 'D')
     const fixD = !pixD && (head.some((t) => t[0] === 'D') || tail.some((t) => t[0] === 'D'))
+    const tokW = tok.some((t) => t[0] === 'W'), headW = head.some((t) => t[0] === 'W'), tailW = tail.some((t) => t[0] === 'W')
     const n = colors.length / 3
     // the whole fixture : its brightest pixel (a head dimmer) and its mean color
     let fdim = 1, ar = 0, ag = 0, ab = 0
@@ -794,26 +827,27 @@ export class LightEngine {
       ar /= n; ag /= n; ab /= n
       if (fixD) fdim = mx
     }
-    let uni = o.kind === 'enttec' ? 0 : f.universe
-    let ch = f.address - 1
+    let uni = firstUniverse(o.kind, f.universe)
+    const lastUni = wled ? 385 : o.kind === 'sacn' ? 63999 : 32767
+    let ch = wled ? Math.floor((f.address - 1) / 3) * 3 : f.address - 1
     const buf = (u: number): Uint8Array => {
-      const key = `${o.id}|${u}`
+      const key = o.kind === 'enttec' ? `enttec|${o.index}` : `${o.kind}|${o.host}|${u}`
       let b = universes.get(key)
-      if (!b) { b = new Uint8Array(512); universes.set(key, b) }
-      return b
+      if (!b) { b = { data: new Uint8Array(512), o, uni: u }; universes.set(key, b) }
+      return b.data
     }
     let data = buf(uni)
-    /** Room for `w` channels here, or the next universe (false : an Enttec full). */
+    /** Room for `w` channels here, or the next universe (false : an Enttec full,
+     *  or past the last universe there is). */
     const room = (w: number): boolean => {
       if (ch + w <= 512) return true
-      if (o.kind === 'enttec') { out.overflow.add(f.id); return false }
+      if (o.kind === 'enttec' || uni >= lastUni) { out.overflow.add(f.id); return false }
       uni++; ch = 0; data = buf(uni)
       return true
     }
     /** One block of tokens for a color (0..1, linear) : its dimmer, white,
      *  complements and luminance worked out from it. */
-    const emit = (tokens: string[], r: number, g: number, b: number, normD: boolean): void => {
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    const emit = (tokens: string[], hasW: boolean, r: number, g: number, b: number, normD: boolean): void => {
       let dim = 1
       if (normD) {
         dim = Math.max(r, g, b)
@@ -822,8 +856,10 @@ export class LightEngine {
         dim = fdim
         if (fdim > 1e-6) { r /= fdim; g /= fdim; b /= fdim } else { r = g = b = 0 }
       }
+      // (beside a dimmer that carries the level, the luminance is the full color's)
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
       let w = 0
-      if (tokens.some((t) => t[0] === 'W')) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
+      if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
       for (const t of tokens) {
         let v: number
         switch (t[0]) {
@@ -854,15 +890,15 @@ export class LightEngine {
     const hw = layoutChannels(head), pw = layoutChannels(tok), tw = layoutChannels(tail)
     if (hw) {
       if (!room(hw)) return
-      emit(head, ar, ag, ab, false)
+      emit(head, headW, ar, ag, ab, false)
     }
     for (let i = 0; i < n; i++) {
       if (!room(pw)) return
-      emit(tok, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD)
+      emit(tok, tokW, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD)
     }
     if (tw) {
       if (!room(tw)) return
-      emit(tail, ar, ag, ab, false)
+      emit(tail, tailW, ar, ag, ab, false)
     }
   }
 }
