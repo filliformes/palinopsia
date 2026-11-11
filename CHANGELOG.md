@@ -315,6 +315,19 @@ that CI builds into cross-platform releases.
     its text). In the test copy : the guide adding the bars from the Output page's LIGHTS
     button, the test's band on the map, two setups switched, back to Output. **Not
     verified : a real Enttec, the real bars.**
+- **Lights : more to modulate, a grade per group, three more masters** (Vincent : "I
+  should be able to modulate more stuff inside the Lights section, especially in the
+  Tuning section of the groups. Also : add more master controls, like master brightness,
+  master saturation and master contrast, as knobs between speed and cue fade").
+  `LightsMaster.gain / saturation / contrast` (0..2, knobs BRIGHT, SATURATION, CONTRAST
+  between SPEED and CUE FADE; MIDI `lights:gain`, `lights:sat`, `lights:contrast`; OSC
+  `/opsia/lights/brightness`, `saturation`, `contrast`; mod fields `masterGain`,
+  `masterSaturation`, `masterContrast`). `GroupTune` (`lightsSession.groupTunes`, kept
+  in cues) : a grade per group over its lights' tuning, in a **Group · name** section of
+  the inspector when a group is picked, each slider a target (`grp:<id>` with
+  `tuneBrightness`, `tuneContrast`, `tuneSaturation`, `tuneHue`, `tuneWarmth`, and its
+  fader). New targets on a light : `tuneContrast`, `tuneGamma`, `tuneBlack`,
+  `tuneSmooth`, `gradSpeed`, `area`. 143 Node checks (5 new).
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

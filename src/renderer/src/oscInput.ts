@@ -1232,6 +1232,9 @@ function route(address: string, args: Args, host = ''): void {
       const k = segs[2]
       if (k === 'master') st.setLightsMaster({ brightness: Math.max(0, Math.min(1, n)) })
       else if (k === 'speed') st.setLightsMaster({ speed: Math.max(0, Math.min(1, n)) * 4 })
+      else if (k === 'brightness') st.setLightsMaster({ gain: Math.max(0, Math.min(1, n)) * 2 })
+      else if (k === 'saturation') st.setLightsMaster({ saturation: Math.max(0, Math.min(1, n)) * 2 })
+      else if (k === 'contrast') st.setLightsMaster({ contrast: Math.max(0, Math.min(1, n)) * 2 })
       else if (k === 'fade') st.setLightsMaster({ fadeSec: Math.max(0, Math.min(1, n)) * 20 })
       else if (k === 'blacktime') st.setLightsMaster({ blackSec: Math.max(0, Math.min(1, n)) * 20 })
       else if (k === 'black') st.setLightsBlack(args.length ? n >= 0.5 : !st.lightsBlack)

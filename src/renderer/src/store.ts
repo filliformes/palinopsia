@@ -54,7 +54,9 @@ import {
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT as LIGHT_LOOK_DEFAULT,
   profilePatch,
+  sanitizeGroupTune,
   sanitizeProfile,
+  type GroupTune,
   SESSION_DEFAULT as LIGHTS_SESSION_DEFAULT,
   sanitizeFixture,
   sanitizeLightsSession,
@@ -2026,6 +2028,7 @@ interface StoreState {
   updateLightGroup: (id: string, patch: { name?: string; members?: string[] }) => void
   removeLightGroup: (id: string) => void
   setLightGroupLevel: (id: string, v: number) => void
+  setLightGroupTune: (id: string, patch: Partial<GroupTune>) => void
   setLightTunes: (ids: string[], patch: Partial<LightTune>) => void
   /** A profile's channels on these fixtures (its kind and size with them). */
   applyLightProfile: (ids: string[], profile: LightProfile) => void
@@ -4962,6 +4965,7 @@ export const useStore = create<StoreState>((set, get) => ({
         looks: { ...L.looks, ...Object.fromEntries(s.lightRig.fixtures.map((f) => [f.id, L.looks[f.id] ?? LIGHT_LOOK_DEFAULT])) },
         master: { brightness: L.master.brightness, speed: L.master.speed },
         groups: { ...(L.groups ?? {}), ...Object.fromEntries(s.lightRig.groups.map((g) => [g.id, L.groups?.[g.id] ?? 1])) },
+        ...(L.groupTunes ? { groupTunes: { ...L.groupTunes } } : {}),
         ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}) } } : {})
       }
       return { lightsSession: { ...L, scenes: [...L.scenes, scene] } }
@@ -4978,6 +4982,7 @@ export const useStore = create<StoreState>((set, get) => ({
           looks: { ...L.looks, ...sc.looks },
           master: sc.master ? { ...L.master, ...sc.master } : L.master,
           ...(sc.groups ? { groups: { ...(L.groups ?? {}), ...sc.groups } } : {}),
+          ...(sc.groupTunes ? { groupTunes: { ...(L.groupTunes ?? {}), ...sc.groupTunes } } : {}),
           ...(sc.tunes && s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...sc.tunes } } : {})
         },
         lightFadeEpoch: s.lightFadeEpoch + 1,
@@ -5109,6 +5114,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   setLightGroupLevel: (id, v) =>
     set((s) => ({ lightsSession: { ...s.lightsSession, groups: { ...(s.lightsSession.groups ?? {}), [id]: Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1)) } } })),
+  setLightGroupTune: (id, patch) =>
+    set((s) => ({ lightsSession: { ...s.lightsSession, groupTunes: { ...(s.lightsSession.groupTunes ?? {}), [id]: sanitizeGroupTune({ ...(s.lightsSession.groupTunes?.[id] ?? {}), ...patch }) } } })),
   setLightTunes: (ids, patch) => {
     for (const id of ids) get().setLightTune(id, patch)
   },

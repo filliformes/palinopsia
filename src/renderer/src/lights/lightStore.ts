@@ -20,15 +20,21 @@ import {
   type LightProfile,
   type LightRig
 } from '@shared/lights'
-import { GROUP_PREFIX, LOOK_DEFAULT, type LightModField, type LightsSession } from '@shared/lights'
+import { GROUP_PREFIX, GROUP_TUNE_DEFAULT, GROUP_TUNE_FIELDS, LOOK_DEFAULT, type GroupTune, type LightModField, type LightsSession } from '@shared/lights'
 
 /** A light slider's value now : a fixture's look or tuning, or a master. */
 export function lightBaseValue(rig: LightRig, L: LightsSession, fixture: string, field: LightModField): number | null {
   if (field === 'masterBrightness') return L.master.brightness
   if (field === 'masterSpeed') return L.master.speed
+  if (field === 'masterGain') return L.master.gain
+  if (field === 'masterSaturation') return L.master.saturation
+  if (field === 'masterContrast') return L.master.contrast
   if (fixture.startsWith(GROUP_PREFIX)) {
     const gid = fixture.slice(GROUP_PREFIX.length)
-    return field === 'level' && rig.groups.some((g) => g.id === gid) ? L.groups?.[gid] ?? 1 : null
+    if (!rig.groups.some((g) => g.id === gid)) return null
+    if (field === 'level') return L.groups?.[gid] ?? 1
+    const k = GROUP_TUNE_FIELDS[field]
+    return k ? (L.groupTunes?.[gid] ?? GROUP_TUNE_DEFAULT)[k] : null
   }
   const f = rig.fixtures.find((x) => x.id === fixture)
   if (!f) return null
@@ -51,6 +57,12 @@ export function lightBaseValue(rig: LightRig, L: LightsSession, fixture: string,
     case 'tuneSaturation': return tune.saturation
     case 'tuneHue': return tune.hue
     case 'tuneWarmth': return tune.warmth
+    case 'tuneContrast': return tune.contrast
+    case 'tuneGamma': return tune.gamma
+    case 'tuneBlack': return tune.black
+    case 'tuneSmooth': return tune.smooth
+    case 'gradSpeed': return look.gradient.speed
+    case 'area': return f.size
   }
   return null
 }
@@ -63,6 +75,8 @@ export function commitLightValue(
     setLightTune: (id: string, p: Partial<import('@shared/lights').LightTune>) => void
     setLightsMaster: (p: Partial<import('@shared/lights').LightsMaster>) => void
     setLightGroupLevel: (id: string, v: number) => void
+    setLightGroupTune: (id: string, p: Partial<GroupTune>) => void
+    updateLightFixture: (id: string, p: Partial<LightFixture>) => void
     lightsSession: LightsSession
   },
   fixture: string,
@@ -71,17 +85,28 @@ export function commitLightValue(
 ): void {
   if (field === 'masterBrightness') return st.setLightsMaster({ brightness: v })
   if (field === 'masterSpeed') return st.setLightsMaster({ speed: v })
+  if (field === 'masterGain') return st.setLightsMaster({ gain: v })
+  if (field === 'masterSaturation') return st.setLightsMaster({ saturation: v })
+  if (field === 'masterContrast') return st.setLightsMaster({ contrast: v })
   if (fixture.startsWith(GROUP_PREFIX)) {
-    if (field === 'level') st.setLightGroupLevel(fixture.slice(GROUP_PREFIX.length), v)
+    const gid = fixture.slice(GROUP_PREFIX.length)
+    const k = GROUP_TUNE_FIELDS[field]
+    if (field === 'level') st.setLightGroupLevel(gid, v)
+    else if (k) st.setLightGroupTune(gid, { [k]: v })
     return
   }
+  if (field === 'tuneContrast') return st.setLightTune(fixture, { contrast: v })
+  if (field === 'tuneGamma') return st.setLightTune(fixture, { gamma: v })
+  if (field === 'tuneBlack') return st.setLightTune(fixture, { black: v })
+  if (field === 'tuneSmooth') return st.setLightTune(fixture, { smooth: v })
+  if (field === 'area') return st.updateLightFixture(fixture, { size: v })
   if (field === 'tuneBrightness') return st.setLightTune(fixture, { brightness: v })
   if (field === 'tuneSaturation') return st.setLightTune(fixture, { saturation: v })
   if (field === 'tuneHue') return st.setLightTune(fixture, { hue: v })
   if (field === 'tuneWarmth') return st.setLightTune(fixture, { warmth: v })
-  if (field === 'gradOffset' || field === 'gradAngle' || field === 'gradScale') {
+  if (field === 'gradOffset' || field === 'gradAngle' || field === 'gradScale' || field === 'gradSpeed') {
     const g = (st.lightsSession.looks[fixture] ?? LOOK_DEFAULT).gradient
-    const k = field === 'gradOffset' ? 'offset' : field === 'gradAngle' ? 'angle' : 'scale'
+    const k = field === 'gradOffset' ? 'offset' : field === 'gradAngle' ? 'angle' : field === 'gradSpeed' ? 'speed' : 'scale'
     return st.setLightLook(fixture, { gradient: { ...g, [k]: v } })
   }
   st.setLightLook(fixture, { [field]: v })
