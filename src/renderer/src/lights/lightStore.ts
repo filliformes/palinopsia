@@ -363,3 +363,28 @@ export const loadSetupName = (): string => { try { return localStorage.getItem(S
 export const persistSetupName = (n: string): string => { try { localStorage.setItem(SETUP_NAME_KEY, n) } catch { /* private */ } return n }
 /** A setup as the text of its file. */
 export const setupText = (s: LightSetup): string => JSON.stringify({ kind: 'palinopsia-light-setup', version: 1, ...s }, null, 1)
+
+/** The kind of light a mode of so many channels most likely is (the 30-zone bars'
+ *  modes first; null : no guess, its channels are written as held values). */
+export function profileForFootprint(fp: number): string | null {
+  return ({ 90: 'b:bar30-90', 94: 'b:bar30-94', 8: 'b:bar-8', 5: 'b:bar-5', 3: 'b:rgb', 4: 'b:drgb', 1: 'b:dimmer', 2: 'b:dimmer16' } as Record<number, string>)[fp] ?? null
+}
+
+/** Lights on the map for what answered on the line : each at the address it has,
+ *  of the kind its mode suggests, in a row across the picture, on `out`. */
+export function lightsFromLine(rig: LightRig, out: string, devs: Array<{ name: string; address: number; profile: LightProfile }>): LightRig {
+  let r = rig
+  const N = devs.length
+  devs.forEach((d, k) => {
+    const t = (k + 0.5) / N
+    const p = d.profile
+    const base = newFixture(r, p.kind)
+    const place =
+      p.kind === 'spot' ? { x0: t, y0: 0.78 }
+        : p.kind === 'matrix' ? { x0: t - 0.4 / N, y0: 0.3, x1: t + 0.4 / N, y1: 0.7 }
+          : { x0: t - 0.42 / N, y0: 0.62, x1: t + 0.42 / N, y1: 0.62 }
+    const f = sanitizeFixture({ ...base, ...profilePatch(p), ...place, bends: [], out, universe: 0, address: Math.max(1, Math.min(512, d.address)), name: d.name.slice(0, 40) || base.name })
+    r = { ...r, fixtures: [...r.fixtures, f] }
+  })
+  return r
+}

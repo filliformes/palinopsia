@@ -76,7 +76,7 @@ import {
   type LightsSession,
   type LightTune
 } from '@shared/lights'
-import { addressedInOrder, chainOf, duplicate, kindPatch, loadSetupName, loadSetups, persistSetupName, persistSetups, readSetup, withProfile, type LightSetup, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
+import { addressedInOrder, chainOf, lightsFromLine, duplicate, kindPatch, loadSetupName, loadSetups, persistSetupName, persistSetups, readSetup, withProfile, type LightSetup, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
@@ -2009,6 +2009,8 @@ interface StoreState {
   /** `n` lights of one kind in a chain : on the Enttec output (made if none), in a
    *  row, addressed one after the other (the Set up guide). */
   addLightChain: (profile: LightProfile, n: number) => void
+  /** Lights on the map for what answered on the line (RDM), at their own addresses. */
+  addLightsFromLine: (out: string, devs: Array<{ name: string; address: number; profile: LightProfile }>) => void
   /** Several lights changed in one go (a drag of the picked ones : one write). */
   updateLightFixtures: (list: Array<[string, Partial<LightFixture>]>) => void
   setLightKind: (id: string, kind: LightKind) => void
@@ -5054,6 +5056,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const done = new Map(addressedInOrder(s.lightRig, out).map((f) => [f.id, f]))
       return { lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((f) => done.get(f.id) ?? f) }) }
     }),
+  addLightsFromLine: (out, devs) =>
+    set((s) => ({ lightRig: persistRig(sanitizeRig(lightsFromLine(s.lightRig, out, devs.map((d) => ({ ...d, profile: sanitizeProfile(d.profile) }))))), lightSel: null, lightPicked: [] })),
   addLightChain: (profile, n) =>
     set((s) => ({ lightRig: persistRig(sanitizeRig(chainOf(s.lightRig, sanitizeProfile(profile), n))), lightSel: null, lightPicked: [] })),
   addLightRow: (id, n, dir) =>
