@@ -25,6 +25,7 @@ import {
 } from '@shared/lights'
 import { lightModKey, lightMods } from './lightMods'
 import { middleOf } from './lightStore'
+import { Automaton, cloud, ECHO_SLOTS, ECHO_STEP, GLITCH_COLORS, Life, makeFx, mirror01, STATEFUL, type FxState } from './lightFx'
 
 export interface LightGrid {
   w: number
@@ -293,6 +294,9 @@ interface FixtureState {
   from: Float32Array | null // a light scene's fade : where it came from
   beatIdx: number // the beat effect : the last flash's count, and its envelope
   beatEnv: number
+  ph: number // its own effect phase, while its rate is modulated (cycles)
+  phOwn: boolean
+  fx?: FxState // a digital effect's state (lightFx.ts)
 }
 
 export class LightEngine {
@@ -303,6 +307,47 @@ export class LightEngine {
   private fadeT = 1 // a light scene's fade : 0..1
   private fadeSec = 0
   private audioSm = [0, 0, 0, 0] // level, low, mid, high
+  private frameNo = 0
+  // The effects' clocks : one phase per rate in use, moved on once a frame by
+  // min(MAX_HZ, rate × the master speed). Lights with the same rate share it (a
+  // chase stays one band across the room), a speed change never jumps it, and no
+  // rate and speed together can pass the three changes a second.
+  private phases = new Map<string, { ph: number; frame: number; usedAt: number }>()
+  // The digital effects' shared fields (an automaton, the Game of Life) : one per
+  // rule and size, stepped once a frame by the first light that asks.
+  private fields = new Map<string, { f: Automaton | Life; acc: number; frame: number; usedAt: number }>()
+  // the fireflies' mean field : this frame's sum, and the last frame's (R, psi)
+  private ffSum = [0, 0, 0]
+  private ffMean = [0, 0]
+
+  /** The phase (cycles) of a clock at `rate`, capped at `cap` a second once the
+   *  master speed is in. */
+  private phaseOf(rate: number, cap: number, speed: number, dt: number, nowMs: number): number {
+    const key = `${cap}|${Math.round(rate * 1000)}`
+    let e = this.phases.get(key)
+    if (!e) { e = { ph: 0, frame: -1, usedAt: nowMs }; this.phases.set(key, e) }
+    if (e.frame !== this.frameNo) {
+      e.frame = this.frameNo
+      e.ph += dt * Math.max(-cap, Math.min(cap, rate * speed))
+    }
+    e.usedAt = nowMs
+    return e.ph
+  }
+
+  /** A shared field, stepped `rate` times a second (once a frame, whoever asks). */
+  private fieldOf<T extends Automaton | Life>(key: string, make: () => T, rate: number, dt: number, nowMs: number): T {
+    let e = this.fields.get(key)
+    if (!e) { e = { f: make(), acc: 0, frame: -1, usedAt: nowMs }; this.fields.set(key, e) }
+    if (e.frame !== this.frameNo) {
+      e.frame = this.frameNo
+      e.acc += dt * rate
+      for (let k = 0; e.acc >= 1 && k < 3; k++) { e.acc -= 1; e.f.step() }
+      if (e.acc >= 1) e.acc = 0
+      if (e.f instanceof Life) e.f.fade(dt)
+    }
+    e.usedAt = nowMs
+    return e.f as T
+  }
 
   /** A light scene is coming in : fade from what shows now over `sec`. */
   beginFade(sec: number): void {
@@ -326,7 +371,7 @@ export class LightEngine {
     if (!s || s.sig !== sig) {
       const pts = fixturePoints(f, aspect)
       const n = pts.length / 2
-      s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0 }
+      s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0, ph: 0, phOwn: false }
       this.st.set(f.id, s)
     }
     return s
@@ -335,6 +380,14 @@ export class LightEngine {
   frame(inp: LightInputs): LightFrame {
     const dt = this.lastMs ? Math.max(0, Math.min(0.25, (inp.nowMs - this.lastMs) / 1000)) : 1 / 40
     this.lastMs = inp.nowMs
+    this.frameNo++
+    const nowS = inp.nowMs / 1000
+    // the fireflies : last frame's mean phase becomes this frame's pull
+    {
+      const [sc, ss, sn] = this.ffSum
+      this.ffMean = sn > 0 ? [Math.hypot(sc, ss) / sn, Math.atan2(ss, sc) / (2 * Math.PI)] : [0, 0]
+      this.ffSum = [0, 0, 0]
+    }
     const M = inp.master
     const mod = (fx: string, field: LightModField, base: number): number => {
       const v = lightMods.get(lightModKey(fx, field))
@@ -413,7 +466,18 @@ export class LightEngine {
       const hue = mod(f.id, 'hue', look.hue), sat = mod(f.id, 'sat', look.sat), val = mod(f.id, 'val', look.val)
       const g = look.gradient
       const gOff = mod(f.id, 'gradOffset', g.offset), gAng = mod(f.id, 'gradAngle', g.angle), gScale = mod(f.id, 'gradScale', g.scale)
-      const rate = Math.min(MAX_HZ, mod(f.id, 'rate', look.rate) * Math.max(0, speed))
+      const rateRaw = mod(f.id, 'rate', look.rate)
+      const rate = Math.min(MAX_HZ, rateRaw * Math.max(0, speed))
+      // its effect's phase : the shared clock of its rate, or its own while a
+      // modulator moves the rate (it leaves the shared one where that stood)
+      const E = look.effect
+      const shared = this.phaseOf(look.rate, MAX_HZ, Math.max(0, speed), dt, inp.nowMs)
+      let ph = shared
+      if (rateRaw !== look.rate) {
+        if (!s.phOwn) { s.phOwn = true; s.ph = shared }
+        s.ph += dt * rate
+        ph = s.ph
+      } else s.phOwn = false
       const depth = clamp01(mod(f.id, 'depth', look.depth))
       const width = Math.max(0.02, mod(f.id, 'width', look.width))
       const eAng = (mod(f.id, 'angle', look.angle) * Math.PI) / 180
@@ -429,13 +493,64 @@ export class LightEngine {
       const asp = Math.max(0.1, inp.aspect)
       const op = look.order !== 'room' ? orderPos.get(f.id) : undefined
       const fan = mod(f.id, 'fan', look.fan)
-      // the room's extent along the effect's direction (a fan across the room)
-      let pLo = 0, pHi = 1
-      if (fan && !op) {
-        const ps = [0, asp * ca, sa, asp * ca + sa] // the room's four corners, projected
-        pLo = Math.min(...ps); pHi = Math.max(...ps)
+      // the room's extent along the effect's direction, and across it (its four
+      // corners, projected) : a place in the room as 0..1 along and across
+      const pA = asp * ca, pB = sa, qA = -asp * sa, qB = ca
+      const pLo = Math.min(0, pA, pB, pA + pB), pHi = Math.max(0, pA, pB, pA + pB)
+      const qLo = Math.min(0, qA, qB, qA + qB), qHi = Math.max(0, qA, qB, qA + qB)
+      const pulse = E === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * (ph - (op?.u ?? 0)))) : 1
+      // the gradient's own drift (never faster than a color a second and a half)
+      const gPh = look.source === 'gradient' && g.speed ? this.phaseOf(g.speed, 1.5, Math.max(0, speed), dt, inp.nowMs) : 0
+      // a digital effect : its state, its shared field, what this frame needs
+      let fx = s.fx
+      if (STATEFUL.has(E)) { if (!fx || fx.kind !== E) fx = s.fx = makeFx(E, n) } else if (fx) fx = s.fx = undefined
+      let auto: Automaton | null = null, life: Life | null = null
+      let cellsN = 0, countN = 0, kTrace = 0, echoBack = 0, ffK = 0
+      const cell = Math.max(0.02, Math.min(0.25, width)) // a cell's size, as a part of the room
+      if (E === 'automaton') {
+        cellsN = op ? Math.max(16, op.steps) : Math.max(4, Math.min(64, Math.round(1 / cell)))
+        const rule = look.rule
+        auto = this.fieldOf(`a|${rule}|${cellsN}`, () => new Automaton(rule, cellsN), rate, dt, inp.nowMs)
+      } else if (E === 'life') {
+        const gw = Math.max(8, Math.min(48, Math.round(1 / cell))), gh = Math.max(4, Math.round(gw / asp))
+        life = this.fieldOf(`l|${gw}|${gh}`, () => new Life(gw, gh), rate, dt, inp.nowMs)
+      } else if (E === 'binary') {
+        const minBeats = (1 / MAX_HZ) * (Math.max(1, inp.bpm) / 60)
+        countN = Math.max(0, Math.floor(inp.beats / Math.max(minBeats, rate > 0 ? 1 / rate : 1)))
+      } else if (E === 'afterimage') {
+        kTrace = 1 - Math.exp(-dt / (0.3 + (Math.min(1, width) - 0.02) * 7.85)) // it lasts 0.3 to 8 s
+      } else if (E === 'echo' && fx?.hist) {
+        // the delay line moves on a row every tenth of a second (the new row
+        // starts as the last one, the pixel loop then writes the present into it)
+        fx.acc += dt
+        for (let k = 0; fx.acc >= ECHO_STEP && k < 4; k++) {
+          fx.acc -= ECHO_STEP
+          const from = fx.head * n * 3
+          fx.head = (fx.head + 1) % ECHO_SLOTS
+          fx.hist.copyWithin(fx.head * n * 3, from, from + n * 3)
+          fx.filled = Math.min(ECHO_SLOTS - 1, fx.filled + 1)
+        }
+        if (fx.acc >= ECHO_STEP) fx.acc = 0
+        echoBack = Math.min(fx.filled, Math.max(1, Math.round((0.3 + (Math.min(1, width) - 0.02) * 7.85) / ECHO_STEP)))
+      } else if (E === 'fireflies') {
+        // the pull toward the others swells and falls over three quarters of a minute
+        ffK = 2.4 * (0.5 - 0.5 * Math.cos((2 * Math.PI * this.clock) / 45)) ** 2
+      } else if (E === 'glitch' && fx) {
+        fx.events = fx.events.filter((e) => e.until > nowS)
+        if (fx.events.length < 3 && Math.random() < rate * 0.6 * dt) {
+          const len = n === 1 ? 1 : Math.max(1, Math.round(n * (0.06 + 0.3 * Math.random())))
+          const from = Math.floor(Math.random() * Math.max(1, n - len + 1))
+          const modes = n === 1 ? [0, 1, 3] : [0, 1, 2, 2, 3]
+          fx.events.push({
+            from, to: from + len, until: nowS + 0.18 + 0.32 * Math.random(),
+            mode: modes[Math.floor(Math.random() * modes.length)],
+            shift: 1 + Math.floor(Math.random() * Math.max(1, n / 3)), color: Math.floor(Math.random() * 6)
+          })
+        }
+      } else if (E === 'hold' && fx) {
+        fx.draw = Math.random() < rate * dt
       }
-      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * (this.clock * rate - (op?.u ?? 0)))) : 1
+      const travel = E === 'scan' ? ph * 0.25 : 0 // the read head's way (room widths)
       // the beat : every 1/rate beats (rate 0 : every beat), the flash decaying in a quarter of it
       let beatMul = 1
       if (look.effect === 'beat') {
@@ -467,13 +582,23 @@ export class LightEngine {
           r = tCol[0] * on; gg = tCol[1] * on; b = tCol[2] * on
         } else {
           if (grid) {
-            sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
-            r = tmp[0]; gg = tmp[1]; b = tmp[2]
+            if (E === 'scan' && depth > 0.001) {
+              // the read head slides across the picture (a mirror at each edge)
+              sampleArea(grid, mirror01(x + (ca * travel) / asp), mirror01(y + sa * travel), f.size, asp, tmp, look.sample)
+              r = tmp[0]; gg = tmp[1]; b = tmp[2]
+              if (depth < 0.999) {
+                sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
+                r = tmp[0] + (r - tmp[0]) * depth; gg = tmp[1] + (gg - tmp[1]) * depth; b = tmp[2] + (b - tmp[2]) * depth
+              }
+            } else {
+              sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
+              r = tmp[0]; gg = tmp[1]; b = tmp[2]
+            }
           } else if (base) {
             r = base[0]; gg = base[1]; b = base[2]
           } else if (look.source === 'gradient') {
             const t = g.along ? (n > 1 ? i / (n - 1) : 0.5) * gScale : (px * gca + y * gsa) * gScale
-            gradientAt(g.stops, t + gOff + this.clock * g.speed, tmp)
+            gradientAt(g.stops, t + gOff + gPh, tmp)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
           }
           // a fan : the hue spread across the room (or along the order)
@@ -483,18 +608,85 @@ export class LightEngine {
             turnHue(tmp, -fan * (pos - 0.5)) // (the color wheel's way : a positive fan climbs toward yellow)
             r = Math.max(0, tmp[0]); gg = Math.max(0, tmp[1]); b = Math.max(0, tmp[2])
           }
+          // the digital effects that work on the color itself
+          if (fx) {
+            const o3 = i * 3
+            if (E === 'hold') {
+              // it freezes what it saw, and looks again now and then
+              if (!fx.ok || (op ? fx.draw : Math.random() < rate * dt)) { fx.a[o3] = r; fx.a[o3 + 1] = gg; fx.a[o3 + 2] = b }
+              r += (fx.a[o3] - r) * depth; gg += (fx.a[o3 + 1] - gg) * depth; b += (fx.a[o3 + 2] - b) * depth
+            } else if (E === 'afterimage') {
+              // a slow trace of the picture; where the picture has moved on, the
+              // light shows the trace's complement (a white leaves its glow)
+              if (!fx.ok) { fx.a[o3] = r; fx.a[o3 + 1] = gg; fx.a[o3 + 2] = b }
+              const pr = fx.a[o3], pg = fx.a[o3 + 1], pb = fx.a[o3 + 2]
+              const moved = Math.min(1, (Math.abs(r - pr) + Math.abs(gg - pg) + Math.abs(b - pb)) * 1.5) * depth
+              const sum = Math.max(pr, pg, pb) + Math.min(pr, pg, pb)
+              fx.a[o3] = pr + (r - pr) * kTrace; fx.a[o3 + 1] = pg + (gg - pg) * kTrace; fx.a[o3 + 2] = pb + (b - pb) * kTrace
+              r += (sum - pr - r) * moved; gg += (sum - pg - gg) * moved; b += (sum - pb - b) * moved
+            } else if (E === 'echo' && fx.hist) {
+              const H = fx.hist, now = fx.head * n * 3 + o3
+              H[now] = r; H[now + 1] = gg; H[now + 2] = b
+              const past = ((fx.head - echoBack + ECHO_SLOTS) % ECHO_SLOTS) * n * 3 + o3
+              r += (H[past] - r) * depth; gg += (H[past + 1] - gg) * depth; b += (H[past + 2] - b) * depth
+            } else if (E === 'bits') {
+              // each channel fully on or off; it keeps a state a third of a second at least
+              for (let c = 0; c < 3; c++) {
+                const v = c === 0 ? r : c === 1 ? gg : b
+                const on = fx.b[o3 + c] > 0.5
+                const want = v > (on ? 0.34 : 0.44)
+                if (want !== on && nowS - fx.a[o3 + c] > 0.34) { fx.b[o3 + c] = want ? 1 : 0; fx.a[o3 + c] = nowS }
+                const q = v + (fx.b[o3 + c] - v) * depth
+                if (c === 0) r = q; else if (c === 1) gg = q; else b = q
+              }
+            } else if (E === 'glitch') {
+              for (const ev of fx.events) {
+                if (i < ev.from || i >= ev.to) continue
+                let er = 0, eg = 0, eb = 0
+                if (ev.mode === 0) { const c = GLITCH_COLORS[ev.color]; er = c[0]; eg = c[1]; eb = c[2] }
+                else if (ev.mode === 1) { const sum = Math.max(r, gg, b) + Math.min(r, gg, b); er = sum - r; eg = sum - gg; eb = sum - b }
+                else if (ev.mode === 2) { const j = ((i + ev.shift) % n) * 3; er = s.cur[j]; eg = s.cur[j + 1]; eb = s.cur[j + 2] } // a block read from elsewhere
+                r += (er - r) * depth; gg += (eg - gg) * depth; b += (eb - b) * depth
+              }
+            }
+          }
           // the effect, a multiplier on the light
           let m = pulse * beatMul * audioMul
-          if (look.effect === 'chase' || look.effect === 'wave') {
+          if (E === 'chase' || E === 'wave') {
             const p = op ? op.u : px * ca + y * sa
-            if (look.effect === 'chase') {
-              const d = fract(p - this.clock * rate) // 0..1 behind the head
+            if (E === 'chase') {
+              const d = fract(p - ph) // 0..1 behind the head
               const band = Math.exp(-((Math.min(d, 1 - d) / width) ** 2) * 3)
               m *= 1 - depth + depth * band
             } else {
-              m *= 1 - depth * (0.5 - 0.5 * Math.sin(2 * Math.PI * (p / width - this.clock * rate)))
+              m *= 1 - depth * (0.5 - 0.5 * Math.sin(2 * Math.PI * (p / width - ph)))
             }
-          } else if (look.effect === 'sparkle') {
+          } else if (auto) {
+            // the automaton : its cells along the effect's way, its past across it
+            const along = (px * ca + y * sa - pLo) / Math.max(1e-6, pHi - pLo)
+            const across = (-px * sa + y * ca - qLo) / Math.max(1e-6, qHi - qLo)
+            const alive = op ? auto.at(op.step, 0) : auto.at(Math.min(cellsN - 1, Math.floor(along * cellsN)), Math.floor(across * Math.min(auto.hist - 1, cellsN / asp)))
+            m *= 1 - depth + depth * alive
+          } else if (life) {
+            m *= 1 - depth + depth * life.at(x, y)
+          } else if (E === 'noise') {
+            const k = 1 / Math.max(0.05, width)
+            m *= 1 - depth + depth * cloud(px * k, y * k, ph * 0.6)
+          } else if (E === 'binary') {
+            // each light a bit (light by light), or eight bits across the room
+            const bit = op ? op.step : Math.min(7, Math.floor(((px * ca + y * sa - pLo) / Math.max(1e-6, pHi - pLo)) * 8))
+            m *= 1 - depth + depth * (Math.floor(countN / 2 ** bit) % 2)
+          } else if (E === 'fireflies' && fx) {
+            // its own tempo (a little off the others), pulled toward the room's
+            // mean phase; a flash as its phase turns over, fading through the cycle
+            const j = op ? 0 : i
+            if (!op || i === 0) {
+              const pull = (ffK * this.ffMean[0] * Math.sin(2 * Math.PI * (this.ffMean[1] - fx.a[j]))) / (2 * Math.PI)
+              fx.a[j] = fract(fx.a[j] + dt * (rate * (1 + 0.14 * fx.b[j]) + pull * rate))
+              this.ffSum[0] += Math.cos(2 * Math.PI * fx.a[j]); this.ffSum[1] += Math.sin(2 * Math.PI * fx.a[j]); this.ffSum[2]++
+            }
+            m *= 1 - depth + depth * Math.exp(-fx.a[j] * 5.5)
+          } else if (E === 'sparkle') {
             // twinkles : a pixel lights at random (rate : how often), then decays
             if (op) m *= 1 - depth + depth * s.spark[0]
             else {
@@ -549,14 +741,18 @@ export class LightEngine {
         colors[o + 1] = fg * gm
         colors[o + 2] = fb * gm
       }
+      if (fx) fx.ok = true
       out.colors.set(f.id, colors)
       // into its universes
       const o = outputs.get(f.out)
       if (!o || !o.enabled || !inp.rig.on) continue
       this.patch(f, o, colors, universes, out)
     }
-    // fixtures gone from the rig : their state goes too
+    // fixtures gone from the rig : their state goes too; the clocks and fields
+    // nobody asked for in five seconds too
     for (const id of [...this.st.keys()]) if (!live.has(id)) this.st.delete(id)
+    for (const [k, e] of this.phases) if (inp.nowMs - e.usedAt > 5000) this.phases.delete(k)
+    for (const [k, e] of this.fields) if (inp.nowMs - e.usedAt > 5000) this.fields.delete(k)
     if (this.fadeT >= 1) for (const s of this.st.values()) s.from = null
     // collect
     for (const [key, data] of universes) {

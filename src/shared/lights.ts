@@ -18,7 +18,22 @@ export type LightKind = 'strip' | 'spot' | 'matrix' | 'ring'
 /** A matrix's first LED : the corner it starts in. */
 export type LightCorner = 'tl' | 'tr' | 'bl' | 'br'
 export type LightSourceKind = 'master' | 'layer' | 'color' | 'gradient' | 'off'
-export type LightEffect = 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat' | 'presence'
+export type LightEffect =
+  | 'none' | 'chase' | 'wave' | 'pulse' | 'sparkle' | 'audio' | 'beat' | 'presence'
+  // the digital ones (lights/lightFx.ts) :
+  | 'automaton' // a cellular automaton and its history, drawn across the room
+  | 'life' // the Game of Life over the room
+  | 'fireflies' // each pixel blinks on its own, they fall into step and out again
+  | 'noise' // slow clouds of light drifting
+  | 'hold' // each pixel freezes what it saw, then looks again
+  | 'glitch' // blocks of wrong colors breaking in
+  | 'binary' // the lights count the beats in binary
+  | 'echo' // the picture as it was a moment ago
+  | 'afterimage' // the complement of what the picture just was, fading
+  | 'scan' // the lights slide across the picture and read it
+  | 'bits' // every channel fully on or off : eight colors
+/** The digital effects, in the menu's order. */
+export const DIGITAL_EFFECTS: readonly LightEffect[] = ['afterimage', 'echo', 'hold', 'bits', 'glitch', 'scan', 'automaton', 'life', 'fireflies', 'noise', 'binary']
 /** How an effect (and a fan) travels : through the room by where each pixel is, or
  *  light by light in an order, as a lighting console spreads a phase over a group. */
 export type LightOrder = 'room' | 'ltr' | 'center' | 'random' | 'oddeven'
@@ -111,6 +126,7 @@ export interface LightLook {
   wings: number // 1..4 : light by light, the order folded into mirrored parts
   fan: number // -180..180 degrees : a hue spread across the room or the order
   band: LightBand // the sound effect : the level or a band
+  rule: number // 0..255 : the automaton's rule (30 : chaos, 90 : triangles, 110 : gliders)
 }
 
 export interface LightsMaster {
@@ -188,7 +204,7 @@ export const GRADIENT_DEFAULT: LightGradient = {
 export const LOOK_DEFAULT: LightLook = {
   source: 'master', layer: 0, sample: 'average', hue: 30, sat: 0.6, val: 1, gradient: GRADIENT_DEFAULT,
   effect: 'none', rate: 0.5, depth: 0.6, width: 0.25, angle: 0, level: 1,
-  order: 'room', wings: 1, fan: 0, band: 'level'
+  order: 'room', wings: 1, fan: 0, band: 'level', rule: 30
 }
 
 export const MASTER_DEFAULT: LightsMaster = { brightness: 1, speed: 1, blackSec: 2, fadeSec: 1.5 }
@@ -246,7 +262,8 @@ const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (li
 export const KINDS: readonly LightKind[] = ['strip', 'spot', 'matrix', 'ring']
 export const CORNERS: readonly LightCorner[] = ['tl', 'tr', 'bl', 'br']
 export const SOURCES: readonly LightSourceKind[] = ['master', 'layer', 'color', 'gradient', 'off']
-export const EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat', 'presence']
+export const CLASSIC_EFFECTS: readonly LightEffect[] = ['none', 'chase', 'wave', 'pulse', 'sparkle', 'audio', 'beat', 'presence']
+export const EFFECTS: readonly LightEffect[] = [...CLASSIC_EFFECTS, ...DIGITAL_EFFECTS]
 export const ORDERS: readonly LightOrder[] = ['room', 'ltr', 'center', 'random', 'oddeven']
 export const BANDS: readonly LightBand[] = ['level', 'low', 'mid', 'high']
 export const SAMPLES: readonly LightSample[] = ['average', 'vivid', 'bright']
@@ -402,7 +419,8 @@ export function sanitizeLook(raw: unknown): LightLook {
     order: oneOf(r.order, ORDERS, d.order),
     wings: Math.round(num(r.wings, d.wings, 1, 4)),
     fan: num(r.fan, d.fan, -180, 180),
-    band: oneOf(r.band, BANDS, d.band)
+    band: oneOf(r.band, BANDS, d.band),
+    rule: Math.round(num(r.rule, d.rule, 0, 255))
   }
 }
 

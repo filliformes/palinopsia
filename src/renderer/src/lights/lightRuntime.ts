@@ -77,6 +77,7 @@ class LightRuntime {
     const active = rig.fixtures.length > 0 && (rig.on || st.lightsPageOpen)
     if (!active) {
       if (this.wasActive) { comp.dropLights(); enttec.keepOnly(new Set()); this.last = null }
+      this.stats = { fps: 0, universes: 0, enttec: 0, net: 0 }
       this.wasActive = false
       return
     }

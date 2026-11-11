@@ -74,7 +74,7 @@ import {
   type LightsSession,
   type LightTune
 } from '@shared/lights'
-import { addressedInOrder, duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
+import { addressedInOrder, chainOf, duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
@@ -2004,6 +2004,9 @@ interface StoreState {
   autoAddressLights: (out: string) => void
   /** A row of `n` of a light across the picture (or down it), addressed in turn. */
   addLightRow: (id: string, n: number, dir: 'across' | 'down') => void
+  /** `n` lights of one kind in a chain : on the Enttec output (made if none), in a
+   *  row, addressed one after the other (the Set up guide). */
+  addLightChain: (profile: LightProfile, n: number) => void
   toggleLightPick: (id: string) => void
   setLightPicked: (ids: string[]) => void
   addLightGroup: (members: string[], name?: string) => string
@@ -4980,6 +4983,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const done = new Map(addressedInOrder(s.lightRig, out).map((f) => [f.id, f]))
       return { lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((f) => done.get(f.id) ?? f) }) }
     }),
+  addLightChain: (profile, n) =>
+    set((s) => ({ lightRig: persistRig(sanitizeRig(chainOf(s.lightRig, sanitizeProfile(profile), n))), lightSel: null, lightPicked: [] })),
   addLightRow: (id, n, dir) =>
     set((s) => {
       const f = s.lightRig.fixtures.find((x) => x.id === id)

@@ -5,6 +5,7 @@
 import {
   fixtureChannels,
   fixtureSpans,
+  profilePatch,
   RIG_DEFAULT,
   sanitizeFixture,
   sanitizeOutput,
@@ -14,6 +15,7 @@ import {
   type LightKind,
   type LightOutput,
   type LightOutputKind,
+  type LightProfile,
   type LightRig
 } from '@shared/lights'
 import { GROUP_PREFIX, LOOK_DEFAULT, type LightModField, type LightsSession } from '@shared/lights'
@@ -217,4 +219,27 @@ export function addressedInOrder(rig: LightRig, out: string): LightFixture[] {
     done.push(g)
   }
   return done
+}
+
+/** A chain of `n` lights of one kind, as a beginner sets a rig up : on the Enttec
+ *  output (made if there is none), in a row across the picture, addressed one
+ *  after the other from the first free channel. */
+export function chainOf(rig: LightRig, profile: LightProfile, n: number): LightRig {
+  let r = rig
+  let out = r.outputs.find((o) => o.kind === 'enttec') ?? r.outputs[0]
+  if (!out) { out = newOutput(r, 'enttec'); r = { ...r, outputs: [out] } }
+  const N = Math.max(1, Math.min(32, Math.round(n)))
+  for (let k = 0; k < N; k++) {
+    const t = (k + 0.5) / N
+    const base = newFixture(r, profile.kind)
+    const place =
+      profile.kind === 'spot' ? { x0: t, y0: 0.78 }
+        : profile.kind === 'ring' ? { x0: t, y0: 0.5, x1: t + 0.3 / N, y1: 0.5 }
+          : profile.kind === 'matrix' ? { x0: t - 0.4 / N, y0: 0.3, x1: t + 0.4 / N, y1: 0.7 }
+            : { x0: t - 0.42 / N, y0: 0.62, x1: t + 0.42 / N, y1: 0.62 }
+    const f = sanitizeFixture({ ...base, ...profilePatch(profile), ...place, bends: [], out: out.id, universe: 0, name: `Light ${r.fixtures.length + 1}` })
+    f.address = nextAddress(r, out.id, 0)
+    r = { ...r, fixtures: [...r.fixtures, f] }
+  }
+  return r
 }
