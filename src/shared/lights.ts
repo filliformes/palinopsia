@@ -51,7 +51,10 @@ export interface LightFixture {
   rows: number
   serpentine: boolean // matrix : wired back and forth
   reverse: boolean // strip / matrix : the first LED at the other end
-  layout: string // channels per pixel : RGB, GRB, RGBW, DRGB... (R G B W A U D S X or a number 0..255)
+  layout: string // channels per pixel : RGB, GRB, RGBW, DRGB... (layoutTokens)
+  head: string // channels sent once before the pixels (a bar's own dimmer and strobe : 'D S')
+  tail: string // channels sent once after them
+  profile: string // the profile it was set from ('' : its own channels)
   out: string // the output it is patched to ('' : none)
   universe: number // network outputs (Art-Net / sACN / WLED); an Enttec has one
   address: number // 1..512 : its first channel
@@ -107,12 +110,39 @@ export interface LightScene {
   name: string
   looks: Record<string, LightLook>
   master?: { brightness: number; speed: number }
+  groups?: Record<string, number> // the group faders
   tunes?: Record<string, LightTune> // when the tuning travels with the look
+}
+
+/** Lights that play together : a fader of their own on the console (a submaster),
+ *  picked at once on the map to give them a look or a show. */
+export interface LightGroup {
+  id: string
+  name: string
+  members: string[] // fixture ids
+}
+
+/** A fixture's channels : what a real light expects, by name. A built-in one, or
+ *  read from an Open Fixture Library file (one per mode). */
+export interface LightProfile {
+  id: string
+  name: string
+  kind: LightKind
+  head: string
+  layout: string
+  tail: string
+  pixels?: number // strip
+  cols?: number // matrix
+  rows?: number
+  /** Per channel, what it does (the patch readout) : 'dimmer', 'red', 'strobe (held at 0)'... */
+  labels?: string[]
 }
 
 export interface LightRig {
   fixtures: LightFixture[]
   outputs: LightOutput[]
+  groups: LightGroup[]
+  profiles: LightProfile[] // the ones imported on this computer
   tuneScope: LightTuneScope
   fps: number // 10..44 : DMX frames a second
   on: boolean // the lights send at all
@@ -123,6 +153,7 @@ export interface LightsSession {
   looks: Record<string, LightLook>
   scenes: LightScene[]
   master: LightsMaster
+  groups?: Record<string, number> // each group's fader (absent : 1)
   tunes?: Record<string, LightTune>
 }
 
@@ -142,7 +173,7 @@ export const LOOK_DEFAULT: LightLook = {
 
 export const MASTER_DEFAULT: LightsMaster = { brightness: 1, speed: 1, blackSec: 2, fadeSec: 1.5 }
 
-export const RIG_DEFAULT: LightRig = { fixtures: [], outputs: [], tuneScope: 'rig', fps: 40, on: true }
+export const RIG_DEFAULT: LightRig = { fixtures: [], outputs: [], groups: [], profiles: [], tuneScope: 'rig', fps: 40, on: true }
 
 export const SESSION_DEFAULT: LightsSession = { looks: {}, scenes: [], master: MASTER_DEFAULT }
 
@@ -150,7 +181,8 @@ export const SESSION_DEFAULT: LightsSession = { looks: {}, scenes: [], master: M
 export const LAYOUTS = ['RGB', 'GRB', 'BRG', 'BGR', 'RGBW', 'GRBW', 'DRGB', 'D16RGB', 'RGBD', 'DRGBW', 'D16RGBW', 'DRGBS', 'RGBWA', 'RGBWAU', 'W', 'L', 'L16', 'DCMY'] as const
 
 /** The sliders a modulator or a Macro knob can move (ranges = the sliders'). A
- *  target on the masters carries fixture ''. */
+ *  target on the masters carries fixture '', a group's fader `grp:<id>` (field level). */
+export const GROUP_PREFIX = 'grp:'
 export type LightModField =
   | 'level' | 'hue' | 'sat' | 'val' | 'gradOffset' | 'gradAngle' | 'gradScale'
   | 'rate' | 'depth' | 'width' | 'angle'
@@ -214,9 +246,9 @@ export function sanitizeTune(raw: unknown): LightTune {
  *  S strobe, X unused), the same followed by 16 for two channels (coarse and fine :
  *  D16 is a dimmer and its fine channel), or a number for a channel held at that
  *  value. Empty or unreadable : RGB. */
-export function layoutTokens(layout: string): string[] {
+export function layoutTokens(layout: string, fallback = true): string[] {
   const t = (layout || '').toUpperCase().match(/[RGBWAUDSXCMYL](?:16)?|\d{1,3}/g) ?? []
-  return t.length ? t.slice(0, 24) : ['R', 'G', 'B']
+  return t.length ? t.slice(0, 64) : fallback ? ['R', 'G', 'B'] : []
 }
 /** The channels a token takes (a 16-bit one : two). */
 export const tokenWidth = (t: string): number => (t.length === 3 && t.endsWith('16') && t[0] >= 'A' && t[0] <= 'Z' ? 2 : 1)
@@ -239,7 +271,10 @@ export function sanitizeFixture(raw: unknown, i = 0): LightFixture {
     rows: Math.round(num(r.rows, 4, 1, 128)),
     serpentine: bool(r.serpentine, false),
     reverse: bool(r.reverse, false),
-    layout: str(r.layout, 'RGB', 48) || 'RGB',
+    layout: str(r.layout, 'RGB', 96) || 'RGB',
+    head: str(r.head, '', 256),
+    tail: str(r.tail, '', 256),
+    profile: str(r.profile, '', 80),
     out: str(r.out, '', 40),
     universe: Math.round(num(r.universe, 0, 0, 32767)),
     address: Math.round(num(r.address, 1, 1, 512)),
@@ -262,6 +297,23 @@ export function sanitizeOutput(raw: unknown, i = 0): LightOutput {
   }
 }
 
+export function sanitizeProfile(raw: unknown, i = 0): LightProfile {
+  const r = obj(raw)
+  const kind = oneOf(r.kind, KINDS, 'spot')
+  return {
+    id: str(r.id, `pr${i}`, 80) || `pr${i}`,
+    name: str(r.name, 'Fixture', 80) || 'Fixture',
+    kind,
+    head: str(r.head, '', 256),
+    layout: str(r.layout, 'RGB', 96) || 'RGB',
+    tail: str(r.tail, '', 256),
+    ...(typeof r.pixels === 'number' ? { pixels: Math.round(num(r.pixels, 1, 1, 2048)) } : {}),
+    ...(typeof r.cols === 'number' ? { cols: Math.round(num(r.cols, 1, 1, 128)) } : {}),
+    ...(typeof r.rows === 'number' ? { rows: Math.round(num(r.rows, 1, 1, 128)) } : {}),
+    ...(Array.isArray(r.labels) ? { labels: r.labels.slice(0, 256).map((x) => str(x, '', 40)) } : {})
+  }
+}
+
 export function sanitizeRig(raw: unknown): LightRig {
   const r = obj(raw)
   const fixtures = (Array.isArray(r.fixtures) ? r.fixtures : []).slice(0, 256).map(sanitizeFixture)
@@ -269,9 +321,21 @@ export function sanitizeRig(raw: unknown): LightRig {
   // (ids unique : a hand-edited file with two of one would patch both as one)
   const seen = new Set<string>()
   for (const f of fixtures) { while (seen.has(f.id)) f.id += 'x'; seen.add(f.id) }
+  const ids = new Set(fixtures.map((f) => f.id))
+  const groups = (Array.isArray(r.groups) ? r.groups : []).slice(0, 64).map((g, i) => {
+    const o = obj(g)
+    return {
+      id: str(o.id, `g${i}`, 40) || `g${i}`,
+      name: str(o.name, `Group ${i + 1}`, 40) || `Group ${i + 1}`,
+      members: (Array.isArray(o.members) ? o.members : []).filter((m): m is string => typeof m === 'string' && ids.has(m)).slice(0, 256)
+    }
+  })
+  const profiles = (Array.isArray(r.profiles) ? r.profiles : []).slice(0, 128).map(sanitizeProfile)
   return {
     fixtures,
     outputs,
+    groups,
+    profiles,
     tuneScope: oneOf(r.tuneScope, ['rig', 'look'] as const, 'rig'),
     fps: Math.round(num(r.fps, 40, 10, 44)),
     on: bool(r.on, true)
@@ -341,6 +405,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
       name: str(o.name, `Light ${i + 1}`, 40),
       looks: mapOf(o.looks, sanitizeLook),
       ...(o.master ? { master: { brightness: num(m.brightness, 1, 0, 1), speed: num(m.speed, 1, 0, 4) } } : {}),
+      ...(o.groups ? { groups: mapOf(o.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
       ...(o.tunes ? { tunes: mapOf(o.tunes, sanitizeTune) } : {})
     }
   })
@@ -348,6 +413,7 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
     looks: mapOf(r.looks, sanitizeLook),
     scenes,
     master: sanitizeMaster(r.master),
+    ...(r.groups ? { groups: mapOf(r.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
     ...(r.tunes ? { tunes: mapOf(r.tunes, sanitizeTune) } : {})
   }
 }
@@ -355,7 +421,33 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
 /** The DMX channels a fixture takes (its pixels times its layout). */
 export function fixtureChannels(f: LightFixture): number {
   const n = f.kind === 'spot' ? 1 : f.kind === 'matrix' ? f.cols * f.rows : f.pixels
-  return n * layoutChannels(layoutTokens(f.layout))
+  return layoutChannels(layoutTokens(f.head, false)) + n * layoutChannels(layoutTokens(f.layout)) + layoutChannels(layoutTokens(f.tail, false))
+}
+
+/** What each token does, for the patch readout. */
+export function tokenLabel(t: string): string {
+  const fine = tokenWidth(t) === 2
+  const base: Record<string, string> = {
+    R: 'red', G: 'green', B: 'blue', W: 'white', A: 'amber', U: 'UV (off)', C: 'cyan', M: 'magenta', Y: 'yellow',
+    L: 'intensity', D: 'dimmer', S: 'strobe (off)', X: 'unused'
+  }
+  if (/^\d/.test(t)) return `held at ${Number(t)}`
+  const b = base[t[0]] ?? t
+  return fine ? `${b} (16-bit)` : b
+}
+
+/** A profile applied to a fixture : its channels, and its kind and size when it has them. */
+export function profilePatch(p: LightProfile): Partial<LightFixture> {
+  return {
+    profile: p.id,
+    head: p.head,
+    layout: p.layout,
+    tail: p.tail,
+    kind: p.kind,
+    ...(p.pixels ? { pixels: p.pixels } : {}),
+    ...(p.cols ? { cols: p.cols } : {}),
+    ...(p.rows ? { rows: p.rows } : {})
+  }
 }
 
 /** The LEDs (pixels) a fixture drives. */

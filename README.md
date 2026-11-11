@@ -2177,18 +2177,42 @@ with shows, light scenes of their own and a lighting console.
 
 - **Fixtures** : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
   light : a small RGB spot, a PAR, a wash), **+ matrix** (a grid of pixels over a
-  rectangle). Each is drawn on the **map** over the picture : drag it and it takes its
+  rectangle). **Shift or Ctrl + click** (on the map or in the list) picks several : drag
+  one and they all move, the arrows and Delete act on all of them, and a look, a
+  tuning, a profile or a show goes to all of them (the inspector then says how many). Each is drawn on the **map** over the picture : drag it and it takes its
   pixels from another part of the image, drag the ends of a bar or the corners of a matrix
   to reshape it (Shift keeps a bar level or upright), the arrows nudge it (Shift :
   farther), Delete removes it, Ctrl+D duplicates it. Each pixel shows, live, the color it
   sends. Under the fixtures : the picture the selected one reads (its layer, or the
   master), the master always, or only the room (a grid).
+- **Groups** : lights that play together. Pick some, **+ group** (or **make a group** in
+  the inspector); click a group to pick its lights again, double-click to rename it,
+  **set** to make it the lights picked now. Each group has a **fader** that dims its
+  lights together after their own level (a light in two groups gets both) : in its row
+  (with an **M** for a modulator or a Macro knob), as a knob on the **console** (MIDI
+  Learn), in OSC (`/opsia/lights/group/<n or name>`). The groups are this computer's,
+  their faders the session's (and the light scenes keep them).
 - **The inspector** (click a fixture) :
   - **Fixture** : its name, kind, LEDs (or columns × rows, serpentine), reversed, how
     wide a patch each pixel averages, and **hold to identify** (it goes full white, to
     find it in the room).
-  - **Patch** : its **output**, **universe** (network outputs) and **address**, and its
-    **channels** per pixel : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, D16RGB, RGBD, DRGBW,
+  - **Patch** : its **output**, **universe** (network outputs) and **address**, and the
+    **light** it is : a **profile** that gives its channels in the right order and holds
+    the ones it does not use where they do nothing. Built in : pixel strips (RGB, GRB,
+    GRBW), LED bars with their own dimmer and strobe before RGB or RGBW pixels, RGB and
+    RGBW lights, dimmer + RGB (+ strobe, + white), RGBWA + UV, a 16-bit dimmer + RGBW,
+    dimmer + CMY, a plain dimmer (8 or 16 bits), an RGB panel. For a real light,
+    **import a fixture file** : find it on the Open Fixture Library
+    (open-fixture-library.org), Download, OFL JSON, and import it : every mode of the
+    light becomes a profile (pick the one the light is set to). Its intensity becomes the
+    dimmer (in 16 bits with its fine channel), its colors the color, a shutter or strobe
+    is held where it is open, pan and tilt at their middle (or their default), and the
+    rest (wheels, gobos, programs) at their default or where they do nothing; a pixel
+    bar's own channels go before its pixels. The imported profiles stay on this
+    computer. Under it, **each channel numbered from the address** with what it
+    carries. Or **its own channels** per pixel (and, for a bar or a matrix, **before**
+    the pixels : a dimmer there is the whole bar's, its brightest pixel, and the pixels
+    go out relative to it) : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, D16RGB, RGBD, DRGBW,
     D16RGBW, DRGBS, RGBWA, RGBWAU, W, L, L16, DCMY, or your own : `R G B W A U`, `C M Y`
     (a subtractive mix), `L` (one channel of white : the luminance), `D` (a dimmer),
     `S` (strobe, sent off), `X` (unused), a letter followed by `16` for two channels in

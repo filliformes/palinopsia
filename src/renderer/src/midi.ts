@@ -227,6 +227,7 @@ export function isContinuousTarget(id: string): boolean {
     id.startsWith('meta:') ||
     id.startsWith('transport:') ||
     id.startsWith('field:') ||
+    id.startsWith('lights:') ||
     id === 'surface:x' ||
     id === 'surface:y' ||
     id === 'sonify:master' ||
@@ -256,6 +257,10 @@ export function midiTargetLabel(id: string): string {
   if (id === 'scene:prev') return 'SCENE prev'
   if (id.startsWith('scene:')) return `SCENE ${Number(id.slice(6)) + 1}`
   if (id in FIELD_LABELS) return FIELD_LABELS[id]
+  if (id.startsWith('lights:group:')) {
+    const g = useStore.getState().lightRig.groups.find((x) => x.id === id.slice(13))
+    return `LIGHTS ${g ? g.name : 'group'} fader`
+  }
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
   if (id === 'bg:speed') return 'BACKGROUND speed'
   if (id === 'bg:depth') return 'BACKGROUND shadow'
@@ -791,6 +796,8 @@ export function applyContinuous(id: string, t: number): boolean {
     return true
   }
   if (id in FIELD_SETTERS) { FIELD_SETTERS[id](t); return true }
+  // a Lights group's fader (its id after the prefix)
+  if (id.startsWith('lights:group:')) { st.setLightGroupLevel(id.slice(13), t); return true }
   // a Sonify parameter (a Synth knob, a patchbay depth) : over the span its modulation uses
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13), d = SONIFY_MOD_DESCS[p]

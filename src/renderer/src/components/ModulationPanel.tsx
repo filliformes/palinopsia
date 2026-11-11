@@ -1826,7 +1826,12 @@ function MatrixSummary(): JSX.Element {
     if (t.kind === 'world') return 'World amount'
     if (t.kind === 'au') return auLabel(t)
     if (t.kind === 'light') {
-      const f = t.fixture ? useStore.getState().lightRig.fixtures.find((x) => x.id === t.fixture) : null
+      const rig = useStore.getState().lightRig
+      if (t.fixture.startsWith('grp:')) {
+        const g = rig.groups.find((x) => `grp:${x.id}` === t.fixture)
+        return `${g ? g.name : 'Group'} fader`
+      }
+      const f = t.fixture ? rig.fixtures.find((x) => x.id === t.fixture) : null
       return `${t.fixture ? (f ? f.name : 'Light') : 'Lights'} ${LIGHT_MOD_RANGE[t.field].label}`
     }
     const inst =

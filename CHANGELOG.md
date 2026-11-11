@@ -100,6 +100,47 @@ that CI builds into cross-platform releases.
     D16RGB spot on the wire at level 0.4 (102 102 / 0 0 255), one ArtSync per frame at 40
     fps, the delay measured from a color change to its packet (2 to 18 ms at 0, 314 to
     332 ms at 300), the palette read from the live readback of three themes.
+- **Lights, closer to the lighting world (2/4) : groups, several lights at once, fixture
+  profiles and Open Fixture Library files.**
+  - **Picking several** (`lightPicked`) : Shift / Ctrl + click on the map or in the list;
+    a drag moves them all, the arrows and Delete act on all; the inspector becomes
+    **N lights** (`ManyInspector`) : the look, the tuning and the profile go to all of
+    them (`setLightLooks`, `setLightTunes`, `applyLightProfile(ids)`), the values shown
+    are the selected one's, no M there (one light's or a group's sliders take it). A
+    show goes to the picked lights alone when several are picked (`applyLightShow(id,
+    ids)`; the section title says so).
+  - **Groups** (`LightRig.groups`, this computer's; `LightsSession.groups` their faders,
+    the session's, kept in light scenes) : + group from the picked lights, click to pick
+    them, rename, set, remove (its modulation goes with it). A group's **fader** multiplies
+    its lights' levels in the engine; it is a modulation target (`{ kind: 'light',
+    fixture: 'grp:<id>', field: 'level' }`, through lightBaseValue / commitLightValue
+    and the Modulate panel's label), a console knob (MIDI Learn `lights:group:<id>`;
+    every `lights:` id is now a continuous target) and OSC `/opsia/lights/group/<n or
+    name>`.
+  - **Profiles** (`shared/lightProfiles.ts`, 17 built in, generic names) and **Open
+    Fixture Library files** (`lights/ofl.ts`, `readOfl`) : every mode of a file becomes
+    a profile; Intensity → `D` (with a fine alias right after it : `D16`), ColorIntensity
+    → R G B W A U C M Y, ShutterStrobe held at its Open (or NoFunction) range, Pan /
+    Tilt at their default or 128, everything else at its default value, its NoFunction
+    or first wheel slot, or 0; a dimmer-only mode's dimmer becomes `L`; a matrix block
+    (per pixel) becomes the pixel layout of a bar or a matrix, the channels before and
+    after it the fixture's **head** and **tail**; a per-channel matrix is left out and
+    said. Imported profiles live in the rig (`LightRig.profiles`, up to 128). The patch
+    shows **each channel numbered** (an imported profile's own labels : "shutter (held
+    open at 8)").
+  - **Head and tail** (`LightFixture.head / tail / profile`) : channels sent once before
+    and after the pixels. A `D` there is the whole fixture's dimmer (its brightest
+    pixel) and the pixels go out relative to it; colors there are the fixture's mean.
+    A block never straddles two universes.
+  - Tested : 54 Node checks (17 new : a bar's head dimmer and its pixels relative to
+    it, a tail, the group faders multiplied and a light in two, group levels sanitized
+    and kept in scenes, a built-in profile, an OFL file of four modes : the 11-channel
+    mode's layout and its bytes on the wire, the pixel mode's head / pixels / tail, a
+    dimmer-only mode, the per-channel one left out, junk files). In the test copy : four
+    spots picked with Ctrl + click in the list, made a group, Sunset given to them alone,
+    the group fader at 0.3 and its console knob, a built-in profile on a bar, an OFL
+    file imported through the page's own file input (three modes, the channel map read
+    out), the rig saved with its group and profiles.
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

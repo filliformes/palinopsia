@@ -9,6 +9,8 @@
 // RGBA8 grids, BOTTOM-UP rows, one per source in use (the master, the layers).
 
 import {
+  GROUP_PREFIX,
+  layoutChannels,
   layoutTokens,
   tokenWidth,
   LOOK_DEFAULT,
@@ -42,6 +44,7 @@ export interface LightInputs {
   audio: number // 0..1 : the sound's level
   aspect: number // the picture's width / height
   identify: string | null // a fixture flashed to find it in the room
+  groupLevels?: Record<string, number> // each group's fader (absent : 1)
 }
 
 /** A frame's DMX : Enttec buffers by device index, network universes by output. */
@@ -287,7 +290,9 @@ export class LightEngine {
       const look = inp.looks[f.id] ?? LOOK_DEFAULT
       const tune = inp.tunes[f.id] ?? f.tune
       const n = s.pts.length / 2
-      const level = mod(f.id, 'level', look.level)
+      // its own fader, times the faders of the groups it is in
+      let level = mod(f.id, 'level', look.level)
+      for (const g of inp.rig.groups) if (g.members.includes(f.id)) level *= clamp01(mod(GROUP_PREFIX + g.id, 'level', inp.groupLevels?.[g.id] ?? 1))
       const hue = mod(f.id, 'hue', look.hue), sat = mod(f.id, 'sat', look.sat), val = mod(f.id, 'val', look.val)
       const g = look.gradient
       const gOff = mod(f.id, 'gradOffset', g.offset), gAng = mod(f.id, 'gradAngle', g.angle), gScale = mod(f.id, 'gradScale', g.scale)
@@ -410,21 +415,34 @@ export class LightEngine {
     return out
   }
 
-  /** One fixture's colors into its output's universes, in its channel layout. A
-   *  pixel never straddles two universes (pixel controllers expect it so) : one
-   *  that would is moved to the next universe's first channel. An Enttec has one
-   *  universe : what goes past its 512 channels is dropped (and reported).
-   *  With a dimmer channel (D) the dimmer takes the light's level and the color
-   *  goes out at full strength : the fades stay smooth down low (in 16 bits with
-   *  D16) and a dim color stays its color. */
+  /** One fixture's colors into its output's universes : its head (the channels
+   *  sent once before the pixels), each pixel in its layout, its tail. A block
+   *  never straddles two universes (pixel controllers expect it so) : one that
+   *  would starts the next universe. An Enttec has one universe : what goes past
+   *  its 512 channels is dropped (and reported).
+   *  A dimmer (D) takes the level and the color goes out at full strength : the
+   *  fades stay smooth down low (in 16 bits with D16) and a dim color stays its
+   *  color. A dimmer in the head is the whole fixture's (its brightest pixel),
+   *  and its pixels then go out relative to it. */
   private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, Uint8Array>, out: LightFrame): void {
     const tok = layoutTokens(f.layout)
-    const wid = tok.map(tokenWidth)
-    let nt = 0
-    for (const w of wid) nt += w
-    const hasW = tok.some((t) => t[0] === 'W')
-    const hasD = tok.some((t) => t[0] === 'D')
+    const head = layoutTokens(f.head, false)
+    const tail = layoutTokens(f.tail, false)
+    const pixD = tok.some((t) => t[0] === 'D')
+    const fixD = !pixD && (head.some((t) => t[0] === 'D') || tail.some((t) => t[0] === 'D'))
     const n = colors.length / 3
+    // the whole fixture : its brightest pixel (a head dimmer) and its mean color
+    let fdim = 1, ar = 0, ag = 0, ab = 0
+    if (head.length || tail.length) {
+      let mx = 0
+      for (let i = 0; i < n; i++) {
+        const r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
+        ar += r; ag += g; ab += b
+        mx = Math.max(mx, r, g, b)
+      }
+      ar /= n; ag /= n; ab /= n
+      if (fixD) fdim = mx
+    }
     let uni = o.kind === 'enttec' ? 0 : f.universe
     let ch = f.address - 1
     const buf = (u: number): Uint8Array => {
@@ -434,23 +452,28 @@ export class LightEngine {
       return b
     }
     let data = buf(uni)
-    for (let i = 0; i < n; i++) {
-      if (ch + nt > 512) {
-        if (o.kind === 'enttec') { out.overflow.add(f.id); break }
-        uni++; ch = 0; data = buf(uni)
-      }
-      let r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
+    /** Room for `w` channels here, or the next universe (false : an Enttec full). */
+    const room = (w: number): boolean => {
+      if (ch + w <= 512) return true
+      if (o.kind === 'enttec') { out.overflow.add(f.id); return false }
+      uni++; ch = 0; data = buf(uni)
+      return true
+    }
+    /** One block of tokens for a color (0..1, linear) : its dimmer, white,
+     *  complements and luminance worked out from it. */
+    const emit = (tokens: string[], r: number, g: number, b: number, normD: boolean): void => {
       const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
       let dim = 1
-      if (hasD) {
+      if (normD) {
         dim = Math.max(r, g, b)
         if (dim > 1e-6) { r /= dim; g /= dim; b /= dim } else { r = g = b = 0; dim = 0 }
+      } else if (fixD) {
+        dim = fdim
+        if (fdim > 1e-6) { r /= fdim; g /= fdim; b /= fdim } else { r = g = b = 0 }
       }
       let w = 0
-      if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
-      let c = ch
-      for (let k = 0; k < tok.length; k++) {
-        const t = tok[k]
+      if (tokens.some((t) => t[0] === 'W')) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
+      for (const t of tokens) {
         let v: number
         switch (t[0]) {
           case 'R': v = r; break
@@ -467,16 +490,28 @@ export class LightEngine {
           default: v = -1 // a fixed value
         }
         if (v < 0) {
-          data[c++] = Math.max(0, Math.min(255, Number(t) | 0))
-        } else if (wid[k] === 2) {
+          data[ch++] = Math.max(0, Math.min(255, Number(t) | 0))
+        } else if (tokenWidth(t) === 2) {
           const q = Math.round(clamp01(v) * 65535)
-          data[c++] = q >> 8
-          data[c++] = q & 0xff
+          data[ch++] = q >> 8
+          data[ch++] = q & 0xff
         } else {
-          data[c++] = Math.round(clamp01(v) * 255)
+          data[ch++] = Math.round(clamp01(v) * 255)
         }
       }
-      ch += nt
+    }
+    const hw = layoutChannels(head), pw = layoutChannels(tok), tw = layoutChannels(tail)
+    if (hw) {
+      if (!room(hw)) return
+      emit(head, ar, ag, ab, false)
+    }
+    for (let i = 0; i < n; i++) {
+      if (!room(pw)) return
+      emit(tok, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD)
+    }
+    if (tw) {
+      if (!room(tw)) return
+      emit(tail, ar, ag, ab, false)
     }
   }
 }

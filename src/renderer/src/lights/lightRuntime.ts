@@ -107,7 +107,8 @@ class LightRuntime {
       bpm: st.composition.bpm,
       audio: audioBus.feature('level'),
       aspect: st.compW / Math.max(1, st.compH),
-      identify: st.lightIdentify
+      identify: st.lightIdentify,
+      groupLevels: L.groups
     })
     this.last = frame
     this.lastAt = now

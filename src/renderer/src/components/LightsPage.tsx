@@ -6,13 +6,18 @@
 // master, the speed, the fades, Black). The model is shared/lights.ts, the engine
 // lights/lightEngine.ts.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type PointerEvent as RPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as RMouseEvent, type ReactNode, type RefObject, type PointerEvent as RPointerEvent } from 'react'
 import { useStore, modTargetKey } from '../store'
 import type { ModTarget } from '@shared/types'
 import {
   EFFECTS,
   fixtureChannels,
+  fixturePixels,
   LAYOUTS,
+  layoutTokens,
+  tokenLabel,
+  tokenWidth,
+  TUNE_DEFAULT,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT,
   SAMPLES,
@@ -28,6 +33,8 @@ import {
 } from '@shared/lights'
 import { lightRuntime } from '../lights/lightRuntime'
 import { paletteOf } from '../lights/lightEngine'
+import { readOfl } from '../lights/ofl'
+import { BUILTIN_PROFILES } from '@shared/lightProfiles'
 import { enttec } from '../lights/enttec'
 import { LIGHT_SHOWS } from '../lights/lightShows'
 import { AssignRow } from './AutoControls'
@@ -66,11 +73,12 @@ const show = (c: number): number => Math.round(Math.pow(Math.max(0, Math.min(1, 
 export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const rig = useStore((s) => s.lightRig)
   const sel = useStore((s) => s.lightSel)
+  const picked = useStore((s) => s.lightPicked)
   const setOpen = useStore((s) => s.setLightsPageOpen)
   const selected = rig.fixtures.find((f) => f.id === sel) ?? null
 
-  // Keys while the page is up : Delete removes the selected fixture, the arrows
-  // move it (Shift : farther), Ctrl+D duplicates it, Esc closes the page.
+  // Keys while the page is up : Delete removes the picked fixtures, the arrows
+  // move them (Shift : farther), Ctrl+D duplicates the selected one, Esc closes the page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null
@@ -79,14 +87,18 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); st.setLightsPageOpen(false); return }
       const f = st.lightRig.fixtures.find((x) => x.id === st.lightSel)
       if (!f) return
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); st.removeLightFixture(f.id); return }
+      const ids = st.lightPicked.length ? st.lightPicked : [f.id]
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); ids.forEach((id) => st.removeLightFixture(id)); return }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); e.stopPropagation(); st.duplicateLightFixture(f.id); return }
       const step = e.shiftKey ? 0.05 : 0.005
       const d = e.key === 'ArrowLeft' ? [-step, 0] : e.key === 'ArrowRight' ? [step, 0] : e.key === 'ArrowUp' ? [0, -step] : e.key === 'ArrowDown' ? [0, step] : null
       if (!d) return
       e.preventDefault()
       e.stopPropagation()
-      st.updateLightFixture(f.id, { x0: f.x0 + d[0], y0: f.y0 + d[1], x1: f.x1 + d[0], y1: f.y1 + d[1] })
+      for (const id of ids) {
+        const x = st.lightRig.fixtures.find((q) => q.id === id)
+        if (x) st.updateLightFixture(id, { x0: x.x0 + d[0], y0: x.y0 + d[1], x1: x.x1 + d[0], y1: x.y1 + d[1] })
+      }
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -108,6 +120,7 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border bg-panel p-2">
           <FixtureList />
+          <GroupList />
           <OutputList />
           <ShowList />
           <SceneList />
@@ -117,7 +130,7 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
           <MapView canvasRef={canvasRef} />
         </main>
         <aside className="flex w-80 shrink-0 flex-col gap-2 overflow-y-auto border-l border-border bg-panel p-2">
-          {selected ? <Inspector f={selected} /> : <NoSelection />}
+          {picked.length > 1 ? <ManyInspector ids={picked} /> : selected ? <Inspector f={selected} /> : <NoSelection />}
         </aside>
       </div>
       <Console />
@@ -173,10 +186,12 @@ function Section({ title, info, actions, children, defaultCollapsed = false }: {
 function FixtureList(): JSX.Element {
   const rig = useStore((s) => s.lightRig)
   const sel = useStore((s) => s.lightSel)
+  const picked = useStore((s) => s.lightPicked)
   const add = useStore((s) => s.addLightFixture)
   const setSel = useStore((s) => s.setLightSel)
+  const toggle = useStore((s) => s.toggleLightPick)
   return (
-    <Section title="Fixtures" info="Every light in the room. Add one, then place it on the map over the part of the picture it should take its light from.">
+    <Section title="Fixtures" info="Every light in the room. Add one, then place it on the map over the part of the picture it should take its light from. Shift or Ctrl + click picks several : a look, a tuning or a show then goes to all of them.">
       <div className="flex gap-1">
         <button className={`flex-1 ${btn(false)}`} onClick={() => add('strip')} title="An LED bar : a row of pixels along a line on the picture">+ bar</button>
         <button className={`flex-1 ${btn(false)}`} onClick={() => add('spot')} title="A single light : a small RGB spot, a PAR, a wash">+ spot</button>
@@ -185,14 +200,86 @@ function FixtureList(): JSX.Element {
       {rig.fixtures.length === 0 && <p className="font-mono text-[10px] leading-snug text-muted">No fixtures yet. Add a bar, a spot or a matrix, then an output in Outputs.</p>}
       <div className="flex flex-col gap-0.5">
         {rig.fixtures.map((f) => (
-          <FixtureRow key={f.id} f={f} on={f.id === sel} onClick={() => setSel(f.id === sel ? null : f.id)} />
+          <FixtureRow
+            key={f.id}
+            f={f}
+            on={f.id === sel}
+            also={f.id !== sel && picked.includes(f.id)}
+            onClick={(e) => (e.shiftKey || e.ctrlKey || e.metaKey ? toggle(f.id) : setSel(f.id === sel && picked.length <= 1 ? null : f.id))}
+          />
         ))}
       </div>
     </Section>
   )
 }
 
-function FixtureRow({ f, on, onClick }: { f: LightFixture; on: boolean; onClick: () => void }): JSX.Element {
+function GroupList(): JSX.Element {
+  const groups = useStore((s) => s.lightRig.groups)
+  const picked = useStore((s) => s.lightPicked)
+  const levels = useStore((s) => s.lightsSession.groups)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [openMod, setOpenMod] = useState<string | null>(null)
+  const st = useStore.getState
+  return (
+    <Section
+      title="Groups"
+      info="Lights that play together. Pick lights (Shift or Ctrl + click on the map or in the list), then + group. Click a group to pick its lights : a look, a tuning or a show then goes to all of them. Its fader (here, and on the console) dims them together, after their own level; it takes a modulator, MIDI and OSC. The groups are this computer's, their faders the session's."
+      actions={<button className={`${btn(false)} disabled:opacity-40`} disabled={!picked.length} onClick={() => st().addLightGroup(picked)} title="A group of the lights picked now">+ group</button>}
+    >
+      {groups.length === 0 && <p className="font-mono text-[10px] leading-snug text-muted">None yet. Pick some lights, then + group.</p>}
+      {groups.map((g) => {
+        const on = g.members.length > 0 && g.members.length === picked.length && g.members.every((m) => picked.includes(m))
+        return (
+          <div key={g.id} className="flex flex-col gap-0.5 rounded border border-border p-1">
+            <div className="flex items-center gap-1">
+              {editing === g.id ? (
+                <input
+                  autoFocus
+                  defaultValue={g.name}
+                  onBlur={(e) => { st().updateLightGroup(g.id, { name: e.target.value }); setEditing(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 font-mono text-[10px]"
+                />
+              ) : (
+                <button
+                  onClick={() => st().setLightPicked(g.members)}
+                  onDoubleClick={() => setEditing(g.id)}
+                  className={`min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-[10px] ${on ? 'bg-accent/15 text-accent' : 'text-text hover:bg-panel3/60'}`}
+                  title="Click : pick its lights · double-click : rename"
+                >
+                  {g.name} <span className="text-muted">{g.members.length}</span>
+                </button>
+              )}
+              <button
+                disabled={!picked.length || on}
+                onClick={() => st().updateLightGroup(g.id, { members: picked })}
+                className="px-1 font-mono text-[9px] text-muted hover:text-accent disabled:opacity-30"
+                title="Its lights become the ones picked now"
+              >
+                set
+              </button>
+              <button className="px-1 font-mono text-[11px] text-muted hover:text-red-400" onClick={() => st().removeLightGroup(g.id)} title="Remove this group (its lights stay)">×</button>
+            </div>
+            <LightSlider
+              label="fader"
+              fixture={`grp:${g.id}`}
+              field="level"
+              value={levels?.[g.id] ?? 1}
+              min={0} max={1} step={0.01}
+              onChange={(v) => st().setLightGroupLevel(g.id, v)}
+              reset={1}
+              openMod={openMod}
+              setOpenMod={setOpenMod}
+              title={`The ${g.name} group's fader : its lights, after their own level`}
+            />
+          </div>
+        )
+      })}
+    </Section>
+  )
+}
+
+function FixtureRow({ f, on, also, onClick }: { f: LightFixture; on: boolean; also: boolean; onClick: (e: RMouseEvent) => void }): JSX.Element {
   const swatch = useRef<HTMLSpanElement | null>(null)
   const outputs = useStore((s) => s.lightRig.outputs)
   // the swatch : its first pixel's color now
@@ -211,7 +298,7 @@ function FixtureRow({ f, on, onClick }: { f: LightFixture; on: boolean; onClick:
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-left font-mono text-[10px] ${on ? 'bg-accent/15 text-accent' : 'text-text hover:bg-panel3/60'}`}
+      className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-left font-mono text-[10px] ${on ? 'bg-accent/15 text-accent' : also ? 'bg-accent/[0.07] text-accent/80' : 'text-text hover:bg-panel3/60'}`}
       title={`${KIND_LABEL[f.kind]} · ${ch} channels${out ? ` on ${out.name}` : ' (not patched)'}`}
     >
       <span ref={swatch} className="h-2.5 w-2.5 shrink-0 rounded-sm border border-border" />
@@ -314,11 +401,16 @@ function OutputList(): JSX.Element {
 function ShowList(): JSX.Element {
   const apply = useStore((s) => s.applyLightShow)
   const n = useStore((s) => s.lightRig.fixtures.length)
+  const picked = useStore((s) => s.lightPicked)
+  const some = picked.length > 1 && picked.length < n
   return (
-    <Section title="Shows" info="A look for every light at once, fading in over the scene fade time. Each one fits your room : its patterns run across the space, so every light takes its part from where it stands.">
+    <Section
+      title={some ? `Shows · to the ${picked.length} picked` : 'Shows'}
+      info="A look for every light at once, fading in over the scene fade time. Each one fits your room : its patterns run across the space, so every light takes its part from where it stands. With several lights picked (or a group), the show goes to them alone."
+    >
       <div className="grid grid-cols-2 gap-1">
         {LIGHT_SHOWS.map((s) => (
-          <button key={s.id} disabled={!n} className={`${btn(false)} truncate text-left disabled:opacity-40`} onClick={() => apply(s.id)} title={s.blurb}>
+          <button key={s.id} disabled={!n} className={`${btn(false)} truncate text-left disabled:opacity-40`} onClick={() => apply(s.id, some ? picked : undefined)} title={s.blurb}>
             {s.name}
           </button>
         ))}
@@ -408,12 +500,13 @@ function NoSelection(): JSX.Element {
     <div className="flex flex-col gap-2 p-2 font-mono text-[10px] leading-relaxed text-muted">
       <p>Click a fixture on the map or in the list to set it up : where it is patched, what it shows, how it is tuned.</p>
       <p>On the map : drag a fixture to move it (it takes its light from another part of the picture), drag the ends of a bar or the corners of a matrix to reshape it. The arrows nudge it (Shift : farther), Delete removes it, Ctrl+D duplicates it.</p>
+      <p>Shift or Ctrl + click picks several lights (on the map or in the list) : drag one and they all move, and a look, a tuning, a profile or a show goes to all of them. Make them a group to pick them again in one click and give them a fader.</p>
     </div>
   )
 }
 
 // ── the map ──────────────────────────────────────────────────────────────────
-type Drag = { id: string; mode: 'move' | 'p0' | 'p1' | 'c01' | 'c10'; sx: number; sy: number; f: LightFixture; pid: number }
+type Drag = { id: string; mode: 'move' | 'p0' | 'p1' | 'c01' | 'c10'; sx: number; sy: number; f: LightFixture; pid: number; group?: LightFixture[] }
 
 function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null> }): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null)
@@ -496,10 +589,11 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
       const P = (x: number, y: number): [number, number] => [R.x + x * R.w, R.y + y * R.h]
       for (const f of st.lightRig.fixtures) {
         const on = f.id === st.lightSel
+        const also = !on && st.lightPicked.includes(f.id)
         const colors = lightRuntime.last?.colors.get(f.id)
         const col = (i: number): string => (colors && colors.length >= i * 3 + 3 ? `rgb(${show(colors[i * 3])},${show(colors[i * 3 + 1])},${show(colors[i * 3 + 2])})` : '#333')
-        g.lineWidth = on ? 2 : 1
-        g.strokeStyle = on ? 'rgb(255,170,60)' : 'rgba(255,255,255,0.55)'
+        g.lineWidth = on || also ? 2 : 1
+        g.strokeStyle = on ? 'rgb(255,170,60)' : also ? 'rgba(255,170,60,0.6)' : 'rgba(255,255,255,0.55)'
         if (f.kind === 'spot') {
           const [cx, cy] = P(f.x0, f.y0)
           const r = Math.max(7, f.size * R.h * 1.2)
@@ -594,10 +688,19 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
     const [x, y, R] = toMap(e)
     const h = hit(x, y, R)
     const st = useStore.getState()
-    if (!h) { st.setLightSel(null); return }
-    st.setLightSel(h.f.id)
+    const mod = e.shiftKey || e.ctrlKey || e.metaKey
+    if (!h) { if (!mod) st.setLightSel(null); return }
+    // Shift / Ctrl + click : one more picked (or one less)
+    if (mod && h.mode === 'move') { st.toggleLightPick(h.f.id); return }
+    // one of several picked : they all move with it
+    const many = h.mode === 'move' && st.lightPicked.length > 1 && st.lightPicked.includes(h.f.id)
+    if (many) useStore.setState({ lightSel: h.f.id })
+    else st.setLightSel(h.f.id)
     e.currentTarget.setPointerCapture(e.pointerId)
-    drag.current = { id: h.f.id, mode: h.mode, sx: x, sy: y, f: h.f, pid: e.pointerId }
+    drag.current = {
+      id: h.f.id, mode: h.mode, sx: x, sy: y, f: h.f, pid: e.pointerId,
+      group: many ? st.lightRig.fixtures.filter((q) => st.lightPicked.includes(q.id)) : undefined
+    }
   }
   const onMove = (e: RPointerEvent<HTMLCanvasElement>): void => {
     const d = drag.current
@@ -607,7 +710,7 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
     const f = d.f
     const dx = x - d.sx, dy = y - d.sy
     if (d.mode === 'move') {
-      st.updateLightFixture(d.id, { x0: f.x0 + dx, y0: f.y0 + dy, x1: f.x1 + dx, y1: f.y1 + dy })
+      for (const q of d.group ?? [f]) st.updateLightFixture(q.id, { x0: q.x0 + dx, y0: q.y0 + dy, x1: q.x1 + dx, y1: q.y1 + dy })
       return
     }
     // Shift : a bar's end kept level or upright
@@ -658,21 +761,20 @@ function MapView({ canvasRef }: { canvasRef: RefObject<HTMLCanvasElement | null>
 }
 
 // ── the inspector ────────────────────────────────────────────────────────────
+type SliderFn = (label: string, field: LightModField | null, value: number, min: number, max: number, step: number, set: (v: number) => void, reset?: number, unit?: string, title?: string) => JSX.Element
+
 function Inspector({ f }: { f: LightFixture }): JSX.Element {
   const st = useStore.getState
   const outputs = useStore((s) => s.lightRig.outputs)
   const look = useStore((s) => s.lightsSession.looks[f.id]) ?? LOOK_DEFAULT
-  const tuneScope = useStore((s) => s.lightRig.tuneScope)
   const tune = useStore((s) => (s.lightRig.tuneScope === 'look' ? s.lightsSession.tunes?.[f.id] : null)) ?? f.tune
   const upd = (p: Partial<LightFixture>): void => st().updateLightFixture(f.id, p)
-  const setLook = (p: Partial<LightLook>): void => st().setLightLook(f.id, p)
-  const setTune = (p: Partial<LightTune>): void => st().setLightTune(f.id, p)
   const out = outputs.find((o) => o.id === f.out)
   const ch = fixtureChannels(f)
   const overflow = out?.kind === 'enttec' && f.address - 1 + ch > 512
   const custom = !(LAYOUTS as readonly string[]).includes(f.layout)
   const [openMod, setOpenMod] = useState<string | null>(null)
-  const S = (label: string, field: LightModField | null, value: number, min: number, max: number, step: number, set: (v: number) => void, reset?: number, unit = '', title?: string): JSX.Element => (
+  const S: SliderFn = (label, field, value, min, max, step, set, reset, unit = '', title) => (
     <LightSlider key={label} label={label} fixture={f.id} field={field} value={value} min={min} max={max} step={step} onChange={set} reset={reset} unit={unit} title={title} openMod={openMod} setOpenMod={setOpenMod} />
   )
   return (
@@ -707,11 +809,11 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
             {f.kind === 'matrix' && <button className={`flex-1 ${btn(f.serpentine)}`} onClick={() => upd({ serpentine: !f.serpentine })} title="Wired back and forth, every other row reversed">serpentine</button>}
           </div>
         )}
-        {S('sampled', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel averages (larger : calmer, less detail)')}
+        {S('sampled', null, f.size, 0, 0.3, 0.005, (v) => upd({ size: v }), 0.03, '', 'How wide a patch of the picture each pixel reads (larger : calmer, less detail)')}
         <IdentifyButton id={f.id} />
       </Section>
 
-      <Section title="Patch" info="Where its channels go. Every pixel takes as many channels as its layout has letters : R G B W, A (amber), C M Y (a subtractive mix), L (one channel of white : the luminance), D (a dimmer : it takes the level, the color goes out full), 16 after a letter for two channels in 16 bits (D16 : the dimmer and its fine channel), S (strobe, sent off), U (UV, off), X (unused), or a number for a channel held at that value.">
+      <Section title="Patch" info="Where its channels go, and what they are. Pick the kind of light it is (a profile : its channels in the right order, the ones it does not use held where they do nothing), import a fixture file for a real light, or write its channels yourself.">
         <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
           <span className="w-14">output</span>
           <select value={f.out} onChange={(e) => upd({ out: e.target.value })} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text">
@@ -721,109 +823,280 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
         </label>
         <div className="flex gap-1.5">
           {out && out.kind !== 'enttec' && <Num label="universe" value={f.universe} min={0} max={32767} onChange={(v) => upd({ universe: v })} />}
-          <Num label="address" value={f.address} min={1} max={512} onChange={(v) => upd({ address: v })} title="Its first DMX channel (1..512)" />
+          <Num label="address" value={f.address} min={1} max={512} onChange={(v) => upd({ address: v })} title="Its first DMX channel (1..512) : the light's own address (its menu or DIP switches)" />
         </div>
-        <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
-          <span className="w-14">channels</span>
-          <select
-            value={custom ? '__custom' : f.layout}
-            onChange={(e) => upd({ layout: e.target.value === '__custom' ? 'D R G B S' : e.target.value })}
-            title="The channels of one pixel. With a dimmer (D, D16 in 16 bits) the dimmer takes the level and the color stays full : smoother fades down low"
-            className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
-          >
-            {LAYOUTS.map((l) => <option key={l} value={l}>{l}</option>)}
-            <option value="__custom">your own…</option>
-          </select>
-        </label>
-        {custom && (
-          <input
-            value={f.layout}
-            onChange={(e) => upd({ layout: e.target.value })}
-            className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[10px]"
-            title="The channels of one pixel, in order : R G B W A U, C M Y, L, D, S, X, a letter followed by 16 for 16 bits (D16), or a number (0..255) for a channel held at that value"
-          />
+        <ProfilePicker ids={[f.id]} current={f.profile} />
+        {!f.profile && (
+          <>
+            <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
+              <span className="w-14">channels</span>
+              <select
+                value={custom ? '__custom' : f.layout}
+                onChange={(e) => upd({ layout: e.target.value === '__custom' ? 'D R G B S' : e.target.value })}
+                className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
+                title="The channels of one pixel. With a dimmer (D, D16 in 16 bits) the dimmer takes the level and the color stays full : smoother fades down low"
+              >
+                {LAYOUTS.map((l) => <option key={l} value={l}>{l}</option>)}
+                <option value="__custom">your own…</option>
+              </select>
+            </label>
+            {custom && (
+              <input
+                value={f.layout}
+                onChange={(e) => upd({ layout: e.target.value })}
+                className="rounded border border-border bg-panel px-1.5 py-1 font-mono text-[10px]"
+                title="The channels of one pixel, in order : R G B W A U, C M Y (a subtractive mix), L (one channel of white), D (a dimmer : it takes the level), S (strobe, off), X (unused), a letter followed by 16 for 16 bits (D16), or a number (0..255) for a channel held at that value"
+              />
+            )}
+            {f.kind !== 'spot' && (
+              <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title="Channels sent once before the pixels (a bar's own dimmer and strobe : D S). A dimmer here is the whole bar's : it takes its brightest pixel, and the pixels go out relative to it">
+                <span className="w-14 shrink-0">before</span>
+                <input
+                  value={f.head}
+                  placeholder="none"
+                  onChange={(e) => upd({ head: e.target.value })}
+                  className="min-w-0 flex-1 rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-text"
+                />
+              </label>
+            )}
+          </>
         )}
+        <ChannelMap f={f} />
         <p className={`font-mono text-[9px] ${overflow ? 'text-red-400' : 'text-muted'}`}>
           {ch} channels · {out ? `ch ${f.address} to ${f.address + ch - 1}${out.kind !== 'enttec' && f.address - 1 + ch > 512 ? ' (continues in the next universes)' : ''}` : 'not patched : pick an output'}
           {overflow ? ' : past the 512 an Enttec carries, the rest is not sent' : ''}
         </p>
       </Section>
 
-      <Section title="Look" info="What it shows : the picture (the master or a layer) where it sits, a color, a gradient running across the room, or nothing; an effect over it, and its own level. Saved with the session and the light scenes.">
-        <div className="flex flex-wrap gap-1">
-          {(['master', 'layer', 'color', 'gradient', 'off'] as LightSourceKind[]).map((s) => (
-            <button key={s} className={btn(look.source === s)} onClick={() => setLook({ source: s })}>
-              {s === 'master' ? 'picture' : s}
-            </button>
-          ))}
-          <button
-            className="ml-auto rounded border border-border px-2 py-1 font-mono text-[10px] text-muted hover:text-accent"
-            onClick={() => { const s = st(); s.setLightLooks(s.lightRig.fixtures.map((x) => x.id), { ...look }) }}
-            title="Give every fixture this look"
-          >
-            to all
-          </button>
-        </div>
-        {look.source === 'layer' && (
-          <div className="flex gap-1">
-            {[0, 1, 2, 3].map((i) => <button key={i} className={`flex-1 ${btn(look.layer === i)}`} onClick={() => setLook({ layer: i })}>L{i + 1}</button>)}
-          </div>
-        )}
-        {(look.source === 'master' || look.source === 'layer') && (
-          <div className="flex items-center gap-1" title="How each pixel reads the picture around it">
-            <span className="w-14 shrink-0 font-mono text-[10px] text-muted">reads</span>
-            {SAMPLES.map((m) => (
-              <button key={m} className={`flex-1 ${btn(look.sample === m)}`} onClick={() => setLook({ sample: m })} title={SAMPLE_HINT[m]}>
-                {m}
-              </button>
-            ))}
-          </div>
-        )}
-        {look.source === 'color' && (
-          <>
-            <div className="h-4 rounded border border-border" style={{ background: `hsl(${look.hue} ${look.sat * 100}% ${look.val * 50 * (2 - look.sat)}%)` }} />
-            {S('hue', 'hue', look.hue, 0, 360, 1, (v) => setLook({ hue: v }), 30)}
-            {S('saturation', 'sat', look.sat, 0, 1, 0.01, (v) => setLook({ sat: v }), 0.6)}
-            {S('brightness', 'val', look.val, 0, 1, 0.01, (v) => setLook({ val: v }), 1)}
-          </>
-        )}
-        {look.source === 'gradient' && <GradientEditor look={look} setLook={setLook} slider={S} />}
-        <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
-          <span className="w-14">effect</span>
-          <select value={look.effect} onChange={(e) => setLook({ effect: e.target.value as LightEffect })} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text" title={EFFECT_HINT[look.effect]}>
-            {EFFECTS.map((x) => <option key={x} value={x}>{EFFECT_LABEL[x]}</option>)}
-          </select>
-        </label>
-        {look.effect !== 'none' && (
-          <>
-            {look.effect !== 'audio' && S(look.effect === 'beat' ? 'per beat' : 'rate', 'rate', look.rate, 0, 4, 0.01, (v) => setLook({ rate: v }), 0.5, look.effect === 'beat' ? '' : ' Hz', 'Its speed (times the master speed). Never more than three changes a second, whatever you set.')}
-            {S('depth', 'depth', look.depth, 0, 1, 0.01, (v) => setLook({ depth: v }), 0.6)}
-            {(look.effect === 'chase' || look.effect === 'wave') && S('width', 'width', look.width, 0.02, 1, 0.01, (v) => setLook({ width: v }), 0.25)}
-            {(look.effect === 'chase' || look.effect === 'wave') && S('direction', 'angle', look.angle, -180, 180, 1, (v) => setLook({ angle: v }), 0, '°')}
-          </>
-        )}
-        {S('level', 'level', look.level, 0, 1, 0.01, (v) => setLook({ level: v }), 1, '', "This fixture's own fader")}
-      </Section>
-
-      <Section
-        title="Tuning"
-        info={`How this physical light renders what it is sent : a grade to match it to the room and to the other lights. ${tuneScope === 'rig' ? 'Kept on this computer (Settings : or with the look).' : 'Travels with the look : the session and the light scenes (Settings).'}`}
-        actions={<button className={btn(false)} onClick={() => setTune({ brightness: 1, contrast: 1, gamma: 2, saturation: 1, hue: 0, warmth: 0, black: 0, smooth: 0.08 })} title="Back to neutral">reset</button>}
-      >
-        {S('brightness', 'tuneBrightness', tune.brightness, 0, 2, 0.01, (v) => setTune({ brightness: v }), 1)}
-        {S('contrast', null, tune.contrast, 0, 2, 0.01, (v) => setTune({ contrast: v }), 1)}
-        {S('gamma', null, tune.gamma, 0.5, 3, 0.01, (v) => setTune({ gamma: v }), 2, '', 'LEDs are linear and the picture is not : 2 or so looks like the screen, lower is brighter in the shadows')}
-        {S('saturation', 'tuneSaturation', tune.saturation, 0, 2, 0.01, (v) => setTune({ saturation: v }), 1)}
-        {S('hue', 'tuneHue', tune.hue, -180, 180, 1, (v) => setTune({ hue: v }), 0, '°')}
-        {S('warmth', 'tuneWarmth', tune.warmth, -1, 1, 0.01, (v) => setTune({ warmth: v }), 0, '', 'A white balance : cooler to warmer')}
-        {S('black', null, tune.black, 0, 0.3, 0.005, (v) => setTune({ black: v }), 0, '', 'A floor under the light (some LEDs flicker when almost off)')}
-        {S('smooth', null, tune.smooth, 0, 2, 0.01, (v) => setTune({ smooth: v }), 0.08, ' s', 'How slowly it follows (calms the flicker of a busy picture)')}
-      </Section>
+      <LookSection ids={[f.id]} look={look} slider={S} />
+      <TuneSection ids={[f.id]} tune={tune} slider={S} />
     </>
   )
 }
 
-function GradientEditor({ look, setLook, slider }: { look: LightLook; setLook: (p: Partial<LightLook>) => void; slider: (label: string, field: LightModField | null, value: number, min: number, max: number, step: number, set: (v: number) => void, reset?: number, unit?: string, title?: string) => JSX.Element }): JSX.Element {
+/** Several lights picked : what they show and their tuning, given to all of them
+ *  at once (the values shown are the selected one's). */
+function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
+  const st = useStore.getState
+  const sel = useStore((s) => s.lightSel)
+  const first = sel && ids.includes(sel) ? sel : ids[0]
+  const f = useStore((s) => s.lightRig.fixtures.find((x) => x.id === first))
+  const look = useStore((s) => s.lightsSession.looks[first]) ?? LOOK_DEFAULT
+  const tune = useStore((s) => (s.lightRig.tuneScope === 'look' ? s.lightsSession.tunes?.[first] : null)) ?? f?.tune ?? TUNE_DEFAULT
+  const groups = useStore((s) => s.lightRig.groups)
+  const same = groups.find((g) => g.members.length === ids.length && g.members.every((m) => ids.includes(m)))
+  // (many lights : the sliders take no modulation here, one light's or a group's do)
+  const S: SliderFn = (label, _field, value, min, max, step, set, reset, unit = '', title) => (
+    <LightSlider key={label} label={label} fixture="" field={null} value={value} min={min} max={max} step={step} onChange={set} reset={reset} unit={unit} title={title} openMod={null} setOpenMod={() => {}} />
+  )
+  return (
+    <>
+      <Section
+        title={`${ids.length} lights`}
+        info="Several lights picked (Shift or Ctrl + click on the map or in the list) : what you set here goes to all of them, and a show goes to them alone. The values shown are the selected light's."
+        actions={
+          <button className="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted hover:text-red-400" onClick={() => ids.forEach((id) => st().removeLightFixture(id))} title="Remove them all (Delete)">×</button>
+        }
+      >
+        <div className="flex gap-1">
+          {same ? (
+            <span className="flex-1 font-mono text-[10px] text-accent">the group {same.name}</span>
+          ) : (
+            <button className={`flex-1 ${btn(false)}`} onClick={() => st().addLightGroup(ids)} title="Make these lights a group : a fader of their own on the console, picked again in one click">make a group</button>
+          )}
+          <button className={btn(false)} onClick={() => st().setLightSel(first)} title="Back to the one selected">just this one</button>
+        </div>
+        <ProfilePicker ids={ids} current={f?.profile ?? ''} />
+      </Section>
+      <LookSection ids={ids} look={look} slider={S} />
+      <TuneSection ids={ids} tune={tune} slider={S} />
+    </>
+  )
+}
+
+function LookSection({ ids, look, slider: S }: { ids: string[]; look: LightLook; slider: SliderFn }): JSX.Element {
+  const st = useStore.getState
+  const setLook = (p: Partial<LightLook>): void => st().setLightLooks(ids, p)
+  return (
+    <Section title="Look" info="What it shows : the picture (the master or a layer) where it sits, a color, a gradient running across the room, or nothing; an effect over it, and its own level. Saved with the session and the light scenes.">
+      <div className="flex flex-wrap gap-1">
+        {(['master', 'layer', 'color', 'gradient', 'off'] as LightSourceKind[]).map((s) => (
+          <button key={s} className={btn(look.source === s)} onClick={() => setLook({ source: s })}>
+            {s === 'master' ? 'picture' : s}
+          </button>
+        ))}
+        <button
+          className="ml-auto rounded border border-border px-2 py-1 font-mono text-[10px] text-muted hover:text-accent"
+          onClick={() => { const s = st(); s.setLightLooks(s.lightRig.fixtures.map((x) => x.id), { ...look }) }}
+          title="Give every fixture this look"
+        >
+          to all
+        </button>
+      </div>
+      {look.source === 'layer' && (
+        <div className="flex gap-1">
+          {[0, 1, 2, 3].map((i) => <button key={i} className={`flex-1 ${btn(look.layer === i)}`} onClick={() => setLook({ layer: i })}>L{i + 1}</button>)}
+        </div>
+      )}
+      {(look.source === 'master' || look.source === 'layer') && (
+        <div className="flex items-center gap-1" title="How each pixel reads the picture around it">
+          <span className="w-14 shrink-0 font-mono text-[10px] text-muted">reads</span>
+          {SAMPLES.map((m) => (
+            <button key={m} className={`flex-1 ${btn(look.sample === m)}`} onClick={() => setLook({ sample: m })} title={SAMPLE_HINT[m]}>
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+      {look.source === 'color' && (
+        <>
+          <div className="h-4 rounded border border-border" style={{ background: `hsl(${look.hue} ${look.sat * 100}% ${look.val * 50 * (2 - look.sat)}%)` }} />
+          {S('hue', 'hue', look.hue, 0, 360, 1, (v) => setLook({ hue: v }), 30)}
+          {S('saturation', 'sat', look.sat, 0, 1, 0.01, (v) => setLook({ sat: v }), 0.6)}
+          {S('brightness', 'val', look.val, 0, 1, 0.01, (v) => setLook({ val: v }), 1)}
+        </>
+      )}
+      {look.source === 'gradient' && <GradientEditor look={look} setLook={setLook} slider={S} />}
+      <label className="flex items-center gap-2 font-mono text-[10px] text-muted">
+        <span className="w-14">effect</span>
+        <select value={look.effect} onChange={(e) => setLook({ effect: e.target.value as LightEffect })} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text" title={EFFECT_HINT[look.effect]}>
+          {EFFECTS.map((x) => <option key={x} value={x}>{EFFECT_LABEL[x]}</option>)}
+        </select>
+      </label>
+      {look.effect !== 'none' && (
+        <>
+          {look.effect !== 'audio' && S(look.effect === 'beat' ? 'per beat' : 'rate', 'rate', look.rate, 0, 4, 0.01, (v) => setLook({ rate: v }), 0.5, look.effect === 'beat' ? '' : ' Hz', 'Its speed (times the master speed). Never more than three changes a second, whatever you set.')}
+          {S('depth', 'depth', look.depth, 0, 1, 0.01, (v) => setLook({ depth: v }), 0.6)}
+          {(look.effect === 'chase' || look.effect === 'wave') && S('width', 'width', look.width, 0.02, 1, 0.01, (v) => setLook({ width: v }), 0.25)}
+          {(look.effect === 'chase' || look.effect === 'wave') && S('direction', 'angle', look.angle, -180, 180, 1, (v) => setLook({ angle: v }), 0, '°')}
+        </>
+      )}
+      {S('level', 'level', look.level, 0, 1, 0.01, (v) => setLook({ level: v }), 1, '', "This fixture's own fader")}
+    </Section>
+  )
+}
+
+function TuneSection({ ids, tune, slider: S }: { ids: string[]; tune: LightTune; slider: SliderFn }): JSX.Element {
+  const tuneScope = useStore((s) => s.lightRig.tuneScope)
+  const setTune = (p: Partial<LightTune>): void => useStore.getState().setLightTunes(ids, p)
+  return (
+    <Section
+      title="Tuning"
+      info={`How this physical light renders what it is sent : a grade to match it to the room and to the other lights. ${tuneScope === 'rig' ? 'Kept on this computer (Settings : or with the look).' : 'Travels with the look : the session and the light scenes (Settings).'}`}
+      actions={<button className={btn(false)} onClick={() => setTune({ ...TUNE_DEFAULT })} title="Back to neutral">reset</button>}
+    >
+      {S('brightness', 'tuneBrightness', tune.brightness, 0, 2, 0.01, (v) => setTune({ brightness: v }), 1)}
+      {S('contrast', null, tune.contrast, 0, 2, 0.01, (v) => setTune({ contrast: v }), 1)}
+      {S('gamma', null, tune.gamma, 0.5, 3, 0.01, (v) => setTune({ gamma: v }), 2, '', 'LEDs are linear and the picture is not : 2 or so looks like the screen, lower is brighter in the shadows')}
+      {S('saturation', 'tuneSaturation', tune.saturation, 0, 2, 0.01, (v) => setTune({ saturation: v }), 1)}
+      {S('hue', 'tuneHue', tune.hue, -180, 180, 1, (v) => setTune({ hue: v }), 0, '°')}
+      {S('warmth', 'tuneWarmth', tune.warmth, -1, 1, 0.01, (v) => setTune({ warmth: v }), 0, '', 'A white balance : cooler to warmer')}
+      {S('black', null, tune.black, 0, 0.3, 0.005, (v) => setTune({ black: v }), 0, '', 'A floor under the light (some LEDs flicker when almost off)')}
+      {S('smooth', null, tune.smooth, 0, 2, 0.01, (v) => setTune({ smooth: v }), 0.08, ' s', 'How slowly it follows (calms the flicker of a busy picture)')}
+    </Section>
+  )
+}
+
+/** The kind of light it is : a built-in profile, an imported one, or its own
+ *  channels; an Open Fixture Library file imports every mode of a real light. */
+function ProfilePicker({ ids, current }: { ids: string[]; current: string }): JSX.Element {
+  const imported = useStore((s) => s.lightRig.profiles)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+  const [note, setNote] = useState('')
+  const all = [...BUILTIN_PROFILES, ...imported]
+  const known = !current || all.some((p) => p.id === current)
+  const pick = (v: string): void => {
+    const st = useStore.getState()
+    if (v === '__import') { fileRef.current?.click(); return }
+    if (v === '') { ids.forEach((id) => st.updateLightFixture(id, { profile: '' })); return }
+    const p = all.find((x) => x.id === v)
+    if (p) st.applyLightProfile(ids, p)
+  }
+  const onFile = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const r = readOfl(await file.text(), file.name)
+    if (!r.profiles.length) { setNote(`${file.name} : nothing it can use${r.skipped.length ? ` (${r.skipped.join('; ')})` : ''}`); return }
+    const st = useStore.getState()
+    st.addLightProfiles(r.profiles)
+    st.applyLightProfile(ids, r.profiles[0])
+    setNote(`${r.name} : ${r.profiles.length} mode${r.profiles.length === 1 ? '' : 's'} added${r.skipped.length ? `, ${r.skipped.length} left out (${r.skipped.join('; ')})` : ''}. Pick the mode the light is set to.`)
+  }
+  const cur = imported.find((p) => p.id === current)
+  return (
+    <>
+      <label className="flex items-center gap-2 font-mono text-[10px] text-muted" title="The kind of light it is : its channels in the right order, the ones it does not use held where they do nothing">
+        <span className="w-14 shrink-0">light</span>
+        <select value={known ? current : ''} onChange={(e) => pick(e.target.value)} className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text">
+          <option value="">its own channels</option>
+          <optgroup label="Common lights">
+            {BUILTIN_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </optgroup>
+          {imported.length > 0 && (
+            <optgroup label="Imported">
+              {imported.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </optgroup>
+          )}
+          <option value="__import">import a fixture file (OFL .json)…</option>
+        </select>
+        {cur && (
+          <button
+            className="px-1 font-mono text-[10px] text-muted hover:text-red-400"
+            onClick={() => { useStore.getState().removeLightProfile(cur.id); pick('') }}
+            title="Forget this imported profile (the lights keep their channels)"
+          >
+            ×
+          </button>
+        )}
+      </label>
+      <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => void onFile(e)} />
+      {note && <p className="font-mono text-[9px] leading-snug text-muted">{note}</p>}
+      {!note && current === '' && (
+        <p className="font-mono text-[9px] leading-snug text-muted" title="open-fixture-library.org : find the light, Download, OFL JSON">
+          A real light : download its file from the Open Fixture Library (OFL JSON) and import it.
+        </p>
+      )}
+    </>
+  )
+}
+
+/** Each of its channels, numbered from its address : what the light receives. */
+function ChannelMap({ f }: { f: LightFixture }): JSX.Element {
+  const imported = useStore((s) => s.lightRig.profiles)
+  const p = imported.find((x) => x.id === f.profile && x.head === f.head && x.layout === f.layout && x.tail === f.tail)
+  const lab = (tokens: string[]): string[] => tokens.flatMap((t) => (tokenWidth(t) === 2 ? [tokenLabel(t), `${tokenLabel(t).replace(' (16-bit)', '')} fine`] : [tokenLabel(t)]))
+  const head = lab(layoutTokens(f.head, false)), pix = lab(layoutTokens(f.layout)), tail = lab(layoutTokens(f.tail, false))
+  // an imported profile names its channels better (a wheel, a shutter held open...)
+  if (p?.labels && p.labels.length === head.length + pix.length + tail.length) {
+    const L = p.labels
+    head.splice(0, head.length, ...L.slice(0, head.length))
+    pix.splice(0, pix.length, ...L.slice(head.length, head.length + pix.length).map((x) => x.replace(/^pixel : /, '')))
+    tail.splice(0, tail.length, ...L.slice(head.length + pix.length))
+  }
+  const n = fixturePixels(f)
+  const rows: Array<[string, string]> = []
+  let c = f.address
+  head.forEach((l) => rows.push([String(c++), l]))
+  if (n === 1) pix.forEach((l) => rows.push([String(c++), l]))
+  else {
+    rows.push([`${c}-${c + n * pix.length - 1}`, `${n} pixels × ${pix.join(' · ')}`])
+    c += n * pix.length
+  }
+  tail.forEach((l) => rows.push([String(c++), l]))
+  return (
+    <div className="max-h-32 overflow-y-auto rounded border border-border/60 bg-panel/40 px-1.5 py-1 font-mono text-[9px] leading-snug" title="What each of its channels carries, from its address">
+      {rows.map(([k, l], i) => (
+        <div key={i} className="flex gap-2">
+          <span className="w-14 shrink-0 text-right text-muted">{k}</span>
+          <span className="min-w-0 flex-1 truncate text-text">{l}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function GradientEditor({ look, setLook, slider }: { look: LightLook; setLook: (p: Partial<LightLook>) => void; slider: SliderFn }): JSX.Element {
   const g = look.gradient
   const hex = (c: number[]): string => `#${c.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('')}`
   const fromHex = (h: string): number[] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
@@ -953,6 +1226,9 @@ function Console(): JSX.Element {
   const [openMod, setOpenMod] = useState<string | null>(null)
   const modMatrix = useStore((s) => s.composition.modMatrix)
   const masterBound = modMatrix.some((a) => a.target.kind === 'light' && a.target.field === 'masterBrightness')
+  const groups = useStore((s) => s.lightRig.groups)
+  const levels = useStore((s) => s.lightsSession.groups)
+  const setGroup = useStore((s) => s.setLightGroupLevel)
   return (
     <footer className="flex flex-col border-t border-border bg-panel">
       <div className="flex items-end gap-6 px-6 py-3">
@@ -973,6 +1249,25 @@ function Console(): JSX.Element {
           </span>
           <span className="font-mono text-[9px] text-muted">{topBlack ? 'show black on' : `in ${m.blackSec.toFixed(1)} s`}</span>
         </div>
+        {groups.length > 0 && (
+          <div className="flex max-w-[45%] shrink-0 items-end gap-3 overflow-x-auto border-l border-border pl-4" title="The groups' faders (Groups, on the left)">
+            {groups.map((g) => {
+              const v = levels?.[g.id] ?? 1
+              return (
+                <Knob
+                  key={g.id}
+                  id={`lights:group:${g.id}`}
+                  label={g.name.length > 10 ? `${g.name.slice(0, 9)}…` : g.name}
+                  value={v}
+                  text={`${Math.round(v * 100)}%`}
+                  onChange={(x) => setGroup(g.id, x)}
+                  def={1}
+                  title={`The ${g.name} group's fader : its ${g.members.length} light${g.members.length === 1 ? '' : 's'}, after their own level`}
+                />
+              )
+            })}
+          </div>
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <LightSlider label="master" fixture="" field="masterBrightness" value={m.brightness} min={0} max={1} step={0.01} onChange={(v) => set({ brightness: v })} reset={1} openMod={openMod} setOpenMod={setOpenMod} title="The grand master, for a modulator or a Macro knob" />
           <LightSlider label="speed" fixture="" field="masterSpeed" value={m.speed} min={0} max={4} step={0.01} onChange={(v) => set({ speed: v })} reset={1} unit="×" openMod={openMod} setOpenMod={setOpenMod} title="The speed, for a modulator or a Macro knob" />

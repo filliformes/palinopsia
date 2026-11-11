@@ -15,12 +15,16 @@ import {
   type LightOutputKind,
   type LightRig
 } from '@shared/lights'
-import { LOOK_DEFAULT, type LightModField, type LightsSession } from '@shared/lights'
+import { GROUP_PREFIX, LOOK_DEFAULT, type LightModField, type LightsSession } from '@shared/lights'
 
 /** A light slider's value now : a fixture's look or tuning, or a master. */
 export function lightBaseValue(rig: LightRig, L: LightsSession, fixture: string, field: LightModField): number | null {
   if (field === 'masterBrightness') return L.master.brightness
   if (field === 'masterSpeed') return L.master.speed
+  if (fixture.startsWith(GROUP_PREFIX)) {
+    const gid = fixture.slice(GROUP_PREFIX.length)
+    return field === 'level' && rig.groups.some((g) => g.id === gid) ? L.groups?.[gid] ?? 1 : null
+  }
   const f = rig.fixtures.find((x) => x.id === fixture)
   if (!f) return null
   const look = L.looks[fixture] ?? LOOK_DEFAULT
@@ -52,6 +56,7 @@ export function commitLightValue(
     setLightLook: (id: string, p: Partial<import('@shared/lights').LightLook>) => void
     setLightTune: (id: string, p: Partial<import('@shared/lights').LightTune>) => void
     setLightsMaster: (p: Partial<import('@shared/lights').LightsMaster>) => void
+    setLightGroupLevel: (id: string, v: number) => void
     lightsSession: LightsSession
   },
   fixture: string,
@@ -60,6 +65,10 @@ export function commitLightValue(
 ): void {
   if (field === 'masterBrightness') return st.setLightsMaster({ brightness: v })
   if (field === 'masterSpeed') return st.setLightsMaster({ speed: v })
+  if (fixture.startsWith(GROUP_PREFIX)) {
+    if (field === 'level') st.setLightGroupLevel(fixture.slice(GROUP_PREFIX.length), v)
+    return
+  }
   if (field === 'tuneBrightness') return st.setLightTune(fixture, { brightness: v })
   if (field === 'tuneSaturation') return st.setLightTune(fixture, { saturation: v })
   if (field === 'tuneHue') return st.setLightTune(fixture, { hue: v })
