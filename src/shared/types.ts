@@ -1210,7 +1210,7 @@ export interface RuleTimeline {
   loop: boolean // off : it plays the length once, then stops
   blocks: RuleBlock[]
 }
-export type SeqLaneId = 'scenes' | 'keys' | 'rules'
+export type SeqLaneId = 'scenes' | 'keys' | 'rules' | 'lights'
 /** What the Seq transport starts (session-scoped; an older file : all of them). */
 export interface SeqLanes {
   arm: Record<SeqLaneId, boolean>
@@ -1810,7 +1810,9 @@ export interface ExposedApi {
   shareFrame: (w: number, h: number, pixels: Uint8Array) => void
   // The Lights' network outputs : DMX universes for Art-Net, sACN, WLED (the
   // Enttec USB Pro is driven from the renderer, through Web Serial).
-  lightDmx: (packets: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array }>) => void
+  lightDmx: (packets: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }>) => void
+  /** Who is on the network (about 1.5 s) : Art-Net nodes and WLED controllers. */
+  lightDiscover: () => Promise<{ artnet: Array<{ ip: string; name: string; long: string; universes: number[] }>; wled: Array<{ ip: string; name: string }> }>
   // Kiosk / installation mode : read the effective launch config; get/set the
   // persisted "enable on next restart" launch file; get the operator UI out.
   kioskConfig: () => Promise<{ kiosk: boolean; sessionPath?: string; display?: number; windowed?: boolean }>

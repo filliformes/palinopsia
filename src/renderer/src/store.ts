@@ -50,8 +50,11 @@ import { sanitizeNdiConfig, idleNdiStatus } from '@shared/ndi'
 import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
 import {
+  GROUP_PREFIX,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT as LIGHT_LOOK_DEFAULT,
+  profilePatch,
+  sanitizeProfile,
   SESSION_DEFAULT as LIGHTS_SESSION_DEFAULT,
   sanitizeFixture,
   sanitizeLightsSession,
@@ -63,6 +66,7 @@ import {
   type LightFixture,
   type LightKind,
   type LightLook,
+  type LightProfile,
   type LightOutput,
   type LightOutputKind,
   type LightRig,
@@ -70,7 +74,7 @@ import {
   type LightsSession,
   type LightTune
 } from '@shared/lights'
-import { duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig } from './lights/lightStore'
+import { addressedInOrder, duplicate, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
@@ -1972,7 +1976,7 @@ interface StoreState {
   recallLightScene: (id: string) => void
   renameLightScene: (id: string, name: string) => void
   deleteLightScene: (id: string) => void
-  applyLightShow: (id: string) => void
+  applyLightShow: (id: string, ids?: string[]) => void
   /** Bumped when the look should fade in (a light scene, a show) : the engine fades. */
   lightFadeEpoch: number
   lightsBlack: boolean
@@ -1981,6 +1985,36 @@ interface StoreState {
   setLightsPageOpen: (on: boolean) => void
   lightSel: string | null
   setLightSel: (id: string | null) => void
+  /** Every fixture picked on the map or in the list (the selected one among them) :
+   *  a look, a tuning or a show goes to all of them; Shift / Ctrl + click adds. */
+  lightPicked: string[]
+  /** The light scenes as cues : the one in now, when it went (performance.now()),
+   *  whether the cues follow on by themselves, and the fade the last one took. */
+  lightCue: string | null
+  lightCueAt: number
+  lightCueRun: boolean
+  lightFadeSec: number | null
+  goLightCue: (dir: 1 | -1) => void
+  setLightCueRun: (on: boolean) => void
+  updateLightScene: (id: string, patch: { fade?: number | null; follow?: number; link?: string | null }) => void
+  /** The test pattern : when it started (performance.now()), null : off. */
+  lightTest: number | null
+  setLightTest: (on: boolean) => void
+  /** Every light on an output readdressed one after the other (the patch view). */
+  autoAddressLights: (out: string) => void
+  /** A row of `n` of a light across the picture (or down it), addressed in turn. */
+  addLightRow: (id: string, n: number, dir: 'across' | 'down') => void
+  toggleLightPick: (id: string) => void
+  setLightPicked: (ids: string[]) => void
+  addLightGroup: (members: string[], name?: string) => string
+  updateLightGroup: (id: string, patch: { name?: string; members?: string[] }) => void
+  removeLightGroup: (id: string) => void
+  setLightGroupLevel: (id: string, v: number) => void
+  setLightTunes: (ids: string[], patch: Partial<LightTune>) => void
+  /** A profile's channels on these fixtures (its kind and size with them). */
+  applyLightProfile: (ids: string[], profile: LightProfile) => void
+  addLightProfiles: (list: LightProfile[]) => void
+  removeLightProfile: (id: string) => void
   lightIdentify: string | null
   identifyLight: (id: string | null) => void
   // Embodied control (MediaPipe Hands + Pose). Machine-local (a webcam is
@@ -4779,9 +4813,14 @@ export const useStore = create<StoreState>((set, get) => ({
       const metaKnobs = s.composition.metaKnobs.map((k) => (k.destinations.some(gone) ? { ...k, destinations: k.destinations.filter((d) => !gone(d)) } : k))
       return {
         composition: { ...s.composition, modMatrix, metaKnobs },
-        lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.filter((f) => f.id !== id) }),
+        lightRig: persistRig({
+          ...s.lightRig,
+          fixtures: s.lightRig.fixtures.filter((f) => f.id !== id),
+          groups: s.lightRig.groups.map((g) => (g.members.includes(id) ? { ...g, members: g.members.filter((m) => m !== id) } : g))
+        }),
         lightsSession: { ...s.lightsSession, looks },
-        lightSel: s.lightSel === id ? null : s.lightSel
+        lightSel: s.lightSel === id ? null : s.lightSel,
+        lightPicked: s.lightPicked.filter((x) => x !== id)
       }
     }),
   duplicateLightFixture: (id) => {
@@ -4793,7 +4832,8 @@ export const useStore = create<StoreState>((set, get) => ({
     set({
       lightRig: persistRig({ ...s.lightRig, fixtures: [...s.lightRig.fixtures, d] }),
       lightsSession: look ? { ...s.lightsSession, looks: { ...s.lightsSession.looks, [d.id]: look } } : s.lightsSession,
-      lightSel: d.id
+      lightSel: d.id,
+      lightPicked: [d.id]
     })
     return d.id
   },
@@ -4848,11 +4888,15 @@ export const useStore = create<StoreState>((set, get) => ({
   saveLightScene: () =>
     set((s) => {
       const L = s.lightsSession
+      // (an id of its own even when several are saved in one millisecond : a script, OSC)
+      let sid = `ls${Date.now().toString(36)}${Math.floor(Math.random() * 46656).toString(36)}`
+      while (L.scenes.some((x) => x.id === sid)) sid += 'x'
       const scene = {
-        id: `ls${Date.now().toString(36)}`,
+        id: sid,
         name: `Light ${L.scenes.length + 1}`,
         looks: { ...L.looks },
         master: { brightness: L.master.brightness, speed: L.master.speed },
+        ...(L.groups ? { groups: { ...L.groups } } : {}),
         ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}) } } : {})
       }
       return { lightsSession: { ...L, scenes: [...L.scenes, scene] } }
@@ -4868,20 +4912,26 @@ export const useStore = create<StoreState>((set, get) => ({
           // (a fixture the scene does not know keeps its look)
           looks: { ...L.looks, ...sc.looks },
           master: sc.master ? { ...L.master, ...sc.master } : L.master,
+          ...(sc.groups ? { groups: { ...(L.groups ?? {}), ...sc.groups } } : {}),
           ...(sc.tunes && s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...sc.tunes } } : {})
         },
-        lightFadeEpoch: s.lightFadeEpoch + 1
+        lightFadeEpoch: s.lightFadeEpoch + 1,
+        lightFadeSec: sc.fade ?? null,
+        lightCue: sc.id,
+        lightCueAt: performance.now()
       }
     }),
   renameLightScene: (id, name) =>
     set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) || x.name } : x)) } })),
-  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) } })),
-  applyLightShow: (id) =>
+  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: s.lightCue === id ? null : s.lightCue })),
+  applyLightShow: (id, ids) =>
     set((s) => {
       const layers = s.composition.layers.map((l, i) => ((l.sourceA.shaderId || l.sourceA.kind !== 'none' || l.sourceB) && !l.mute ? i : -1)).filter((i) => i >= 0)
-      const looks = showLooks(id, s.lightRig.fixtures, s.lightsSession.looks, layers)
+      // (to some : the selection, its patterns laid over those lights alone)
+      const on = ids && ids.length ? s.lightRig.fixtures.filter((f) => ids.includes(f.id)) : s.lightRig.fixtures
+      const looks = showLooks(id, on, s.lightsSession.looks, layers)
       if (!looks) return s
-      return { lightsSession: { ...s.lightsSession, looks }, lightFadeEpoch: s.lightFadeEpoch + 1 }
+      return { lightsSession: { ...s.lightsSession, looks }, lightFadeEpoch: s.lightFadeEpoch + 1, lightFadeSec: null }
     }),
   lightFadeEpoch: 0,
   lightsBlack: false,
@@ -4889,7 +4939,120 @@ export const useStore = create<StoreState>((set, get) => ({
   lightsPageOpen: false,
   setLightsPageOpen: (on) => set({ lightsPageOpen: on }),
   lightSel: null,
-  setLightSel: (id) => set({ lightSel: id }),
+  setLightSel: (id) => set({ lightSel: id, lightPicked: id ? [id] : [] }),
+  lightPicked: [],
+  lightCue: null,
+  lightCueAt: 0,
+  lightCueRun: false,
+  lightFadeSec: null,
+  goLightCue: (dir) => {
+    const s = get()
+    const list = s.lightsSession.scenes
+    if (!list.length) return
+    const cur = list.findIndex((x) => x.id === s.lightCue)
+    const next = cur < 0 ? (dir > 0 ? 0 : list.length - 1) : (cur + dir + list.length) % list.length
+    s.recallLightScene(list[next].id)
+  },
+  setLightCueRun: (on) => {
+    if (on === get().lightCueRun) return
+    set({ lightCueRun: on })
+    // (playing from nothing : the first cue goes)
+    if (on && !get().lightsSession.scenes.some((x) => x.id === get().lightCue)) get().goLightCue(1)
+  },
+  updateLightScene: (id, patch) =>
+    set((s) => ({
+      lightsSession: {
+        ...s.lightsSession,
+        scenes: s.lightsSession.scenes.map((x) => {
+          if (x.id !== id) return x
+          const n = { ...x }
+          if (patch.fade !== undefined) { if (patch.fade === null) delete n.fade; else n.fade = Math.max(0, Math.min(60, patch.fade)) }
+          if (patch.follow !== undefined) n.follow = Math.max(0, Math.min(3600, patch.follow))
+          if (patch.link !== undefined) { if (!patch.link) delete n.link; else n.link = patch.link }
+          return n
+        })
+      }
+    })),
+  lightTest: null,
+  setLightTest: (on) => set({ lightTest: on ? performance.now() : null }),
+  autoAddressLights: (out) =>
+    set((s) => {
+      const done = new Map(addressedInOrder(s.lightRig, out).map((f) => [f.id, f]))
+      return { lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((f) => done.get(f.id) ?? f) }) }
+    }),
+  addLightRow: (id, n, dir) =>
+    set((s) => {
+      const f = s.lightRig.fixtures.find((x) => x.id === id)
+      if (!f) return s
+      const row = rowOf(s.lightRig, f, n, dir)
+      const byId = new Map(row.map((x) => [x.id, x]))
+      const fixtures = [...s.lightRig.fixtures.map((x) => byId.get(x.id) ?? x), ...row.filter((x) => !s.lightRig.fixtures.some((q) => q.id === x.id))]
+      const look = s.lightsSession.looks[id]
+      const looks = { ...s.lightsSession.looks }
+      if (look) for (const x of row) looks[x.id] = look
+      return { lightRig: persistRig({ ...s.lightRig, fixtures }), lightsSession: { ...s.lightsSession, looks }, lightPicked: row.map((x) => x.id), lightSel: id }
+    }),
+  toggleLightPick: (id) =>
+    set((s) => {
+      if (s.lightPicked.includes(id)) {
+        const picked = s.lightPicked.filter((x) => x !== id)
+        return { lightPicked: picked, lightSel: s.lightSel === id ? picked[picked.length - 1] ?? null : s.lightSel }
+      }
+      return { lightPicked: [...s.lightPicked, id], lightSel: id }
+    }),
+  setLightPicked: (ids) => set((s) => {
+    const live = ids.filter((id) => s.lightRig.fixtures.some((f) => f.id === id))
+    return { lightPicked: live, lightSel: live.includes(s.lightSel ?? '') ? s.lightSel : live[0] ?? null }
+  }),
+  addLightGroup: (members, name) => {
+    const id = `g${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
+    set((s) => ({
+      lightRig: persistRig({
+        ...s.lightRig,
+        groups: [...s.lightRig.groups, { id, name: (name || `Group ${s.lightRig.groups.length + 1}`).slice(0, 40), members: members.filter((m) => s.lightRig.fixtures.some((f) => f.id === m)) }]
+      })
+    }))
+    return id
+  },
+  updateLightGroup: (id, patch) =>
+    set((s) => ({
+      lightRig: persistRig({
+        ...s.lightRig,
+        groups: s.lightRig.groups.map((g) => (g.id === id ? { ...g, ...(patch.name !== undefined ? { name: patch.name.slice(0, 40) || g.name } : {}), ...(patch.members ? { members: patch.members.filter((m) => s.lightRig.fixtures.some((f) => f.id === m)) } : {}) } : g))
+      })
+    })),
+  removeLightGroup: (id) =>
+    set((s) => {
+      // its fader's modulation goes with it
+      const gone = (t: ModTarget): boolean => t.kind === 'light' && t.fixture === GROUP_PREFIX + id
+      const modMatrix = s.composition.modMatrix.filter((a) => !gone(a.target))
+      const metaKnobs = s.composition.metaKnobs.map((k) => (k.destinations.some(gone) ? { ...k, destinations: k.destinations.filter((d) => !gone(d)) } : k))
+      const groups = { ...(s.lightsSession.groups ?? {}) }
+      delete groups[id]
+      return {
+        composition: { ...s.composition, modMatrix, metaKnobs },
+        lightRig: persistRig({ ...s.lightRig, groups: s.lightRig.groups.filter((g) => g.id !== id) }),
+        lightsSession: { ...s.lightsSession, groups }
+      }
+    }),
+  setLightGroupLevel: (id, v) =>
+    set((s) => ({ lightsSession: { ...s.lightsSession, groups: { ...(s.lightsSession.groups ?? {}), [id]: Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1)) } } })),
+  setLightTunes: (ids, patch) => {
+    for (const id of ids) get().setLightTune(id, patch)
+  },
+  applyLightProfile: (ids, profile) =>
+    set((s) => {
+      const p = sanitizeProfile(profile)
+      const fixtures = s.lightRig.fixtures.map((f) => (ids.includes(f.id) ? sanitizeFixture({ ...f, ...profilePatch(p), id: f.id }) : f))
+      return { lightRig: persistRig({ ...s.lightRig, fixtures }) }
+    }),
+  addLightProfiles: (list) =>
+    set((s) => {
+      const add = list.map((p, i) => sanitizeProfile(p, i))
+      const keep = s.lightRig.profiles.filter((p) => !add.some((a) => a.id === p.id))
+      return { lightRig: persistRig({ ...s.lightRig, profiles: [...keep, ...add].slice(-128) }) }
+    }),
+  removeLightProfile: (id) => set((s) => ({ lightRig: persistRig({ ...s.lightRig, profiles: s.lightRig.profiles.filter((p) => p.id !== id) }) })),
   lightIdentify: null,
   identifyLight: (id) => set({ lightIdentify: id }),
   bodyControl: (() => {
@@ -5941,6 +6104,12 @@ export const useStore = create<StoreState>((set, get) => ({
         const next = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
         queueMicrotask(() => { sonifyEngine.loadingSound(); useStore.getState().setSonify(next) })
       }
+      // a light cue tied to this scene goes with it
+      queueMicrotask(() => {
+        const st = useStore.getState()
+        const cue = st.lightsSession.scenes.find((c) => c.link === id)
+        if (cue) st.recallLightScene(cue.id)
+      })
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     }),
   renameScene: (id, name) =>

@@ -45,7 +45,7 @@ import { OutputSender } from './output'
 import { prepareNdi } from './ndi/prepare'
 import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
-import { DmxSender, type DmxPacket } from './light'
+import { DmxSender, discoverLights, type DmxPacket } from './light'
 import { displayHz, samplePerf } from './perf'
 import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
@@ -1175,6 +1175,8 @@ app.whenReady().then(async () => {
   // ---------- IPC: Light output (ArtNet/DMX · WLED) ----------
   safeOn('light:dmx', (_e, packets) => dmxSender.send(packets as DmxPacket[])
   )
+  // who is on the network : Art-Net nodes (ArtPoll) and WLED controllers (mDNS)
+  safeHandle('light:discover', () => discoverLights())
 
   // ---------- IPC: Kiosk / installation mode ----------
   safeHandle('kiosk:config', () => getKioskConfig())

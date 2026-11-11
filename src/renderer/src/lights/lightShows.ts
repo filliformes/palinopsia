@@ -9,8 +9,16 @@ export interface LightShow {
   id: string
   name: string
   blurb: string
-  look: (f: LightFixture, i: number, all: LightFixture[], layers: number[]) => Partial<LightLook>
+  look: (f: LightFixture, i: number, all: LightFixture[], layers: number[], palette: number[][] | null) => Partial<LightLook>
 }
+
+/** The picture's main colors now (the runtime registers it : the store side stays
+ *  free of the readback). */
+let paletteSource: () => number[][] | null = () => null
+export function setPaletteSource(fn: () => number[][] | null): void {
+  paletteSource = fn
+}
+export const pictureColors = (): number[][] | null => paletteSource()
 
 const grad = (stops: number[][], over: Partial<LightLook['gradient']> = {}): Partial<LightLook> => ({
   source: 'gradient',
@@ -27,6 +35,10 @@ export const LIGHT_SHOWS: LightShow[] = [
       const L = layers.length ? layers : [0]
       return { source: 'layer', layer: L[Math.floor((k / Math.max(1, order.length)) * L.length) % L.length], effect: 'none', level: 1 }
     }
+  },
+  {
+    id: 'palette', name: 'Picture colors', blurb: "The picture's own colors as a gradient across the room, left to right as they sit in it, drifting slowly.",
+    look: (_f, _i, _a, _l, pal) => ({ ...grad(pal ?? [[0.9, 0.3, 0.1], [0.2, 0.4, 0.9]], { angle: 0, speed: 0.02 }), effect: 'none', level: 1 })
   },
   { id: 'warm', name: 'Warm white', blurb: 'A soft warm white, barely breathing.', look: () => ({ source: 'color', hue: 32, sat: 0.32, val: 1, effect: 'pulse', rate: 0.08, depth: 0.15, level: 1 }) },
   { id: 'sunset', name: 'Sunset', blurb: 'Deep red to gold across the room, drifting.', look: () => ({ ...grad([[0.55, 0.04, 0.06], [0.95, 0.35, 0.08], [1, 0.75, 0.35]], { angle: 0, speed: 0.03 }), effect: 'none', level: 1 }) },
@@ -47,9 +59,10 @@ export function showLooks(id: string, fixtures: LightFixture[], looks: Record<st
   const show = LIGHT_SHOWS.find((s) => s.id === id)
   if (!show) return null
   const out: Record<string, LightLook> = { ...looks }
+  const palette = id === 'palette' ? pictureColors() : null
   fixtures.forEach((f, i) => {
     const cur = looks[f.id] ?? LOOK_DEFAULT
-    const p = show.look(f, i, fixtures, layers)
+    const p = show.look(f, i, fixtures, layers, palette)
     out[f.id] = { ...cur, ...p, gradient: p.gradient ? { ...p.gradient } : cur.gradient }
   })
   return out

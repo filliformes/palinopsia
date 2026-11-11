@@ -33,8 +33,8 @@ const KEY = 'opsia.ruleSeq'
 
 export const makeDefaultRuleTimeline = (): RuleTimeline => ({ length: 16, loop: true, blocks: [] })
 
-export const SEQ_LANE_IDS: SeqLaneId[] = ['scenes', 'keys', 'rules']
-export const makeDefaultSeqLanes = (): SeqLanes => ({ arm: { scenes: true, keys: true, rules: true } })
+export const SEQ_LANE_IDS: SeqLaneId[] = ['scenes', 'keys', 'rules', 'lights']
+export const makeDefaultSeqLanes = (): SeqLanes => ({ arm: { scenes: true, keys: true, rules: true, lights: true } })
 
 export function sanitizeSeqLanes(raw: unknown): SeqLanes {
   const d = makeDefaultSeqLanes()

@@ -111,7 +111,7 @@ function toggleSoniVoice(i: number): void {
 // key, Audio Layer and output lives in ./actions.ts (ids act:...), handed over
 // below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
-  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:lightsblack', 'fire:freeze', 'fire:record',
+  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:lightsblack', 'fire:lightsgo', 'fire:lightsback', 'fire:lightscues', 'fire:freeze', 'fire:record',
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:transport', 'fire:ruleseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
@@ -133,6 +133,9 @@ export function fireTrigger(id: string): void {
     case 'fire:flush': firePanic(); return
     case 'fire:black': st.setBlack('toggle'); return
     case 'fire:lightsblack': st.setLightsBlack(!st.lightsBlack); return
+    case 'fire:lightsgo': st.goLightCue(1); return
+    case 'fire:lightsback': st.goLightCue(-1); return
+    case 'fire:lightscues': st.setLightCueRun(!st.lightCueRun); return
     case 'fire:freeze': fireFreeze(); return
     case 'fire:record': fireRecordToggle(); return
     case 'fire:tap': tapTempo(); return
@@ -227,6 +230,7 @@ export function isContinuousTarget(id: string): boolean {
     id.startsWith('meta:') ||
     id.startsWith('transport:') ||
     id.startsWith('field:') ||
+    id.startsWith('lights:') ||
     id === 'surface:x' ||
     id === 'surface:y' ||
     id === 'sonify:master' ||
@@ -256,6 +260,10 @@ export function midiTargetLabel(id: string): string {
   if (id === 'scene:prev') return 'SCENE prev'
   if (id.startsWith('scene:')) return `SCENE ${Number(id.slice(6)) + 1}`
   if (id in FIELD_LABELS) return FIELD_LABELS[id]
+  if (id.startsWith('lights:group:')) {
+    const g = useStore.getState().lightRig.groups.find((x) => x.id === id.slice(13))
+    return `LIGHTS ${g ? g.name : 'group'} fader`
+  }
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
   if (id === 'bg:speed') return 'BACKGROUND speed'
   if (id === 'bg:depth') return 'BACKGROUND shadow'
@@ -333,6 +341,12 @@ export function midiTargetLabel(id: string): string {
       return 'BLACK on/off'
     case 'fire:lightsblack':
       return 'LIGHTS black on/off'
+    case 'fire:lightsgo':
+      return 'LIGHTS cue GO'
+    case 'fire:lightsback':
+      return 'LIGHTS cue back'
+    case 'fire:lightscues':
+      return 'LIGHTS cues follow on/off'
     case 'fire:freeze':
       return 'FREEZE / hold'
     case 'fire:record':
@@ -791,6 +805,8 @@ export function applyContinuous(id: string, t: number): boolean {
     return true
   }
   if (id in FIELD_SETTERS) { FIELD_SETTERS[id](t); return true }
+  // a Lights group's fader (its id after the prefix)
+  if (id.startsWith('lights:group:')) { st.setLightGroupLevel(id.slice(13), t); return true }
   // a Sonify parameter (a Synth knob, a patchbay depth) : over the span its modulation uses
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13), d = SONIFY_MOD_DESCS[p]

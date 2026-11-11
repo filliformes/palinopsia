@@ -9,8 +9,12 @@
 // RGBA8 grids, BOTTOM-UP rows, one per source in use (the master, the layers).
 
 import {
+  GROUP_PREFIX,
+  layoutChannels,
   layoutTokens,
+  tokenWidth,
   LOOK_DEFAULT,
+  type LightSample,
   type LightFixture,
   type LightLook,
   type LightModField,
@@ -20,6 +24,7 @@ import {
   type LightTune
 } from '@shared/lights'
 import { lightModKey, lightMods } from './lightMods'
+import { middleOf } from './lightStore'
 
 export interface LightGrid {
   w: number
@@ -38,14 +43,23 @@ export interface LightInputs {
   beats: number // a running beat count (the shared clock)
   bpm: number
   audio: number // 0..1 : the sound's level
+  bands?: number[] // 0..1 : the sound's low, mid and high
+  /** The people in the room (the Body page's tracking), on the picture : (x, y)
+   *  0..1 y down, r their size in frame heights. */
+  people?: Array<{ x: number; y: number; r: number }>
   aspect: number // the picture's width / height
   identify: string | null // a fixture flashed to find it in the room
+  groupLevels?: Record<string, number> // each group's fader (absent : 1)
+  /** The test pattern : seconds since it started (null : off). A line sweeps the
+   *  room, red, then green, blue, white : every light shows where it is and
+   *  whether its colors are in the right order. */
+  test?: number | null
 }
 
 /** A frame's DMX : Enttec buffers by device index, network universes by output. */
 export interface LightFrame {
   enttec: Map<number, Uint8Array>
-  net: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array }>
+  net: Array<{ kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; data: Uint8Array; out: string }>
   /** Per fixture, its pixels' final colors (0..1 RGB, interleaved) : the page draws them. */
   colors: Map<string, Float32Array>
   /** Channels past an Enttec's 512 (unpatched), by fixture : the page warns. */
@@ -53,6 +67,19 @@ export interface LightFrame {
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+/** A color's hue turned by `deg` (YIQ : its brightness kept), in place. */
+function turnHue(c: number[], deg: number): void {
+  if (!deg) return
+  const a = (deg * Math.PI) / 180, hc = Math.cos(a), hs = Math.sin(a)
+  const r = c[0], g = c[1], b = c[2]
+  const y = 0.299 * r + 0.587 * g + 0.114 * b, i = 0.596 * r - 0.274 * g - 0.322 * b, q = 0.211 * r - 0.523 * g + 0.312 * b
+  const i2 = i * hc - q * hs, q2 = i * hs + q * hc
+  c[0] = y + 0.956 * i2 + 0.621 * q2
+  c[1] = y - 0.272 * i2 - 0.647 * q2
+  c[2] = y - 1.106 * i2 + 1.703 * q2
+}
+const idHash = (id: string): number => { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296 }
 const fract = (v: number): number => v - Math.floor(v)
 
 function hsv(h: number, s: number, v: number): [number, number, number] {
@@ -64,39 +91,91 @@ function hsv(h: number, s: number, v: number): [number, number, number] {
   return [r + m, g + m, b + m]
 }
 
-/** Each pixel's place on the picture (0..1, y down), in channel order. */
-export function fixturePoints(f: LightFixture): Float32Array {
+/** A matrix's cell (column, row from its top left) for each pixel, in channel
+ *  order : from its start corner, row by row or column by column, zigzag or not. */
+export function matrixCells(f: LightFixture): Int32Array {
+  const n = f.cols * f.rows
+  const out = new Int32Array(n * 2)
+  const right = f.start === 'tr' || f.start === 'br', bottom = f.start === 'bl' || f.start === 'br'
+  for (let k = 0; k < n; k++) {
+    let c: number, r: number
+    if (f.byCols) {
+      c = Math.floor(k / f.rows); r = k % f.rows
+      if (f.serpentine && c % 2 === 1) r = f.rows - 1 - r
+    } else {
+      r = Math.floor(k / f.cols); c = k % f.cols
+      if (f.serpentine && r % 2 === 1) c = f.cols - 1 - c
+    }
+    if (right) c = f.cols - 1 - c
+    if (bottom) r = f.rows - 1 - r
+    out[k * 2] = c; out[k * 2 + 1] = r
+  }
+  if (f.reverse) {
+    for (let i = 0, j = n - 1; i < j; i++, j--) {
+      const c = out[i * 2], r = out[i * 2 + 1]
+      out[i * 2] = out[j * 2]; out[i * 2 + 1] = out[j * 2 + 1]
+      out[j * 2] = c; out[j * 2 + 1] = r
+    }
+  }
+  return out
+}
+
+/** A strip's path : its ends and its bends, in order. */
+export function stripPath(f: LightFixture): number[] {
+  return [f.x0, f.y0, ...f.bends, f.x1, f.y1]
+}
+
+/** Each pixel's place on the picture (0..1, y down), in channel order. `aspect`
+ *  (the picture's width / height) keeps a bent strip's LEDs evenly spaced and a
+ *  ring round. */
+export function fixturePoints(f: LightFixture, aspect = 16 / 9): Float32Array {
   if (f.kind === 'spot') return new Float32Array([f.x0, f.y0])
+  const asp = Math.max(0.1, aspect)
   if (f.kind === 'matrix') {
     const n = f.cols * f.rows
+    const cells = matrixCells(f)
     const out = new Float32Array(n * 2)
-    let k = 0
-    for (let r = 0; r < f.rows; r++) {
-      for (let c = 0; c < f.cols; c++) {
-        const cc = f.serpentine && r % 2 === 1 ? f.cols - 1 - c : c
-        out[k++] = f.x0 + ((cc + 0.5) / f.cols) * (f.x1 - f.x0)
-        out[k++] = f.y0 + ((r + 0.5) / f.rows) * (f.y1 - f.y0)
-      }
+    for (let k = 0; k < n; k++) {
+      out[k * 2] = f.x0 + ((cells[k * 2] + 0.5) / f.cols) * (f.x1 - f.x0)
+      out[k * 2 + 1] = f.y0 + ((cells[k * 2 + 1] + 0.5) / f.rows) * (f.y1 - f.y0)
     }
-    if (f.reverse) reversePairs(out)
     return out
   }
   const n = Math.max(1, f.pixels)
   const out = new Float32Array(n * 2)
+  if (f.kind === 'ring') {
+    // a circle in the room's own proportions : its radius and its first LED's angle
+    const dx = (f.x1 - f.x0) * asp, dy = f.y1 - f.y0
+    const r = Math.hypot(dx, dy)
+    const a0 = Math.atan2(dy, dx)
+    const dir = f.reverse ? -1 : 1
+    for (let i = 0; i < n; i++) {
+      const a = a0 + dir * (2 * Math.PI * i) / n
+      out[i * 2] = f.x0 + (r * Math.cos(a)) / asp
+      out[i * 2 + 1] = f.y0 + r * Math.sin(a)
+    }
+    return out
+  }
+  // a strip : evenly along its path (through its bends), by length in the room
+  const p = stripPath(f)
+  const segs = p.length / 2 - 1
+  const len: number[] = []
+  let total = 0
+  for (let s = 0; s < segs; s++) {
+    const l = Math.hypot((p[s * 2 + 2] - p[s * 2]) * asp, p[s * 2 + 3] - p[s * 2 + 1])
+    len.push(l)
+    total += l
+  }
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0.5 : i / (n - 1)
-    const u = f.reverse ? 1 - t : t
-    out[i * 2] = f.x0 + u * (f.x1 - f.x0)
-    out[i * 2 + 1] = f.y0 + u * (f.y1 - f.y0)
+    let d = (f.reverse ? 1 - t : t) * total
+    let s = 0
+    while (s < segs - 1 && d > len[s]) { d -= len[s]; s++ }
+    const u = len[s] > 1e-9 ? Math.min(1, d / len[s]) : 0
+    out[i * 2] = p[s * 2] + u * (p[s * 2 + 2] - p[s * 2])
+    out[i * 2 + 1] = p[s * 2 + 1] + u * (p[s * 2 + 3] - p[s * 2 + 1])
   }
   return out
-}
-function reversePairs(a: Float32Array): void {
-  for (let i = 0, j = a.length - 2; i < j; i += 2, j -= 2) {
-    const x = a[i], y = a[i + 1]
-    a[i] = a[j]; a[i + 1] = a[j + 1]
-    a[j] = x; a[j + 1] = y
-  }
 }
 
 /** Bilinear read of a bottom-up RGBA8 grid at (x, y) (y down), 0..1 RGB. */
@@ -116,19 +195,77 @@ function sampleAt(g: LightGrid, x: number, y: number, out: number[]): void {
   }
 }
 
-/** The picture around a point : a footprint of nine taps (`size`, frame heights). */
-function sampleArea(g: LightGrid, x: number, y: number, size: number, aspect: number, out: number[]): void {
+/** The picture around a point (`size` : its footprint, in frame heights). The
+ *  average : nine taps. Vivid and bright weigh 25 taps by how colorful (or how
+ *  bright) each is, so a few strong colors are not drowned in their neighbors. */
+const TMP = [0, 0, 0]
+function sampleArea(g: LightGrid, x: number, y: number, size: number, aspect: number, out: number[], mode: LightSample = 'average'): void {
   if (size < 0.004) { sampleAt(g, x, y, out); return }
-  const tmp = [0, 0, 0]
-  let r = 0, gg = 0, b = 0
-  const dx = size / Math.max(0.1, aspect), dy = size
-  for (let j = -1; j <= 1; j++) {
-    for (let i = -1; i <= 1; i++) {
-      sampleAt(g, x + i * dx, y + j * dy, tmp)
-      r += tmp[0]; gg += tmp[1]; b += tmp[2]
+  let r = 0, gg = 0, b = 0, wsum = 0
+  const k = mode === 'average' ? 1 : 2
+  const dx = size / Math.max(0.1, aspect) / k, dy = size / k
+  for (let j = -k; j <= k; j++) {
+    for (let i = -k; i <= k; i++) {
+      sampleAt(g, x + i * dx, y + j * dy, TMP)
+      let w = 1
+      if (mode === 'vivid') {
+        const c = Math.max(TMP[0], TMP[1], TMP[2]) - Math.min(TMP[0], TMP[1], TMP[2])
+        w = c * c * c + 1e-4
+      } else if (mode === 'bright') {
+        const l = 0.299 * TMP[0] + 0.587 * TMP[1] + 0.114 * TMP[2]
+        w = l * l * l * l + 1e-5
+      }
+      r += TMP[0] * w; gg += TMP[1] * w; b += TMP[2] * w; wsum += w
     }
   }
-  out[0] = r / 9; out[1] = gg / 9; out[2] = b / 9
+  out[0] = r / wsum; out[1] = gg / wsum; out[2] = b / wsum
+}
+
+/** The picture's main colors (2 to `n`), for a gradient : hues weighed by how much
+ *  of the picture has them and how colorful they are, a grey only when the picture
+ *  has little color, ordered from left to right as they sit in the picture (a
+ *  gradient across the room then follows it). Null : nothing lit to read. */
+export function paletteOf(g: LightGrid | null, n = 4): number[][] | null {
+  if (!g) return null
+  const BINS = 12
+  const acc = Array.from({ length: BINS + 1 }, () => ({ w: 0, r: 0, g: 0, b: 0, x: 0 }))
+  const c = [0, 0, 0]
+  // every cell of the grid (a click, not a frame : the small patches of color count)
+  for (let j = 0; j < g.h; j++) {
+    for (let i = 0; i < g.w; i++) {
+      const o = (j * g.w + i) * 4
+      c[0] = g.px[o] / 255; c[1] = g.px[o + 1] / 255; c[2] = g.px[o + 2] / 255
+      const x = (i + 0.5) / g.w
+      const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2])
+      if (mx < 0.06) continue
+      const ch = mx - mn
+      // (a grey counts little : a light is its color)
+      let bin = BINS, w = mx * 0.02
+      if (ch > 0.1) {
+        let h = 0
+        if (mx === c[0]) h = ((c[1] - c[2]) / ch + 6) % 6
+        else if (mx === c[1]) h = (c[2] - c[0]) / ch + 2
+        else h = (c[0] - c[1]) / ch + 4
+        bin = Math.min(BINS - 1, Math.floor((h / 6) * BINS))
+        w = ch * ch * mx
+      }
+      const a = acc[bin]
+      a.w += w; a.r += c[0] * w; a.g += c[1] * w; a.b += c[2] * w; a.x += x * w
+    }
+  }
+  const top = acc.filter((a) => a.w > 0).sort((p, q) => q.w - p.w)
+  if (!top.length) return null
+  const keep = top.filter((a, i) => i === 0 || a.w >= top[0].w * 0.04).slice(0, Math.max(2, Math.min(5, n)))
+  const stops = keep
+    .map((a) => ({ x: a.x / a.w, c: [a.r / a.w, a.g / a.w, a.b / a.w] }))
+    .sort((p, q) => p.x - q.x)
+    .map((s) => {
+      // each color at its full strength : the light is the color, the fader its level
+      const m = Math.max(s.c[0], s.c[1], s.c[2], 1e-6)
+      return s.c.map((v) => Math.min(1, v / m))
+    })
+  if (stops.length === 1) stops.push(stops[0].map((v) => v * 0.35))
+  return stops
 }
 
 /** A gradient's color at t (ping-pong : no seam where it wraps). */
@@ -165,7 +302,7 @@ export class LightEngine {
   private blackLevel = 1 // 1 = lit, 0 = black
   private fadeT = 1 // a light scene's fade : 0..1
   private fadeSec = 0
-  private audioSm = 0
+  private audioSm = [0, 0, 0, 0] // level, low, mid, high
 
   /** A light scene is coming in : fade from what shows now over `sec`. */
   beginFade(sec: number): void {
@@ -183,11 +320,11 @@ export class LightEngine {
     return this.blackLevel
   }
 
-  private stateOf(f: LightFixture): FixtureState {
-    const sig = `${f.kind}|${f.x0}|${f.y0}|${f.x1}|${f.y1}|${f.pixels}|${f.cols}|${f.rows}|${f.serpentine}|${f.reverse}`
+  private stateOf(f: LightFixture, aspect: number): FixtureState {
+    const sig = `${f.kind}|${f.x0}|${f.y0}|${f.x1}|${f.y1}|${f.pixels}|${f.cols}|${f.rows}|${f.serpentine}|${f.reverse}|${f.bends.join(',')}|${f.start}|${f.byCols}|${aspect.toFixed(3)}`
     let s = this.st.get(f.id)
     if (!s || s.sig !== sig) {
-      const pts = fixturePoints(f)
+      const pts = fixturePoints(f, aspect)
       const n = pts.length / 2
       s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0 }
       this.st.set(f.id, s)
@@ -211,7 +348,44 @@ export class LightEngine {
     this.blackLevel = inp.black ? Math.max(0, this.blackLevel - dt / bs) : Math.min(1, this.blackLevel + dt / bs)
     if (this.fadeT < 1) this.fadeT = this.fadeSec > 0 ? Math.min(1, this.fadeT + dt / this.fadeSec) : 1
     // the sound, smoothed (a level that jumps every frame flickers the room)
-    this.audioSm += (clamp01(inp.audio) - this.audioSm) * (1 - Math.exp(-dt / 0.06))
+    const aK = 1 - Math.exp(-dt / 0.06)
+    const aIn = [inp.audio, inp.bands?.[0] ?? inp.audio, inp.bands?.[1] ?? inp.audio, inp.bands?.[2] ?? inp.audio]
+    for (let k = 0; k < 4; k++) this.audioSm[k] += (clamp01(aIn[k]) - this.audioSm[k]) * aK
+    // light by light : each fixture's place in its order (the fixtures with the same
+    // order and wings make one set), and its step for a beat
+    const orderPos = new Map<string, { u: number; step: number; steps: number }>()
+    {
+      const sets = new Map<string, LightFixture[]>()
+      for (const f of inp.rig.fixtures) {
+        const lk = inp.looks[f.id] ?? LOOK_DEFAULT
+        if (lk.order === 'room') continue
+        const key = `${lk.order}|${lk.wings}`
+        let l = sets.get(key)
+        if (!l) { l = []; sets.set(key, l) }
+        l.push(f)
+      }
+      const asp0 = Math.max(0.1, inp.aspect)
+      for (const [key, list] of sets) {
+        const [order, w] = key.split('|')
+        const wings = Number(w) || 1
+        const mid = new Map(list.map((f) => [f.id, middleOf(f)]))
+        const sorted = list.slice().sort((a, b) => {
+          const [ax, ay] = mid.get(a.id)!, [bx, by] = mid.get(b.id)!
+          if (order === 'center') return Math.hypot((ax - 0.5) * asp0, ay - 0.5) - Math.hypot((bx - 0.5) * asp0, by - 0.5)
+          if (order === 'random') return idHash(a.id) - idHash(b.id)
+          return ax - bx || ay - by
+        })
+        const N = sorted.length
+        const us = sorted.map((_, rank) => {
+          if (order === 'oddeven') return (rank % 2) * 0.5
+          let u = (rank + 0.5) / N
+          if (wings > 1) { const v = u * wings, k = Math.floor(v), fr = v - k; u = k % 2 ? 1 - fr : fr }
+          return u
+        })
+        const distinct = [...new Set(us.map((u) => Math.round(u * 1000)))].sort((a, b) => a - b)
+        sorted.forEach((f, i) => orderPos.set(f.id, { u: us[i], step: distinct.indexOf(Math.round(us[i] * 1000)), steps: distinct.length }))
+      }
+    }
     // the beat : a flash on each, decaying
     const beatNow = inp.beats
     const out: LightFrame = { enttec: new Map(), net: [], colors: new Map(), overflow: new Set() }
@@ -221,13 +395,21 @@ export class LightEngine {
     const tmp = [0, 0, 0]
     const ease = (x: number): number => x * x * (3 - 2 * x)
 
+    // the test pattern : a line sweeping the room, one color a pass
+    const test = inp.test ?? null
+    const TEST_SPEED = 0.35 // passes a second
+    const tPass = test !== null ? Math.floor(test * TEST_SPEED) : 0
+    const tHead = test !== null ? fract(test * TEST_SPEED) * 1.3 - 0.15 : 0
+    const tCol = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1]][tPass % 4]
     for (const f of inp.rig.fixtures) {
       live.add(f.id)
-      const s = this.stateOf(f)
+      const s = this.stateOf(f, Math.max(0.1, inp.aspect))
       const look = inp.looks[f.id] ?? LOOK_DEFAULT
       const tune = inp.tunes[f.id] ?? f.tune
       const n = s.pts.length / 2
-      const level = mod(f.id, 'level', look.level)
+      // its own fader, times the faders of the groups it is in
+      let level = mod(f.id, 'level', look.level)
+      for (const g of inp.rig.groups) if (g.members.includes(f.id)) level *= clamp01(mod(GROUP_PREFIX + g.id, 'level', inp.groupLevels?.[g.id] ?? 1))
       const hue = mod(f.id, 'hue', look.hue), sat = mod(f.id, 'sat', look.sat), val = mod(f.id, 'val', look.val)
       const g = look.gradient
       const gOff = mod(f.id, 'gradOffset', g.offset), gAng = mod(f.id, 'gradAngle', g.angle), gScale = mod(f.id, 'gradScale', g.scale)
@@ -245,7 +427,15 @@ export class LightEngine {
       // hue rotation (YIQ) for the tuning
       const hr = (tHue * Math.PI) / 180, hc = Math.cos(hr), hs = Math.sin(hr)
       const asp = Math.max(0.1, inp.aspect)
-      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * this.clock * rate)) : 1
+      const op = look.order !== 'room' ? orderPos.get(f.id) : undefined
+      const fan = mod(f.id, 'fan', look.fan)
+      // the room's extent along the effect's direction (a fan across the room)
+      let pLo = 0, pHi = 1
+      if (fan && !op) {
+        const ps = [0, asp * ca, sa, asp * ca + sa] // the room's four corners, projected
+        pLo = Math.min(...ps); pHi = Math.max(...ps)
+      }
+      const pulse = look.effect === 'pulse' ? 1 - depth * (0.5 - 0.5 * Math.cos(2 * Math.PI * (this.clock * rate - (op?.u ?? 0)))) : 1
       // the beat : every 1/rate beats (rate 0 : every beat), the flash decaying in a quarter of it
       let beatMul = 1
       if (look.effect === 'beat') {
@@ -253,20 +443,31 @@ export class LightEngine {
         const minBeats = (MAX_HZ > 0 ? 1 / MAX_HZ : 1) * (Math.max(1, inp.bpm) / 60)
         const every = Math.max(minBeats, rate > 0 ? 1 / rate : 1) // beats between flashes
         const idx = Math.floor(beatNow / every)
-        if (idx !== s.beatIdx) { s.beatIdx = idx; s.beatEnv = 1 }
+        // light by light : a step chase, one place of the order on each flash
+        if (idx !== s.beatIdx) { s.beatIdx = idx; if (!op || ((idx % op.steps) + op.steps) % op.steps === op.step) s.beatEnv = 1 }
         beatMul = 1 - depth + depth * s.beatEnv
         s.beatEnv *= Math.exp(-dt * 7)
       }
-      const audioMul = look.effect === 'audio' ? 1 - depth + depth * this.audioSm : 1
+      const audioMul = look.effect === 'audio' ? 1 - depth + depth * this.audioSm[look.band === 'low' ? 1 : look.band === 'mid' ? 2 : look.band === 'high' ? 3 : 0] : 1
+      const people = look.effect === 'presence' ? inp.people ?? [] : []
+      // (light by light, a sparkle is the whole light's)
+      if (look.effect === 'sparkle' && op) {
+        if (Math.random() < rate * dt * 0.5) s.spark[0] = 1
+        s.spark[0] *= Math.exp(-dt * 6)
+      }
       const colors = new Float32Array(n * 3)
       const ident = inp.identify === f.id
       for (let i = 0; i < n; i++) {
         const x = s.pts[i * 2], y = s.pts[i * 2 + 1]
         const px = x * asp // the room's own proportions for patterns across it
         let r = 0, gg = 0, b = 0
-        if (ident) { r = gg = b = 1 } else {
+        if (ident) { r = gg = b = 1 } else if (test !== null) {
+          const pos = (x * asp + y) / (asp + 1)
+          const on = Math.abs(pos - tHead) < 0.045 ? 1 : 0
+          r = tCol[0] * on; gg = tCol[1] * on; b = tCol[2] * on
+        } else {
           if (grid) {
-            sampleArea(grid, x, y, f.size, asp, tmp)
+            sampleArea(grid, x, y, f.size, asp, tmp, look.sample)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
           } else if (base) {
             r = base[0]; gg = base[1]; b = base[2]
@@ -275,10 +476,17 @@ export class LightEngine {
             gradientAt(g.stops, t + gOff + this.clock * g.speed, tmp)
             r = tmp[0]; gg = tmp[1]; b = tmp[2]
           }
+          // a fan : the hue spread across the room (or along the order)
+          if (fan) {
+            const pos = op ? op.u : ((px * ca + y * sa) - pLo) / Math.max(1e-6, pHi - pLo)
+            tmp[0] = r; tmp[1] = gg; tmp[2] = b
+            turnHue(tmp, -fan * (pos - 0.5)) // (the color wheel's way : a positive fan climbs toward yellow)
+            r = Math.max(0, tmp[0]); gg = Math.max(0, tmp[1]); b = Math.max(0, tmp[2])
+          }
           // the effect, a multiplier on the light
           let m = pulse * beatMul * audioMul
           if (look.effect === 'chase' || look.effect === 'wave') {
-            const p = px * ca + y * sa
+            const p = op ? op.u : px * ca + y * sa
             if (look.effect === 'chase') {
               const d = fract(p - this.clock * rate) // 0..1 behind the head
               const band = Math.exp(-((Math.min(d, 1 - d) / width) ** 2) * 3)
@@ -288,9 +496,21 @@ export class LightEngine {
             }
           } else if (look.effect === 'sparkle') {
             // twinkles : a pixel lights at random (rate : how often), then decays
-            if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
-            s.spark[i] *= Math.exp(-dt * 6)
-            m *= 1 - depth + depth * s.spark[i]
+            if (op) m *= 1 - depth + depth * s.spark[0]
+            else {
+              if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
+              s.spark[i] *= Math.exp(-dt * 6)
+              m *= 1 - depth + depth * s.spark[i]
+            }
+          } else if (look.effect === 'presence') {
+            // lit near the people (width : how near), dim away from them
+            let near = 0
+            const rad = Math.max(0.02, width)
+            for (const pp of people) {
+              const d = Math.hypot((x - pp.x) * asp, y - pp.y) / rad
+              near = Math.max(near, Math.exp(-d * d * 1.5))
+            }
+            m *= 1 - depth + depth * near
           }
           m *= level
           r *= m; gg *= m; b *= m
@@ -311,8 +531,8 @@ export class LightEngine {
           b = clamp01(b * tBright) ** tune.gamma
           r = tune.black + (1 - tune.black) * r; gg = tune.black + (1 - tune.black) * gg; b = tune.black + (1 - tune.black) * b
         }
-        // smoothing (identify is never smoothed : it must answer at once)
-        const k = ident ? 1 : smoothA
+        // smoothing (identify and the test are never smoothed : they must answer at once)
+        const k = ident || test !== null ? 1 : smoothA
         const o = i * 3
         s.cur[o] += (r - s.cur[o]) * k
         s.cur[o + 1] += (gg - s.cur[o + 1]) * k
@@ -324,7 +544,7 @@ export class LightEngine {
           fg = s.from[o + 1] + (fg - s.from[o + 1]) * e
           fb = s.from[o + 2] + (fb - s.from[o + 2]) * e
         }
-        const gm = ident ? 1 : grand * ease(this.blackLevel)
+        const gm = ident || test !== null ? 1 : grand * ease(this.blackLevel)
         colors[o] = fr * gm
         colors[o + 1] = fg * gm
         colors[o + 2] = fb * gm
@@ -345,20 +565,39 @@ export class LightEngine {
       if (!o) continue
       const uni = Number(key.slice(sep + 1))
       if (o.kind === 'enttec') out.enttec.set(o.index, data)
-      else out.net.push({ kind: o.kind, host: o.host, universe: uni, data })
+      else out.net.push({ kind: o.kind, host: o.host, universe: uni, data, out: o.id })
     }
     return out
   }
 
-  /** One fixture's colors into its output's universes, in its channel layout. A
-   *  pixel never straddles two universes (pixel controllers expect it so) : one
-   *  that would is moved to the next universe's first channel. An Enttec has one
-   *  universe : what goes past its 512 channels is dropped (and reported). */
+  /** One fixture's colors into its output's universes : its head (the channels
+   *  sent once before the pixels), each pixel in its layout, its tail. A block
+   *  never straddles two universes (pixel controllers expect it so) : one that
+   *  would starts the next universe. An Enttec has one universe : what goes past
+   *  its 512 channels is dropped (and reported).
+   *  A dimmer (D) takes the level and the color goes out at full strength : the
+   *  fades stay smooth down low (in 16 bits with D16) and a dim color stays its
+   *  color. A dimmer in the head is the whole fixture's (its brightest pixel),
+   *  and its pixels then go out relative to it. */
   private patch(f: LightFixture, o: LightOutput, colors: Float32Array, universes: Map<string, Uint8Array>, out: LightFrame): void {
     const tok = layoutTokens(f.layout)
-    const nt = tok.length
-    const hasW = tok.includes('W')
+    const head = layoutTokens(f.head, false)
+    const tail = layoutTokens(f.tail, false)
+    const pixD = tok.some((t) => t[0] === 'D')
+    const fixD = !pixD && (head.some((t) => t[0] === 'D') || tail.some((t) => t[0] === 'D'))
     const n = colors.length / 3
+    // the whole fixture : its brightest pixel (a head dimmer) and its mean color
+    let fdim = 1, ar = 0, ag = 0, ab = 0
+    if (head.length || tail.length) {
+      let mx = 0
+      for (let i = 0; i < n; i++) {
+        const r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
+        ar += r; ag += g; ab += b
+        mx = Math.max(mx, r, g, b)
+      }
+      ar /= n; ag /= n; ab /= n
+      if (fixD) fdim = mx
+    }
     let uni = o.kind === 'enttec' ? 0 : f.universe
     let ch = f.address - 1
     const buf = (u: number): Uint8Array => {
@@ -368,31 +607,66 @@ export class LightEngine {
       return b
     }
     let data = buf(uni)
-    const b255 = (v: number): number => Math.round(clamp01(v) * 255)
-    for (let i = 0; i < n; i++) {
-      if (ch + nt > 512) {
-        if (o.kind === 'enttec') { out.overflow.add(f.id); break }
-        uni++; ch = 0; data = buf(uni)
+    /** Room for `w` channels here, or the next universe (false : an Enttec full). */
+    const room = (w: number): boolean => {
+      if (ch + w <= 512) return true
+      if (o.kind === 'enttec') { out.overflow.add(f.id); return false }
+      uni++; ch = 0; data = buf(uni)
+      return true
+    }
+    /** One block of tokens for a color (0..1, linear) : its dimmer, white,
+     *  complements and luminance worked out from it. */
+    const emit = (tokens: string[], r: number, g: number, b: number, normD: boolean): void => {
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+      let dim = 1
+      if (normD) {
+        dim = Math.max(r, g, b)
+        if (dim > 1e-6) { r /= dim; g /= dim; b /= dim } else { r = g = b = 0; dim = 0 }
+      } else if (fixD) {
+        dim = fdim
+        if (fdim > 1e-6) { r /= fdim; g /= fdim; b /= fdim } else { r = g = b = 0 }
       }
-      let r = colors[i * 3], g = colors[i * 3 + 1], b = colors[i * 3 + 2]
       let w = 0
-      if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
-      for (let k = 0; k < nt; k++) {
-        const t = tok[k]
+      if (tokens.some((t) => t[0] === 'W')) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
+      for (const t of tokens) {
         let v: number
-        switch (t) {
-          case 'R': v = b255(r); break
-          case 'G': v = b255(g); break
-          case 'B': v = b255(b); break
-          case 'W': v = b255(w); break
-          case 'A': v = b255(Math.min(r, g * 2) * 0.8); break // amber : from the warm part
-          case 'D': v = 255; break // a dimmer channel : open (the color carries the level)
+        switch (t[0]) {
+          case 'R': v = r; break
+          case 'G': v = g; break
+          case 'B': v = b; break
+          case 'W': v = w; break
+          case 'A': v = Math.min(r, g * 2) * 0.8; break // amber : from the warm part
+          case 'C': v = 1 - r; break // a subtractive mix : the color's complement
+          case 'M': v = 1 - g; break
+          case 'Y': v = 1 - b; break
+          case 'L': v = lum; break // one channel of white : its luminance
+          case 'D': v = dim; break
           case 'U': case 'S': case 'X': v = 0; break // UV, strobe, unused : off
-          default: v = Math.max(0, Math.min(255, Number(t) | 0)) // a fixed value
+          default: v = -1 // a fixed value
         }
-        data[ch + k] = v
+        if (v < 0) {
+          data[ch++] = Math.max(0, Math.min(255, Number(t) | 0))
+        } else if (tokenWidth(t) === 2) {
+          const q = Math.round(clamp01(v) * 65535)
+          data[ch++] = q >> 8
+          data[ch++] = q & 0xff
+        } else {
+          data[ch++] = Math.round(clamp01(v) * 255)
+        }
       }
-      ch += nt
+    }
+    const hw = layoutChannels(head), pw = layoutChannels(tok), tw = layoutChannels(tail)
+    if (hw) {
+      if (!room(hw)) return
+      emit(head, ar, ag, ab, false)
+    }
+    for (let i = 0; i < n; i++) {
+      if (!room(pw)) return
+      emit(tok, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD)
+    }
+    if (tw) {
+      if (!room(tw)) return
+      emit(tail, ar, ag, ab, false)
     }
   }
 }

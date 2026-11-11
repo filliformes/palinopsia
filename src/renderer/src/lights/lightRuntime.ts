@@ -8,16 +8,46 @@ import type { Compositor } from '../engine/Compositor'
 import { useStore } from '../store'
 import { audioBus } from '../engine/audioIn'
 import { soniBeats } from '../audio/soniClock'
-import { LightEngine, type LightFrame, type LightGrid } from './lightEngine'
+import { LightEngine, paletteOf, type LightFrame, type LightGrid } from './lightEngine'
 import { enttec } from './enttec'
-import type { LightTune } from '@shared/lights'
+import type { LightOutput, LightTune } from '@shared/lights'
 import { setLightBaseOf } from './lightMods'
 import { lightBaseValue } from './lightStore'
+import { setPaletteSource } from './lightShows'
+import { bodyTracker } from '../engine/bodyTracker'
+
+/** The people the Body page tracks, on the picture (x, y 0..1, y down; r their
+ *  height in frame heights) : the Room tracker's everyone, or the one pose. */
+function peopleNow(): Array<{ x: number; y: number; r: number }> {
+  if (!bodyTracker.status().running) return []
+  const p = bodyTracker.preview()
+  const mx = (x: number): number => (p.mirror ? 1 - x : x)
+  const out: Array<{ x: number; y: number; r: number }> = []
+  if (p.people.length) {
+    for (const q of p.people) out.push({ x: mx((q.box[0] + q.box[2]) / 2), y: (q.box[1] + q.box[3]) / 2, r: Math.max(0.05, q.box[3] - q.box[1]) })
+  } else if (p.pose) {
+    let x0 = 1, x1 = 0, y0 = 1, y1 = 0, n = 0
+    for (const l of p.pose) {
+      if ((l.visibility ?? 1) < 0.5) continue
+      x0 = Math.min(x0, l.x); x1 = Math.max(x1, l.x); y0 = Math.min(y0, l.y); y1 = Math.max(y1, l.y); n++
+    }
+    if (n > 4) out.push({ x: mx((x0 + x1) / 2), y: (y0 + y1) / 2, r: Math.max(0.05, y1 - y0) })
+  }
+  return out
+}
 
 setLightBaseOf((fixture, field) => {
   const st = useStore.getState()
   return lightBaseValue(st.lightRig, st.lightsSession, fixture, field)
 })
+// (the Picture colors show, and the gradient's "from the picture" : the master's colors)
+setPaletteSource(() => paletteOf(lightRuntime.grid(-1), 4))
+
+/** Now, or `ms` later (an output's delay); dropped if the lights went off meanwhile. */
+function later(ms: number, fn: () => void): void {
+  if (ms <= 0) { fn(); return }
+  window.setTimeout(() => { if (useStore.getState().lightRig.on) fn() }, ms)
+}
 
 const W = 192
 const H = 108
@@ -59,9 +89,10 @@ class LightRuntime {
     // rig's fps : now + interval sent every other frame, 30 for a 40 Hz rig)
     const interval = 1000 / Math.max(10, Math.min(44, rig.fps))
     this.nextAt = Math.max(this.nextAt + interval, now - interval)
-    // the sources in use : the master, the layers the looks read
+    // the sources in use : the master (always : its colors make the palettes), the
+    // layers the looks read
     const L = st.lightsSession
-    const srcs = new Set<number>()
+    const srcs = new Set<number>([-1])
     for (const f of rig.fixtures) {
       const look = L.looks[f.id]
       const s = look?.source ?? 'master'
@@ -76,9 +107,16 @@ class LightRuntime {
     const list = [...srcs].sort((a, b) => a - b)
     if (list.length) comp.kickLights(list, W, H)
     if (st.lightFadeEpoch !== this.fadeEpoch) {
-      if (this.fadeEpoch >= 0) this.engine.beginFade(L.master.fadeSec)
+      if (this.fadeEpoch >= 0) this.engine.beginFade(st.lightFadeSec ?? L.master.fadeSec)
       this.fadeEpoch = st.lightFadeEpoch
     }
+    // the cues following on : the next one goes its follow time after this one is in
+    if (st.lightCueRun && st.lightCue) {
+      const sc = L.scenes.find((x) => x.id === st.lightCue)
+      if (sc?.follow && sc.follow > 0 && now - st.lightCueAt >= ((sc.fade ?? L.master.fadeSec) + sc.follow) * 1000) st.goLightCue(1)
+    }
+    const wantPeople = rig.fixtures.some((f) => L.looks[f.id]?.effect === 'presence')
+    const band = (i: number): number => Math.max(audioBus.feature('band', i * 2), audioBus.feature('band', i * 2 + 1))
     const tunes: Record<string, LightTune> = {}
     if (rig.tuneScope === 'look' && L.tunes) for (const f of rig.fixtures) if (L.tunes[f.id]) tunes[f.id] = L.tunes[f.id]
     const frame = this.engine.frame({
@@ -96,17 +134,42 @@ class LightRuntime {
       beats: soniBeats(),
       bpm: st.composition.bpm,
       audio: audioBus.feature('level'),
+      bands: [band(0), band(1), band(2)],
+      people: wantPeople ? peopleNow() : undefined,
       aspect: st.compW / Math.max(1, st.compH),
-      identify: st.lightIdentify
+      identify: st.lightIdentify,
+      groupLevels: L.groups,
+      test: st.lightTest !== null ? Math.max(0, now - st.lightTest) / 1000 : null
     })
     this.last = frame
     this.lastAt = now
     // out
     const used = new Set<number>()
     if (rig.on) {
-      for (const [index, data] of frame.enttec) { enttec.send(index, data); used.add(index) }
-      if (frame.net.length) {
-        try { window.api.lightDmx(frame.net) } catch { /* main not ready yet */ }
+      // each output on its own delay (a projector's lag); an Art-Net one with sync
+      // closes its frame with an ArtSync
+      const byOut = new Map<string, LightOutput>(rig.outputs.map((o) => [o.id, o]))
+      for (const o of rig.outputs) {
+        if (o.kind !== 'enttec' || !o.enabled) continue
+        const data = frame.enttec.get(o.index)
+        if (!data || used.has(o.index)) continue
+        used.add(o.index)
+        later(o.delay, () => enttec.send(o.index, data))
+      }
+      const groups = new Map<string, typeof frame.net>()
+      for (const p of frame.net) {
+        let g = groups.get(p.out)
+        if (!g) { g = []; groups.set(p.out, g) }
+        g.push(p)
+      }
+      for (const [id, packets] of groups) {
+        const o = byOut.get(id)
+        if (!o) continue
+        const list: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }> = packets
+        if (o.kind === 'artnet' && o.sync && o.host) list.push({ kind: 'artsync', host: o.host, universe: 0 })
+        later(o.delay, () => {
+          try { window.api.lightDmx(list) } catch { /* main not ready yet */ }
+        })
       }
       this.sentTimes.push(now)
     }

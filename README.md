@@ -1273,6 +1273,14 @@ folds to its header (it keeps playing folded).
   it again. Its play is
   MIDI learnable (`RULE timeline run`), and `/opsia/seq/rules` over OSC.
 
+- **Light cues** : the [Lights page](#lights--dmx-fixtures-on-the-picture-key-t)'s cue
+  list as a lane : the same cues (click one to bring it, ⚙ for its fade, its follow time
+  and its scene), **GO** and **◀ back**. Playing, the cues **follow on** : a cue with a
+  follow time hands over to the next one by itself, a cue without one waits for GO, and
+  after the last comes the first. Its own time : the fades and the follow times, in
+  seconds. The lane's play needs a cue with a follow time. MIDI learnable (`LIGHTS cues
+  follow on/off`), and `/opsia/lights/cues` over OSC.
+
 **Scenes : the auto-pilot.** An auto-pilot over the scene bank. Each scene carries relation tags : **Diégèse**
 (world) · **Synchrèse** (coupling) · **Espace-temps** · **Climat** (set in the tag
 editor : click a scene card ; **Climat** also takes a **◔ from picture** suggestion
@@ -1911,8 +1919,8 @@ bottom:
   mild, it goes to **strong** (0.7) while the Fulldome output is on (a flash fills the
   whole view on a dome) and back to mild when the dome goes off; a level you set
   yourself, before or during, stays.
-- **Lights** : DMX lights have their own page now ([Lights](#lights--dmx-fixtures-on-the-picture-key-t), key `T`); the Output page's
-  Lights section opens it.
+- **Lights** : DMX lights have their own page now ([Lights](#lights--dmx-fixtures-on-the-picture-key-t), key `T`); the
+  **LIGHTS** button in this page's header opens it (lit while the lights send).
 - **Installation mode** : a panel to run Opsia as a **kiosk**. Boot a chosen session
   **fullscreen on a chosen display** on launch (or from the command line:
   `--kiosk [--session=<file>] [--display=<n>]`), with its sound playing if Sonify (or
@@ -2170,37 +2178,107 @@ or need to restart.
 
 ## Lights : DMX fixtures on the picture (key `T`)
 
-The **Lights** page (`T`, the **Lights** button in the bottom bar, `Ctrl+K` → Lights) brings
+The **Lights** page (`T`, the **LIGHTS** button in the Output page's header, `Ctrl+K` → Lights) brings
 DMX lights into Palinopsia : LED bars, spots and LED matrices, each placed on the picture
 it takes its light from, with or without the video in them, tuned to the physical light,
 with shows, light scenes of their own and a lighting console.
 
 - **Fixtures** : **+ bar** (an LED strip : a row of pixels along a line), **+ spot** (one
-  light : a small RGB spot, a PAR, a wash), **+ matrix** (a grid of pixels over a
-  rectangle). Each is drawn on the **map** over the picture : drag it and it takes its
-  pixels from another part of the image, drag the ends of a bar or the corners of a matrix
-  to reshape it (Shift keeps a bar level or upright), the arrows nudge it (Shift :
-  farther), Delete removes it, Ctrl+D duplicates it. Each pixel shows, live, the color it
-  sends. Under the fixtures : the picture the selected one reads (its layer, or the
-  master), the master always, or only the room (a grid).
+  light : a small RGB spot, a PAR, a wash), **+ ring** (pixels around a circle),
+  **+ matrix** (a grid of pixels over a rectangle). Each is drawn on the **map** over the
+  picture : drag it and it takes its pixels from another part of the image, drag the
+  ends of a bar or the corners of a matrix to reshape it (Shift keeps a bar's end level
+  or upright), the arrows nudge it (Shift : farther), Delete removes it, Ctrl+D
+  duplicates it. **Double-click a bar to bend it there** (a strip following the
+  architecture : its LEDs stay evenly spaced along the bends), drag a bend to move it,
+  double-click it to take it away. A ring : drag it by its circle, its handle sets the
+  radius and where its first LED is. Each pixel shows, live, the color it sends, and a
+  dot marks each light's first LED (where the wire comes in).
+  - **Picking several** : **Shift or Ctrl + click** (on the map or in the list), or drag
+    a **rubber band** around them on an empty part of the map (Shift or Ctrl : added to
+    the picked ones). Drag one and they all move, the arrows and Delete act on all of
+    them, and a look, a tuning, a profile or a show goes to all of them (the inspector
+    then says how many). **Place** (in that inspector) : all **in a row** or **in a
+    column**, **spread across** or **down** evenly between the two outermost, **mirror**
+    left to right or top to bottom (a bar's first LED goes to the other side, as a
+    mirrored rig is wired).
+  - **A row of** N (one light's inspector) : it and its copies spread evenly across the
+    picture (or down), addressed one after the other and picked, ready to be a group.
+  - **Under the lights** : the picture the selected one reads (its layer, or the master),
+    the master always, only the room (a grid), or a **photo** of the room (or a plan of
+    the stage : **photo…**, kept on this computer) to place each light where it really
+    is, with the picture over it at the opacity you set.
+  - **test** : a line sweeps the room, red, then green, blue and white : every light shows
+    whether it is where the map says and whether its colors come in the right order. It
+    ignores the masters and Black.
+  - **patch** (beside **map**) : every universe in use, 512 channels each, every light in
+    its color. Click one to select it, drag it to another channel to readdress it;
+    channels two lights share are red and counted. **address in order** readdresses every
+    light of an output one after the other from channel 1 (one that would cross into the
+    next universe starts it; a long pixel bar flows over, as pixel controllers expect).
+- **Groups** : lights that play together. Pick some, **+ group** (or **make a group** in
+  the inspector); click a group to pick its lights again, double-click to rename it,
+  **set** to make it the lights picked now. Each group has a **fader** that dims its
+  lights together after their own level (a light in two groups gets both) : in its row
+  (with an **M** for a modulator or a Macro knob), as a knob on the **console** (MIDI
+  Learn), in OSC (`/opsia/lights/group/<n or name>`). The groups are this computer's,
+  their faders the session's (and the light scenes keep them).
 - **The inspector** (click a fixture) :
-  - **Fixture** : its name, kind, LEDs (or columns × rows, serpentine), reversed, how
-    wide a patch each pixel averages, and **hold to identify** (it goes full white, to
-    find it in the room).
-  - **Patch** : its **output**, **universe** (network outputs) and **address**, and its
-    **channels** per pixel : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, RGBD, DRGBW, DRGBS,
-    RGBWAU, W, or your own (`R G B W A U D S X` or a number for a fixed value : a
-    dimmer `D` is sent full, a strobe `S` off). New fixtures are addressed after the
-    ones already there. A pixel never straddles two universes (170 RGB pixels to a
+  - **Fixture** : its name, kind, LEDs (a bar's bends, **straighten**; a ring
+    **clockwise** or not), reversed, a matrix's columns × rows and its **wiring** : the
+    corner its **first LED** is in, **rows** or **columns**, **zigzag** or not (the 16
+    ways a panel is wired, its path drawn small), how wide a patch each pixel reads, and
+    **hold to identify** (it goes full white, to find it in the room).
+  - **Patch** : its **output**, **universe** (network outputs) and **address** (with the
+    **DIP** switches that set it, 1 to 9, for a light that has them), and the
+    **light** it is : a **profile** that gives its channels in the right order and holds
+    the ones it does not use where they do nothing. Built in : pixel strips (RGB, GRB,
+    GRBW), LED bars with their own dimmer and strobe before RGB or RGBW pixels, RGB and
+    RGBW lights, dimmer + RGB (+ strobe, + white), RGBWA + UV, a 16-bit dimmer + RGBW,
+    dimmer + CMY, a plain dimmer (8 or 16 bits), an RGB panel. For a real light,
+    **import a fixture file** : find it on the Open Fixture Library
+    (open-fixture-library.org), Download, OFL JSON, and import it : every mode of the
+    light becomes a profile (pick the one the light is set to). Its intensity becomes the
+    dimmer (in 16 bits with its fine channel), its colors the color, a shutter or strobe
+    is held where it is open, pan and tilt at their middle (or their default), and the
+    rest (wheels, gobos, programs) at their default or where they do nothing; a pixel
+    bar's own channels go before its pixels. The imported profiles stay on this
+    computer. Under it, **each channel numbered from the address** with what it
+    carries. Or **its own channels** per pixel (and, for a bar or a matrix, **before**
+    the pixels : a dimmer there is the whole bar's, its brightest pixel, and the pixels
+    go out relative to it) : RGB, GRB, BRG, BGR, RGBW, GRBW, DRGB, D16RGB, RGBD, DRGBW,
+    D16RGBW, DRGBS, RGBWA, RGBWAU, W, L, L16, DCMY, or your own : `R G B W A U`, `C M Y`
+    (a subtractive mix), `L` (one channel of white : the luminance), `D` (a dimmer),
+    `S` (strobe, sent off), `X` (unused), a letter followed by `16` for two channels in
+    16 bits (`D16` : the dimmer and its fine channel), or a number for a channel held at
+    that value. **With a dimmer, the dimmer takes the light's level and the color goes
+    out at full strength** : the fades stay smooth down low (in 16 bits with `D16`, 65,536
+    steps instead of 256) and a dim color stays its color instead of drifting as its
+    channels run out of steps. New fixtures are addressed after the ones already there. A pixel never straddles two universes (170 RGB pixels to a
     universe, as pixel controllers expect); past an Enttec's 512 channels the rest is
     not sent and the patch says so.
   - **Look** : **picture** (the master where it sits), **layer** (L1 to L4, that
     layer's own picture), **color**, **gradient** (2 to 5 colors running across the
-    room at an angle, a scale, an offset and a drift, or **along** each fixture) or
-    **off**; an **effect** over it (**chase** : a band running across the room,
-    **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud,
-    **beat** : a flash on the beat), and its **level**. **to all** gives every fixture
-    this look. Effects never change more than three times a second, at any rate and speed.
+    room at an angle, a scale, an offset and a drift, or **along** each fixture; **from
+    the picture** takes the picture's main colors, left to right as they sit in it) or
+    **off**. A light reading the picture **reads** its patch as the **average** (calm,
+    but a busy picture can go beige), **vivid** (its most colorful part : the lights
+    keep the picture's colors) or **bright** (its brightest part); an **effect** over it (**chase** : a band running across the room,
+    **wave**, **pulse**, **sparkle**, **sound** : as bright as the sound is loud (all of
+    it, or its **lows**, **mids** or **highs** : the floor spots on the kick, the bars on
+    the cymbals), **beat** : a flash on the beat, **presence** : lit near the people the
+    Body page tracks, dim away from them (**near** : how near; the Room tracker's
+    everyone, or the one pose)), and its **level**. **to all** gives every fixture this
+    look. Effects never change more than three times a second, at any rate and speed.
+    **travels** : an effect goes **through the room** (by where each pixel is, at a
+    **direction**) or **light by light**, as a lighting console spreads a phase over a
+    group : **left to right**, **from the center**, **at random** or **odd and even**
+    (the lights with the same order make one set, each light a step : a chase hops from
+    light to light, a pulse ripples, a sparkle twinkles whole lights, a beat becomes a
+    step chase, one light a beat). **wings** (2 to 4) fold the order into mirrored parts
+    (2 : from both ends to the middle). **fan** spreads a hue across the room or along
+    the order, from one end to the other (a positive fan climbs toward yellow, as the
+    hue slider does).
   - **Tuning** : brightness, contrast, gamma (LEDs are linear : 2 or so looks like the
     screen), saturation, hue, warmth (a white balance), a black floor, and a smoothing
     that calms a busy picture's flicker. Kept **on this computer** (it belongs to the
@@ -2215,14 +2293,26 @@ with shows, light scenes of their own and a lighting console.
   unplugged and plugged in again or the computer wakes up (every two seconds; **scan**
   looks at once). The fixtures and outputs are this computer's patch : they stay when you
   open another session. The old Output page's light grid comes over once, as a matrix
-  on its own output.
+  on its own output. **find** (Art-Net, sACN, WLED) asks the network who is there (an
+  ArtPoll for Art-Net nodes, most sACN nodes answer it too; mDNS for WLED) : pick one
+  instead of typing its address. Each output has a **delay** (0 to 1000 ms) : the lights answer at
+  once and a projector shows the picture two or three frames late, so about 40 ms keeps
+  them together (0 for lights alone). An Art-Net output can **sync** : an ArtSync after
+  each frame, so the nodes that know it show all their universes at the same moment.
 - **Shows** : a look for every light at once, fading in : Follow the picture, Each its
-  layer, Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
+  layer, Picture colors (the picture's own colors as a gradient across the room), Warm white, Sunset, Ocean, Fire, Rainbow drift, White chase, Picture chase, On
   the beat, Sound reactive, Breathing, Night sparkle, Dark. They fit any room : their
   patterns run across the space, so each light takes its part from where it stands.
-- **Light scenes** : looks for the lights apart from Palinopsia's scenes : **+ save**,
-  click to bring one back (over the scene fade), double-click to rename. Saved with the
-  session, with the looks and the masters.
+- **Light cues** : looks for the lights apart from Palinopsia's scenes, played as a cue
+  list. **+ save** keeps what they show now (the looks, the masters, the group faders);
+  click a cue to bring it (over its fade), **GO** for the next (after the last : the
+  first), **◀ back** for the one before, double-click to rename. **⚙** on a cue : its own
+  **fade** (empty : the console's scene fade), **then** a follow time (while the cues
+  **follow** on, the next one goes that long after this one is in; 0 : it waits for
+  GO) and **with** a Palinopsia scene (recalling that scene brings this cue : the picture
+  and its lights together). The cue in now shows its progress. Saved with the session;
+  the [Seq page](#sequencer-key-q) has them as a lane. GO, back and follow take MIDI
+  Learn, and OSC (`/opsia/lights/go`, `back`, `cues`).
 - **The console** : **MASTER** (the grand master), **SPEED** (every effect's and
   gradient's clock), **SCENE FADE**, **BLACK TIME** and **BLACK** (every light down over
   the black time, and back), plus the master and the speed as sliders for a modulator.

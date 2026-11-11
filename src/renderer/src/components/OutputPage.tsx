@@ -80,7 +80,7 @@ export function OutputPage({
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const setShareActive = useStore((s) => s.setShareActive)
-  const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0)
+  const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0 && s.lightRig.outputs.some((o) => o.enabled))
   // Installation mode : a persisted "enable on next restart" launch config (main
   // owns kiosk.json). Load it once; toggling writes it back.
   const sessionPath = useStore((s) => s.sessionPath)
@@ -343,6 +343,17 @@ export function OutputPage({
         <span className="font-mono text-[13px] font-semibold uppercase tracking-[0.2em]">
           Output · Mapping
         </span>
+        {/* Lights : the DMX fixtures mapped on the picture (also T). Lit while
+            they send. From the Output page's own window it opens in the app's. */}
+        <button
+          onClick={() => useStore.getState().setLightsPageOpen(true)}
+          className={`rounded border px-3 py-1 font-mono text-[11px] font-semibold tracking-[0.15em] transition-colors ${
+            lightsOn ? 'border-accent/60 bg-accent/15 text-accent' : 'border-border text-muted hover:text-accent'
+          }`}
+          title={`Lights : DMX fixtures (LED bars, spots, matrices) placed on the picture, with shows, light scenes and a console (T). Lit while they send.${inWindow ? ' It opens in the app window.' : ''}`}
+        >
+          {lightsOn ? '◉ LIGHTS' : 'LIGHTS'}
+        </button>
         <div className="flex-1" />
         {/* In its own window (from the Output button's right-click menu) : back
             in over the instrument. */}
@@ -929,15 +940,6 @@ export function OutputPage({
                 </button>
               ))}
             </div>
-          </Section>
-
-          <Section
-            title="Lights"
-            info="DMX lights have their own page now : LED bars, spots and matrices placed on the picture, each taking the master, a layer, a color or a gradient, tuned for its physical light, with light scenes, shows and a console of masters. Out through an Enttec DMX USB Pro, Art-Net, sACN or WLED."
-          >
-            <button onClick={() => useStore.getState().setLightsPageOpen(true)} className={`w-full ${btn(lightsOn)}`}>
-              {lightsOn ? '◉ ' : ''}Open the Lights page (T)
-            </button>
           </Section>
 
           <Section

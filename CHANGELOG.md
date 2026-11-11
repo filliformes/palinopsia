@@ -56,8 +56,10 @@ that CI builds into cross-platform releases.
   - **Persistence** : the rig in localStorage (`opsia.lightRig`; the old `opsia.lights`
     grid migrated once into a matrix + its output), the look / scenes / masters in the
     session (`lights`; an older file : every light follows the picture; New clears them).
-  - The Output page's Lights section now opens the page; the Performance chip and its
-    meter row read the Lights. `LightConfig` and the zone grid are gone.
+  - The **LIGHTS** button in the Output page's header opens the page (lit while the lights
+    send; the bottom bar stays as it was : Vincent, "Lights n'a pas besoin d'être dans la
+    toolbar du bas"); the Output page's old light section is gone; the Performance chip and
+    its meter row read the Lights. `LightConfig` and the zone grid are gone.
   - Tested : 25 Node checks of the engine and the packets (colors and layouts, universes,
     the Enttec overflow, Black, master, sampling left / right and reversed, serpentine,
     sanitizers, the Enttec message, Art-Net and sACN received on 127.0.0.1); in the test
@@ -66,6 +68,156 @@ that CI builds into cross-platform releases.
     breathing it (smoothed), a session round trip with its light scenes, the map's drags,
     an Enttec output with nothing plugged in (looking, no error). **Not verified : a real
     Enttec Pro** (none here).
+- **Lights, closer to the lighting world (1/4) : the dimmer, the picture's colors, the
+  output delay** (Vincent picked 1 to 12 of the 11-10 suggestions, from Resolume's DMX
+  output and ossia score).
+  - **The dimmer takes the level.** With a `D` in a layout the dimmer channel now carries
+    the light's level (the brightest of its three colors, after the tuning) and the
+    color goes out normalized to full, the same light on a linear fixture but with the
+    dimmer's resolution : smooth low fades, and a dim color that stays its color. Before,
+    `D` was held at 255 and the 8-bit color carried everything. **New tokens** : a
+    letter followed by `16` is two channels, coarse and fine (`D16`, `R16`... : the
+    dimmer in 65,536 steps), `C M Y` (a subtractive mix, the color's complement), `L`
+    (one channel of white : the luminance, for a dimmer-only or white fixture). New
+    layouts in the menu : D16RGB, D16RGBW, RGBWA, L, L16, DCMY. `tokenWidth` /
+    `layoutChannels` in shared/lights.ts; `fixtureChannels` counts 16-bit tokens twice.
+  - **How a pixel reads the picture** (`LightLook.sample`) : **average** (nine taps, as
+    before), **vivid** (25 taps weighed by chroma cubed : a few strong colors are not
+    drowned in a grey patch) or **bright** (weighed by luma to the fourth).
+  - **The picture's colors** : `paletteOf(grid)` reads every cell of the master's light
+    grid into twelve hue bins (weighed by chroma squared × value; greys count little),
+    keeps the bins over 4 % of the strongest (2 to 5), each at full strength, ordered by
+    where they sit from left to right. The gradient editor's **from the picture**, and
+    a new show **Picture colors**. The master is now always in the light readback (it
+    is the palette's source).
+  - **Output delay** (`LightOutput.delay`, 0..1000 ms, per output) : each output's frame
+    goes out that much later (an Enttec's and the network's alike), so the lights land
+    with a projector's picture; **sync** on an Art-Net output closes each frame with an
+    ArtSync (OpSync 0x5200, 14 bytes), new packet kind `artsync` in `DmxSender`.
+  - Tested : 37 Node checks (12 new : the dimmer at 0.5 and in 16 bits, a dim orange
+    keeping its color, L, L16, DCMY, the channel counts, vivid against average, bright,
+    the palette and an empty one, ArtSync received on 127.0.0.1). In the test copy : the
+    D16RGB spot on the wire at level 0.4 (102 102 / 0 0 255), one ArtSync per frame at 40
+    fps, the delay measured from a color change to its packet (2 to 18 ms at 0, 314 to
+    332 ms at 300), the palette read from the live readback of three themes.
+- **Lights, closer to the lighting world (2/4) : groups, several lights at once, fixture
+  profiles and Open Fixture Library files.**
+  - **Picking several** (`lightPicked`) : Shift / Ctrl + click on the map or in the list;
+    a drag moves them all, the arrows and Delete act on all; the inspector becomes
+    **N lights** (`ManyInspector`) : the look, the tuning and the profile go to all of
+    them (`setLightLooks`, `setLightTunes`, `applyLightProfile(ids)`), the values shown
+    are the selected one's, no M there (one light's or a group's sliders take it). A
+    show goes to the picked lights alone when several are picked (`applyLightShow(id,
+    ids)`; the section title says so).
+  - **Groups** (`LightRig.groups`, this computer's; `LightsSession.groups` their faders,
+    the session's, kept in light scenes) : + group from the picked lights, click to pick
+    them, rename, set, remove (its modulation goes with it). A group's **fader** multiplies
+    its lights' levels in the engine; it is a modulation target (`{ kind: 'light',
+    fixture: 'grp:<id>', field: 'level' }`, through lightBaseValue / commitLightValue
+    and the Modulate panel's label), a console knob (MIDI Learn `lights:group:<id>`;
+    every `lights:` id is now a continuous target) and OSC `/opsia/lights/group/<n or
+    name>`.
+  - **Profiles** (`shared/lightProfiles.ts`, 17 built in, generic names) and **Open
+    Fixture Library files** (`lights/ofl.ts`, `readOfl`) : every mode of a file becomes
+    a profile; Intensity → `D` (with a fine alias right after it : `D16`), ColorIntensity
+    → R G B W A U C M Y, ShutterStrobe held at its Open (or NoFunction) range, Pan /
+    Tilt at their default or 128, everything else at its default value, its NoFunction
+    or first wheel slot, or 0; a dimmer-only mode's dimmer becomes `L`; a matrix block
+    (per pixel) becomes the pixel layout of a bar or a matrix, the channels before and
+    after it the fixture's **head** and **tail**; a per-channel matrix is left out and
+    said. Imported profiles live in the rig (`LightRig.profiles`, up to 128). The patch
+    shows **each channel numbered** (an imported profile's own labels : "shutter (held
+    open at 8)").
+  - **Head and tail** (`LightFixture.head / tail / profile`) : channels sent once before
+    and after the pixels. A `D` there is the whole fixture's dimmer (its brightest
+    pixel) and the pixels go out relative to it; colors there are the fixture's mean.
+    A block never straddles two universes.
+  - Tested : 54 Node checks (17 new : a bar's head dimmer and its pixels relative to
+    it, a tail, the group faders multiplied and a light in two, group levels sanitized
+    and kept in scenes, a built-in profile, an OFL file of four modes : the 11-channel
+    mode's layout and its bytes on the wire, the pixel mode's head / pixels / tail, a
+    dimmer-only mode, the per-channel one left out, junk files). In the test copy : four
+    spots picked with Ctrl + click in the list, made a group, Sunset given to them alone,
+    the group fader at 0.3 and its console knob, a built-in profile on a bar, an OFL
+    file imported through the page's own file input (three modes, the channel map read
+    out), the rig saved with its group and profiles.
+- **Lights, closer to the lighting world (3/4) : the patch view, the test pattern, finding
+  the nodes, bends and rings and the 16 matrix wirings, placing faster.**
+  - **Patch view** (map | patch) : every universe in use as a 32 × 16 grid, each light in
+    its color (hashed from its id), shared channels red and counted, click to select,
+    drag to readdress (`fixtureSpans` in shared/lights.ts : the engine's own block
+    placement, so the view and the bytes agree); **address in order** per output
+    (`addressedInOrder` : one after the other, a light that would cross starts the next
+    universe, a long pixel bar flows over). The inspector shows the **DIP** switches of
+    the address (`dipOf`).
+  - **The test pattern** (`lightTest`, the engine's `test`) : a line sweeping the room
+    diagonally at 0.35 passes a second, red, green, blue, white in turn, past the
+    masters, Black, the tuning and the smoothing.
+  - **Finding the nodes** (`discoverLights` in main/light.ts, IPC `light:discover`) : an
+    ArtPoll to every IPv4 broadcast (the socket on 6454 with reuseAddr, or any port),
+    ArtPollReplies read (`parseArtPollReply` : IP, names, the output ports' 15-bit
+    universes); WLED by mDNS (`_wled._tcp`, `wledFromResponse`). **find** on Art-Net,
+    sACN and WLED outputs.
+  - **Shapes** : `LightKind` 'ring' (a circle around (x0, y0), its first LED at (x1, y1),
+    round in the room's proportions, clockwise or not); a strip's `bends` (double-click
+    to add, drag, double-click to remove, straighten; LEDs evenly spaced by length in
+    the room : `fixturePoints(f, aspect)`, the aspect now in the engine's geometry
+    signature); a matrix's `start` corner and `byCols` with the zigzag : the 16 wirings
+    (`matrixCells`; the old `reverse` still reads as before), drawn as a small path in
+    the inspector. The map draws every kind from `fixturePoints`, and marks each light's
+    first LED.
+  - **Placing** : a rubber band on the empty map picks (Shift / Ctrl adds); **Place** for
+    several lights (in a row, in a column, spread across / down, mirror left-right /
+    top-bottom, bends included); **a row of N** across or down from one light
+    (`rowOf` : addressed in turn, picked); a **photo** of the room under the map
+    (downscaled to 1280 px JPEG, localStorage `opsia.lightPhoto`) with the picture over
+    it at an opacity.
+  - Tested : 81 Node checks (27 new : an L-shaped bar's LEDs evenly spaced and its
+    middle on the bend, a ring's radius, first LED and direction, the matrix wirings
+    including all 16 distinct, the spans of a long bar with a head and the engine's bytes
+    exactly on them, an Enttec's cut, address in order with a crossing, a row of 4 and
+    its addresses, DIP 37, the test pattern's red then green through Black, an
+    ArtPollReply, a WLED mDNS answer, the discovery finding a fake node on 127.0.0.2). In
+    the test copy : a bend by double-click and its drag, a matrix wired from the bottom
+    right by columns in zigzag, a rubber band, a row of 4, an overlap in the patch view
+    (72 channels red) cleared by address in order, the test pattern, a room photo through
+    the page's input.
+- **Lights, closer to the lighting world (4/4) : light by light, wings and fans, cues,
+  presence, the sound by band.**
+  - **Light by light** (`LightLook.order` : room / ltr / center / random / oddeven,
+    `wings` 1 to 4) : the fixtures with the same order and wings make a set, ranked (by
+    their middle from left to right, from the room's center, by a hash of their id, or
+    alternating), each at (rank + 0.5) / N, folded into mirrored wings. A chase or a
+    wave runs over that place (the whole light one step), a pulse ripples, a sparkle
+    twinkles whole lights, the beat becomes a step chase (one distinct place a flash).
+    The room order keeps everything as before.
+  - **Fan** (`LightLook.fan`, -180..180°, modulatable) : a hue turn of fan × (place -
+    0.5), the place along the order or across the room at the effect's direction (the
+    room's four corners projected); the color wheel's way, as the color's hue slider.
+  - **Presence** (effect `presence`) : 1 - depth + depth × the nearest person's
+    exp(-1.5 (d / near)²), the people from the Body page (the Room tracker's boxes, or
+    the pose's visible points; mirrored as the Body page is), read only while a light
+    uses it.
+  - **The sound by band** (`LightLook.band` : all / lows / mids / highs) : the six
+    bands paired, each smoothed (60 ms).
+  - **Cues** (`LightScene.fade / follow / link`; store `lightCue`, `lightCueAt`,
+    `lightCueRun`, `lightFadeSec`, `goLightCue`, `setLightCueRun`, `updateLightScene`) :
+    the light scenes are a cue list (`components/LightCues.tsx`, on the Lights page and
+    as the Seq page's **Light cues** lane, `SeqLaneId` 'lights' : the transport starts it
+    when a cue has a follow time). Each cue's own fade; while following, the next goes
+    its follow time after the cue is in; a Palinopsia scene's recall brings the cue tied
+    to it. MIDI `fire:lightsgo`, `fire:lightsback`, `fire:lightscues`; OSC
+    `/opsia/lights/go`, `back`, `cues`.
+  - **Fixed** : light scenes saved in the same millisecond (a script, OSC `save` twice)
+    took the same id, so a cue list could never move past them; a saved scene now gets
+    a random suffix, and a session's duplicate ids are made apart when it loads.
+  - Tested : 90 Node checks (9 new : the chase from the first light to the second left
+    to right, wings 2 lighting both ends together, from the center, the beat's step
+    chase, presence near a person, the lows against the highs, the fan's two ends turned
+    apart, the new fields sanitized, two cues with one id made apart). In the test copy :
+    three cues following on (the second at 1.43 s and the third at 2.89 s for a 0.4 s
+    fade and a 1 s follow), a Palinopsia scene bringing its cue, GO and back, the Seq
+    lane, six spots in a light-by-light chase with wings 2 and a fan.
 - **dataflou : the data view, what flows in and out live** (Vincent : "une façon de
   visualiser le data entrant et sortant de dataflou directement dans la section dataflou").
   A **data** box in the Connect tab's dataflou section, above the connections : each of our

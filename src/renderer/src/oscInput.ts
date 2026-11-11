@@ -1227,7 +1227,8 @@ function route(address: string, args: Args, host = ''): void {
       // The Lights page : /opsia/lights/master · speed (0..1 : ×0..4) · black (a
       // value, or none to turn it over) · on · scene (its number, or its name) ·
       // save (a light scene of what shows now) · show (a show's name or id) ·
-      // fade (0..1 : 0..20 s).
+      // fade (0..1 : 0..20 s) · group/<its number or name> (its fader, 0..1) ·
+      // go · back (the light cues) · cues (following on, a value or none to turn it over).
       const k = segs[2]
       if (k === 'master') st.setLightsMaster({ brightness: Math.max(0, Math.min(1, n)) })
       else if (k === 'speed') st.setLightsMaster({ speed: Math.max(0, Math.min(1, n)) * 4 })
@@ -1236,11 +1237,22 @@ function route(address: string, args: Args, host = ''): void {
       else if (k === 'black') st.setLightsBlack(args.length ? n >= 0.5 : !st.lightsBlack)
       else if (k === 'on') st.setLightRig({ on: args.length ? n >= 0.5 : !st.lightRig.on })
       else if (k === 'save') st.saveLightScene()
+      else if (k === 'go') st.goLightCue(1)
+      else if (k === 'back') st.goLightCue(-1)
+      else if (k === 'cues') st.setLightCueRun(args.length ? n >= 0.5 : !st.lightCueRun)
       else if (k === 'scene') {
         const s = firstStr(args)
         const list = st.lightsSession.scenes
         const sc = s ? list.find((x) => x.name.toLowerCase() === s.trim().toLowerCase()) : list[Math.round(n) - 1]
         if (sc) st.recallLightScene(sc.id)
+      } else if (k === 'group') {
+        const raw = segs[3] ?? ''
+        let key = raw
+        try { key = decodeURIComponent(raw) } catch { /* a stray % : as typed */ }
+        key = key.trim().toLowerCase()
+        const list = st.lightRig.groups
+        const g = /^\d+$/.test(key) ? list[Number(key) - 1] : list.find((x) => x.name.toLowerCase() === key || x.name.toLowerCase().replace(/\s+/g, '-') === key)
+        if (g && args.length) st.setLightGroupLevel(g.id, Math.max(0, Math.min(1, n)))
       } else if (k === 'show') {
         const s = (firstStr(args) ?? '').trim().toLowerCase()
         const sh = LIGHT_SHOWS.find((x) => x.id === s || x.name.toLowerCase() === s)

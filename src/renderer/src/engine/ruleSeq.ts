@@ -242,15 +242,18 @@ export function tickRuleSeq(now = performance.now()): void {
  *  sequencer, the rule timeline). */
 export function seqTransportPlaying(): boolean {
   const st = useStore.getState()
-  return st.ruleSeqOn || st.soniKeySeq.on || (st.sequence.enabled && st.sequence.running)
+  return st.ruleSeqOn || st.soniKeySeq.on || (st.sequence.enabled && st.sequence.running) || st.lightCueRun
 }
 
 /** What the transport's play would start now : the lanes it starts that have
  *  something to play. */
-export function seqTransportReady(): { scenes: boolean; keys: boolean; rules: boolean } {
+export function seqTransportReady(): { scenes: boolean; keys: boolean; rules: boolean; lights: boolean } {
   const st = useStore.getState()
   const a = st.seqLanes.arm
-  return { scenes: a.scenes && st.scenes.length > 1, keys: a.keys, rules: a.rules && st.ruleSeq.blocks.length > 0 }
+  return {
+    scenes: a.scenes && st.scenes.length > 1, keys: a.keys, rules: a.rules && st.ruleSeq.blocks.length > 0,
+    lights: a.lights && st.lightsSession.scenes.some((c) => (c.follow ?? 0) > 0)
+  }
 }
 
 /** Play : every lane the transport starts (each on its own time : the scenes
@@ -268,6 +271,7 @@ export function seqTransportPlay(): void {
   }
   if (r.keys && !st.soniKeySeq.on) st.setSoniKeySeqOn(true)
   if (r.rules && !st.ruleSeqOn) st.setRuleSeqOn(true)
+  if (r.lights && !st.lightCueRun) st.setLightCueRun(true)
 }
 
 /** Stop : every lane, whichever started it. */
@@ -276,6 +280,7 @@ export function seqTransportStop(): void {
   if (st.sequence.running) st.toggleSequenceRunning()
   if (st.soniKeySeq.on) st.setSoniKeySeqOn(false)
   if (st.ruleSeqOn) st.setRuleSeqOn(false)
+  if (st.lightCueRun) st.setLightCueRun(false)
 }
 
 export function seqTransportToggle(): void {
