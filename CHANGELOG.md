@@ -13,7 +13,8 @@ that CI builds into cross-platform releases.
   computer's, the LOOK the session's), `lights/lightEngine.ts` (pure CPU), `lightRuntime.ts`
   (the render loop's side), `enttec.ts`, `lightShows.ts`, `lightStore.ts`, `lightMods.ts`,
   `components/LightsPage.tsx`, `main/light.ts` (now `DmxSender`).
-  - **Fixtures** : LED bars (a line of N pixels), spots, matrices (cols × rows, serpentine),
+  - **Fixtures** (the list is called **Lights** since) : LED bars (a line of N pixels),
+    spots, matrices (cols × rows, serpentine),
     placed on the picture (0..1, y down) and edited on the map over their source (drag the
     body or the ends / corners, Shift keeps a bar level, arrows nudge, Delete, Ctrl+D);
     each pixel drawn in the color it sends. Patch : output, universe, address (new ones
@@ -33,9 +34,11 @@ that CI builds into cross-platform releases.
     proportions (x × aspect).
   - **Tuning** per fixture : brightness, contrast, gamma (default 2 : LEDs are linear),
     saturation, hue (YIQ rotation), warmth, a black floor, smoothing (default 0.08 s);
-    kept in the rig or, with `tuneScope : 'look'`, in the session and the light scenes.
-  - **Masters** : grand master, speed, scene fade, Black (down over its time, eased); the
-    top bar's Black takes the lights down too. Light scenes fade in from what showed
+    kept in the rig or, with `tuneScope : 'look'`, in the session and the light scenes
+    (the cues, below).
+  - **Masters** : grand master, speed, scene fade (the knob reads **CUE FADE** since),
+    Black (down over its time, eased); the top bar's Black takes the lights down too.
+    Light scenes (now the cues) fade in from what showed
     (`lightFadeEpoch` → `LightEngine.beginFade`). 14 shows (`lightShows.ts`), spatial so
     they fit any room.
   - **Outputs** : the **Enttec DMX USB Pro** through **Web Serial** in the renderer (no
@@ -65,7 +68,7 @@ that CI builds into cross-platform releases.
     sanitizers, the Enttec message, Art-Net and sACN received on 127.0.0.1); in the test
     copy : the rig across a restart, 40 frames a second sent for a 40 fps rig, Art-Net
     packets out with the picture's colors, Black to 0, a 1 Hz square on a spot's level
-    breathing it (smoothed), a session round trip with its light scenes, the map's drags,
+    breathing it (smoothed), a session round trip with its light scenes (cues), the map's drags,
     an Enttec output with nothing plugged in (looking, no error). **Not verified : a real
     Enttec Pro** (none here).
 - **Lights, closer to the lighting world (1/4) : the dimmer, the picture's colors, the
@@ -110,7 +113,7 @@ that CI builds into cross-platform releases.
     show goes to the picked lights alone when several are picked (`applyLightShow(id,
     ids)`; the section title says so).
   - **Groups** (`LightRig.groups`, this computer's; `LightsSession.groups` their faders,
-    the session's, kept in light scenes) : + group from the picked lights, click to pick
+    the session's, kept in light scenes : the cues) : + group from the picked lights, click to pick
     them, rename, set, remove (its modulation goes with it). A group's **fader** multiplies
     its lights' levels in the engine; it is a modulation target (`{ kind: 'light',
     fixture: 'grp:<id>', field: 'level' }`, through lightBaseValue / commitLightValue
@@ -369,6 +372,13 @@ that CI builds into cross-platform releases.
   Body and click-to-play cards; the OSC reference's twelve voices; the cheat-sheet's
   click-to-play row (Relief, Fur, Sand Plate, Drape) and the rule timeline's gestures; the
   two hints Drape lacked (light angle, light height).
+- **The docs for v1.3.3, the Lights release** : the release notes written out (Lights :
+  setting up, playing, shows, cues, setups, outputs; dataflou; one slot held for RDM until
+  `feat-rdm` merges); the README's Lights section in the page's own words (lights, cues,
+  kind, area, **CUE FADE**, the console's group knobs and sliders), `T` in the keyboard
+  table, the Lights page in the intro, the contents, the Output page and the Seq lanes;
+  the OSC reference's `/opsia/lights/brightness · saturation · contrast` row and its cue
+  wording; the site's **New in v1.3.3** block (held until the release is published).
 
 ## v1.3.2 — 2026-11-08
 
