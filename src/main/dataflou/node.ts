@@ -39,6 +39,8 @@ const MAX_FRAME = 1 << 20
 const MAX_SUBS = 4
 const MAX_MONITORS = 256 // the visualizer's live values : at most this many remote params
 const MONITOR_RATE_HZ = 10
+const WATCH_RATE_HZ = 30 // a watched value draws a line : a little finer than the page's
+const MAX_WATCHES = 64
 
 /** The mesh as the visualizer page reads it (the reference VisServer's snapshot). */
 export interface VisParam {
@@ -205,6 +207,12 @@ export class DataflouNode {
   private monitorOn = false
   private monitors: DfSub[] = []
   private lastMonitorKeepalive = 0
+  // outside values watched in the Connect tab's data view (◉) : streamed like the
+  // page's monitors (a stream with no destination), kept whether a page is open
+  private watches: DfSub[] = []
+  private watchAt = new Map<string, number>()
+  private watchCount = new Map<string, number>()
+  private watchRate = new Map<string, number>()
   visualizerClients = 0
   private byPath = new Map<string, DfParam>()
   private values = new Map<string, DfValue>()
@@ -345,6 +353,8 @@ export class DataflouNode {
       this.pollMonitors(now)
       this.inRate = this.inCount
       this.inCount = new Map()
+      this.watchRate = this.watchCount
+      this.watchCount = new Map()
       for (const t of this.targets) { t.perSec = t.sent ?? 0; t.sent = 0 }
       this.rxPerSec = this.rx
       this.txPerSec = this.tx
@@ -1061,8 +1071,16 @@ export class DataflouNode {
     if (!pkt) return
     const out: Array<{ path: string; value: DfValue; type: DfType }> = []
     const srcSku = this.skuOfHash(pkt.skuHash)
+    const now = Date.now()
     for (const e of pkt.entries) {
-      if (srcSku) this.remoteVals.set(`${srcSku}\n${e.path}`, e.value)
+      if (srcSku) {
+        const k = `${srcSku}\n${e.path}`
+        this.remoteVals.set(k, e.value)
+        if (this.watchAt.has(k)) {
+          this.watchAt.set(k, now)
+          this.watchCount.set(k, (this.watchCount.get(k) ?? 0) + 1)
+        }
+      }
       for (const [dest, list] of this.subs) {
         for (const s of list) {
           if (s.path !== e.path || crc32Sku(s.sku) !== pkt.skuHash) continue
@@ -1125,11 +1143,18 @@ export class DataflouNode {
   setMonitoring(on: boolean): void {
     if (on === this.monitorOn) return
     this.monitorOn = on
-    if (on) this.pollMonitors(Date.now())
-    else {
-      for (const m of this.monitors) this.stopMonitor(m)
-      this.monitors = []
-    }
+    this.pollMonitors(Date.now(), true) // (off : the watched ones stay)
+  }
+
+  /** The outside values to watch (sku + path), from the Connect tab. */
+  setWatches(list: DfSub[]): void {
+    const key = (m: DfSub): string => `${m.sku}\n${m.path}`
+    this.watches = list.filter((m) => m && typeof m.sku === 'string' && typeof m.path === 'string' && m.sku !== this.identity.sku).slice(0, MAX_WATCHES)
+    const keep = new Set(this.watches.map(key))
+    for (const k of [...this.watchAt.keys()]) if (!keep.has(k)) this.watchAt.delete(k)
+    for (const k of keep) if (!this.watchAt.has(k)) this.watchAt.set(k, 0)
+    this.pollMonitors(Date.now(), true)
+    this.host.onChange()
   }
 
   private stopMonitor(m: DfSub): void {
@@ -1137,25 +1162,43 @@ export class DataflouNode {
     if (peer) this.send(peer, encodeStreamStop(++this.seq, this.identity.sku, m.path, '', this.identity.sku))
   }
 
-  private pollMonitors(now: number): void {
-    if (!this.monitorOn || !this.running) return
+  /** The streams with no destination this node keeps open : every remote value
+   *  while a page is open (monitors), and the watched ones always. `fresh` : the
+   *  set changed (a watch toggled) : new ones are asked at once. */
+  private pollMonitors(now: number, fresh = false): void {
+    if (!this.running) return
     const keepalive = now - this.lastMonitorKeepalive >= KEEPALIVE_MS
+    const key = (m: DfSub): string => `${m.sku}\n${m.path}`
     const wanted: DfSub[] = []
-    for (const [sku, w] of this.world) {
-      if (w.local || !w.online || !this.peerOf(sku)) continue
-      for (const p of w.params) {
-        if (p.kind !== 'param' || wanted.length >= MAX_MONITORS) continue
-        wanted.push({ sku, path: p.path })
+    const seen = new Set<string>()
+    const add = (m: DfSub): void => {
+      const k = key(m)
+      if (seen.has(k)) return
+      seen.add(k)
+      wanted.push(m)
+    }
+    for (const m of this.watches) {
+      const w = this.world.get(m.sku)
+      if (w && !w.local && w.online && this.peerOf(m.sku)) add(m)
+    }
+    if (this.monitorOn) {
+      for (const [sku, w] of this.world) {
+        if (w.local || !w.online || !this.peerOf(sku)) continue
+        for (const p of w.params) {
+          if (p.kind !== 'param' || wanted.length >= MAX_MONITORS + this.watches.length) continue
+          add({ sku, path: p.path })
+        }
       }
     }
-    const key = (m: DfSub): string => `${m.sku}\n${m.path}`
     const had = new Set(this.monitors.map(key))
-    const want = new Set(wanted.map(key))
-    for (const m of this.monitors) if (!want.has(key(m))) this.stopMonitor(m)
+    for (const m of this.monitors) if (!seen.has(key(m))) this.stopMonitor(m)
+    const watched = new Set(this.watches.map(key))
     for (const m of wanted) {
-      if (!keepalive && had.has(key(m))) continue
+      if (!keepalive && had.has(key(m)) && !fresh) continue
+      if (!keepalive && had.has(key(m)) && fresh && !watched.has(key(m))) continue
       const peer = this.peerOf(m.sku)
-      if (peer) this.send(peer, encodeStreamRequest(++this.seq, this.identity.sku, m.path, '', this.identity.sku, this.udpPort, MONITOR_RATE_HZ))
+      const rate = watched.has(key(m)) ? WATCH_RATE_HZ : MONITOR_RATE_HZ
+      if (peer) this.send(peer, encodeStreamRequest(++this.seq, this.identity.sku, m.path, '', this.identity.sku, this.udpPort, rate))
     }
     this.monitors = wanted
     if (keepalive) this.lastMonitorKeepalive = now
@@ -1217,7 +1260,9 @@ export class DataflouNode {
       if (seen.has(path) || now - at > 10_000) continue
       inRows.push({ path, label: this.byPath.get(path)?.label || path, value: this.lastIn.get(path) ?? null, peers: ['set'], ageMs: now - at, perSec: this.inRate.get(path) ?? 0, live: true })
     }
-    const outRows: DfIoRow[] = this.targets.map((t) => ({
+    // wires only : a stream with no destination is a node monitoring us (its
+    // visualizer page asks for every value), counted on one line instead
+    const outRows: DfIoRow[] = this.targets.filter((t) => t.destPath !== '').map((t) => ({
       path: t.localPath,
       label: this.byPath.get(t.localPath)?.label || t.localPath,
       value: this.values.get(t.localPath) ?? null,
@@ -1226,7 +1271,29 @@ export class DataflouNode {
       perSec: t.perSec ?? 0,
       live: live(t.destSku)
     }))
-    return { sku: me, label: this.identity.label, in: inRows, out: outRows, rxPerSec: this.rxPerSec, txPerSec: this.txPerSec }
+    const by = new Map<string, number>()
+    for (const t of this.targets) if (t.destPath === '' && live(t.destSku)) by.set(t.destSku, (by.get(t.destSku) ?? 0) + 1)
+    const watchedBy = [...by].map(([sku, count]) => ({ label: name(sku), count }))
+    const watched: DfIoRow[] = this.watches.map((m) => {
+      const k = `${m.sku}\n${m.path}`
+      const w = this.world.get(m.sku)
+      const p = w?.byPath.get(m.path)
+      const at = this.watchAt.get(k) || 0
+      // its group with it : two gloves both have a 'pitch'
+      const segs = m.path.split('/')
+      const leaf = p?.label || segs[segs.length - 1]
+      return {
+        sku: m.sku,
+        path: m.path,
+        label: segs.length > 1 ? `${segs[segs.length - 2]} · ${leaf}` : leaf,
+        value: this.remoteVals.get(k) ?? null,
+        peers: [`${name(m.sku)}/${m.path}`],
+        ageMs: at ? now - at : null,
+        perSec: this.watchRate.get(k) ?? 0,
+        live: !!w && w.online && live(m.sku)
+      }
+    })
+    return { sku: me, label: this.identity.label, in: inRows, out: outRows, watched, watchedBy, rxPerSec: this.rxPerSec, txPerSec: this.txPerSec }
   }
 
   status(): DfStatus {

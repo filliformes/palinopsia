@@ -89,6 +89,7 @@ const api: ExposedApi = {
   dataflouVisualizer: (open) => ipcRenderer.invoke('dataflou:visualizer', open),
   dataflouStatus: () => ipcRenderer.invoke('dataflou:status'),
   dataflouIo: () => ipcRenderer.invoke('dataflou:io'),
+  dataflouWatch: (list) => ipcRenderer.send('dataflou:watch', list),
   dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
   dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),
   dataflouForget: (sku) => ipcRenderer.invoke('dataflou:forget', sku),

@@ -41,6 +41,7 @@ let node2: DataflouNode | null = null
 let actions2On = 0
 let actions2Dropped = 0
 let companionOp: Promise<void> = Promise.resolve()
+let watches: DfSub[] = []
 
 const dir = (): string => {
   const d = join(app.getPath('userData'), 'dataflou')
@@ -280,6 +281,7 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
       await n.start()
       node = n
       n.visualizerClients = visClients
+      n.setWatches(watches)
       visualizerNodeChanged()
       log('info', `[dataflou] on the mesh as ${label} (universe ${universe}), DECLARE ${n.declareBytes()} bytes`)
     } catch (e) {
@@ -341,6 +343,15 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
     node ? node.subscribeRemote(a.destSku, a.destPath, a.srcSku, a.srcPath, !!a.on) : false
   )
   ipcMain.handle('dataflou:io', () => [node, node2].filter((n): n is DataflouNode => !!n).map((n) => n.io()))
+  // the outside values watched in the data view (the renderer keeps the list)
+  ipcMain.on('dataflou:watch', (_e, list: unknown) => {
+    if (!Array.isArray(list)) return
+    watches = list
+      .filter((m): m is DfSub => !!m && typeof m.sku === 'string' && typeof m.path === 'string' && m.path.length < 200)
+      .slice(0, 64)
+      .map((m) => ({ sku: m.sku, path: m.path }))
+    node?.setWatches(watches)
+  })
   // Back from sleep, or the network changed under us : each node looks for the
   // mesh again (its lost peers dialled at once, mDNS from the address we have now).
   const wakeAll = (why: string): void => {

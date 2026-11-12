@@ -3999,14 +3999,19 @@ tab has the whole setup :
   that went offline; **forget** removes it from the whole mesh), with what it publishes
   (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
   wires that source to one of Palinopsia's destinations, **← Palinopsia…** feeds that
-  destination from one of Palinopsia's sources.
-- **data** : what flows in and out, live. Each of Palinopsia's destinations a node feeds
-  (↙ : from which node and parameter) and each of its sources a node listens to (↗ : to
-  where), with the value now, its last seconds as a small line (a swatch for a color), and
-  how many values a second. A row goes grey when nothing has arrived for two seconds or
-  the other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a
-  SETVAL) show too, for ten seconds. Click **data** to fold it (remembered); it only asks
-  for the values while it is open.
+  destination from one of Palinopsia's sources, and **◉** watches it in the data view
+  (wired or not : a glove's sensors before you decide what they play).
+- **data** : what matters in a connected show, live, in three parts. **into Palinopsia** :
+  each destination another node feeds (↙ : from which node and parameter); **watching** :
+  the outside values you picked with ◉ (✕ stops one; kept on this computer, per
+  universe); **from Palinopsia** : each of its values wired to another node (↗ : to where).
+  Each row has the value now, its last seconds as a small line (a swatch for a color) and
+  how many values a second; it goes grey when nothing has arrived for two seconds or the
+  other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a SETVAL)
+  show too, for ten seconds. Palinopsia's own values that a node merely monitors (a
+  visualizer page open on it asks for every value) are not wires : one line says who and
+  how many (**monitored : 256 values by gloves**). Click **data** to fold it (remembered);
+  it only asks for the values while it is open.
 - **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
   the other nodes announce), with ✕ to unwire. The header shows the values received and
   sent per second.
