@@ -188,6 +188,10 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Softens the picture along its own light-and-dark edges and keeps feeding its last frame back in, so the boundaries between forms bleed. Turn the creep up and the melted front walks outward a few pixels a second, the bright side spilling over the dark (or the dark eating in), the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
   'node-faultline':
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires (or hit the trigger by hand), and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole program glitches like circuit-bent kit.',
+  'node-reaction':
+    'Reaction-diffusion grown by the picture : its darks and lights grow different patterns, it plants new growth along its edges or where it moves, and the pattern travels with its motion. The pattern comes back through the picture, inked over it, carved into it, as a matte or as a lens.',
+  'node-fluid':
+    'A real fluid that carries the picture : where the picture moves it stirs the water, its light can rise like smoke, and the water has a restlessness of its own, so any film or generator gets smeared, curled and marbled. Still parts can stay sharp.',
   'node-ibfv':
     'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments : a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
   'node-remap':

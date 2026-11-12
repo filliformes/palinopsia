@@ -199,6 +199,12 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-fur': /^(tip|root|skin|markColor)$/,
   // Relief : its colors and ground go together (its presets).
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
+  // Noise : matte, never plasma. Focus is a blur (by hand only), the map, the
+  // key, the seamless repeat and the tempo lock are uses, not looks, and the
+  // tint stays the preset's.
+  noise: /^(focus|field|key|seamless|sync|tint)$/,
+  // Morphogen : the ink goes with its preset.
+  'node-reaction': /^ink$/,
   'sync-osc': /^loA$/,
   // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
   // set it racing), Crawl's ground (clear hides the picture under it) and Store
@@ -738,7 +744,7 @@ type Blend = (typeof MIX_BLENDS)[number]
 // (median above 0.3) ...
 const LIT_GROUND = new Set<string>([
   'gen-marble', 'gen-physarum', 'dye-field', 'gen-veins', 'scan', 'ground', 'solid-color',
-  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane'
+  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane', 'noise'
 ])
 // ... and these a mid one (0.15 to 0.3).
 const MID_GROUND = new Set<string>([

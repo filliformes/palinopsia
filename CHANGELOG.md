@@ -467,6 +467,54 @@ that CI builds into cross-platform releases.
   smoothing halving the swing, three badges, the glide back to 0.9 after the gloves
   stopped).
 
+- **Morphogen and Current : reaction-diffusion and fluid as effects** (Vincent :
+  "Reaction-diffusion and fluid as effects that any layer feeds and steers, not only as
+  sources"). Two native nodes in a new **Organic** group of the FX picker, both
+  self-contained (any rack), both on the sources' OWN simulations, shared rather than
+  forked : `engine/reactionSim.ts` (the Gray-Scott grid, step, resample and display copy,
+  now used by the Reaction source too, plus an `RD_STEER` build of the same step and an
+  advection pass) and `engine/fluidSolver.ts` (advection, splats, vorticity confinement,
+  Jacobi pressure, stir : used by the Fluid source too); the optical-flow passes moved
+  from `convNodes.ts` to `engine/pictureFlow.ts` (`PictureFlow`, a fixed 256 field) for
+  both.
+  - **Morphogen** (`node-reaction`, `engine/morphogenNode.ts`) : the picture's brightness
+    or its warm / cool color pushes feed and kill per cell (`dark / light`), it plants V
+    along its edges, where it moves or in its lights, and its motion carries the living
+    state (`follow motion`). Five looks, one small program each : through, ink, emboss,
+    matte, warp. A `steered by` sidechain takes over the steering. 11 presets.
+  - **Current** (`node-fluid`, `engine/currentNode.ts`) : the picture is the dye (RGBA16F,
+    premultiplied, up to 1080 rows); its motion drags the water toward its own velocity
+    (a bounded pull), `light rises` is buoyancy from luma (to the zenith under the full
+    dome, `lib/dome.glsl`), `churn` four wandering pushes, `memory` the live picture's
+    refresh rate, `keep still` the sharp picture where the water is still. A `moved by`
+    sidechain takes over the pushing. 10 presets.
+  - Fixed grids : the pattern and the water keep their size and speed at 1080p, 4K and
+    on the 4096 dome. Measured on the RTX 4070 (render + finish, median of 20) :
+    Morphogen +0.2 ms at 1080p, +0.7 ms at 4K, +0.4 ms on the dome (2048Â² composition); Current +0.3, +0.3, +0.4 ms; the two together on one layer hold 60 fps at all three, and two of each on two layers hold 60 fps on the dome (3.8 ms a frame in all), 59 at 1080p, 55 at 4K.
+  - The Reaction and Fluid sources run on the shared code with the same arithmetic and
+    pass order (checked in the test copy : Reaction alive at 61 fps, Fluid ink, smoke and fire at 60 fps, stir still fires).
+  - The **Field effects** master chains (8 : Grown Picture, Coral Print, Carved Program,
+    Ink Water, Smoke Program, Wet Growth, Steered Growth, Stirred by the Top) and the
+    Generate themes **Grown Over**, **Coral Print**, **Ink Current**, **Rising Smoke**
+    (Organic / Reaction-Diffusion), **Noise Garden** and **Noise Water** (Node Workshop).
+- **Noise : a raw noise field** (the shelf's "NOISE module : raw noise field ... Taste :
+  curate ranges matte (contrast, posterized), never color plasma", with "Band-limited
+  noise : an analytic 'focus' knob"). `shaders/isf/Noise.fs`, an Analog source beside
+  Ramps : value, gradient, cellular, cracks, ridged, billow, warped; scale, octaves
+  (fractional), rough, seed; contrast, level, steps (posterized with soft, pixel-wide band
+  edges), invert, key (dark = clear), a two-field `map` (red and green) for Remap or
+  Displace; drift along an angle (`PH_noiseDX/DY`), evolve (each lattice point on its own
+  cycle : it morphs in place, never loops), `sync` to the tempo (a new field a bar · 1/2 ·
+  1/4 · 1/8, `glide` cut to melt, at most 4 a second, `PH_noiseEvolve`). **focus** is an
+  analytic defocus : each octave is attenuated by what a gaussian of the pixel footprint
+  plus the focus radius leaves of it (octaves under 1 % are skipped), so it never aliases
+  and costs nothing more; it is in `RANDOMIZE_SKIP` with the map, key, seamless, sync and
+  tint. Under the full dome (fill) the field lies round on the disc (`domeDisc`) and its
+  drift turns round the zenith (`PH_noiseTurn`); `seamless` repeats it exactly across the
+  width for the wrap mode. The lattice wraps at 4096 cells an octave (hash inputs stay
+  small : exact for days). Cost over a solid color : the default (gradient, 4 octaves) +0.3 ms at 1080p, +1.7 ms at 4K, +0.8 ms on the dome; warped +1.2, +4.0, +1.9 ms. 12 presets, filed as a lit ground for
+  Randomize, the **Noise Matte** theme (Analog Video Synthesis).
+
 ### Fixed
 
 - **A camera opens in the selfie view, and remembers its mirror** (Vincent : "when a

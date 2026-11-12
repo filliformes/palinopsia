@@ -29,6 +29,7 @@ import swell from './Swell.fs?raw'
 import congeal from './Congeal.fs?raw'
 import slitScan from './SlitScan.fs?raw'
 import ramps from './Ramps.fs?raw'
+import noise from './Noise.fs?raw'
 import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
@@ -633,6 +634,73 @@ export const NATIVE_NODES: IsfShader[] = [
       motion: [0.2, 0.9], angle: [0.0, 1.0], push: [0.0, 0.6], swirl: [0.2, 0.8],
       swirlX: [0.3, 0.7], swirlY: [0.3, 0.7], ground: [0, 1],
       dye: [0.3, 0.9], speed: [0.2, 0.8], mix: [0.5, 1.0]
+    }
+  },
+  // ── Field effects : the Organic sources' own simulations, fed and steered by
+  // the picture (engine/morphogenNode.ts, engine/currentNode.ts). Self-contained :
+  // a sidechain only takes over the steering.
+  {
+    id: 'node-reaction',
+    name: 'Morphogen',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Morphogen : reaction-diffusion grown by the picture. The Reaction source's own simulation runs on its own grid (the pattern keeps its size at 1080p, 4K and on the dome) and the picture feeds it : its brightness (or its warm and cool colors, PATTERNS BY) pushes FEED and KILL apart, so its darks and its lights grow different species (DARK / LIGHT sets how far, and which way), and it PLANTS new growth along its edges, where it moves, or in its lights. FOLLOW MOTION carries the living pattern along the picture's own movement. The pattern comes back in a LOOK : THROUGH (the picture seen through the pattern), INK (the pattern drawn over it in the ink color), EMBOSS (the picture carved by it), MATTE (the layer shows only where it grows) or WARP (the picture bent along its slopes); AMOUNT is how strong. SPARKS are the source's sparse random seeds, PATTERN SIZE and RATE as in the source, RELIEF lights it. A STEERED BY layer picked in the Inspector (a Noise, a film) does the steering while this layer is what it shows. REGROW starts over. Any rack.",
+      CATEGORIES: ['FX', 'Organic', 'Texture'],
+      INPUTS: [
+        { NAME: 'look', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['through', 'ink', 'emboss', 'matte', 'warp'], DEFAULT: 0, LABEL: 'look' },
+        { NAME: 'amount', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.8, LABEL: 'amount' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 1.0, LABEL: 'mix' },
+        { NAME: 'steer', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['brightness', 'color', 'nothing'], DEFAULT: 0, LABEL: 'patterns by' },
+        { NAME: 'bias', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'dark / light' },
+        { NAME: 'feed', TYPE: 'float', MIN: 0.008, MAX: 0.09, DEFAULT: 0.0456, LABEL: 'feed' },
+        { NAME: 'kill', TYPE: 'float', MIN: 0.03, MAX: 0.07, DEFAULT: 0.0635, LABEL: 'kill' },
+        { NAME: 'plant', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'plant' },
+        { NAME: 'plantFrom', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['edges', 'motion', 'lights'], DEFAULT: 0, LABEL: 'plant from' },
+        { NAME: 'seed', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.15, LABEL: 'sparks' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'follow motion' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.45, LABEL: 'pattern size' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 4.0, DEFAULT: 2.0, LABEL: 'rate' },
+        { NAME: 'sharp', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'sharpness' },
+        { NAME: 'ink', TYPE: 'color', DEFAULT: [0.12, 0.11, 0.1, 1.0] },
+        { NAME: 'relief', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0.0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
+    curated: {
+      amount: [0.5, 1], mix: [0.7, 1], bias: [-0.9, 0.9], feed: [0.03, 0.055], kill: [0.057, 0.065], plant: [0.2, 0.8],
+      seed: [0.05, 0.4], follow: [0.3, 0.9], scale: [0.25, 0.75], rate: [1.2, 3], sharp: [0.3, 0.8], relief: [0.3, 0.8], lightAngle: [0, 6.2832]
+    }
+  },
+  {
+    id: 'node-fluid',
+    name: 'Current',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Current : a real fluid that carries the picture. The Fluid source's own solver runs on its own grid (the water keeps its size and speed at 1080p, 4K and on the dome) and the picture is the dye it carries. Where the picture MOVES, the water is dragged along with it, so a dancer or a pan stirs it; LIGHT RISES lifts the bright parts like warm smoke (below 0 they sink; under the full dome they rise to the zenith); CHURN is the water's own restlessness, so a still picture or a generator still gets curled and smeared; SWIRL keeps the eddies spinning, VISCOSITY thickens it. MEMORY is how long the water keeps carrying the old picture before the live one refreshes it (short smears to long marbled drifts), KEEP STILL lets the sharp live picture through where the water is still, MIX the blend. DETAIL is the grid (fine curls or broad flows), RATE how fast it all goes. A sidechain layer can move the water (its motion and its light) while this layer is what it carries. STIR gives it a sudden turn, CLEAR starts from still water. Any rack.",
+      CATEGORIES: ['FX', 'Organic', 'Distortion'],
+      INPUTS: [
+        { NAME: 'motion', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'motion' },
+        { NAME: 'rise', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'light rises' },
+        { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.35, LABEL: 'churn' },
+        { NAME: 'swirl', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'swirl' },
+        { NAME: 'viscosity', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.2, LABEL: 'viscosity' },
+        { NAME: 'memory', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'memory' },
+        { NAME: 'keep', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'keep still' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 1.0, LABEL: 'mix' },
+        { NAME: 'detail', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'detail' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 2.0, DEFAULT: 1.0, LABEL: 'rate' },
+        { NAME: 'stir', TYPE: 'event', LABEL: 'stir ▸' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' }
+      ]
+    })}*/`,
+    curated: {
+      motion: [0.3, 0.9], rise: [-0.4, 0.6], churn: [0.15, 0.6], swirl: [0.25, 0.8], viscosity: [0.05, 0.4],
+      memory: [0.35, 0.85], keep: [0.1, 0.6], mix: [0.7, 1], detail: [0.3, 0.7], rate: [0.6, 1.3]
     }
   },
   {
@@ -1375,6 +1443,18 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: ramps,
     curated: { freq: [1, 6], steps: [1, 16], rate: [-0.8, 0.8], angle: [0, 6.2832] }
+  },
+  {
+    id: 'noise',
+    name: 'Noise',
+    category: 'Generator',
+    source: noise,
+    // matte, never plasma : a dice keeps the contrast and the bands tasteful, never
+    // the focus (blur is set by hand), the map, the key or the seamless repeat
+    curated: {
+      scale: [2, 14], octaves: [2, 6], rough: [0.35, 0.65], seed: [0, 1], contrast: [1, 2.6], level: [-0.25, 0.2],
+      steps: [1, 6], focus: [0, 0], drift: [0.03, 0.4], angle: [0, 6.2832], evolve: [0.03, 0.3], glide: [0.3, 1]
+    }
   },
   {
     id: 'rgb-osc',

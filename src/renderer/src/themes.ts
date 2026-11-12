@@ -251,6 +251,18 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'add'], gestureTexture: 0.35, coalesce: 0.4
   }),
   mk({
+    id: 'noise-matte', name: 'Noise Matte', family: 'Analog Video Synthesis',
+    blurb: 'Raw noise shaped into mattes : banded, cracked and keyed, colored by a voltage colorizer and stacked.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.16, 0.2, 1], [0.6, 0.62, 0.7, 1], [0.92, 0.9, 0.84, 1]],
+    sources: ['noise', 'ramps'],
+    stack: [['noise'], ['noise', 'ramps']],
+    presets: { noise: ['Soft hills', 'Bands', 'Two tone', 'Cracks', 'Ridges', 'Key mask', 'Cells'] },
+    layerFx: ['fx-colorizer', 'fx-posterize', 'fx-grade'],
+    blends: ['multiply', 'difference', 'screen', 'overlay'], layers: [2, 3], useB: 0.2, feedback: 0.1, drift: 0.2,
+    motion: { skip: '^(kind|seed|steps|focus)$' }
+  }),
+  mk({
     id: 'wobbulator', name: 'Wobbulator', family: 'Analog Video Synthesis',
     loops: ['melt', 'swirl'],
     blurb: 'One oscillator folded back through a wandering feedback loop.',
@@ -526,6 +538,59 @@ export const THEMES: Theme[] = [
     sources: ['organic', 'erosion', 'dye-field'],
     layerFx: ['fx-light-trails', 'fx-grain', 'fx-grade'],
     blends: ['screen', 'lighten'], feedback: 0.45, density: 0.4, drift: 0.3
+  }),
+  // The field effects : the picture grows the pattern, the water carries the picture.
+  mk({
+    id: 'grown-over', name: 'Grown Over', family: 'Organic / Reaction-Diffusion',
+    blurb: 'A moving picture overgrown by reaction-diffusion : its darks and lights grow their own patterns, out of its edges, along its motion.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.14, 0.1, 1], [0.78, 0.8, 0.7, 1]],
+    sources: ['organic', 'swell', 'dye-field', 'congeal', 'op-art', 'shapes'],
+    stackFx: [['node-reaction']],
+    presets: { 'node-reaction': ['Grown through', 'Edges grow', 'Carved', 'Warm and cool', 'Motion bloom'] },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.25, feedback: 0, density: 0.55, coalesce: 0.55, drift: 0.2,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp)$' }
+  }),
+  mk({
+    id: 'coral-print', name: 'Coral Print', family: 'Organic / Reaction-Diffusion',
+    blurb: 'Coral, mazes and spots printed over the picture in bone or ink, where its lights and edges ask for them.',
+    world: 'sublimated',
+    palette: [K, [0.24, 0.18, 0.14, 1], [0.88, 0.82, 0.72, 1]],
+    sources: ['organic', 'dye-field', 'swell', 'ground', 'membrane'],
+    stackFx: [['node-reaction']],
+    presets: { 'node-reaction': ['Coral print', 'Ink maze', 'Lights bloom', 'Spotted matte'] },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal', 'screen'], layers: [1, 2], useB: 0.2, feedback: 0, density: 0.5, drift: 0.15,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp)$' }
+  }),
+  mk({
+    id: 'ink-current', name: 'Ink Current', family: 'Organic / Reaction-Diffusion',
+    blurb: 'The picture poured into moving water : stirred where it moves, curled and marbled by a current of its own.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.12, 0.18, 1], [0.7, 0.76, 0.8, 1]],
+    sources: ['op-art', 'shapes', 'organic', 'ten-print', 'congeal', 'interference'],
+    stackFx: [['node-fluid']],
+    presets: { 'node-fluid': ['Marbled', 'Stirred', 'Fine curls', 'Broad tide', 'Storm'] },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten', 'normal'], layers: [1, 2], useB: 0.2, feedback: 0, density: 0.5, drift: 0.25,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail)$' }
+  }),
+  mk({
+    id: 'rising-smoke', name: 'Rising Smoke', family: 'Organic / Reaction-Diffusion',
+    blurb: 'Light that rises as smoke : the bright parts of the picture lift, curl and thin out, the dark ones settle.',
+    world: 'sublimated',
+    palette: [K, [0.14, 0.12, 0.12, 1], [0.82, 0.78, 0.74, 1]],
+    sources: ['particle-drift', 'ash', 'filaments', 'shapes', 'organic'],
+    stackFx: [['node-fluid']],
+    presets: { 'node-fluid': ['Smoke rise', 'Sinking ink', 'Slow syrup'] },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.15, feedback: 0, density: 0.45, drift: 0.3,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail)$' }
   }),
 
   // ── Data / Parametric ─────────────────────────────────────────────────
@@ -1816,6 +1881,39 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     nativeNodes: ['node-remap'], nativeChance: 0.95, nativeFrom: 1,
     blends: ['normal', 'screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'workshop-noise-garden', name: 'Noise Garden', family: 'Node Workshop',
+    blurb: 'A hidden noise field steers reaction-diffusion over a picture : where the noise is light one pattern grows, where it is dark another.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.14, 0.12, 1], [0.8, 0.8, 0.72, 1]],
+    sources: ['organic', 'swell', 'dye-field', 'op-art'],
+    stack: [['noise'], ['organic', 'swell', 'dye-field', 'op-art']],
+    presets: { noise: ['Soft hills', 'Bands', 'Cells', 'Marble'], 'node-reaction': ['Grown through', 'Lights bloom', 'Carved'] },
+    stackFx: [[], ['node-reaction']],
+    reads: { 'node-reaction': 0 },
+    muted: [0],
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp|kind|seed|steps|focus)$' }
+  }),
+  mk({
+    id: 'workshop-noise-water', name: 'Noise Water', family: 'Node Workshop',
+    blurb: 'A picture carried by water that a hidden, slowly turning noise field keeps stirring.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.1, 0.14, 1], [0.74, 0.76, 0.8, 1]],
+    sources: ['op-art', 'shapes', 'ten-print', 'organic'],
+    stack: [['noise'], ['op-art', 'shapes', 'ten-print', 'organic']],
+    presets: { noise: ['Soft hills', 'Clouds', 'Beat fields'], 'node-fluid': ['Marbled', 'Stirred', 'Fine curls'] },
+    pickInputs: { noise: { drift: [0.3, 0.5, 0.8], evolve: [0.2, 0.4] }, 'node-fluid': { motion: [0.9, 1], rise: [0.3, 0.6] } },
+    stackFx: [[], ['node-fluid']],
+    reads: { 'node-fluid': 0 },
+    muted: [0],
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail|kind|seed|steps|focus)$' }
   }),
   mk({
     id: 'workshop-focus', name: 'Focus Pull', family: 'Node Workshop',

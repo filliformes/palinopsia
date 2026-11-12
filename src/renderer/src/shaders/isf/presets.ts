@@ -76,6 +76,32 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Occasional fault', values: { type: 4, rate: 0.8, sync: 0, dirt: 0.3, depth: 0.5, hold: 0.06 } }
   ],
   // ── Sillage (advected-noise feedback : IBFV wake) ──
+  // ── Field effects : Morphogen (reaction-diffusion) and Current (fluid) ──
+  'node-reaction': [
+    { name: 'Grown through', values: { look: 0, amount: 0.8, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Coral print', values: { look: 1, amount: 0.9, mix: 1, steer: 0, bias: 0.4, feed: 0.0545, kill: 0.062, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.86, 0.8, 0.7, 1], relief: 0.6, lightAngle: 2.36 } },
+    { name: 'Ink maze', values: { look: 1, amount: 0.95, mix: 1, steer: 0, bias: 0.5, feed: 0.029, kill: 0.057, plant: 0.4, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.55, rate: 2, sharp: 0.5, ink: [0.07, 0.07, 0.08, 1], relief: 0.35, lightAngle: 2.36 } },
+    { name: 'Carved', values: { look: 2, amount: 0.75, mix: 1, steer: 0, bias: 0.8, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2 } },
+    { name: 'Spotted matte', values: { look: 3, amount: 0.9, mix: 1, steer: 0, bias: 0.6, feed: 0.03, kill: 0.062, plant: 0.35, plantFrom: 2, seed: 0.25, follow: 0.6, scale: 0.5, rate: 2, sharp: 0.7, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Lens of cells', values: { look: 4, amount: 0.6, mix: 1, steer: 0, bias: 0.5, feed: 0.0367, kill: 0.0649, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.35, rate: 2, sharp: 0.6, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Edges grow', values: { look: 0, amount: 0.85, mix: 1, steer: 0, bias: 0.3, feed: 0.0456, kill: 0.0635, plant: 0.9, plantFrom: 0, seed: 0.02, follow: 0.5, scale: 0.55, rate: 2, sharp: 0.65, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Motion bloom', values: { look: 0, amount: 0.75, mix: 1, steer: 0, bias: 0.5, feed: 0.0456, kill: 0.0635, plant: 0.8, plantFrom: 1, seed: 0.05, follow: 0.9, scale: 0.5, rate: 2.5, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Warm and cool', values: { look: 0, amount: 0.85, mix: 1, steer: 1, bias: 0.9, feed: 0.0456, kill: 0.0635, plant: 0.4, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.55, lightAngle: 2.36 } },
+    { name: 'Lights bloom', values: { look: 1, amount: 0.85, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.7, plantFrom: 2, seed: 0.1, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.92, 0.9, 0.85, 1], relief: 0.45, lightAngle: 2.36 } },
+    { name: 'Still mitosis', values: { look: 0, amount: 0.7, mix: 1, steer: 2, bias: 0, feed: 0.0367, kill: 0.0649, plant: 0.2, plantFrom: 0, seed: 0.3, follow: 0, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.6, lightAngle: 2.36 } }
+  ],
+  'node-fluid': [
+    { name: 'Stirred', values: { motion: 0.6, rise: 0, churn: 0.35, swirl: 0.5, viscosity: 0.2, memory: 0.6, keep: 0.4, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Marbled', values: { motion: 0.6, rise: 0, churn: 0.45, swirl: 0.7, viscosity: 0.2, memory: 0.9, keep: 0.1, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Smoke rise', values: { motion: 0.6, rise: 0.6, churn: 0.2, swirl: 0.6, viscosity: 0.2, memory: 0.7, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Sinking ink', values: { motion: 0.6, rise: -0.5, churn: 0.25, swirl: 0.55, viscosity: 0.2, memory: 0.75, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Dancer wake', values: { motion: 1, rise: 0, churn: 0.1, swirl: 0.6, viscosity: 0.2, memory: 0.55, keep: 0.6, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Slow syrup', values: { motion: 0.6, rise: 0, churn: 0.3, swirl: 0.35, viscosity: 0.7, memory: 0.8, keep: 0.3, mix: 1, detail: 0.5, rate: 0.6 } },
+    { name: 'Fine curls', values: { motion: 0.6, rise: 0, churn: 0.4, swirl: 0.9, viscosity: 0.2, memory: 0.65, keep: 0.3, mix: 1, detail: 0.9, rate: 1 } },
+    { name: 'Broad tide', values: { motion: 0.6, rise: 0, churn: 0.6, swirl: 0.3, viscosity: 0.2, memory: 0.7, keep: 0.2, mix: 1, detail: 0.15, rate: 1 } },
+    { name: 'Light touch', values: { motion: 0.6, rise: 0, churn: 0.25, swirl: 0.5, viscosity: 0.2, memory: 0.4, keep: 0.7, mix: 0.6, detail: 0.5, rate: 1 } },
+    { name: 'Storm', values: { motion: 0.8, rise: 0, churn: 0.9, swirl: 0.9, viscosity: 0.2, memory: 0.8, keep: 0.1, mix: 1, detail: 0.5, rate: 1.4 } }
+  ],
   'node-ibfv': [
     { name: 'Soft wake', values: { flow: 0.4, inject: 0.15, scale: 0.4, scan: 1, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.4, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.4, mix: 0.7 } },
     { name: 'Long smear', values: { flow: 0.7, inject: 0.06, scale: 0.35, scan: 1, field: 0.4, motion: 0.7, angle: 0, push: 0, swirl: 0.3, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.7, speed: 0.35, mix: 0.8 } },
@@ -857,6 +883,20 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Amber log', values: { rate: 0.6, span: 9, freq: 7, bands: 6, tint: [0.9, 0.6, 0.25, 1], vertical: 0 } },
     { name: 'Teal log', values: { rate: 0.55, span: 11, freq: 10, bands: 8, tint: [0.35, 0.7, 0.72, 1], vertical: 0 } },
     { name: 'Nervous', values: { rate: 1.5, span: 14, freq: 20, bands: 9, vertical: 0, tint: [0.7, 0.75, 0.72, 1] } }
+  ],
+  noise: [
+    { name: 'Soft hills', values: { kind: 1, scale: 4, octaves: 4, rough: 0.5, seed: 0, seamless: 0, contrast: 1.6, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.12, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Clouds', values: { kind: 5, scale: 3, octaves: 6, rough: 0.55, seed: 0, seamless: 0, contrast: 1.4, level: -0.1, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.08, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Cells', values: { kind: 2, scale: 8, octaves: 1, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.05, angle: 1.2, evolve: 0.15, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Cracks', values: { kind: 3, scale: 6, octaves: 2, rough: 0.45, seed: 0, seamless: 0, contrast: 2.2, level: 0, steps: 1, focus: 0, invert: 1, key: 0, drift: 0.04, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Ridges', values: { kind: 4, scale: 3, octaves: 5, rough: 0.5, seed: 0, seamless: 0, contrast: 1.6, level: -0.1, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Marble', values: { kind: 6, scale: 2.5, octaves: 5, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.06, angle: 1.2, evolve: 0.06, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Bands', values: { kind: 1, scale: 3, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1.4, level: 0, steps: 6, focus: 0, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Two tone', values: { kind: 0, scale: 5, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1.2, level: 0, steps: 2, focus: 0, invert: 0, key: 0, drift: 0.15, angle: 1.2, evolve: 0.12, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Out of focus', values: { kind: 1, scale: 6, octaves: 6, rough: 0.6, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0.6, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Beat fields', values: { kind: 1, scale: 5, octaves: 4, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 3, focus: 0, invert: 0, key: 0, drift: 0, angle: 1.2, evolve: 0.1, sync: 3, glide: 0.3, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Map for Remap', values: { kind: 1, scale: 2.5, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.08, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 1, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Key mask', values: { kind: 2, scale: 6, octaves: 2, rough: 0.4, seed: 0, seamless: 0, contrast: 2.5, level: 0, steps: 1, focus: 0, invert: 0, key: 1, drift: 0.06, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } }
   ],
   'ramps': [
     { name: 'H ramp', values: { shape: 0, freq: 1, steps: 1, rate: 0.1, angle: 0, mirror: 0, center: [0.5, 0.5], tint: [0.7, 0.72, 0.68, 1] } },

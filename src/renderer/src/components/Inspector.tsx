@@ -93,6 +93,8 @@ const NODE_INPUTS: Record<string, NodeInput[]> = {
   'node-fieldstore': [{ label: 'key from', hint: 'its brightness decides where the store is written (with key : sidechain)', none: 'self' }],
   'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }],
   'node-inflate': [{ label: 'reflects', hint: 'the layer the metal reflects, or the glass bends', none: 'none' }],
+  'node-reaction': [{ label: 'steered by', hint: 'its brightness or colors, its edges and its motion grow the pattern (this layer is what it shows)', none: 'self' }],
+  'node-fluid': [{ label: 'moved by', hint: 'its motion and its light push the water (this layer is what the water carries)', none: 'self' }],
   'node-silhouette': [
     {
       label: 'fill',

@@ -1394,6 +1394,71 @@ export const MASTER_PRESETS: MasterPreset[] = [
     vibe: { contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0.1 },
     context: { bloom: 0.2 }
   },
+  // ── Field effects : Morphogen grows the program, Current carries it (they keep its
+  // colors : mixSrc 1; the Steered / Stirred chains read the top layer, a Noise there
+  // makes the best field). ──
+  {
+    name: 'Grown Picture', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 0, amount: 0.8, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.04, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Coral Print', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 1, amount: 0.9, mix: 1, steer: 0, bias: 0.4, feed: 0.0545, kill: 0.062, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.86, 0.8, 0.7, 1], relief: 0.6, lightAngle: 2.36 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 0.92, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
+  },
+  {
+    name: 'Carved Program', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 2, amount: 0.7, mix: 1, steer: 0, bias: 0.8, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.1, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Ink Water', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0, churn: 0.45, swirl: 0.7, viscosity: 0.2, memory: 0.9, keep: 0.1, mix: 1, detail: 0.5, rate: 1 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 0.96, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Smoke Program', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0.6, churn: 0.2, swirl: 0.6, viscosity: 0.2, memory: 0.7, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.08 }
+  },
+  {
+    name: 'Wet Growth', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0, churn: 0.3, swirl: 0.5, viscosity: 0.2, memory: 0.7, keep: 0.5, mix: 0.8, detail: 0.5, rate: 1 } },
+      { shaderId: 'node-reaction', inputs: { look: 0, amount: 0.7, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.8, scale: 0.5, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Steered Growth', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', reads: 'top', inputs: { look: 0, amount: 0.85, mix: 1, steer: 0, bias: 0.9, feed: 0.0456, kill: 0.0635, plant: 0.7, plantFrom: 2, seed: 0.15, follow: 0.7, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Stirred by the Top', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', reads: 'top', inputs: { motion: 1, rise: 0.3, churn: 0.2, swirl: 0.5, viscosity: 0.2, memory: 0.75, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   {
     name: 'Outline', group: 'People',
     fx: [
