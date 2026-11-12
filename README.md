@@ -1941,7 +1941,9 @@ bottom:
   accidents) is held to a soft, gentle pulse until it stops, while cuts, motion and a
   steady image pass untouched (on a very bright scene it can soften film flutter too).
   One slider plus **off / mild / strong / max**; it ships **on** at **mild** (0.35),
-  applies to the preview and every output, and its section starts collapsed. Left at
+  applies to the preview and every output, and its section starts collapsed. The DMX
+  lights have the same limiter on every LED (see [Lights](#lights--dmx-fixtures-on-the-picture-key-t)),
+  at this strength, and at its gentlest when this is off. Left at
   mild, it goes to **strong** (0.7) while the Fulldome output is on (a flash fills the
   whole view on a dome) and back to mild when the dome goes off; a level you set
   yourself, before or during, stays.
@@ -2340,7 +2342,9 @@ lost. **save to a file…** and **open a file…** carry one to another computer
     (a long pixel bar's spill into the next universe counted). A pixel never straddles
     two universes (170 RGB pixels to a universe, as pixel controllers expect); past an
     Enttec's 512 channels the rest is not sent and the patch says so. On a WLED output a
-    light always goes out as red, green and blue.
+    light always goes out as red, green and blue, three channels an LED (its head and
+    tail are not sent) : the patch and the next free address count it so. A white-only
+    light (`W`, `D W`) shows the color's brightness.
   - **Look** : **picture** (the master where it sits), **layer** (L1 to L4, that
     layer's own picture), **color**, **gradient** (2 to 5 colors running across the
     room at an angle, a scale, an offset and a drift, or **along** each light; **from
@@ -2355,6 +2359,12 @@ lost. **save to a file…** and **open a file…** carry one to another computer
     Body page tracks, dim away from them (**near** : how near; the Room tracker's
     everyone, or the one pose)), and its **level**. **to all** gives every light this
     look. Effects never change more than three times a second, at any rate and speed.
+    And **whatever feeds a light** (the picture, a layer that strobes, an effect, a cue,
+    a modulator on its level), **it never flashes more than three times a second** :
+    every LED goes through the same limiter as the picture's Flash safety, last, on what
+    is sent. A light flashing faster is held to a gentle pulse until it stops, slower
+    changes pass untouched. It holds sooner with Flash safety's strength, and it stays
+    on (at its gentlest) when Flash safety is off : the lights fill the room.
     **travels** : an effect goes **through the room** (by where each pixel is, at a
     **direction**) or **light by light**, as a lighting console spreads a phase over a
     group : **left to right**, **from the center**, **at random** or **odd and even**

@@ -517,6 +517,45 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Lights, after the v1.3.3 audit** (18 findings, two of them reported twice, all fixed). **Safety first : no
+  light flashes more than three times a second, whatever feeds it.** A light reading a
+  layer took that layer's own picture, before the picture's Flash safety : a strobing
+  layer (Shutter, a flashing clip) reached the room unlimited (a 20 Hz strobe measured
+  41 swings in one second at the DMX). Every LED now goes through a limiter of its own,
+  last, on what is sent (`lights/lightLimit.ts`) : the picture's rule (swings of 10 % of
+  linear luminance or of saturated red, counted over the last second, held to a gentle
+  pulse at the count Flash safety's strength sets), plus a guarantee that a fourth flash
+  in a second waits. It stays on at its gentlest when Flash safety is off. Measured on the
+  real engine (Node, 30 / 40 / 44 fps, strength 0 / 0.35 / 1, a layer strobing 3.5 to
+  20 Hz, bursts, noise, red / blue, a modulator on the level at 5 Hz, a 30-LED strip) :
+  never more than 6 swings in any second (three flashes), the DMX bytes too; slow content
+  (a 1 or 2 Hz square, a pulse, a chase, a fade) comes out bit for bit the same; 0.12 ms a
+  frame for 3,400 LEDs. The effects keep their own cap too : **fireflies** could run at
+  4.6 a second (its tempo and pull now capped), **sparkle**, **glitch** and **hold** drew
+  at random with no gap (7 flashes in one second measured) : now never twice on a light
+  or LED within a third of a second. **The room goes dark when it should** : frames held
+  back by an output's delay landed after the dark frame (the room stayed lit, and an
+  Enttec closed for good was opened again); an Art-Net output with sync got its dark
+  frame without an ArtSync (a node in synchronous mode never showed it). **The Enttec**
+  is opened as soon as its output is on and the page is open, a light patched or not :
+  the page said "plug it in" while it was plugged, and RDM could not ask an empty line;
+  the RDM panel kept talking to a link closed since (lights off and on) : every request
+  answered nothing and a blinking light could not be stopped. **Cues** : following on by
+  themselves, they were undo steps (Ctrl+Z took back the last cue, the history filled);
+  the scene sequencer never brought the cue tied to a scene; a cue now keeps every
+  group's grade (a neutral one comes back neutral), every light's tuning when it travels
+  with the look, and the console's gain, saturation and contrast; deleting the cue in
+  play while they follow on goes to the next one instead of stalling. **Smaller** : a
+  white-only light (`W`, `D W`, an OFL tunable white) went dark on a saturated color (its
+  white is now the color's brightness); an OFL mode whose only dimmer shares its channel
+  with a strobe was held at full whatever the faders (now left out and named); on WLED
+  the patch view and the next free address counted the layout's channels and the head,
+  while three bytes an LED go out (gaps of dark LEDs between strips); "put on the map"
+  twice doubled every light (a light already there is kept, given its mode's kind);
+  Ctrl+D in a page window copied the selected light; removing several lights (Delete,
+  the x of N lights) now asks a second press; the rig is written to disk at most four
+  times a second (a map drag rewrote it on every move).
+
 - **A camera opens in the selfie view, and remembers its mirror** (Vincent : "when a
   Webcam or Live Input is opened, its always mirrored by default, correct this ... when I
   raise my left arm standing in front of the camera, I want to see my left arm at the
