@@ -19,48 +19,11 @@
 
 import { EngineGL, FS_HEAD, RELIEF, SlotClock, Edge, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator } from './nativeGenerators'
+// The solver itself (advection, pushes, vorticity, pressure) is shared with the
+// Current effect : fluidSolver.ts.
+import { FluidSolver, MAX_SPLATS } from './fluidSolver'
 
-const MAX_SOURCES = 6
-const JACOBI = 24
-
-// Semi-Lagrangian advection : trace back along the velocity, sample there.
-// `uDiss` : per-step multiplier (fade). Works for any field at any grid size
-// (velocity is in grid cells of the VELOCITY grid per second).
-const ADVECT_FS = `${FS_HEAD}
-uniform sampler2D uVel, uSrc;
-uniform vec2 uVelN, uDstN;
-uniform float uDt;
-uniform vec4 uDiss;
-out vec4 o;
-void main() {
-  vec2 uv = gl_FragCoord.xy / uDstN;
-  vec2 v = texture(uVel, uv).xy;                 // cells / s of the velocity grid
-  vec2 back = uv - v * uDt / uVelN;
-  o = texture(uSrc, back) * uDiss;
-}`
-
-// Sources : gaussian splats of velocity (xy), and of the scalar fields : dye
-// (two inks / smoke density / soot) and temperature (the w channel of state).
-const SPLAT_FS = `${FS_HEAD}
-uniform sampler2D uSrc;
-uniform vec2 uDstN;
-uniform float uAspect;
-uniform int uCount;
-uniform vec4 uP[${MAX_SOURCES}];   // x, y (uv), radius (frame heights), strength
-uniform vec4 uV[${MAX_SOURCES}];   // what this source adds (per field)
-uniform float uDt;
-out vec4 o;
-void main() {
-  vec2 uv = gl_FragCoord.xy / uDstN;
-  vec4 s = texture(uSrc, uv);
-  for (int i = 0; i < ${MAX_SOURCES}; i++) {
-    if (i >= uCount) break;
-    vec2 d = (uv - uP[i].xy) * vec2(uAspect, 1.0);
-    float g = exp(-dot(d, d) / max(1e-5, uP[i].z * uP[i].z)) * uP[i].w;
-    s += uV[i] * g * uDt;
-  }
-  o = s;
-}`
+const MAX_SOURCES = MAX_SPLATS
 
 // Buoyancy + soot weight on the velocity (smoke / fire) : hot gas rises, soot
 // weighs it down a little.
@@ -74,95 +37,6 @@ void main() {
   vec4 v = texture(uVel, uv);
   vec4 st = texture(uState, uv);
   v.y += (st.w * uBuoy - st.x * uWeight) * uDt;
-  o = v;
-}`
-
-const CURL_FS = `${FS_HEAD}
-uniform sampler2D uVel;
-uniform ivec2 uN;
-out vec4 o;
-vec2 at(ivec2 c) { return texelFetch(uVel, clamp(c, ivec2(0), uN - 1), 0).xy; }
-void main() {
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  float w = 0.5 * ((at(c + ivec2(1, 0)).y - at(c - ivec2(1, 0)).y) - (at(c + ivec2(0, 1)).x - at(c - ivec2(0, 1)).x));
-  o = vec4(w, 0.0, 0.0, 1.0);
-}`
-
-// Vorticity confinement (Fedkiw, Stam, Jensen 2001) : push along N x curl so the
-// eddies the grid would smear out keep spinning.
-const VORT_FS = `${FS_HEAD}
-uniform sampler2D uVel, uCurl;
-uniform ivec2 uN;
-uniform float uEps, uDt;
-out vec4 o;
-float cu(ivec2 c) { return texelFetch(uCurl, clamp(c, ivec2(0), uN - 1), 0).x; }
-void main() {
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  vec2 g = 0.5 * vec2(abs(cu(c + ivec2(1, 0))) - abs(cu(c - ivec2(1, 0))), abs(cu(c + ivec2(0, 1))) - abs(cu(c - ivec2(0, 1))));
-  vec2 n = g / (length(g) + 1e-5);
-  vec2 f = uEps * cu(c) * vec2(n.y, -n.x);
-  vec4 v = texelFetch(uVel, c, 0);
-  v.xy += f * uDt;
-  o = v;
-}`
-
-const DIV_FS = `${FS_HEAD}
-uniform sampler2D uVel;
-uniform ivec2 uN;
-out vec4 o;
-// Walls : the velocity across the border is mirrored (no flow through).
-vec2 at(ivec2 c) {
-  vec2 v = texelFetch(uVel, clamp(c, ivec2(0), uN - 1), 0).xy;
-  if (c.x < 0 || c.x >= uN.x) v.x = -v.x;
-  if (c.y < 0 || c.y >= uN.y) v.y = -v.y;
-  return v;
-}
-void main() {
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  float d = 0.5 * (at(c + ivec2(1, 0)).x - at(c - ivec2(1, 0)).x + at(c + ivec2(0, 1)).y - at(c - ivec2(0, 1)).y);
-  o = vec4(d, 0.0, 0.0, 1.0);
-}`
-
-const JACOBI_FS = `${FS_HEAD}
-uniform sampler2D uP, uDiv;
-uniform ivec2 uN;
-out vec4 o;
-float p(ivec2 c) { return texelFetch(uP, clamp(c, ivec2(0), uN - 1), 0).x; }
-void main() {
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  float d = texelFetch(uDiv, c, 0).x;
-  o = vec4((p(c + ivec2(1, 0)) + p(c - ivec2(1, 0)) + p(c + ivec2(0, 1)) + p(c - ivec2(0, 1)) - d) * 0.25, 0.0, 0.0, 1.0);
-}`
-
-const GRAD_FS = `${FS_HEAD}
-uniform sampler2D uP, uVel;
-uniform ivec2 uN;
-uniform float uVisc;
-out vec4 o;
-float p(ivec2 c) { return texelFetch(uP, clamp(c, ivec2(0), uN - 1), 0).x; }
-void main() {
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  vec4 v = texelFetch(uVel, c, 0);
-  v.xy -= 0.5 * vec2(p(c + ivec2(1, 0)) - p(c - ivec2(1, 0)), p(c + ivec2(0, 1)) - p(c - ivec2(0, 1)));
-  // No flow through the walls; viscosity as a gentle per-step drag.
-  if (c.x == 0 || c.x == uN.x - 1) v.x = 0.0;
-  if (c.y == 0 || c.y == uN.y - 1) v.y = 0.0;
-  v.xy *= uVisc;
-  o = v;
-}`
-
-// Stir : a large swirl about a random point (the stir event).
-const STIR_FS = `${FS_HEAD}
-uniform sampler2D uVel;
-uniform vec2 uN, uC;
-uniform float uAspect, uAmt;
-out vec4 o;
-void main() {
-  vec2 uv = gl_FragCoord.xy / uN;
-  vec4 v = texture(uVel, uv);
-  vec2 d = (uv - uC) * vec2(uAspect, 1.0);
-  float g = exp(-dot(d, d) / 0.06);
-  v.xy += vec2(-d.y, d.x) * g * uAmt * uN.y;
   o = v;
 }`
 
@@ -207,11 +81,7 @@ void main() {
 }`
 
 interface Fields {
-  vel: [Target, Target]
   state: [Target, Target] // x, y : dye A / B (ink) or density (smoke, fire) · w : temperature
-  curl: Target
-  div: Target
-  p: [Target, Target]
   gw: number
   gh: number
   dw: number
@@ -220,18 +90,10 @@ interface Fields {
 
 export class FluidSource implements NativeGenerator {
   private g: EngineGL
-  private advect: Prog
-  private splat: Prog
+  private solver: FluidSolver
   private buoy: Prog
-  private curl: Prog
-  private vort: Prog
-  private divP: Prog
-  private jacobi: Prog
-  private grad: Prog
-  private stirP: Prog
   private show: Prog
   private f: Fields | null = null
-  private vi = 0
   private si = 0
   private clock = new SlotClock()
   private acc = 0
@@ -247,15 +109,8 @@ export class FluidSource implements NativeGenerator {
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     const g = (this.g = new EngineGL(gl, 'fluid'))
-    this.advect = g.prog(ADVECT_FS)
-    this.splat = g.prog(SPLAT_FS)
+    this.solver = new FluidSolver(g)
     this.buoy = g.prog(BUOY_FS)
-    this.curl = g.prog(CURL_FS)
-    this.vort = g.prog(VORT_FS)
-    this.divP = g.prog(DIV_FS)
-    this.jacobi = g.prog(JACOBI_FS)
-    this.grad = g.prog(GRAD_FS)
-    this.stirP = g.prog(STIR_FS)
     this.show = g.prog(SHOW_FS)
   }
 
@@ -276,7 +131,8 @@ export class FluidSource implements NativeGenerator {
     const f = this.f
     if (!f) return
     const g = this.g
-    for (const t of [...f.vel, ...f.state, ...f.p, f.curl, f.div]) g.freeTarget(t)
+    for (const t of f.state) g.freeTarget(t)
+    this.solver.free()
     this.f = null
   }
 
@@ -290,15 +146,11 @@ export class FluidSource implements NativeGenerator {
     const dh = Math.min(1080, gh * 3)
     const dw = Math.max(8, Math.round((dh * this.w) / this.h))
     const half = (w: number, h: number): Target => g.target(w, h, { half: 'rgba', linear: true })
+    this.solver.ensure(gw, gh)
     this.f = {
-      vel: [half(gw, gh), half(gw, gh)],
       state: [half(dw, dh), half(dw, dh)],
-      curl: half(gw, gh),
-      div: half(gw, gh),
-      p: [half(gw, gh), half(gw, gh)],
       gw, gh, dw, dh
     }
-    this.vi = 0
     this.si = 0
     return this.f
   }
@@ -355,54 +207,30 @@ export class FluidSource implements NativeGenerator {
     const buoyIn = num(this.inputs, 'buoyancy', 0.5)
     const push = f.gh * (kind === 0 ? 7 : 2.5) // cells/s gained per second at flow 1
 
+    const sv = this.solver
     // 1) advect velocity by itself
-    this.advect.use().i1('uVel', 0).i1('uSrc', 1).f2('uVelN', f.gw, f.gh).f2('uDstN', f.gw, f.gh).f1('uDt', dt).f4('uDiss', 1, 1, 1, 1)
-    g.bind(0, f.vel[this.vi].tex); g.bind(1, f.vel[this.vi].tex)
-    g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+    sv.advectSelf(dt)
     // 2) sources push the water
     const Vv = new Float32Array(4 * MAX_SOURCES)
     for (let i = 0; i < count; i++) {
       Vv[i * 4] = this.V[i * 4] * push
       Vv[i * 4 + 1] = this.V[i * 4 + 1] * push
     }
-    this.splat.use().i1('uSrc', 0).f2('uDstN', f.gw, f.gh).f1('uAspect', aspect).i1('uCount', count).f1('uDt', dt)
-    g.gl.uniform4fv(this.splat.u('uP'), this.P)
-    g.gl.uniform4fv(this.splat.u('uV'), Vv)
-    g.bind(0, f.vel[this.vi].tex)
-    g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+    sv.splatVelocity(aspect, this.P, Vv, count, dt)
     // 3) buoyancy (smoke, fire; ink : a slight sinking with buoyancy below 0)
     const buoy = kind === 0 ? buoyIn * 0.3 * f.gh : (0.5 + buoyIn * 2) * f.gh * (kind === 2 ? 1.5 : 1)
     this.buoy.use().i1('uVel', 0).i1('uState', 1).f2('uN', f.gw, f.gh).f1('uDt', dt).f1('uBuoy', buoy).f1('uWeight', kind === 0 ? 0 : 0.08 * f.gh)
-    g.bind(0, f.vel[this.vi].tex); g.bind(1, f.state[this.si].tex)
-    g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+    g.bind(0, sv.vel); g.bind(1, f.state[this.si].tex)
+    g.draw(sv.velBack.fbo, f.gw, f.gh); sv.swap()
     // 4) vorticity confinement
-    this.curl.use().i1('uVel', 0).i2('uN', f.gw, f.gh)
-    g.bind(0, f.vel[this.vi].tex)
-    g.draw(f.curl.fbo, f.gw, f.gh)
-    this.vort.use().i1('uVel', 0).i1('uCurl', 1).i2('uN', f.gw, f.gh).f1('uEps', swirl * (kind === 0 ? 30 : 36)).f1('uDt', dt)
-    g.bind(0, f.vel[this.vi].tex); g.bind(1, f.curl.tex)
-    g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+    sv.confine(swirl * (kind === 0 ? 30 : 36), dt)
     // 5) stir (event)
     if (this.pendingStir) {
       this.pendingStir = false
-      this.stirP.use().i1('uVel', 0).f2('uN', f.gw, f.gh).f2('uC', 0.3 + 0.4 * Math.random(), 0.3 + 0.4 * Math.random()).f1('uAspect', aspect).f1('uAmt', (Math.random() < 0.5 ? -1 : 1) * 2.2)
-      g.bind(0, f.vel[this.vi].tex)
-      g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+      sv.stir(0.3 + 0.4 * Math.random(), 0.3 + 0.4 * Math.random(), aspect, (Math.random() < 0.5 ? -1 : 1) * 2.2)
     }
     // 6) project : divergence, pressure, subtract the gradient
-    this.divP.use().i1('uVel', 0).i2('uN', f.gw, f.gh)
-    g.bind(0, f.vel[this.vi].tex)
-    g.draw(f.div.fbo, f.gw, f.gh)
-    let pi = 0
-    this.jacobi.use().i1('uP', 0).i1('uDiv', 1).i2('uN', f.gw, f.gh)
-    g.bind(1, f.div.tex)
-    for (let k = 0; k < JACOBI; k++) {
-      g.bind(0, f.p[pi].tex)
-      g.draw(f.p[1 - pi].fbo, f.gw, f.gh); pi = 1 - pi
-    }
-    this.grad.use().i1('uP', 0).i1('uVel', 1).i2('uN', f.gw, f.gh).f1('uVisc', Math.pow(1 - visc * 0.012, dt * 60))
-    g.bind(0, f.p[pi].tex); g.bind(1, f.vel[this.vi].tex)
-    g.draw(f.vel[1 - this.vi].fbo, f.gw, f.gh); this.vi = 1 - this.vi
+    sv.project(Math.pow(1 - visc * 0.012, dt * 60))
     // 7) the dye / temperature : sources add, then the water carries them
     const amt = kind === 0 ? 7 : kind === 1 ? 4 : 2.5
     const Vs = new Float32Array(4 * MAX_SOURCES)
@@ -415,20 +243,14 @@ export class FluidSource implements NativeGenerator {
         Vs[i * 4 + 3] = kind === 1 ? 3 : 9 // temperature
       }
     }
-    this.splat.use().i1('uSrc', 0).f2('uDstN', f.dw, f.dh).f1('uAspect', aspect).i1('uCount', count).f1('uDt', dt)
-    g.gl.uniform4fv(this.splat.u('uP'), this.P)
-    g.gl.uniform4fv(this.splat.u('uV'), Vs)
-    g.bind(0, f.state[this.si].tex)
-    g.draw(f.state[1 - this.si].fbo, f.dw, f.dh); this.si = 1 - this.si
+    sv.splat(f.state[this.si].tex, f.state[1 - this.si], aspect, this.P, Vs, count, dt); this.si = 1 - this.si
     // fade : ink lingers (tens of seconds), smoke thins over seconds, and the
     // heat cools faster than the gas clears (a plume rises, slows, drifts), fire
     // fastest of all (short flames, soot above them).
     const k = (perStep: number): number => Math.pow(perStep, dt * 60)
     const dye = k(kind === 0 ? 1 - fade * 0.003 : kind === 1 ? 1 - fade * 0.012 : 1 - fade * 0.02)
     const heat = k(kind === 0 ? 0.99 : kind === 1 ? 0.988 : 0.972)
-    this.advect.use().i1('uVel', 0).i1('uSrc', 1).f2('uVelN', f.gw, f.gh).f2('uDstN', f.dw, f.dh).f1('uDt', dt).f4('uDiss', dye, dye, dye, heat)
-    g.bind(0, f.vel[this.vi].tex); g.bind(1, f.state[this.si].tex)
-    g.draw(f.state[1 - this.si].fbo, f.dw, f.dh); this.si = 1 - this.si
+    sv.advect(f.state[this.si].tex, f.state[1 - this.si], dt, [dye, dye, dye, heat]); this.si = 1 - this.si
   }
 
   render(targetFbo: WebGLFramebuffer, clockSec: number): void {
@@ -446,8 +268,9 @@ export class FluidSource implements NativeGenerator {
     const kind = Math.max(0, Math.min(2, Math.round(num(this.inputs, 'kind', 0))))
     if (this.pendingClear) {
       this.pendingClear = false
+      this.solver.clear()
       gl.clearColor(0, 0, 0, 0)
-      for (const t of [...f.vel, ...f.state, ...f.p]) {
+      for (const t of f.state) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo)
         gl.clear(gl.COLOR_BUFFER_BIT)
       }

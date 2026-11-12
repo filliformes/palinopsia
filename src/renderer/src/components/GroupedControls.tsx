@@ -104,6 +104,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('trail', 'deposit', 'decay', 'diffuse', 'contrast', 'glow'),
     g('light', 'tint', 'ground', 'relief', 'lightAngle')
   ],
+  // Noise : what the field is · how it is shaped into a matte · how it moves
+  noise: [
+    g('field', 'kind', 'scale', 'octaves', 'rough', 'seed', 'seamless', 'field'),
+    g('matte', 'contrast', 'level', 'steps', 'focus', 'invert', 'key', 'tint'),
+    g('motion', 'drift', 'angle', 'evolve', 'sync', 'glide')
+  ],
   'gen-fluid': [
     g('sources', 'kind', 'sources', 'flow', 'size', 'wander', 'stir', 'clear'),
     g('motion', 'rate', 'swirl', 'buoyancy', 'viscosity', 'fade', 'detail'),
@@ -211,6 +217,19 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('motion', 'motion', 'thresh', 'swirl', 'edgeRepel', 'flowInvert', 'sidechainFlow', 'flowRes'),
     g('texture', 'block', 'bleed', 'resharp'),
     g('bursts', 'trig', 'pulse', 'autoBloom', 'cutSense', 'actant', 'actantTrig', 'actantRate', 'actantLife')
+  ],
+  // the field effects : how it lands on the picture · what the picture does to
+  // it · how it grows (the organic light rides with the look : a fourth column of
+  // two wrapped under the others and left a blank band)
+  'node-reaction': [
+    g('look', 'look', 'amount', 'mix', 'ink', 'sharp', 'relief', 'lightAngle'),
+    g('steer', 'steer', 'bias', 'feed', 'kill', 'follow'),
+    g('growth', 'plant', 'plantFrom', 'seed', 'scale', 'rate', 'reseed')
+  ],
+  'node-fluid': [
+    g('push', 'motion', 'rise', 'churn', 'swirl'),
+    g('water', 'viscosity', 'detail', 'rate', 'stir'),
+    g('picture', 'memory', 'keep', 'mix', 'clear')
   ],
   'node-ibfv': [
     g('trails', 'flow', 'inject', 'speed', 'clear'),
@@ -454,6 +473,30 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   reaction: ({ zero }) => one(zero('relief'), 'lightAngle', NO_RELIEF),
+  // Morphogen (engine/morphogenNode.ts) : the light only on the lit looks, the ink
+  // only on ink; steering and planting each need their own switch on.
+  'node-reaction': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('look', 1)) put(d, ['ink'], 'Only the ink look draws in the ink color.')
+    if (is('look', 3, 4)) put(d, ['relief', 'lightAngle'], 'The matte and warp looks are not lit.')
+    else if (is('look', 2)) put(d, ['relief'], 'Emboss : amount is the depth of the carving.')
+    else if (zero('relief')) put(d, ['lightAngle'], NO_RELIEF)
+    if (is('steer', 2)) put(d, ['bias'], 'Steered by nothing : feed and kill are the same everywhere.')
+    else if (zero('bias')) put(d, ['steer'], 'Dark / light is at 0 : the picture does not push feed and kill.')
+    if (zero('plant')) put(d, ['plantFrom'], 'Plant is at 0 : the picture plants nothing.')
+    return d
+  },
+  // Noise (Noise.fs) : the glide only shapes the tempo's steps; with sync on, the
+  // tempo clocks the evolving; a map is two plain fields (no tint).
+  noise: ({ zero, is, isnt, at }) => {
+    const d: Why = {}
+    if (is('sync', 0)) put(d, ['glide'], 'Sync is free : glide only shapes the steps on the tempo.')
+    else put(d, ['evolve'], 'Sync is on : the tempo sets how fast it changes.')
+    if (zero('drift')) put(d, ['angle'], 'Drift is at 0 : nothing moves along the angle.')
+    if (at('octaves', 1)) put(d, ['rough'], 'One octave : there are no finer copies to weigh.')
+    if (isnt('field', 0)) put(d, ['tint'], 'A map is two plain fields, red and green : no tint.')
+    return d
+  },
   'gen-veins': ({ zero, is }) => {
     const d: Why = {}
     if (is('kind', 2)) put(d, ['blade', 'bladeAmt'], 'Roots have no blade.')

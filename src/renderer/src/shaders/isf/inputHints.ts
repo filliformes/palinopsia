@@ -318,6 +318,42 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     hold: 'How long each fault lasts, in seconds. The picture is untouched between faults.',
     trig: 'FIRE ▸ : throw one fault now (rising edge). Press it, send OSC, or bind a modulator.'
   },
+  // ── Morphogen (reaction-diffusion fed and steered by the picture) ──
+  'node-reaction': {
+    look: 'How the pattern comes back over the picture. Through : the picture seen through the pattern (its grooves sink dark). Ink : the pattern drawn over the picture in the ink color (it grows into transparency too). Emboss : the picture carved by the pattern, its own colors. Matte : the layer shows only where the pattern grows. Warp : the picture bent along the pattern\'s slopes.',
+    amount: 'How strong the look is : how dark the grooves, how solid the ink, how deep the carving, how much the matte cuts, how far the warp bends.',
+    mix: 'Dry / wet over the picture as it entered.',
+    steer: 'What of the picture (or of the STEERED BY layer) pushes feed and kill. Brightness : its darks and lights grow different species. Color : its warm and cool parts do. Nothing : the same chemistry everywhere (the picture still plants and moves it).',
+    bias: 'How far the picture pushes feed and kill apart, and which way : above 0 the lights grow mazes and coral while the darks keep to spots, below 0 the other way round. 0 = the same everywhere.',
+    feed: 'The rate fresh U is fed in, everywhere before the picture pushes it. With kill it picks the species : small moves change it (as in the Reaction source).',
+    kill: 'The rate V is removed. Higher thins the pattern toward spots and then nothing; lower lets it fill in.',
+    plant: 'How much new growth the picture plants, a little every step, where PLANT FROM says. 0 = only the sparks.',
+    plantFrom: 'Where the picture plants : along its edges (the pattern grows out of its contours), where it moves, or in its lights.',
+    seed: 'The sparse random sparks the Reaction source has : new critters anywhere, which keep it from settling.',
+    follow: 'Where the picture moves, the living pattern is carried along with it. 0 = the pattern stays put while the picture moves under it.',
+    scale: 'The size of the pattern in the frame : the same at 1080p, 4K and on the dome. Changing it carries the living pattern over.',
+    rate: 'How fast the chemistry lives, the same at any frame rate. 0 = held still.',
+    sharp: 'How crisp the pattern\'s edges are : soft gradients to hard cut shapes.',
+    ink: 'The ink color (the ink look). Its opacity is not used : amount sets how solid it is.',
+    relief: 'Lights the pattern as a surface under one low raking light (through and ink looks). 0 = flat.',
+    lightAngle: 'Where the light comes from, round the frame.',
+    reseed: 'Starts over : the empty ground and a fresh scatter of sparks.'
+  },
+  // ── Current (a fluid that carries the picture) ──
+  'node-fluid': {
+    motion: 'Where the picture moves, the water is dragged along with it : a pan, a dancer, a passing car stir it. 0 = its movement does nothing.',
+    rise: 'The bright parts rise like warm smoke (above 0) or sink (below 0). Under the full dome they rise to the zenith.',
+    churn: 'The water\'s own restlessness : a few wandering pushes, so a still picture or a generator still gets curled and smeared. 0 = only the picture moves it.',
+    swirl: 'Keeps the eddies spinning (the coarse grid would smear them out) : flat drifts to tight curls.',
+    viscosity: 'How thick the water is : higher slows every movement, like syrup.',
+    memory: 'How long the water keeps carrying the old picture before the live one refreshes it : short smears near 0, long marbled drifts near 1.',
+    keep: 'Where the water is still, the sharp live picture shows through. 0 = the carried picture everywhere.',
+    mix: 'Dry / wet over the picture as it entered.',
+    detail: 'The water\'s grid : broad slow flows at 0, fine curls at 1. The same in the frame at any size.',
+    rate: 'How fast the water moves, the same at any frame rate. 0 = held still.',
+    stir: 'A sudden large swirl somewhere in the middle.',
+    clear: 'Still water again, carrying the live picture.'
+  },
   'node-ibfv': {
     flow: 'How far the dye travels along the flow : the length of the streaks.',
     inject: 'How fast fresh noise replaces the dye : low = long smears that remember, high = short trails close to the grain.',
@@ -1177,6 +1213,27 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     bands: 'How many flat brightness levels the signal is stepped into (whole numbers, from black to full tint).',
     vertical: 'Time runs down the frame instead of across it.',
     tint: 'Color of the brightest band, over the near-black ground.'
+  },
+  noise: {
+    kind: 'The basis. Value : soft blotches. Gradient : smooth rolling hills. Cellular : cells, by the distance to their nearest point. Cracks : the borders between cells. Ridged : sharp creased ridges. Billow : puffed, cloudy. Warped : a field folded through itself (heavier).',
+    scale: 'How many cells across the frame height : big soft forms at 1, fine grain at 64.',
+    octaves: 'Finer copies laid on top (each half the size). Fractions fade the last one in, so it can be moved smoothly.',
+    rough: 'How strong each finer copy is : smooth at 0.2, gritty at 0.85.',
+    seed: 'Another field of the same character.',
+    seamless: 'Repeats exactly across the width, for the dome\'s wrap mode (no seam at the back). The cells then fit a whole number across, so scale moves in small steps.',
+    contrast: 'How hard the field is : flat gray at 0, a near black-and-white matte at 4.',
+    level: 'Brighter or darker overall (before the steps).',
+    steps: 'Posterizes the field into this many flat bands (1 = smooth). The band edges stay clean at any size.',
+    focus: 'Throws the field out of focus with no blur pass : the fine detail fades by itself, so it never aliases at 4K or on the dome. 0 = sharp. Set by hand only (the dice never touch it).',
+    invert: 'Swaps the darks and the lights.',
+    key: 'The dark parts become see-through : the field as a mask over the layers below.',
+    drift: 'How fast the field travels along ANGLE, in cells a second. Under the full dome it turns round the zenith instead.',
+    angle: 'The direction of the drift (turning it bends the path, it never jumps).',
+    evolve: 'How fast the field morphs in place, never scrolling and never looping.',
+    sync: 'Locks the morphing to the tempo : a new field every bar, half, quarter or eighth note (on this layer\'s clock). Free = EVOLVE sets the pace.',
+    glide: 'With sync : how each new field arrives, from a cut on the beat (0) to a smooth melt across the whole step (1).',
+    field: 'Mono : one field in the tint. Map : two separate fields, red and green, a map for Remap or Displace.',
+    tint: 'The color of the lights (mono). The dark stays near black.'
   },
   ramps: {
     freq: 'How many ramps repeat across the frame. 1 = one ramp exactly edge to edge (center to farthest corner for radial and diamond).',

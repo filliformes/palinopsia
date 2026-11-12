@@ -67,7 +67,20 @@ const INTEGRANDS: Record<string, (v: Get) => number> = {
   // cycle per `band` seconds of history, plus the `cycle` rotation, so at cycle 0
   // a stamped pixel keeps its color).
   PH_crawlClock: () => 1,
-  PH_crawlIdx: (v) => 1 / Math.max(v('band'), 0.05) + v('cycle')
+  PH_crawlIdx: (v) => 1 / Math.max(v('band'), 0.05) + v('cycle'),
+  // Noise : the drift is a vector along `angle` (turning it bends the path); under
+  // the full dome it turns the field round the zenith instead, its rim moving at
+  // half the flat drift; the evolve clock counts free time (`evolve`), or beats of
+  // the tempo with `sync` (a new field a bar · 1/2 · 1/4 · 1/8), never more than 4
+  // a second (flash safety).
+  PH_noiseDX: (v) => v('drift') * Math.cos(v('angle')),
+  PH_noiseDY: (v) => v('drift') * Math.sin(v('angle')),
+  PH_noiseTurn: (v) => v('drift') / Math.max(v('scale'), 0.5),
+  PH_noiseEvolve: (v) => {
+    const s = Math.round(v('sync'))
+    if (s <= 0) return v('evolve')
+    return Math.min(Math.max((tempoBpm() / 60) * (SHATTER_PER_BEAT[s] ?? 1), 0), 4)
+  }
 }
 
 const SHATTER_PER_BEAT = [0, 0.25, 0.5, 1, 2]
