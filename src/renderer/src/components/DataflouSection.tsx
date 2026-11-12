@@ -378,6 +378,8 @@ function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
   const d = DF_DESTS.find((x) => x.path === dest)
   const o: DfWireOpt = src.opt ?? {}
   const num = d?.type === 'number'
+  // a scene number is never smoothed nor glided back (each step would recall one)
+  const glides = num && !d?.discrete
   const set = (p: Partial<DfWireOpt>): void => {
     const next = { ...o, ...p }
     void window.api.dataflouWireOpt({ dest, sku: src.sku, path: src.path, opt: next })
@@ -397,15 +399,15 @@ function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
       <button onClick={() => set({ invert: !o.invert })} className={chip(!!o.invert)} title="Turned the other way : the source's low end plays the high end">
         invert
       </button>
-      {num && (
-        <span className="flex items-center gap-1" title="Smoothing : the control glides to each new value over about this long (ms; 0 : at once). For a jittery sensor">
+      {glides && (
+        <span className="flex items-center gap-1" title="Smoothing : the control glides to each new value over about this long (ms; 0 : at once). For a jittery sensor. Shared by every wire into this control : the longest counts">
           smooth
           <BoundedNumberInput fixedWidth integer className={box} value={o.slewMs ?? 0} min={0} max={10000} onCommit={(v) => set({ slewMs: v })} />
           ms
         </span>
       )}
-      {num && (
-        <span className="flex items-center gap-1" title="When the source goes quiet for 2 s (a glove out of battery, a computer asleep) : hold its last value, or glide back to where the control was before the wire played it">
+      {glides && (
+        <span className="flex items-center gap-1" title="When the source goes quiet for 2 s (a glove out of battery, a computer asleep) : hold its last value, or glide back to where the control was before the wire played it. Shared by every wire into this control : one asking to glide back is enough">
           on loss
           <button onClick={() => set({ onLoss: o.onLoss === 'return' ? 'hold' : 'return', returnSec: o.returnSec ?? 2 })} className={chip(o.onLoss === 'return')}>
             {o.onLoss === 'return' ? 'glide back' : 'hold'}
