@@ -589,14 +589,14 @@ function targetOnLayer(t: ModTarget, li: number): boolean {
   return s.kind !== 'master' && s.kind !== 'background' && s.layer === li
 }
 
-/** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped.
- *  Then GUARANTEE MOTION : every layer with an active source gets at least one
- *  assignment — a random draw that leaves a layer untargeted reads as a static,
- *  lifeless scene (the "Randomize feels dead" report). */
 /** A modulator played by a value from the dataflou mesh (a glove axis mapped with
  *  its ◈) : Randomize leaves it and its bindings as they are, like the World's. */
 const isMeshMod = (m: ModulatorConfig): boolean => m.type === 'controller' && !!m.mesh
 
+/** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped.
+ *  Then GUARANTEE MOTION : every layer with an active source gets at least one
+ *  assignment — a random draw that leaves a layer untargeted reads as a static,
+ *  lifeless scene (the "Randomize feels dead" report). */
 function randomMatrix(c: CompositionState): ModAssignment[] {
   const targets = diceTargets(c)
   if (targets.length === 0) return []
