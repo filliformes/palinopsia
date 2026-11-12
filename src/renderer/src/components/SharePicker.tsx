@@ -121,7 +121,8 @@ export function SharePicker({
           ) : (
             <div className="flex flex-col gap-1">
               {senders.map((s) => {
-                const own = ownOn && s.name === 'Palinopsia'
+                // (Syphon lists a server as "app : name")
+                const own = ownOn && (s.name === 'Palinopsia' || (kind === 'Syphon' && s.name.endsWith(' : Palinopsia')))
                 return (
                   <button
                     key={s.name}

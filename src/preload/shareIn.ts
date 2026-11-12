@@ -79,6 +79,9 @@ interface Rx {
   mac: { seq: number; w: number; h: number; fps: number; state: ShareInStatus['state']; error: string; surfaceId: number; took: number; liveAt: number } | null
   macImp: Imported | null
   macGen: number
+  // The GPU route's last VideoFrame in THIS world : the bridge hands the page a
+  // copy of its own (which the page closes), this one is closed here.
+  lastVf: VideoFrame | null
 }
 
 const rxs = new Map<string, Rx>()
@@ -94,12 +97,39 @@ function spout(): SpoutAddon | null {
   const a = shareAddon<SpoutAddon>().mod
   return a && a.receives ? a : null
 }
+// macOS : whether main has a Syphon module that receives (asked once : the
+// module does not come or go while the app runs).
+let macCan: boolean | null = null
+function macReceives(): boolean {
+  if (macCan === null) {
+    try {
+      macCan = ipcRenderer.sendSync('sharein:can') === true
+    } catch {
+      macCan = false
+    }
+  }
+  return macCan
+}
 function syphon(): SyphonAddon | null {
   if (process.platform !== 'darwin') return null
   const a = shareAddon<SyphonAddon>().mod
   return a && a.receives ? a : null
 }
 const canImport = (): boolean => !gpuBroken && !!sharedTexture?.subtle?.importSharedTexture
+
+/** Closes this world's copy of the last frame handed to the page. */
+function closeVf(r: Rx): void {
+  try { r.lastVf?.close() } catch { /* closed */ }
+  r.lastVf = null
+}
+
+/** One VideoFrame for the page; the one handed before it is closed here (the
+ *  page has its own copy by then, and closes it when this one replaces it). */
+function hand(r: Rx, vf: VideoFrame): VideoFrame {
+  closeVf(r)
+  r.lastVf = vf
+  return vf
+}
 
 function releaseAll(list: Imported[], done?: () => void): void {
   let left = list.length
@@ -174,6 +204,7 @@ function toCopy(r: Rx, a: SpoutAddon): void {
   try { a.recvClose(r.id) } catch { /* ignore */ }
   releaseAll(r.imps)
   r.imps = []
+  closeVf(r)
   r.gen = 0
   r.route = 'cpu'
   r.readSeq = 0
@@ -195,7 +226,7 @@ export function shareInFrame(name: string): ShareInGpuFrame | null {
   const imp = r.imps[t.slot]
   if (!imp) return null
   try {
-    return { vf: imp.getVideoFrame(), seq: t.seq, w: r.w, h: r.h, stamp: t.stamp }
+    return { vf: hand(r, imp.getVideoFrame()), seq: t.seq, w: r.w, h: r.h, stamp: t.stamp }
   } catch (e) {
     console.warn('[spout in] no frame from the shared texture : copying instead.', (e as Error).message)
     gpuBroken = true
@@ -265,11 +296,12 @@ function macFrame(r: Rx): ShareInGpuFrame | null {
   if (!m || !r.macImp || m.seq === m.took) return null
   m.took = m.seq
   try {
-    return { vf: r.macImp.getVideoFrame(), seq: m.seq, w: m.w, h: m.h, stamp: Date.now() }
+    return { vf: hand(r, r.macImp.getVideoFrame()), seq: m.seq, w: m.w, h: m.h, stamp: Date.now() }
   } catch (e) {
     console.warn('[syphon in] no frame from the shared surface : copying instead.', (e as Error).message)
     gpuBroken = true
     r.route = 'cpu'
+    closeVf(r)
     ensureCopyTimer()
     return null
   }
@@ -341,6 +373,7 @@ function health(): void {
       const m = r.mac
       if (r.route === 'gpu' && m && m.state === 'live' && !r.macImp && m.liveAt && now - m.liveAt > 3000) {
         r.route = 'cpu'
+        closeVf(r)
         ensureCopyTimer()
       }
       continue
@@ -393,9 +426,11 @@ export function shareInOpen(name: string): boolean {
   }
   const r: Rx = {
     name, refs: 1, route: canImport() ? 'gpu' : 'cpu', id: 0, gen: 0, imps: [], w: 0, h: 0, lastState: null, stateAt: 0,
-    pool: [], out: 0, reading: false, readSeq: 0, mac: null, macImp: null, macGen: 0
+    pool: [], out: 0, reading: false, readSeq: 0, mac: null, macImp: null, macGen: 0, lastVf: null
   }
   if (process.platform === 'darwin') {
+    // No module in main (or an old one) : it would never be picked up.
+    if (!macReceives()) return false
     rxs.set(name, r)
     ipcRenderer.send('sharein:open', name)
   } else {
@@ -415,6 +450,7 @@ export function shareInClose(name: string): void {
   if (!r) return
   if (--r.refs > 0) return
   rxs.delete(name)
+  closeVf(r)
   if (process.platform === 'darwin') {
     ipcRenderer.send('sharein:close', name)
     if (r.macImp) releaseAll([r.macImp])
@@ -430,7 +466,11 @@ export function shareInClose(name: string): void {
 /** What a receiver is doing, for the readout. */
 export function shareInStatus(name: string): ShareInStatus | null {
   const r = rxs.get(name)
-  if (!r) return null
+  if (!r) {
+    // Not opened because this computer cannot receive : the readout says so.
+    const can = process.platform === 'darwin' ? macReceives() : !!spout()
+    return can ? null : { state: 'unavailable', w: 0, h: 0, fps: 0, route: '', error: '' }
+  }
   if (process.platform === 'darwin') {
     const m = r.mac
     if (!m) return { state: 'waiting', w: 0, h: 0, fps: 0, route: r.route, error: '' }
