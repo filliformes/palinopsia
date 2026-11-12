@@ -438,6 +438,18 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A camera opens in the selfie view, and remembers its mirror** (Vincent : "when a
+  Webcam or Live Input is opened, its always mirrored by default, correct this ... when I
+  raise my left arm standing in front of the camera, I want to see my left arm at the
+  left of the screen"). A camera arrives as others see you (a fake camera, white on its
+  left half, came out white on the left : nothing in Palinopsia turned it). A Webcam, a
+  Live Input or the macOS USB input now opens with the framing's mirror on
+  *left-right*, and the mirror you choose is remembered per camera on this computer
+  (localStorage `opsia.cameraMirror`, keyed by the camera's name;
+  `setSourceCapture` / `setSourceTransform`) : a capture card set to *off* once stays
+  off. Screens and NDI open as they arrive. Sessions keep the mirror they were saved
+  with.
+
 - **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
   move the macro knob mapped to a parameter, this parameter's slider doesnt update in
   realtime, like when the Modulators are in use"). A knob's gesture plays engine-side
