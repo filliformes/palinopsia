@@ -45,11 +45,15 @@ racks, palette, World and macro biases : in one click.
 | ![Marbling](docs/images/shot-marbling.jpg)<br>**Marbling** : drops of paint floating on water, each new one pushing the others into rings | ![Marbled Paper](docs/images/shot-marbled-paper.jpg)<br>**Marbled Paper** : slow currents comb the paint into veins, like the endpapers of an old book | ![Night Bath](docs/images/shot-night-bath.jpg)<br>**Night Bath** : bright inks on dark water, carried along by currents and swirls |
 | ![Liquid Metal](docs/images/shot-liquid-metal.jpg)<br>**Liquid Metal** : strokes of molten chrome fusing where they cross, every reflection sliding along them as the lamp goes round | ![Clay Studio](docs/images/shot-clay-studio.jpg)<br>**Clay Studio** : rolls of modeling clay with real volume, laid on a pale table under one soft lamp | ![Pelt](docs/images/shot-pelt.jpg)<br>**Pelt** : a coat of real hairs under a studio lamp, breathing in a slow wind |
 | ![Singing Plate](docs/images/shot-singing-plate.jpg)<br>**Singing Plate** : sand on a vibrating plate, gathered on the still lines of the note it rings at | ![Glasshouse](docs/images/shot-glasshouse.jpg)<br>**Glasshouse** : a soft world seen through rained-on glass, the color split at every edge | ![Print Shop](docs/images/shot-print-shop.jpg)<br>**Print Shop** : the picture run off a press, its inks out of register on the screen |
+| ![Pond](docs/images/shot-pond.jpg)<br>**Pond** : the picture under water, rain ringing it and whatever moves in it stirring it | ![Glitched Memory](docs/images/shot-glitched-memory.jpg)<br>**Glitched Memory** : time smeared and broken inside its own memory, the trails torn and crushed, then glitched again | ![Broken Glass](docs/images/shot-broken-glass.jpg)<br>**Broken Glass** : a pane over the picture, hit again and again, its cracks racing out and its shards tilting into the light |
+| ![Coral Print](docs/images/shot-coral-print.jpg)<br>**Coral Print** : mazes and spots grown over the picture, printed where its lights and edges ask for them | ![Endless Spiral](docs/images/shot-endless-spiral.jpg)<br>**Endless Spiral** : a pattern wound into itself, the whole frame spiraling inward without end | ![Noise Matte](docs/images/shot-noise-matte.jpg)<br>**Noise Matte** : raw noise shaped into mattes, cut, colored and stacked |
 
 *(The first two rows are from v1.0.0, the third from v1.2.6 (Lattice, Perspective and
-Lowercase's slant, each straight from its Space theme), the last from v1.3.0 : the
-**Oil Cloud** and **Cloud Study** generators and Lattice's new forms, each straight from
-its Generate theme. The older shots stay in `docs/images/`.)*
+Lowercase's slant, each straight from its Space theme), the fourth from v1.3.0 : the
+**Oil Cloud** and **Cloud Study** generators and Lattice's new forms; the fifth from v1.3.1
+(Marbling), the next two from v1.3.2 (the surfaces, Glass and Print) and the last two from
+v1.3.3 (Ripple, Time Glitch, Break, Morphogen, Droste and Noise), each straight from its
+Generate theme. The older shots stay in `docs/images/`.)*
 
 ---
 
