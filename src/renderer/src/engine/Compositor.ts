@@ -368,6 +368,21 @@ in vec2 uv; out vec4 o;
 uniform sampler2D tex;
 void main(){ o = texture(tex, uv); }`;
 
+// The master over black : the layers sit on an opaque black ground, so the
+// composite is opaque until an effect on the Master FX cuts its alpha. The preview
+// canvas shows that alpha over the black page, while every output drops it (the
+// projector, NDI, Spout / Syphon, the recording and the dome all read rgb) : the
+// finished master is flattened so they all get what the preview shows. An opaque
+// pixel passes untouched (bit for bit).
+const FLATTEN_FS = `#version 300 es
+precision highp float;
+in vec2 uv; out vec4 o;
+uniform sampler2D tex;
+void main(){
+  vec4 c = texture(tex, uv);
+  o = c.a >= 1.0 ? vec4(c.rgb, 1.0) : vec4(clamp(c.rgb, 0.0, 1.0) * max(c.a, 0.0), 1.0);
+}`;
+
 // The Background's GROUP mode : the four layers composited on their own (from
 // transparent, so `grp` is premultiplied by their coverage) sit over the
 // Background, which shows through where they are transparent or dark : the
@@ -766,6 +781,7 @@ interface FxUnit {
   inputs?: Record<string, number | number[]>;
   sidechain?: SidechainRef | null;
   sidechain2?: SidechainRef | null; // second input (Matte's matte)
+  locked?: boolean; // a pinned finishing stage (the master's Vibe, Context, Finalizer)
 }
 
 // Everything a native node needs beyond its input texture: the sidechain
@@ -794,6 +810,13 @@ class FxRack {
   // per rack per frame — 14 racks of steady GC churn).
   private index = new Map<string, FxUnit>();
   private scratch: FxUnit[] = []; // swapped with `units` each sync : no array alloc
+  /** The master's : the picture over black (FLATTEN_FS) at the end, when anything
+   *  ran, so the preview and every output agree (with Context bypassed, a cut
+   *  showed on the preview alone); and where the effects end and the pinned
+   *  finishing stages begin when an effect whose job IS the cut ran (CUT_FX) :
+   *  Context drops alpha, so a Key or a Break on the Master FX cut nothing
+   *  anywhere, the preview included, and Outlines Only did nothing on stage. */
+  flatten: ((tex: WebGLTexture) => WebGLTexture) | null = null;
 
   constructor(private shared: SharedGL) {}
 
@@ -850,6 +873,7 @@ class FxRack {
       }
       unit.enabled = inst.enabled;
       unit.opacity = inst.opacity ?? 1;
+      unit.locked = !!inst.locked;
       if (native) {
         // Native node: refresh its base params (modulation overlays these before
         // render via setUnitInput) and the sidechain ref. The unit keeps ONE map,
@@ -926,7 +950,12 @@ class FxRack {
 
   apply(input: WebGLTexture, chain: ChainBuffers, nodeCtx?: NodeApplyCtx): WebGLTexture {
     let cur = input;
+    let cut = false; // a CUT_FX unit ran, not yet laid over black
     for (const u of this.units) {
+      if (cut && u.locked) {
+        cut = false;
+        cur = this.flatten!(cur);
+      }
       if (!u.enabled) continue;
       const dry = cur;
       let wet: WebGLTexture;
@@ -968,7 +997,9 @@ class FxRack {
         u.opacity < 0.999 && this.shared.blendDryWet
           ? this.shared.blendDryWet(dry, wet, u.opacity)
           : wet;
+      if (this.flatten && CUT_FX.has(u.shaderId)) cut = true;
     }
+    if (this.flatten && cur !== input) cur = this.flatten(cur);
     return cur;
   }
 
@@ -996,6 +1027,12 @@ class FxRack {
     this.units = [];
   }
 }
+
+/** Master FX that cut to transparency on purpose : laid over black before the
+ *  finishing stages (FxRack.flatten). The other effects that leave alpha (Perspective's
+ *  fade, Drape, Inflate, Silhouette, Matte ...) keep the look they have through
+ *  Context; the final flatten still makes the preview and the outputs agree. */
+const CUT_FX = new Set(['fx-key', 'fx-break']);
 
 /** Two shared scratch targets FX chains ping-pong through (sequential use). */
 class ChainBuffers {
@@ -2019,6 +2056,8 @@ export class Compositor {
   private persistProg: WebGLProgram;
   private mixProg: WebGLProgram;
   private copyProg: WebGLProgram;
+  private flattenProg: WebGLProgram;
+  private uFTex: WebGLUniformLocation;
   private vao: WebGLVertexArrayObject;
   private quadBuf: WebGLBuffer;    // the fullscreen-triangle vertex buffer
   private acc: PingPong;            // accumulator for the layer stack
@@ -2145,6 +2184,8 @@ export class Compositor {
 
     this.copyProg = compile(gl, QUAD_VS, COPY_FS);
     this.uCTex = gl.getUniformLocation(this.copyProg, 'tex')!;
+    this.flattenProg = compile(gl, QUAD_VS, FLATTEN_FS);
+    this.uFTex = gl.getUniformLocation(this.flattenProg, 'tex')!;
     this.groupProg = compile(gl, QUAD_VS, GROUP_FS);
     this.uGBg = gl.getUniformLocation(this.groupProg, 'bg')!;
     this.uGGrp = gl.getUniformLocation(this.groupProg, 'grp')!;
@@ -2232,6 +2273,7 @@ export class Compositor {
       gl.bindVertexArray(null);
     };
     this.masterRack = new FxRack(this.shared);
+    this.masterRack.flatten = (tex) => this.flattenMaster(tex);
     this.bgRack = new FxRack(this.shared);
     for (let i = 0; i < 4; i++) this.layers.push(new ISFLayer(this.shared, w, h));
   }
@@ -3130,6 +3172,22 @@ export class Compositor {
       L.stackReagent = new PingPong(gl, this.w, this.h);
     }
     return this.stepReagent(L.stackReagent, L.texture(), base, 0.5);
+  }
+
+  /** The master's picture over black, into a chain buffer it is not in (one
+   *  pass). */
+  private flattenMaster(tex: WebGLTexture): WebGLTexture {
+    const gl = this.gl;
+    let t = this.chain.next();
+    if (t.tex === tex) t = this.chain.next();
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.flattenProg);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(this.uFTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindVertexArray(null);
+    return t.tex;
   }
 
   private copyInto(fbo: WebGLFramebuffer, tex: WebGLTexture): void {
@@ -4172,6 +4230,7 @@ export class Compositor {
     gl.deleteProgram(this.persistProg);
     gl.deleteProgram(this.mixProg);
     gl.deleteProgram(this.copyProg);
+    gl.deleteProgram(this.flattenProg);
     gl.deleteProgram(this.xformProg);
     if (this.blankMask) gl.deleteTexture(this.blankMask);
     gl.deleteProgram(this.warpProg);
