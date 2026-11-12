@@ -207,8 +207,21 @@ static Napi::Value RecvPoll(const Napi::CallbackInfo& info) {
       const double now = NowSec();
       if (now - rx->lastLook > 0.5 && g_device) {
         rx->lastLook = now;
-        for (NSDictionary* d in [[SyphonServerDirectory sharedDirectory] servers]) {
-          if (Utf8(LabelOf(d)) != rx->label) continue;
+        NSArray* list = [[SyphonServerDirectory sharedDirectory] servers];
+        // By its label ("app : name") first, else by the server's own name :
+        // a session saved on Windows names a Spout sender, which a Mac program
+        // publishes over Syphon under the same name.
+        NSDictionary* match = nil;
+        for (NSDictionary* d in list) {
+          if (Utf8(LabelOf(d)) == rx->label) { match = d; break; }
+        }
+        if (!match && !rx->label.empty()) {
+          for (NSDictionary* d in list) {
+            if (Utf8(d[SyphonServerDescriptionNameKey]) == rx->label) { match = d; break; }
+          }
+        }
+        if (match) {
+          NSDictionary* d = match;
           std::shared_ptr<std::atomic<uint64_t>> frames = rx->frames;
           SyphonMetalClient* c = [[SyphonMetalClient alloc] initWithServerDescription:d
                                                                                device:g_device
@@ -219,7 +232,6 @@ static Napi::Value RecvPoll(const Napi::CallbackInfo& info) {
                                                                       }];
           if (c && c.isValid) rx->client = c;
           else if (c) [c stop];
-          break;
         }
       }
     }

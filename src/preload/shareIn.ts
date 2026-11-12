@@ -94,6 +94,19 @@ function spout(): SpoutAddon | null {
   const a = shareAddon<SpoutAddon>().mod
   return a && a.receives ? a : null
 }
+// macOS : whether main has a Syphon module that receives (asked once : the
+// module does not come or go while the app runs).
+let macCan: boolean | null = null
+function macReceives(): boolean {
+  if (macCan === null) {
+    try {
+      macCan = ipcRenderer.sendSync('sharein:can') === true
+    } catch {
+      macCan = false
+    }
+  }
+  return macCan
+}
 function syphon(): SyphonAddon | null {
   if (process.platform !== 'darwin') return null
   const a = shareAddon<SyphonAddon>().mod
@@ -396,6 +409,8 @@ export function shareInOpen(name: string): boolean {
     pool: [], out: 0, reading: false, readSeq: 0, mac: null, macImp: null, macGen: 0
   }
   if (process.platform === 'darwin') {
+    // No module in main (or an old one) : it would never be picked up.
+    if (!macReceives()) return false
     rxs.set(name, r)
     ipcRenderer.send('sharein:open', name)
   } else {
@@ -430,7 +445,11 @@ export function shareInClose(name: string): void {
 /** What a receiver is doing, for the readout. */
 export function shareInStatus(name: string): ShareInStatus | null {
   const r = rxs.get(name)
-  if (!r) return null
+  if (!r) {
+    // Not opened because this computer cannot receive : the readout says so.
+    const can = process.platform === 'darwin' ? macReceives() : !!spout()
+    return can ? null : { state: 'unavailable', w: 0, h: 0, fps: 0, route: '', error: '' }
+  }
   if (process.platform === 'darwin') {
     const m = r.mac
     if (!m) return { state: 'waiting', w: 0, h: 0, fps: 0, route: r.route, error: '' }

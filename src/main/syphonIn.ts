@@ -48,6 +48,9 @@ interface Rx {
 }
 
 const rxs = new Map<string, Rx>()
+// The windows already watched for closing : one listener each, however often
+// their layers open and close servers.
+const hooked = new Set<number>()
 let timer: ReturnType<typeof setInterval> | null = null
 let warned = false
 
@@ -121,6 +124,10 @@ function close(label: string, wcId: number, all = false): void {
 
 export function installSyphonIn(): void {
   if (process.platform !== 'darwin') return
+  // The window asks once, before its first receiver : no module, no waiting.
+  ipcMain.on('sharein:can', (e) => {
+    e.returnValue = !!addon()
+  })
   ipcMain.handle('sharein:list', async (): Promise<ShareInList> => {
     const a = addon()
     if (!a) return { ok: false, senders: [], message: 'the Syphon module is missing from this build (sh native/syphon/build.sh)' }
@@ -150,7 +157,14 @@ export function installSyphonIn(): void {
       r.owners.set(wc.id, { wc, refs: 1 })
       // A window that joins a running server gets its surface too.
       r.gen = 0
-      wc.once('destroyed', () => close(label, wc.id, true))
+      if (!hooked.has(wc.id)) {
+        hooked.add(wc.id)
+        const id = wc.id
+        wc.once('destroyed', () => {
+          hooked.delete(id)
+          for (const l of [...rxs.keys()]) close(l, id, true)
+        })
+      }
     }
     if (!timer) timer = setInterval(poll, 4)
   })

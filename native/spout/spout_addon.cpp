@@ -211,8 +211,12 @@ struct SpoutRx {
   uint64_t seq = 0;
   uint64_t takenSeq = 0;
   double stampMs = 0; // when the newest frame was ready (ms since the epoch)
-  // CPU route : the newest frame (front) and the one being filled (back)
-  std::vector<unsigned char> front, back;
+  // CPU route : the newest frame (front) and the one being filled (back). A
+  // read lends `front` out and copies it unlocked (a 4K frame is 33 MB, several
+  // ms : recvState and the next swap must not wait for it); `spare` takes the
+  // lent buffer back when a newer frame arrived meanwhile.
+  std::vector<unsigned char> front, back, spare;
+  bool lent = false;
   unsigned fw = 0, fh = 0;
 
   Ring* Current() { return rings.empty() ? nullptr : rings.back().get(); }
@@ -258,9 +262,17 @@ struct Pacer {
     fresh = false;
     return f && ema > 4 ? (ema * 0.6 < 40 ? ema * 0.6 : 40) : 1.0;
   }
-  void Got() {
+  // `frames` : how far the sender's frame number moved since the last frame
+  // taken (1 when it does not count). The estimate is per sender frame, and a
+  // stall (the sender paused or held its texture) stretches it only slowly :
+  // waiting longer than one frame would skip frames, again and again.
+  void Got(long frames = 1) {
     const double now = Ms();
-    if (last > 0 && now - last < 250) ema = ema > 0 ? ema * 0.8 + (now - last) * 0.2 : now - last;
+    if (last > 0 && now - last < 250) {
+      double dt = (now - last) / (frames > 1 ? frames : 1);
+      if (ema > 0 && dt > ema * 1.25) dt = ema * 1.25;
+      ema = ema > 0 ? ema * 0.8 + dt * 0.2 : dt;
+    }
     last = now;
     fresh = true;
   }
@@ -313,6 +325,7 @@ static void RunGpu(std::shared_ptr<SpoutRx> rx) {
   ID3D11Texture2D* none = nullptr;
   bool counted = true; // the sender counts its frames : poll fast, copy only new ones
   int missing = 0;
+  long lastTaken = 0; // the sender frame number of the last frame taken
 
   while (!rx->stop.load()) {
     // A sender that does not count its frames looks new on every call : then
@@ -333,6 +346,7 @@ static void RunGpu(std::shared_ptr<SpoutRx> rx) {
       }
     }
     ID3D11Texture2D* dst = (cur && target >= 0) ? cur->slot[target].tex : nullptr;
+    const long before = sp.GetSenderFrame();
     bool ok = sp.ReceiveTexture(dst ? &dst : &none);
     if (sp.IsUpdated()) {
       const unsigned w = sp.GetSenderWidth(), h = sp.GetSenderHeight();
@@ -381,8 +395,14 @@ static void RunGpu(std::shared_ptr<SpoutRx> rx) {
       continue;
     }
     missing = 0;
-    counted = sp.IsFrameCountEnabled() && sp.GetSenderFrame() > 0;
-    if (!dst || !sp.IsFrameNew()) continue;
+    const long after = sp.GetSenderFrame();
+    counted = sp.IsFrameCountEnabled() && after > 0;
+    // Published only when a copy really happened. A sender that holds its
+    // texture past the SDK's 67 ms access wait gets no copy, yet IsFrameNew
+    // keeps its last answer : the slot would show a frame from the past (or
+    // nothing at all, right after a resize). The frame number moves only on a
+    // real look at a counted sender's new frame.
+    if (!dst || !sp.IsFrameNew() || (counted && after == before)) continue;
     // Wait (on this thread) for the copy to land before the page may read it.
     if (done) {
       ctx->End(done);
@@ -399,7 +419,8 @@ static void RunGpu(std::shared_ptr<SpoutRx> rx) {
     rx->published = target;
     rx->seq++;
     rx->stampMs = NowMs();
-    pace.Got();
+    pace.Got(counted && lastTaken > 0 && after > lastTaken ? after - lastTaken : 1);
+    lastTaken = after;
     rx->fps = sp.GetSenderFps();
     rx->senderFrame = sp.GetSenderFrame();
     rx->state = RxState::Live;
@@ -438,11 +459,17 @@ static void RunCpu(std::shared_ptr<SpoutRx> rx) {
   bool swap = false, opaque = false; // BGRA : swapped to RGBA; BGRX : the fourth byte is not alpha
   ID3D11Texture2D* staging = nullptr;
   ID3D11Texture2D* none = nullptr;
+  int missing = 0;
+  long lastTaken = 0; // the sender frame number of the last frame taken
+  bool unopenable = false; // listed, yet nothing can be read from it
   while (!rx->stop.load()) {
     // No sender (yet, or it closed) : looked for 20 times a second, not 1000.
     tick.Wait(away ? 50.0 : pace.Next(counted));
+    const long before = sp.GetSenderFrame();
     bool ok = sp.ReceiveTexture(staging ? &staging : &none);
     if (sp.IsUpdated()) {
+      missing = 0;
+      unopenable = false;
       const unsigned w = sp.GetSenderWidth(), h = sp.GetSenderHeight();
       const DWORD f = (DWORD)sp.GetSenderFormat();
       FormatWay way = WayFor(f);
@@ -476,19 +503,43 @@ static void RunCpu(std::shared_ptr<SpoutRx> rx) {
       } else {
         bw = bh = 0;
         rx->state = way.cpu ? RxState::Failed : RxState::Unsupported;
-        rx->error = way.cpu ? "could not read this sender" : "this sender's pixel format cannot be read";
+        rx->error = way.cpu ? "could not read this sender" : "this sender's pixel format cannot be read : set its output to 8-bit";
       }
       continue;
     }
     away = !ok;
     if (!ok) {
+      // Not there (closed, not started yet), or there but unreadable : a sender
+      // sharing through memory, or a texture no graphics card here can open.
+      bool listed = false;
+      {
+        unsigned w = 0, h = 0; HANDLE hh = nullptr; DWORD f = 0;
+        listed = sp.GetSenderInfo(rx->name.c_str(), w, h, hh, f);
+      }
       std::lock_guard<std::mutex> lk(rx->mx);
-      if (rx->state == RxState::Live) rx->state = RxState::Waiting;
+      const bool stuck = rx->state == RxState::Unsupported || rx->state == RxState::Failed;
+      if (!listed) {
+        missing = 0;
+        if (rx->state == RxState::Live || unopenable) {
+          rx->state = RxState::Waiting;
+          rx->error.clear();
+        }
+        unopenable = false;
+      } else if (!stuck && ++missing > 30) {
+        // ~1.5 s listed and still nothing : saying "start it" would not help.
+        unopenable = true;
+        rx->state = RxState::Failed;
+        rx->error = "this sender is running but cannot be opened (it shares through memory, or from a graphics card this computer cannot read)";
+      }
       rx->fps = 0;
       continue;
     }
-    counted = sp.IsFrameCountEnabled() && sp.GetSenderFrame() > 0;
-    if (!staging || !sp.IsFrameNew()) continue;
+    missing = 0;
+    const long after = sp.GetSenderFrame();
+    counted = sp.IsFrameCountEnabled() && after > 0;
+    // Read only when a copy really happened (see RunGpu) : else the staging
+    // texture holds the last frame again, or nothing yet after a resize.
+    if (!staging || !sp.IsFrameNew() || (counted && after == before)) continue;
     ID3D11DeviceContext* ctx = sp.GetDX11Context();
     D3D11_MAPPED_SUBRESOURCE map = {};
     if (!ctx || FAILED(ctx->Map(staging, 0, D3D11_MAP_READ, 0, &map))) continue;
@@ -498,12 +549,17 @@ static void RunCpu(std::shared_ptr<SpoutRx> rx) {
     if (opaque) for (size_t i = 3; i < rx->back.size(); i += 4) rx->back[i] = 255;
     std::lock_guard<std::mutex> lk(rx->mx);
     rx->front.swap(rx->back);
-    if (rx->back.size() != rx->front.size()) rx->back.assign(rx->front.size(), 0);
+    // (back is empty when a read has the old front out : the spare stands in)
+    if (rx->back.size() != rx->front.size()) {
+      if (rx->spare.size() == rx->front.size()) rx->back.swap(rx->spare);
+      else rx->back.assign(rx->front.size(), 0);
+    }
     rx->fw = bw;
     rx->fh = bh;
     rx->seq++;
     rx->stampMs = NowMs();
-    pace.Got();
+    pace.Got(counted && lastTaken > 0 && after > lastTaken ? after - lastTaken : 1);
+    lastTaken = after;
     rx->fps = sp.GetSenderFps();
     rx->senderFrame = sp.GetSenderFrame();
     rx->state = RxState::Live;
@@ -670,15 +726,32 @@ class ReadWorker : public Napi::AsyncWorker {
         cap_(ab.ByteLength()), after_(after), def_(Napi::Promise::Deferred::New(env)) {}
   Napi::Promise Promise() { return def_.Promise(); }
   void Execute() override {
+    // The newest frame is lent out under the lock and copied without it, so
+    // the page's recvState and the receiver's next swap never wait on a copy.
+    std::vector<unsigned char> buf;
+    size_t n = 0;
+    {
+      std::lock_guard<std::mutex> lk(rx_->mx);
+      if (rx_->seq <= after_ || rx_->front.empty()) return;
+      n = (size_t)rx_->fw * rx_->fh * 4;
+      if (n > cap_ || rx_->front.size() < n) { short_ = true; w_ = rx_->fw; h_ = rx_->fh; return; }
+      w_ = rx_->fw;
+      h_ = rx_->fh;
+      seq_ = rx_->seq;
+      stamp_ = rx_->stampMs;
+      if (rx_->lent) {
+        // another read has a buffer out (not the app's way : one read at a time)
+        memcpy(dst_, rx_->front.data(), n);
+        return;
+      }
+      buf.swap(rx_->front);
+      rx_->lent = true;
+    }
+    memcpy(dst_, buf.data(), n);
     std::lock_guard<std::mutex> lk(rx_->mx);
-    if (rx_->seq <= after_ || rx_->front.empty()) return;
-    const size_t n = (size_t)rx_->fw * rx_->fh * 4;
-    if (n > cap_ || rx_->front.size() < n) { short_ = true; w_ = rx_->fw; h_ = rx_->fh; return; }
-    memcpy(dst_, rx_->front.data(), n);
-    w_ = rx_->fw;
-    h_ = rx_->fh;
-    seq_ = rx_->seq;
-    stamp_ = rx_->stampMs;
+    rx_->lent = false;
+    if (rx_->front.empty()) rx_->front.swap(buf); // still the newest
+    else if (rx_->spare.empty()) rx_->spare.swap(buf); // a newer one came : kept for the next fill
   }
   void OnOK() override {
     Napi::Env env = Env();

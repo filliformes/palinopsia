@@ -710,7 +710,8 @@ nothing is compressed (NDI) or grabbed off the screen. A layer's source menu →
 **Syphon** servers), with their size; pick one and it plays in the layer like a camera
 (framing, People, FX, blend), the right way up; **Switch input** in the Inspector changes
 it. Several layers can show the same sender (one receiver). The session remembers it by
-name (`spout:<name>`, `syphon:<name>` on a Mac : either one opens on either computer), and
+name (`spout:<name>`, `syphon:<name>` on a Mac : either one opens on either computer, a Mac
+finding the server by its own name too), and
 a sender that is **not running yet**, **closes**, **restarts** or **changes size** is
 picked up again by itself; the last frame holds meanwhile. The Inspector shows what
 arrives : size, frames per second and the route.
@@ -719,11 +720,16 @@ arrives : size, frames per second and the route.
   a texture Palinopsia shares with Chromium, so no pixel ever goes through memory.
   Measured on the Aero (RTX 4070) with a test sender drawing a time code : a 1080p 60 fps sender reaches the layer **13 ms** after it sent the frame (95 % within 23 ms), a 4K one in **21 ms** (32), the app holding 60 fps; the upload costs 0.2 ms a frame (0.4 at 4K), the receiving about 10 % of one CPU core (its own thread, never the app's) and a few % more on the GPU.
 - **Copied**, when the sender draws on **another graphics card** (a laptop's integrated
-  one) or in a format the shared texture cannot hold : the frame is read back on the
-  receiver's own thread and copied into the layer off the app's thread : 1080p arrives in 20 ms (28), 4K in 44 ms (55) at about 37 frames a second, the app still at 60 fps, for about a quarter (1080p) to half (4K) of a CPU core.
+  one) or sends 8-bit BGRX, which the shared texture cannot hold : the frame is read back on the
+  receiver's own thread and copied into the layer off the app's thread : 1080p arrives in 21 ms (28), 4K in 42 ms (52) at about 47 frames a second, the app still at 60 fps, for about a quarter (1080p) to half (4K) of a CPU core.
   On a laptop with two graphics cards, set the sending program to the high-performance
   one (Windows Settings → Display → Graphics) to keep the shared route.
 - The picture keeps the sender's **alpha** : a transparent sender shows the layers below.
+- **Pixel formats** : 8-bit senders (RGBA, BGRA, BGRX) come in by either route; 16-bit
+  float only shared on the graphics card (the sender on the same card). A **10-bit** or
+  **32-bit float** sender is refused and the Inspector says so : set its output to 8-bit
+  (or 16-bit float). A sender that shares **through memory** (an old Spout setting) cannot
+  be received either : the Inspector says it is running but cannot be opened.
 - **macOS (Syphon)** : written the same way (the server's IOSurface shared with the
   window; a copy route reading the surface if that fails) but **not yet tried on a Mac**.
   If the picture comes in upside down, **mirror → upside down** in the framing fixes it
