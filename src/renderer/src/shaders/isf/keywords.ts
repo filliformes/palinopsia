@@ -95,6 +95,8 @@ export const SHADER_KEYWORDS: Record<string, string[]> = {
   'fx-rain-pane': ['rain', 'window', 'glass', 'drops', 'droplets', 'condensation', 'fog', 'mist', 'wet', 'weather', 'pane', 'storm', 'refraction'],
   'fx-thinfilm': ['thin film', 'soap', 'bubble', 'oil', 'slick', 'iridescent', 'interference', 'rainbow', 'color', 'pearl'],
   'node-drape': ['drape', 'cloth', 'fabric', 'sheet', 'curtain', 'flag', 'banner', 'grab', 'wind', 'textile', 'satin', '3d', 'physics', 'bedsheet', 'projection'],
+  'node-touch': ['touch', 'hand', 'push', 'shockwave', 'ring', 'rings', 'shock', 'swirl', 'twist', 'smudge', 'drag', 'lens', 'magnify', 'bulge', 'pinch', 'attract', 'spread', 'jelly', 'elastic', 'displace', 'warp', 'pointer', 'interactive', 'kick'],
+  'node-ripple': ['ripple', 'water', 'pond', 'pool', 'rain', 'drops', 'stone', 'waves', 'wave', 'rings', 'refraction', 'liquid', 'puddle', 'lake', 'splash', 'interactive', 'kick', 'surface'],
   'node-inflate': ['flowing', 'mercury', 'liquid metal', 'prism', 'inflate', 'puff', 'balloon', 'chrome', 'liquid', 'metal', '3d', 'relief', 'emboss', 'bevel', 'glass', 'clay', 'plastic', 'soap', 'text', 'logo'],
   'fx-solarize': ['solarize', 'invert', 'distortion', 'contrast', 'psychedelic'],
   'fx-streak': ['streak', 'motion blur', 'drag', 'smear', 'blur'],

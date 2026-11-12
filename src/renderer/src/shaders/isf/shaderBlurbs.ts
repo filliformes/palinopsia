@@ -32,6 +32,10 @@ export const SHADER_BLURBS: Record<string, string> = {
     'The picture as the thickness of a soap film or an oil slick : every thickness gives back its own color, in the orders every bubble shows, slowly running in currents of its own.',
   'node-drape':
     'The picture printed on a sheet of cloth you grab on the preview : it hangs like a curtain, flies like a flag or floats, the wind and the sound move it, people in the Room press into it.',
+  'node-touch':
+    'Makes any picture touchable : lay a hand on the preview (or pinch, or let the Room\'s people walk in) and the picture is pushed, swirled, dragged, magnified or pulled in, then springs back. Its rings mode is a shockwave that a kick or a pad can fire.',
+  'node-ripple':
+    'The picture seen through water : rain, the sound\'s hits, a stone, the picture\'s own motion or a hand trailing through it make rings that travel, cross and come back from the edges (the rim, on the dome).',
   'node-inflate':
     'Blows the layer up into volume : its shape gets a real height, rounded in from its edges, lit as clay, plastic, metal, chrome, soap film or glass, live. Text or a silhouette comes out as liquid chrome.',
   'fx-solarize':

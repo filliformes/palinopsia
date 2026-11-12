@@ -7,6 +7,37 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Touch and Ripple : any picture touchable, and the picture seen through water** (Vincent :
+  "build Topographic Flow, Touch, Shockwave and Ripple"; the shelf's *Touch : an FX that
+  makes any picture touchable [...] from the mouse, every pinching hand, Room people or OSC,
+  so all generators and every film answer the hand; absorbs the shelf Shockwave* and
+  *Ripple : the picture seen through water [...] on the dome the circle rim is the
+  reflecting boundary. Keep the crest shine matte, never a glossy glow*). Two native nodes,
+  any rack (the master too), sharing their input points (`engine/touchInput.ts` : the
+  pointer through `pointerInput.ts`, every pinching hand, the Room's people, an OSC
+  finger, the effect's own point, a wandering hand; the field space is the flat frame or,
+  under dome fill, the dome's disc).
+  - **Touch** (`node-touch`, `engine/touchNode.ts`) : modes rings (the Shockwave, a
+    first-class mode : a ring of displacement bursting from the touch and traveling out,
+    a wake of rings while dragged), spread, swirl, drag (the field is carried along under
+    the hand), lens, attract; follow, fade, spring (creep or jelly), soft; FIRE at the
+    center / the point / anywhere, sound hits (a shockwave on the kick), people push, by
+    itself, press the point; matte shade, color split. A displacement field at half the
+    height (at most 720 rows, RGBA32F where it filters), relaxed by a damped spring; rings
+    (16) and lenses (8) drawn over it from uniforms; one warp pass.
+  - **Ripple** (`node-ripple`, `engine/rippleNode.ts`) : a wave height field (RGBA32F,
+    200 to 720 rows, a third of the height), substepped so rings travel at the same speed
+    at any size; rain, sound hits, the stone trigger, its own motion (luma change on the
+    grid), the hand (a stone, then a finger that leaves a wake), people wade, by itself;
+    reflect or absorb edges (on the dome the disc's rim is the wall); refraction with a
+    color split, matte crest light, water color in the troughs.
+  - `/opsia/touch x y [s]`, `/opsia/touch/hold x y`, `/opsia/touch/up` (every Touch and
+    Ripple); each effect's own inputs (`fire`, `stone`, `point` …) as for every effect.
+  - 14 Touch presets, 12 Ripple presets; the chain group **Touch and water** (Touch the
+    Picture, Shockwave on the Kick, Jelly Picture, A Hand of Its Own, Through the Water,
+    Drops on the Kick, Downpour, Water You Touch) and **Dome · Pool**; themes **Pond**,
+    **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome); Ripple joins the
+    dice's effects.
 - **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
   nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
   his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this

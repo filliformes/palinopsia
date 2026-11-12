@@ -623,6 +623,30 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
   }),
   mk({
+    id: 'pond', name: 'Pond', family: 'Living Surfaces',
+    blurb: 'The picture under water : rain rings it, what moves in it stirs it, a hand trails through it.',
+    world: 'sublimated',
+    palette: [K, [0.06, 0.1, 0.12, 1], [0.62, 0.74, 0.76, 1]],
+    sources: ['dye-field', 'organic', 'op-art', 'membrane', 'swell'],
+    stackFx: [['node-ripple']],
+    presets: { 'node-ripple': ['Pond', 'Downpour', 'Moving water', 'Bath', 'Ink water', 'Mercury pool', 'Boat wake'] },
+    pickInputs: { 'node-ripple': { people: [0], audio: [0], refract: [0.6, 0.7, 0.8] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
+    id: 'a-hand-in-it', name: 'A Hand in It', family: 'Living Surfaces',
+    blurb: 'An unseen hand moves through the picture : it drags it, rings it, swirls it, and the picture springs back behind it. Lay your own on the preview.',
+    world: 'synthetic',
+    palette: [K, [0.1, 0.09, 0.08, 1], [0.8, 0.74, 0.66, 1]],
+    sources: ['op-art', 'organic', 'dye-field', 'ramps', 'congeal'],
+    stackFx: [['node-touch']],
+    presets: { 'node-touch': ['Ghost hand', 'Wake of rings', 'Drifting lens'] },
+    pickInputs: { 'node-touch': { wander: [0.5, 0.7, 0.9], people: [0], audio: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.25, feedback: 0, layers: [1, 1], drift: 0.25, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
     id: 'cross-loop', name: 'Cross Loop', family: 'Feedback / Afterimage',
     blurb: 'Two monitors facing each other : each layer plays the other\'s picture, smaller and turned, frames inside frames.',
     world: 'synthetic',
@@ -1530,6 +1554,19 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-light-trails', 'fx-grade', 'fx-hue-rotate'],
     blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2, feedback: 0.3, drift: 0.2, density: 0.4,
     context: { depth: 0, haze: 0.1, bloom: 0.18 }
+  }),
+  mk({
+    id: 'dome-pool', name: 'Pool Overhead', family: 'Dome',
+    blurb: 'The sky as the surface of a pool seen from below : rings travel to the rim and come back from all round.',
+    world: 'sublimated',
+    palette: [K, [0.04, 0.1, 0.13, 1], [0.5, 0.7, 0.75, 1]],
+    sources: ['dye-field', 'swell', 'membrane', 'op-art'],
+    stackFx: [['node-ripple']],
+    presets: { 'node-ripple': ['Pond', 'Bath', 'Boat wake', 'Mercury pool'] },
+    pickInputs: { 'node-ripple': { people: [0], audio: [0], edges: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0.2, feedback: 0, drift: 0.2, density: 0.45,
+    context: { depth: 0 }
   }),
   mk({
     id: 'dome-canopy', name: 'Canopy', family: 'Dome',
