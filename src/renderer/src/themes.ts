@@ -243,6 +243,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'scan-processor', name: 'Scan Processor', family: 'Analog Video Synthesis',
+    loops: ['scan-relief'],
     blurb: 'Voltage ramps coloured by a CV colorizer and pushed into relief.',
     world: 'parametric',
     palette: [K, [0.4, 0.1, 0.5, 1], [1.0, 0.5, 0.1, 1], [0.9, 0.95, 0.4, 1]],
@@ -294,6 +295,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'signal-loss', name: 'Signal Loss', family: 'Glitch / Datamosh',
+    loops: ['tear-drift', 'band-slip'],
     blurb: 'The picture climbs, catches and tears : sync roll + tracking + line holds.',
     world: 'incongruent',
     palette: [K, [0.12, 0.14, 0.16, 1], [0.75, 0.78, 0.72, 1]],
@@ -324,6 +326,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'dropout', name: 'Dropout', family: 'Glitch / Datamosh',
+    loops: ['tape-rot'],
     blurb: 'A worn tape dub : generation-loss chroma bleed, jitter and dropout lines.',
     world: 'presse',
     palette: [K, [0.28, 0.2, 0.12, 1], [0.82, 0.72, 0.55, 1]],
@@ -353,6 +356,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'cut-up', name: 'Cut-Up', family: 'Glitch / Datamosh',
+    loops: ['torn-echo', 'bar-grab', 'beat-stutter'],
     blurb: 'The frame diced into cells that jump and re-shuffle on the beat : a live collage.',
     world: 'incongruent',
     palette: [INK, [0.14, 0.16, 0.2, 1], [0.9, 0.9, 0.88, 1]],
@@ -370,6 +374,20 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-wide-time', 'fx-slit-buffer'],
     nativeNodes: ['node-chronoscan'], nativeChance: 0.9,
     blends: ['screen', 'add'], drift: 0.4, coalesce: 0.3
+  }),
+
+  mk({
+    id: 'glitch-loop', name: 'Glitch Loop', family: 'Glitch / Datamosh',
+    blurb: 'The damage goes round the loop : tears, slips, sorted drips and frozen bands that every pass remembers and smears further.',
+    world: 'synthetic',
+    // (a lifted middle : on Incongruent and a dark second stop, two draws in three sat at 0.09)
+    palette: [K, [0.24, 0.2, 0.28, 1], [0.86, 0.52, 0.4, 1], [0.92, 0.9, 0.84, 1]],
+    // (full-frame sources : the loop has something to tear everywhere)
+    sources: ['swell', 'drift-field', 'dye-field', 'congeal'],
+    loops: ['tear-drift', 'band-slip', 'sort-drip', 'freeze-bands', 'tape-rot', 'slice-drag', 'torn-echo', 'beat-stutter', 'step-spiral'],
+    loopChance: 1,
+    layerFx: ['fx-chroma-shift', 'fx-scanlines'],
+    blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], gestureTexture: 0.6, coalesce: 0.35, drift: 0.3
   }),
 
   // ── Cameraless / Direct Film ──────────────────────────────────────────
@@ -1033,6 +1051,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'databent', name: 'Databent', family: 'Datamosh & Compression',
+    loops: ['band-slip', 'tear-drift', 'slice-drag'],
     blurb: 'Editing the stream, not the picture : bands tear and hold, channels drift, the signal breaks.',
     world: 'incongruent',
     palette: [K, [0.16, 0.16, 0.18, 1], [0.78, 0.78, 0.72, 1]],
@@ -1043,6 +1062,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'pixel-sort', name: 'Pixel Sort', family: 'Datamosh & Compression',
+    loops: ['sort-drip'],
     blurb: 'Brightness pulled into clean monotone streaks : the sorted-pixel light-leak.',
     world: 'sublimated',
     palette: [K, [0.3, 0.12, 0.28, 1], [1.0, 0.75, 0.55, 1]],
