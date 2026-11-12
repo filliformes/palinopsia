@@ -557,10 +557,12 @@ export function clearFinalizerFilm(c: CompositionState): CompositionState {
 }
 
 // ── A camera's mirror, per camera, on this computer ──
-// Some cameras (their driver, a maker's app, a Windows camera setting) send the
-// picture already turned left to right. Palinopsia shows a camera as it
-// arrives; the mirror chosen in its framing is kept for THAT camera (by its name)
-// and used every time it is opened again here. Screens and NDI are left alone.
+// A camera opens in the SELFIE view (turned left to right : raise your left arm,
+// it shows on the left of the screen), as a performer in front of it expects;
+// the picture as a camera sends it is the other way round. The mirror chosen in
+// a camera's framing is kept for THAT camera (by its name) and used every time it
+// is opened again here : a capture card or a camera filming the stage is set to
+// off once. Screens and NDI are left alone (never mirrored by default).
 const CAMERA_MIRROR_KEY = 'opsia.cameraMirror'
 type Mirror = 'off' | 'x' | 'y' | 'xy'
 function cameraKeyOf(spec: string, name: string): string | null {
@@ -574,10 +576,11 @@ function cameraMirror(spec: string, name: string): Mirror | null {
   if (!k) return null
   try {
     const v = (JSON.parse(localStorage.getItem(CAMERA_MIRROR_KEY) ?? '{}') as Record<string, Mirror>)[k]
-    return v === 'x' || v === 'y' || v === 'xy' || v === 'off' ? v : null
+    if (v === 'x' || v === 'y' || v === 'xy' || v === 'off') return v
   } catch {
-    return null
+    /* storage blocked : the default */
   }
+  return 'x' // the selfie view
 }
 function rememberCameraMirror(spec: string, name: string, m: Mirror): void {
   const k = cameraKeyOf(spec, name)
