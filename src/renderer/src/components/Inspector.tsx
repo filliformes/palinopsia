@@ -27,6 +27,8 @@ import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { AvfReadout, DevicePicker } from './DevicePicker'
 import { NdiInReadout, NdiPicker } from './NdiPicker'
+import { ShareInReadout, SharePicker } from './SharePicker'
+import { shareInName, shareInSpec } from '@shared/shareIn'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -125,6 +127,7 @@ export function Inspector(): JSX.Element {
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
   const [switchNdi, setSwitchNdi] = useState(false)
+  const [switchShare, setSwitchShare] = useState(false)
   // The mod-assign side panel: which parameter's M was clicked (null = closed),
   // and its draggable width (persisted).
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
@@ -435,7 +438,9 @@ export function Inspector(): JSX.Element {
       const isHive = vslot?.kind === 'hive'
       const capId = vslot?.mediaId ?? ''
       const isNdi = capId.startsWith('ndi:')
-      const isDevice = capId.startsWith('device:') || isNdi
+      const shareName = isCap ? shareInName(capId) : null
+      const isShare = shareName !== null
+      const isDevice = capId.startsWith('device:') || isNdi || isShare
       const isScreen = isCap && !isDevice && capId !== 'webcam'
       const isAsm = vslot?.kind === 'assemble'
       const icon = isAsm
@@ -444,6 +449,8 @@ export function Inspector(): JSX.Element {
           ? '📡'
           : !isCap
             ? '🎞'
+            : isShare
+              ? '⧉'
             : isDevice
               ? '🎥'
               : capId === 'webcam'
@@ -469,7 +476,7 @@ export function Inspector(): JSX.Element {
             )}
             {isDevice && (
               <button
-                onClick={() => (isNdi ? setSwitchNdi(true) : setSwitchDevice(true))}
+                onClick={() => (isNdi ? setSwitchNdi(true) : isShare ? setSwitchShare(true) : setSwitchDevice(true))}
                 className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
                 title="Choose a different live input device"
               >
@@ -493,6 +500,7 @@ export function Inspector(): JSX.Element {
             )}
           </div>
           {isNdi && <NdiInReadout name={capId.slice(4)} />}
+          {isShare && <ShareInReadout name={shareName} />}
           {capId.startsWith('device:avf:') && <AvfReadout id={capId.slice('device:avf:'.length)} />}
           {switchCapture && (
             <CapturePicker
@@ -501,6 +509,15 @@ export function Inspector(): JSX.Element {
                 setSwitchCapture(false)
               }}
               onCancel={() => setSwitchCapture(false)}
+            />
+          )}
+          {switchShare && (
+            <SharePicker
+              onPick={(name) => {
+                setSourceCapture(selection.layer, selection.slot, shareInSpec(name, window.api.platform), name)
+                setSwitchShare(false)
+              }}
+              onCancel={() => setSwitchShare(false)}
             />
           )}
           {switchNdi && (

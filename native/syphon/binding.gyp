@@ -18,6 +18,7 @@
               "-F<(module_root_dir)/frameworks",
               "-framework", "Syphon",
               "-framework", "Metal",
+              "-framework", "IOSurface",
               "-framework", "Foundation",
               "-Wl,-rpath,@loader_path"
             ]

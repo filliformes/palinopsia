@@ -25,6 +25,11 @@ export function shareKind(): 'Spout' | 'Syphon' | null {
 let mod: ShareAddon | null = null
 let loadError = ''
 
+/** The platform's addon, as the Syphon input's client sees it (main/syphonIn.ts). */
+export function loadShareAddon<T>(): T | null {
+  return loadAddon() as unknown as T | null
+}
+
 /** Load the platform's addon once (dlopen bypasses the bundler). In dev
  *  getAppPath() is the project root; packaged builds unpack it (asarUnpack). */
 function loadAddon(): ShareAddon | null {

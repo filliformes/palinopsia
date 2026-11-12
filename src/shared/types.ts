@@ -1823,6 +1823,14 @@ export interface ExposedApi {
   avfOpen: (id: string) => boolean
   avfClose: (id: string) => void
   avfStatus: (id: string) => import('./avf').AvfStatus | null
+  /** Spout (Windows) / Syphon (macOS) senders on this computer. */
+  shareInList: () => Promise<import('./shareIn').ShareInList>
+  /** Start (or share) receiving one sender; false : no module on this computer. */
+  shareInOpen: (name: string) => boolean
+  shareInClose: (name: string) => void
+  /** The newest frame on the GPU route (the page closes it), or null. */
+  shareInFrame: (name: string) => import('./shareIn').ShareInGpuFrame | null
+  shareInStatus: (name: string) => import('./shareIn').ShareInStatus | null
   // No NDI on this computer : download + verify + open NDI's official installer.
   ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
   onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void

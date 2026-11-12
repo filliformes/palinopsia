@@ -30,4 +30,13 @@ Then **Output → Spout / Syphon → Syphon on** publishes a `Palinopsia` server
 Check it with Syphon's *Simple Client* or add it as a source in Resolume
 (Sources → Syphon) or MadMapper.
 
+It also has a **client** (the layer source *Spout / Syphon Input…*), UNTESTED until it
+runs on a Mac : `servers()` (the `SyphonServerDirectory`, labels `app : name`),
+`recvOpen(label)`, `recvPoll(id)` (connects, notices new frames and a new surface),
+`recvSurface(id)` (the server's IOSurface, for Electron's `sharedTexture` in main) and
+`recvClose(id)`, used by `src/main/syphonIn.ts` in the main process (Syphon's
+notifications need its run loop); `readSurface(surfaceId, buffer)` is the window's copy
+route (IOSurface by its id, BGRA to RGBA, off the JS thread). `build.sh` loads the
+finished addon in Node once, so a missing symbol shows in the CI log.
+
 Not built on Windows / Linux (Spout covers Windows; Linux has neither).

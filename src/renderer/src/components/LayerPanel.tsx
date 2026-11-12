@@ -27,6 +27,8 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
 import { NdiPicker } from './NdiPicker'
+import { SharePicker } from './SharePicker'
+import { shareInName, shareInSpec, shareInKind } from '@shared/shareIn'
 import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
@@ -1031,6 +1033,7 @@ function SourceRow({
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showNdi, setShowNdi] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [showHive, setShowHive] = useState(false)
   // ffmpeg import conversion (DXV3 / HAP / ProRes → all-intra cache) : 0..1, null = idle.
   const [converting, setConverting] = useState<number | null>(null)
@@ -1115,6 +1118,8 @@ function SourceRow({
             ? '__cap_live__'
             : mediaId?.startsWith('ndi:')
               ? '__cap_ndi__'
+              : shareInName(mediaId) !== null
+                ? '__cap_share__'
             : '__cap_screen__'
         : (shaderId ?? '')
   const active = isVideo || isAudio || isCapture || isHive || isAsm || isLoop || !!shaderId
@@ -1212,6 +1217,16 @@ function SourceRow({
             { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
             { value: '__cap_ndi__', label: 'NDI Input…', prefix: '📶 ', group: 'live', title: 'An NDI® source on the network : a camera, a phone, OBS, NDI Tools, another Palinopsia' },
+            ...(shareInKind(window.api.platform)
+              ? [{
+                  value: '__cap_share__',
+                  label: 'Spout / Syphon Input…',
+                  prefix: '⧉ ',
+                  group: 'live',
+                  keywords: ['spout', 'syphon', 'texture', 'share', 'local', 'program', 'app'],
+                  title: `Another program's picture on this computer (its ${shareInKind(window.api.platform)} output) at full quality, shared on the graphics card : no compression, almost no delay`
+                }]
+              : []),
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             // A Loop source : a layer's picture (its last frame for this layer and
@@ -1248,6 +1263,7 @@ function SourceRow({
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
             else if (v === '__cap_ndi__') setShowNdi(true)
+            else if (v === '__cap_share__') setShowShare(true)
             else if (v === '__cap_hive__') setShowHive(true)
             // Assemblage… : the latest saved edit (or a fresh one from the corpus)
             // right here, selected so the Inspector shows how it plays; the tab
@@ -1307,6 +1323,15 @@ function SourceRow({
             setShowNdi(false)
           }}
           onCancel={() => setShowNdi(false)}
+        />
+      )}
+      {showShare && (
+        <SharePicker
+          onPick={(name) => {
+            onPickCapture(shareInSpec(name, window.api.platform), name)
+            setShowShare(false)
+          }}
+          onCancel={() => setShowShare(false)}
         />
       )}
       {showDevices && (

@@ -33,9 +33,10 @@ export function personStatus(layer: number, slot: 'A' | 'B'): PersonStatus | nul
   return statuses.get(`${layer}${slot}`) ?? null
 }
 
-/** A frame the slot already holds : its <video>, or an RGBA buffer (top row first;
- *  `seq` tells a new frame from the same one again). */
-export type PersonFrame = HTMLVideoElement | { w: number; h: number; stride: number; buf: ArrayBuffer; seq?: number }
+/** A frame the slot already holds : its <video>, a VideoFrame (the Spout / Syphon
+ *  input's GPU route), or an RGBA buffer (top row first; `seq` tells a new frame
+ *  from the same one again). */
+export type PersonFrame = HTMLVideoElement | VideoFrame | { w: number; h: number; stride: number; buf: ArrayBuffer; seq?: number }
 
 export class PersonMask {
   private worker: Worker | null = null
@@ -57,6 +58,7 @@ export class PersonMask {
   private inFlightGen = 0
   private lastVideoTime = -1
   private lastSeq = -1
+  private lastVf: VideoFrame | null = null
   readonly status: PersonStatus = { state: 'loading', people: 0, ms: 0, error: '' }
 
   private key: string
@@ -96,6 +98,7 @@ export class PersonMask {
     this.pending = null
     this.lastVideoTime = -1
     this.lastSeq = -1
+    this.lastVf = null
   }
 
   /** How many people to look for (1 to 4 : the model finds each one separately). */
@@ -166,6 +169,17 @@ export class PersonMask {
         this.lastVideoTime = frame.currentTime
         const h = Math.max(1, Math.round((FEED_W * frame.videoHeight) / frame.videoWidth))
         make = createImageBitmap(frame, { resizeWidth: FEED_W, resizeHeight: h, resizeQuality: 'low' })
+      } else if (frame instanceof VideoFrame) {
+        if (this.has && frame === this.lastVf) return // the same frame again
+        this.lastVf = frame
+        const fw = frame.displayWidth
+        const fh = frame.displayHeight
+        if (!fw || !fh) return
+        // A clone : the input closes its frame when the next one arrives, maybe
+        // before this scaled copy is made.
+        const own = frame.clone()
+        const h = Math.max(1, Math.round((FEED_W * fh) / fw))
+        make = createImageBitmap(own, { resizeWidth: FEED_W, resizeHeight: h, resizeQuality: 'low' }).finally(() => own.close())
       } else {
         const { w, h, stride, buf } = frame
         if (!(w > 0 && h > 0) || stride < w * 4 || buf.byteLength < stride * h) return
