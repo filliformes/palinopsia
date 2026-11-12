@@ -36,8 +36,8 @@ that CI builds into cross-platform releases.
   - 14 Touch presets, 12 Ripple presets; the chain group **Touch and water** (Touch the
     Picture, Shockwave on the Kick, Jelly Picture, A Hand of Its Own, Through the Water,
     Drops on the Kick, Downpour, Water You Touch) and **Dome · Pool**; themes **Pond**,
-    **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome); Ripple joins the
-    dice's effects.
+    **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome). (Ripple first joined
+    the dice's effects; the audit below kept it hand-placed.)
 - **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
   nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
   his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this
@@ -556,6 +556,37 @@ that CI builds into cross-platform releases.
   Node with its own redial switched off (like Max's core), its sockets destroyed with no
   goodbye : values flowed again after 7.2 s and 6.7 s. **Not verified : a real sleep with
   Max** (to do on his machines).
+
+- **The new effects and the Macro range, from an audit** (Touch, Ripple, Current, Noise,
+  the knob range). A held OSC finger (`/opsia/touch/hold`) whose controller stopped
+  without `/opsia/touch/up` pressed on every Touch and Ripple forever, through New, Open
+  and PANIC : it now lets go 3 s after the last `/hold` (`touchInput.HOLD_TIMEOUT_MS`; a
+  controller that holds keeps sending it), and New, Open, Generate and PANIC let it go. A
+  double click held into a drag (a heavy scene at a low frame rate) turned into a tap
+  every frame (a ring or a stone per frame, the drag did nothing) : a new press clears the
+  last click's ending (`TouchPoints.set`). `/opsia/macro/n/min` and `/max` moved the
+  destinations only at the knob's next move, then all at once : they follow at once now,
+  as the bar and the typed numbers do (`commitKnob`, unless a modulator drives the knob).
+  **Randomize Meta Knobs** put the new destinations outside their good zone on a knob with
+  a range (0.85 to 1 : all in their top 15 %) or a curve : a re-rolled knob starts on the
+  full range, and its position is chosen through its curve (`randomize.knobPosIn`).
+  **Ripple** is no longer dealt by the dice (`SELF_NODE_IDS`) : dealt into the Master FX
+  or a layer's rack it took the preview's clicks and pinches from a Marbling, Sand Plate,
+  Relief or Fur played by hand, with nothing to say why; the effects that take the
+  pointer stay hand-placed (chains and Generate themes still use it). Modulating
+  **Current**'s detail started still water at every step of it (six targets remade, the
+  water never built up) : a new grid now resamples the velocity (`FluidSolver.ensure`).
+  **Noise** *seamless* jumped by a cell (4096 mod the cells across) when its drift wrapped,
+  within hours on an installation : it drifts on a phase of its own in frame widths,
+  wrapped at the repeat (`PH_noiseSX`). Proven with esbuild checks (the double click
+  held into a drag : 10 taps out of 10 frames on master, none now; the seamless field's
+  largest move in a frame across the wrap : 0.97 cells at 7 across, 7.97 at 28, now one
+  frame of drift; Randomize Meta Knobs on a dumped composition, knobs at 0.85..1 : 78 % of
+  the destinations outside their zone on master, none now; 300 dice presses : 18 dealt a
+  Ripple on master, none now) and on the test copy (`/opsia/macro/1/min 0.8` : the opacity
+  0.5 -> 0.9 at once; the OSC finger held through 4 s of refreshes, gone 3.5 s after the
+  last, gone after PANIC and New; Current's mean water speed across a detail step 9 to 14
+  cells/s, 1.4 to 7 with the old still start; 60 fps with detail swept every frame).
 
 ### Docs
 

@@ -174,10 +174,16 @@ export class FluidSolver {
     this.stirP = g.prog(STIR_FS)
   }
 
-  /** The velocity grid at gw × gh (a change starts still water). True when it
-   *  was (re)made. */
+  /** The velocity grid at gw × gh. True when it was (re)made. A new size keeps
+   *  the water moving : the velocity is resampled onto the new grid (in its cells,
+   *  so the same speed), the pressure restarts (the next solve rebuilds it). A
+   *  modulated detail would otherwise start still water at every step of it. */
   ensure(gw: number, gh: number): boolean {
     if (this.velT && this.gw === gw && this.gh === gh) return false
+    const oldVel = this.velT
+    const old = oldVel ? oldVel[this.vi] : null
+    const ow = this.gw, oh = this.gh
+    this.velT = null
     this.free()
     const half = (w: number, h: number): Target => this.g.target(w, h, { half: 'rgba', linear: true })
     this.velT = [half(gw, gh), half(gw, gh)]
@@ -187,6 +193,15 @@ export class FluidSolver {
     this.gw = gw
     this.gh = gh
     this.vi = 0
+    if (old && ow > 0 && oh > 0) {
+      // an advection with no time step is a plain bilinear resample; uDiss scales
+      // the cells / s to the new grid's cells
+      this.advectP.use().i1('uVel', 0).i1('uSrc', 1).f2('uVelN', gw, gh).f2('uDstN', gw, gh).f1('uDt', 0).f4('uDiss', gw / ow, gh / oh, 1, 1)
+      this.g.bind(0, old.tex)
+      this.g.bind(1, old.tex)
+      this.g.draw(this.velT[0].fbo, gw, gh)
+    }
+    if (oldVel) for (const t of oldVel) this.g.freeTarget(t)
     return true
   }
 

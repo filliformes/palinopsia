@@ -22,6 +22,7 @@
 import type { SourcePointer } from './nativeGenerators'
 import { roomTracker, roomMirror } from './roomTracker'
 import { audioBus } from './audioIn'
+import { onSessionLoaded } from '../sessionEvents'
 
 const clamp = (x: number, a: number, b: number): number => (x < a ? a : x > b ? b : x)
 
@@ -57,22 +58,31 @@ export function firePlace(at: number, point: number[] | undefined, dome: boolean
 
 interface Tap { seq: number; u: number; v: number; s: number }
 
+/** A held OSC finger lets go by itself when no /opsia/touch/hold came for this
+ *  long (a controller that crashed, a release that is not mapped, the network). */
+export const HOLD_TIMEOUT_MS = 3000
+
 class TouchBus {
   private seq = 0
   private taps: Tap[] = []
-  /** The held OSC finger (frame uv), null when let go. */
-  hold: { u: number; v: number } | null = null
+  /** The held OSC finger (frame uv) and when it was last sent, null when let go. */
+  private held: { u: number; v: number; at: number } | null = null
 
   /** A tap at (u, v) (0..1, v up), strength s (1 = as the effect's own). */
   tap(u: number, v: number, s = 1): void {
     this.taps.push({ seq: ++this.seq, u: clamp(u, 0, 1), v: clamp(v, 0, 1), s: clamp(s, 0, 4) })
     if (this.taps.length > 32) this.taps.splice(0, this.taps.length - 32)
   }
-  holdAt(u: number, v: number): void {
-    this.hold = { u: clamp(u, 0, 1), v: clamp(v, 0, 1) }
+  holdAt(u: number, v: number, now = performance.now()): void {
+    this.held = { u: clamp(u, 0, 1), v: clamp(v, 0, 1), at: now }
   }
   release(): void {
-    this.hold = null
+    this.held = null
+  }
+  /** The held OSC finger now (frame uv), null when let go or timed out. */
+  hold(now = performance.now()): { u: number; v: number } | null {
+    if (this.held && now - this.held.at > HOLD_TIMEOUT_MS) this.held = null
+    return this.held
   }
   /** The taps after `seq` (a reader's last seen), and the newest seq. A new reader
    *  (seq < 0) starts from now : nothing old replays when an effect is added. */
@@ -83,6 +93,8 @@ class TouchBus {
 }
 
 export const touchBus = new TouchBus()
+// a finger held in one session does not press on the next (New, Open, Generate)
+onSessionLoaded(() => touchBus.release())
 
 // ── The sound's hits ─────────────────────────────────────────────────────
 
@@ -165,6 +177,9 @@ export class TouchPoints {
       t = { u, v, down: false, fresh: false, x, y, px: x, py: y, seen: true, w, ending: false }
       this.tracks.set(key, t)
     }
+    // pressed again (a double click, a press right after a sub-frame click) : the
+    // last one's ending no longer applies, or the held press would end every frame
+    if (down) t.ending = false
     if (down && !t.down) {
       // a new touch starts right where it lands : no glide from the last one
       const [x, y] = toField(u, v, dome, aspect)
@@ -194,7 +209,7 @@ export class TouchPoints {
     }
     for (const [k, t] of this.tracks) if (k < OSC_KEY && t.down) t.seen = true
     // the OSC finger, the effect's own point
-    const h = touchBus.hold
+    const h = touchBus.hold()
     if (h) this.set(OSC_KEY, h.u, h.v, true, 1, dome, aspect)
     if (ex.ghost && ex.ghost[2] > 0) this.set(GHOST_KEY, clamp(ex.ghost[0], 0, 1), clamp(ex.ghost[1], 0, 1), true, clamp(ex.ghost[2], 0, 1), dome, aspect)
     if (ex.press && Array.isArray(ex.point) && ex.point.length >= 2) this.set(POINT_KEY, clamp(ex.point[0], 0, 1), clamp(ex.point[1], 0, 1), true, 1, dome, aspect)

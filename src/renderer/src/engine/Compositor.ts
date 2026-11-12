@@ -36,6 +36,7 @@ import { setTempoBpm } from './tempoSignal';
 import { audioBus } from './audioIn';
 import { makeConvNode, isNativeNode, type ConvNode, type NodeContext } from './convNodes';
 import { dropKeptStores } from './fieldStore';
+import { touchBus } from './touchInput';
 import { TextSource } from './TextSource';
 import { ParametricSource } from './ParametricSource';
 import { NATIVE_GENERATOR_IDS, nativeGeneratorFactory, syncNativeSlot, type NativeSlot } from './nativeGenerators';
@@ -2601,6 +2602,8 @@ export class Compositor {
     // a Field Store kept across scenes parked its store on the flush : let it go,
     // so the rebuilt one starts empty too
     dropKeptStores();
+    // a held OSC finger (/opsia/touch/hold) lets go too
+    touchBus.release();
   }
 
   /** Compile ONE shader (or native node) and immediately discard it : startup

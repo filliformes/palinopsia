@@ -31,6 +31,7 @@ import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
 import { randomSteps } from './engine/stepSeq'
+import { shapeCurve } from './engine/modulation'
 import { LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
 
 export type RandomizeScope =
@@ -334,11 +335,14 @@ const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
 // The self-contained native nodes need no sidechain, so they join the random pool
 // for EVERY rack (not just layer FX). They're `native`, so they share the "≤1
 // native node per rack" cap below. (node-parallax is excluded : inert without the
-// Depth engine.)
+// Depth engine. The effects that take the preview's clicks and pinches, Ripple,
+// Touch, Drape, stay hand-placed : dealt blind into the Master FX or a layer's
+// rack they would take the pointer from a source played by hand, a Marbling, a
+// Sand Plate, a Relief, a Fur, with nothing to say why : pointerInput.ts.)
 const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
-  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-ripple',
+  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile',
   // Sidechain recipes safe to draw blind (Remap and Matte can scramble or hide the
   // whole picture with an arbitrary sidechain, so they stay hand-placed).
   'node-lumablur', 'node-gooey', 'node-lookup'
@@ -560,9 +564,31 @@ export function randomMetaKnobs(c: CompositionState): CompositionState['metaKnob
         pool.splice(i, 1)
       } else i++
     }
-    const value = destinations.length ? range(lo, hi) : rnd()
-    return { ...k, destinations, value }
+    // The knob sends knobOut = min + (max - min) * curve(value) : a re-rolled knob
+    // starts on the full range (its old range was set for its old destinations),
+    // and the position is one whose CURVED output sits in the zone (a flipped or
+    // steep curve would throw a plain position out of it).
+    const value = destinations.length ? knobPosIn(k.curve, lo, hi) : rnd()
+    return { ...k, destinations, value, min: undefined, max: undefined }
   })
+}
+
+/** A knob position whose curve(position) lands in [lo, hi] (at random among them;
+ *  none : the one nearest the zone's middle). */
+export function knobPosIn(curve: CompositionState['metaKnobs'][number]['curve'], lo: number, hi: number): number {
+  const N = 1024
+  const inZone: number[] = []
+  let best = 0.5, bestD = Infinity
+  const mid = (lo + hi) / 2
+  for (let i = 0; i <= N; i++) {
+    const p = i / N
+    const o = shapeCurve(p, curve)
+    if (o >= lo && o <= hi) inZone.push(p)
+    const d = Math.abs(o - mid)
+    if (d < bestD) { bestD = d; best = p }
+  }
+  if (!inZone.length) return best
+  return inZone[Math.floor(rnd() * inZone.length)]
 }
 
 function targetKey(t: ModTarget): string {
