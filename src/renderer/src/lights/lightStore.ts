@@ -390,12 +390,15 @@ export function profileForFootprint(fp: number): string | null {
 export function lightsFromLine(rig: LightRig, out: string, devs: Array<{ name: string; address: number; profile: LightProfile }>): LightRig {
   let r = rig
   const N = devs.length
+  // (each light on the map stands for one device : two answering at one address are two)
+  const claimed = new Set<string>()
   devs.forEach((d, k) => {
     const t = (k + 0.5) / N
     const p = d.profile
     const at = Math.max(1, Math.min(512, d.address))
-    const there = r.fixtures.find((f) => f.out === out && f.address === at)
+    const there = rig.fixtures.find((f) => f.out === out && f.address === at && !claimed.has(f.id))
     if (there) {
+      claimed.add(there.id)
       if (p.id && p.id !== there.profile) r = { ...r, fixtures: r.fixtures.map((f) => (f.id === there.id ? withProfile(f, p) : f)) }
       return
     }
