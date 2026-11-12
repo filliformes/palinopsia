@@ -41,6 +41,7 @@ const MAX_MONITORS = 256 // the visualizer's live values : at most this many rem
 const MONITOR_RATE_HZ = 10
 const WATCH_RATE_HZ = 30 // a watched value draws a line : a little finer than the page's
 const MAX_WATCHES = 64
+const LEARN_MS = 25_000 // a learn ends by itself this long after it was last asked about (the app gives up at 20 s)
 
 /** The mesh as the visualizer page reads it (the reference VisServer's snapshot). */
 export interface VisParam {
@@ -134,9 +135,11 @@ interface WorldNode {
 }
 
 /** Scenes (the core's docs/scenes.md) : 16 slots, each our own incoming
- *  connections (dest path, source sku, source path); the cue state beside them.
- *  One file per universe and node. */
+ *  connections (dest path, source sku, source path, and how the wire plays when
+ *  it is shaped : ours, the core never reads this file); the cue state beside
+ *  them. One file per universe and node. */
 export const MAX_SCENES = 16
+export type SceneLink = [string, string, string] | [string, string, string, DfWireOpt]
 export interface SceneFile {
   v: 1
   cue: SceneCue
@@ -144,7 +147,7 @@ export interface SceneFile {
   state: SceneState
   skipped: number
   clock: number
-  slots: Record<string, Array<[string, string, string]>>
+  slots: Record<string, SceneLink[]>
 }
 
 interface StreamTarget {
@@ -260,8 +263,10 @@ export class DataflouNode {
   private sceneStatus: SceneStatus = NO_SCENE_STATUS
   private sceneClock = 0
   private sceneStored: SceneStamp[] = Array.from({ length: MAX_SCENES }, () => ({ counter: 0, origin: 0 }))
-  private sceneSlots = new Map<number, Array<[string, string, string]>>()
+  private sceneSlots = new Map<number, SceneLink[]>()
   private applyingScene = false
+  // a learn from the mesh ends by itself (its window may be gone : a reload)
+  private learnUntil = 0
 
   constructor(cfg: NodeConfig, private host: NodeHost) {
     this.identity = { sku: cfg.sku, label: cfg.label, product: cfg.product, version: cfg.version, state: 'active' }
@@ -281,8 +286,22 @@ export class DataflouNode {
     for (const [k, v] of Object.entries(this.savedSubs)) {
       if (this.subs.has(k)) continue
       const p = this.byPath.get(k)
-      if (p && p.kind === 'param' && p.flow !== 'source' && Array.isArray(v)) this.subs.set(k, v.slice(0, MAX_SUBS))
+      if (!(p && p.kind === 'param' && p.flow !== 'source' && Array.isArray(v))) continue
+      const list = v.slice(0, MAX_SUBS)
+      this.subs.set(k, list)
+      // one of our own sources : its stream straight back into us, as subscribe() makes it
+      for (const s of list) if (s.sku === this.identity.sku) this.addLocalTarget(s.path, k)
     }
+  }
+
+  /** A wire from one of our sources to one of our destinations : a target straight
+   *  back into ourselves (pump() delivers it without the network). */
+  private addLocalTarget(srcPath: string, destPath: string): void {
+    const sp = this.byPath.get(srcPath)
+    if (sp?.kind !== 'param') return
+    const me = this.identity.sku
+    if (this.targets.some((t) => t.destSku === me && t.localPath === srcPath && t.destPath === destPath)) return
+    this.targets.push({ destSku: me, destAddress: '127.0.0.1', destUdpPort: this.udpPort, localPath: srcPath, destPath, rateHz: sp.rate, lastSent: 0, lastValue: undefined, lastRequest: Date.now() })
   }
 
   /** A new tree (the actions changed) : a newer declaration, sent to every peer
@@ -359,6 +378,8 @@ export class DataflouNode {
         lastKeepalive = now
         this.sendAllStreamRequests()
       }
+      // a learn nobody asks about any more (its window reloaded) : over
+      if (this.learning && now > this.learnUntil) this.learnStop()
       this.pollMonitors(now)
       this.inRate = this.inCount
       this.inCount = new Map()
@@ -558,6 +579,7 @@ export class DataflouNode {
     try { peer.sock.destroy() } catch { /* gone */ }
     if (peer.sku) {
       this.targets = this.targets.filter((t) => t.destSku !== peer.sku)
+      if (!this.peers.some((p) => p.sku === peer.sku)) this.forgetMonitors(peer.sku)
       const w = this.world.get(peer.sku)
       if (lost && w && !w.local && !this.peers.some((p) => p.sku === peer.sku)) {
         w.online = false
@@ -628,6 +650,16 @@ export class DataflouNode {
 
   private sendDeclare(peer: Peer, w: WorldNode): void {
     this.send(peer, encodeDeclare(++this.seq, this.identity.sku, w.identity.sku, w.declVersion, w.identity, w.params, w.local ? this.sceneStatus : w.scene))
+    if (w.local) this.sendSubAnnouncesTo(peer)
+  }
+
+  /** As the core (8.3) follows its own DECLARE : a clear (no source), then every
+   *  connection into us, so a node that joined later, or was away, knows them
+   *  (an older core ignores the clear : no connection has an empty source). */
+  private sendSubAnnouncesTo(peer: Peer): void {
+    const me = this.identity.sku
+    this.send(peer, encodeSubAnnounce(++this.seq, me, false, me, '', '', ''))
+    for (const [dest, list] of this.subs) for (const s of list) this.send(peer, encodeSubAnnounce(++this.seq, me, true, me, dest, s.sku, s.path))
   }
 
   /** Our own DECLARE size (the tree must stay small for microcontroller nodes). */
@@ -669,6 +701,10 @@ export class DataflouNode {
         this.sendDeclare(peer, this.world.get(this.identity.sku)!)
         // our bindings sourced from it : ask it to stream again
         for (const [dest, list] of this.subs) for (const s of list) if (s.sku === m.from) this.sendStreamRequest(s, dest)
+        // and the values we watch, play or monitor from it (it dropped those
+        // streams with the old connection) : asked again now, not at the next keepalive
+        this.forgetMonitors(m.from)
+        this.pollMonitors(now, true)
         this.host.log(`hello from ${m.identity.label} (${m.from})`)
         this.host.onChange()
         // a recall made while we were away : apply it now
@@ -748,6 +784,12 @@ export class DataflouNode {
       case 'SUBANNOUNCE': {
         const w = this.world.get(m.destSku)
         if (!w || w.local) break
+        if (!m.sub && !m.sourceSku) {
+          // a clear (core 8.3) : that node's own list of its connections follows
+          w.subs.clear()
+          this.host.onChange()
+          break
+        }
         const list = w.subs.get(m.destPath) ?? []
         const i = list.findIndex((s) => s.sku === m.sourceSku && s.path === m.sourcePath)
         if (m.sub && i < 0) list.push({ sku: m.sourceSku, path: m.sourcePath })
@@ -789,22 +831,22 @@ export class DataflouNode {
     this.host.saveSubs(Object.fromEntries(this.subs))
   }
 
-  /** Bind one of OUR destinations to a source (any node, ourselves included). */
-  subscribe(localPath: string, srcSku: string, srcPath: string): boolean {
+  /** Bind one of OUR destinations to a source (any node, ourselves included).
+   *  `opt` : how the wire plays (a scene giving back a shaped wire). */
+  subscribe(localPath: string, srcSku: string, srcPath: string, opt?: unknown): boolean {
     const p = this.byPath.get(localPath)
     if (!p || p.kind !== 'param' || p.flow === 'source') return false
     const list = this.subs.get(localPath) ?? []
     if (list.some((s) => s.sku === srcSku && s.path === srcPath)) return true
     if (list.length >= MAX_SUBS) return false
-    const src = { sku: srcSku, path: srcPath }
+    const src: DfSub = { sku: srcSku, path: srcPath }
+    const o = opt === undefined ? null : cleanWireOpt(opt)
+    if (o) src.opt = o
     list.push(src)
     this.subs.set(localPath, list)
-    if (srcSku === this.identity.sku) {
-      // local to local : a target straight back into ourselves
-      if (this.byPath.get(srcPath)?.kind === 'param') {
-        this.targets.push({ destSku: srcSku, destAddress: '127.0.0.1', destUdpPort: this.udpPort, localPath: srcPath, destPath: localPath, rateHz: this.byPath.get(srcPath)!.rate, lastSent: 0, lastValue: undefined, lastRequest: Date.now() })
-      }
-    } else this.sendStreamRequest(src, localPath)
+    // local to local : a target straight back into ourselves
+    if (srcSku === this.identity.sku) this.addLocalTarget(srcPath, localPath)
+    else this.sendStreamRequest(src, localPath)
     this.announce(true, localPath, src)
     this.persist()
     this.host.onChange()
@@ -874,7 +916,13 @@ export class DataflouNode {
       for (const [k, list] of Object.entries(f.slots ?? {})) {
         const slot = Number(k)
         if (!(slot >= 1 && slot <= MAX_SCENES) || !Array.isArray(list)) continue
-        this.sceneSlots.set(slot, list.filter((l) => Array.isArray(l) && l.length === 3 && l.every((x) => typeof x === 'string')))
+        const links: SceneLink[] = []
+        for (const l of list as unknown[]) {
+          if (!Array.isArray(l) || (l.length !== 3 && l.length !== 4) || !l.slice(0, 3).every((x) => typeof x === 'string')) continue
+          const o = l.length === 4 ? cleanWireOpt(l[3]) : null
+          links.push(o ? [l[0], l[1], l[2], o] : [l[0], l[1], l[2]])
+        }
+        this.sceneSlots.set(slot, links)
       }
       const state: SceneState = (['none', 'applied', 'modified', 'missing'] as const).includes(f.state) ? f.state : 'none'
       this.sceneStatus = { current: this.sceneCue.slot, state, slots: this.slotMask(), skipped: Math.min(255, n(f.skipped)) }
@@ -899,10 +947,11 @@ export class DataflouNode {
     })
   }
 
-  /** Our incoming connections now, as a slot holds them. */
-  private currentLinks(): Array<[string, string, string]> {
-    const out: Array<[string, string, string]> = []
-    for (const [dest, list] of this.subs) for (const s of list) out.push([dest, s.sku, s.path])
+  /** Our incoming connections now, as a slot holds them (a shaped wire with its
+   *  shape, so a recall that makes it again makes it as it was). */
+  private currentLinks(): SceneLink[] {
+    const out: SceneLink[] = []
+    for (const [dest, list] of this.subs) for (const s of list) out.push(s.opt ? [dest, s.sku, s.path, { ...s.opt }] : [dest, s.sku, s.path])
     return out
   }
 
@@ -983,7 +1032,7 @@ export class DataflouNode {
       this.setSceneStatus(st, 'recall', slot)
       return
     }
-    const key = (l: [string, string, string]): string => l.join('\n')
+    const key = (l: SceneLink): string => `${l[0]}\n${l[1]}\n${l[2]}`
     const have = this.currentLinks()
     const wantKeys = new Set(want.map(key))
     const haveKeys = new Set(have.map(key))
@@ -993,7 +1042,7 @@ export class DataflouNode {
       for (const l of have) if (!wantKeys.has(key(l)) && this.unsubscribe(l[0], l[1], l[2])) removed++
       for (const l of want) {
         if (haveKeys.has(key(l))) continue
-        if (this.subscribe(l[0], l[1], l[2])) added++
+        if (this.subscribe(l[0], l[1], l[2], l[3])) added++
         else skipped++
       }
     } finally {
@@ -1065,7 +1114,9 @@ export class DataflouNode {
       const p = this.byPath.get(t.localPath)!
       if (t.destSku === this.identity.sku) {
         const dest = this.byPath.get(t.destPath)
-        if (dest) local.push({ path: t.destPath, type: dest.type, value: mapValue(v, p.type, p, dest) })
+        // shaped like a wire from another node (its range, invert)
+        const opt = this.subs.get(t.destPath)?.find((s) => s.sku === this.identity.sku && s.path === t.localPath)?.opt
+        if (dest) local.push({ path: t.destPath, type: dest.type, value: shapeWire(mapValue(v, p.type, p, dest), dest, opt) })
         continue
       }
       const pkt = encodeStreamPacket(this.skuHash, now & 0xffffffff, [{ path: t.localPath, type: p.type, value: v }])
@@ -1182,6 +1233,7 @@ export class DataflouNode {
    *  page), and the one that moves the most is the answer (learnPeek). */
   learnStart(): void {
     this.learning = new Map()
+    this.learnUntil = Date.now() + LEARN_MS
     if (!this.monitorOn) {
       this.monitorOn = true
       this.pollMonitors(Date.now(), true)
@@ -1190,6 +1242,7 @@ export class DataflouNode {
 
   learnStop(): void {
     this.learning = null
+    this.learnUntil = 0
     if (this.monitorOn && !this.pageMonitor) {
       this.monitorOn = false
       this.pollMonitors(Date.now(), true)
@@ -1200,6 +1253,7 @@ export class DataflouNode {
    *  least `min` of its range (null : nothing yet). */
   learnPeek(min = 0.25): { sku: string; path: string; label: string; node: string; span: number } | null {
     if (!this.learning) return null
+    this.learnUntil = Date.now() + LEARN_MS // (someone is still asking)
     let best: { k: string; span: number } | null = null
     for (const [k, r] of this.learning) {
       const span = r.hi - r.lo
@@ -1233,6 +1287,12 @@ export class DataflouNode {
     for (const k of keep) if (!this.watchAt.has(k)) this.watchAt.set(k, 0)
     this.pollMonitors(Date.now(), true)
     this.host.onChange()
+  }
+
+  /** A node's streams to us are gone with its connection : the next poll asks
+   *  them as new ones. */
+  private forgetMonitors(sku: string): void {
+    this.monitors = this.monitors.filter((m) => m.sku !== sku)
   }
 
   private stopMonitor(m: DfSub): void {
