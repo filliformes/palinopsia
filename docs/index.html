@@ -162,10 +162,10 @@
 
     <div class="specs">
       <div class="s"><span class="n"><em>4</em></span><span class="l">layers</span></div>
-      <div class="s"><span class="n"><em>50</em></span><span class="l">sources</span></div>
-      <div class="s"><span class="n"><em>61</em></span><span class="l">effects</span></div>
+      <div class="s"><span class="n"><em>51</em></span><span class="l">sources</span></div>
+      <div class="s"><span class="n"><em>65</em></span><span class="l">effects</span></div>
       <div class="s"><span class="n"><em>12</em></span><span class="l">sonify voices</span></div>
-      <div class="s"><span class="n"><em>147</em></span><span class="l">one-click recipes</span></div>
+      <div class="s"><span class="n"><em>162</em></span><span class="l">one-click recipes</span></div>
       <div class="s"><span class="n mono">OSC·MIDI·Link·body·mesh</span><span class="l">played by</span></div>
     </div>
 
@@ -242,7 +242,7 @@
       <li>Open the <b>Feel</b> tab with <kbd>G</kbd> and drag <b>Density</b>, <b>Flow</b> and <b>Drift</b>. These are whole-image macros: one slider reshapes the entire picture at once. Double-click any slider to reset it to neutral.</li>
       <li>In a layer's <b>IN</b> step, click its <b>A</b> button (or pick another source from the menu beside it) and play with its parameters in the Inspector under the preview. Every slider carries a dice for a curated random value, a preset menu, and an <b>M</b> button to attach a modulator.</li>
       <li>Keep something you like: click <kbd>+</kbd> in the scene bank to save it, then press <kbd>1</kbd>–<kbd>9</kbd> to recall your scenes live. Recalls morph over the <b>Morph</b> time, live: set it long and one scene slowly becomes the next.</li>
-      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 147 recipes and a blank Init, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
+      <li>Go big: press <kbd>O</kbd> for the Output page (it opens inside the app), pick a display, and go fullscreen. Or reach for <b>Generate</b> in the toolbar: 162 recipes and a blank Init, each building a whole coherent session (visuals, palette, world and feel) in one click.</li>
     </ol>
     <div class="note">Lost at any point? Press <kbd>?</kbd> for the full keyboard cheat-sheet, in the app. <kbd>Esc</kbd> closes it. Looking for something? <kbd>Ctrl</kbd>+<kbd>K</kbd> finds any effect, source, preset or control as you type.</div>
   </section>
@@ -283,7 +283,7 @@
         <img src="images/interface-output.jpg" alt="The Output and mapping page: a keystone editor over a live mirror of the output, with resolution, flash safety and record controls.">
         <div class="body">
           <h3>Output &amp; mapping<span class="k">O</span></h3>
-          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and light the room : DMX lights placed on the picture take their colors from it, on their own Lights page (<kbd>T</kbd>), out through an Enttec DMX USB Pro, Art-Net, sACN or WLED, all behind a built-in flash-safety limiter. The page opens inside the app; right-click the Output button to open the output, or the whole page, in a window beside the controls.</p>
+          <p>Fullscreen to any display, projection-map with a keystone editor, and record the take in real time, DXV3 included (it keeps rolling when you leave the page). Send over NDI, Spout, Syphon or HIVE (and play any NDI source on the network, or another program's Spout or Syphon output on the same computer, as a layer), go under a fulldome with a 3D simulator, span a custom composition across several projectors, run it as a self-healing installation, and light the room : DMX lights placed on the picture take their colors from it, on their own Lights page (<kbd>T</kbd>), out through an Enttec DMX USB Pro, Art-Net, sACN or WLED, all behind a built-in flash-safety limiter. The page opens inside the app; right-click the Output button to open the output, or the whole page, in a window beside the controls.</p>
         </div>
       </div>
       <div class="card">
@@ -433,26 +433,31 @@
 
   <section>
     <h2>Where to go next</h2>
-    <p>When you want the full vocabulary (50 sources, 61 effects, 30 native nodes, 147 Generate recipes, the modulation matrix, the sequencers, the 12 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.3.md">1.3.3 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
+    <p>When you want the full vocabulary (51 sources, 65 effects, 34 native nodes, 162 Generate recipes, the modulation matrix, the sequencers, the 12 Sonify voices, the Audio Layer, Ableton Link, the Agent and the dataflou mesh), read the <a href="https://github.com/filliformes/palinopsia#readme">complete README</a>, and the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.3.md">1.3.3 release notes</a> for what changed. To drive Palinopsia from any OSC brain, see the <a href="opsia-osc-reference.html">OSC reference</a>. The whole instrument is reachable over OSC, MIDI or the interface, through one write path.</p>
   </section>
 
   <hr class="soft">
 
   <details class="news" id="new-133" open>
     <summary><h2>New in 1.3.3</h2></summary>
-    <p class="section-lede">The Lights. DMX lights placed on the picture take their colors from it, so the room plays with the projection. Plug in an Enttec DMX USB Pro, follow five steps, and your lights are playing in minutes. And dataflou stays connected through a sleep.</p>
+    <p class="section-lede">Lights, touch and glitch. DMX lights placed on the picture take their colors from it, so the room plays with the projection : plug in an Enttec DMX USB Pro, follow five steps, and your lights are playing in minutes. The picture answers the hand, reaction-diffusion and fluid become effects, four new effects and fifteen glitch loops arrive, and other apps' Spout or Syphon output plays in a layer.</p>
     <ul class="new">
       <li><b>A page for your lights</b> (key <kbd>T</kbd>, or <b>LIGHTS</b> on the Output page) : LED bars, spots, rings and panels, each dragged on the map over the part of the picture it takes its light from, every LED showing the color it sends.</li>
       <li><b>Set up in five steps</b> : plug in the Enttec, say what lights you have and how many, set the address the page shows on each one, run the test, pick a show. Your kind of light from a list, or its file from the Open Fixture Library; the 30-zone RGB pixel bars are in the list.</li>
-      <!-- RDM : merge with feat-rdm -->
-      <li><b>Your lights find themselves (RDM)</b> : the page asks the lights on the DMX line what they are, shows their mode and address, makes one blink to find it, and sets addresses and modes from the page, through the Enttec DMX USB Pro.</li>
+      <li><b>Your lights find themselves (RDM)</b> : the page asks the lights on the DMX line what they are, shows their mode and address, makes one blink to find it, sets addresses and modes from the page, gives them all addresses in a row and puts them on the map, through the Enttec DMX USB Pro. No light ever flashes more than three times a second.</li>
       <li><b>A test and a patch you can see</b> : a line sweeps the room in red, green, blue and white to show what is wired wrong; every universe at a glance, overlaps in red, drag a light to readdress it.</li>
       <li><b>The picture's colors, not its beige</b> : each light reads its part as the average, the most vivid or the brightest color, with smooth 16-bit fades on lights with a dimmer.</li>
       <li><b>Effects that play like a console</b> : chases, waves, pulses, sparkle, the sound by band, the beat, the people in the room, traveling light by light with wings and fans; and <b>digital</b> ones (afterimage, echo, glitch, tape head, cellular automata, the Game of Life, fireflies).</li>
       <li><b>27 shows</b> that fit any room, <b>groups</b> with a fader and a grade of their own, and a <b>console</b> : master, speed, brightness, saturation, contrast, cue fade and Black, all learning MIDI and taking modulators.</li>
       <li><b>Cues</b> : GO and back, a fade and a follow time for each, a Palinopsia scene to go with, and a lane on the Seq page.</li>
       <li><b>Light setups</b> : keep several by name or as a file, and switch rooms under the same project. Each output can wait a few milliseconds to land with the projector.</li>
-      <li><b>dataflou</b> : a computer that sleeps or drops off the network comes back by itself, and a <b>data</b> view shows what flows in and out, live.</li>
+      <li><b>Touch</b> makes any picture touchable : push, swirl, drag or magnify it with the mouse, a pinching hand or the people in the room, or send a <b>shockwave</b> out on the kick. <b>Ripple</b> puts the picture under water : rain, a stone on every beat, a finger trailing through.</li>
+      <li><b>Morphogen</b> and <b>Current</b> : reaction-diffusion and a real fluid as effects any layer feeds and steers, and <b>Noise</b>, a raw noise field to steer them or to make masks.</li>
+      <li><b>Time Glitch</b> (the recent past, glitched inside its own feedback), <b>Break</b> (the picture cracks from a point, then heals, drifts or falls), <b>Key</b> (chroma key and more) and <b>Droste</b> (an endless spiral).</li>
+      <li><b>Fifteen glitch and beat loops</b> for a layer's feedback : the damage runs inside the loop, so every pass remembers it.</li>
+      <li><b>Spout / Syphon input</b> : another program's output on the same computer, full quality, GPU to GPU on Windows.</li>
+      <li><b>dataflou</b> : a computer that sleeps or drops off the network comes back by itself, a <b>data</b> view shows what flows in and out and any outside value you watch, <b>scenes</b> of connections recall across the mesh, and a glove maps onto any control in a click (or by moving it).</li>
+      <li><b>Macro knobs</b> show what they drive and take a range; a camera opens in the selfie view.</li>
     </ul>
     <p>The full list is in the <a href="https://github.com/filliformes/palinopsia/blob/master/docs/release-notes/v1.3.3.md">release notes</a>.</p>
   </details>
