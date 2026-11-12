@@ -80,10 +80,28 @@ const INTEGRANDS: Record<string, (v: Get) => number> = {
     const s = Math.round(v('sync'))
     if (s <= 0) return v('evolve')
     return Math.min(Math.max((tempoBpm() / 60) * (SHATTER_PER_BEAT[s] ?? 1), 0), 4)
+  },
+  // Time Glitch : the damage clock (one step per whole unit), at `rate` Hz or on a
+  // beat division of the tempo (sync 1 bar · 1/2 · 1/4 · 1/8 · 1/16), capped at
+  // 16 steps a second.
+  PH_timeGlitch: (v) => {
+    const s = Math.round(v('sync'))
+    const hz = s > 0 ? (tempoBpm() / 60) * (TIME_GLITCH_PER_BEAT[s] ?? 1) : v('rate')
+    return Math.min(Math.max(hz, 0), 16)
+  },
+  // Break : the automatic hits, every `every` seconds (0 = none) or on the tempo
+  // (sync 4 bars · 2 bars · 1 bar · 1/2 · 1/4), at most four a second.
+  PH_breakAuto: (v) => {
+    const s = Math.round(v('sync'))
+    const every = v('every')
+    const hz = s > 0 ? tempoBpm() / 60 / (BREAK_BEATS[s] ?? 4) : every > 0.05 ? 1 / every : 0
+    return Math.min(Math.max(hz, 0), 4)
   }
 }
 
 const SHATTER_PER_BEAT = [0, 0.25, 0.5, 1, 2]
+const TIME_GLITCH_PER_BEAT = [0, 0.25, 0.5, 1, 2, 4]
+const BREAK_BEATS = [0, 16, 8, 4, 2, 1]
 
 function smooth(a: number, b: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))

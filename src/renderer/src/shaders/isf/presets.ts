@@ -1242,6 +1242,55 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Byte shift', values: { bands: 70, shift: 0.4, chance: 0.45, hold: 0.3, channel: 0.5, rate: 0.5, wrap: 1, audio: 0 } }
   ],
   // ── Pixel Sort (threshold-interval luma sort) ──
+  // ── Time Glitch, Break, Key, Droste ──
+  'fx-time-glitch': [
+    { name: 'Lit memory', values: { time: 0.6, mode: 1, drift: 0.15, chaos: 0.35, rate: 6, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Smeared memory', values: { time: 0.85, mode: 0, drift: 0.05, chaos: 0.25, rate: 3, sync: 0, blocks: 10, shift: 0.3, split: 0.2, crush: 0.1, inside: 0.8, after: 0.15, burstLen: 1.2, audio: 0, amount: 1 } },
+    { name: 'Light painting gone wrong', values: { time: 0.75, mode: 1, drift: 0.3, chaos: 0.4, rate: 5, sync: 0, blocks: 18, shift: 0.5, split: 0.45, crush: 0.2, inside: 0.75, after: 0.25, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Dark residue', values: { time: 0.7, mode: 2, drift: -0.2, chaos: 0.35, rate: 4, sync: 0, blocks: 12, shift: 0.35, split: 0.25, crush: 0.35, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Codec rot', values: { time: 0.55, mode: 0, drift: 0, chaos: 0.55, rate: 8, sync: 0, blocks: 24, shift: 0.6, split: 0.15, crush: 0.6, inside: 0.85, after: 0.35, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Torn tape', values: { time: 0.45, mode: 0, drift: 0, chaos: 0.45, rate: 10, sync: 0, blocks: 32, shift: 0.7, split: 0.5, crush: 0.1, inside: 0.6, after: 0.5, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'On the beat', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.3, rate: 6, sync: 3, blocks: 16, shift: 0.45, split: 0.3, crush: 0.3, inside: 0.7, after: 0.4, burstLen: 0.5, audio: 0, amount: 1 } },
+    { name: 'Burst only', values: { time: 0.65, mode: 0, drift: 0.15, chaos: 0.05, rate: 8, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.9, after: 0.2, burstLen: 1.5, audio: 0, amount: 1 } },
+    { name: 'Breathing outward', values: { time: 0.8, mode: 0, drift: 0.8, chaos: 0.3, rate: 4, sync: 0, blocks: 12, shift: 0.3, split: 0.35, crush: 0.15, inside: 0.7, after: 0.2, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Audio damage', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.15, rate: 8, sync: 0, blocks: 20, shift: 0.5, split: 0.3, crush: 0.3, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0.6, amount: 1 } }
+  ],
+  'fx-break': [
+    { name: 'Pane', values: { every: 3.5, sync: 0, after: 3, time: 1.8, force: 0.5, shards: 13, rings: 4, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Cracked and held', values: { every: 0, sync: 0, after: 0, time: 2, force: 0.4, shards: 18, rings: 5, wander: 0.55, broken: 0.3, tilt: 0.5, refract: 0.5, bevel: 0.6, light: 2.3, behind: 0, scatter: 0, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Falling glass', values: { every: 5, sync: 0, after: 2, time: 2.5, force: 0.6, shards: 16, rings: 5, wander: 0.5, broken: 0.35, tilt: 0.7, refract: 0.4, bevel: 0.55, light: 2.3, behind: 0, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Drifting shards', values: { every: 6, sync: 0, after: 1, time: 4, force: 0.5, shards: 12, rings: 4, wander: 0.6, broken: 0.4, tilt: 0.6, refract: 0.35, bevel: 0.5, light: 2.3, behind: 0.25, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Windscreen', values: { every: 0, sync: 0, after: 0, time: 1.8, force: 0.2, shards: 28, rings: 8, wander: 0.35, broken: 0.15, tilt: 0.25, refract: 0.6, bevel: 0.35, light: 2.3, behind: 0, scatter: 0, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Every bar', values: { every: 3.5, sync: 3, after: 3, time: 0.9, force: 0.7, shards: 10, rings: 3, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.6, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Heavy stone', values: { every: 6, sync: 0, after: 2, time: 1.6, force: 1, shards: 9, rings: 3, wander: 0.5, broken: 0.5, tilt: 0.9, refract: 0.3, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Hairline', values: { every: 5, sync: 0, after: 3, time: 3, force: 0.1, shards: 20, rings: 6, wander: 0.5, broken: 0.35, tilt: 0.15, refract: 0.2, bevel: 0.8, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Ice', values: { every: 7, sync: 0, after: 1, time: 5, force: 0.35, shards: 13, rings: 4, wander: 0.5, broken: 0.2, tilt: 0.8, refract: 0.7, bevel: 0.9, light: 0.8, behind: 0.4, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Smash on the half note', values: { every: 3.5, sync: 4, after: 3, time: 0.6, force: 0.55, shards: 11, rings: 4, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.8, amount: 1, hitX: 0.5, hitY: 0.5 } }
+  ],
+  'fx-key': [
+    { name: 'Green cloth', values: { mode: 0, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0.6, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Blue cloth', values: { mode: 0, color: [0.1, 0.25, 0.85, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0.6, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Tight green', values: { mode: 0, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.22, softness: 0.08, despill: 0.8, choke: 0.3, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Keep the red costume', values: { mode: 0, color: [0.8, 0.12, 0.1, 1], channel: 0, tolerance: 0.35, softness: 0.12, despill: 0, choke: 0, feather: 0.15, invert: 1, showMatte: 0, amount: 1 } },
+    { name: 'Colors on gray', values: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.25, softness: 0.15, despill: 0, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Only the vivid', values: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.5, softness: 0.1, despill: 0, choke: 0.2, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Outlines', values: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.2, softness: 0.2, despill: 0, choke: 0, feather: 0.2, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Bold outlines', values: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.15, softness: 0.25, despill: 0, choke: 0.6, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Brightness as alpha', values: { mode: 3, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.1, softness: 0.6, despill: 0, choke: 0, feather: 0, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Black cut out', values: { mode: 3, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.04, softness: 0.12, despill: 0, choke: 0, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } }
+  ],
+  'fx-droste': [
+    { name: 'Spiral', values: { scale: 5, strands: 1, arms: 1, zoom: 0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Nested frames', values: { scale: 5, strands: 0, arms: 1, zoom: 0.15, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Two strands', values: { scale: 6, strands: 2, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Wound backward', values: { scale: 5, strands: -1, arms: 1, zoom: -0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Round window', values: { scale: 4, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 1, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Deep and slow', values: { scale: 12, strands: 1, arms: 1, zoom: 0.04, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Turning', values: { scale: 5, strands: 1, arms: 1, zoom: 0.08, spin: 0.04, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Three arms', values: { scale: 5, strands: 1, arms: 3, zoom: 0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Framed', values: { scale: 3, strands: 0, arms: 1, zoom: 0.08, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0.6, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Off center', values: { scale: 6, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.35, cy: 0.62, amount: 1 } }
+  ],
   'fx-pixelsort': [
     { name: 'Bright streaks', values: { low: 0.25, high: 0.85, length: 0.2, vertical: 0, reverse: 0, angle: 0 } },
     { name: 'Vertical rain', values: { low: 0.2, high: 0.8, length: 0.3, vertical: 1, reverse: 1, angle: 0 } },

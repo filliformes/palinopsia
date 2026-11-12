@@ -128,6 +128,14 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Reproduces the artifacts of a heavily compressed still: the picture is cut into blocks, each crushed until fine detail vanishes and edges ring. This is the keyframe look rather than the motion smear. Turn it up and the image becomes a memory of itself.',
   'fx-databend':
     'Tears horizontal bands sideways as if the file itself had been edited in the wrong program. It is about damaging the stream rather than the movement, so it sits differently from Datamosh. Sharp, abrupt and rhythmic.',
+  'fx-time-glitch':
+    'Time smeared, then broken inside its own memory : the picture leaves trails, and on a stepped clock blocks of that memory are dragged, torn, stuck or crushed. Because the memory feeds back, every glitch is smeared and remembered, then glitched again; a second round of damage hits the result on its way out. A burst throws it into a fit of chaos that dies away.',
+  'fx-break':
+    'The picture cracks like a pane hit by a stone : cracks race out from the impact and round it, the pieces tilt and catch the room\'s light on their faces and chamfered edges, then hold, drift apart, fall or heal back together. Hit it from a beat, a click on the preview or a hand, or let it break by itself every few seconds.',
+  'fx-key':
+    'Cuts part of the picture to transparency so the layers below show through : a color (a green cloth, a costume), the grays (keeping only what is colored), everything but the outlines, or one channel. A clean edge with choke, feather and despill; show matte to set it up.',
+  'fx-droste':
+    'The picture inside itself forever, wound into a spiral : each turn goes one level deeper into a smaller copy of the whole frame, and the zoom flies in without end. Wind it in more strands or none (plain nested frames), turn it, and put its center where you click.',
   'fx-pixelsort':
     'Finds runs of pixels within a brightness range and pulls each run toward its brightest value along an axis, so parts of the image pour into smooth streaks. Bright or dark regions can be targeted independently. The signature glitch effect, and still one of the most legible.',
   'fx-ringing':

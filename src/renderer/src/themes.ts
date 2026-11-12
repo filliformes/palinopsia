@@ -383,6 +383,31 @@ export const THEMES: Theme[] = [
     nativeNodes: ['node-chronoscan'], nativeChance: 0.9,
     blends: ['screen', 'add'], drift: 0.4, coalesce: 0.3
   }),
+  mk({
+    id: 'glitched-memory', name: 'Glitched Memory', family: 'Glitch / Datamosh',
+    blurb: 'Time smeared and broken inside its own memory : trails dragged, torn and crushed, then glitched again on the way out.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.08, 0.24, 1], [0.78, 0.36, 0.42, 1], [0.92, 0.9, 0.84, 1]],
+    sources: ['murmuration', 'particle-drift', 'drift-field', 'slabs', 'filaments', 'shapes'],
+    layerFx: ['fx-grade', 'fx-chroma-shift', 'fx-posterize'],
+    stackFx: [['fx-time-glitch'], ['fx-time-glitch']],
+    presets: { 'fx-time-glitch': ['Lit memory', 'Smeared memory', 'Light painting gone wrong', 'Codec rot', 'Torn tape', 'Breathing outward'] },
+    blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0.15, feedback: 0, gestureTexture: 0.6, coalesce: 0.3,
+    motion: { ...STEPPED, skip: '^(sync|blocks|audio|mode)$' }
+  }),
+  mk({
+    id: 'broken-glass', name: 'Broken Glass', family: 'Glitch / Datamosh',
+    blurb: 'A pane over the picture, hit again and again : cracks race out, the shards tilt into the light, fall or heal.',
+    world: 'synthetic',
+    palette: [K, [0.12, 0.14, 0.18, 1], [0.6, 0.66, 0.72, 1], [0.94, 0.94, 0.92, 1]],
+    sources: ['organic', 'op-art', 'congeal', 'interference', 'dye-field'],
+    stack: [['dye-field', 'drift-field', 'swell', 'membrane'], ['organic', 'op-art', 'congeal', 'interference', 'slabs']],
+    stackFx: [[], ['fx-break']],
+    presets: { 'fx-break': ['Pane', 'Falling glass', 'Drifting shards', 'Every bar', 'Heavy stone', 'Ice', 'Smash on the half note'] },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, coalesce: 0.35,
+    motion: { mods: [1, 2], skip: '^(every|sync|after|shards|rings|time|hitX|hitY|scatter)$' }
+  }),
 
   // ── Cameraless / Direct Film ──────────────────────────────────────────
   mk({
@@ -483,6 +508,18 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-ringing', 'fx-sharpen', 'fx-posterize'],
     blends: ['difference', 'overlay', 'weave'], useB: 0.35,
     mixBlends: ['weave', 'difference']
+  }),
+  mk({
+    id: 'endless-spiral', name: 'Endless Spiral', family: 'Optical / Op-Art',
+    blurb: 'A pattern wound into itself forever : a spiral of the whole frame, flying inward without end.',
+    world: 'parametric',
+    palette: [INK, [0.18, 0.18, 0.2, 1], [0.84, 0.82, 0.78, 1]],
+    sources: ['op-art', 'interference', 'shapes', 'ten-print', 'slabs'],
+    layerFx: ['fx-posterize', 'fx-grade'],
+    stackFx: [['fx-droste']],
+    presets: { 'fx-droste': ['Spiral', 'Two strands', 'Nested frames', 'Round window', 'Framed', 'Wound backward'] },
+    blends: ['difference', 'screen'], layers: [1, 1], useB: 0.25, feedback: 0,
+    motion: { skip: '^(strands|arms|shape|cx|cy)$' }
   }),
 
   // ── Organic / Reaction-Diffusion ──────────────────────────────────────
@@ -1056,6 +1093,19 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grain', 'fx-grade'],
     blends: ['screen', 'lighten'], useB: 0.1, layers: [1, 2], density: 0.25, drift: 0.2,
     context: { depth: 0.4, haze: 0.14, trails: 0.16 }
+  }),
+  mk({
+    id: 'cut-by-color', name: 'Cut by Color', family: 'Minimal / Structural',
+    blurb: 'One layer keyed over another : only its colors, its outlines or its lights left standing on the ground below.',
+    world: 'monomedia',
+    palette: [INK, [0.14, 0.15, 0.18, 1], [0.86, 0.84, 0.8, 1]],
+    sources: ['op-art', 'interference', 'shapes', 'slabs', 'organic'],
+    stack: [['dye-field', 'swell', 'drift-field', 'membrane'], ['op-art', 'interference', 'shapes', 'slabs', 'organic', 'congeal']],
+    stackFx: [[], ['fx-key']],
+    presets: { 'fx-key': ['Colors on gray', 'Only the vivid', 'Outlines', 'Bold outlines', 'Brightness as alpha', 'Black cut out'] },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.35,
+    motion: { skip: '^(mode|channel|invert|showMatte|color)$' }
   }),
 
   // ── Datamosh & Compression (from the glitch research) ─────────────────
