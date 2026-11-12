@@ -120,10 +120,10 @@ import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { colorOf, hsvaOf, PART_INDEX, PART_OF_WORD, PART_WORD, withPart } from './engine/colorParts'
 import type { ColorChannel } from '@shared/types'
-import { useStore } from './store'
+import { modTargetKey, useStore } from './store'
 import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
-import { setKnobTarget } from './metaSmooth'
+import { setKnobTarget, commitKnob } from './metaSmooth'
 import { firePanic, fireVariation } from './commands'
 import { fireTrigger, randIntensity } from './midi'
 import { OUT_EDGES, OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
@@ -638,7 +638,12 @@ function route(address: string, args: Args, host = ''): void {
       if (!(k >= 0 && k < st.composition.metaKnobs.length)) return
       // its range : /opsia/macro/{n}/min, /max
       if (segs[3] === 'min' || segs[3] === 'max') {
-        if (Number.isFinite(n)) st.updateMetaKnob(k, { [segs[3]]: clamp01(n) })
+        if (!Number.isFinite(n)) return
+        st.updateMetaKnob(k, { [segs[3]]: clamp01(n) })
+        // the destinations follow at once, the knob at rest or not (as the bar
+        // and the typed boxes do); a modulator on the knob already rewrites them
+        const key = modTargetKey({ kind: 'meta', knob: k })
+        if (!st.composition.modMatrix.some((a) => modTargetKey(a.target) === key)) commitKnob(k)
         return
       }
       setKnobTarget(k, clamp01(n), st.composition.metaKnobs[k]?.smoothMs ?? 10)
@@ -1294,7 +1299,8 @@ function route(address: string, args: Args, host = ''): void {
       // Touch and Ripple, every one in the composition : `/opsia/touch x y [s]` a tap
       // at (x, y) (0..1, y up : a shockwave, a stone in the water; s the strength,
       // 1 = the effect's own), `/opsia/touch/hold x y` a finger held there (it
-      // drags, swirls, wades as it moves), `/opsia/touch/up` lets it go.
+      // drags, swirls, wades as it moves; it lets go 3 s after the last one :
+      // touchInput.HOLD_TIMEOUT_MS), `/opsia/touch/up` lets it go.
       const v = oscNums(args)
       if (segs[2] === 'up') { touchBus.release(); return }
       if (segs[2] === 'hold') {
@@ -1883,7 +1889,7 @@ function enumerateLeaves(): Leaf[] {
     }
   }
   add('/opsia/touch', 0, 1, 0.5, 'Touch and Ripple : a tap at x y (two 0..1 floats, y up; a third : its strength) on every one in the composition', false)
-  add('/opsia/touch/hold', 0, 1, 0.5, 'Touch and Ripple : a finger held at x y (two 0..1 floats); it drags as it moves', false)
+  add('/opsia/touch/hold', 0, 1, 0.5, 'Touch and Ripple : a finger held at x y (two 0..1 floats); it drags as it moves, lets go 3 s after the last one', false)
   add('/opsia/touch/up', 0, 1, 0, 'Touch and Ripple : let the held finger go (trigger)', false)
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')

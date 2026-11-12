@@ -28,10 +28,11 @@
 
 // The drift is a vector integrated along its angle (turning the angle bends the
 // path), wrapped at the lattice's 4096-cell period, so it stays exact for days and
-// the wrap is invisible. The dome's turn round the zenith is its own phase. The
+// the wrap is invisible (seamless : across, in frame widths, wrapped at the repeat). The dome's turn round the zenith is its own phase. The
 // evolve clock counts free time, or beats of the transport tempo with sync.
 uniform float PH_noiseDX; // wrap 4096
 uniform float PH_noiseDY; // wrap 4096
+uniform float PH_noiseSX; // wrap 1
 uniform float PH_noiseTurn; // wrap 6.2831853
 uniform float PH_noiseEvolve; // wrap 4096
 
@@ -175,7 +176,8 @@ vec2 place(vec2 uv, float nx, bool dome) {
     return domeRot(domeDisc(uv), PH_noiseTurn) * 0.5 * scale;
   }
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
-  if (seamless) return vec2(uv.x * nx + mod(PH_noiseDX, nx), uv.y * scale + PH_noiseDY);
+  // (seamless : its own drift in frame widths, wrapped at the repeat, so it never jumps)
+  if (seamless) return vec2((uv.x + PH_noiseSX) * nx, uv.y * scale + PH_noiseDY);
   return vec2(uv.x * aspect * scale + PH_noiseDX, uv.y * scale + PH_noiseDY);
 }
 

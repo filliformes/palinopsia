@@ -154,7 +154,7 @@ export class CurrentNode implements ConvNode {
     // grids : the water by `detail`, the dye at the picture's size up to 1080 rows
     const gh = rowsFor(num(inp, 'detail', 0.5))
     const gw = Math.max(8, Math.round((gh * W) / H))
-    // a new water grid starts still (its targets are made empty); the dye carries on
+    // a new water grid keeps the water moving (resampled : FluidSolver.ensure); the dye carries on
     sv.ensure(gw, gh)
     let fresh = false
     const dh = Math.max(4, Math.min(1080, H))
