@@ -36,6 +36,7 @@ import { registerMediaRefs } from './mediaRefs'
 import { registerUserShaders } from './userShaders'
 import { registerMcp } from './mcp'
 import { installAvcaptureHost } from './avcaptureHost'
+import { installSyphonIn } from './syphonIn'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
 import { closeLink, initLink } from './link'
@@ -1003,6 +1004,8 @@ app.whenReady().then(async () => {
 
   // The USB input's capture process (macOS) : started the first time a window asks.
   installAvcaptureHost()
+  // The Syphon input's client (macOS) : the server directory needs main's run loop.
+  installSyphonIn()
 
   // Camera permission for the USB input (src/preload/avcapture.ts), asked HERE so
   // the system prompt names the app. Chromium asks on its own for the cameras it

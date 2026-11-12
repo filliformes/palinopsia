@@ -62,7 +62,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 
 **The instrument**
 - [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files, live inputs and NDI® sources into Sonify's mix
-- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
+- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio) · [Spout / Syphon input](#spout--syphon-input)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
@@ -679,7 +679,7 @@ hour-long file costs the same as a short one. Presets, and three master chains t
 flatter it (**Sound** : Phosphor, Tape Floor, Relief). It plays on Sonify's output
 device (recordings do not carry it yet), and a muted layer is silent.
 
-Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
+Live **captures** (webcam / screen / device), [NDI](#ndi) sources, [Spout / Syphon](#spout--syphon-input) senders on this computer and **HIVE**
 (HEVC-over-TCP network streams) fill slots the same way, and every video/capture slot
 has its own **framing** and Source-FX rack. A camera that drops out
 (unplugged, or reset by USB power saving) **reconnects by itself** : it is tried again
@@ -687,6 +687,37 @@ has its own **framing** and Source-FX rack. A camera that drops out
 comes back under another id; its last frame holds meanwhile. A camera that is **not
 there yet** when the session opens (an installation whose camera powers up after the
 computer) is looked for the same way.
+
+### Spout / Syphon input
+
+Another program's picture **on this computer** (TouchDesigner, Resolume, Unity, a
+VJ app, another Palinopsia) as a layer source, at full quality and almost no delay :
+nothing is compressed (NDI) or grabbed off the screen. A layer's source menu →
+**Spout / Syphon Input…** lists the **Spout** senders running on this PC (on a Mac, the
+**Syphon** servers), with their size; pick one and it plays in the layer like a camera
+(framing, People, FX, blend), the right way up; **Switch input** in the Inspector changes
+it. Several layers can show the same sender (one receiver). The session remembers it by
+name (`spout:<name>`, `syphon:<name>` on a Mac : either one opens on either computer), and
+a sender that is **not running yet**, **closes**, **restarts** or **changes size** is
+picked up again by itself; the last frame holds meanwhile. The Inspector shows what
+arrives : size, frames per second and the route.
+
+- **Shared on the graphics card** (Windows) : each new frame is copied, on the GPU, into
+  a texture Palinopsia shares with Chromium, so no pixel ever goes through memory.
+  Measured on the Aero (RTX 4070) with a test sender drawing a time code : a 1080p 60 fps sender reaches the layer **13 ms** after it sent the frame (95 % within 23 ms), a 4K one in **21 ms** (32), the app holding 60 fps; the upload costs 0.2 ms a frame (0.4 at 4K), the receiving about 10 % of one CPU core (its own thread, never the app's) and a few % more on the GPU.
+- **Copied**, when the sender draws on **another graphics card** (a laptop's integrated
+  one) or in a format the shared texture cannot hold : the frame is read back on the
+  receiver's own thread and copied into the layer off the app's thread : 1080p arrives in 20 ms (28), 4K in 44 ms (55) at about 37 frames a second, the app still at 60 fps, for about a quarter (1080p) to half (4K) of a CPU core.
+  On a laptop with two graphics cards, set the sending program to the high-performance
+  one (Windows Settings → Display → Graphics) to keep the shared route.
+- The picture keeps the sender's **alpha** : a transparent sender shows the layers below.
+- **macOS (Syphon)** : written the same way (the server's IOSurface shared with the
+  window; a copy route reading the surface if that fails) but **not yet tried on a Mac**.
+  If the picture comes in upside down, **mirror → upside down** in the framing fixes it
+  (and tell us).
+- Not offered by Generate or the dice (like the NDI input : a live input is your choice).
+- Palinopsia's own **Spout / Syphon output** (the Output page) appears in the list too :
+  picking it makes a loop through the whole picture.
 
 **Framing** (under a video, capture, Assemble or HIVE source in the Inspector) : **fit** sets how the
 whole picture sits in the layer (*stretch* fills it whatever its shape, the default;
@@ -1920,7 +1951,8 @@ bottom:
   Windows, Syphon on macOS, both built in : nothing to install. Sends the clean
   picture (before keystone) at the full render size, every frame (4K : ~58 fps
   measured, ~3 ms of the frame). Syphon is built in CI but not yet tried with a Syphon
-  client.
+  client. The other way, another program's Spout / Syphon output plays in a layer :
+  see [Spout / Syphon input](#spout--syphon-input).
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the

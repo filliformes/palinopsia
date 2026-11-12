@@ -8,6 +8,8 @@
 import { uploadVideoFrame } from './VideoSource'
 import { ndiInAcquire, ndiInLatest, ndiInRelease, ndiInStats, type NdiInStats } from './ndiIn'
 import { AVF_PREFIX, avfInAcquire, avfInLatest, avfInRelease } from './avfIn'
+import { shareInAcquire, shareInLatest, shareInRelease, type ShareFrame } from './shareIn'
+import { shareInName } from '@shared/shareIn'
 
 // A live-capture start can fail silently (permission denied, no device, screen
 // picker cancelled) and the slot just renders transparent — the most confusing
@@ -32,6 +34,9 @@ export class CaptureSource {
   // USB input ('device:avf:<id>', macOS) : an iPhone by USB or another camera
   // Chromium cannot list; frames come from the preload (src/preload/avcapture.ts).
   private avfId: string | null = null
+  // Spout / Syphon input ('spout:<name>' / 'syphon:<name>') : another program on
+  // this computer; frames come from the preload (src/preload/shareIn.ts).
+  private shareName: string | null = null
   // A camera that drops out (unplugged, or reset by USB power saving over a
   // days-long installation) ends its track : the source reconnects by itself,
   // finding the camera again by name if it comes back under another id.
@@ -50,7 +55,7 @@ export class CaptureSource {
    *  are : the blit samples them upside down (a CPU flip on upload was the slow
    *  path). */
   get flipY(): boolean {
-    return this.ndiName !== null || this.avfId !== null
+    return this.ndiName !== null || this.avfId !== null || this.shareName !== null
   }
   get ndiStats(): NdiInStats | null {
     return this.ndiName ? ndiInStats(this.ndiName) : null
@@ -72,17 +77,27 @@ export class CaptureSource {
    *    'device:avf:<id>' → a USB input on macOS (an iPhone by USB…), captured
    *                        natively : the preload keeps looking for it
    *    'ndi:<name>'      → an NDI® source on the network (src/preload/ndi.ts)
+   *    'spout:<name>' / 'syphon:<name>' → a Spout (Windows) or Syphon (macOS)
+   *                        sender on this computer (src/preload/shareIn.ts)
    *  Safe to call once; ignores re-entrancy. `quiet` : a reconnection attempt
    *  (no error reported to the UI each time). `label` : the device's name as
    *  picked, to find it again if it comes back under another id. */
   async start(spec: string, quiet = false, label = ''): Promise<void> {
-    if (this.starting || this.stream || this.disposed || this.ndiName || this.avfId) return
+    if (this.starting || this.stream || this.disposed || this.ndiName || this.avfId || this.shareName !== null) return
     if (label && !this.label) this.label = label
     if (spec.startsWith('device:' + AVF_PREFIX)) {
       this.avfId = spec.slice(('device:' + AVF_PREFIX).length)
       // Not a Mac, or the module is missing : say so. A device that is simply
       // not there yet is no error : the preload keeps looking for it.
       if (!avfInAcquire(this.avfId) && !this.disposed) captureErrorReporter?.(spec, 'AvfUnavailable')
+      return
+    }
+    const share = shareInName(spec)
+    if (share !== null) {
+      this.shareName = share
+      // No module on this computer : say so. A sender that is not there yet is
+      // no error : the receiver waits for it (and for its return when it closes).
+      if (!shareInAcquire(share) && !this.disposed) captureErrorReporter?.(spec, 'ShareUnavailable')
       return
     }
     if (spec.startsWith('ndi:')) {
@@ -203,18 +218,23 @@ export class CaptureSource {
 
   /** The picture's size (0×0 before the first frame) : for the framing's fit. */
   frameSize(): [number, number] {
-    if (this.ndiName || this.avfId) return [this.frameW, this.frameH]
+    if (this.ndiName || this.avfId || this.shareName !== null) return [this.frameW, this.frameH]
     return [this.video.videoWidth, this.video.videoHeight]
   }
 
   /** The current frame, for People (personMask.ts) to look at. */
-  personFrame(): HTMLVideoElement | { w: number; h: number; stride: number; buf: ArrayBuffer } | null {
+  personFrame(): HTMLVideoElement | VideoFrame | { w: number; h: number; stride: number; buf: ArrayBuffer } | null {
+    if (this.shareName !== null) {
+      const f = shareInLatest(this.shareName)
+      return !f ? null : f.kind === 'vf' ? f.vf : f
+    }
     if (this.ndiName) return ndiInLatest(this.ndiName)
     if (this.avfId) return avfInLatest(this.avfId)
     return this.stream ? this.video : null
   }
 
   upload(): WebGLTexture | null {
+    if (this.shareName !== null) return this.uploadShare(shareInLatest(this.shareName))
     if (this.ndiName) return this.uploadFrame(ndiInLatest(this.ndiName))
     if (this.avfId) return this.uploadFrame(avfInLatest(this.avfId))
     this.tex = uploadVideoFrame(this.gl, this.video, this.tex)
@@ -250,6 +270,39 @@ export class CaptureSource {
     return this.tex
   }
 
+  /** A Spout / Syphon frame : a VideoFrame over a shared GPU texture (copied on
+   *  the graphics card, 0.2 ms at 1080p, 0.4 ms at 4K, measured) or a copied
+   *  buffer. Top row first either way (see flipY). */
+  private uploadShare(f: ShareFrame | null): WebGLTexture | null {
+    if (!f || f.kind === 'buf') return this.uploadFrame(f)
+    if (f.seq === this.frameSeq) return this.tex
+    const gl = this.gl
+    if (!this.tex) {
+      this.tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, this.tex)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.tex)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+    gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0)
+    try {
+      if (f.w !== this.frameW || f.h !== this.frameH) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+        this.frameW = f.w
+        this.frameH = f.h
+      }
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, f.vf)
+    } catch (e) {
+      // A closed or broken frame : the last picture stays.
+      console.warn('[share in] frame upload failed:', (e as Error).message)
+    }
+    this.frameSeq = f.seq
+    return this.tex
+  }
+
   dispose(): void {
     this.disposed = true
     window.clearTimeout(this.retryTimer)
@@ -261,6 +314,10 @@ export class CaptureSource {
     if (this.avfId) {
       avfInRelease(this.avfId)
       this.avfId = null
+    }
+    if (this.shareName !== null) {
+      shareInRelease(this.shareName)
+      this.shareName = null
     }
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null

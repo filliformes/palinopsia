@@ -436,6 +436,63 @@ that CI builds into cross-platform releases.
   smoothing halving the swing, three badges, the glide back to 0.9 after the gloves
   stopped).
 
+- **Spout / Syphon input : another program's picture on this computer as a layer source**
+  (Vincent : "Spout / Syphon input"; the shelf : take TouchDesigner / Resolume / Unity
+  output on the same computer at full quality and low latency instead of compressing it
+  through NDI or grabbing the screen). **Spout / Syphon Input…** in the source menu's live
+  group (beside NDI Input…) lists the senders running here (`SharePicker.tsx`, sizes, this
+  app's own output marked as a loop) and receives one into the layer like the NDI input :
+  framing, People (now also on a `VideoFrame`, `personMask.ts`), FX, one receiver per
+  sender shared by every layer, **Switch input** and a live readout in the Inspector
+  (`ShareInReadout` : size, fps, route). mediaId `spout:<name>` (`syphon:<name>` on a
+  Mac; either opens on either, `shared/shareIn.ts`). Not offered by Generate or the dice,
+  like the NDI input.
+  - **Windows, the GPU route (measured, used whenever it can)** : `native/spout` now
+    receives too. Each receiver runs on a thread of its own with its own D3D11 device on
+    the high-performance card (the SDK sleeps 67 ms when a sender closes or resizes :
+    never on the app's thread); each new frame is copied on the GPU into one of four
+    textures shared by NT handle (`recvRing` / `recvTake`, never writing the two slots the
+    page read last), which the preload imports ONCE with Electron's
+    `sharedTexture.subtle.importSharedTexture`; the page pulls a `VideoFrame` over the
+    bridge each drawn frame and uploads it GPU to GPU (`texSubImage2D(vf)` : 0.2 ms at
+    1080p, 0.4 ms at 4K). No pixel crosses the CPU. `src/preload/shareIn.ts`,
+    `engine/shareIn.ts`, `CaptureSource.uploadShare`.
+  - **The copy route** : a sender on another graphics card (`other-gpu`, the SDK follows
+    it there) or a format the shared textures cannot hold (BGRX) falls back by itself :
+    the receiver thread copies to a staging texture and maps it at once (not the SDK's
+    two-staging read, a frame late : 33 → 18 ms at 1080p in Node), BGRA swapped to RGBA,
+    then `recvRead` copies it into the page's pooled buffer on a worker thread (the NDI
+    input's transfer shape, `opsia:shareinport`).
+  - **Reconnection** : a sender that is not there yet, closes, restarts or changes size is
+    found again by name (new shared textures, imported again; the old ones freed once
+    their imports are released); looked for 20 times a second while absent. Polling
+    paced on the sender's own frame interval (1 kHz cost 9.6 % of a core, now 6.8 % with a
+    second, absent receiver) and the copy fence waited by sleeping, not spinning.
+  - **Measured on the test copy (RTX 4070, a standalone Node sender drawing a time code
+    into its pixels, read back from the layer's own texture)** : GPU route 1080p60 :
+    app 60 fps, 51-53 new frames/s in the layer (newest wins), sender clock to pixels
+    p50 13 ms / p95 22 ms, colors exact; 4K60 : 60 fps, p50 21 / p95 32 ms. Copy route
+    (the sender on the Intel iGPU, BGRA) : 1080p 54 frames/s, p50 20 / p95 28 ms; 4K
+    37 frames/s, p50 44 / p95 55 ms, the app at 60 fps. CPU (whole renderer process, one
+    core = 100 %) : 18 % with the 1080p input vs 8 % without; GPU process 20 vs 18 %.
+    Survived 30 s of the sender resizing every 5 s (1080p → 720p → 4K) and closing /
+    reopening twice : picked up within a second each time, worst app frame 18 ms
+    throughout; two layers on one sender showed the same frame 300 / 300 frames; a page
+    reload stops its receivers (addon cleanup hook) and starts new ones. Under the dome
+    (4096 master, 210° fill, 2048² composition) 60 fps and 51.5 new frames/s, as flat.
+  - **macOS (Syphon), UNTESTED (no Mac here)** : `native/syphon` gains a client
+    (`SyphonServerDirectory` + `SyphonMetalClient`, labels "app : name"), run in MAIN
+    (`main/syphonIn.ts` : Syphon's notifications need its run loop) which imports each
+    server's IOSurface with `sharedTexture.importSharedTexture` and sends it to the window
+    once per size (`sendSharedTexture`), then a small tick per frame; the window's copy
+    route reads the surface by its id (`readSurface`, `IOSurfaceLookup`). Built only on
+    the mac CI leg; `build.sh` now loads the addon in Node once (a missing symbol shows
+    in CI). The surface is assumed top row first (as SyphonMetalServer blits it); if a
+    Mac shows it upside down, the framing's mirror fixes it.
+  - Also : the preload finds the Spout / Syphon addon in a test build too (it looked one
+    folder too high, so the test copy's Spout output always fell back to main);
+    `open(name, format, adapter)` and `adapters()` for test senders.
+
 ### Fixed
 
 - **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
