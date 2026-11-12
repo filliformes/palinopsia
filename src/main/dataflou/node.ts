@@ -29,7 +29,7 @@ import {
   encodeStreamRequest, encodeStreamStop, encodeSubAnnounce, encodeSubRequest, frame, type DfIdentity, type DfMsg
 } from './protocol'
 import { crc32Sku, decodeStreamPacket, encodeStreamPacket, type StreamEntry } from './stream'
-import type { DfIo, DfIoRow, DfNodeView, DfParam, DfStatus, DfSub, DfType, DfValue } from '@shared/dataflou'
+import { cleanWireOpt, remote01, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfStatus, type DfSub, type DfType, type DfValue, type DfWireOpt } from '@shared/dataflou'
 
 const DIGEST_MS = 10_000
 const PEER_TIMEOUT_MS = 30_000
@@ -169,6 +169,8 @@ export interface NodeHost {
   onChange(): void
   /** Persist our own bindings (local dest path → sources). */
   saveSubs(subs: Record<string, DfSub[]>): void
+  /** A listened remote value (a modulator plays it), 0..1 of its range. */
+  onRemote?(sku: string, path: string, v01: number): void
   /** Persist our scenes (the slots and the cue state). */
   saveScenes?(s: SceneFile): void
   /** A cue was applied (recall), our connections saved in a slot (store), or our
@@ -213,6 +215,13 @@ export class DataflouNode {
   private watchAt = new Map<string, number>()
   private watchCount = new Map<string, number>()
   private watchRate = new Map<string, number>()
+  // remote values the app plays itself (a modulator's mesh input) : streamed
+  // like watches, handed to the app as they arrive, not shown in the data view
+  private listens: DfSub[] = []
+  private listenSet = new Set<string>()
+  // the page asks for every value (monitors); a learn does too, for a while
+  private pageMonitor = false
+  private learning: Map<string, { lo: number; hi: number }> | null = null
   visualizerClients = 0
   private byPath = new Map<string, DfParam>()
   private values = new Map<string, DfValue>()
@@ -1080,6 +1089,20 @@ export class DataflouNode {
           this.watchAt.set(k, now)
           this.watchCount.set(k, (this.watchCount.get(k) ?? 0) + 1)
         }
+        if (this.listenSet.has(k) || this.learning) {
+          const v01 = remote01(e.value, this.world.get(srcSku)?.byPath.get(e.path))
+          if (v01 !== null) {
+            if (this.listenSet.has(k)) this.host.onRemote?.(srcSku, e.path, v01)
+            if (this.learning) {
+              const r = this.learning.get(k)
+              if (!r) this.learning.set(k, { lo: v01, hi: v01 })
+              else {
+                if (v01 < r.lo) r.lo = v01
+                if (v01 > r.hi) r.hi = v01
+              }
+            }
+          }
+        }
       }
       for (const [dest, list] of this.subs) {
         for (const s of list) {
@@ -1087,7 +1110,7 @@ export class DataflouNode {
           const dp = this.byPath.get(dest)
           if (!dp) continue
           const sp = this.world.get(s.sku)?.byPath.get(s.path) ?? null
-          out.push({ path: dest, type: dp.type, value: mapValue(e.value, e.type, sp, dp) })
+          out.push({ path: dest, type: dp.type, value: shapeWire(mapValue(e.value, e.type, sp, dp), dp, s.opt) })
           this.rx++
         }
       }
@@ -1141,9 +1164,64 @@ export class DataflouNode {
   /** While a visualizer page is open, every remote param streams to us (the
    *  reference node's monitors : a STREAMREQ with no destination path). */
   setMonitoring(on: boolean): void {
-    if (on === this.monitorOn) return
-    this.monitorOn = on
+    this.pageMonitor = on
+    const want = on || !!this.learning
+    if (want === this.monitorOn) return
+    this.monitorOn = want
     this.pollMonitors(Date.now(), true) // (off : the watched ones stay)
+  }
+
+  /** Remote values the app plays itself (a modulator's mesh input). */
+  setListens(list: DfSub[]): void {
+    this.listens = list.filter((m) => m && typeof m.sku === 'string' && typeof m.path === 'string' && m.sku !== this.identity.sku).slice(0, MAX_WATCHES)
+    this.listenSet = new Set(this.listens.map((m) => `${m.sku}\n${m.path}`))
+    this.pollMonitors(Date.now(), true)
+  }
+
+  /** Learn from the mesh : every remote value streams for a while (as for the
+   *  page), and the one that moves the most is the answer (learnPeek). */
+  learnStart(): void {
+    this.learning = new Map()
+    if (!this.monitorOn) {
+      this.monitorOn = true
+      this.pollMonitors(Date.now(), true)
+    }
+  }
+
+  learnStop(): void {
+    this.learning = null
+    if (this.monitorOn && !this.pageMonitor) {
+      this.monitorOn = false
+      this.pollMonitors(Date.now(), true)
+    }
+  }
+
+  /** The remote value that moved the most since learnStart, once it swept at
+   *  least `min` of its range (null : nothing yet). */
+  learnPeek(min = 0.25): { sku: string; path: string; label: string; node: string; span: number } | null {
+    if (!this.learning) return null
+    let best: { k: string; span: number } | null = null
+    for (const [k, r] of this.learning) {
+      const span = r.hi - r.lo
+      if (span >= min && (!best || span > best.span)) best = { k, span }
+    }
+    if (!best) return null
+    const [sku, path] = best.k.split('\n')
+    const w = this.world.get(sku)
+    const p = w?.byPath.get(path)
+    return { sku, path, label: p?.label || path, node: w?.identity.label ?? sku.slice(0, 8), span: best.span }
+  }
+
+  /** How a wire into us plays (range, invert, smoothing, on loss). */
+  setWireOpt(dest: string, srcSku: string, srcPath: string, opt: unknown): boolean {
+    const s = this.subs.get(dest)?.find((x) => x.sku === srcSku && x.path === srcPath)
+    if (!s) return false
+    const o = cleanWireOpt(opt)
+    if (o) s.opt = o
+    else delete s.opt
+    this.persist()
+    this.host.onChange()
+    return true
   }
 
   /** The outside values to watch (sku + path), from the Connect tab. */
@@ -1177,7 +1255,7 @@ export class DataflouNode {
       seen.add(k)
       wanted.push(m)
     }
-    for (const m of this.watches) {
+    for (const m of [...this.watches, ...this.listens]) {
       const w = this.world.get(m.sku)
       if (w && !w.local && w.online && this.peerOf(m.sku)) add(m)
     }
@@ -1185,14 +1263,14 @@ export class DataflouNode {
       for (const [sku, w] of this.world) {
         if (w.local || !w.online || !this.peerOf(sku)) continue
         for (const p of w.params) {
-          if (p.kind !== 'param' || wanted.length >= MAX_MONITORS + this.watches.length) continue
+          if (p.kind !== 'param' || wanted.length >= MAX_MONITORS + this.watches.length + this.listens.length) continue
           add({ sku, path: p.path })
         }
       }
     }
     const had = new Set(this.monitors.map(key))
     for (const m of this.monitors) if (!seen.has(key(m))) this.stopMonitor(m)
-    const watched = new Set(this.watches.map(key))
+    const watched = new Set([...this.watches, ...this.listens].map(key))
     for (const m of wanted) {
       if (!keepalive && had.has(key(m)) && !fresh) continue
       if (!keepalive && had.has(key(m)) && fresh && !watched.has(key(m))) continue
@@ -1346,6 +1424,20 @@ export class DataflouNode {
 /** A value from a source param onto a destination param, as dataflou maps it :
  *  through the source's range to 0..1, then onto the destination's range (a
  *  number onto a bool : on at half way). No source description yet : as is. */
+/** A wire's shape on its way in (DfWireOpt) : the part of the destination's range
+ *  it covers, and turned the other way. (Smoothing and on-loss are the app's.) */
+export function shapeWire(v: DfValue, dp: DfParam, opt: DfWireOpt | undefined): DfValue {
+  if (!opt) return v
+  if (dp.type === 'bool') return opt.invert ? !v : v
+  if (dp.type !== 'number' || typeof v !== 'number') return v
+  const span = dp.max - dp.min
+  if (!(span !== 0)) return v
+  let t = Math.max(0, Math.min(1, (v - dp.min) / span))
+  if (opt.invert) t = 1 - t
+  const lo = opt.lo ?? 0, hi = opt.hi ?? 1
+  return dp.min + (lo + (hi - lo) * t) * span
+}
+
 export function mapValue(v: DfValue, type: DfType, src: DfParam | null, dst: DfParam): DfValue {
   let t: number
   if (type === 'bool') t = v ? 1 : 0

@@ -1275,7 +1275,9 @@ export function normalizeComposition(c: CompositionState): CompositionState {
         return {
           ...x, steps: sanitizeSteps(x.steps), body: sanitizeBodyMod(x.body, d.body),
           controller: { ...d.controller, ...(x.controller ?? {}) },
-          ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {})
+          ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {}),
+          // a mesh input (dataflou) : whole, or none
+          mesh: x.mesh && typeof x.mesh.sku === 'string' && typeof x.mesh.path === 'string' ? { sku: x.mesh.sku, path: x.mesh.path, label: String(x.mesh.label ?? x.mesh.path).slice(0, 40) } : undefined
         }
       })
     })(),

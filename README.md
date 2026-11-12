@@ -3998,7 +3998,11 @@ tab has the whole setup :
 - **network** : every other node, online or remembered (dataflou never forgets a node
   that went offline; **forget** removes it from the whole mesh), with what it publishes
   (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
-  wires that source to one of Palinopsia's destinations, **← Palinopsia…** feeds that
+  wires that source to **◈ a free Macro knob** (the first with no destination and no wire,
+  named after it, "glove-l pitch", the Macro row opening : give it any controls with
+  their M, its range and curve shape it), to **◈ a free modulator** (it becomes a
+  Controller played by that value : bind it to any control with its M, with depth,
+  curve and shaping), or to one of Palinopsia's destinations; **← Palinopsia…** feeds that
   destination from one of Palinopsia's sources, and **◉** watches it in the data view
   (wired or not : a glove's sensors before you decide what they play).
 - **data** : what matters in a connected show, live, in three parts. **into Palinopsia** :
@@ -4014,7 +4018,23 @@ tab has the whole setup :
   it only asks for the values while it is open.
 - **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
   the other nodes announce), with ✕ to unwire. The header shows the values received and
-  sent per second.
+  sent per second. A wire into Palinopsia has a **⚙** : the part of the destination's range
+  it covers (**range** 0.2 to 0.4 : the source's whole sweep lands there), **invert**,
+  **smooth** (the control glides to each new value over that many ms : a jittery sensor),
+  and **on loss** : **hold** the last value, or **glide back** (over a few seconds) to where
+  the control was before the wire began to play it, once the source has been quiet for
+  2 s (a glove out of battery, a computer asleep). Kept with the wire.
+
+**Mapping from the mesh, wherever you are** : every control's **M** panel has a **◈** under
+"macro" : click it, move the thing on the other node (a glove, a fader in Max), and the
+value that moved the most plays this control through a free Macro knob (named after it,
+its range and curve to shape it, its capsule in the Macro title bar). A **Controller**
+modulator's input row has the same ◈ : the moved value plays that modulator (beside or
+instead of a learned MIDI / OSC control; the session keeps it). A control another node
+plays shows a **◈** beside it (the layer strip's opacity, A/B mix and vary, the
+Background's opacity, the Macro tiles) : lit while values arrive, its tooltip says from
+where, right-click unwires. The values a modulator plays stream only to Palinopsia (they
+add nothing to Palinopsia's own parameter list on the mesh).
 - **visualizer ↗** opens the dataflou project's mesh visualizer (by Alexandre Burton) in
   your browser : every node a colored arc of its parameters around one circle, the wires
   between them, the values live; drag a source onto a destination to wire them, click a

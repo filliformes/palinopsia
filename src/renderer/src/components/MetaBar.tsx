@@ -35,6 +35,7 @@ import { warnModMatrixFull } from './AutoControls'
 import { PinZone } from './Pin'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { describeModTarget } from './ModulationPanel'
+import { MeshBadge } from './MeshBadge'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -415,8 +416,9 @@ function MetaKnobTile({ index, hot }: { index: number; hot: boolean }): JSX.Elem
       </div>
 
       {/* destinations count : what this knob drives */}
-      <span className="font-mono text-[9px] leading-none text-muted">
+      <span className="flex items-center gap-1 font-mono text-[9px] leading-none text-muted">
         {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : 'no dest'}
+        <MeshBadge dest={`meta/${index + 1}`} />
       </span>
 
       {renaming ? (

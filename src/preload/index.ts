@@ -90,6 +90,14 @@ const api: ExposedApi = {
   dataflouStatus: () => ipcRenderer.invoke('dataflou:status'),
   dataflouIo: () => ipcRenderer.invoke('dataflou:io'),
   dataflouWatch: (list) => ipcRenderer.send('dataflou:watch', list),
+  dataflouListen: (list) => ipcRenderer.send('dataflou:listen', list),
+  dataflouLearn: (op) => ipcRenderer.invoke('dataflou:learn', op),
+  dataflouWireOpt: (a) => ipcRenderer.invoke('dataflou:wireOpt', a),
+  onDataflouRemote: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, b: Parameters<typeof cb>[0]): void => cb(b)
+    ipcRenderer.on('dataflou:remote', h)
+    return () => ipcRenderer.off('dataflou:remote', h)
+  },
   dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
   dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),
   dataflouForget: (sku) => ipcRenderer.invoke('dataflou:forget', sku),

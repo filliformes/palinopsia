@@ -737,6 +737,10 @@ export interface TakeoverConfig extends ControlInputConfig {
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
+  // A Controller modulator played by a value of another dataflou node (a glove
+  // axis) : that node's sku, the parameter's path, how it reads. Beside (not
+  // instead of) a learned MIDI / OSC control; the session keeps it.
+  mesh?: { sku: string; path: string; label: string }
   // Installed by a World's audio routing : the next World replaces it (yours never).
   // Cleared the moment you change it or its bindings : from then on it is yours.
   fromWorld?: boolean
@@ -1643,6 +1647,14 @@ export interface ExposedApi {
   dataflouIo: () => Promise<import('./dataflou').DfIo[]>
   /** The outside values to watch in the data view (sku + path each). */
   dataflouWatch: (list: Array<{ sku: string; path: string }>) => void
+  /** The remote values the modulators play (their mesh inputs). */
+  dataflouListen: (list: Array<{ sku: string; path: string }>) => void
+  /** Learn from the mesh : start, the value that moved the most (peek), stop. */
+  dataflouLearn: (op: 'start' | 'peek' | 'stop') => Promise<{ sku: string; path: string; label: string; node: string; span: number } | null>
+  /** A wire into Palinopsia : its range, invert, smoothing and what happens on loss. */
+  dataflouWireOpt: (a: { dest: string; sku: string; path: string; opt: import('./dataflou').DfWireOpt | null }) => Promise<boolean>
+  /** Listened remote values, 0..1 of their range, once a frame. */
+  onDataflouRemote: (cb: (batch: Array<{ sku: string; path: string; v: number }>) => void) => () => void
   dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
   dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>
   dataflouForget: (sku: string) => Promise<boolean>

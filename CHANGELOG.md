@@ -409,6 +409,32 @@ that CI builds into cross-platform releases.
   one line (`DfIo.watchedBy`). Tested with a stand-in gloves node (2 × 6 IMU values,
   monitoring Palinopsia) on the test copy : 256 monitor rows gone to one line, two
   watched values at ~22/s with their lines, a wired one in "into Palinopsia".
+- **dataflou : mapping when other nodes play Palinopsia** (Vincent picked 1 to 6 of the
+  11-11 shelf : "Implement them intelligently"). (1) **→ Palinopsia…** offers **a free
+  Macro knob** (no destination, no wire, no modulator, not persistent; named after the
+  source, the Macro row shown) and **a free modulator** (no binding, not persistent; a
+  Controller first). (2) A **Controller** modulator takes a mesh value as its input
+  (`ModulatorConfig.mesh`, sanitized on load) : main streams it with no destination
+  (`DataflouNode.setListens`, like the watches) and pushes it once a frame
+  (`dataflou:remote`, 0..1 of the remote range through `remote01`) into `controlBus`
+  `in:<slot>`, so Palinopsia's declared tree (and the C++ 128-entry limit) is
+  untouched. (3) **Learn from the mesh** : `learnStart` makes every remote value stream
+  (as the page's monitors), `learnPeek` answers the one that swept at least a quarter of
+  its range the most; the M panel's ◈ (under "macro") puts it on a free Macro knob
+  driving that control, the Controller card's ◈ makes it the card's input. (4) A wire's
+  **⚙** : range (lo / hi of the destination), invert (main, `shapeWire` on the way in)
+  and smoothing (renderer, a one-pole slew in ms) : `DfSub.opt` / `DfWireOpt`, kept in
+  the bindings file, `cleanWireOpt`. (5) **◈ badges** (`MeshBadge`) on the controls a
+  wire plays : layer opacity / mix / vary, Background opacity, the Macro tiles; lit
+  while values arrive, right-click unwires. (6) **On loss** : hold, or glide back over
+  N s to where the control was before the wire began (remembered at every wire's first
+  value after a quiet spell, so turning the option on later still knows), after 2 s of
+  quiet. Tested on the test copy with a stand-in gloves node (12 IMU values that sweep
+  on cue) : 17 checks, all six features through the real interface (the free knob named
+  and following, the modulator swinging L2 opacity 0.05 to 0.99 on a sweep, learn
+  catching the swept axis among the resting ones, range + invert 0.296 in 0.29..0.31,
+  smoothing halving the swing, three badges, the glide back to 0.9 after the gloves
+  stopped).
 
 ### Fixed
 

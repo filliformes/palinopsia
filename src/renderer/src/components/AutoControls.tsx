@@ -18,6 +18,7 @@ import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
+import { learnFromMesh, useDataflouStatus, useMeshLearning, wireToFreeMacro } from '../dataflou'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { fracFor } from './numberBox'
 import { showToast } from './Toast'
@@ -620,6 +621,10 @@ export function AssignRow({
   const full = used >= MAX_MOD_ASSIGNMENTS
   // the binding whose shaping is open under its row (one at a time)
   const [shapeOpen, setShapeOpen] = useState<string | null>(null)
+  // learn from the mesh : on the dataflou mesh, move something; it plays this
+  // control through a free Macro knob (range, curve, capsules)
+  const meshOn = useDataflouStatus().running
+  const meshLearn = useMeshLearning() === `ctl:${targetKey}`
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -731,7 +736,24 @@ export function AssignRow({
           above, the whole panel is the fixed three-row shape). */}
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
-          <span className="w-8 shrink-0 pt-0.5 font-mono text-[9px] uppercase text-muted">macro</span>
+          <span className="flex w-8 shrink-0 flex-col gap-0.5 pt-0.5">
+            <span className="font-mono text-[9px] uppercase text-muted">macro</span>
+            {meshOn && (
+              <button
+                onClick={() =>
+                  void learnFromMesh(`ctl:${targetKey}`).then((r) => {
+                    if (r) void wireToFreeMacro(r, target)
+                  })
+                }
+                className={`rounded px-0.5 font-mono text-[9px] leading-4 ${meshLearn ? 'animate-pulse bg-accent2/25 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent2'}`}
+                title={meshLearn
+                  ? 'Listening to the dataflou mesh : move the thing (a glove, a fader on another node). Click : stop'
+                  : 'Learn from the dataflou mesh : click, then move something on another node; the value that moves the most plays this control through a free Macro knob (its range, curve and capsules)'}
+              >
+                {meshLearn ? '…' : '◈'}
+              </button>
+            )}
+          </span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             {[metaBound.slice(0, 9), metaBound.slice(9)].map((row, r) => (
               <div key={r} className="flex min-w-0 gap-0.5">

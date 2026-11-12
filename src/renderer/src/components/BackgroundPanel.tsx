@@ -22,6 +22,7 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MeshBadge } from './MeshBadge'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
@@ -182,6 +183,7 @@ export function BackgroundPanel(): JSX.Element {
           />
         </span>
         </PinZone>
+        <MeshBadge dest="bg/opacity" />
         {modChip('opacity')}
         <span className="relative inline-flex shrink-0">
           <MidiLearnOverlay id="rand:bg" />
