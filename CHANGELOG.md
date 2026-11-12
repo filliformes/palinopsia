@@ -109,7 +109,10 @@ that CI builds into cross-platform releases.
   in rings there (Tracking's dome form), so its loop builds a pale ring at the rim.
   - The recipe menu is grouped (`<optgroup>` : feedback, glitch, echoes and beats; `LOOP_GROUPS`).
   - `dice: false` keeps a recipe to the menu : Bit rot, Recompress, Ink latch and Crawl stain (the most
-    destructive) are never dealt by the layer dice (`DICE_LOOP_RECIPES`) or a theme.
+    destructive) and Tape rot (it rings the dome's rim) are never dealt by the layer dice
+    (`DICE_LOOP_RECIPES`) or a theme (Generate checks the flag too; Dropout deals Band slip and Tear
+    drift instead). A loop is only named as a recipe that comes back on a delay or the tempo when its
+    own timing matches (a hand-built Stutter loop is not Beat stutter).
   - Generate : new theme **Glitch Loop** (Glitch / Datamosh : every layer feeds back through a glitch or
     beat loop), and glitch loops for Signal Loss, Dropout, Cut-Up, Databent, Pixel Sort and Scan Processor.
 

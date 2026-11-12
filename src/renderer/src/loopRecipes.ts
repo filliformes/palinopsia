@@ -258,7 +258,10 @@ export function loopRecipeOf(
   timing?: { loopDelay?: number; loopSync?: number }
 ): LoopRecipe | null {
   const ids = fx.map((f) => f.shaderId).join('|')
-  const same = LOOP_RECIPES.filter((r) => r.blend === (blend ?? 'mix') && r.fx.map((f) => f.shaderId).join('|') === ids)
+  // a recipe that comes back on a delay or the tempo is that recipe only with the
+  // same timing (a hand-built Stutter loop with no delay is not Beat stutter)
+  const timed = (r: LoopRecipe): boolean => (r.sync ?? 0) === (timing?.loopSync ?? 0) && (r.delay ?? 0) === (timing?.loopDelay ?? 0)
+  const same = LOOP_RECIPES.filter((r) => r.blend === (blend ?? 'mix') && r.fx.map((f) => f.shaderId).join('|') === ids && (!(r.sync || r.delay) || timed(r)))
   if (same.length < 2) return same[0] ?? null
   // Two recipes on the same effects (Spiral and Tunnel are both a Transform and
   // a Displace) : the one whose delay and values are nearest.

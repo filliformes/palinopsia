@@ -1520,7 +1520,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     l.feedback = R() < theme.feedback
     l.feedbackAmount = rr(0.4, 0.75)
     // a loop of the theme's : effects that compound inside the feedback
-    const loop = l.feedback && theme.loops?.length && R() < (theme.loopChance ?? 0.6) ? LOOP_RECIPE_BY_ID[pickOf(theme.loops)] : undefined
+    // (a menu-only recipe, dice: false, is never dealt here either)
+    const dealable = (theme.loops ?? []).filter((id) => LOOP_RECIPE_BY_ID[id] && LOOP_RECIPE_BY_ID[id].dice !== false)
+    const loop = l.feedback && dealable.length && R() < (theme.loopChance ?? 0.6) ? LOOP_RECIPE_BY_ID[pickOf(dealable)] : undefined
     if (loop) Object.assign(l, loopFromRecipe(loop))
     l.speed = rr(0.6, 1.6)
     return l
