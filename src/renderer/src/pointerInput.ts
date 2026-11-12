@@ -21,8 +21,8 @@
 // - Nothing changes for a session with no source that takes the pointer : the
 //   cursor stays the arrow and a click does what it always did (nothing).
 
-import { useStore } from './store'
-import { commitNow } from './undo'
+import { useStore, withFxInputs } from './store'
+import { commitNow, runSilently, writeLive } from './undo'
 import { showToast } from './components/Toast'
 import { SHADER_BY_ID } from './shaders/isf'
 import type { Compositor } from './engine/Compositor'
@@ -83,8 +83,66 @@ export function hintStatus(): string {
 
 /** What takes the pointer at a target now (an effect unit or a slot's engine). */
 function takerOf(comp: Compositor, t: Target): Taker | null {
-  if (isFx(t)) return comp.pointerFx(t.fx, t.instId)
+  if (isFx(t)) return fxTaker(comp, t.fx, t.instId)
   return comp.pointerEngine(t)
+}
+
+// ── ISF effects that take the pointer (Break, Droste) ───────────────────
+// Their registry entry names two inputs the click sets (the frame's u, v) and,
+// for Break, an event it fires : written through the store like a slider (a
+// mouse click is an edit you can undo, a pinch is live : writeLive, which never
+// closes an edit in progress, so a fader dragged during a pinch stays one undo
+// step). One taker per unit, kept while it plays the same shader, so a
+// gesture's target keeps its identity.
+const scopeWord = (s: FxScope): string => (s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`)
+const isfTakers = new Map<string, { sid: string; taker: Taker }>()
+const firePulses = new Map<string, number>()
+function isfTaker(fx: FxScope, instId: string): Taker | null {
+  const u = rackUnits(fx).find((x) => x.id === instId)
+  const sid = u?.shaderId
+  const spec = sid ? SHADER_BY_ID[sid]?.pointer : undefined
+  if (!sid || !spec) return null
+  const key = `${scopeWord(fx)}:${instId}`
+  const had = isfTakers.get(key)
+  if (had && had.sid === sid) return had.taker
+  const set = (u01: number, v01: number, live: boolean): void => {
+    if (live) writeLive((c) => withFxInputs(c, fx, instId, { [spec.x]: u01, [spec.y]: v01 }))
+    else {
+      const st = useStore.getState()
+      st.setFxInput(fx, instId, spec.x, u01)
+      st.setFxInput(fx, instId, spec.y, v01)
+    }
+  }
+  const fire = (name: string): void => {
+    // a pulse, as its FIRE ▸ button (on, then off 140 ms later) : silent
+    const k = `${key}:${name}`
+    const t = firePulses.get(k)
+    if (t != null) window.clearTimeout(t)
+    runSilently(() => useStore.getState().setFxInput(fx, instId, name, 1))
+    firePulses.set(k, window.setTimeout(() => {
+      firePulses.delete(k)
+      runSilently(() => useStore.getState().setFxInput(fx, instId, name, 0))
+    }, 140))
+  }
+  const taker: Taker = {
+    pointer: (ev) => {
+      if (ev.phase === 'up' || ev.phase === 'cancel') return
+      if (ev.phase === 'move' && !spec.drag) return
+      const live = ev.pid !== MOUSE_PID
+      const u01 = Math.max(0, Math.min(1, ev.u))
+      const v01 = Math.max(0, Math.min(1, ev.v))
+      set(u01, v01, live)
+      if (ev.phase === 'down' && spec.fire) fire(spec.fire)
+    },
+    pointerHint: () => spec.hint
+  }
+  if (isfTakers.size > 64) isfTakers.clear() // (units come and go : never a long list)
+  isfTakers.set(key, { sid, taker })
+  return taker
+}
+/** An effect unit's taker : a native node's own, or an ISF effect's by its entry. */
+function fxTaker(comp: Compositor, fx: FxScope, instId: string): Taker | null {
+  return comp.pointerFx(fx, instId) ?? isfTaker(fx, instId)
 }
 
 function rackUnits(fx: FxScope): FxInstance[] {
@@ -101,7 +159,7 @@ function fxIn(comp: Compositor, fx: FxScope): { t: Target; eng: Taker; shaderId:
   for (let i = units.length - 1; i >= 0; i--) {
     const u = units[i]
     if (!u.enabled || !u.shaderId) continue
-    const eng = comp.pointerFx(fx, u.id)
+    const eng = fxTaker(comp, fx, u.id)
     if (eng) return { t: { fx, instId: u.id }, eng, shaderId: u.shaderId }
   }
   return null
@@ -122,7 +180,7 @@ function findTarget(): { t: Target; eng: Taker; shaderId: string } | null {
   const sel = st.selection
   // the selected effect or source first
   if (sel?.type === 'fx') {
-    const eng = comp.pointerFx(sel.scope, sel.instId)
+    const eng = fxTaker(comp, sel.scope, sel.instId)
     const u = rackUnits(sel.scope).find((x) => x.id === sel.instId)
     if (eng && u?.shaderId && u.enabled) return { t: { fx: sel.scope, instId: sel.instId }, eng, shaderId: u.shaderId }
   } else if (sel?.type === 'source') {

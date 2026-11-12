@@ -21,12 +21,14 @@ import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
 import { fxArrayFor, modTargetKey, useStore, type FxScope } from '../store'
 import { controlKey } from '../modKey'
-import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound } from './AutoControls'
+import { AutoControls, AssignContext, AssignRow, ColorPartSwitch, ModButton, useBound, useOnMacro } from './AutoControls'
 import { GroupedControls, CONTROL_GROUPS, groupDim } from './GroupedControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { CapturePicker } from './CapturePicker'
 import { AvfReadout, DevicePicker } from './DevicePicker'
 import { NdiInReadout, NdiPicker } from './NdiPicker'
+import { ShareInReadout, SharePicker } from './SharePicker'
+import { shareInName, shareInSpec } from '@shared/shareIn'
 import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { SourceFraming } from './SourceFraming'
@@ -93,6 +95,8 @@ const NODE_INPUTS: Record<string, NodeInput[]> = {
   'node-fieldstore': [{ label: 'key from', hint: 'its brightness decides where the store is written (with key : sidechain)', none: 'self' }],
   'node-codecmosh': [{ label: 'motion from', hint: 'its movement paints this layer (with motion from sidechain on)', none: 'none' }],
   'node-inflate': [{ label: 'reflects', hint: 'the layer the metal reflects, or the glass bends', none: 'none' }],
+  'node-reaction': [{ label: 'steered by', hint: 'its brightness or colors, its edges and its motion grow the pattern (this layer is what it shows)', none: 'self' }],
+  'node-fluid': [{ label: 'moved by', hint: 'its motion and its light push the water (this layer is what the water carries)', none: 'self' }],
   'node-silhouette': [
     {
       label: 'fill',
@@ -123,6 +127,7 @@ export function Inspector(): JSX.Element {
   const [switchCapture, setSwitchCapture] = useState(false)
   const [switchDevice, setSwitchDevice] = useState(false)
   const [switchNdi, setSwitchNdi] = useState(false)
+  const [switchShare, setSwitchShare] = useState(false)
   // The mod-assign side panel: which parameter's M was clicked (null = closed),
   // and its draggable width (persisted).
   const [assign, setAssign] = useState<{ target: ModTarget; label: string } | null>(null)
@@ -395,11 +400,12 @@ export function Inspector(): JSX.Element {
   }
   const fxOpaKey = fxOpaTarget ? modTargetKey(fxOpaTarget) : null
   const fxOpaModulated = fxOpaBound.length > 0
+  const fxOpaMacro = useOnMacro(fxOpaKey)
   useEffect(() => {
     const el = fxOpaRef.current
-    if (!fxOpaModulated || !fxOpaKey || !el) return
+    if (!(fxOpaModulated || fxOpaMacro) || !fxOpaKey || !el) return
     return registerLiveOverlay({ el, key: fxOpaKey, format: (x) => String(x) })
-  }, [fxOpaModulated, fxOpaKey])
+  }, [fxOpaModulated, fxOpaMacro, fxOpaKey])
 
   // A stable identity for the preset picker : distinct per selected FX unit /
   // source slot / background, so it never bleeds an applied name between two
@@ -432,7 +438,9 @@ export function Inspector(): JSX.Element {
       const isHive = vslot?.kind === 'hive'
       const capId = vslot?.mediaId ?? ''
       const isNdi = capId.startsWith('ndi:')
-      const isDevice = capId.startsWith('device:') || isNdi
+      const shareName = isCap ? shareInName(capId) : null
+      const isShare = shareName !== null
+      const isDevice = capId.startsWith('device:') || isNdi || isShare
       const isScreen = isCap && !isDevice && capId !== 'webcam'
       const isAsm = vslot?.kind === 'assemble'
       const icon = isAsm
@@ -441,6 +449,8 @@ export function Inspector(): JSX.Element {
           ? '📡'
           : !isCap
             ? '🎞'
+            : isShare
+              ? '⧉'
             : isDevice
               ? '🎥'
               : capId === 'webcam'
@@ -466,7 +476,7 @@ export function Inspector(): JSX.Element {
             )}
             {isDevice && (
               <button
-                onClick={() => (isNdi ? setSwitchNdi(true) : setSwitchDevice(true))}
+                onClick={() => (isNdi ? setSwitchNdi(true) : isShare ? setSwitchShare(true) : setSwitchDevice(true))}
                 className="shrink-0 rounded border border-accent/50 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent transition-colors hover:bg-accent/20"
                 title="Choose a different live input device"
               >
@@ -490,6 +500,7 @@ export function Inspector(): JSX.Element {
             )}
           </div>
           {isNdi && <NdiInReadout name={capId.slice(4)} />}
+          {isShare && <ShareInReadout name={shareName} />}
           {capId.startsWith('device:avf:') && <AvfReadout id={capId.slice('device:avf:'.length)} />}
           {switchCapture && (
             <CapturePicker
@@ -498,6 +509,15 @@ export function Inspector(): JSX.Element {
                 setSwitchCapture(false)
               }}
               onCancel={() => setSwitchCapture(false)}
+            />
+          )}
+          {switchShare && (
+            <SharePicker
+              onPick={(name) => {
+                setSourceCapture(selection.layer, selection.slot, shareInSpec(name, window.api.platform), name)
+                setSwitchShare(false)
+              }}
+              onCancel={() => setSwitchShare(false)}
             />
           )}
           {switchNdi && (

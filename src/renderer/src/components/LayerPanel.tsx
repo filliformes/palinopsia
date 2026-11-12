@@ -9,14 +9,14 @@ import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyle
 import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { DEFAULT_LAYER_VARY, LOOP_BLENDS, LOOP_SYNCS, LOOP_SYNC_NAMES, type LoopBlend } from '@shared/types'
 import { LOOP_DELAY_MAX_MS } from '../engine/loopDelay'
-import { LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
+import { LOOP_GROUPS, LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
 import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
 import { BlendSelect } from './BlendSelect'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { makeDefaultMask, modTargetKey, useStore } from '../store'
-import { AssignRow } from './AutoControls'
+import { AssignRow, useOnMacro } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { useModSlide } from './useModSlide'
 import { showToast } from './Toast'
@@ -27,10 +27,13 @@ import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
 import { NdiPicker } from './NdiPicker'
+import { SharePicker } from './SharePicker'
+import { shareInName, shareInSpec, shareInKind } from '@shared/shareIn'
 import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MeshBadge } from './MeshBadge'
 import { MarginLabel } from './MarginLabel'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -88,7 +91,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   // (a scene saved before the Loop rack holds none)
   const loopFx = layer.loopFx ?? []
   const loopOn = loopFx.filter((f) => f.enabled).length
-  const recipe = loopRecipeOf(loopFx, layer.loopBlend)
+  const recipe = loopRecipeOf(loopFx, layer.loopBlend, layer)
   // the loop's delay as it plays : beats on the tempo when synced, else its ms
   const loopSync = layer.loopSync ?? 0
   const delayMs = loopSync > 0 ? Math.min(LOOP_DELAY_MAX_MS, Math.round((loopSync * 60000) / Math.max(1, bpm || 120))) : layer.loopDelay ?? 0
@@ -111,6 +114,10 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   const varyBound = boundFor('vary').length > 0
   const mixBound = boundFor('mix').length > 0
   const blendBound = boundFor('blend').length > 0
+  // a Macro knob on them : the slider follows the knob as it moves
+  const opacityMacro = useOnMacro(modTargetKey(layerTarget('opacity')))
+  const mixMacro = useOnMacro(modTargetKey(layerTarget('mix')))
+  const blendMacro = useOnMacro(modTargetKey(layerTarget('blend')))
   const hasB = !!layer.sourceB && layer.sourceB.kind !== 'none'
   const coupled = couplingOn && hasB && layer.coupling.mode !== 'off'
   const opacityRef = useRef<HTMLInputElement | null>(null)
@@ -125,13 +132,13 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   blendBase.current = layer.blend
   useEffect(() => {
     const offs: Array<() => void> = []
-    if (opacityBound && opacityRef.current)
+    if ((opacityBound || opacityMacro) && opacityRef.current)
       offs.push(registerLiveOverlay({ el: opacityRef.current, key: modTargetKey(layerTarget('opacity')), format: (x) => String(x) }))
-    if (mixBound && mixRef.current)
+    if ((mixBound || mixMacro) && mixRef.current)
       offs.push(registerLiveOverlay({ el: mixRef.current, key: modTargetKey(layerTarget('mix')), format: (x) => String(x) }))
     // (the blend menu in the drawer shows its live mode itself : BlendSelect)
     const tab = blendTabRef.current
-    if (blendBound && tab) {
+    if ((blendBound || blendMacro) && tab) {
       const show = (m: string): void => {
         if (tab.textContent !== m) tab.textContent = m
       }
@@ -139,7 +146,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
     }
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opacityBound, mixBound, blendBound, collapsed, index, outTab])
+  }, [opacityBound, mixBound, blendBound, opacityMacro, mixMacro, blendMacro, collapsed, index, outTab])
 
   // The M chip beside a layer control : accent when bound, accent2 while its
   // binding row is open. Right-click clears every modulation on that field.
@@ -274,6 +281,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           />
         </span>
         </PinZone>
+        <MeshBadge dest={`layer/${index + 1}/opacity`} />
         {modChip('opacity', 'layer opacity')}
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
@@ -438,6 +446,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       ≈
                     </button>
                   )}
+                  <MeshBadge dest={`layer/${index + 1}/mix`} />
                   {modChip('mix', 'A-B mix')}
                 </div>
                 {modAssign('mix')}
@@ -518,7 +527,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                           className={`input select-compact min-w-0 flex-1 text-[11px] ${blendBound ? 'text-accent2 ring-1 ring-accent2' : ''}`}
                           value={layer.blend}
                           onChange={(m) => setBlend(index, m)}
-                          liveKey={blendBound ? modTargetKey(layerTarget('blend')) : undefined}
+                          liveKey={blendBound || blendMacro ? modTargetKey(layerTarget('blend')) : undefined}
                         />
                         </PinZone>
                         {modChip('blend', 'blend mode')}
@@ -581,10 +590,15 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                         <option value="" disabled>
                           {loopFx.length ? 'own loop' : 'recipes'}
                         </option>
-                        {LOOP_RECIPES.map((r) => (
-                          <option key={r.id} value={r.id} title={r.blurb}>
-                            {r.name}
-                          </option>
+                        {/* in groups : the plain feedback loops, the glitch loops, the echoes */}
+                        {LOOP_GROUPS.map((g) => (
+                          <optgroup key={g.label} label={g.label}>
+                            {LOOP_RECIPES.filter((r) => r.group === g.group).map((r) => (
+                              <option key={r.id} value={r.id} title={r.blurb}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </Row>
@@ -685,6 +699,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               Vary
               <Blink n={varyPulse} color="accent2" />
             </button>
+            <MeshBadge dest={`layer/${index + 1}/vary`} />
             {modChip('vary', 'Vary (a modulator fires it)')}
             <input
               type="range"
@@ -1023,6 +1038,7 @@ function SourceRow({
   const [showCapture, setShowCapture] = useState(false)
   const [showDevices, setShowDevices] = useState(false)
   const [showNdi, setShowNdi] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [showHive, setShowHive] = useState(false)
   // ffmpeg import conversion (DXV3 / HAP / ProRes → all-intra cache) : 0..1, null = idle.
   const [converting, setConverting] = useState<number | null>(null)
@@ -1107,6 +1123,8 @@ function SourceRow({
             ? '__cap_live__'
             : mediaId?.startsWith('ndi:')
               ? '__cap_ndi__'
+              : shareInName(mediaId) !== null
+                ? '__cap_share__'
             : '__cap_screen__'
         : (shaderId ?? '')
   const active = isVideo || isAudio || isCapture || isHive || isAsm || isLoop || !!shaderId
@@ -1204,6 +1222,16 @@ function SourceRow({
             { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
             { value: '__cap_ndi__', label: 'NDI Input…', prefix: '📶 ', group: 'live', title: 'An NDI® source on the network : a camera, a phone, OBS, NDI Tools, another Palinopsia' },
+            ...(shareInKind(window.api.platform)
+              ? [{
+                  value: '__cap_share__',
+                  label: 'Spout / Syphon Input…',
+                  prefix: '⧉ ',
+                  group: 'live',
+                  keywords: ['spout', 'syphon', 'texture', 'share', 'local', 'program', 'app'],
+                  title: `Another program's picture on this computer (its ${shareInKind(window.api.platform)} output) at full quality, shared on the graphics card : no compression, almost no delay`
+                }]
+              : []),
             { value: '__cap_screen__', label: 'Screen…', prefix: '🖥 ', group: 'live' },
             { value: '__cap_hive__', label: 'HIVE stream…', prefix: '📡 ', group: 'live' },
             // A Loop source : a layer's picture (its last frame for this layer and
@@ -1240,6 +1268,7 @@ function SourceRow({
             else if (v === '__cap_screen__') setShowCapture(true)
             else if (v === '__cap_live__') setShowDevices(true)
             else if (v === '__cap_ndi__') setShowNdi(true)
+            else if (v === '__cap_share__') setShowShare(true)
             else if (v === '__cap_hive__') setShowHive(true)
             // Assemblage… : the latest saved edit (or a fresh one from the corpus)
             // right here, selected so the Inspector shows how it plays; the tab
@@ -1299,6 +1328,15 @@ function SourceRow({
             setShowNdi(false)
           }}
           onCancel={() => setShowNdi(false)}
+        />
+      )}
+      {showShare && (
+        <SharePicker
+          onPick={(name) => {
+            onPickCapture(shareInSpec(name, window.api.platform), name)
+            setShowShare(false)
+          }}
+          onCancel={() => setShowShare(false)}
         />
       )}
       {showDevices && (

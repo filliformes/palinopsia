@@ -11,7 +11,7 @@ import type { AuModTarget } from '@shared/auMod'
 import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { VideoTransport } from './VideoTransport'
-import { AssignRow, useBound } from './AutoControls'
+import { AssignRow, useBound, useOnMacro } from './AutoControls'
 import { registerLiveOverlay } from './liveOverlay'
 import { useModSlide } from './useModSlide'
 import { modTargetKey, useStore } from '../store'
@@ -606,8 +606,9 @@ function AuSlider({ target, value, min, max, set, onDoubleClick, className, titl
   const ref = useRef<HTMLInputElement | null>(null)
   const key = modTargetKey(target)
   const bound = useBound(key).length > 0
+  const onMacro = useOnMacro(key)
   const slide = useModSlide(bound, value, min, max, set)
-  useEffect(() => (bound && ref.current ? registerLiveOverlay({ el: ref.current, key, format: (x) => String(x) }) : undefined), [bound, key])
+  useEffect(() => ((bound || onMacro) && ref.current ? registerLiveOverlay({ el: ref.current, key, format: (x) => String(x) }) : undefined), [bound, onMacro, key])
   return (
     <input
       ref={ref}

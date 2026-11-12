@@ -51,6 +51,7 @@ import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
 import {
   GROUP_PREFIX,
+  GROUP_TUNE_DEFAULT,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT as LIGHT_LOOK_DEFAULT,
   profilePatch,
@@ -76,7 +77,7 @@ import {
   type LightsSession,
   type LightTune
 } from '@shared/lights'
-import { addressedInOrder, chainOf, duplicate, kindPatch, loadSetupName, loadSetups, persistSetupName, persistSetups, readSetup, withProfile, type LightSetup, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
+import { addressedInOrder, chainOf, lightsFromLine, duplicate, kindPatch, loadSetupName, loadSetups, persistSetupName, persistSetups, readSetup, withProfile, type LightSetup, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
@@ -553,6 +554,44 @@ export function clearFinalizerFilm(c: CompositionState): CompositionState {
         ? { ...f, inputs: { ...Object.fromEntries(Object.entries(f.inputs).filter(([k]) => !film.has(k))), filmGauge: 1 } }
         : f
     )
+  }
+}
+
+// ── A camera's mirror, per camera, on this computer ──
+// A camera opens in the SELFIE view (turned left to right : raise your left arm,
+// it shows on the left of the screen), as a performer in front of it expects;
+// the picture as a camera sends it is the other way round. The mirror chosen in
+// a camera's framing is kept for THAT camera (by its name) and used every time it
+// is opened again here : a capture card or a camera filming the stage is set to
+// off once. Screens and NDI are left alone (never mirrored by default).
+const CAMERA_MIRROR_KEY = 'opsia.cameraMirror'
+type Mirror = 'off' | 'x' | 'y' | 'xy'
+function cameraKeyOf(spec: string, name: string): string | null {
+  if (spec === 'webcam') return 'webcam'
+  if (spec.startsWith('device:') && !spec.startsWith('device:avf:')) return `device:${name || spec.slice(7)}`
+  if (spec.startsWith('device:avf:')) return spec
+  return null
+}
+function cameraMirror(spec: string, name: string): Mirror | null {
+  const k = cameraKeyOf(spec, name)
+  if (!k) return null
+  try {
+    const v = (JSON.parse(localStorage.getItem(CAMERA_MIRROR_KEY) ?? '{}') as Record<string, Mirror>)[k]
+    if (v === 'x' || v === 'y' || v === 'xy' || v === 'off') return v
+  } catch {
+    /* storage blocked : the default */
+  }
+  return 'x' // the selfie view
+}
+function rememberCameraMirror(spec: string, name: string, m: Mirror): void {
+  const k = cameraKeyOf(spec, name)
+  if (!k) return
+  try {
+    const all = JSON.parse(localStorage.getItem(CAMERA_MIRROR_KEY) ?? '{}') as Record<string, Mirror>
+    all[k] = m
+    localStorage.setItem(CAMERA_MIRROR_KEY, JSON.stringify(all))
+  } catch {
+    /* storage blocked : this time only */
   }
 }
 
@@ -1275,7 +1314,9 @@ export function normalizeComposition(c: CompositionState): CompositionState {
         return {
           ...x, steps: sanitizeSteps(x.steps), body: sanitizeBodyMod(x.body, d.body),
           controller: { ...d.controller, ...(x.controller ?? {}) },
-          ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {})
+          ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {}),
+          // a mesh input (dataflou) : whole, or none
+          mesh: x.mesh && typeof x.mesh.sku === 'string' && typeof x.mesh.path === 'string' ? { sku: x.mesh.sku, path: x.mesh.path, label: String(x.mesh.label ?? x.mesh.path).slice(0, 40) } : undefined
         }
       })
     })(),
@@ -1295,7 +1336,14 @@ export function normalizeComposition(c: CompositionState): CompositionState {
     // `destinations`) can't leave it undefined.
     metaKnobs: (() => {
       const k = c.metaKnobs ?? []
-      return makeDefaultMetaKnobs().map((d, i) => ({ ...d, ...(k[i] ?? {}) }))
+      // a range outside 0..1 (or not a number) : the full range
+      const r = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined)
+      return makeDefaultMetaKnobs().map((d, i) => {
+        const m = { ...d, ...(k[i] ?? {}) }
+        const min = r(m.min), max = r(m.max)
+        delete m.min; delete m.max
+        return { ...m, ...(min !== undefined && min !== 0 ? { min } : {}), ...(max !== undefined && max !== 1 ? { max } : {}) }
+      })
     })()
   })
 }
@@ -1473,7 +1521,9 @@ function buildThemeComposition(theme: Theme, clips: CollageClips | null): Compos
     l.feedback = R() < theme.feedback
     l.feedbackAmount = rr(0.4, 0.75)
     // a loop of the theme's : effects that compound inside the feedback
-    const loop = l.feedback && theme.loops?.length && R() < (theme.loopChance ?? 0.6) ? LOOP_RECIPE_BY_ID[pickOf(theme.loops)] : undefined
+    // (a menu-only recipe, dice: false, is never dealt here either)
+    const dealable = (theme.loops ?? []).filter((id) => LOOP_RECIPE_BY_ID[id] && LOOP_RECIPE_BY_ID[id].dice !== false)
+    const loop = l.feedback && dealable.length && R() < (theme.loopChance ?? 0.6) ? LOOP_RECIPE_BY_ID[pickOf(dealable)] : undefined
     if (loop) Object.assign(l, loopFromRecipe(loop))
     l.speed = rr(0.6, 1.6)
     return l
@@ -2009,6 +2059,8 @@ interface StoreState {
   /** `n` lights of one kind in a chain : on the Enttec output (made if none), in a
    *  row, addressed one after the other (the Set up guide). */
   addLightChain: (profile: LightProfile, n: number) => void
+  /** Lights on the map for what answered on the line (RDM), at their own addresses. */
+  addLightsFromLine: (out: string, devs: Array<{ name: string; address: number; profile: LightProfile }>) => void
   /** Several lights changed in one go (a drag of the picked ones : one write). */
   updateLightFixtures: (list: Array<[string, Partial<LightFixture>]>) => void
   setLightKind: (id: string, kind: LightKind) => void
@@ -2760,6 +2812,17 @@ function updateFxArray(
   }
 }
 
+/** Some inputs of one FX unit set, immutably (the pointer's live writes, undo.ts
+ *  writeLive : the same change made to the store and to the undo baseline). */
+export function withFxInputs(
+  c: CompositionState,
+  scope: FxScope,
+  instId: string,
+  inputs: Record<string, number | number[]>
+): CompositionState {
+  return updateFxArray(c, scope, (fx) => fx.map((f) => (f.id === instId ? { ...f, inputs: { ...f.inputs, ...inputs } } : f)))
+}
+
 // Startup: seed a random one-layer scene, then apply the active World so the
 // composition matches the World selector on a cold launch (else it'd say e.g.
 // "Musical" while the layers are uncoupled).
@@ -3423,7 +3486,9 @@ export const useStore = create<StoreState>((set, get) => ({
               shaderId: null,
               inputs: {},
               mediaId: spec,
-              mediaName: name
+              mediaName: name,
+              // the way this camera was last turned on this computer (set once)
+              ...((m) => (m ? { mirror: m } : {}))(cameraMirror(spec, name))
             }
             if (slot === 'A') return { ...l, sourceA: cap, sourceAFx: [] }
             return { ...l, sourceB: cap, sourceBFx: [] }
@@ -3674,6 +3739,8 @@ export const useStore = create<StoreState>((set, get) => ({
           // video / capture only : Compositor.setFraming).
           if (!cur || (cur.kind !== 'video' && cur.kind !== 'capture' && cur.kind !== 'assemble' && cur.kind !== 'hive')) return l
           const next = { ...cur, ...patch }
+          // a camera's mirror is remembered for that camera, on this computer
+          if (patch.mirror && cur.kind === 'capture') rememberCameraMirror(cur.mediaId ?? '', cur.mediaName ?? '', patch.mirror)
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }
@@ -4963,10 +5030,12 @@ export const useStore = create<StoreState>((set, get) => ({
         id: sid,
         name: `Cue ${L.scenes.length + 1}`,
         looks: { ...L.looks, ...Object.fromEntries(s.lightRig.fixtures.map((f) => [f.id, L.looks[f.id] ?? LIGHT_LOOK_DEFAULT])) },
-        master: { brightness: L.master.brightness, speed: L.master.speed },
+        // (every master the console shows, every group's grade and, when the tuning
+        // travels with the look, every light's : a neutral one comes back neutral)
+        master: { brightness: L.master.brightness, speed: L.master.speed, gain: L.master.gain, saturation: L.master.saturation, contrast: L.master.contrast },
         groups: { ...(L.groups ?? {}), ...Object.fromEntries(s.lightRig.groups.map((g) => [g.id, L.groups?.[g.id] ?? 1])) },
-        ...(L.groupTunes ? { groupTunes: { ...L.groupTunes } } : {}),
-        ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}) } } : {})
+        groupTunes: { ...(L.groupTunes ?? {}), ...Object.fromEntries(s.lightRig.groups.map((g) => [g.id, L.groupTunes?.[g.id] ?? GROUP_TUNE_DEFAULT])) },
+        ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...Object.fromEntries(s.lightRig.fixtures.map((f) => [f.id, L.tunes?.[f.id] ?? f.tune])) } } : {})
       }
       return { lightsSession: { ...L, scenes: [...L.scenes, scene] } }
     }),
@@ -4993,7 +5062,19 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   renameLightScene: (id, name) =>
     set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) || x.name } : x)) } })),
-  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: s.lightCue === id ? null : s.lightCue })),
+  deleteLightScene: (id) => {
+    const s = get()
+    const at = s.lightsSession.scenes.findIndex((x) => x.id === id)
+    const inPlay = s.lightCue === id
+    set((q) => ({ lightsSession: { ...q.lightsSession, scenes: q.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: q.lightCue === id ? null : q.lightCue }))
+    // (the cue in play deleted while they follow on : the one after it goes, or
+    // following stops when nothing is left to follow)
+    if (inPlay && s.lightCueRun) {
+      const list = get().lightsSession.scenes
+      if (list.length && list.some((c) => (c.follow ?? 0) > 0)) get().recallLightScene(list[Math.max(0, at) % list.length].id)
+      else set({ lightCueRun: false })
+    }
+  },
   applyLightShow: (id, ids) =>
     set((s) => {
       const layers = s.composition.layers.map((l, i) => ((l.sourceA.shaderId || l.sourceA.kind !== 'none' || l.sourceB) && !l.mute ? i : -1)).filter((i) => i >= 0)
@@ -5054,6 +5135,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const done = new Map(addressedInOrder(s.lightRig, out).map((f) => [f.id, f]))
       return { lightRig: persistRig({ ...s.lightRig, fixtures: s.lightRig.fixtures.map((f) => done.get(f.id) ?? f) }) }
     }),
+  addLightsFromLine: (out, devs) =>
+    set((s) => ({ lightRig: persistRig(sanitizeRig(lightsFromLine(s.lightRig, out, devs.map((d) => ({ ...d, profile: sanitizeProfile(d.profile) }))))), lightSel: null, lightPicked: [] })),
   addLightChain: (profile, n) =>
     set((s) => ({ lightRig: persistRig(sanitizeRig(chainOf(s.lightRig, sanitizeProfile(profile), n))), lightSel: null, lightPicked: [] })),
   addLightRow: (id, n, dir) =>
@@ -6359,6 +6442,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   sequenceTo: (id, variation, crossfadeMs) => {
     let sound = null as SoniConfig | null
+    let went = false
     set((s) => {
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
@@ -6382,6 +6466,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
         sound = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
       }
+      went = true
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     })
     // The sound lands inside this same call, after the composition : the
@@ -6390,6 +6475,12 @@ export const useStore = create<StoreState>((set, get) => ({
     if (sound) {
       sonifyEngine.loadingSound() // (a line-in closed now stays closed : sonify.ts)
       get().setSonify(sound)
+    }
+    // a light cue tied to this scene goes with it (here too, as recallScene does :
+    // inside this call, so the sequencer's silence covers it)
+    if (went) {
+      const cue = get().lightsSession.scenes.find((c) => c.link === id)
+      if (cue) get().recallLightScene(cue.id)
     }
   },
   sequencePageOpen: false,

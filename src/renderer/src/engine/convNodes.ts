@@ -16,6 +16,11 @@ import { SilhouetteNode } from './silhouetteNode'
 import { FieldStoreNode } from './fieldStore'
 import { InflateNode } from './inflateNode'
 import { DrapeNode } from './drapeNode'
+import { TouchNode } from './touchNode'
+import { RippleNode } from './rippleNode'
+import { MorphogenNode } from './morphogenNode'
+import { CurrentNode } from './currentNode'
+import { F_DOWNSAMPLE, F_FLOW, F_BLUR } from './pictureFlow'
 import { domeFill } from './domeSignal'
 // The dome's disc helpers, shared with the ISF shaders' "// @dome" (Feedback).
 import DOME_GLSL from '../shaders/isf/lib/dome.glsl?raw'
@@ -70,57 +75,8 @@ vec4 mixStraight(vec4 a, vec4 b, float t){
   return vec4(c.a > 1e-5 ? c.rgb / c.a : a.rgb, max(a.a, c.a));
 }`
 
-// Luma of the flow source at flow resolution. uBox > 0 averages a 4×4 grid over
-// the output texel's footprint (a box prefilter : fine texture no longer aliases
-// into flow noise); 0 = one bilinear tap.
-const F_DOWNSAMPLE = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uTex; uniform float uBox;
-float lum(vec2 uv){ return dot(texture(uTex, uv).rgb, vec3(0.299,0.587,0.114)); }
-void main(){
-  float l = 0.0;
-  if (uBox > 0.0) {
-    for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
-      vec2 d = (vec2(float(i), float(j)) - 1.5) * 0.25 * uBox;
-      vec2 uv = vUV + d;
-      l += lum(uv);
-    }
-    l *= 0.0625;
-  } else l = lum(vUV);
-  o = vec4(l, 0.0, 0.0, 1.0);
-}`
-
-// Gradient (poor-man's Lucas–Kanade) flow : RG = flow vector, in texels of a
-// 256-wide field whatever the flow resolution (uScale = 256/res), so the flow-res
-// dial is a quality knob, not a hidden gain.
-const F_FLOW = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uCur, uPrev; uniform vec2 uRes; uniform float uLambda, uClamp, uScale;
-void main(){
-  vec2 texel = 1.0 / uRes;
-  float c = texture(uCur, vUV).r;
-  float p = texture(uPrev, vUV).r;
-  float dx = texture(uCur, vUV + vec2(texel.x,0.0)).r - texture(uCur, vUV - vec2(texel.x,0.0)).r;
-  float dy = texture(uCur, vUV + vec2(0.0,texel.y)).r - texture(uCur, vUV - vec2(0.0,texel.y)).r;
-  float dt = c - p;
-  vec2 grad = vec2(dx, dy) * 0.5;
-  float mag2 = dot(grad, grad) + uLambda;
-  vec2 flow = -dt * grad / mag2 * uScale;
-  o = vec4(clamp(flow, -uClamp, uClamp), 0.0, 1.0);
-}`
-
-// Separable blur on the flow field (dynamic radius : WebGL2 allows it).
-const F_BLUR = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uTex; uniform vec2 uStep; uniform float uRadius;
-void main(){
-  vec2 acc = vec2(0.0); float wsum = 0.0; int R = int(uRadius);
-  for (int i = -R; i <= R; i++){
-    float w = 1.0 - abs(float(i)) / (uRadius + 1.0);
-    acc += texture(uTex, vUV + uStep * float(i)).rg * w; wsum += w;
-  }
-  o = vec4(acc / max(wsum, 1e-4), 0.0, 1.0);
-}`
+// The flow pipeline's first three passes (luma, gradient flow, blur) live in
+// pictureFlow.ts, shared with the field effects (Morphogen, Current).
 
 // Temporal smoothing / inertia: state = mix(prevState, newFlow, response).
 const F_CONDITION = `#version 300 es
@@ -5231,9 +5187,13 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-silhouette') return new SilhouetteNode(gl)
   if (shaderId === 'node-inflate') return new InflateNode(gl)
   if (shaderId === 'node-drape') return new DrapeNode(gl)
+  if (shaderId === 'node-touch') return new TouchNode(gl)
+  if (shaderId === 'node-ripple') return new RippleNode(gl)
+  if (shaderId === 'node-reaction') return new MorphogenNode(gl)
+  if (shaderId === 'node-fluid') return new CurrentNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-drape', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
+export const NATIVE_NODE_IDS = ['node-reaction', 'node-fluid', 'node-drape', 'node-touch', 'node-ripple', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

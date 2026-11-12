@@ -76,6 +76,32 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Occasional fault', values: { type: 4, rate: 0.8, sync: 0, dirt: 0.3, depth: 0.5, hold: 0.06 } }
   ],
   // ── Sillage (advected-noise feedback : IBFV wake) ──
+  // ── Field effects : Morphogen (reaction-diffusion) and Current (fluid) ──
+  'node-reaction': [
+    { name: 'Grown through', values: { look: 0, amount: 0.8, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Coral print', values: { look: 1, amount: 0.9, mix: 1, steer: 0, bias: 0.4, feed: 0.0545, kill: 0.062, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.86, 0.8, 0.7, 1], relief: 0.6, lightAngle: 2.36 } },
+    { name: 'Ink maze', values: { look: 1, amount: 0.95, mix: 1, steer: 0, bias: 0.5, feed: 0.029, kill: 0.057, plant: 0.4, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.55, rate: 2, sharp: 0.5, ink: [0.07, 0.07, 0.08, 1], relief: 0.35, lightAngle: 2.36 } },
+    { name: 'Carved', values: { look: 2, amount: 0.75, mix: 1, steer: 0, bias: 0.8, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2 } },
+    { name: 'Spotted matte', values: { look: 3, amount: 0.9, mix: 1, steer: 0, bias: 0.6, feed: 0.03, kill: 0.062, plant: 0.35, plantFrom: 2, seed: 0.25, follow: 0.6, scale: 0.5, rate: 2, sharp: 0.7, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Lens of cells', values: { look: 4, amount: 0.6, mix: 1, steer: 0, bias: 0.5, feed: 0.0367, kill: 0.0649, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.35, rate: 2, sharp: 0.6, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Edges grow', values: { look: 0, amount: 0.85, mix: 1, steer: 0, bias: 0.3, feed: 0.0456, kill: 0.0635, plant: 0.9, plantFrom: 0, seed: 0.02, follow: 0.5, scale: 0.55, rate: 2, sharp: 0.65, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Motion bloom', values: { look: 0, amount: 0.75, mix: 1, steer: 0, bias: 0.5, feed: 0.0456, kill: 0.0635, plant: 0.8, plantFrom: 1, seed: 0.05, follow: 0.9, scale: 0.5, rate: 2.5, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+    { name: 'Warm and cool', values: { look: 0, amount: 0.85, mix: 1, steer: 1, bias: 0.9, feed: 0.0456, kill: 0.0635, plant: 0.4, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.55, lightAngle: 2.36 } },
+    { name: 'Lights bloom', values: { look: 1, amount: 0.85, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.7, plantFrom: 2, seed: 0.1, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.92, 0.9, 0.85, 1], relief: 0.45, lightAngle: 2.36 } },
+    { name: 'Still mitosis', values: { look: 0, amount: 0.7, mix: 1, steer: 2, bias: 0, feed: 0.0367, kill: 0.0649, plant: 0.2, plantFrom: 0, seed: 0.3, follow: 0, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.6, lightAngle: 2.36 } }
+  ],
+  'node-fluid': [
+    { name: 'Stirred', values: { motion: 0.6, rise: 0, churn: 0.35, swirl: 0.5, viscosity: 0.2, memory: 0.6, keep: 0.4, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Marbled', values: { motion: 0.6, rise: 0, churn: 0.45, swirl: 0.7, viscosity: 0.2, memory: 0.9, keep: 0.1, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Smoke rise', values: { motion: 0.6, rise: 0.6, churn: 0.2, swirl: 0.6, viscosity: 0.2, memory: 0.7, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Sinking ink', values: { motion: 0.6, rise: -0.5, churn: 0.25, swirl: 0.55, viscosity: 0.2, memory: 0.75, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Dancer wake', values: { motion: 1, rise: 0, churn: 0.1, swirl: 0.6, viscosity: 0.2, memory: 0.55, keep: 0.6, mix: 1, detail: 0.5, rate: 1 } },
+    { name: 'Slow syrup', values: { motion: 0.6, rise: 0, churn: 0.3, swirl: 0.35, viscosity: 0.7, memory: 0.8, keep: 0.3, mix: 1, detail: 0.5, rate: 0.6 } },
+    { name: 'Fine curls', values: { motion: 0.6, rise: 0, churn: 0.4, swirl: 0.9, viscosity: 0.2, memory: 0.65, keep: 0.3, mix: 1, detail: 0.9, rate: 1 } },
+    { name: 'Broad tide', values: { motion: 0.6, rise: 0, churn: 0.6, swirl: 0.3, viscosity: 0.2, memory: 0.7, keep: 0.2, mix: 1, detail: 0.15, rate: 1 } },
+    { name: 'Light touch', values: { motion: 0.6, rise: 0, churn: 0.25, swirl: 0.5, viscosity: 0.2, memory: 0.4, keep: 0.7, mix: 0.6, detail: 0.5, rate: 1 } },
+    { name: 'Storm', values: { motion: 0.8, rise: 0, churn: 0.9, swirl: 0.9, viscosity: 0.2, memory: 0.8, keep: 0.1, mix: 1, detail: 0.5, rate: 1.4 } }
+  ],
   'node-ibfv': [
     { name: 'Soft wake', values: { flow: 0.4, inject: 0.15, scale: 0.4, scan: 1, field: 0.5, motion: 0.6, angle: 0, push: 0, swirl: 0.4, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.6, speed: 0.4, mix: 0.7 } },
     { name: 'Long smear', values: { flow: 0.7, inject: 0.06, scale: 0.35, scan: 1, field: 0.4, motion: 0.7, angle: 0, push: 0, swirl: 0.3, swirlX: 0.5, swirlY: 0.5, ground: 0, dye: 0.7, speed: 0.35, mix: 0.8 } },
@@ -391,6 +417,38 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: "Beat cloth", values: {mode: 2, size: 0.9, crumple: 0.35, gravity: 0.5, wind: 0.1, gust: 0.5, stiffness: 0.7, damping: 0.2, grab: 0.15, audio: 0.8, people: 0, material: 0, color: [0.08, 0.08, 0.09, 1], sheen: 0.5, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.15, behind: 0, rainbow: 0.25, flakes: 160, glint: 0.5} },
     { name: "Hung over the picture", values: {mode: 0, size: 0.7, crumple: 0.25, gravity: 0.5, wind: 0.2, gust: 0.5, stiffness: 0.7, damping: 0.25, grab: 0.15, audio: 0, people: 0, material: 0, color: [0.08, 0.08, 0.09, 1], sheen: 0.5, folds: 0.6, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.15, behind: 1, rainbow: 0.25, flakes: 160, glint: 0.5} },
     { name: "Foil sheet", values: {mode: 2, size: 0.9, crumple: 0.5, gravity: 0.5, wind: 0.1, gust: 0.3, stiffness: 0.7, damping: 0.25, grab: 0.15, audio: 0, people: 0, material: 4, color: [0.08, 0.08, 0.09, 1], sheen: 0.5, folds: 0.3, lightAngle: 2.36, lightHeight: 0.55, tilt: 0.2, behind: 0, rainbow: 0.5, flakes: 180, glint: 0.7} },
+  ],
+  // ── Touch (any picture pushed by the hand) : every preset sets every input ──
+  'node-touch': [
+    { name: "Hand push", values: {mode: 3, size: 0.18, strength: 0.6, follow: 0.75, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} },
+    { name: "Shockwave", values: {mode: 0, size: 0.2, strength: 0.75, follow: 1, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.5, width: 0.45, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.45, split: 0.15, mix: 1} },
+    { name: "Kick shockwave", values: {mode: 0, size: 0.2, strength: 0.8, follow: 1, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.6, width: 0.45, fireAt: 0, audio: 0.85, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.4, split: 0.2, mix: 1} },
+    { name: "Shocks anywhere", values: {mode: 0, size: 0.2, strength: 0.6, follow: 1, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.4, width: 0.5, fireAt: 2, audio: 0.7, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.35, split: 0.1, mix: 1} },
+    { name: "Wake of rings", values: {mode: 0, size: 0.2, strength: 0.55, follow: 0.6, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.35, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0.7, press: 0, point: [0.5, 0.5], shade: 0.4, split: 0, mix: 1} },
+    { name: "Jelly", values: {mode: 3, size: 0.25, strength: 0.7, follow: 0.6, fade: 0.4, spring: 0.9, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.35, split: 0, mix: 1} },
+    { name: "Smudge", values: {mode: 3, size: 0.12, strength: 0.9, follow: 1, fade: 0, spring: 0, soft: 0.1, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.2, split: 0, mix: 1} },
+    { name: "Whirlpool", values: {mode: 2, size: 0.3, strength: 0.7, follow: 0.7, fade: 0.25, spring: 0.2, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} },
+    { name: "Magnifier", values: {mode: 4, size: 0.2, strength: 0.6, follow: 0.55, fade: 0.4, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.15, split: 0.1, mix: 1} },
+    { name: "Black hole", values: {mode: 5, size: 0.3, strength: 0.8, follow: 0.5, fade: 0.3, spring: 0.3, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.5, split: 0, mix: 1} },
+    { name: "Plow", values: {mode: 1, size: 0.14, strength: 0.8, follow: 0.85, fade: 0.15, spring: 0.2, soft: 0.2, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.4, split: 0, mix: 1} },
+    { name: "Crowd wake", values: {mode: 3, size: 0.22, strength: 0.6, follow: 0.5, fade: 0.3, spring: 0.5, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0.9, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} },
+    { name: "Ghost hand", values: {mode: 3, size: 0.22, strength: 0.55, follow: 0.4, fade: 0.3, spring: 0.55, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0.7, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} },
+    { name: "Drifting lens", values: {mode: 4, size: 0.24, strength: 0.55, follow: 0.3, fade: 0.5, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0.8, press: 0, point: [0.5, 0.5], shade: 0.15, split: 0.12, mix: 1} },
+  ],
+  // ── Ripple (the picture seen through water) : every preset sets every input ──
+  'node-ripple': [
+    { name: "Pond", values: {rain: 0.25, dropSize: 0.35, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.35, edges: 0, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Downpour", values: {rain: 0.85, dropSize: 0.2, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.45, calm: 0.55, edges: 0, refract: 0.45, split: 0.15, shade: 0.3, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Still water", values: {rain: 0, dropSize: 0.35, audio: 0, motion: 0, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.2, edges: 0, refract: 0.6, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Kick drops", values: {rain: 0.05, dropSize: 0.35, audio: 0.9, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.5, calm: 0.3, edges: 0, refract: 0.6, split: 0.15, shade: 0.4, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Beat rain", values: {rain: 0.1, dropSize: 0.35, audio: 0.8, motion: 0.25, people: 0, wander: 0, stoneAt: 2, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.45, calm: 0.4, edges: 0, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Moving water", values: {rain: 0.05, dropSize: 0.35, audio: 0, motion: 0.8, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.45, edges: 0, refract: 0.55, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Bath", values: {rain: 0.1, dropSize: 0.7, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.35, calm: 0.1, edges: 0, refract: 0.55, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Shore", values: {rain: 0.4, dropSize: 0.35, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.3, edges: 1, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Wading room", values: {rain: 0.05, dropSize: 0.5, audio: 0, motion: 0.2, people: 0.9, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.35, edges: 0, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+    { name: "Ink water", values: {rain: 0.3, dropSize: 0.35, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.35, edges: 0, refract: 0.5, split: 0.3, shade: 0.4, lightAngle: 2.36, tint: [0.3, 0.45, 0.5, 1], deep: 0.45, mix: 1} },
+    { name: "Mercury pool", values: {rain: 0.15, dropSize: 0.6, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.25, calm: 0.15, edges: 0, refract: 0.8, split: 0, shade: 0.55, lightAngle: 2.36, tint: [0.7, 0.72, 0.75, 1], deep: 0.2, mix: 1} },
+    { name: "Boat wake", values: {rain: 0, dropSize: 0.45, audio: 0, motion: 0.1, people: 0, wander: 0.8, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.3, edges: 0, refract: 0.55, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
   ],
   'node-inflate': [
     { name: "Liquid chrome", values: {from: 1, threshold: 0.4, puff: 0.4, round: 0.85, volume: 0.5, material: 3, keep: 1, tint: [0.8, 0.82, 0.86, 1], gloss: 0.6, film: 0, filmThick: 0.3, shadow: 0.5, lightAngle: 2.36, lightHeight: 0.55, orbit: 0.1, flow: 0, flowSpeed: 0.3, bands: 3, split: 0.35, ripple: 0.3, mix: 1, rainbow: 0.25, flakes: 160, glint: 0.5, cavity: 0, dispersion: 0, rim: 0} },
@@ -826,6 +884,20 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Teal log', values: { rate: 0.55, span: 11, freq: 10, bands: 8, tint: [0.35, 0.7, 0.72, 1], vertical: 0 } },
     { name: 'Nervous', values: { rate: 1.5, span: 14, freq: 20, bands: 9, vertical: 0, tint: [0.7, 0.75, 0.72, 1] } }
   ],
+  noise: [
+    { name: 'Soft hills', values: { kind: 1, scale: 4, octaves: 4, rough: 0.5, seed: 0, seamless: 0, contrast: 1.6, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.12, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Clouds', values: { kind: 5, scale: 3, octaves: 6, rough: 0.55, seed: 0, seamless: 0, contrast: 1.4, level: -0.1, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.08, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Cells', values: { kind: 2, scale: 8, octaves: 1, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.05, angle: 1.2, evolve: 0.15, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Cracks', values: { kind: 3, scale: 6, octaves: 2, rough: 0.45, seed: 0, seamless: 0, contrast: 2.2, level: 0, steps: 1, focus: 0, invert: 1, key: 0, drift: 0.04, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Ridges', values: { kind: 4, scale: 3, octaves: 5, rough: 0.5, seed: 0, seamless: 0, contrast: 1.6, level: -0.1, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Marble', values: { kind: 6, scale: 2.5, octaves: 5, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.06, angle: 1.2, evolve: 0.06, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Bands', values: { kind: 1, scale: 3, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1.4, level: 0, steps: 6, focus: 0, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Two tone', values: { kind: 0, scale: 5, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1.2, level: 0, steps: 2, focus: 0, invert: 0, key: 0, drift: 0.15, angle: 1.2, evolve: 0.12, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Out of focus', values: { kind: 1, scale: 6, octaves: 6, rough: 0.6, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 1, focus: 0.6, invert: 0, key: 0, drift: 0.1, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Beat fields', values: { kind: 1, scale: 5, octaves: 4, rough: 0.5, seed: 0, seamless: 0, contrast: 1.8, level: 0, steps: 3, focus: 0, invert: 0, key: 0, drift: 0, angle: 1.2, evolve: 0.1, sync: 3, glide: 0.3, field: 0, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Map for Remap', values: { kind: 1, scale: 2.5, octaves: 3, rough: 0.5, seed: 0, seamless: 0, contrast: 1, level: 0, steps: 1, focus: 0, invert: 0, key: 0, drift: 0.08, angle: 1.2, evolve: 0.08, sync: 0, glide: 0.6, field: 1, tint: [0.86, 0.86, 0.84, 1] } },
+    { name: 'Key mask', values: { kind: 2, scale: 6, octaves: 2, rough: 0.4, seed: 0, seamless: 0, contrast: 2.5, level: 0, steps: 1, focus: 0, invert: 0, key: 1, drift: 0.06, angle: 1.2, evolve: 0.1, sync: 0, glide: 0.6, field: 0, tint: [0.86, 0.86, 0.84, 1] } }
+  ],
   'ramps': [
     { name: 'H ramp', values: { shape: 0, freq: 1, steps: 1, rate: 0.1, angle: 0, mirror: 0, center: [0.5, 0.5], tint: [0.7, 0.72, 0.68, 1] } },
     { name: 'V ramp', values: { shape: 1, freq: 1, steps: 1, rate: 0.1, angle: 0, mirror: 0, center: [0.5, 0.5], tint: [0.7, 0.72, 0.68, 1] } },
@@ -1170,6 +1242,55 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Byte shift', values: { bands: 70, shift: 0.4, chance: 0.45, hold: 0.3, channel: 0.5, rate: 0.5, wrap: 1, audio: 0 } }
   ],
   // ── Pixel Sort (threshold-interval luma sort) ──
+  // ── Time Glitch, Break, Key, Droste ──
+  'fx-time-glitch': [
+    { name: 'Lit memory', values: { time: 0.6, mode: 1, drift: 0.15, chaos: 0.35, rate: 6, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Smeared memory', values: { time: 0.85, mode: 0, drift: 0.05, chaos: 0.25, rate: 3, sync: 0, blocks: 10, shift: 0.3, split: 0.2, crush: 0.1, inside: 0.8, after: 0.15, burstLen: 1.2, audio: 0, amount: 1 } },
+    { name: 'Light painting gone wrong', values: { time: 0.75, mode: 1, drift: 0.3, chaos: 0.4, rate: 5, sync: 0, blocks: 18, shift: 0.5, split: 0.45, crush: 0.2, inside: 0.75, after: 0.25, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Dark residue', values: { time: 0.7, mode: 2, drift: -0.2, chaos: 0.35, rate: 4, sync: 0, blocks: 12, shift: 0.35, split: 0.25, crush: 0.35, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Codec rot', values: { time: 0.55, mode: 0, drift: 0, chaos: 0.55, rate: 8, sync: 0, blocks: 24, shift: 0.6, split: 0.15, crush: 0.6, inside: 0.85, after: 0.35, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Torn tape', values: { time: 0.45, mode: 0, drift: 0, chaos: 0.45, rate: 10, sync: 0, blocks: 32, shift: 0.7, split: 0.5, crush: 0.1, inside: 0.6, after: 0.5, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'On the beat', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.3, rate: 6, sync: 3, blocks: 16, shift: 0.45, split: 0.3, crush: 0.3, inside: 0.7, after: 0.4, burstLen: 0.5, audio: 0, amount: 1 } },
+    { name: 'Burst only', values: { time: 0.65, mode: 0, drift: 0.15, chaos: 0.05, rate: 8, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.9, after: 0.2, burstLen: 1.5, audio: 0, amount: 1 } },
+    { name: 'Breathing outward', values: { time: 0.8, mode: 0, drift: 0.8, chaos: 0.3, rate: 4, sync: 0, blocks: 12, shift: 0.3, split: 0.35, crush: 0.15, inside: 0.7, after: 0.2, burstLen: 0.8, audio: 0, amount: 1 } },
+    { name: 'Audio damage', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.15, rate: 8, sync: 0, blocks: 20, shift: 0.5, split: 0.3, crush: 0.3, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 1, amount: 1 } }
+  ],
+  'fx-break': [
+    { name: 'Pane', values: { every: 3.5, sync: 0, after: 3, time: 1.8, force: 0.5, shards: 13, rings: 4, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Cracked and held', values: { every: 0, sync: 0, after: 0, time: 2, force: 0.4, shards: 18, rings: 5, wander: 0.55, broken: 0.3, tilt: 0.5, refract: 0.5, bevel: 0.6, light: 2.3, behind: 0, scatter: 0, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Falling glass', values: { every: 5, sync: 0, after: 2, time: 2.5, force: 0.6, shards: 16, rings: 5, wander: 0.5, broken: 0.35, tilt: 0.7, refract: 0.4, bevel: 0.55, light: 2.3, behind: 0, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Drifting shards', values: { every: 6, sync: 0, after: 1, time: 4, force: 0.5, shards: 12, rings: 4, wander: 0.6, broken: 0.4, tilt: 0.6, refract: 0.35, bevel: 0.5, light: 2.3, behind: 0.25, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Windscreen', values: { every: 0, sync: 0, after: 0, time: 1.8, force: 0.2, shards: 28, rings: 8, wander: 0.35, broken: 0.15, tilt: 0.25, refract: 0.6, bevel: 0.35, light: 2.3, behind: 0, scatter: 0, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Every bar', values: { every: 3.5, sync: 3, after: 3, time: 0.9, force: 0.7, shards: 10, rings: 3, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.6, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Heavy stone', values: { every: 6, sync: 0, after: 2, time: 1.6, force: 1, shards: 9, rings: 3, wander: 0.5, broken: 0.5, tilt: 0.9, refract: 0.3, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Hairline', values: { every: 5, sync: 0, after: 3, time: 3, force: 0.1, shards: 20, rings: 6, wander: 0.5, broken: 0.35, tilt: 0.15, refract: 0.2, bevel: 0.8, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Ice', values: { every: 7, sync: 0, after: 1, time: 5, force: 0.35, shards: 13, rings: 4, wander: 0.5, broken: 0.2, tilt: 0.8, refract: 0.7, bevel: 0.9, light: 0.8, behind: 0.4, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
+    { name: 'Smash on the half note', values: { every: 3.5, sync: 4, after: 3, time: 0.6, force: 0.55, shards: 11, rings: 4, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.8, amount: 1, hitX: 0.5, hitY: 0.5 } }
+  ],
+  'fx-key': [
+    { name: 'Green cloth', values: { mode: 0, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0.6, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Blue cloth', values: { mode: 0, color: [0.1, 0.25, 0.85, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0.6, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Tight green', values: { mode: 0, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.22, softness: 0.08, despill: 0.8, choke: 0.3, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Keep the red costume', values: { mode: 0, color: [0.8, 0.12, 0.1, 1], channel: 0, tolerance: 0.35, softness: 0.12, despill: 0, choke: 0, feather: 0.15, invert: 1, showMatte: 0, amount: 1 } },
+    { name: 'Colors on gray', values: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.25, softness: 0.15, despill: 0, choke: 0, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Only the vivid', values: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.5, softness: 0.1, despill: 0, choke: 0.2, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Outlines', values: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.2, softness: 0.2, despill: 0, choke: 0, feather: 0.2, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Bold outlines', values: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.15, softness: 0.25, despill: 0, choke: 0.6, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Brightness as alpha', values: { mode: 3, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.1, softness: 0.6, despill: 0, choke: 0, feather: 0, invert: 0, showMatte: 0, amount: 1 } },
+    { name: 'Black cut out', values: { mode: 3, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.04, softness: 0.12, despill: 0, choke: 0, feather: 0.1, invert: 0, showMatte: 0, amount: 1 } }
+  ],
+  'fx-droste': [
+    { name: 'Spiral', values: { scale: 5, strands: 1, arms: 1, zoom: 0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Nested frames', values: { scale: 5, strands: 0, arms: 1, zoom: 0.15, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Two strands', values: { scale: 6, strands: 2, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Wound backward', values: { scale: 5, strands: -1, arms: 1, zoom: -0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Round window', values: { scale: 4, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 1, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Deep and slow', values: { scale: 12, strands: 1, arms: 1, zoom: 0.04, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Turning', values: { scale: 5, strands: 1, arms: 1, zoom: 0.08, spin: 0.04, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Three arms', values: { scale: 5, strands: 1, arms: 3, zoom: 0.12, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Framed', values: { scale: 3, strands: 0, arms: 1, zoom: 0.08, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0.6, cx: 0.5, cy: 0.5, amount: 1 } },
+    { name: 'Off center', values: { scale: 6, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.35, cy: 0.62, amount: 1 } }
+  ],
   'fx-pixelsort': [
     { name: 'Bright streaks', values: { low: 0.25, high: 0.85, length: 0.2, vertical: 0, reverse: 0, angle: 0 } },
     { name: 'Vertical rain', values: { low: 0.2, high: 0.8, length: 0.3, vertical: 1, reverse: 1, angle: 0 } },

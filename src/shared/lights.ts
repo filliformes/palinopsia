@@ -157,7 +157,7 @@ export interface LightScene {
   id: string
   name: string
   looks: Record<string, LightLook>
-  master?: { brightness: number; speed: number }
+  master?: { brightness: number; speed: number; gain?: number; saturation?: number; contrast?: number }
   groups?: Record<string, number> // the group faders
   groupTunes?: Record<string, GroupTune>
   tunes?: Record<string, LightTune> // when the tuning travels with the look
@@ -499,7 +499,18 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
       id: str(o.id, `ls${i}`, 40) || `ls${i}`,
       name: str(o.name, `Light ${i + 1}`, 40),
       looks: mapOf(o.looks, sanitizeLook),
-      ...(o.master ? { master: { brightness: num(m.brightness, 1, 0, 1), speed: num(m.speed, 1, 0, 4) } } : {}),
+      ...(o.master
+        ? {
+            master: {
+              brightness: num(m.brightness, 1, 0, 1),
+              speed: num(m.speed, 1, 0, 4),
+              // (the grade a cue was saved with; an older cue without it leaves it as it is)
+              ...(typeof m.gain === 'number' ? { gain: num(m.gain, 1, 0, 2) } : {}),
+              ...(typeof m.saturation === 'number' ? { saturation: num(m.saturation, 1, 0, 2) } : {}),
+              ...(typeof m.contrast === 'number' ? { contrast: num(m.contrast, 1, 0, 2) } : {})
+            }
+          }
+        : {}),
       ...(o.groups ? { groups: mapOf(o.groups, (v) => num(v, 1, 0, 1), 64) } : {}),
       ...(o.groupTunes ? { groupTunes: mapOf(o.groupTunes, sanitizeGroupTune, 64) } : {}),
       ...(typeof o.fade === 'number' ? { fade: num(o.fade, 1.5, 0, 60) } : {}),
@@ -521,9 +532,11 @@ export function sanitizeLightsSession(raw: unknown): LightsSession {
   }
 }
 
-/** The DMX channels a fixture takes (its pixels times its layout). */
-export function fixtureChannels(f: LightFixture): number {
+/** The DMX channels a fixture takes (its pixels times its layout). On WLED (`wled`)
+ *  three an LED : its realtime stream is RGB, whatever the layout says. */
+export function fixtureChannels(f: LightFixture, wled = false): number {
   const n = fixturePixels(f)
+  if (wled) return n * 3
   return layoutChannels(layoutTokens(f.head, false)) + n * layoutChannels(layoutTokens(f.layout)) + layoutChannels(layoutTokens(f.tail, false))
 }
 
@@ -565,18 +578,19 @@ export const firstUniverse = (kind: LightOutputKind, universe: number): number =
 /** Where a fixture's channels land : its blocks (the head, each pixel, the tail)
  *  laid from its address, a block that would straddle a universe moved to the
  *  next one (an Enttec has one : what goes past 512 is cut). The same placement
- *  the engine's patch makes. */
-export function fixtureSpans(f: LightFixture, enttec: boolean, sacn = false): Array<{ universe: number; from: number; to: number }> {
-  const head = layoutChannels(layoutTokens(f.head, false))
-  const pix = layoutChannels(layoutTokens(f.layout))
-  const tail = layoutChannels(layoutTokens(f.tail, false))
+ *  the engine's patch makes : on WLED (`wled`) three channels an LED, no head or
+ *  tail, from the LED its address falls in. */
+export function fixtureSpans(f: LightFixture, enttec: boolean, sacn = false, wled = false): Array<{ universe: number; from: number; to: number }> {
+  const head = wled ? 0 : layoutChannels(layoutTokens(f.head, false))
+  const pix = wled ? 3 : layoutChannels(layoutTokens(f.layout))
+  const tail = wled ? 0 : layoutChannels(layoutTokens(f.tail, false))
   const blocks: number[] = []
   if (head) blocks.push(head)
   for (let i = fixturePixels(f); i > 0; i--) blocks.push(pix)
   if (tail) blocks.push(tail)
   const out: Array<{ universe: number; from: number; to: number }> = []
   let uni = firstUniverse(enttec ? 'enttec' : sacn ? 'sacn' : 'artnet', f.universe)
-  let ch = f.address - 1
+  let ch = wled ? Math.floor((f.address - 1) / 3) * 3 : f.address - 1
   let cur: { universe: number; from: number; to: number } | null = null
   for (const w of blocks) {
     if (ch + w > 512) {

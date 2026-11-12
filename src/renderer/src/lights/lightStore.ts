@@ -115,8 +115,21 @@ export function commitLightValue(
 const RIG_KEY = 'opsia.lightRig'
 const OLD_KEY = 'opsia.lights'
 
+// (written at most four times a second : a drag on the map or a knob on a light's
+// tuning commits at pointer or MIDI rate, and the whole rig is a big string)
+let rigDue: LightRig | null = null
+let rigTimer: ReturnType<typeof setTimeout> | null = null
+function writeRig(): void {
+  if (rigTimer !== null) { clearTimeout(rigTimer); rigTimer = null }
+  const r = rigDue
+  rigDue = null
+  if (r) { try { localStorage.setItem(RIG_KEY, JSON.stringify(r)) } catch { /* quota : the rig lives on for this run */ } }
+}
+if (typeof window !== 'undefined') window.addEventListener('beforeunload', writeRig)
+
 export function persistRig(rig: LightRig): LightRig {
-  try { localStorage.setItem(RIG_KEY, JSON.stringify(rig)) } catch { /* quota : the rig lives on for this run */ }
+  rigDue = rig
+  if (rigTimer === null) rigTimer = setTimeout(writeRig, 250)
   return rig
 }
 
@@ -161,7 +174,7 @@ export function nextSlot(rig: LightRig, out: string, channels: number): { univer
   let uni = firstUniverse(o?.kind ?? 'enttec', 0), end = 0, any = false
   for (const f of rig.fixtures) {
     if (f.out !== out) continue
-    const sp = fixtureSpans(f, enttec, o?.kind === 'sacn')
+    const sp = fixtureSpans(f, enttec, o?.kind === 'sacn', o?.kind === 'wled')
     const last = sp[sp.length - 1]
     if (!last) continue
     if (!any || last.universe > uni || (last.universe === uni && last.to > end)) { uni = last.universe; end = last.to }
@@ -178,7 +191,7 @@ export function nextAddress(rig: LightRig, out: string, _universe: number): numb
 }
 /** A light put on its output's next free slot. */
 function slotted(rig: LightRig, f: LightFixture): LightFixture {
-  const sl = nextSlot(rig, f.out, fixtureChannels(f))
+  const sl = nextSlot(rig, f.out, fixtureChannels(f, rig.outputs.find((o) => o.id === f.out)?.kind === 'wled'))
   return { ...f, universe: sl.universe, address: sl.address }
 }
 
@@ -266,11 +279,11 @@ export function addressedInOrder(rig: LightRig, out: string): LightFixture[] {
   let ch = 0
   const done: LightFixture[] = []
   for (const f of list) {
-    const n = fixtureChannels(f)
+    const n = fixtureChannels(f, o?.kind === 'wled')
     if (!enttec && ch > 0 && ch + n > 512 && n <= 512) { uni++; ch = 0 }
     if (!enttec && ch >= 512) { uni++; ch = 0 }
     const g = { ...f, address: Math.min(512, ch + 1), universe: enttec ? f.universe : uni }
-    const spans = fixtureSpans(g, enttec, o?.kind === 'sacn')
+    const spans = fixtureSpans(g, enttec, o?.kind === 'sacn', o?.kind === 'wled')
     const last = spans[spans.length - 1]
     if (last) { if (!enttec) uni = last.universe; ch = last.to } else ch += n
     done.push(g)
@@ -363,3 +376,39 @@ export const loadSetupName = (): string => { try { return localStorage.getItem(S
 export const persistSetupName = (n: string): string => { try { localStorage.setItem(SETUP_NAME_KEY, n) } catch { /* private */ } return n }
 /** A setup as the text of its file. */
 export const setupText = (s: LightSetup): string => JSON.stringify({ kind: 'palinopsia-light-setup', version: 1, ...s }, null, 1)
+
+/** The kind of light a mode of so many channels most likely is (the 30-zone bars'
+ *  modes first; null : no guess, its channels are written as held values). */
+export function profileForFootprint(fp: number): string | null {
+  return ({ 90: 'b:bar30-90', 94: 'b:bar30-94', 8: 'b:bar-8', 5: 'b:bar-5', 3: 'b:rgb', 4: 'b:drgb', 1: 'b:dimmer', 2: 'b:dimmer16' } as Record<number, string>)[fp] ?? null
+}
+
+/** Lights on the map for what answered on the line : each at the address it has,
+ *  of the kind its mode suggests, in a row across the picture, on `out`. A light
+ *  already on the map at that address stays where it is (its look, its place) and
+ *  takes the kind of its mode now, if that is known : asked twice, nothing doubles. */
+export function lightsFromLine(rig: LightRig, out: string, devs: Array<{ name: string; address: number; profile: LightProfile }>): LightRig {
+  let r = rig
+  const N = devs.length
+  // (each light on the map stands for one device : two answering at one address are two)
+  const claimed = new Set<string>()
+  devs.forEach((d, k) => {
+    const t = (k + 0.5) / N
+    const p = d.profile
+    const at = Math.max(1, Math.min(512, d.address))
+    const there = rig.fixtures.find((f) => f.out === out && f.address === at && !claimed.has(f.id))
+    if (there) {
+      claimed.add(there.id)
+      if (p.id && p.id !== there.profile) r = { ...r, fixtures: r.fixtures.map((f) => (f.id === there.id ? withProfile(f, p) : f)) }
+      return
+    }
+    const base = newFixture(r, p.kind)
+    const place =
+      p.kind === 'spot' ? { x0: t, y0: 0.78 }
+        : p.kind === 'matrix' ? { x0: t - 0.4 / N, y0: 0.3, x1: t + 0.4 / N, y1: 0.7 }
+          : { x0: t - 0.42 / N, y0: 0.62, x1: t + 0.42 / N, y1: 0.62 }
+    const f = sanitizeFixture({ ...base, ...profilePatch(p), ...place, bends: [], out, universe: 0, address: at, name: d.name.slice(0, 40) || base.name })
+    r = { ...r, fixtures: [...r.fixtures, f] }
+  })
+  return r
+}

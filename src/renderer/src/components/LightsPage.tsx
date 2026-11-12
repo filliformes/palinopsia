@@ -49,11 +49,14 @@ import { readOfl } from '../lights/ofl'
 import { RULES } from '../lights/lightFx'
 import { BUILTIN_PROFILES } from '@shared/lightProfiles'
 import { enttec } from '../lights/enttec'
+import { addressesInRow, RdmController, uidText, type RdmDevice } from '../lights/rdm'
+import { profileForFootprint } from '../lights/lightStore'
 import { LIGHT_SHOWS } from '../lights/lightShows'
 import { AssignRow } from './AutoControls'
 import { LightCueButtons, LightCueList } from './LightCues'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { showToast } from './Toast'
 
 const KIND_LABEL: Record<LightKind, string> = { strip: 'bar', ring: 'ring', spot: 'spot', matrix: 'matrix' }
 const OUT_LABEL: Record<LightOutputKind, string> = { enttec: 'Enttec USB Pro', artnet: 'Art-Net', sacn: 'sACN', wled: 'WLED' }
@@ -134,6 +137,7 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
 
   // Keys while the page is up : Delete removes the picked fixtures, the arrows
   // move them (Shift : farther), Ctrl+D duplicates the selected one, Esc closes the page.
+  const delAsk = useRef<{ key: string; at: number } | null>(null)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null
@@ -144,8 +148,21 @@ export function LightsPage({ canvasRef }: { canvasRef: RefObject<HTMLCanvasEleme
       const f = st.lightRig.fixtures.find((x) => x.id === st.lightSel)
       if (!f) return
       const ids = st.lightPicked.length ? st.lightPicked : [f.id]
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); ids.forEach((id) => st.removeLightFixture(id)); return }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); e.stopPropagation(); st.duplicateLightFixture(f.id); return }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault(); e.stopPropagation()
+        // (several lights : a second press, they cannot be brought back)
+        const key = ids.slice().sort().join(',')
+        if (ids.length > 1 && !(delAsk.current && delAsk.current.key === key && performance.now() - delAsk.current.at < 3000)) {
+          delAsk.current = { key, at: performance.now() }
+          showToast(`Press ${e.key} again to remove these ${ids.length} lights (it cannot be undone)`, 'warn', 3000)
+          return
+        }
+        delAsk.current = null
+        ids.forEach((id) => st.removeLightFixture(id))
+        return
+      }
+      // (a page in its own window passes its keys here : its Ctrl+D is not this page's)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { if (!e.isTrusted) return; e.preventDefault(); e.stopPropagation(); st.duplicateLightFixture(f.id); return }
       const step = e.shiftKey ? 0.05 : 0.005
       const d = e.key === 'ArrowLeft' ? [-step, 0] : e.key === 'ArrowRight' ? [step, 0] : e.key === 'ArrowUp' ? [0, -step] : e.key === 'ArrowDown' ? [0, step] : null
       if (!d) return
@@ -228,10 +245,12 @@ function IfaceStatus(): JSX.Element | null {
   if (o.kind !== 'enttec') return <span title="Where the DMX goes"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400 align-middle" />{OUT_LABEL[o.kind]}{o.host ? ` to ${o.host}` : ''}</span>
   const s = enttec.status(o.index)
   const ok = s.status === 'open'
+  // ('off' : not looked for yet, the output turned off or the page just opened)
+  const off = s.status === 'off'
   return (
-    <span title={ok ? 'The Enttec DMX USB Pro is connected' : s.status === 'unsupported' ? 'This build has no serial ports' : 'Plug the Enttec DMX USB Pro into a USB port : it is found by itself, within two seconds'}>
-      <span className={`mr-1 inline-block h-2 w-2 rounded-full align-middle ${ok ? 'bg-emerald-400' : s.status === 'error' ? 'bg-red-400' : 'bg-yellow-400'}`} />
-      {ok ? 'Enttec connected' : s.status === 'error' ? `Enttec : ${s.error}` : 'Enttec not found : plug it in'}
+    <span title={ok ? 'The Enttec DMX USB Pro is connected' : s.status === 'unsupported' ? 'This build has no serial ports' : off && !o.enabled ? 'The Enttec output is off : turn it on in Outputs' : 'Plug the Enttec DMX USB Pro into a USB port : it is found by itself, within two seconds'}>
+      <span className={`mr-1 inline-block h-2 w-2 rounded-full align-middle ${ok ? 'bg-emerald-400' : s.status === 'error' ? 'bg-red-400' : off ? 'bg-panel3' : 'bg-yellow-400'}`} />
+      {ok ? 'Enttec connected' : s.status === 'error' ? `Enttec : ${s.error}` : off ? (o.enabled ? 'looking for the Enttec' : 'Enttec output off') : 'Enttec not found : plug it in'}
     </span>
   )
 }
@@ -421,7 +440,7 @@ function FixtureRow({ f, on, also, onClick }: { f: LightFixture; on: boolean; al
     return () => cancelAnimationFrame(raf)
   }, [f.id])
   const out = outputs.find((o) => o.id === f.out)
-  const ch = fixtureChannels(f)
+  const ch = fixtureChannels(f, out?.kind === 'wled')
   return (
     <button
       onClick={onClick}
@@ -548,7 +567,8 @@ function OutputList(): JSX.Element {
                   : s?.status === 'unsupported' ? 'this build has no serial ports'
                     : s?.status === 'error' ? `it would not open : ${s.error} (is another program using it ?)`
                       : !o.enabled ? 'off'
-                        : s?.error === 'none plugged in' || !s?.error ? 'not found yet : plug it into a USB port' : `looking : ${s.error}`}
+                        : s?.status === 'off' ? 'looking for it'
+                          : s?.error === 'none plugged in' || !s?.error ? 'not found yet : plug it into a USB port' : `looking : ${s.error}`}
               </span>
             )}
             {found[o.id] && !found[o.id]!.busy && (
@@ -650,6 +670,165 @@ function Settings(): JSX.Element {
   )
 }
 
+// ── RDM : the lights on the line answer back ─────────────────────────────────
+// (kept while the page lives : found once, still there when the guide comes back)
+let rdmFound: RdmDevice[] = []
+
+function RdmSection(): JSX.Element {
+  const outputs = useStore((s) => s.lightRig.outputs)
+  const rigLights = useStore((s) => s.lightRig.fixtures)
+  const pros = outputs.filter((o) => o.kind === 'enttec')
+  const [outId, setOutId] = useState(pros[0]?.id ?? '')
+  const out = pros.find((o) => o.id === outId) ?? pros[0]
+  const [devs, setDevs] = useState<RdmDevice[]>(rdmFound)
+  const [busy, setBusy] = useState('')
+  const [note, setNote] = useState('')
+  const [blink, setBlink] = useState<number | null>(null)
+  const ctl = useRef<RdmController | null>(null)
+  const ctlLink = useRef<unknown>(null) // the link ctl was made on
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => tick((x) => x + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  useEffect(() => { rdmFound = devs }, [devs])
+  const open = !!out && enttec.status(out.index).status === 'open'
+  const controller = async (): Promise<RdmController | null> => {
+    if (!out) return null
+    const t = enttec.rdm(out.index)
+    if (!t) return null
+    // (made again on a new link : the one it was made on closed, the lights off and on)
+    if (!ctl.current || ctlLink.current !== t.link) { ctlLink.current = t.link; ctl.current = new RdmController(t, await t.self()) }
+    return ctl.current
+  }
+  const controllerRef = useRef(controller)
+  controllerRef.current = controller
+  // a blinking light stops when the panel goes
+  const blinkRef = useRef<number | null>(null)
+  blinkRef.current = blink
+  useEffect(() => () => { const b = blinkRef.current; if (b !== null) void controllerRef.current().then((c) => c?.identify(b, false)) }, [])
+  const run = async (label: string, job: (c: RdmController) => Promise<string>): Promise<void> => {
+    const c = await controller()
+    if (!c) { setNote('The Enttec is not connected.'); return }
+    setBusy(label); setNote('')
+    try { setNote(await job(c)) } catch (e) { setNote(`It stopped : ${(e as Error).message}`) } finally { setBusy('') }
+  }
+  const find = (): Promise<void> => run('looking', async (c) => {
+    let n = 0
+    const uids = await c.discover(() => { n++; setBusy(`found ${n}`) })
+    const list: RdmDevice[] = []
+    for (const u of uids) {
+      setBusy(`asking ${list.length + 1} of ${uids.length}`)
+      const d = await c.describe(u)
+      if (d) list.push(d)
+    }
+    // in address order : as they would be patched
+    list.sort((a, b) => a.address - b.address || a.uid - b.uid)
+    setDevs(list)
+    return uids.length === 0
+      ? 'Nothing answered. Lights that do not speak RDM never answer : set those on their own menu. Check that the cable runs from the Pro to the first light, and that the last light has nothing after it (or a terminator).'
+      : `${uids.length} answered${list.length < uids.length ? `, ${uids.length - list.length} would not say what it is` : ''}.`
+  })
+  const name = (d: RdmDevice): string => d.label || d.modelName || d.manufacturer || uidText(d.uid)
+  const modeName = (d: RdmDevice): string => d.personalities.find((p) => p.n === d.personality)?.name ?? `mode ${d.personality}`
+  const update = (uid: number, p: Partial<RdmDevice>): void => setDevs((l) => l.map((d) => (d.uid === uid ? { ...d, ...p } : d)))
+  const setAddr = (d: RdmDevice, a: number): Promise<void> => run('setting', async (c) => {
+    const okA = await c.setAddress(d.uid, a)
+    if (okA) update(d.uid, { address: a })
+    return okA ? `${name(d)} : address ${a}.` : `${name(d)} did not take the address.`
+  })
+  const setMode = (d: RdmDevice, n: number): Promise<void> => run('setting', async (c) => {
+    const okM = await c.setPersonality(d.uid, n)
+    const fp = d.personalities.find((p) => p.n === n)?.footprint || d.footprint
+    if (okM) update(d.uid, { personality: n, footprint: fp })
+    return okM ? `${name(d)} : ${d.personalities.find((p) => p.n === n)?.name ?? `mode ${n}`} (${fp} channels).` : `${name(d)} did not take the mode.`
+  })
+  const toggleBlink = (d: RdmDevice): Promise<void> => run('', async (c) => {
+    const prev = blink
+    if (prev !== null) await c.identify(prev, false)
+    if (prev === d.uid) { setBlink(null); return '' }
+    const okI = await c.identify(d.uid, true)
+    setBlink(okI ? d.uid : null)
+    return okI ? `${name(d)} is blinking.` : `${name(d)} does not blink on request.`
+  })
+  const inRow = (): Promise<void> => run('setting', async (c) => {
+    const want = addressesInRow(devs)
+    let done = 0
+    for (let i = 0; i < devs.length; i++) {
+      const a = want[i]
+      if (a === null || devs[i].address === a) { if (a !== null) done++; continue }
+      setBusy(`setting ${i + 1} of ${devs.length}`)
+      if (await c.setAddress(devs[i].uid, a)) { done++; update(devs[i].uid, { address: a }) }
+    }
+    return `${done} of ${devs.length} addressed one after the other from 1${want.includes(null) ? ' (the rest would pass 512)' : ''}.`
+  })
+  const toMap = (): void => {
+    if (!out) return
+    const all = [...BUILTIN_PROFILES, ...useStore.getState().lightRig.profiles]
+    useStore.getState().addLightsFromLine(out.id, devs.map((d) => {
+      const pid = profileForFootprint(d.footprint)
+      const p = all.find((x) => x.id === pid) ?? { id: '', name: '', kind: 'spot' as const, head: '', layout: Array.from({ length: Math.max(1, d.footprint) }, () => '0').join(' '), tail: '' }
+      return { name: name(d), address: d.address, profile: p }
+    }))
+    const already = devs.filter(onMap).length
+    setNote(`${devs.length} light${devs.length === 1 ? '' : 's'} on the map, at their own addresses${already ? ` (${already} already there : kept, given the kind of its mode now)` : ''}. A kind it could not guess holds its channels at 0 : pick its kind.`)
+  }
+  const onMap = (d: RdmDevice): boolean => rigLights.some((f) => f.out === out?.id && f.address === d.address)
+  const move = (i: number, dir: -1 | 1): void => setDevs((l) => { const c = l.slice(); const j = i + dir; if (j < 0 || j >= c.length) return l; [c[i], c[j]] = [c[j], c[i]]; return c })
+  return (
+    <Section
+      title="Ask the lights (RDM)"
+      defaultCollapsed={devs.length === 0}
+      info="Lights that speak RDM answer back over the DMX cable : the Enttec asks who is on the line, and each says what it is, its mode (how many channels) and its address. From here : make one blink to find it in the room, change its mode, set its address, address them all one after the other, put them on the map. Lights that do not speak RDM do not answer : set those on their own menu."
+    >
+      {pros.length > 1 && (
+        <select value={out?.id ?? ''} onChange={(e) => { setOutId(e.target.value); ctl.current = null; ctlLink.current = null; setDevs([]) }} className="rounded border border-border bg-panel px-1 py-0.5 font-mono text-[10px] text-text">
+          {pros.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      )}
+      {!out && <p className="font-mono text-[10px] text-muted">RDM goes through an Enttec DMX USB Pro : add it first (step 1).</p>}
+      {out && (
+        <button className={`${btn(!!busy)} disabled:opacity-40`} disabled={!open || !!busy} onClick={() => void find()} title={open ? 'Ask every light on the line what it is (a few seconds)' : 'Plug the Enttec in first'}>
+          {busy || (devs.length ? 'ask again' : 'ask the lights on the line')}
+        </button>
+      )}
+      {devs.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {devs.map((d, i) => (
+            <div key={d.uid} className={`flex flex-col gap-1 rounded border p-1 ${blink === d.uid ? 'border-accent/70 bg-accent/10' : 'border-border'}`}>
+              <div className="flex items-center gap-1 font-mono text-[10px]">
+                <span className="min-w-0 flex-1 truncate text-text" title={`${d.manufacturer} ${d.modelName} · ${uidText(d.uid)}`}>{name(d)}</span>
+                {onMap(d) && <span className="shrink-0 text-[9px] text-muted" title="A light on the map is at this address">on the map</span>}
+                <button className="px-0.5 text-muted hover:text-text disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} title="Earlier in the row">↑</button>
+                <button className="px-0.5 text-muted hover:text-text disabled:opacity-30" disabled={i === devs.length - 1} onClick={() => move(i, 1)} title="Later in the row">↓</button>
+                <button className={btn(blink === d.uid)} disabled={!!busy} onClick={() => void toggleBlink(d)} title="Make it blink, to see which one it is in the room">{blink === d.uid ? '◉ blinking' : 'blink'}</button>
+              </div>
+              <div className="flex items-center gap-1 font-mono text-[10px] text-muted">
+                <select
+                  value={d.personality}
+                  disabled={!!busy || d.personalities.length < 2}
+                  onChange={(e) => void setMode(d, Number(e.target.value))}
+                  className="min-w-0 flex-1 rounded border border-border bg-panel px-1 py-0.5 text-[10px] text-text"
+                  title="Its mode : how many channels it takes, and what they do"
+                >
+                  {d.personalities.length ? d.personalities.map((p) => <option key={p.n} value={p.n}>{p.name}{p.footprint ? ` · ${p.footprint} ch` : ''}</option>) : <option value={d.personality}>{modeName(d)} · {d.footprint} ch</option>}
+                </select>
+                <span className="shrink-0">address</span>
+                <NumBox value={d.address} min={1} max={512} onCommit={(v) => void setAddr(d, v)} className="w-12" />
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-1">
+            <button className={`flex-1 ${btn(false)} disabled:opacity-40`} disabled={!!busy} onClick={() => void inRow()} title="Give them addresses one after the other from 1, in this order (each mode's channels counted) : arrange the order with the arrows, blink to see which is which">address in a row</button>
+            <button className={`flex-1 ${btn(false)} disabled:opacity-40`} disabled={!!busy} onClick={toMap} title="Put them on the map at their own addresses, each of the kind its mode suggests">put on the map</button>
+          </div>
+        </div>
+      )}
+      {note && <p className="font-mono text-[9px] leading-snug text-muted">{note}</p>}
+    </Section>
+  )
+}
+
 /** A step of the guide : its number, done or not, what to do. */
 function Step({ n, done, title, children }: { n: number; done: boolean; title: string; children: ReactNode }): JSX.Element {
   return (
@@ -685,7 +864,7 @@ function SetupGuide(): JSX.Element {
   const used = new Map<string, number>()
   let clash = false
   for (const f of mine) {
-    const spans = fixtureSpans(f, out?.kind === 'enttec', out?.kind === 'sacn')
+    const spans = fixtureSpans(f, out?.kind === 'enttec', out?.kind === 'sacn', out?.kind === 'wled')
     if (out?.kind === 'enttec' && f.address - 1 + fixtureChannels(f) > 512) clash = true
     for (const sp of spans) for (let c = sp.from; c <= sp.to; c++) { const k = `${sp.universe}|${c}`; if (used.has(k)) clash = true; used.set(k, 1) }
   }
@@ -719,7 +898,7 @@ function SetupGuide(): JSX.Element {
         </Step>
         <Step n={3} done={mine.length > 0 && !clash} title="Give each light its address">
           <p className="font-mono text-[10px] leading-snug text-muted">
-            Set these on the lights themselves : in their menu (often A001, d001), or with their DIP switches (up where filled).
+            Set these on the lights themselves : in their menu (often A001, d001), or with their DIP switches (up where filled). Lights that speak RDM can be set from here : Ask the lights, below.
           </p>
           {mine.length === 0 && <span className="font-mono text-[10px] text-muted">No lights on the interface yet.</span>}
           <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
@@ -752,6 +931,7 @@ function SetupGuide(): JSX.Element {
           </p>
         </Step>
       </Section>
+      <RdmSection />
       <Section title="On the map" defaultCollapsed info="How the map is played.">
         <p className="font-mono text-[10px] leading-snug text-muted">Click a light to set it up : where it is patched, what it shows, how it is tuned. Drag it to move it, drag the ends of a bar or the corners of a matrix to reshape it, double-click a bar to bend it. The arrows nudge it (Shift : farther), Delete removes it, Ctrl+D duplicates it.</p>
         <p className="font-mono text-[10px] leading-snug text-muted">Shift or Ctrl + click picks several lights, a drag on an empty part draws a rubber band around them : they move together, and a look, a tuning, a kind or a show goes to all of them. Make them a group to give them a fader.</p>
@@ -1196,7 +1376,7 @@ function PatchView(): JSX.Element {
     const by = new Map<number, Array<string[]>>()
     for (const f of rig.fixtures) {
       if (f.out !== o.id) continue
-      for (const sp of fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn')) {
+      for (const sp of fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn', o.kind === 'wled')) {
         let cells = by.get(sp.universe)
         if (!cells) { cells = Array.from({ length: 512 }, () => []); by.set(sp.universe, cells) }
         for (let c = sp.from; c <= sp.to; c++) cells[c - 1].push(f.id)
@@ -1209,7 +1389,7 @@ function PatchView(): JSX.Element {
   // lights whose channels do not all fit (past an Enttec's 512)
   const cut = rig.fixtures.filter((f) => {
     const o = rig.outputs.find((x) => x.id === f.out)
-    return !!o && fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn').reduce((n, sp) => n + sp.to - sp.from + 1, 0) < fixtureChannels(f)
+    return !!o && fixtureSpans(f, o.kind === 'enttec', o.kind === 'sacn', o.kind === 'wled').reduce((n, sp) => n + sp.to - sp.from + 1, 0) < fixtureChannels(f, o.kind === 'wled')
   })
   const name = (id: string): string => rig.fixtures.find((f) => f.id === id)?.name ?? '?'
   const overlaps = blocks.reduce((n, b) => n + b.cells.filter((c) => c.length > 1).length, 0)
@@ -1256,7 +1436,7 @@ function PatchView(): JSX.Element {
                     st().setLightSel(id)
                     // (dragged by its first universe's part only : the rest follows)
                     const fx = rig.fixtures.find((q) => q.id === id)
-                    const first = fx ? fixtureSpans(fx, out.kind === 'enttec', out.kind === 'sacn')[0] : undefined
+                    const first = fx ? fixtureSpans(fx, out.kind === 'enttec', out.kind === 'sacn', out.kind === 'wled')[0] : undefined
                     drag.current = first && first.universe === uni && i + 1 >= first.from && i + 1 <= first.to ? { id, off: i + 1 - first.from, uni, out: out.id, at: i } : null
                   }}
                   onPointerEnter={() => setHover({ out: out.id, uni, ch: i })}
@@ -1290,7 +1470,7 @@ function Inspector({ f }: { f: LightFixture }): JSX.Element {
   const tune = useStore((s) => (s.lightRig.tuneScope === 'look' ? s.lightsSession.tunes?.[f.id] : null)) ?? f.tune
   const upd = (p: Partial<LightFixture>): void => st().updateLightFixture(f.id, p)
   const out = outputs.find((o) => o.id === f.out)
-  const ch = fixtureChannels(f)
+  const ch = fixtureChannels(f, out?.kind === 'wled')
   const overflow = out?.kind === 'enttec' && f.address - 1 + ch > 512
   const [customOpen, setCustomOpen] = useState(false)
   const custom = customOpen || !(LAYOUTS as readonly string[]).includes(f.layout)
@@ -1421,6 +1601,7 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
   const groups = useStore((s) => s.lightRig.groups)
   const outputs = useStore((s) => s.lightRig.outputs)
   const same = groups.find((g) => g.members.length === ids.length && g.members.every((m) => ids.includes(m)))
+  const [sure, setSure] = useState(false)
   // (many lights : the sliders take no modulation here, one light's or a group's do)
   const S: SliderFn = (label, _field, value, min, max, step, set, reset, unit = '', title, fmt) => (
     <LightSlider key={label} label={label} fixture="" field={null} value={value} min={min} max={max} step={step} onChange={set} reset={reset} unit={unit} title={title} fmt={fmt} openMod={null} setOpenMod={() => {}} />
@@ -1431,7 +1612,14 @@ function ManyInspector({ ids }: { ids: string[] }): JSX.Element {
         title={`${ids.length} lights`}
         info="Several lights picked (Shift or Ctrl + click on the map or in the list) : what you set here goes to all of them, and a show goes to them alone. The values shown are the selected light's."
         actions={
-          <button className="rounded border border-border px-2 py-1 font-mono text-[10px] text-muted hover:text-red-400" onClick={() => ids.forEach((id) => st().removeLightFixture(id))} title="Remove them all (Delete)">×</button>
+          <button
+            className={`rounded border border-border px-2 py-1 font-mono text-[10px] hover:text-red-400 ${sure ? 'text-red-400' : 'text-muted'}`}
+            onClick={() => { if (!sure) setSure(true); else { setSure(false); ids.forEach((id) => st().removeLightFixture(id)) } }}
+            onBlur={() => setSure(false)}
+            title="Remove them all (Delete) : a second click, they cannot be brought back"
+          >
+            {sure ? 'sure ?' : '×'}
+          </button>
         }
       >
         <div className="flex gap-1">

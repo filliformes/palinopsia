@@ -38,6 +38,58 @@ export interface DfParam {
 export interface DfSub {
   sku: string
   path: string
+  /** How a wire into Palinopsia plays (ours only : the connections list's ⚙). */
+  opt?: DfWireOpt
+}
+
+/** A wire into Palinopsia, shaped : the part of the destination's range it covers
+ *  (lo..hi, 0..1 of that range), turned the other way, smoothed (a slew in ms,
+ *  the renderer's), and what happens when its source goes quiet : hold the last
+ *  value, or glide back over returnSec to where the control was before the wire
+ *  began to play it. */
+export interface DfWireOpt {
+  lo?: number
+  hi?: number
+  invert?: boolean
+  slewMs?: number
+  onLoss?: 'hold' | 'return'
+  returnSec?: number
+}
+
+/** Clean a wire's options : only what differs from the plain wire is kept
+ *  (null : a plain wire). */
+export function cleanWireOpt(o: unknown): DfWireOpt | null {
+  if (!o || typeof o !== 'object') return null
+  const x = o as Record<string, unknown>
+  const num = (v: unknown, lo: number, hi: number): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : undefined)
+  const out: DfWireOpt = {}
+  const lo = num(x.lo, 0, 1), hi = num(x.hi, 0, 1)
+  if (lo !== undefined && lo !== 0) out.lo = lo
+  if (hi !== undefined && hi !== 1) out.hi = hi
+  if (x.invert === true) out.invert = true
+  const slew = num(x.slewMs, 0, 10_000)
+  if (slew) out.slewMs = Math.round(slew)
+  if (x.onLoss === 'return') {
+    out.onLoss = 'return'
+    out.returnSec = num(x.returnSec, 0.1, 60) ?? 2
+  }
+  return Object.keys(out).length ? out : null
+}
+
+/** A value of a remote parameter as 0..1 of its declared range (a vector : its
+ *  first part; a colour : its brightness). */
+export function remote01(v: DfValue, p: { type: DfType; min: number; max: number } | null | undefined): number | null {
+  let n: number
+  if (typeof v === 'boolean') return v ? 1 : 0
+  if (typeof v === 'number') n = v
+  else if (Array.isArray(v)) {
+    if (p?.type === 'colour') return v.length >= 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : null
+    n = typeof v[0] === 'number' ? v[0] : NaN
+  } else return null
+  if (!Number.isFinite(n)) return null
+  const lo = p ? p.min : 0, hi = p ? p.max : 1
+  if (!(hi > lo)) return Math.max(0, Math.min(1, n))
+  return Math.max(0, Math.min(1, (n - lo) / (hi - lo)))
 }
 
 /** Another node as Palinopsia sees it (the monitor). */
@@ -67,12 +119,18 @@ export interface DfIoRow {
   ageMs: number | null // since the last value (null : none yet)
   perSec: number
   live: boolean // connected to the node(s) it talks with
+  sku?: string // a watched row : the node it belongs to
 }
 export interface DfIo {
   sku: string
   label: string
   in: DfIoRow[]
   out: DfIoRow[]
+  /** Outside values watched (◉ in the node list) : streamed here only to be seen. */
+  watched: DfIoRow[]
+  /** The nodes that monitor ours (a visualizer page on them asks for every value) :
+   *  how many of our values each takes. Not wires : shown as one line. */
+  watchedBy: Array<{ label: string; count: number }>
   rxPerSec: number
   txPerSec: number
 }
@@ -222,6 +280,9 @@ export interface DfDest {
   max?: number
   init?: number
   bidir?: string // also a source : the signal it reads (see DfSource.signal)
+  // a number that picks one thing (a scene) : played once per whole step, never
+  // smoothed nor glided back (each step on the way would recall another one)
+  discrete?: boolean
 }
 
 /** A source : a signal Palinopsia publishes (read like the Resolume mapper's rows). */
@@ -249,7 +310,7 @@ export const DF_DESTS: DfDest[] = [
   { path: 'feel/coalesce', label: 'dispersal / coalescence', osc: '/opsia/coalesce', type: 'number', init: 0.5 },
   { path: 'feel/flow', label: 'flow / interruption', osc: '/opsia/flow', type: 'number', init: 0.5 },
   { path: 'feel/drift', label: 'drift', osc: '/opsia/drift', type: 'number' },
-  { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9 },
+  { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9, discrete: true },
   { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'bool' },
   { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'bool' },
   { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'bool' },
@@ -322,7 +383,7 @@ export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[
     addGroups(d.path)
     out.push(param(d.path, d.label, {
       type: d.type,
-      mode: d.type === 'bool' || d.path === 'scene/recall' ? 'discrete' : 'streaming',
+      mode: d.type === 'bool' || d.discrete ? 'discrete' : 'streaming',
       flow: d.bidir ? 'bidir' : 'destination',
       min: d.min ?? 0, max: d.max ?? (d.type === 'bool' ? 1 : 1), init: d.init ?? 0,
       rate: d.type === 'bool' ? 0 : 60

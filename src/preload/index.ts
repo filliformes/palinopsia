@@ -1,6 +1,7 @@
 import { ndiConfigure, ndiOnStatus, ndiInFind, ndiInOpen, ndiInClose, ndiAudioOpen, ndiAudioClose } from './ndi'
 import { avfList, avfOpen, avfClose, avfStatus } from './avcapture'
 import { shareLocal } from './share'
+import { shareInList, shareInOpen, shareInClose, shareInFrame, shareInStatus } from './shareIn'
 import './recWriter' // real-time DXV3 recording : the file writer
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
@@ -89,6 +90,15 @@ const api: ExposedApi = {
   dataflouVisualizer: (open) => ipcRenderer.invoke('dataflou:visualizer', open),
   dataflouStatus: () => ipcRenderer.invoke('dataflou:status'),
   dataflouIo: () => ipcRenderer.invoke('dataflou:io'),
+  dataflouWatch: (list) => ipcRenderer.send('dataflou:watch', list),
+  dataflouListen: (list) => ipcRenderer.send('dataflou:listen', list),
+  dataflouLearn: (op) => ipcRenderer.invoke('dataflou:learn', op),
+  dataflouWireOpt: (a) => ipcRenderer.invoke('dataflou:wireOpt', a),
+  onDataflouRemote: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, b: Parameters<typeof cb>[0]): void => cb(b)
+    ipcRenderer.on('dataflou:remote', h)
+    return () => ipcRenderer.off('dataflou:remote', h)
+  },
   dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
   dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),
   dataflouForget: (sku) => ipcRenderer.invoke('dataflou:forget', sku),
@@ -101,6 +111,11 @@ const api: ExposedApi = {
     const h = (_e: Electron.IpcRendererEvent, b: Parameters<typeof cb>[0]): void => cb(b)
     ipcRenderer.on('dataflou:in', h)
     return () => ipcRenderer.off('dataflou:in', h)
+  },
+  onDataflouUniverse: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, name: string): void => cb(name)
+    ipcRenderer.on('dataflou:universe', h)
+    return () => ipcRenderer.off('dataflou:universe', h)
   },
 
   // ── Ableton Link ─────────────────────────────────────────────────
@@ -241,6 +256,15 @@ const api: ExposedApi = {
   avfOpen: (id: string) => avfOpen(id),
   avfClose: (id: string) => avfClose(id),
   avfStatus: (id: string) => avfStatus(id),
+  // Spout / Syphon input : another program's picture on this computer, received
+  // here (src/preload/shareIn.ts). shareInFrame hands the page the newest frame
+  // as a VideoFrame over a shared GPU texture (no copy); the copy route's frames
+  // reach it over their own port, like NDI's.
+  shareInList: () => shareInList(),
+  shareInOpen: (name: string) => shareInOpen(name),
+  shareInClose: (name: string) => shareInClose(name),
+  shareInFrame: (name: string) => shareInFrame(name),
+  shareInStatus: (name: string) => shareInStatus(name),
   ndiInstallRuntime: () => ipcRenderer.invoke('ndi:installRuntime'),
   onNdiInstallProgress: (cb: (p: import('@shared/ndi').NdiInstallProgress) => void) => {
     const h = (_e: Electron.IpcRendererEvent, p: import('@shared/ndi').NdiInstallProgress): void => cb(p)

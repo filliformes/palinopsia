@@ -251,9 +251,19 @@ function lerpComposition(a: CompositionState, b: CompositionState, k: number): C
     modMatrix: lerpMods(a.modMatrix ?? [], b.modMatrix ?? [], k, a.modulators, b.modulators),
     metaKnobs: b.metaKnobs.map((bk, i) => {
       const ak = a.metaKnobs[i]
-      return ak ? { ...bk, value: lerpN(ak.value, bk.value, k) } : bk
+      return ak ? morphKnob(ak, bk, k) : bk
     })
   }
+}
+
+/** A Macro knob on its way : its position and its range glide (a range that
+ *  jumped would jump every destination). */
+function morphKnob(a: CompositionState['metaKnobs'][number], b: CompositionState['metaKnobs'][number], k: number): CompositionState['metaKnobs'][number] {
+  const out = { ...b, value: lerpN(a.value, b.value, k) }
+  const lo = lerpN(a.min ?? 0, b.min ?? 0, k), hi = lerpN(a.max ?? 1, b.max ?? 1, k)
+  if (lo !== 0) out.min = lo; else delete out.min
+  if (hi !== 1) out.max = hi; else delete out.max
+  return out
 }
 
 /** What the engine should render THIS frame: the eased composition, or the
@@ -671,7 +681,7 @@ function relayedComposition(now: number, target: CompositionState): CompositionS
     modMatrix: lerpMods(a.modMatrix ?? [], target.modMatrix ?? [], k, a.modulators, target.modulators),
     metaKnobs: target.metaKnobs.map((bk, i) => {
       const ak = a.metaKnobs[i]
-      return ak ? { ...bk, value: lerpN(ak.value, bk.value, k) } : bk
+      return ak ? morphKnob(ak, bk, k) : bk
     })
   }
 }

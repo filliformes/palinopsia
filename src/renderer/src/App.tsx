@@ -1333,6 +1333,18 @@ export default function App(): JSX.Element {
           showToast(`NDI input : no NDI runtime on this computer. Install it from Output → NDI; the source starts by itself once NDI is there.`, 'warn', 8000)
           return
         }
+        if (errName === 'ShareUnavailable') {
+          showToast(
+            window.api.platform === 'darwin'
+              ? 'Syphon input : the Syphon module is missing from this build. Rebuild it (sh native/syphon/build.sh) or use a release.'
+              : window.api.platform === 'win32'
+                ? 'Spout input : the Spout module in this build cannot receive. Rebuild it (native/spout) or use a release.'
+                : 'Spout and Syphon inputs exist on Windows and macOS only.',
+            'warn',
+            8000
+          )
+          return
+        }
         if (errName === 'AvfUnavailable') {
           showToast(
             window.api.platform === 'darwin'

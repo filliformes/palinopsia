@@ -101,6 +101,15 @@ export function effectiveHz(m: ModulatorConfig, bpm: number): number {
 // ── The 14 output curves (dataFLOU's scaleMetaValue, on [0,1]) ────────
 const STEP_COUNT = 8
 
+/** What a Macro knob sends at position `v01` : its curve, then its range
+ *  (min..max, 0..1 of each destination's range). Every path a knob takes (a
+ *  drag, a glide, MIDI, OSC, a modulator) goes out through this. */
+export function knobOut(knob: { curve: ModCurve; min?: number; max?: number }, v01: number): number {
+  const lo = knob.min ?? 0, hi = knob.max ?? 1
+  const s = shapeCurve(Math.max(0, Math.min(1, v01)), knob.curve)
+  return lo + (hi - lo) * s
+}
+
 export function shapeCurve(t: number, curve: ModCurve): number {
   const tc = t < 0 ? 0 : t > 1 ? 1 : t
   switch (curve) {
@@ -1996,7 +2005,7 @@ export function applyMetaGlides(
     if (!knob) continue
     // Same mapping as the settle-time store fan-out (metaSmooth.applyKnob) :
     // position shaped by the knob's curve, then mapped per destination.
-    const shaped = shapeCurve(Math.max(0, Math.min(1, v01)), knob.curve)
+    const shaped = knobOut(knob, v01)
     metaLiveValues.set(i, Math.max(0, Math.min(1, v01)))
     for (const dest of knob.destinations) {
       if (dest.kind === 'meta') continue // knobs never chain into knobs
@@ -2067,7 +2076,7 @@ export function applyModulation(
         v01 = Math.max(0, Math.min(1, knob.value + (mv - 0.5) * 2 * a.depth))
       }
       metaLiveValues.set(a.target.knob, v01)
-      const shaped = shapeCurve(v01, knob.curve)
+      const shaped = knobOut(knob, v01)
       for (const dest of knob.destinations) {
         if (dest.kind === 'meta') continue // knobs never chain into knobs
         writeTarget(dest, shaped)

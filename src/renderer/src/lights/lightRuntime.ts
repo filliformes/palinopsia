@@ -15,6 +15,7 @@ import { setLightBaseOf } from './lightMods'
 import { lightBaseValue } from './lightStore'
 import { setPaletteSource } from './lightShows'
 import { bodyTracker } from '../engine/bodyTracker'
+import { runSilently } from '../undo'
 
 /** The people the Body page tracks, on the picture (x, y 0..1, y down; r their
  *  height in frame heights) : the Room tracker's everyone, or the one pose. */
@@ -43,16 +44,25 @@ setLightBaseOf((fixture, field) => {
 // (the Picture colors show, and the gradient's "from the picture" : the master's colors)
 setPaletteSource(() => paletteOf(lightRuntime.grid(-1), 4))
 
-/** Now, or `ms` later (an output's delay); dropped if the lights went off meanwhile. */
-function later(ms: number, out: string, fn: () => void): void {
+type Dest = { kind: 'enttec'; index: number } | { kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number; sync?: boolean }
+const destKey = (d: Dest): string => (d.kind === 'enttec' ? `e|${d.index}` : `${d.kind}|${d.host}|${d.universe}`)
+
+// Each place's epoch : bumped when it goes dark, so a frame still held back by an
+// output's delay never lands after its dark one (and never reopens a closed Enttec).
+const epochs = new Map<string, number>()
+const epochOf = (k: string): number => epochs.get(k) ?? 0
+
+/** Now, or `ms` later (an output's delay); dropped if the lights went off meanwhile,
+ *  or if one of the places it feeds (`keys`) went dark since. */
+function later(ms: number, out: string, keys: string[], fn: () => void): void {
   if (ms <= 0) { fn(); return }
+  const at = keys.map(epochOf)
   window.setTimeout(() => {
     const r = useStore.getState().lightRig
+    if (!keys.every((k, i) => epochOf(k) === at[i])) return
     if (r.on && r.outputs.some((o) => o.id === out && o.enabled)) fn()
   }, ms)
 }
-
-type Dest = { kind: 'enttec'; index: number } | { kind: 'artnet' | 'sacn' | 'wled'; host: string; universe: number }
 
 const W = 192
 const H = 108
@@ -79,8 +89,15 @@ class LightRuntime {
   }
 
   private dark(d: Dest): void {
+    const k = destKey(d)
+    epochs.set(k, epochOf(k) + 1)
     if (d.kind === 'enttec') enttec.dark(d.index)
-    else { try { window.api.lightDmx([{ kind: d.kind, host: d.host, universe: d.universe, data: new Uint8Array(512) }]) } catch { /* main gone */ } }
+    else {
+      // (a node in synchronous mode shows the zeros only on an ArtSync)
+      const list: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }> = [{ kind: d.kind, host: d.host, universe: d.universe, data: new Uint8Array(512) }]
+      if (d.kind === 'artnet' && d.sync) list.push({ kind: 'artsync', host: d.host, universe: 0 })
+      try { window.api.lightDmx(list) } catch { /* main gone */ }
+    }
   }
 
   /** Every place fed so far goes dark (the lights off, the page closed, quitting). */
@@ -102,8 +119,14 @@ class LightRuntime {
     // patched costs no readback while the page is closed)
     const reach = rig.on && rig.fixtures.some((f) => rig.outputs.some((o) => o.id === f.out && o.enabled))
     const active = rig.fixtures.length > 0 && (reach || st.lightsPageOpen)
+    // While the page is open every Enttec output that is on stays open, a light on
+    // it or not : the page then says whether it is plugged in, and RDM can ask the
+    // lights on the line before any is on the map (nothing is written for that).
+    const keep = new Set<number>()
+    if (st.lightsPageOpen) for (const o of rig.outputs) if (o.kind === 'enttec' && o.enabled) { keep.add(o.index); enttec.ensure(o.index) }
     if (!active) {
-      if (this.wasActive) { this.darkAll(); comp.dropLights(); enttec.keepOnly(new Set()); this.last = null }
+      if (this.wasActive) { this.darkAll(); comp.dropLights(); this.last = null }
+      enttec.keepOnly(keep)
       this.stats = { fps: 0, universes: 0, enttec: 0, net: 0 }
       this.wasActive = false
       return
@@ -141,9 +164,14 @@ class LightRuntime {
       this.fadeEpoch = st.lightFadeEpoch
     }
     // the cues following on : the next one goes its follow time after this one is in
-    if (st.lightCueRun && st.lightCue) {
+    // (silently : a cue going by itself is not an undo step, as the scene sequencer's)
+    if (st.lightCueRun) {
       const sc = L.scenes.find((x) => x.id === st.lightCue)
-      if (sc?.follow && sc.follow > 0 && now - st.lightCueAt >= ((sc.fade ?? L.master.fadeSec) + sc.follow) * 1000) st.goLightCue(1)
+      if (!sc) {
+        // (the cue in play is gone : the next one goes, or nothing is left to follow)
+        if (L.scenes.some((c) => (c.follow ?? 0) > 0)) runSilently(() => st.goLightCue(1))
+        else st.setLightCueRun(false)
+      } else if (sc.follow && sc.follow > 0 && now - st.lightCueAt >= ((sc.fade ?? L.master.fadeSec) + sc.follow) * 1000) runSilently(() => st.goLightCue(1))
     }
     const wantPeople = rig.fixtures.some((f) => L.looks[f.id]?.effect === 'presence')
     const band = (i: number): number => Math.max(audioBus.feature('band', i * 2), audioBus.feature('band', i * 2 + 1))
@@ -170,7 +198,8 @@ class LightRuntime {
       identify: st.lightIdentify,
       groupLevels: L.groups,
       groupTunes: L.groupTunes,
-      test: st.lightTest !== null ? Math.max(0, now - st.lightTest) / 1000 : null
+      test: st.lightTest !== null ? Math.max(0, now - st.lightTest) / 1000 : null,
+      flashSafe: st.strobeSafe
     })
     this.last = frame
     this.lastAt = now
@@ -185,7 +214,7 @@ class LightRuntime {
         const data = frame.enttec.get(o.index)
         if (!data || used.has(o.index)) continue
         used.add(o.index)
-        later(o.delay, o.id, () => enttec.send(o.index, data))
+        later(o.delay, o.id, [`e|${o.index}`], () => enttec.send(o.index, data))
       }
       const groups = new Map<string, typeof frame.net>()
       for (const p of frame.net) {
@@ -198,7 +227,7 @@ class LightRuntime {
         if (!o) continue
         const list: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }> = packets
         if (o.kind === 'artnet' && o.sync && o.host) list.push({ kind: 'artsync', host: o.host, universe: 0 })
-        later(o.delay, o.id, () => {
+        later(o.delay, o.id, packets.map((p) => `${p.kind}|${p.host}|${p.universe}`), () => {
           try { window.api.lightDmx(list) } catch { /* main not ready yet */ }
         })
       }
@@ -206,11 +235,12 @@ class LightRuntime {
       // what was fed and no longer is : one dark frame
       const fedNow = new Map<string, Dest>()
       for (const o of rig.outputs) if (o.kind === 'enttec' && o.enabled && frame.enttec.has(o.index)) fedNow.set(`e|${o.index}`, { kind: 'enttec', index: o.index })
-      for (const p of frame.net) fedNow.set(`${p.kind}|${p.host}|${p.universe}`, { kind: p.kind, host: p.host, universe: p.universe })
+      for (const p of frame.net) fedNow.set(`${p.kind}|${p.host}|${p.universe}`, { kind: p.kind, host: p.host, universe: p.universe, sync: p.kind === 'artnet' && !!byOut.get(p.out)?.sync })
       for (const [k, d] of this.fed) if (!fedNow.has(k)) this.dark(d)
       this.fed = fedNow
     } else if (this.fed.size) this.darkAll()
-    enttec.keepOnly(used)
+    for (const i of used) keep.add(i)
+    enttec.keepOnly(keep)
     while (this.sentTimes.length && now - this.sentTimes[0] > 1000) this.sentTimes.shift()
     this.stats = { fps: this.sentTimes.length, universes: frame.enttec.size + frame.net.length, enttec: frame.enttec.size, net: frame.net.length }
   }

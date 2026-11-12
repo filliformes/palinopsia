@@ -8,9 +8,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { dataflouBind, openDataflouVisualizer, useDataflouStatus } from '../dataflou'
+import { dataflouBind, meshToModulator, openDataflouVisualizer, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
+import { BoundedNumberInput } from './BoundedNumberInput'
 import { showToast } from './Toast'
-import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfValue } from '@shared/dataflou'
+import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -31,6 +32,7 @@ export function DataflouSection(): JSX.Element {
   const [name, setName] = useState(cfg.label)
   const [univ, setUniv] = useState(cfg.universe)
   const [open, setOpen] = useState<string | null>(null)
+  const [shapeOf, setShapeOf] = useState<string | null>(null)
   useEffect(() => setName(cfg.label), [cfg.label])
   useEffect(() => setUniv(cfg.universe), [cfg.universe])
 
@@ -198,12 +200,26 @@ export function DataflouSection(): JSX.Element {
                 )}
                 {connections.map(({ node, dest, src }) => {
                   const ours = node.local || node.sku === st.companion?.sku || src.sku === st.sku
+                  const key = `${node.sku}/${dest}<${src.sku}/${src.path}`
+                  // a wire into Palinopsia's main node : shaped here (⚙)
+                  const shapeable = node.local && DF_DESTS.some((d) => d.path === dest)
+                  const shaped = !!src.opt
                   return (
-                    <div key={`${node.sku}/${dest}<${src.sku}/${src.path}`} className="flex min-w-0 items-center gap-1 font-mono text-[9px]">
+                    <div key={key} className="flex min-w-0 flex-col">
+                    <div className="flex min-w-0 items-center gap-1 font-mono text-[9px]">
                       <span className={`min-w-0 truncate ${ours ? 'text-text' : 'text-muted'}`} title={`${nameOf(src.sku)}/${src.path} → ${node.label}/${dest}`}>
                         {nameOf(src.sku)}/{src.path} <span className="text-accent2">→</span> {node.local ? st.label : node.label}/{dest}
                       </span>
                       <div className="flex-1" />
+                      {shapeable && (
+                        <button
+                          onClick={() => setShapeOf(shapeOf === key ? null : key)}
+                          className={`shrink-0 rounded px-1 ${shapeOf === key ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : shaped ? 'text-accent2' : 'text-muted hover:text-text'}`}
+                          title={`How this wire plays : the part of the range it covers, turned the other way, smoothed, and what happens when its source goes quiet${shaped ? ' (shaped)' : ''}`}
+                        >
+                          ⚙
+                        </button>
+                      )}
                       <button
                         onClick={() => void dataflouBind(node.sku, dest, src.sku, src.path, false)}
                         className="shrink-0 px-1 text-muted hover:text-danger"
@@ -211,6 +227,8 @@ export function DataflouSection(): JSX.Element {
                       >
                         ✕
                       </button>
+                    </div>
+                    {shapeOf === key && <WireShape dest={dest} src={src} />}
                     </div>
                   )
                 })}
@@ -224,10 +242,13 @@ export function DataflouSection(): JSX.Element {
 }
 
 // ── the data view : what flows in and out, live ─────────────────────────────
-// Each of our destinations with what feeds it (in ↙) and each of our sources
-// someone streams (out ↗) : the value now, its last seconds as a line, where it
-// comes from or goes, how many a second. Asked of main ten times a second, only
-// while it is open.
+// What a connected scenario needs to see : what comes INTO Palinopsia over a
+// wire (in ↙), the outside values you chose to WATCH (◉, from the node list :
+// wired or not), and what Palinopsia SENDS over a wire (out ↗); each with its
+// value now, its last seconds as a line, where it comes from or goes, how many a
+// second. Palinopsia's own values that other nodes merely monitor (a visualizer
+// page asks for all of them) are not wires : one line says who, and how many.
+// Asked of main ten times a second, only while it is open.
 const HIST = 80
 function numOf(v: DfValue | null): number | null {
   if (v === null || v === undefined) return null
@@ -269,7 +290,7 @@ function DataView({ running }: { running: boolean }): JSX.Element {
         if (!alive) return
         const keep = new Set<string>()
         for (const n of list) {
-          for (const [dir, rows] of [['in', n.in], ['out', n.out]] as const) {
+          for (const [dir, rows] of [['in', n.in], ['out', n.out], ['watch', n.watched ?? []]] as const) {
             for (const r of rows) {
               const k = `${n.sku}|${dir}|${r.path}|${r.peers.join(',')}`
               keep.add(k)
@@ -290,15 +311,15 @@ function DataView({ running }: { running: boolean }): JSX.Element {
     const id = window.setInterval(tick, 100)
     return () => { alive = false; window.clearInterval(id) }
   }, [open, running])
-  const total = io.reduce((n, x) => n + x.in.length + x.out.length, 0)
-  const row = (sku: string, dir: 'in' | 'out', r: DfIoRow): JSX.Element => {
+  const total = io.reduce((n, x) => n + x.in.length + x.out.length + (x.watched?.length ?? 0), 0)
+  const row = (sku: string, dir: 'in' | 'out' | 'watch', r: DfIoRow): JSX.Element => {
     const k = `${sku}|${dir}|${r.path}|${r.peers.join(',')}`
     const stale = !r.live || r.ageMs === null || r.ageMs > 2000
     const colour = Array.isArray(r.value) && r.value.length >= 3
     return (
       <div key={k} className={`flex min-w-0 items-center gap-1.5 font-mono text-[9px] ${stale ? 'text-muted' : 'text-text'}`}
         title={`${dir === 'in' ? `${r.peers.join(', ')} → ${r.path}` : `${r.path} → ${r.peers.join(', ')}`}${r.ageMs !== null ? ` · last ${(r.ageMs / 1000).toFixed(1)} s ago` : ' · nothing yet'}${r.live ? '' : ' · not connected'}`}>
-        <span className={`w-3 shrink-0 ${dir === 'in' ? 'text-accent2' : 'text-accent'}`}>{dir === 'in' ? '↙' : '↗'}</span>
+        <span className={`w-3 shrink-0 ${dir === 'in' ? 'text-accent2' : dir === 'watch' ? 'text-text' : 'text-accent'}`}>{dir === 'in' ? '↙' : dir === 'watch' ? '◉' : '↗'}</span>
         <span className="w-28 shrink-0 truncate">{r.label}</span>
         {colour ? (
           <span className="h-3 w-16 shrink-0 rounded-sm border border-border" style={{ background: `rgb(${(r.value as number[]).slice(0, 3).join(',')})` }} />
@@ -306,8 +327,13 @@ function DataView({ running }: { running: boolean }): JSX.Element {
           <Spark pts={hist.current.get(k) ?? []} />
         )}
         <span className="w-14 shrink-0 truncate text-right">{fmt(r.value)}</span>
-        <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : 'to '}{r.peers.join(', ')}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : dir === 'watch' ? '' : 'to '}{r.peers.join(', ')}</span>
         <span className="w-9 shrink-0 text-right text-muted">{r.perSec}/s</span>
+        {dir === 'watch' && r.sku && (
+          <button onClick={() => toggleDfWatch(r.sku!, r.path)} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Stop watching this value">
+            ✕
+          </button>
+        )}
       </div>
     )
   }
@@ -316,19 +342,89 @@ function DataView({ running }: { running: boolean }): JSX.Element {
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left" title="What flows in and out of Palinopsia on the mesh, live">
         <span className={`font-mono text-[9px] text-muted transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
         <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-text">data</span>
-        <span className="font-mono text-[9px] text-muted">in ↙ · out ↗{open ? ` (${total})` : ''}</span>
+        <span className="font-mono text-[9px] text-muted">in ↙ · watching ◉ · out ↗{open ? ` (${total})` : ''}</span>
       </button>
       {open && (
         <>
-          {total === 0 && <span className="font-mono text-[9px] text-muted">nothing flows yet : wire a source to Palinopsia (or Palinopsia to a destination) and its values show here</span>}
-          {io.map((n) => (n.in.length || n.out.length ? (
-            <div key={n.sku} className="flex min-w-0 flex-col gap-0.5">
-              {io.length > 1 && <span className="font-mono text-[9px] text-muted">{n.label} · ↙ {n.rxPerSec}/s ↗ {n.txPerSec}/s</span>}
-              {n.in.map((r) => row(n.sku, 'in', r))}
-              {n.out.map((r) => row(n.sku, 'out', r))}
-            </div>
-          ) : null))}
+          {total === 0 && (
+            <span className="font-mono text-[9px] text-muted">
+              nothing flows yet : wire a source to Palinopsia (or Palinopsia to a destination), or open a node in the network above and watch one of its values (◉)
+            </span>
+          )}
+          {/* in : what plays Palinopsia over a wire, from either of its nodes */}
+          {io.some((n) => n.in.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">into Palinopsia</span>}
+          {io.flatMap((n) => n.in.map((r) => row(n.sku, 'in', r)))}
+          {/* watched : outside values, wired or not */}
+          {io.some((n) => n.watched?.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">watching</span>}
+          {io.flatMap((n) => (n.watched ?? []).map((r) => row(n.sku, 'watch', r)))}
+          {/* out : Palinopsia's values wired to other nodes */}
+          {io.some((n) => n.out.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">from Palinopsia</span>}
+          {io.flatMap((n) => n.out.map((r) => row(n.sku, 'out', r)))}
+          {/* monitored, not wired : one line */}
+          {io.some((n) => n.watchedBy?.length) && (
+            <span className="mt-0.5 font-mono text-[9px] text-muted" title="A visualizer page (or a node watching) asks for every value of Palinopsia to show it : these are not wires, and they cost nothing on Palinopsia's side to speak of">
+              monitored : {io.flatMap((n) => n.watchedBy ?? []).map((w) => `${w.count} values by ${w.label}`).join(' · ')}
+            </span>
+          )}
         </>
+      )}
+    </div>
+  )
+}
+
+/** A wire into Palinopsia, shaped : the part of the destination's range it covers,
+ *  turned the other way, smoothed, and on loss hold or glide back. */
+function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
+  const d = DF_DESTS.find((x) => x.path === dest)
+  const o: DfWireOpt = src.opt ?? {}
+  const num = d?.type === 'number'
+  // a scene number is never smoothed nor glided back (each step would recall one)
+  const glides = num && !d?.discrete
+  const set = (p: Partial<DfWireOpt>): void => {
+    const next = { ...o, ...p }
+    void window.api.dataflouWireOpt({ dest, sku: src.sku, path: src.path, opt: next })
+  }
+  const box = 'input w-11 px-0.5 py-0 text-center text-[9px]'
+  const chip = (on: boolean): string => `rounded px-1 ${on ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-text'}`
+  return (
+    <div className="ml-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-l border-accent2/40 py-0.5 pl-2 font-mono text-[9px] text-muted">
+      {num && (
+        <span className="flex items-center gap-1" title="The part of the destination's range this wire covers (0 to 1) : the source's whole sweep lands between these">
+          range
+          <BoundedNumberInput fixedWidth className={box} value={o.lo ?? 0} min={0} max={1} maxFrac={2} onCommit={(v) => set({ lo: v })} />
+          to
+          <BoundedNumberInput fixedWidth className={box} value={o.hi ?? 1} min={0} max={1} maxFrac={2} onCommit={(v) => set({ hi: v })} />
+        </span>
+      )}
+      <button onClick={() => set({ invert: !o.invert })} className={chip(!!o.invert)} title="Turned the other way : the source's low end plays the high end">
+        invert
+      </button>
+      {glides && (
+        <span className="flex items-center gap-1" title="Smoothing : the control glides to each new value over about this long (ms; 0 : at once). For a jittery sensor. Shared by every wire into this control : the longest counts">
+          smooth
+          <BoundedNumberInput fixedWidth integer className={box} value={o.slewMs ?? 0} min={0} max={10000} onCommit={(v) => set({ slewMs: v })} />
+          ms
+        </span>
+      )}
+      {glides && (
+        <span className="flex items-center gap-1" title="When the source goes quiet for 2 s (a glove out of battery, a computer asleep) : hold its last value, or glide back to where the control was before the wire played it. Shared by every wire into this control : one asking to glide back is enough">
+          on loss
+          <button onClick={() => set({ onLoss: o.onLoss === 'return' ? 'hold' : 'return', returnSec: o.returnSec ?? 2 })} className={chip(o.onLoss === 'return')}>
+            {o.onLoss === 'return' ? 'glide back' : 'hold'}
+          </button>
+          {o.onLoss === 'return' && (
+            <>
+              over
+              <BoundedNumberInput fixedWidth className={box} value={o.returnSec ?? 2} min={0.1} max={60} maxFrac={1} onCommit={(v) => set({ returnSec: v })} />
+              s
+            </>
+          )}
+        </span>
+      )}
+      {src.opt && (
+        <button onClick={() => void window.api.dataflouWireOpt({ dest, sku: src.sku, path: src.path, opt: null })} className="px-0.5 text-muted hover:text-danger" title="Back to a plain wire">
+          reset
+        </button>
       )}
     </div>
   )
@@ -373,6 +469,7 @@ function NodeRow({ n, open, onToggle, ourSku }: { n: DfNodeView; open: boolean; 
 }
 
 function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string }): JSX.Element {
+  const watching = useDfWatches().some((w) => w.sku === n.sku && w.path === p.path)
   // dataflou casts between bool, numbers, vectors and colors, never into a string
   const castable = p.type !== 'string' && p.type !== 'blob'
   const isSource = p.flow !== 'destination' && castable
@@ -392,19 +489,36 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
       </span>
       <span className="shrink-0 text-muted">{range}</span>
       <div className="flex-1" />
+      <button
+        onClick={() => toggleDfWatch(n.sku, p.path)}
+        className={`shrink-0 rounded px-1 ${watching ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'text-muted hover:text-text'}`}
+        title={watching ? 'Watched in the data view : click to stop' : 'Watch this value in the data view, live (wired or not)'}
+      >
+        ◉
+      </button>
       {isSource && (
         <select
           value=""
-          onChange={(e) => e.target.value && void dataflouBind(ourSku, e.target.value, n.sku, p.path, true)}
+          onChange={(e) => {
+            const v = e.target.value
+            const src = { sku: n.sku, path: p.path, label: p.label }
+            if (v === '__macro__') void wireToFreeMacro(src)
+            else if (v === '__mod__') meshToModulator(src)
+            else if (v) void dataflouBind(ourSku, v, n.sku, p.path, true)
+          }}
           className={select}
-          title="Wire this to one of Palinopsia's destinations"
+          title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations"
         >
           <option value="">→ Palinopsia…</option>
-          {DF_DESTS.map((d) => (
-            <option key={d.path} value={d.path}>
-              {d.label}
-            </option>
-          ))}
+          <option value="__macro__">◈ a free Macro knob</option>
+          <option value="__mod__">◈ a free modulator</option>
+          <optgroup label="a destination">
+            {DF_DESTS.map((d) => (
+              <option key={d.path} value={d.path}>
+                {d.label}
+              </option>
+            ))}
+          </optgroup>
         </select>
       )}
       {isDest && (

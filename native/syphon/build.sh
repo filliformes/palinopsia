@@ -30,4 +30,7 @@ npm install --ignore-scripts --no-audit --no-fund
 ELECTRON=$(node -p "require('../../node_modules/electron/package.json').version")
 npx --yes node-gyp@11 rebuild --target="$ELECTRON" --dist-url=https://electronjs.org/headers --arch="$ARCH"
 cp -R frameworks/Syphon.framework build/Release/
+# Load it once in Node : a missing symbol (the client part is built without a Mac
+# to try it on) shows up here, in the CI log, rather than in the app.
+node -e "const m = { exports: {} }; process.dlopen(m, process.argv[1]); const a = m.exports; console.log('syphon addon loads : receives', !!a.receives, '; servers', a.servers().length)" "$PWD/build/Release/syphon.node"
 echo "built native/syphon/build/Release/syphon.node + Syphon.framework (Electron $ELECTRON, $ARCH)"

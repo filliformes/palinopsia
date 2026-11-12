@@ -32,6 +32,10 @@ export const SHADER_BLURBS: Record<string, string> = {
     'The picture as the thickness of a soap film or an oil slick : every thickness gives back its own color, in the orders every bubble shows, slowly running in currents of its own.',
   'node-drape':
     'The picture printed on a sheet of cloth you grab on the preview : it hangs like a curtain, flies like a flag or floats, the wind and the sound move it, people in the Room press into it.',
+  'node-touch':
+    'Makes any picture touchable : lay a hand on the preview (or pinch, or let the Room\'s people walk in) and the picture is pushed, swirled, dragged, magnified or pulled in, then springs back. Its rings mode is a shockwave that a kick or a pad can fire.',
+  'node-ripple':
+    'The picture seen through water : rain, the sound\'s hits, a stone, the picture\'s own motion or a hand trailing through it make rings that travel, cross and come back from the edges (the rim, on the dome).',
   'node-inflate':
     'Blows the layer up into volume : its shape gets a real height, rounded in from its edges, lit as clay, plastic, metal, chrome, soap film or glass, live. Text or a silhouette comes out as liquid chrome.',
   'fx-solarize':
@@ -124,6 +128,14 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Reproduces the artifacts of a heavily compressed still: the picture is cut into blocks, each crushed until fine detail vanishes and edges ring. This is the keyframe look rather than the motion smear. Turn it up and the image becomes a memory of itself.',
   'fx-databend':
     'Tears horizontal bands sideways as if the file itself had been edited in the wrong program. It is about damaging the stream rather than the movement, so it sits differently from Datamosh. Sharp, abrupt and rhythmic.',
+  'fx-time-glitch':
+    'Time smeared, then broken inside its own memory : the picture leaves trails, and on a stepped clock blocks of that memory are dragged, torn, stuck or crushed. Because the memory feeds back, every glitch is smeared and remembered, then glitched again; a second round of damage hits the result on its way out. A burst throws it into a fit of chaos that dies away.',
+  'fx-break':
+    'The picture cracks like a pane hit by a stone : cracks race out from the impact and round it, the pieces tilt and catch the room\'s light on their faces and chamfered edges, then hold, drift apart, fall or heal back together. Hit it from a beat, a click on the preview or a hand, or let it break by itself every few seconds.',
+  'fx-key':
+    'Cuts part of the picture to transparency so the layers below show through : a color (a green cloth, a costume), the grays (keeping only what is colored), everything but the outlines, or one channel. A clean edge with choke, feather and despill; show matte to set it up.',
+  'fx-droste':
+    'The picture inside itself forever, wound into a spiral : each turn goes one level deeper into a smaller copy of the whole frame, and the zoom flies in without end. Wind it in more strands or none (plain nested frames), turn it, and put its center where you click.',
   'fx-pixelsort':
     'Finds runs of pixels within a brightness range and pulls each run toward its brightest value along an axis, so parts of the image pour into smooth streaks. Bright or dark regions can be targeted independently. The signature glitch effect, and still one of the most legible.',
   'fx-ringing':
@@ -184,6 +196,10 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Softens the picture along its own light-and-dark edges and keeps feeding its last frame back in, so the boundaries between forms bleed. Turn the creep up and the melted front walks outward a few pixels a second, the bright side spilling over the dark (or the dark eating in), the image melting at its contours. Unlike a datamosh it is driven by edges, not motion, so it keeps going even on a still picture.',
   'node-faultline':
     'A dirty vision-mixer that throws momentary faults into the picture and stays completely clean between them. A rate and a dirt dial decide how often it fires (or hit the trigger by hand), and each fire drops the signal out, hard-cuts to a frozen frame, knocks the timebase sideways, or sweeps a band of switching noise across the cut. Best on the master chain, where the whole program glitches like circuit-bent kit.',
+  'node-reaction':
+    'Reaction-diffusion grown by the picture : its darks and lights grow different patterns, it plants new growth along its edges or where it moves, and the pattern travels with its motion. The pattern comes back through the picture, inked over it, carved into it, as a matte or as a lens.',
+  'node-fluid':
+    'A real fluid that carries the picture : where the picture moves it stirs the water, its light can rise like smoke, and the water has a restlessness of its own, so any film or generator gets smeared, curled and marbled. Still parts can stay sharp.',
   'node-ibfv':
     'Drags a cloud of dye along a flowing field and keeps topping it up with fresh noise, so the noise smears into long flow-aligned filaments : a wake of material trailing the motion. The field is a slow curl-noise swirl that is always moving (so even a still picture streams) plus the image’s own movement, and the dye can be tinted by the picture so it reads as its own substance flowing. Decays into structure rather than glowing, so it stays matte.',
   'node-remap':

@@ -10,7 +10,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     title: 'Full-page views',
     rows: [
       ['O', 'Output / mapping (in its own window : brings it up)'],
-      ['T', 'Lights : DMX fixtures on the picture, shows, light scenes, the console (on the map : arrows move the selected fixture, Delete removes it, Ctrl+D duplicates it)'],
+      ['T', 'Lights : DMX lights on the picture, shows, cues, the console (on the map : arrows move the selected light, Delete removes it (press again to remove several), Ctrl+D duplicates it)'],
       ['W', 'World editor'],
       ['Q', 'Sequence : the scenes, the Sonify keys and the Body rule timeline (in its own window : brings it up)'],
       ['S', 'Sonify (image → sound; in its own window : brings it up)'],
@@ -31,7 +31,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
       ['V', 'Big preview : fold the panels under it (and back)'],
-      ['Click the preview', 'Play on a source or effect that takes a click (Marbling : a drop · hold : pour · drag : a trail, its comb tool : drag a stylus, ⇧-drag a five-tine comb · Relief : drag to draw · Fur : drag to comb, click to part · Sand Plate : click rings it, drag a finger through the sand · Drape : grab the cloth, let go and it falls) · Body’s Pinch = click : a pinch does the same']
+      ['Click the preview', 'Play on a source or effect that takes a click (Marbling : a drop · hold : pour · drag : a trail, its comb tool : drag a stylus, ⇧-drag a five-tine comb · Relief : drag to draw · Fur : drag to comb, click to part · Sand Plate : click rings it, drag a finger through the sand · Drape : grab the cloth, let go and it falls · Touch : push, swirl, drag or magnify the picture, a shockwave in rings · Ripple : click a stone, drag a finger through the water) · Body’s Pinch = click : a pinch does the same']
     ]
   },
   {

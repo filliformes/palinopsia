@@ -737,6 +737,10 @@ export interface TakeoverConfig extends ControlInputConfig {
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
+  // A Controller modulator played by a value of another dataflou node (a glove
+  // axis) : that node's sku, the parameter's path, how it reads. Beside (not
+  // instead of) a learned MIDI / OSC control; the session keeps it.
+  mesh?: { sku: string; path: string; label: string }
   // Installed by a World's audio routing : the next World replaces it (yours never).
   // Cleared the moment you change it or its bindings : from then on it is yours.
   fromWorld?: boolean
@@ -1066,6 +1070,11 @@ export interface MetaKnobState {
   curve: ModCurve // shapes the 0..1 before mapping to each target's range
   midiCc: { channel: number; number: number } | null
   destinations: ModTarget[] // max META_MAX_DESTS
+  // The knob's range (0..1 of each destination's own range) : the curved
+  // position lands between min and max, so a full turn sweeps only that part.
+  // min above max turns it the other way. Absent : 0 and 1 (older sessions).
+  min?: number
+  max?: number
 }
 
 // The Background slab : the stable ground UNDER the four layers. One source
@@ -1636,11 +1645,23 @@ export interface ExposedApi {
   dataflouStatus: () => Promise<import('./dataflou').DfStatus>
   /** What flows now on our nodes (the data view : polled while it is open). */
   dataflouIo: () => Promise<import('./dataflou').DfIo[]>
+  /** The outside values to watch in the data view (sku + path each). */
+  dataflouWatch: (list: Array<{ sku: string; path: string }>) => void
+  /** The remote values the modulators play (their mesh inputs). */
+  dataflouListen: (list: Array<{ sku: string; path: string }>) => void
+  /** Learn from the mesh : start, the value that moved the most (peek), stop. */
+  dataflouLearn: (op: 'start' | 'peek' | 'stop') => Promise<{ sku: string; path: string; label: string; node: string; span: number } | null>
+  /** A wire into Palinopsia : its range, invert, smoothing and what happens on loss. */
+  dataflouWireOpt: (a: { dest: string; sku: string; path: string; opt: import('./dataflou').DfWireOpt | null }) => Promise<boolean>
+  /** Listened remote values, 0..1 of their range, once a frame. */
+  onDataflouRemote: (cb: (batch: Array<{ sku: string; path: string; v: number }>) => void) => () => void
   dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
   dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>
   dataflouForget: (sku: string) => Promise<boolean>
   onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
   onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
+  /** The mesh visualizer moved the node to another universe (the setting is ours to keep). */
+  onDataflouUniverse: (cb: (name: string) => void) => () => void
   // Ableton Link (src/main/link.ts)
   linkConfigure: (cfg: Partial<LinkConfig>) => Promise<LinkState>
   /** The state without configuring anything : at startup, is Link in this build? */
@@ -1802,6 +1823,14 @@ export interface ExposedApi {
   avfOpen: (id: string) => boolean
   avfClose: (id: string) => void
   avfStatus: (id: string) => import('./avf').AvfStatus | null
+  /** Spout (Windows) / Syphon (macOS) senders on this computer. */
+  shareInList: () => Promise<import('./shareIn').ShareInList>
+  /** Start (or share) receiving one sender; false : no module on this computer. */
+  shareInOpen: (name: string) => boolean
+  shareInClose: (name: string) => void
+  /** The newest frame on the GPU route (the page closes it), or null. */
+  shareInFrame: (name: string) => import('./shareIn').ShareInGpuFrame | null
+  shareInStatus: (name: string) => import('./shareIn').ShareInStatus | null
   // No NDI on this computer : download + verify + open NDI's official installer.
   ndiInstallRuntime: () => Promise<{ ok: boolean; message: string }>
   onNdiInstallProgress: (cb: (p: import('./ndi').NdiInstallProgress) => void) => () => void

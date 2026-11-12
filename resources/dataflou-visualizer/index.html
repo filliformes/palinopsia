@@ -6,10 +6,13 @@
     <title>dataflou visualizer</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
+    <link rel="stylesheet" href="fonts/fonts.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="status">connecting... <span id="ver" style="color:#555"></span>
+        <span id="host-ip" style="display:none"></span>
+        <span id="universe" title="Universe of this node: click to move it to another universe (Enter to switch, Escape to cancel)">universe: &hellip;</span>
         <span id="perf-toggle" title="High performance mode (p): stop streaming remote values and periodic updates to this page">high performance: off</span></div>
     <div id="main-layout">
         <div id="vis"></div>

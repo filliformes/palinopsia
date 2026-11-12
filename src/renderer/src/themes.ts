@@ -243,12 +243,25 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'scan-processor', name: 'Scan Processor', family: 'Analog Video Synthesis',
+    loops: ['scan-relief'],
     blurb: 'Voltage ramps coloured by a CV colorizer and pushed into relief.',
     world: 'parametric',
     palette: [K, [0.4, 0.1, 0.5, 1], [1.0, 0.5, 0.1, 1], [0.9, 0.95, 0.4, 1]],
     sources: ['ramps', 'sync-osc', 'differential', 'column-scan', 'slit-scan'],
     layerFx: ['fx-colorizer', 'fx-rutt', 'fx-posterize', 'fx-wavefold'],
     blends: ['screen', 'add'], gestureTexture: 0.35, coalesce: 0.4
+  }),
+  mk({
+    id: 'noise-matte', name: 'Noise Matte', family: 'Analog Video Synthesis',
+    blurb: 'Raw noise shaped into mattes : banded, cracked and keyed, colored by a voltage colorizer and stacked.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.16, 0.2, 1], [0.6, 0.62, 0.7, 1], [0.92, 0.9, 0.84, 1]],
+    sources: ['noise', 'ramps'],
+    stack: [['noise'], ['noise', 'ramps']],
+    presets: { noise: ['Soft hills', 'Bands', 'Two tone', 'Cracks', 'Ridges', 'Key mask', 'Cells'] },
+    layerFx: ['fx-colorizer', 'fx-posterize', 'fx-grade'],
+    blends: ['multiply', 'difference', 'screen', 'overlay'], layers: [2, 3], useB: 0.2, feedback: 0.1, drift: 0.2,
+    motion: { skip: '^(kind|seed|steps|focus)$' }
   }),
   mk({
     id: 'wobbulator', name: 'Wobbulator', family: 'Analog Video Synthesis',
@@ -294,6 +307,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'signal-loss', name: 'Signal Loss', family: 'Glitch / Datamosh',
+    loops: ['tear-drift', 'band-slip'],
     blurb: 'The picture climbs, catches and tears : sync roll + tracking + line holds.',
     world: 'incongruent',
     palette: [K, [0.12, 0.14, 0.16, 1], [0.75, 0.78, 0.72, 1]],
@@ -324,6 +338,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'dropout', name: 'Dropout', family: 'Glitch / Datamosh',
+    loops: ['band-slip', 'tear-drift'],
     blurb: 'A worn tape dub : generation-loss chroma bleed, jitter and dropout lines.',
     world: 'presse',
     palette: [K, [0.28, 0.2, 0.12, 1], [0.82, 0.72, 0.55, 1]],
@@ -353,6 +368,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'cut-up', name: 'Cut-Up', family: 'Glitch / Datamosh',
+    loops: ['torn-echo', 'bar-grab', 'beat-stutter'],
     blurb: 'The frame diced into cells that jump and re-shuffle on the beat : a live collage.',
     world: 'incongruent',
     palette: [INK, [0.14, 0.16, 0.2, 1], [0.9, 0.9, 0.88, 1]],
@@ -370,6 +386,45 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-wide-time', 'fx-slit-buffer'],
     nativeNodes: ['node-chronoscan'], nativeChance: 0.9,
     blends: ['screen', 'add'], drift: 0.4, coalesce: 0.3
+  }),
+  mk({
+    id: 'glitched-memory', name: 'Glitched Memory', family: 'Glitch / Datamosh',
+    blurb: 'Time smeared and broken inside its own memory : trails dragged, torn and crushed, then glitched again on the way out.',
+    world: 'parametric',
+    palette: [K, [0.16, 0.08, 0.24, 1], [0.78, 0.36, 0.42, 1], [0.92, 0.9, 0.84, 1]],
+    sources: ['murmuration', 'particle-drift', 'drift-field', 'slabs', 'filaments', 'shapes'],
+    layerFx: ['fx-grade', 'fx-chroma-shift', 'fx-posterize'],
+    stackFx: [['fx-time-glitch'], ['fx-time-glitch']],
+    presets: { 'fx-time-glitch': ['Lit memory', 'Smeared memory', 'Light painting gone wrong', 'Codec rot', 'Torn tape', 'Breathing outward'] },
+    blends: ['screen', 'lighten', 'difference'], layers: [1, 2], useB: 0.15, feedback: 0, gestureTexture: 0.6, coalesce: 0.3,
+    motion: { ...STEPPED, skip: '^(sync|blocks|audio|mode)$' }
+  }),
+  mk({
+    id: 'broken-glass', name: 'Broken Glass', family: 'Glitch / Datamosh',
+    blurb: 'A pane over the picture, hit again and again : cracks race out, the shards tilt into the light, fall or heal.',
+    world: 'synthetic',
+    palette: [K, [0.12, 0.14, 0.18, 1], [0.6, 0.66, 0.72, 1], [0.94, 0.94, 0.92, 1]],
+    sources: ['organic', 'op-art', 'congeal', 'interference', 'dye-field'],
+    stack: [['dye-field', 'drift-field', 'swell', 'membrane'], ['organic', 'op-art', 'congeal', 'interference', 'slabs']],
+    stackFx: [[], ['fx-break']],
+    presets: { 'fx-break': ['Pane', 'Falling glass', 'Drifting shards', 'Every bar', 'Heavy stone', 'Ice', 'Smash on the half note'] },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, coalesce: 0.35,
+    motion: { mods: [1, 2], skip: '^(every|sync|after|shards|rings|time|hitX|hitY|scatter)$' }
+  }),
+
+  mk({
+    id: 'glitch-loop', name: 'Glitch Loop', family: 'Glitch / Datamosh',
+    blurb: 'The damage goes round the loop : tears, slips, sorted drips and frozen bands that every pass remembers and smears further.',
+    world: 'synthetic',
+    // (a lifted middle : on Incongruent and a dark second stop, two draws in three sat at 0.09)
+    palette: [K, [0.24, 0.2, 0.28, 1], [0.86, 0.52, 0.4, 1], [0.92, 0.9, 0.84, 1]],
+    // (full-frame sources : the loop has something to tear everywhere)
+    sources: ['swell', 'drift-field', 'dye-field', 'congeal'],
+    loops: ['tear-drift', 'band-slip', 'sort-drip', 'freeze-bands', 'slice-drag', 'torn-echo', 'beat-stutter', 'step-spiral'],
+    loopChance: 1,
+    layerFx: ['fx-chroma-shift', 'fx-scanlines'],
+    blends: ['screen', 'lighten'], feedback: 1, layers: [1, 2], gestureTexture: 0.6, coalesce: 0.35, drift: 0.3
   }),
 
   // ── Cameraless / Direct Film ──────────────────────────────────────────
@@ -472,6 +527,18 @@ export const THEMES: Theme[] = [
     blends: ['difference', 'overlay', 'weave'], useB: 0.35,
     mixBlends: ['weave', 'difference']
   }),
+  mk({
+    id: 'endless-spiral', name: 'Endless Spiral', family: 'Optical / Op-Art',
+    blurb: 'A pattern wound into itself forever : a spiral of the whole frame, flying inward without end.',
+    world: 'parametric',
+    palette: [INK, [0.18, 0.18, 0.2, 1], [0.84, 0.82, 0.78, 1]],
+    sources: ['op-art', 'interference', 'shapes', 'ten-print', 'slabs'],
+    layerFx: ['fx-posterize', 'fx-grade'],
+    stackFx: [['fx-droste']],
+    presets: { 'fx-droste': ['Spiral', 'Two strands', 'Nested frames', 'Round window', 'Framed', 'Wound backward'] },
+    blends: ['difference', 'screen'], layers: [1, 1], useB: 0.25, feedback: 0,
+    motion: { skip: '^(strands|arms|shape|cx|cy)$' }
+  }),
 
   // ── Organic / Reaction-Diffusion ──────────────────────────────────────
   mk({
@@ -526,6 +593,59 @@ export const THEMES: Theme[] = [
     sources: ['organic', 'erosion', 'dye-field'],
     layerFx: ['fx-light-trails', 'fx-grain', 'fx-grade'],
     blends: ['screen', 'lighten'], feedback: 0.45, density: 0.4, drift: 0.3
+  }),
+  // The field effects : the picture grows the pattern, the water carries the picture.
+  mk({
+    id: 'grown-over', name: 'Grown Over', family: 'Organic / Reaction-Diffusion',
+    blurb: 'A moving picture overgrown by reaction-diffusion : its darks and lights grow their own patterns, out of its edges, along its motion.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.14, 0.1, 1], [0.78, 0.8, 0.7, 1]],
+    sources: ['organic', 'swell', 'dye-field', 'congeal', 'op-art', 'shapes'],
+    stackFx: [['node-reaction']],
+    presets: { 'node-reaction': ['Grown through', 'Edges grow', 'Carved', 'Warm and cool', 'Motion bloom'] },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.25, feedback: 0, density: 0.55, coalesce: 0.55, drift: 0.2,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp)$' }
+  }),
+  mk({
+    id: 'coral-print', name: 'Coral Print', family: 'Organic / Reaction-Diffusion',
+    blurb: 'Coral, mazes and spots printed over the picture in bone or ink, where its lights and edges ask for them.',
+    world: 'sublimated',
+    palette: [K, [0.24, 0.18, 0.14, 1], [0.88, 0.82, 0.72, 1]],
+    sources: ['organic', 'dye-field', 'swell', 'ground', 'membrane'],
+    stackFx: [['node-reaction']],
+    presets: { 'node-reaction': ['Coral print', 'Ink maze', 'Lights bloom', 'Spotted matte'] },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['normal', 'screen'], layers: [1, 2], useB: 0.2, feedback: 0, density: 0.5, drift: 0.15,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp)$' }
+  }),
+  mk({
+    id: 'ink-current', name: 'Ink Current', family: 'Organic / Reaction-Diffusion',
+    blurb: 'The picture poured into moving water : stirred where it moves, curled and marbled by a current of its own.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.12, 0.18, 1], [0.7, 0.76, 0.8, 1]],
+    sources: ['op-art', 'shapes', 'organic', 'ten-print', 'congeal', 'interference'],
+    stackFx: [['node-fluid']],
+    presets: { 'node-fluid': ['Marbled', 'Stirred', 'Fine curls', 'Broad tide', 'Storm'] },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten', 'normal'], layers: [1, 2], useB: 0.2, feedback: 0, density: 0.5, drift: 0.25,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail)$' }
+  }),
+  mk({
+    id: 'rising-smoke', name: 'Rising Smoke', family: 'Organic / Reaction-Diffusion',
+    blurb: 'Light that rises as smoke : the bright parts of the picture lift, curl and thin out, the dark ones settle.',
+    world: 'sublimated',
+    palette: [K, [0.14, 0.12, 0.12, 1], [0.82, 0.78, 0.74, 1]],
+    sources: ['particle-drift', 'ash', 'filaments', 'shapes', 'organic'],
+    stackFx: [['node-fluid']],
+    presets: { 'node-fluid': ['Smoke rise', 'Sinking ink', 'Slow syrup'] },
+    layerFx: ['fx-grade', 'fx-grain'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.15, feedback: 0, density: 0.45, drift: 0.3,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail)$' }
   }),
 
   // ── Data / Parametric ─────────────────────────────────────────────────
@@ -621,6 +741,30 @@ export const THEMES: Theme[] = [
     pickInputs: { 'node-drape': { behind: [0], people: [0] } },
     layerFx: ['fx-grade'],
     blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
+    id: 'pond', name: 'Pond', family: 'Living Surfaces',
+    blurb: 'The picture under water : rain rings it, what moves in it stirs it, a hand trails through it.',
+    world: 'sublimated',
+    palette: [K, [0.06, 0.1, 0.12, 1], [0.62, 0.74, 0.76, 1]],
+    sources: ['dye-field', 'organic', 'op-art', 'membrane', 'swell'],
+    stackFx: [['node-ripple']],
+    presets: { 'node-ripple': ['Pond', 'Downpour', 'Moving water', 'Bath', 'Ink water', 'Mercury pool', 'Boat wake'] },
+    pickInputs: { 'node-ripple': { people: [0], audio: [0], refract: [0.6, 0.7, 0.8] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
+  }),
+  mk({
+    id: 'a-hand-in-it', name: 'A Hand in It', family: 'Living Surfaces',
+    blurb: 'An unseen hand moves through the picture : it drags it, rings it, swirls it, and the picture springs back behind it. Lay your own on the preview.',
+    world: 'synthetic',
+    palette: [K, [0.1, 0.09, 0.08, 1], [0.8, 0.74, 0.66, 1]],
+    sources: ['op-art', 'organic', 'dye-field', 'ramps', 'congeal'],
+    stackFx: [['node-touch']],
+    presets: { 'node-touch': ['Ghost hand', 'Wake of rings', 'Drifting lens'] },
+    pickInputs: { 'node-touch': { wander: [0.5, 0.7, 0.9], people: [0], audio: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], useB: 0.25, feedback: 0, layers: [1, 1], drift: 0.25, coalesce: 0.5, bgOpacity: 0.6
   }),
   mk({
     id: 'cross-loop', name: 'Cross Loop', family: 'Feedback / Afterimage',
@@ -968,6 +1112,19 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], useB: 0.1, layers: [1, 2], density: 0.25, drift: 0.2,
     context: { depth: 0.4, haze: 0.14, trails: 0.16 }
   }),
+  mk({
+    id: 'cut-by-color', name: 'Cut by Color', family: 'Minimal / Structural',
+    blurb: 'One layer keyed over another : only its colors, its outlines or its lights left standing on the ground below.',
+    world: 'monomedia',
+    palette: [INK, [0.14, 0.15, 0.18, 1], [0.86, 0.84, 0.8, 1]],
+    sources: ['op-art', 'interference', 'shapes', 'slabs', 'organic'],
+    stack: [['dye-field', 'swell', 'drift-field', 'membrane'], ['op-art', 'interference', 'shapes', 'slabs', 'organic', 'congeal']],
+    stackFx: [[], ['fx-key']],
+    presets: { 'fx-key': ['Colors on gray', 'Only the vivid', 'Outlines', 'Bold outlines', 'Brightness as alpha', 'Black cut out'] },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.35,
+    motion: { skip: '^(mode|channel|invert|showMatte|color)$' }
+  }),
 
   // ── Datamosh & Compression (from the glitch research) ─────────────────
   mk({
@@ -1033,6 +1190,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'databent', name: 'Databent', family: 'Datamosh & Compression',
+    loops: ['band-slip', 'tear-drift', 'slice-drag'],
     blurb: 'Editing the stream, not the picture : bands tear and hold, channels drift, the signal breaks.',
     world: 'incongruent',
     palette: [K, [0.16, 0.16, 0.18, 1], [0.78, 0.78, 0.72, 1]],
@@ -1043,6 +1201,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'pixel-sort', name: 'Pixel Sort', family: 'Datamosh & Compression',
+    loops: ['sort-drip'],
     blurb: 'Brightness pulled into clean monotone streaks : the sorted-pixel light-leak.',
     world: 'sublimated',
     palette: [K, [0.3, 0.12, 0.28, 1], [1.0, 0.75, 0.55, 1]],
@@ -1532,6 +1691,19 @@ export const THEMES: Theme[] = [
     context: { depth: 0, haze: 0.1, bloom: 0.18 }
   }),
   mk({
+    id: 'dome-pool', name: 'Pool Overhead', family: 'Dome',
+    blurb: 'The sky as the surface of a pool seen from below : rings travel to the rim and come back from all round.',
+    world: 'sublimated',
+    palette: [K, [0.04, 0.1, 0.13, 1], [0.5, 0.7, 0.75, 1]],
+    sources: ['dye-field', 'swell', 'membrane', 'op-art'],
+    stackFx: [['node-ripple']],
+    presets: { 'node-ripple': ['Pond', 'Bath', 'Boat wake', 'Mercury pool'] },
+    pickInputs: { 'node-ripple': { people: [0], audio: [0], edges: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 1], useB: 0.2, feedback: 0, drift: 0.2, density: 0.45,
+    context: { depth: 0 }
+  }),
+  mk({
     id: 'dome-canopy', name: 'Canopy', family: 'Dome',
     blurb: 'Branching threads growing overhead, like looking up through a forest.',
     world: 'musical',
@@ -1779,6 +1951,39 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     nativeNodes: ['node-remap'], nativeChance: 0.95, nativeFrom: 1,
     blends: ['normal', 'screen'], layers: [2, 2], useB: 0
+  }),
+  mk({
+    id: 'workshop-noise-garden', name: 'Noise Garden', family: 'Node Workshop',
+    blurb: 'A hidden noise field steers reaction-diffusion over a picture : where the noise is light one pattern grows, where it is dark another.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.14, 0.12, 1], [0.8, 0.8, 0.72, 1]],
+    sources: ['organic', 'swell', 'dye-field', 'op-art'],
+    stack: [['noise'], ['organic', 'swell', 'dye-field', 'op-art']],
+    presets: { noise: ['Soft hills', 'Bands', 'Cells', 'Marble'], 'node-reaction': ['Grown through', 'Lights bloom', 'Carved'] },
+    stackFx: [[], ['node-reaction']],
+    reads: { 'node-reaction': 0 },
+    muted: [0],
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(look|steer|plantFrom|scale|sharp|kind|seed|steps|focus)$' }
+  }),
+  mk({
+    id: 'workshop-noise-water', name: 'Noise Water', family: 'Node Workshop',
+    blurb: 'A picture carried by water that a hidden, slowly turning noise field keeps stirring.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.1, 0.14, 1], [0.74, 0.76, 0.8, 1]],
+    sources: ['op-art', 'shapes', 'ten-print', 'organic'],
+    stack: [['noise'], ['op-art', 'shapes', 'ten-print', 'organic']],
+    presets: { noise: ['Soft hills', 'Clouds', 'Beat fields'], 'node-fluid': ['Marbled', 'Stirred', 'Fine curls'] },
+    pickInputs: { noise: { drift: [0.3, 0.5, 0.8], evolve: [0.2, 0.4] }, 'node-fluid': { motion: [0.9, 1], rise: [0.3, 0.6] } },
+    stackFx: [[], ['node-fluid']],
+    reads: { 'node-fluid': 0 },
+    muted: [0],
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0,
+    vibe: { mixSrc: 1 },
+    motion: { skip: '^(detail|kind|seed|steps|focus)$' }
   }),
   mk({
     id: 'workshop-focus', name: 'Focus Pull', family: 'Node Workshop',

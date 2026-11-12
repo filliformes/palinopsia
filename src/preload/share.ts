@@ -10,6 +10,7 @@
 // refilled. If the addon won't run in this process, shareLocal() says so and the
 // page falls back to the main-process sender (src/main/output.ts).
 
+import { existsSync } from 'fs'
 import { join } from 'path'
 
 type ShareAddon = {
@@ -20,13 +21,42 @@ type ShareAddon = {
 }
 
 let mod: ShareAddon | null = null
+let loadError = ''
 let open = false
 let port: MessagePort | null = null
 
 function addonPath(kind: string): string {
-  // out/preload → the project (dev) or app.asar (packaged, unpacked beside it).
-  const root = join(__dirname, '..', '..').replace(/app\.asar(?=$|[\\/])/, 'app.asar.unpacked')
-  return join(root, 'native', kind, 'build', 'Release', `${kind}.node`)
+  // out/preload → the project (dev) or app.asar (packaged, unpacked beside it);
+  // a copy built elsewhere (tools/test-build.sh : <out>/preload) keeps the
+  // addons one folder up, beside main/.
+  const at = (root: string): string =>
+    join(root.replace(/app\.asar(?=$|[\\/])/, 'app.asar.unpacked'), 'native', kind, 'build', 'Release', `${kind}.node`)
+  const first = at(join(__dirname, '..', '..'))
+  if (existsSync(first)) return first
+  const near = at(join(__dirname, '..'))
+  return existsSync(near) ? near : first
+}
+
+/** The platform's addon (Spout on Windows, Syphon on macOS), loaded once in
+ *  this process : the sender here and the Spout input (shareIn.ts) share it.
+ *  Null when it is missing from this build or will not load. */
+export function shareAddon<T = ShareAddon>(): { mod: T | null; error: string } {
+  if (mod) return { mod: mod as unknown as T, error: '' }
+  if (loadError) return { mod: null, error: loadError }
+  const kind = process.platform === 'win32' ? 'spout' : process.platform === 'darwin' ? 'syphon' : null
+  if (!kind) {
+    loadError = 'not available on this platform'
+    return { mod: null, error: loadError }
+  }
+  try {
+    const m = { exports: {} as ShareAddon }
+    process.dlopen(m as unknown as NodeModule, addonPath(kind))
+    mod = m.exports
+    return { mod: mod as unknown as T, error: '' }
+  } catch (e) {
+    loadError = (e as Error).message
+    return { mod: null, error: loadError }
+  }
 }
 
 /** Start / stop the sender here. `topDown` : frames may come top-down. */
@@ -37,16 +67,12 @@ export function shareLocal(on: boolean): { ok: boolean; topDown: boolean; error?
     return { ok: true, topDown: false }
   }
   if (open) return { ok: true, topDown: !!mod?.topDown }
-  const kind = process.platform === 'win32' ? 'spout' : process.platform === 'darwin' ? 'syphon' : null
-  if (!kind) return { ok: false, topDown: false, error: 'not available on this platform' }
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return { ok: false, topDown: false, error: 'not available on this platform' }
   try {
-    if (!mod) {
-      const m = { exports: {} as ShareAddon }
-      process.dlopen(m as unknown as NodeModule, addonPath(kind))
-      mod = m.exports
-    }
-    open = mod.open('Palinopsia')
-    return open ? { ok: true, topDown: !!mod.topDown } : { ok: false, topDown: false, error: 'the sender did not open' }
+    const a = shareAddon()
+    if (!a.mod) return { ok: false, topDown: false, error: a.error }
+    open = a.mod.open('Palinopsia')
+    return open ? { ok: true, topDown: !!a.mod.topDown } : { ok: false, topDown: false, error: 'the sender did not open' }
   } catch (e) {
     return { ok: false, topDown: false, error: (e as Error).message }
   }

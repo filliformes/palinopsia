@@ -7,6 +7,115 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Touch and Ripple : any picture touchable, and the picture seen through water** (Vincent :
+  "build Topographic Flow, Touch, Shockwave and Ripple"; the shelf's *Touch : an FX that
+  makes any picture touchable [...] from the mouse, every pinching hand, Room people or OSC,
+  so all generators and every film answer the hand; absorbs the shelf Shockwave* and
+  *Ripple : the picture seen through water [...] on the dome the circle rim is the
+  reflecting boundary. Keep the crest shine matte, never a glossy glow*). Two native nodes,
+  any rack (the master too), sharing their input points (`engine/touchInput.ts` : the
+  pointer through `pointerInput.ts`, every pinching hand, the Room's people, an OSC
+  finger, the effect's own point, a wandering hand; the field space is the flat frame or,
+  under dome fill, the dome's disc).
+  - **Touch** (`node-touch`, `engine/touchNode.ts`) : modes rings (the Shockwave, a
+    first-class mode : a ring of displacement bursting from the touch and traveling out,
+    a wake of rings while dragged), spread, swirl, drag (the field is carried along under
+    the hand), lens, attract; follow, fade, spring (creep or jelly), soft; FIRE at the
+    center / the point / anywhere, sound hits (a shockwave on the kick), people push, by
+    itself, press the point; matte shade, color split. A displacement field at half the
+    height (at most 720 rows, RGBA32F where it filters), relaxed by a damped spring; rings
+    (16) and lenses (8) drawn over it from uniforms; one warp pass.
+  - **Ripple** (`node-ripple`, `engine/rippleNode.ts`) : a wave height field (RGBA32F,
+    200 to 720 rows, a third of the height), substepped so rings travel at the same speed
+    at any size; rain, sound hits, the stone trigger, its own motion (luma change on the
+    grid), the hand (a stone, then a finger that leaves a wake), people wade, by itself;
+    reflect or absorb edges (on the dome the disc's rim is the wall); refraction with a
+    color split, matte crest light, water color in the troughs.
+  - `/opsia/touch x y [s]`, `/opsia/touch/hold x y`, `/opsia/touch/up` (every Touch and
+    Ripple); each effect's own inputs (`fire`, `stone`, `point` …) as for every effect.
+  - 14 Touch presets, 12 Ripple presets; the chain group **Touch and water** (Touch the
+    Picture, Shockwave on the Kick, Jelly Picture, A Hand of Its Own, Through the Water,
+    Drops on the Kick, Downpour, Water You Touch) and **Dome · Pool**; themes **Pond**,
+    **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome); Ripple joins the
+    dice's effects.
+- **Time Glitch, Break, Key and Droste : four new effects** (Vincent, quoting a user : "a
+  kind of time effect mixed with chaotic glitch, so you drop it, it warps time a bit like
+  Sediment / Wide Time / trails, but then glitches those trails inside its feedback loop
+  and post too"; and from the shelf : Shatter (impact fracture), one Key FX with modes, the
+  Droste spiral).
+  - **Time Glitch** (`fx/TimeGlitch.fs`, ISF, `fx-time-glitch`) : a memory of the recent
+    past (8-bit, stochastic rounding, as Wide Time; mode lights / smear / darks, drift) in
+    which a stepped clock (`PH_timeGlitch` : rate up to 16 Hz or a tempo division) damages
+    blocks INSIDE the loop (moved, torn along their row, stuck, crushed, red and blue split),
+    so each glitch is smeared, remembered and glitched again; `after` deals a second round
+    on the way out (block jumps, row tears, the split, channels turned), not kept. A 1x1
+    latch carries the layer clock and the `burst ▸` envelope (`burstLen`); `audio` per
+    block column. The memory step is folded again in the output pass (no frame late). The
+    split first ran a touch everywhere every frame : it streamed every trail into a
+    rainbow, so it acts in the damaged blocks only; the default mode is **lights** (the
+    mean smeared sparse light-on-black sources to nothing : murmuration 0.03 mean
+    brightness, 0.26 with lights). 2.9 ms at 4K (shader rig).
+  - **Break** (`fx/Break.fs`, ISF, `fx-break`; the frame-store Shatter keeps its name) :
+    one fragment shader. Polar cells round the impact (radial cracks, rings in a geometric
+    run, both wandering on value noise, a `broken` share of segments missing), the piece
+    under each pixel found by walking back along the way the pieces move (14 steps), each
+    piece moved / turned / tilted per **then** (hold, drift, fall, heal; fall runs out to
+    the rim on the full dome through `domeDir`), its face lit from a fixed room light, the
+    chamfer within a few pixels of each crack sloping outward (a mirror highlight mixed
+    toward a pale room light, never added), refraction by the tilt. A 4x1 state pass keeps
+    the age (16 bits), the hit count (a new crack pattern each hit), the latched impact
+    point, the layer clock and the automatic step (`PH_breakAuto` : every N s or a tempo
+    division). The hit : `break ▸`, a click on the preview, a pinch, or automatic, round
+    `hitX` / `hitY` by `scatter`. 4.0 ms at 4K (shader rig), 60 fps at 1080p.
+  - **Key** (`fx/Key.fs`, ISF, `fx-key`, Utility) : color (the angle off the key's hue in
+    Cb / Cr, a minimum chroma, despill of only the excess along the key), saturation,
+    edges (the brightness spread over a ring), channel (brightness / R / G / B / alpha);
+    tolerance, softness, choke (min / max over the ring), feather, invert, show matte; the
+    alpha goes to the layer blend. Nine reads, 0.9 ms at 4K.
+  - **Droste** (`fx/Droste.fs`, ISF, `fx-droste`) : log space times
+    `gamma = arms - i strands log(scale) / 2pi` (whole numbers keep it seamless), folded
+    into one level against the frame's own box or a circle, `PH_zoom` / `PH_spin`
+    integrated; edge line and a vanishing point that settles to the mean. 0.8 ms at 4K.
+  - **The preview pointer takes ISF effects** (`pointerInput.ts`, registry field
+    `pointer`) : a click on the preview sets Break's impact point and fires it, a click or
+    a drag sets Droste's center (the mouse : an undoable edit; a pinch : live).
+  - Key and Droste stay out of every dice (`HAND_FX` in `randomize.ts`; Droste dealt into
+    six random scenes vanished into the textures or took the whole layer); Key's color,
+    mode, channel and views are never rolled. Time Glitch and Break deal (Break never into
+    hold).
+  - 10 presets each, Inspector groups and grey-outs (`GroupedControls.tsx`), the chain
+    group **Glitch** (Glitched Memory, Rotten Trails, Smashed Screen, Healing Glass,
+    Outlines Only, Color Isolate) and Droste Spiral / Frames in Frames (Space), the
+    Generate themes **Glitched Memory**, **Broken Glass** (Glitch / Datamosh), **Endless
+    Spiral** (Optical / Op-Art), **Cut by Color** (Minimal / Structural).
+  - Fulldome gate : all four PASS (60 fps flat and on the dome, p95 17-17.3 ms, 59.7
+    updates a second at the defaults and at the heaviest settings).
+
+    **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome). (Ripple first joined
+    the dice's effects; the audit below kept it hand-placed.)
+- **Glitch loops : fifteen new Loop rack recipes** (Vincent : "I'd also want more recipes for the
+  Feedback layer, and more experimental, glitchy ones"). `loopRecipes.ts`. The glitch family runs INSIDE
+  the loop, so the damage compounds, is remembered and smeared by every pass : **Bit rot** (Byte Corrupt +
+  a creeping Transform), **Recompress** (Compress), **Tear drift** (Slice Shuffle, a hair a frame), **Band slip**
+  (Databend), **Sort drip** (Pixel Sort + a downward pan), **Freeze bands** (a slow spiral through Stutter),
+  **Tape rot** (Tracking, 90 ms delay), **Scan relief** (Rutt, lighten), **Slice drag** (Streak + Slice
+  Shuffle), **Ink latch** (Threshold + Displace, half back), **Crawl stain** (Crawl); and loops on the
+  tempo : **Torn echo** (an eighth-note echo through Slice Shuffle), **Bar grab** (Shatter grabbing on the
+  bar), **Beat stutter** (a sixteenth delay through Stutter), **Step spiral** (Decimate on the eighth
+  note before the zoom : a stop-motion spiral). Each soaked 60 s on a film and on a generator (mean light,
+  near-black and near-white shares at 5 s and 60 s, flashes a second per sixth of the frame, change over
+  a second) : none collapses, none flashes 3 times a second. Mosh Blocks stays out of every recipe.
+  Each ran 20 s more under the full dome (fisheye fill) : same numbers, except that Tape rot's band runs
+  in rings there (Tracking's dome form), so its loop builds a pale ring at the rim.
+  - The recipe menu is grouped (`<optgroup>` : feedback, glitch, echoes and beats; `LOOP_GROUPS`).
+  - `dice: false` keeps a recipe to the menu : Bit rot, Recompress, Ink latch and Crawl stain (the most
+    destructive) and Tape rot (it rings the dome's rim) are never dealt by the layer dice
+    (`DICE_LOOP_RECIPES`) or a theme (Generate checks the flag too; Dropout deals Band slip and Tear
+    drift instead). A loop is only named as a recipe that comes back on a delay or the tempo when its
+    own timing matches (a hand-built Stutter loop is not Beat stutter).
+  - Generate : new theme **Glitch Loop** (Glitch / Datamosh : every layer feeds back through a glitch or
+    beat loop), and glitch loops for Signal Loss, Dropout, Cut-Up, Databent, Pixel Sort and Scan Processor.
+
 - **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
   nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
   his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this
@@ -318,6 +427,23 @@ that CI builds into cross-platform releases.
     its text). In the test copy : the guide adding the bars from the Output page's LIGHTS
     button, the test's band on the map, two setups switched, back to Output. **Not
     verified : a real Enttec, the real bars.**
+- **Lights : RDM, the lights answer back** (Vincent : "build RDM so the app finds the bars
+  and sets their addresses"). `lights/rdm.ts` : E1.20 packets (built, read, checksums),
+  the discovery's binary search over the 48-bit ids (DISC_UNIQUE_BRANCH, the answers
+  decoded, a clash split, MUTE / UN_MUTE; a clash that reads as a valid id is split when
+  no light answers its mute), DEVICE_INFO, labels, DMX_PERSONALITY(_DESCRIPTION),
+  DMX_START_ADDRESS, IDENTIFY_DEVICE, ACK_TIMER waited. Through the Enttec Pro's own
+  messages (`enttec.ts` : label 7 a request, 11 a discovery branch, 5 the answer after a
+  status byte, 12 nothing in time, 10 the serial number : our id is 454E:<serial>); the
+  link now reads (`EnttecReader`, a read loop closed with the port). The page : **Ask the
+  lights (RDM)** under the Set up guide (find, blink, mode, address, address in a row,
+  put on the map : `addLightsFromLine`, `profileForFootprint`). Tested : 21 Node checks
+  against a simulated line (six bars incl. far ids, one silent, one that will not stay
+  muted, 24 close ids, a NACK, an ACK_TIMER) and a simulated Pro (its labels, answers cut
+  in two, noise); in the test copy through the real Web Serial path with a fake Pro on
+  `navigator.serial` and two bars (found, one switched from 5CH to 90CH, addressed 1 and
+  91, blink on then off when the page closed, put on the map as 30-zone bars). **Not
+  verified : a real Pro, real lights.**
 - **Lights : more to modulate, a grade per group, three more masters** (Vincent : "I
   should be able to modulate more stuff inside the Lights section, especially in the
   Tuning section of the groups. Also : add more master controls, like master brightness,
@@ -340,8 +466,261 @@ that CI builds into cross-platform releases.
   elsewhere on unwired paths show for 10 s. `DataflouNode.io()` (main) counts per path in
   `deliver()` and per stream in the pump, rolled each second; `dataflou:io` IPC, polled at
   10 Hz only while the box is open (folding remembered in `opsia.dfData`).
+- **Macro : destination capsules and a range per knob** (Vincent : "add macro
+  destinations capsules (like on the top of the Modulation tab) to the Macro tab" and
+  "add a min max to the Macro knobs so I can use them to scale the data better"). The
+  Macro title bar carries a capsule per destination, knob by knob (`MacroDests` in
+  `MetaBar.tsx`; the label is the Modulation chips' own, hoisted to
+  `describeModTarget`), with the count under the name; a capsule lights its knob, **×**
+  takes the destination off. Each knob gets a **range** (`MetaKnobState.min` / `max`,
+  optional, 0..1 of each destination's range; min above max turns it the other way) :
+  a bar with two ends to drag and two numbers to type, under the curve. One `knobOut()`
+  (curve, then range) serves every path a knob takes (glides, the settle-time fan-out,
+  a modulator on the knob), so a drag, MIDI, OSC and a modulator land the same. The
+  destinations follow a range change at once (through the knob's own overlay at rest;
+  a modulated knob is left to its modulator). Sanitized on load, compared by the
+  persistence gate, glided by morphs. OSC `/opsia/macro/{k}/min|max` (and in OSCQuery).
+  Two more lines in the Macro row.
+- **dataflou : scenes, and the visualizer of 11-11** (Vincent : "integrate the new
+  dataflou packages (from the recently pulled repo) into a new version of Palinopsia").
+  The dataflou core (Alexandre Burton, 518c67f) added **scenes** : sets of connections
+  each node keeps for itself in 16 slots, recalled or stored by a cue the universe shares
+  (Lamport counter, then the CRC32 of the sender's sku, so concurrent cues converge),
+  relayed once by each node, carried by HELLO and DIGEST for late joiners, a node's
+  status (none / applied / modified / missing, its slots, skipped) in its DECLARE.
+  Palinopsia's TypeScript node now speaks it (`protocol.ts` : `scene` [slot, counter,
+  origin] on HELLO / DIGEST, `scene_status` on DECLARE, the SCENE message, as strict as
+  the core's decoder; `node.ts` : load / store / apply / merge, a restart in the same cue
+  does not re-apply, hand edits after a recall read modified), both nodes, slots per
+  universe in `dataflou/scenes-<universe>[-session].json`. The visualizer page rebuilt
+  from dataflou's web/ at 518c67f (scenes panel, universe selector, host address,
+  ip:port, undo / redo, NDI video through dataflou's own bridge); Palinopsia's server
+  answers what it now asks : `universe`, `host_ips`, each node's `address` / `port` /
+  `scene` in the snapshot, the `scene` message both ways, `set_universe` (the renderer
+  keeps the setting, so it changes it there and reconfigures). Tested : 21 checks
+  across three Palinopsia nodes (stores and recalls from both sides, hand edits, a late
+  joiner, a restart), the page's own scenes panel and universe switch on the test
+  copy. The reference C++ node at 518c67f does not run on this Windows PC (its Release
+  build aborts at start with 0xc0000409, a stack-buffer check; its Debug build hangs
+  before listening), so the cross-check against C++ is by code : an older core
+  ignores the SCENE message and the new keys and keeps the connection.
+- **dataflou : watch any outside value, and a data view for a connected show**
+  (Vincent : "add the watch toggle to the data view" and "I see a lot of Palinopsia
+  parameters that I can already monitor elsewhere [...] I want to see useful stuff for a
+  dataflou connected scenario"). A **◉** on every parameter of another node streams it
+  to Palinopsia only to be seen (a stream with no destination, as the visualizer's
+  monitors, 30 a second, kept whether a page is open : `DataflouNode.setWatches`,
+  `pollMonitors` now keeps watches beside the page's monitors); the list is the
+  renderer's (localStorage `opsia.dfWatch`, per universe, IPC `dataflou:watch`). The
+  data view is now **into Palinopsia** / **watching** / **from Palinopsia**; the
+  streams other nodes open to MONITOR Palinopsia (a visualizer on them asks for all 256
+  of its values : Macro knobs, vision, audio, body, modulators) were each a ↗ row, now
+  one line (`DfIo.watchedBy`). Tested with a stand-in gloves node (2 × 6 IMU values,
+  monitoring Palinopsia) on the test copy : 256 monitor rows gone to one line, two
+  watched values at ~22/s with their lines, a wired one in "into Palinopsia".
+- **dataflou : mapping when other nodes play Palinopsia** (Vincent picked 1 to 6 of the
+  11-11 shelf : "Implement them intelligently"). (1) **→ Palinopsia…** offers **a free
+  Macro knob** (no destination, no wire, no modulator, not persistent; named after the
+  source, the Macro row shown) and **a free modulator** (no binding, not persistent; a
+  Controller first). (2) A **Controller** modulator takes a mesh value as its input
+  (`ModulatorConfig.mesh`, sanitized on load) : main streams it with no destination
+  (`DataflouNode.setListens`, like the watches) and pushes it once a frame
+  (`dataflou:remote`, 0..1 of the remote range through `remote01`) into `controlBus`
+  `in:<slot>`, so Palinopsia's declared tree (and the C++ 128-entry limit) is
+  untouched. (3) **Learn from the mesh** : `learnStart` makes every remote value stream
+  (as the page's monitors), `learnPeek` answers the one that swept at least a quarter of
+  its range the most; the M panel's ◈ (under "macro") puts it on a free Macro knob
+  driving that control, the Controller card's ◈ makes it the card's input. (4) A wire's
+  **⚙** : range (lo / hi of the destination), invert (main, `shapeWire` on the way in)
+  and smoothing (renderer, a one-pole slew in ms) : `DfSub.opt` / `DfWireOpt`, kept in
+  the bindings file, `cleanWireOpt`. (5) **◈ badges** (`MeshBadge`) on the controls a
+  wire plays : layer opacity / mix / vary, Background opacity, the Macro tiles; lit
+  while values arrive, right-click unwires. (6) **On loss** : hold, or glide back over
+  N s to where the control was before the wire began (remembered at every wire's first
+  value after a quiet spell, so turning the option on later still knows), after 2 s of
+  quiet. Tested on the test copy with a stand-in gloves node (12 IMU values that sweep
+  on cue) : 17 checks, all six features through the real interface (the free knob named
+  and following, the modulator swinging L2 opacity 0.05 to 0.99 on a sweep, learn
+  catching the swept axis among the resting ones, range + invert 0.296 in 0.29..0.31,
+  smoothing halving the swing, three badges, the glide back to 0.9 after the gloves
+  stopped).
+
+- **Morphogen and Current : reaction-diffusion and fluid as effects** (Vincent :
+  "Reaction-diffusion and fluid as effects that any layer feeds and steers, not only as
+  sources"). Two native nodes in a new **Organic** group of the FX picker, both
+  self-contained (any rack), both on the sources' OWN simulations, shared rather than
+  forked : `engine/reactionSim.ts` (the Gray-Scott grid, step, resample and display copy,
+  now used by the Reaction source too, plus an `RD_STEER` build of the same step and an
+  advection pass) and `engine/fluidSolver.ts` (advection, splats, vorticity confinement,
+  Jacobi pressure, stir : used by the Fluid source too); the optical-flow passes moved
+  from `convNodes.ts` to `engine/pictureFlow.ts` (`PictureFlow`, a fixed 256 field) for
+  both.
+  - **Morphogen** (`node-reaction`, `engine/morphogenNode.ts`) : the picture's brightness
+    or its warm / cool color pushes feed and kill per cell (`dark / light`), it plants V
+    along its edges, where it moves or in its lights, and its motion carries the living
+    state (`follow motion`). Five looks, one small program each : through, ink, emboss,
+    matte, warp. A `steered by` sidechain takes over the steering. 11 presets.
+  - **Current** (`node-fluid`, `engine/currentNode.ts`) : the picture is the dye (RGBA16F,
+    premultiplied, up to 1080 rows); its motion drags the water toward its own velocity
+    (a bounded pull), `light rises` is buoyancy from luma (to the zenith under the full
+    dome, `lib/dome.glsl`), `churn` four wandering pushes, `memory` the live picture's
+    refresh rate, `keep still` the sharp picture where the water is still. A `moved by`
+    sidechain takes over the pushing. 10 presets.
+  - Fixed grids : the pattern and the water keep their size and speed at 1080p, 4K and
+    on the 4096 dome. Measured on the RTX 4070 (render + finish, median of 20) :
+    Morphogen +0.2 ms at 1080p, +0.7 ms at 4K, +0.4 ms on the dome (2048Â² composition); Current +0.3, +0.3, +0.4 ms; the two together on one layer hold 60 fps at all three, and two of each on two layers hold 60 fps on the dome (3.8 ms a frame in all), 59 at 1080p, 55 at 4K.
+  - The Reaction and Fluid sources run on the shared code with the same arithmetic and
+    pass order (checked in the test copy : Reaction alive at 61 fps, Fluid ink, smoke and fire at 60 fps, stir still fires).
+  - The **Field effects** master chains (8 : Grown Picture, Coral Print, Carved Program,
+    Ink Water, Smoke Program, Wet Growth, Steered Growth, Stirred by the Top) and the
+    Generate themes **Grown Over**, **Coral Print**, **Ink Current**, **Rising Smoke**
+    (Organic / Reaction-Diffusion), **Noise Garden** and **Noise Water** (Node Workshop).
+- **Noise : a raw noise field** (the shelf's "NOISE module : raw noise field ... Taste :
+  curate ranges matte (contrast, posterized), never color plasma", with "Band-limited
+  noise : an analytic 'focus' knob"). `shaders/isf/Noise.fs`, an Analog source beside
+  Ramps : value, gradient, cellular, cracks, ridged, billow, warped; scale, octaves
+  (fractional), rough, seed; contrast, level, steps (posterized with soft, pixel-wide band
+  edges), invert, key (dark = clear), a two-field `map` (red and green) for Remap or
+  Displace; drift along an angle (`PH_noiseDX/DY`), evolve (each lattice point on its own
+  cycle : it morphs in place, never loops), `sync` to the tempo (a new field a bar · 1/2 ·
+  1/4 · 1/8, `glide` cut to melt, at most 3 a second, `PH_noiseEvolve`). **focus** is an
+  analytic defocus : each octave is attenuated by what a gaussian of the pixel footprint
+  plus the focus radius leaves of it (octaves under 1 % are skipped), so it never aliases
+  and costs nothing more; it is in `RANDOMIZE_SKIP` with the map, key, seamless, sync and
+  tint. Under the full dome (fill) the field lies round on the disc (`domeDisc`) and its
+  drift turns round the zenith (`PH_noiseTurn`); `seamless` repeats it exactly across the
+  width for the wrap mode. The lattice wraps at 4096 cells an octave (hash inputs stay
+  small : exact for days). Cost over a solid color : the default (gradient, 4 octaves) +0.3 ms at 1080p, +1.7 ms at 4K, +0.8 ms on the dome; warped +1.2, +4.0, +1.9 ms. 12 presets, filed as a lit ground for
+  Randomize, the **Noise Matte** theme (Analog Video Synthesis).
+- **Spout / Syphon input : another program's picture on this computer as a layer source**
+  (Vincent : "Spout / Syphon input"; the shelf : take TouchDesigner / Resolume / Unity
+  output on the same computer at full quality and low latency instead of compressing it
+  through NDI or grabbing the screen). **Spout / Syphon Input…** in the source menu's live
+  group (beside NDI Input…) lists the senders running here (`SharePicker.tsx`, sizes, this
+  app's own output marked as a loop) and receives one into the layer like the NDI input :
+  framing, People (now also on a `VideoFrame`, `personMask.ts`), FX, one receiver per
+  sender shared by every layer, **Switch input** and a live readout in the Inspector
+  (`ShareInReadout` : size, fps, route). mediaId `spout:<name>` (`syphon:<name>` on a
+  Mac; either opens on either, `shared/shareIn.ts`). Not offered by Generate or the dice,
+  like the NDI input.
+  - **Windows, the GPU route (measured, used whenever it can)** : `native/spout` now
+    receives too. Each receiver runs on a thread of its own with its own D3D11 device on
+    the high-performance card (the SDK sleeps 67 ms when a sender closes or resizes :
+    never on the app's thread); each new frame is copied on the GPU into one of four
+    textures shared by NT handle (`recvRing` / `recvTake`, never writing the two slots the
+    page read last), which the preload imports ONCE with Electron's
+    `sharedTexture.subtle.importSharedTexture`; the page pulls a `VideoFrame` over the
+    bridge each drawn frame and uploads it GPU to GPU (`texSubImage2D(vf)` : 0.2 ms at
+    1080p, 0.4 ms at 4K). No pixel crosses the CPU. `src/preload/shareIn.ts`,
+    `engine/shareIn.ts`, `CaptureSource.uploadShare`.
+  - **The copy route** : a sender on another graphics card (`other-gpu`, the SDK follows
+    it there) or a format the shared textures cannot hold (BGRX) falls back by itself :
+    the receiver thread copies to a staging texture and maps it at once (not the SDK's
+    two-staging read, a frame late : 33 → 18 ms at 1080p in Node), BGRA swapped to RGBA,
+    then `recvRead` copies it into the page's pooled buffer on a worker thread (the NDI
+    input's transfer shape, `opsia:shareinport`). 10-bit and 32-bit float senders are
+    refused on both routes (the readout says to set them to 8-bit); a listed sender that
+    shares through memory, or whose texture no card here can open, is said so after
+    ~1.5 s.
+  - **Reconnection** : a sender that is not there yet, closes, restarts or changes size is
+    found again by name (new shared textures, imported again; the old ones freed once
+    their imports are released); looked for 20 times a second while absent. Polling
+    paced on the sender's own frame interval (1 kHz cost 9.6 % of a core, now 6.8 % with a
+    second, absent receiver) and the copy fence waited by sleeping, not spinning.
+  - **Measured on the test copy (RTX 4070, a standalone Node sender drawing a time code
+    into its pixels, read back from the layer's own texture)** : GPU route 1080p60 :
+    app 60 fps, 51-53 new frames/s in the layer (newest wins), sender clock to pixels
+    p50 13 ms / p95 22 ms, colors exact; 4K60 : 60 fps, p50 21 / p95 32 ms. Copy route
+    (the sender on the Intel iGPU, BGRA) : 1080p 54 frames/s, p50 20 / p95 28 ms; 4K
+    37 frames/s, p50 44 / p95 55 ms, the app at 60 fps. CPU (whole renderer process, one
+    core = 100 %) : 18 % with the 1080p input vs 8 % without; GPU process 20 vs 18 %.
+    Survived 30 s of the sender resizing every 5 s (1080p → 720p → 4K) and closing /
+    reopening twice : picked up within a second each time, worst app frame 18 ms
+    throughout; two layers on one sender showed the same frame 300 / 300 frames; a page
+    reload stops its receivers (addon cleanup hook) and starts new ones. Under the dome
+    (4096 master, 210° fill, 2048² composition) 60 fps and 51.5 new frames/s, as flat.
+  - **macOS (Syphon), UNTESTED (no Mac here)** : `native/syphon` gains a client
+    (`SyphonServerDirectory` + `SyphonMetalClient`, labels "app : name", or found by the
+    server's own name, so a `spout:` name saved on Windows opens), run in MAIN
+    (`main/syphonIn.ts` : Syphon's notifications need its run loop) which imports each
+    server's IOSurface with `sharedTexture.importSharedTexture` and sends it to the window
+    once per size (`sendSharedTexture`), then a small tick per frame; the window's copy
+    route reads the surface by its id (`readSurface`, `IOSurfaceLookup`). Built only on
+    the mac CI leg; `build.sh` now loads the addon in Node once (a missing symbol shows
+    in CI). The surface is assumed top row first (as SyphonMetalServer blits it); if a
+    Mac shows it upside down, the framing's mirror fixes it.
+  - Also : the preload finds the Spout / Syphon addon in a test build too (it looked one
+    folder too high, so the test copy's Spout output always fell back to main);
+    `open(name, format, adapter)` and `adapters()` for test senders.
 
 ### Fixed
+
+- **The Lights, after the v1.3.3 audit** (18 findings, two of them reported twice, all fixed). **Safety first : no
+  light flashes more than three times a second, whatever feeds it.** A light reading a
+  layer took that layer's own picture, before the picture's Flash safety : a strobing
+  layer (Shutter, a flashing clip) reached the room unlimited (a 20 Hz strobe measured
+  41 swings in one second at the DMX). Every LED now goes through a limiter of its own,
+  last, on what is sent (`lights/lightLimit.ts`) : the picture's rule (swings of 10 % of
+  linear luminance or of saturated red, counted over the last second, held to a gentle
+  pulse at the count Flash safety's strength sets), plus a guarantee that a fourth flash
+  in a second waits. It stays on at its gentlest when Flash safety is off. Measured on the
+  real engine (Node, 30 / 40 / 44 fps, strength 0 / 0.35 / 1, a layer strobing 3.5 to
+  20 Hz, bursts, noise, red / blue, a modulator on the level at 5 Hz, a 30-LED strip) :
+  never more than 6 swings in any second (three flashes), the DMX bytes too; slow content
+  (a 1 or 2 Hz square, a pulse, a chase, a fade) comes out bit for bit the same; 0.12 ms a
+  frame for 3,400 LEDs. The effects keep their own cap too : **fireflies** could run at
+  4.6 a second (its tempo and pull now capped), **sparkle**, **glitch** and **hold** drew
+  at random with no gap (7 flashes in one second measured) : now never twice on a light
+  or LED within a third of a second. **The room goes dark when it should** : frames held
+  back by an output's delay landed after the dark frame (the room stayed lit, and an
+  Enttec closed for good was opened again); an Art-Net output with sync got its dark
+  frame without an ArtSync (a node in synchronous mode never showed it). **The Enttec**
+  is opened as soon as its output is on and the page is open, a light patched or not :
+  the page said "plug it in" while it was plugged, and RDM could not ask an empty line;
+  the RDM panel kept talking to a link closed since (lights off and on) : every request
+  answered nothing and a blinking light could not be stopped. **Cues** : following on by
+  themselves, they were undo steps (Ctrl+Z took back the last cue, the history filled);
+  the scene sequencer never brought the cue tied to a scene; a cue now keeps every
+  group's grade (a neutral one comes back neutral), every light's tuning when it travels
+  with the look, and the console's gain, saturation and contrast; deleting the cue in
+  play while they follow on goes to the next one instead of stalling. **Smaller** : a
+  white-only light (`W`, `D W`, an OFL tunable white) went dark on a saturated color (its
+  white is now the color's brightness); an OFL mode whose only dimmer shares its channel
+  with a strobe was held at full whatever the faders (now left out and named); on WLED
+  the patch view and the next free address counted the layout's channels and the head,
+  while three bytes an LED go out (gaps of dark LEDs between strips); "put on the map"
+  twice doubled every light (a light already there is kept, given its mode's kind);
+  Ctrl+D in a page window copied the selected light; removing several lights (Delete,
+  the x of N lights) now asks a second press; the rig is written to disk at most four
+  times a second (a map drag rewrote it on every move).
+
+- **A camera opens in the selfie view, and remembers its mirror** (Vincent : "when a
+  Webcam or Live Input is opened, its always mirrored by default, correct this ... when I
+  raise my left arm standing in front of the camera, I want to see my left arm at the
+  left of the screen"). A camera arrives as others see you (a fake camera, white on its
+  left half, came out white on the left : nothing in Palinopsia turned it). A Webcam, a
+  Live Input or the macOS USB input now opens with the framing's mirror on
+  *left-right*, and the mirror you choose is remembered per camera on this computer
+  (localStorage `opsia.cameraMirror`, keyed by the camera's name;
+  `setSourceCapture` / `setSourceTransform`) : a capture card set to *off* once stays
+  off. Screens and NDI open as they arrive. Sessions keep the mirror they were saved
+  with.
+- **The loop menu named Tunnel "Spiral"** : both are a Transform and a Displace in a mixing loop, and the
+  menu matched recipes by their effects and blend alone. `loopRecipeOf` now breaks a tie by the delay and
+  the nearest values.
+
+- **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
+  move the macro knob mapped to a parameter, this parameter's slider doesnt update in
+  realtime, like when the Modulators are in use"). A knob's gesture plays engine-side
+  and only settles in the store at its end, so the slider sat still until the release;
+  the live value was in the shared map all along, but every control's live overlay
+  registered only for a MODULATOR binding. One `useOnMacro()` (AutoControls) now opens
+  it for a Macro destination too : the Inspector's sliders, toggles, menus and number
+  boxes, an FX's opacity, the layer strip's opacity / A-B mix / blend, the Background's
+  opacity / speed / shadow, a clip's speed and volume, the Audio Layer's sliders, the
+  Sonify page's and the key sequencer's Every (the Mixer, the Output page and Lights
+  already counted the knobs). Measured on the test copy : the layer opacity slider read
+  0.1, 0.2 … 1.0 through the drag while the stored value still read 0.5.
 
 - **dataflou : a node lost to a sleep or a disconnect comes back by itself** (Vincent :
   "quand on se déconnecte/un ordi tombe en veille, la connexion se perd (on doit fermer et
@@ -358,6 +737,133 @@ that CI builds into cross-platform releases.
   goodbye : values flowed again after 7.2 s and 6.7 s. **Not verified : a real sleep with
   Max** (to do on his machines).
 
+- **dataflou : the mesh mapping plays as it is set, and the mesh knows Palinopsia's
+  wires** (the v1.3.3 audit, 11 findings). A smoothed or glide-back wire on the scene
+  number swept through every scene on the way (each step a recall, an undo step and a
+  restarted morph, and again every half second while the source held still) : `scene/recall`
+  is now `discrete` (`DfDest`), played once per whole step, never smoothed nor glided
+  back (the gear hides those two), and a smoothed wire's repeated value no longer plays
+  again. A scene recall that made a shaped wire again made it plain : slots now keep a
+  shaped wire's options as a 4th element (ours, the core never reads that file). Range and
+  invert did nothing on a wire from one of Palinopsia's own sources, and such a wire was
+  dead after a restart, a mesh off and on, a rename or a universe change (no local stream
+  was made when the bindings came back). Smoothing and on loss followed the first shaped
+  wire of a destination : they are now the destination's (the longest smoothing of its
+  wires, a glide back when any asks), said so in the gear. A glide back cut short by the
+  source returning remembered the mid-glide value as "before" : it keeps the place it was
+  going back to. A glide back could miss its end by a rounding hair and then send the same
+  value every frame forever; the 16 ms animation timer kept running while any glide-back
+  wire existed : both stop when nothing glides. After a quick reconnect (inside one
+  second) the watched, listened and monitored values waited up to 15 s for the keepalive :
+  they are asked again on the HELLO. A learn from the mesh left running by a window reload
+  streamed every remote value forever : it ends 25 s after the app last asked about it.
+  Randomize re-rolled a modulator played by the mesh into another type : it is kept, with
+  its bindings, like the World's. And with dataflou core 8.3 : a node's "clear"
+  announcement (after its DECLARE) now empties what we knew of its connections before its
+  own list follows (a wire removed while we were away no longer lingers), and Palinopsia
+  follows each of its own DECLAREs the same way (a clear, then one announcement per wire
+  into it), so a node that joins later sees Palinopsia's wires; older cores ignore the
+  clear. Proven in Node with three nodes of our class on a private universe and the
+  renderer bridge with its app modules stubbed, each check failing on master and passing
+  after (scratch harness `dffix/`).
+- **The new effects and the Macro range, from an audit** (Touch, Ripple, Current, Noise,
+  the knob range). A held OSC finger (`/opsia/touch/hold`) whose controller stopped
+  without `/opsia/touch/up` pressed on every Touch and Ripple forever, through New, Open
+  and PANIC : it now lets go 3 s after the last `/hold` (`touchInput.HOLD_TIMEOUT_MS`; a
+  controller that holds keeps sending it), and New, Open, Generate and PANIC let it go. A
+  double click held into a drag (a heavy scene at a low frame rate) turned into a tap
+  every frame (a ring or a stone per frame, the drag did nothing) : a new press clears the
+  last click's ending (`TouchPoints.set`). `/opsia/macro/n/min` and `/max` moved the
+  destinations only at the knob's next move, then all at once : they follow at once now,
+  as the bar and the typed numbers do (`commitKnob`, unless a modulator drives the knob).
+  **Randomize Meta Knobs** put the new destinations outside their good zone on a knob with
+  a range (0.85 to 1 : all in their top 15 %) or a curve : a re-rolled knob starts on the
+  full range, and its position is chosen through its curve (`randomize.knobPosIn`).
+  **Ripple** is no longer dealt by the dice (`SELF_NODE_IDS`) : dealt into the Master FX
+  or a layer's rack it took the preview's clicks and pinches from a Marbling, Sand Plate,
+  Relief or Fur played by hand, with nothing to say why; the effects that take the
+  pointer stay hand-placed (chains and Generate themes still use it). Modulating
+  **Current**'s detail started still water at every step of it (six targets remade, the
+  water never built up) : a new grid now resamples the velocity (`FluidSolver.ensure`).
+  **Noise** *seamless* jumped by a cell (4096 mod the cells across) when its drift wrapped,
+  within hours on an installation : it drifts on a phase of its own in frame widths,
+  wrapped at the repeat (`PH_noiseSX`). Proven with esbuild checks (the double click
+  held into a drag : 10 taps out of 10 frames on master, none now; the seamless field's
+  largest move in a frame across the wrap : 0.97 cells at 7 across, 7.97 at 28, now one
+  frame of drift; Randomize Meta Knobs on a dumped composition, knobs at 0.85..1 : 78 % of
+  the destinations outside their zone on master, none now; 300 dice presses : 18 dealt a
+  Ripple on master, none now) and on the test copy (`/opsia/macro/1/min 0.8` : the opacity
+  0.5 -> 0.9 at once; the OSC finger held through 4 s of refreshes, gone 3.5 s after the
+  last, gone after PANIC and New; Current's mean water speed across a detail step 9 to 14
+  cells/s, 1.4 to 7 with the old still start; 60 fps with detail swept every frame).
+
+- **Time Glitch, Break, Key and Droste, from an audit.** **Key** and **Break** on the
+  Master FX cut nothing anywhere : Context (the pinned finishing stage) drops alpha, so
+  the chains **Outlines Only** and **Color Isolate** only graded the picture and Break's
+  gaps showed the picture at 30 % instead of black, its crack lines gone; and with Context
+  bypassed the preview alone showed the cut while the projector, NDI, Spout / Syphon, the
+  recording and the dome got the uncut picture. The master is now laid over black where
+  the effects end and the finishing stages begin when a Key or a Break ran
+  (`FxRack.flatten`, `CUT_FX`), and the finished master always, so the preview and every
+  output agree whatever master effect leaves transparency (an opaque pixel passes bit for
+  bit; the other effects that leave alpha on the master, Perspective's fade, Drape,
+  Inflate, Silhouette, Matte, Transform, keep the look they had through Context). A
+  surveyed 1,435 master set-ups (99 effects at their defaults and every preset, the 179
+  chains) : with Context on, only the Key and Break ones reach the flatten with any
+  transparency, every other flatten pass is identical to its input to the last bit;
+  preview against the captures (rgbx, rgba-up) : mean difference 52 levels (Outlines Only,
+  Context bypassed) and up to 145 (Break's lines), now 0 in all 16 flat and 16 dome cases;
+  Outlines Only's luma 64 against 63 unkeyed, now 1 (outlines on black, on the dome too);
+  0.15 ms a pass at 4K (GPU timer), 60 fps kept. **PANIC** no longer breaks the picture : the
+  flush zeroed Break's state, read as a first frame, and landed a new hit on top of the
+  recovery (a held pane replaced : 77 % of the pixels changed); an empty state now starts
+  the pane whole unless it is the effect's very first frame (`FRAMEINDEX`), which still
+  lands with a hit. Break's automatic hits stop at **three a second** (four at 1/4 from
+  240 bpm, or every under 1/3 s : the flash rule). The dice no longer deals a Break whose
+  hits come before its fall ends (every 2.5 s with a 3 s fall snapped a half-fallen frame
+  whole) : every 3.5 to 8 s, time 1 to 2.5 s. **Time Glitch**'s audio dealt damage with
+  inside and after at 0 (30 % of the pixels moved, loud), as the grey-outs said none was
+  dealt : its share is now scaled by inside and after like the chaos (the preset Audio
+  damage goes to audio 1 to keep its bite), and split greys out with the rest; the copy
+  no longer says stuck blocks stop taking the live picture (only in smear : lights and
+  darks still let a brighter or darker one in) or that crushed blocks swap channels in
+  the loop (AFTER does). A pinch dragging **Droste**'s center wrote the store through
+  `runSilently` every tracker frame, closing a fader drag made meanwhile at every frame :
+  two seconds of both left 100 undo steps and evicted the history, now one
+  (`undo.writeLive`, the Link tempo's way). The walk, Variation and a random modulator no
+  longer re-wind Droste (strands, arms, shape, center) or re-cut Break's pane (shards,
+  rings, then, sync, every, time) : 400 Variations moved them 130 to 400 times, now never
+  (`NUDGE_SKIP`; a full roll still deals them). The manual says which master effects take
+  the click first (Drape, Touch, Ripple, Break, Droste) and that selecting a source gives
+  it back. Proven with esbuild checks (the real phases, registry, randomize, undo and
+  pointer code) and on the test copy (readbacks of the composite, the canvas and the
+  capture rings, RTX 4070).
+
+- **Spout / Syphon input : no old frame flashing in, no stall on a 4K copy, honest
+  messages** (the v1.3.3 audit, 8 findings). When a sender held its texture longer than
+  the Spout library waits (67 ms : a program loading, a GPU stall), the receiver got no
+  copy yet still published a slot, so the layer jumped back to an older frame (or showed
+  an empty one right after a resize) : a frame is now published only when the sender's
+  frame number moved (both routes). Measured in the test copy with the sender's texture
+  held 100 ms five times a second for 20 s : the layer went back to an older frame 67
+  times on master, 0 now. The receiver's poll pacing now estimates per sender frame and
+  grows slowly through a stall (with those stalls it took 704 of ~750 frames in Node,
+  where master took 616 real ones plus 71 stale). The copy route copied each frame into
+  the page's buffer while holding the receiver's lock, so the page's status calls waited
+  up to 6 ms at 4K : the buffer is now lent out and copied unlocked (status calls 0.11 ms
+  at most; 4K from the other card now about 47 frames/s instead of 37, 42 / 52 ms).
+  A sender that is listed but cannot be opened (memory share, an unreachable texture)
+  said "waiting for X : start it" forever : after ~1.5 s it now says it is running but
+  cannot be opened; a 10-bit or 32-bit float sender is told to switch to 8-bit. On a Mac
+  : without a working Syphon module the layer waited for its server forever with no
+  word (it now says the module is missing, with the toast); a session saved on Windows
+  found nothing, as Syphon lists "app : name" (a server is now found by its own name
+  too, and the picker marks this app's own output); each reopened receiver added a
+  window listener for good (now one per window). The Syphon changes are compiled on the
+  mac CI leg only. Not changed : the preload's `VideoFrame` (closing it closes the
+  page's, measured : the bridge shares one frame, so the page's close already releases
+  it) and the Syphon `kIOReturnSuccess` compare (CI run 43191252414 built and loaded it).
+
 ### Docs
 
 - **The docs catch up with v1.3.2** (after publishing, the sweep) : six new gallery frames
@@ -373,8 +879,7 @@ that CI builds into cross-platform releases.
   click-to-play row (Relief, Fur, Sand Plate, Drape) and the rule timeline's gestures; the
   two hints Drape lacked (light angle, light height).
 - **The docs for v1.3.3, the Lights release** : the release notes written out (Lights :
-  setting up, playing, shows, cues, setups, outputs; dataflou; one slot held for RDM until
-  `feat-rdm` merges); the README's Lights section in the page's own words (lights, cues,
+  setting up, playing, shows, cues, setups, outputs; dataflou; RDM); the README's Lights section in the page's own words (lights, cues,
   kind, area, **CUE FADE**, the console's group knobs and sliders), `T` in the keyboard
   table, the Lights page in the intro, the contents, the Output page and the Seq lanes;
   the OSC reference's `/opsia/lights/brightness · saturation · contrast` row and its cue

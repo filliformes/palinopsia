@@ -104,6 +104,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('trail', 'deposit', 'decay', 'diffuse', 'contrast', 'glow'),
     g('light', 'tint', 'ground', 'relief', 'lightAngle')
   ],
+  // Noise : what the field is · how it is shaped into a matte · how it moves
+  noise: [
+    g('field', 'kind', 'scale', 'octaves', 'rough', 'seed', 'seamless', 'field'),
+    g('matte', 'contrast', 'level', 'steps', 'focus', 'invert', 'key', 'tint'),
+    g('motion', 'drift', 'angle', 'evolve', 'sync', 'glide')
+  ],
   'gen-fluid': [
     g('sources', 'kind', 'sources', 'flow', 'size', 'wander', 'stir', 'clear'),
     g('motion', 'rate', 'swirl', 'buoyancy', 'viscosity', 'fade', 'detail'),
@@ -158,10 +164,39 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('forces', 'gravity', 'wind', 'gust', 'audio', 'people', 'poke', 'reset'),
     g('look', 'material', 'color', 'sheen', 'folds', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'tilt', 'behind')
   ],
+  // Touch : the touch · how it moves and looks · what fires it
+  'node-touch': [
+    g('touch', 'mode', 'size', 'strength', 'follow', 'soft', 'mix'),
+    g('motion and look', 'fade', 'spring', 'speed', 'width', 'shade', 'split', 'clear'),
+    g('fired by', 'fire', 'fireAt', 'audio', 'people', 'wander', 'press', 'point')
+  ],
+  // Ripple : the water · what stirs it · how it looks
+  'node-ripple': [
+    g('water', 'rain', 'dropSize', 'motion', 'speed', 'calm', 'edges', 'still'),
+    g('stirred by', 'audio', 'people', 'wander', 'stone', 'stoneAt', 'follow', 'press', 'point'),
+    g('look', 'refract', 'split', 'shade', 'lightAngle', 'tint', 'deep', 'mix')
+  ],
   'node-inflate': [
     g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
     g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'dispersion', 'rim', 'cavity'),
     g('light and flow', 'shadow', 'lightAngle', 'lightHeight', 'orbit', 'flow', 'flowSpeed', 'bands', 'split', 'ripple')
+  ],
+  // Time Glitch : the memory · the damage · where it lands (three balanced columns)
+  'fx-time-glitch': [
+    g('time', 'time', 'mode', 'drift', 'clear', 'amount'),
+    g('damage', 'chaos', 'rate', 'sync', 'blocks', 'shift', 'audio'),
+    g('where', 'inside', 'after', 'split', 'crush', 'burst', 'burstLen')
+  ],
+  // Break : the hit · the cracks · the pieces and their light
+  'fx-break': [
+    g('hit', 'impact', 'every', 'sync', 'scatter', 'hitX', 'hitY'),
+    g('cracks', 'shards', 'rings', 'wander', 'broken', 'force', 'bevel'),
+    g('pieces', 'after', 'time', 'tilt', 'refract', 'light', 'behind', 'amount')
+  ],
+  // Droste : the spiral · its flight
+  'fx-droste': [
+    g('spiral', 'scale', 'strands', 'arms', 'shape', 'edge', 'amount'),
+    g('flight', 'zoom', 'spin', 'twist', 'depth', 'cx', 'cy')
   ],
   // Glass : the pane · the light
   'fx-glass': [
@@ -211,6 +246,19 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('motion', 'motion', 'thresh', 'swirl', 'edgeRepel', 'flowInvert', 'sidechainFlow', 'flowRes'),
     g('texture', 'block', 'bleed', 'resharp'),
     g('bursts', 'trig', 'pulse', 'autoBloom', 'cutSense', 'actant', 'actantTrig', 'actantRate', 'actantLife')
+  ],
+  // the field effects : how it lands on the picture · what the picture does to
+  // it · how it grows (the organic light rides with the look : a fourth column of
+  // two wrapped under the others and left a blank band)
+  'node-reaction': [
+    g('look', 'look', 'amount', 'mix', 'ink', 'sharp', 'relief', 'lightAngle'),
+    g('steer', 'steer', 'bias', 'feed', 'kill', 'follow'),
+    g('growth', 'plant', 'plantFrom', 'seed', 'scale', 'rate', 'reseed')
+  ],
+  'node-fluid': [
+    g('push', 'motion', 'rise', 'churn', 'swirl'),
+    g('water', 'viscosity', 'detail', 'rate', 'stir'),
+    g('picture', 'memory', 'keep', 'mix', 'clear')
   ],
   'node-ibfv': [
     g('trails', 'flow', 'inject', 'speed', 'clear'),
@@ -360,6 +408,27 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
     return d
   },
+  // Time Glitch : with no damage inside or after, the clock and the damage
+  // controls have nothing to hit (the audio's share is scaled by them too)
+  'fx-time-glitch': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('sync', 0)) d.rate = 'Sync is on : the tempo sets the pace.'
+    if (zero('inside') && zero('after')) put(d, ['chaos', 'rate', 'sync', 'blocks', 'shift', 'split', 'crush', 'burst', 'burstLen', 'audio'], 'Inside and after are at 0 : no damage is dealt.')
+    return d
+  },
+  'fx-break': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('sync', 0)) d.every = 'Sync is on : the tempo sets when it breaks by itself.'
+    else if (zero('every')) d.scatter = 'Every is at 0 and sync is free : it only breaks when hit, right on the point.'
+    if (is('after', 0)) d.time = 'Hold : the pieces stay cracked until the next hit.'
+    return d
+  },
+  'fx-key': ({ isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 0)) put(d, ['color', 'despill'], 'Only the color mode keys a color and takes its cast off.')
+    if (isnt('mode', 3)) d.channel = 'Only the channel mode reads one channel.'
+    return d
+  },
   'fx-dither': ({ is, isnt }) => {
     const d: Why = {}
     if (isnt('color', 2)) put(d, ['ink', 'paper'], 'Only ink on paper uses the two colors.')
@@ -385,6 +454,21 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('mode', 2)) put(d, ['gravity'], 'Float has no gravity : the sheet drifts and comes back.')
     if (isnt('material', 0) && isnt('material', 1)) put(d, ['sheen'], 'Sheen is the cloth\'s : plastic, chrome and foil shine their own way.')
     if (isnt('material', 4)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
+    return d
+  },
+  'node-touch': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 0)) put(d, ['speed', 'width'], 'Only the rings travel.')
+    if (is('mode', 0)) put(d, ['fade', 'spring', 'soft'], 'Rings travel out and die away by themselves : nothing is pushed to come back.')
+    if (is('mode', 4)) put(d, ['spring', 'soft'], 'A lens is drawn fresh each frame : nothing is pushed to spring back (FADE is how fast it closes).')
+    if (isnt('fireAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : fire at the point, or press it.')
+    return d
+  },
+  'node-ripple': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('stoneAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : drop the stone at the point, or press it.')
+    if (zero('refract')) put(d, ['split'], 'Refraction is at 0 : nothing is bent to split.')
+    if (zero('deep')) put(d, ['tint'], 'Water depth is at 0 : the water has no color.')
     return d
   },
   'node-inflate': ({ zero, is, isnt }) => {
@@ -454,6 +538,30 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   reaction: ({ zero }) => one(zero('relief'), 'lightAngle', NO_RELIEF),
+  // Morphogen (engine/morphogenNode.ts) : the light only on the lit looks, the ink
+  // only on ink; steering and planting each need their own switch on.
+  'node-reaction': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('look', 1)) put(d, ['ink'], 'Only the ink look draws in the ink color.')
+    if (is('look', 3, 4)) put(d, ['relief', 'lightAngle'], 'The matte and warp looks are not lit.')
+    else if (is('look', 2)) put(d, ['relief'], 'Emboss : amount is the depth of the carving.')
+    else if (zero('relief')) put(d, ['lightAngle'], NO_RELIEF)
+    if (is('steer', 2)) put(d, ['bias'], 'Steered by nothing : feed and kill are the same everywhere.')
+    else if (zero('bias')) put(d, ['steer'], 'Dark / light is at 0 : the picture does not push feed and kill.')
+    if (zero('plant')) put(d, ['plantFrom'], 'Plant is at 0 : the picture plants nothing.')
+    return d
+  },
+  // Noise (Noise.fs) : the glide only shapes the tempo's steps; with sync on, the
+  // tempo clocks the evolving; a map is two plain fields (no tint).
+  noise: ({ zero, is, isnt, at }) => {
+    const d: Why = {}
+    if (is('sync', 0)) put(d, ['glide'], 'Sync is free : glide only shapes the steps on the tempo.')
+    else put(d, ['evolve'], 'Sync is on : the tempo sets how fast it changes.')
+    if (zero('drift')) put(d, ['angle'], 'Drift is at 0 : nothing moves along the angle.')
+    if (at('octaves', 1)) put(d, ['rough'], 'One octave : there are no finer copies to weigh.')
+    if (isnt('field', 0)) put(d, ['tint'], 'A map is two plain fields, red and green : no tint.')
+    return d
+  },
   'gen-veins': ({ zero, is }) => {
     const d: Why = {}
     if (is('kind', 2)) put(d, ['blade', 'bladeAmt'], 'Roots have no blade.')

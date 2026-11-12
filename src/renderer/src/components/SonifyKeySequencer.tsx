@@ -119,11 +119,12 @@ export function SonifyKeySequencer({ onWidth, chip, assignBox, lane = false }: {
   const toggleSection = useStore((s) => s.toggleSection)
   // EVERY swung by a modulator : its thumb follows (its readout too, LiveNum)
   const everyModulated = useStore((s) => s.composition.modMatrix.some((a) => a.target.kind === 'sonify' && a.target.param === 'keyEvery'))
+  const everyMacro = useStore((s) => s.composition.metaKnobs.some((k) => k.destinations.some((d) => d.kind === 'sonify' && d.param === 'keyEvery')))
   const everyRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => {
-    if (!everyModulated || !everyRef.current) return
+    if (!(everyModulated || everyMacro) || !everyRef.current) return
     return registerLiveOverlay({ el: everyRef.current, key: EVERY_KEY, format: (x) => String(x) })
-  }, [everyModulated, folded])
+  }, [everyModulated, everyMacro, folded])
   const ks = useStore((s) => s.soniKeySeq)
   const set = useStore((s) => s.setSoniKeySeq)
   const setOn = useStore((s) => s.setSoniKeySeqOn)

@@ -2,8 +2,11 @@
 // metaKnobs, kind 'meta', `meta:<i>` MIDI ids) : 16 macro knobs, one flat bank. Each tile
 // matches the modulator-card chrome: bordered, aligned rows, everything
 // legible at a glance. A knob shows: dial (destination count under it),
-// name (double-click renames), CC learn, curve, and an M button binding
-// MODULATORS to the knob : modulated knobs' dials move live (accent2 arc).
+// name (double-click renames), curve, range (min..max : where a full turn
+// lands), CC learn, and an M button binding MODULATORS to the knob : modulated
+// knobs' dials move live (accent2 arc). The title row carries a capsule per
+// destination (like the Modulation row's), so what the knobs drive is in view
+// even folded.
 
 import {
   useEffect,
@@ -14,7 +17,7 @@ import {
 } from 'react'
 import type { ModCurve } from '@shared/types'
 import { META_KNOB_COUNT } from '@shared/types'
-import { metaLiveValues, shapeCurve } from '../engine/modulation'
+import { knobOut, metaLiveValues } from '../engine/modulation'
 import {
   commitKnob,
   knobDisplayValue,
@@ -30,6 +33,9 @@ import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { useFlash } from './useFlash'
 import { warnModMatrixFull } from './AutoControls'
 import { PinZone } from './Pin'
+import { BoundedNumberInput } from './BoundedNumberInput'
+import { describeModTarget } from './ModulationPanel'
+import { MeshBadge } from './MeshBadge'
 
 const KNOB_PX = 44
 const ARC_SWEEP_DEG = 270
@@ -51,6 +57,10 @@ export function MetaBar(): JSX.Element | null {
   const peek = useStore((s) => !s.macroBar && s.midiLearnMode)
   const collapsed = folded && !peek
   const [flashing, flash] = useFlash()
+  // the knob whose capsule the pointer is on : its tile lights up
+  const [hot, setHot] = useState<number | null>(null)
+  const dests = useStore((s) => s.composition.metaKnobs.reduce((n, k) => n + k.destinations.length, 0))
+  const onKnobs = useStore((s) => s.composition.metaKnobs.filter((k) => k.destinations.length > 0).length)
 
   if (!shown && !peek) return null
   return (
@@ -70,7 +80,16 @@ export function MetaBar(): JSX.Element | null {
           >
             ▶
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Macro</span>
+          {/* the destinations in use under the name, like Modulation's count */}
+          <span className="flex flex-col items-start leading-none">
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Macro</span>
+            <span
+              className="mt-0.5 font-mono text-[9px] text-muted/80"
+              title={dests ? `${dests} destination${dests > 1 ? 's' : ''} on ${onKnobs} knob${onKnobs > 1 ? 's' : ''}` : 'No destinations yet'}
+            >
+              {dests} dest
+            </span>
+          </span>
         </button>
         <span className="relative inline-flex">
           <MidiLearnOverlay id="rand:meta" />
@@ -89,9 +108,10 @@ export function MetaBar(): JSX.Element | null {
             ⚄
           </button>
         </span>
+        <MacroDests onHot={setHot} />
         <button
           onClick={toggleMetaXYPads}
-          className={`ml-auto rounded border px-1.5 font-mono text-[9px] leading-4 transition-colors ${
+          className={`shrink-0 self-start rounded border px-1.5 font-mono text-[9px] leading-4 transition-colors ${
             metaXYPads
               ? 'border-accent/50 bg-accent/10 text-accent hover:bg-accent/20'
               : 'border-border text-muted hover:text-text'
@@ -115,17 +135,17 @@ export function MetaBar(): JSX.Element | null {
           {metaXYPads ? (
             <>
               {Array.from({ length: 12 }, (_, i) => (
-                <MetaKnobTile key={i} index={i} />
+                <MetaKnobTile key={i} index={i} hot={hot === i} />
               ))}
               {/* Knobs 13–14 and 15–16 become two XY performance pads (each spans
                   the two knob columns it replaces). Configure their destinations /
                   names / bindings in knob mode (toggle top-right). */}
-              <MetaXYPad key="xy1" xIndex={12} yIndex={13} />
-              <MetaXYPad key="xy2" xIndex={14} yIndex={15} />
+              <MetaXYPad key="xy1" xIndex={12} yIndex={13} hot={hot === 12 || hot === 13} />
+              <MetaXYPad key="xy2" xIndex={14} yIndex={15} hot={hot === 14 || hot === 15} />
             </>
           ) : (
             Array.from({ length: META_KNOB_COUNT }, (_, i) => (
-              <MetaKnobTile key={i} index={i} />
+              <MetaKnobTile key={i} index={i} hot={hot === i} />
             ))
           )}
         </div>
@@ -138,7 +158,7 @@ export function MetaBar(): JSX.Element | null {
 // view/controller : it writes the same knob values a knob tile does, so the two
 // knobs keep their destinations / bindings / CC / persistence. The handle reflects
 // the LIVE (modulated) value. Configure the underlying knobs in knob mode.
-function MetaXYPad({ xIndex, yIndex }: { xIndex: number; yIndex: number }): JSX.Element {
+function MetaXYPad({ xIndex, yIndex, hot }: { xIndex: number; yIndex: number; hot: boolean }): JSX.Element {
   const xName = useStore((s) => s.composition.metaKnobs[xIndex].name)
   const yName = useStore((s) => s.composition.metaKnobs[yIndex].name)
   const xSmooth = useStore((s) => s.composition.metaKnobs[xIndex].smoothMs)
@@ -204,7 +224,7 @@ function MetaXYPad({ xIndex, yIndex }: { xIndex: number; yIndex: number }): JSX.
     <div
       className={`flex min-w-0 flex-col items-center gap-1 rounded border p-1.5 transition-colors ${
         highlight ? 'border-accent/40 bg-panel2' : 'border-border bg-panel2/40'
-      }`}
+      } ${hot ? 'ring-1 ring-accent' : ''}`}
       style={{ gridColumn: 'span 2' }}
     >
       <div
@@ -235,7 +255,7 @@ function MetaXYPad({ xIndex, yIndex }: { xIndex: number; yIndex: number }): JSX.
   )
 }
 
-function MetaKnobTile({ index }: { index: number }): JSX.Element {
+function MetaKnobTile({ index, hot }: { index: number; hot: boolean }): JSX.Element {
   const knob = useStore((s) => s.composition.metaKnobs[index])
   const updateMetaKnob = useStore((s) => s.updateMetaKnob)
   const midiLearn = useStore((s) => s.midiLearn)
@@ -341,7 +361,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         knob.destinations.length > 0 || isModulated
           ? 'border-accent/40 bg-panel2'
           : 'border-border bg-panel2/40'
-      }`}
+      } ${hot ? 'ring-1 ring-accent' : ''}`}
     >
       <div
         className="relative cursor-pointer"
@@ -352,7 +372,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
         onPointerCancel={onPointerUp}
         onLostPointerCapture={onLostCapture}
         onDoubleClick={() => setKnobTarget(index, 0, knob.smoothMs)}
-        title={`${knob.name} : drag vertically · Shift = fine · double-click resets. The number is what it sends now, through its curve (${knob.curve}).`}
+        title={`${knob.name} : drag vertically · Shift = fine · double-click resets. The number is what it sends now, through its curve (${knob.curve}) and its range (${(knob.min ?? 0).toFixed(2)} to ${(knob.max ?? 1).toFixed(2)}).`}
       >
         <MidiLearnOverlay id={`meta:${index}`} />
         {/* What the knob sends now, through its curve : live (a drag, a glide,
@@ -361,7 +381,7 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
           className={`pointer-events-none absolute inset-x-0 text-center font-mono text-[9px] leading-none tabular-nums ${isModulated ? 'text-accent2' : 'text-muted'}`}
           style={{ top: KNOB_PX - 9 }}
         >
-          {shapeCurve(display, knob.curve).toFixed(2)}
+          {knobOut(knob, display).toFixed(2)}
         </span>
         <svg width={KNOB_PX} height={KNOB_PX} className="absolute inset-0">
           <path
@@ -396,8 +416,9 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
       </div>
 
       {/* destinations count : what this knob drives */}
-      <span className="font-mono text-[9px] leading-none text-muted">
+      <span className="flex items-center gap-1 font-mono text-[9px] leading-none text-muted">
         {knob.destinations.length > 0 ? `${knob.destinations.length} dest` : 'no dest'}
+        <MeshBadge dest={`meta/${index + 1}`} />
       </span>
 
       {renaming ? (
@@ -438,6 +459,9 @@ function MetaKnobTile({ index }: { index: number }): JSX.Element {
           </option>
         ))}
       </select>
+
+      {/* after the curve, its range : the order the value takes */}
+      <KnobRange index={index} lo={knob.min ?? 0} hi={knob.max ?? 1} modulated={isModulated} />
 
       <div className="flex w-full items-center justify-center gap-1">
         <button
@@ -539,6 +563,144 @@ function KnobModAssign({
           title={`M${current.mod + 1} depth ${current.depth.toFixed(2)} : bipolar swing around the base. Double-click : 0.5`}
         />
       )}
+    </div>
+  )
+}
+
+// The title row's capsules : one per destination, knob by knob (like the
+// Modulation row's chips). × takes the destination off its knob; the pointer on
+// a capsule lights its knob up.
+function MacroDests({ onHot }: { onHot: (k: number | null) => void }): JSX.Element {
+  const composition = useStore((s) => s.composition)
+  const toggleMetaDest = useStore((s) => s.toggleMetaDest)
+  const chips = composition.metaKnobs.flatMap((k, i) => k.destinations.map((d) => ({ i, d, k })))
+  // (the capsule under the pointer can go : its knob must not stay lit)
+  useEffect(() => () => onHot(null), [onHot])
+  if (!chips.length) {
+    return (
+      <div className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted/60">
+        no destinations yet : a control&apos;s M puts it on a knob
+      </div>
+    )
+  }
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" onPointerLeave={() => onHot(null)}>
+      {chips.map(({ i, d, k }) => {
+        const what = describeModTarget(d, composition)
+        const named = k.name !== `Knob ${i + 1}` ? ` (${k.name})` : ''
+        const ranged = (k.min ?? 0) !== 0 || (k.max ?? 1) !== 1
+        return (
+          <span
+            key={`${i}:${modTargetKey(d)}`}
+            onPointerEnter={() => onHot(i)}
+            className="flex items-center gap-1 rounded border border-border bg-panel2 px-1.5 py-0.5 font-mono text-[9px] hover:border-accent/50"
+            title={`Knob ${i + 1}${named} drives ${what}${ranged ? ` over ${(k.min ?? 0).toFixed(2)} to ${(k.max ?? 1).toFixed(2)} of its range` : ''}`}
+          >
+            <span className="text-accent">K{i + 1}</span>
+            <span className="max-w-[160px] truncate text-muted">{what}</span>
+            <button
+              onClick={() => toggleMetaDest(i, d)}
+              className="text-muted hover:text-danger"
+              title={`Take ${what} off knob ${i + 1}`}
+            >
+              ×
+            </button>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// A knob's range : where a full turn lands, 0..1 of each destination's own
+// range. A bar with its two ends (drag the nearer one; double-click : the full
+// range) and the two numbers under it. Min above max turns the knob the other
+// way. The destinations follow at once, the knob at rest or not.
+function KnobRange({ index, lo, hi, modulated }: { index: number; lo: number; hi: number; modulated: boolean }): JSX.Element {
+  const updateMetaKnob = useStore((s) => s.updateMetaKnob)
+  const barRef = useRef<HTMLDivElement | null>(null)
+  const drag = useRef<{ id: number; end: 'min' | 'max' } | null>(null)
+  const round = (v: number): number => Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
+  // A new end : the destinations move now. At rest, through the knob's own
+  // overlay (as a drag of the dial would); a modulator already rewrites them
+  // every frame, and an overlay would hold it still.
+  function setEnd(end: 'min' | 'max', v: number): void {
+    updateMetaKnob(index, { [end]: round(v) })
+    if (!modulated) setKnobImmediate(index, knobDisplayValue(index))
+  }
+  function at(e: ReactPointerEvent<HTMLDivElement>): number {
+    const r = barRef.current!.getBoundingClientRect() // (CSS zoom : the rect, never dpr)
+    return (e.clientX - r.left) / Math.max(1, r.width)
+  }
+  function onDown(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return
+    const x = at(e)
+    const dl = Math.abs(x - lo), dh = Math.abs(x - hi)
+    const end = dl < dh || (dl === dh && x < lo) ? 'min' : 'max'
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { id: e.pointerId, end }
+    setEnd(end, x)
+  }
+  function onMove(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (drag.current?.id !== e.pointerId) return
+    setEnd(drag.current.end, at(e))
+  }
+  function onUp(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (drag.current?.id !== e.pointerId) return
+    drag.current = null
+    commitKnob(index) // (the destinations' values settle in the session, one undo step)
+  }
+  const a = Math.min(lo, hi), b = Math.max(lo, hi)
+  const flipped = lo > hi
+  const full = lo === 0 && hi === 1 // (the default : quiet, so a set range stands out)
+  const help = `Range : where a full turn of the knob lands, ${lo.toFixed(2)} to ${hi.toFixed(2)} of each destination's own range${flipped ? ' (min above max : it turns the other way)' : ''}. Drag an end · double-click : the full range.`
+  return (
+    <div className="flex w-full flex-col gap-0.5">
+      <div
+        ref={barRef}
+        className="relative h-2.5 w-full cursor-ew-resize rounded-sm bg-panel3"
+        style={{ touchAction: 'none' }}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onDoubleClick={() => { updateMetaKnob(index, { min: undefined, max: undefined }); commitKnob(index) }}
+        title={help}
+      >
+        <div
+          className={`pointer-events-none absolute inset-y-0 rounded-sm ${full ? 'bg-accent/15' : flipped ? 'bg-accent/35' : 'bg-accent/60'}`}
+          style={{ left: `${a * 100}%`, width: `${(b - a) * 100}%` }}
+        />
+        {[lo, hi].map((v, n) => (
+          <div
+            key={n}
+            className={`pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 rounded-full ${full ? 'bg-muted/60' : 'bg-text'}`}
+            style={{ left: `${v * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="flex w-full items-center gap-0.5">
+        <BoundedNumberInput
+          value={lo}
+          min={0}
+          max={1}
+          maxFrac={2}
+          fixedWidth
+          className="input w-1/2 min-w-0 px-0.5 py-0 text-center text-[9px]"
+          onCommit={(v) => { updateMetaKnob(index, { min: round(v) }); commitKnob(index) }}
+          title={`Min : what the knob sends at its bottom, through its curve (0..1 of each destination's range). ${flipped ? 'Above max : the knob turns the other way.' : ''}`}
+        />
+        <BoundedNumberInput
+          value={hi}
+          min={0}
+          max={1}
+          maxFrac={2}
+          fixedWidth
+          className="input w-1/2 min-w-0 px-0.5 py-0 text-center text-[9px]"
+          onCommit={(v) => { updateMetaKnob(index, { max: round(v) }); commitKnob(index) }}
+          title="Max : what the knob sends at its top, through its curve (0..1 of each destination's range)."
+        />
+      </div>
     </div>
   )
 }

@@ -67,6 +67,7 @@
 //   /opsia/sonify/glue/voice                            s name | i index (clean warm punch bite slow)
 //   /opsia/sonify/eq/preset                             s name | i n (a saved output EQ, 1-based; 0 / flat)
 //   /opsia/macro/{1..16}                               f 0..1 (drives the Macro knob; the old /opsia/meta/{n} still works)
+//   /opsia/macro/{1..16}/min|max                       f 0..1 (the knob's range : where a full turn lands)
 //   /opsia/bpm                                          f 20..800 (raw)
 //   /opsia/scene/{n}                                    trigger
 //   /opsia/randomize[/{scope}]                          trigger (at the Transport's intensity)
@@ -85,6 +86,8 @@
 //   /opsia/mod/<n>/in · take f   (+ /note f)            a modulator slot's controller input / takeover, 0..1 (a note : velocity, 0 = off)
 //   /opsia/black                                        >= 0.5 fades the whole show to black over the Morph time, < 0.5 back (no value : over)
 //   /opsia/vary                                         trigger (the Transport's Vary, at its spread)
+//   /opsia/touch x y [s]                                a tap on every Touch and Ripple (0..1, y up; s strength, default 1)
+//   /opsia/touch/hold x y · /opsia/touch/up             a finger held there (drags as it moves) · let it go
 //   /opsia/surface x y                                  two 0..1 floats : the Metasurface cursor
 //   /opsia/surface/active {0|1}                         bool : enable the Metasurface
 //   /opsia/surface/play {0|1}                           bool : auto-trace the drawn path
@@ -117,10 +120,10 @@ import { keySeqNext } from './audio/soniKeySeq'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { colorOf, hsvaOf, PART_INDEX, PART_OF_WORD, PART_WORD, withPart } from './engine/colorParts'
 import type { ColorChannel } from '@shared/types'
-import { useStore } from './store'
+import { modTargetKey, useStore } from './store'
 import { sendOsc } from './oscMonitor'
 import type { RandomizeScope } from './randomize'
-import { setKnobTarget } from './metaSmooth'
+import { setKnobTarget, commitKnob } from './metaSmooth'
 import { firePanic, fireVariation } from './commands'
 import { fireTrigger, randIntensity } from './midi'
 import { OUT_EDGES, OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
@@ -132,6 +135,7 @@ import { visionBus, VISION_FEATURES } from './engine/visionIn'
 import { sequencerSkip } from './engine/sequencer'
 import { seqTransportPlay, seqTransportPlaying, seqTransportStop } from './engine/ruleSeq'
 import { sourceEvent } from './pointerInput'
+import { touchBus } from './engine/touchInput'
 import { layerRackOf } from './layerRack'
 
 type Args = OscInEvent['args']
@@ -632,6 +636,16 @@ function route(address: string, args: Args, host = ''): void {
     case 'meta': {
       const k = parseInt(segs[2], 10) - 1
       if (!(k >= 0 && k < st.composition.metaKnobs.length)) return
+      // its range : /opsia/macro/{n}/min, /max
+      if (segs[3] === 'min' || segs[3] === 'max') {
+        if (!Number.isFinite(n)) return
+        st.updateMetaKnob(k, { [segs[3]]: clamp01(n) })
+        // the destinations follow at once, the knob at rest or not (as the bar
+        // and the typed boxes do); a modulator on the knob already rewrites them
+        const key = modTargetKey({ kind: 'meta', knob: k })
+        if (!st.composition.modMatrix.some((a) => modTargetKey(a.target) === key)) commitKnob(k)
+        return
+      }
       setKnobTarget(k, clamp01(n), st.composition.metaKnobs[k]?.smoothMs ?? 10)
       return
     }
@@ -1281,6 +1295,22 @@ function route(address: string, args: Args, host = ''): void {
       return
     }
 
+    case 'touch': {
+      // Touch and Ripple, every one in the composition : `/opsia/touch x y [s]` a tap
+      // at (x, y) (0..1, y up : a shockwave, a stone in the water; s the strength,
+      // 1 = the effect's own), `/opsia/touch/hold x y` a finger held there (it
+      // drags, swirls, wades as it moves; it lets go 3 s after the last one :
+      // touchInput.HOLD_TIMEOUT_MS), `/opsia/touch/up` lets it go.
+      const v = oscNums(args)
+      if (segs[2] === 'up') { touchBus.release(); return }
+      if (segs[2] === 'hold') {
+        if (v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1])) touchBus.holdAt(v[0], v[1])
+        else if (v.length === 1 && !(v[0] >= 0.5)) touchBus.release()
+        return
+      }
+      if (segs[2] === undefined && v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1])) touchBus.tap(v[0], v[1], Number.isFinite(v[2]) ? v[2] : 1)
+      return
+    }
     case 'surface': {
       // The Metasurface cursor (Pandore's Trill Square plays it). `/opsia/surface x y`
       // are two 0..1 floats on the plane, and sending them turns the surface ON;
@@ -1492,6 +1522,8 @@ function enumerateLeaves(): Leaf[] {
     const named = knob?.name && knob.name !== `Knob ${k}` ? ` : ${knob.name}` : ''
     add(`/opsia/macro/${k}`, 0, 1, knob?.value ?? 0, `Macro knob ${k}${named}`)
     out[out.length - 1].alias = `/opsia/meta/${k}`
+    add(`/opsia/macro/${k}/min`, 0, 1, knob?.min ?? 0, `Macro knob ${k} : the bottom of its range`)
+    add(`/opsia/macro/${k}/max`, 0, 1, knob?.max ?? 1, `Macro knob ${k} : the top of its range`)
   }
   // Sonify (the S page) : the core streamable set. Probe params normalize over
   // the same spans the mod-matrix uses.
@@ -1856,6 +1888,9 @@ function enumerateLeaves(): Leaf[] {
       }
     }
   }
+  add('/opsia/touch', 0, 1, 0.5, 'Touch and Ripple : a tap at x y (two 0..1 floats, y up; a third : its strength) on every one in the composition', false)
+  add('/opsia/touch/hold', 0, 1, 0.5, 'Touch and Ripple : a finger held at x y (two 0..1 floats); it drags as it moves, lets go 3 s after the last one', false)
+  add('/opsia/touch/up', 0, 1, 0, 'Touch and Ripple : let the held finger go (trigger)', false)
   add('/opsia/surface', 0, 1, st.surface.x, 'Metasurface cursor X (send x y together; turns it on)')
   add('/opsia/surface/active', 0, 1, st.surface.active ? 1 : 0, 'Enable the Metasurface (>= 0.5)')
   add('/opsia/surface/play', 0, 1, st.surface.play ? 1 : 0, 'Auto-trace the drawn path (>= 0.5)')

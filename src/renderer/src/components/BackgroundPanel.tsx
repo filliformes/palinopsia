@@ -16,12 +16,13 @@ import { BG_PRESETS, BG_SOURCES, bgPresetToState } from '../bgPresets'
 import { SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
 import { keywordsFor } from '../shaders/isf/keywords'
 import { generatorBlurb } from '../shaders/isf/sourceBlurbs'
-import { AssignRow } from './AutoControls'
+import { AssignRow, useOnMacro } from './AutoControls'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { registerLiveOverlay } from './liveOverlay'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MeshBadge } from './MeshBadge'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
 import { useFlash } from './useFlash'
@@ -74,6 +75,9 @@ export function BackgroundPanel(): JSX.Element {
   const opacityBound = boundFor('opacity').length > 0
   const speedBound = boundFor('speed').length > 0
   const depthBound = boundFor('depth').length > 0
+  const opacityMacro = useOnMacro(modTargetKey(bgTarget('opacity')))
+  const speedMacro = useOnMacro(modTargetKey(bgTarget('speed')))
+  const depthMacro = useOnMacro(modTargetKey(bgTarget('depth')))
   const opacityRef = useRef<HTMLInputElement | null>(null)
   const speedRef = useRef<HTMLInputElement | null>(null)
   const depthRef = useRef<HTMLInputElement | null>(null)
@@ -82,12 +86,12 @@ export function BackgroundPanel(): JSX.Element {
     const live = (on: boolean, el: HTMLInputElement | null, field: BgField): void => {
       if (on && el) offs.push(registerLiveOverlay({ el, key: modTargetKey(bgTarget(field)), format: (x) => String(x) }))
     }
-    live(opacityBound, opacityRef.current, 'opacity')
-    live(speedBound, speedRef.current, 'speed')
-    live(depthBound, depthRef.current, 'depth')
+    live(opacityBound || opacityMacro, opacityRef.current, 'opacity')
+    live(speedBound || speedMacro, speedRef.current, 'speed')
+    live(depthBound || depthMacro, depthRef.current, 'depth')
     return () => offs.forEach((o) => o())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opacityBound, speedBound, depthBound, collapsed])
+  }, [opacityBound, speedBound, depthBound, opacityMacro, speedMacro, depthMacro, collapsed])
 
   const modChip = (field: BgField): JSX.Element => {
     const bound = boundFor(field)
@@ -179,6 +183,7 @@ export function BackgroundPanel(): JSX.Element {
           />
         </span>
         </PinZone>
+        <MeshBadge dest="bg/opacity" />
         {modChip('opacity')}
         <span className="relative inline-flex shrink-0">
           <MidiLearnOverlay id="rand:bg" />

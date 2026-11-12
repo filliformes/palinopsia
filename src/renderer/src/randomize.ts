@@ -31,7 +31,8 @@ import { isWorldRow, worldModIndex } from './worlds'
 import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
 import { randomSteps } from './engine/stepSeq'
-import { LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
+import { shapeCurve } from './engine/modulation'
+import { DICE_LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
 
 export type RandomizeScope =
   | 'all'
@@ -169,6 +170,8 @@ function randomizeOneInput(
 // Film damage is a deliberate "worn print" choice too : since it no longer waits
 // for Film Hold, a dice roll would leave every Finishing randomize dirty.
 const RANDOMIZE_SKIP: Record<string, RegExp> = {
+  // Key : what it keys is the show's (the cloth's color, the channel, the views)
+  'fx-key': /^(color|mode|channel|invert|showMatte)$/,
   'fx-context': /^(pbr|lightOrder$|blur$)/,
   // Finalizer staging intent : anaglyph 3D, the film-hold / draw clock, leader
   // blanks and splices, film damage and the output shape are deliberate show
@@ -199,6 +202,12 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-fur': /^(tip|root|skin|markColor)$/,
   // Relief : its colors and ground go together (its presets).
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
+  // Noise : matte, never plasma. Focus is a blur (by hand only), the map, the
+  // key, the seamless repeat and the tempo lock are uses, not looks, and the
+  // tint stays the preset's.
+  noise: /^(focus|field|key|seamless|sync|tint)$/,
+  // Morphogen : the ink goes with its preset.
+  'node-reaction': /^ink$/,
   'sync-osc': /^loA$/,
   // Frame-store tricks : the tempo sync and the flip clock (a strobe if a dice
   // set it racing), Crawl's ground (clear hides the picture under it) and Store
@@ -209,6 +218,15 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Feedback Zoom : a rolled center can land the tunnel in a corner; the dice
   // rolls `drift` instead, which lets the center wander on its own.
   'fx-feedback-zoom': /^center$/
+}
+
+// What the walk, Variation and a random modulator never move, though a full roll
+// deals it : inputs that re-cut or re-wind the whole picture in one frame when
+// nudged (Break's pane and its pace, Droste's winding and the center put there by
+// hand). The themes' motion skips the same (Broken Glass, Endless Spiral).
+const NUDGE_SKIP: Record<string, RegExp> = {
+  'fx-break': /^(every|sync|after|time|shards|rings)$/,
+  'fx-droste': /^(strands|arms|shape|cx|cy)$/
 }
 
 // Solid Color : one rolled hue drives the whole gradient (a dark end tinted
@@ -328,7 +346,10 @@ const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
 // The self-contained native nodes need no sidechain, so they join the random pool
 // for EVERY rack (not just layer FX). They're `native`, so they share the "≤1
 // native node per rack" cap below. (node-parallax is excluded : inert without the
-// Depth engine.)
+// Depth engine. The effects that take the preview's clicks and pinches, Ripple,
+// Touch, Drape, stay hand-placed : dealt blind into the Master FX or a layer's
+// rack they would take the pointer from a source played by hand, a Marbling, a
+// Sand Plate, a Relief, a Fur, with nothing to say why : pointerInput.ts.)
 const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
@@ -339,7 +360,14 @@ const SELF_NODE_IDS = [
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 /** The effects a blind rack is dealt from (the convolution nodes join the layer rack). */
-export const DICE_FX_IDS = (): string[] => [...FX_SHADERS, ...SELF_NODES].map((f) => f.id)
+// Effects a blind dice never deals (they stay in the pickers, chains, themes and
+// OSC) : Key cuts holes by a color it was never shown, and Droste folds the whole
+// frame into one spiral, a deliberate move rather than a texture (dealt into six
+// random scenes, 11-11 : over the busy textures a dice deals it vanished into
+// them, and where it showed it took the whole layer : it plays when chosen).
+const HAND_FX = new Set(['fx-key', 'fx-droste'])
+const DICE_FX = (): typeof FX_SHADERS => FX_SHADERS.filter((f) => !HAND_FX.has(f.id))
+export const DICE_FX_IDS = (): string[] => [...DICE_FX(), ...SELF_NODES].map((f) => f.id)
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
 
 /** Build a rack of n DISTINCT random FX, each with randomized params.
@@ -351,7 +379,7 @@ function randomRack(
   includeConv = false
 ): FxInstance[] {
   const n = drawCount(countWeights)
-  const pool = [...FX_SHADERS, ...SELF_NODES, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
+  const pool = [...DICE_FX(), ...SELF_NODES, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
   const picked: typeof FX_SHADERS = []
   let convUsed = 0
   for (let i = 0; i < n && pool.length > 0; i++) {
@@ -463,7 +491,7 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
       // the film stage, blur…) is not handed to a random modulator either.
       const skip = RANDOMIZE_SKIP[inst.shaderId]
       for (const d of inputsForShader(inst.shaderId)) {
-        if (d.type === 'float' && !skip?.test(d.name)) out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
+        if (d.type === 'float' && !skip?.test(d.name) && !NUDGE_SKIP[inst.shaderId]?.test(d.name)) out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
       }
     }
   }
@@ -554,9 +582,31 @@ export function randomMetaKnobs(c: CompositionState): CompositionState['metaKnob
         pool.splice(i, 1)
       } else i++
     }
-    const value = destinations.length ? range(lo, hi) : rnd()
-    return { ...k, destinations, value }
+    // The knob sends knobOut = min + (max - min) * curve(value) : a re-rolled knob
+    // starts on the full range (its old range was set for its old destinations),
+    // and the position is one whose CURVED output sits in the zone (a flipped or
+    // steep curve would throw a plain position out of it).
+    const value = destinations.length ? knobPosIn(k.curve, lo, hi) : rnd()
+    return { ...k, destinations, value, min: undefined, max: undefined }
   })
+}
+
+/** A knob position whose curve(position) lands in [lo, hi] (at random among them;
+ *  none : the one nearest the zone's middle). */
+export function knobPosIn(curve: CompositionState['metaKnobs'][number]['curve'], lo: number, hi: number): number {
+  const N = 1024
+  const inZone: number[] = []
+  let best = 0.5, bestD = Infinity
+  const mid = (lo + hi) / 2
+  for (let i = 0; i <= N; i++) {
+    const p = i / N
+    const o = shapeCurve(p, curve)
+    if (o >= lo && o <= hi) inZone.push(p)
+    const d = Math.abs(o - mid)
+    if (d < bestD) { bestD = d; best = p }
+  }
+  if (!inZone.length) return best
+  return inZone[Math.floor(rnd() * inZone.length)]
 }
 
 function targetKey(t: ModTarget): string {
@@ -583,6 +633,10 @@ function targetOnLayer(t: ModTarget, li: number): boolean {
   return s.kind !== 'master' && s.kind !== 'background' && s.layer === li
 }
 
+/** A modulator played by a value from the dataflou mesh (a glove axis mapped with
+ *  its ◈) : Randomize leaves it and its bindings as they are, like the World's. */
+const isMeshMod = (m: ModulatorConfig): boolean => m.type === 'controller' && !!m.mesh
+
 /** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped.
  *  Then GUARANTEE MOTION : every layer with an active source gets at least one
  *  assignment — a random draw that leaves a layer untargeted reads as a static,
@@ -596,6 +650,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
   c.modulators.forEach((m, mi) => {
     if (!m.enabled) return
     if (m.fromWorld) return // the World's audio routing : its own, whatever its slot
+    if (isMeshMod(m)) return // played by a mesh value : its bindings are the performer's
     enabledMods.push(mi)
     const n = drawCount([0.1, 0.5, 0.4]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
@@ -738,7 +793,7 @@ type Blend = (typeof MIX_BLENDS)[number]
 // (median above 0.3) ...
 const LIT_GROUND = new Set<string>([
   'gen-marble', 'gen-physarum', 'dye-field', 'gen-veins', 'scan', 'ground', 'solid-color',
-  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane'
+  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane', 'noise'
 ])
 // ... and these a mid one (0.15 to 0.3).
 const MID_GROUND = new Set<string>([
@@ -876,8 +931,9 @@ function randomLoop(feedback: boolean, amount: number, ground: Ground = 'dark'):
   // The loops that brighten (lighten, screen : 0.7 to 0.96 of each pass back) were
   // made for light on black; over a lit or mid ground they climb to white in a
   // second (a Rise on Swell over Solid Color came out white). Those layers take the
-  // mixing, keying, XOR and multiplying loops.
-  const pool = ground === 'dark' ? LOOP_RECIPES : LOOP_RECIPES.filter((r) => r.blend !== 'lighten' && r.blend !== 'screen')
+  // mixing, keying, XOR and multiplying loops. (The most destructive glitch loops,
+  // `dice: false`, are never dealt : DICE_LOOP_RECIPES.)
+  const pool = ground === 'dark' ? DICE_LOOP_RECIPES : DICE_LOOP_RECIPES.filter((r) => r.blend !== 'lighten' && r.blend !== 'screen')
   if (feedback && chance(0.35) && pool.length) return loopFromRecipe(pick(pool))
   return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount, loopDelay: 0, loopSync: 0 }
 }
@@ -1221,15 +1277,18 @@ function randomizeStructural(
     // The World's audio modulator (its flag, whatever its slot) and the
     // bindings it installed are left out of the randomizer, so a World's bond
     // survives. Every other slot is yours to re-roll, M8 included.
+    // A modulator played by the mesh is left too, with its bindings.
     const wm = worldModIndex(next)
-    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== wm)
+    const was = next.modulators
+    const keep = (i: number): boolean => i === wm || (!!was[i] && isMeshMod(was[i]))
+    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => !keep(s))
     for (let i = slots.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
       ;[slots[i], slots[j]] = [slots[j], slots[i]]
     }
     const chosen = new Set(slots.slice(0, enabledCount))
-    const worldRows = next.modMatrix.filter((a) => isWorldRow(next, a))
-    const modulators = next.modulators.map((m, i) => (i === wm ? m : freshModulator(m, chosen.has(i))))
+    const worldRows = next.modMatrix.filter((a) => isWorldRow(next, a) || (a.mod !== wm && keep(a.mod)))
+    const modulators = next.modulators.map((m, i) => (keep(i) ? m : freshModulator(m, chosen.has(i))))
     next = { ...next, modulators }
     next = { ...next, modMatrix: [...worldRows, ...randomMatrix(next)] }
   }
@@ -1258,7 +1317,7 @@ function jitterOneInput(
   // The same "never touch" rules as a full Randomize : skipped inputs, pinned
   // curated spans, and on the locked finalizers their brightness-critical levels
   // and every switch (3D, film hold, output shape, surface) stay as set.
-  if (RANDOMIZE_SKIP[shaderId]?.test(d.name)) return keep()
+  if (RANDOMIZE_SKIP[shaderId]?.test(d.name) || NUDGE_SKIP[shaderId]?.test(d.name)) return keep()
   if (locked && (d.type === 'bool' || d.type === 'long' || FINISHING_SAFE[shaderId]?.[d.name])) return keep()
   if (d.type === 'float' || d.type === 'bool' || d.type === 'long') {
     const dl = typeof d.min === 'number' ? d.min : 0

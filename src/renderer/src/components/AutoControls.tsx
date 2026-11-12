@@ -18,6 +18,7 @@ import type { IsfInputDesc } from '../shaders/isf/inputs'
 import { registerLiveOverlay } from './liveOverlay'
 import { useShallow } from 'zustand/react/shallow'
 import { isToggleTarget, modTargetKey, targetAlive, useStore } from '../store'
+import { learnFromMesh, useDataflouStatus, useMeshLearning, wireToFreeMacro } from '../dataflou'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { fracFor } from './numberBox'
 import { showToast } from './Toast'
@@ -56,6 +57,14 @@ export function useBound(targetKey: string | null): BoundAssignment[] {
       targetKey ? s.composition.modMatrix.filter((a) => modTargetKey(a.target) === targetKey) : []
     )
   )
+}
+
+/** A Macro knob holds this control : while the knob moves (a drag, a glide,
+ *  MIDI, OSC) the control's live value is in the shared map, so its slider or
+ *  readout follows it like a modulated one (the store only settles at the end
+ *  of the gesture). */
+export function useOnMacro(targetKey: string | null | undefined): boolean {
+  return useStore((s) => !!targetKey && s.composition.metaKnobs.some((k) => k.destinations.some((d) => modTargetKey(d) === targetKey)))
 }
 
 // The M pill. Toggles the provider's mod-assign side panel. Highlights when
@@ -450,6 +459,7 @@ function FloatControl({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
 
   // A MODULATED slider's thumb shows the live value, not the base. Grabbing it
   // used to set the base to wherever the modulator happened to be (and, in
@@ -487,9 +497,9 @@ function FloatControl({
   const sliderRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => {
     const el = sliderRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(x) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
 
   // Dense single-line layout (Finishing view): label · slider · M · number,
   // all on one row so the stack takes minimal vertical space.
@@ -525,7 +535,7 @@ function FloatControl({
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
               maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
+              liveKey={isModulated || onMacro ? (targetKey ?? undefined) : undefined}
               className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
@@ -551,7 +561,7 @@ function FloatControl({
               onChange={(n) => onChange(inp.name, inp.integer ? Math.round(n) : n)}
               integer={!!inp.integer}
               maxFrac={frac}
-              liveKey={isModulated ? (targetKey ?? undefined) : undefined}
+              liveKey={isModulated || onMacro ? (targetKey ?? undefined) : undefined}
               className="input px-1 py-0.5 text-right text-[11px]"
             />
           </div>
@@ -611,6 +621,10 @@ export function AssignRow({
   const full = used >= MAX_MOD_ASSIGNMENTS
   // the binding whose shaping is open under its row (one at a time)
   const [shapeOpen, setShapeOpen] = useState<string | null>(null)
+  // learn from the mesh : on the dataflou mesh, move something; it plays this
+  // control through a free Macro knob (range, curve, capsules)
+  const meshOn = useDataflouStatus().running
+  const meshLearn = useMeshLearning() === `ctl:${targetKey}`
   return (
     <div className="flex flex-col gap-1 rounded border border-border bg-panel2/60 p-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -722,7 +736,24 @@ export function AssignRow({
           above, the whole panel is the fixed three-row shape). */}
       {!hideMeta && (
         <div className="flex min-w-0 items-start gap-1">
-          <span className="w-8 shrink-0 pt-0.5 font-mono text-[9px] uppercase text-muted">macro</span>
+          <span className="flex w-8 shrink-0 flex-col gap-0.5 pt-0.5">
+            <span className="font-mono text-[9px] uppercase text-muted">macro</span>
+            {meshOn && (
+              <button
+                onClick={() =>
+                  void learnFromMesh(`ctl:${targetKey}`).then((r) => {
+                    if (r) void wireToFreeMacro(r, target)
+                  })
+                }
+                className={`rounded px-0.5 font-mono text-[9px] leading-4 ${meshLearn ? 'animate-pulse bg-accent2/25 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent2'}`}
+                title={meshLearn
+                  ? 'Listening to the dataflou mesh : move the thing (a glove, a fader on another node). Click : stop'
+                  : 'Learn from the dataflou mesh : click, then move something on another node; the value that moves the most plays this control through a free Macro knob (its range, curve and capsules)'}
+              >
+                {meshLearn ? '…' : '◈'}
+              </button>
+            )}
+          </span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             {[metaBound.slice(0, 9), metaBound.slice(9)].map((row, r) => (
               <div key={r} className="flex min-w-0 gap-0.5">
@@ -909,10 +940,11 @@ function BoolControl({
   const target = modTargetFor?.(inp.name)
   const targetKey = target ? modTargetKey(target) : null
   const isModulated = useBound(targetKey).length > 0
+  const onMacro = useOnMacro(targetKey)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     const el = btnRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     let last: boolean | null = null
     return registerLiveOverlay({
       key: targetKey,
@@ -929,7 +961,7 @@ function BoolControl({
         el.classList.toggle('ring-accent2/40', !live)
       }
     })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   if (inp.type === 'event' && dense) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">
@@ -1043,6 +1075,7 @@ function EnumControl({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
   // A modulated dropdown tracks the LIVE selection (the engine snaps enums to
   // declared values, so the live value always matches an <option>) and turns
   // accent2 like modulated sliders. React keeps rendering the BASE value; the
@@ -1050,9 +1083,9 @@ function EnumControl({
   const selRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   if (dense) {
     return (
       <div className="flex min-w-0 items-center gap-1.5">
@@ -1124,12 +1157,13 @@ export function EnumSwitch({
   const targetKey = target ? modTargetKey(target) : null
   const bound = useBound(targetKey)
   const isModulated = bound.length > 0
+  const onMacro = useOnMacro(targetKey)
   const selRef = useRef<HTMLSelectElement | null>(null)
   useEffect(() => {
     const el = selRef.current
-    if (!isModulated || !targetKey || !el) return
+    if (!(isModulated || onMacro) || !targetKey || !el) return
     return registerLiveOverlay({ el, key: targetKey, format: (x) => String(Math.round(x)) })
-  }, [isModulated, targetKey])
+  }, [isModulated, onMacro, targetKey])
   return (
     <span className="flex min-w-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
       <select

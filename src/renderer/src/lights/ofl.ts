@@ -185,6 +185,12 @@ export function readOfl(text: string, fileName = 'fixture'): { name: string; pro
       // a dimmer-only light : its dimmer is the luminance
       const all = [...toks.head, ...toks.pix, ...toks.tail]
       const hasColor = all.some((t) => /^[RGBWAUCMY]/.test(t))
+      // (its only dimmer shares a channel with a strobe : held full there, nothing
+      // would carry its level, its fader and Black would never take it down)
+      if (!hasColor && !all.some((t) => t[0] === 'D') && [...labs.head, ...labs.pix, ...labs.tail].some((l) => l.startsWith('dimmer / strobe'))) {
+        skipped.push(`${mname} : its only dimmer shares its channel with a strobe`)
+        return
+      }
       const fix = (list: string[]): string[] => (hasColor ? list : list.map((t) => (t[0] === 'D' ? 'L' + t.slice(1) : t)))
       const hasPix = seenPix && repeats > 1
       // every pixel of a full grid : a matrix; anything else (groups, a list, holes) : a bar of that many

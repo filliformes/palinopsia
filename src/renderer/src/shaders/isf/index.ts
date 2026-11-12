@@ -29,6 +29,7 @@ import swell from './Swell.fs?raw'
 import congeal from './Congeal.fs?raw'
 import slitScan from './SlitScan.fs?raw'
 import ramps from './Ramps.fs?raw'
+import noise from './Noise.fs?raw'
 import rgbOsc from './RgbOsc.fs?raw'
 import recurse from './Recurse.fs?raw'
 import shapes from './Shapes.fs?raw'
@@ -110,6 +111,10 @@ import perspective from './fx/Perspective.fs?raw'
 import shatter from './fx/Shatter.fs?raw'
 import crawl from './fx/Crawl.fs?raw'
 import storeZoom from './fx/StoreZoom.fs?raw'
+import timeGlitch from './fx/TimeGlitch.fs?raw'
+import breakFx from './fx/Break.fs?raw'
+import keyFx from './fx/Key.fs?raw'
+import droste from './fx/Droste.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -129,6 +134,10 @@ export interface IsfShader {
   /** A native GENERATOR that needs nothing from the user (no text, film pool or
    *  camera) : it stays in Randomize's source pool like an ISF generator. */
   dice?: boolean
+  /** An ISF effect that takes the preview pointer (pointerInput.ts) : a click or
+   *  a pinch sets the inputs `x` / `y` (frame 0..1, y up) and, with `fire`, pulses
+   *  that event; `drag` keeps following while held. Natives take it their own way. */
+  pointer?: { x: string; y: string; fire?: string; drag?: boolean; hint: string }
 }
 
 // ── Native convolution nodes (visual-convolution spec) ──────────────────
@@ -635,6 +644,73 @@ export const NATIVE_NODES: IsfShader[] = [
       dye: [0.3, 0.9], speed: [0.2, 0.8], mix: [0.5, 1.0]
     }
   },
+  // ── Field effects : the Organic sources' own simulations, fed and steered by
+  // the picture (engine/morphogenNode.ts, engine/currentNode.ts). Self-contained :
+  // a sidechain only takes over the steering.
+  {
+    id: 'node-reaction',
+    name: 'Morphogen',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Morphogen : reaction-diffusion grown by the picture. The Reaction source's own simulation runs on its own grid (the pattern keeps its size at 1080p, 4K and on the dome) and the picture feeds it : its brightness (or its warm and cool colors, PATTERNS BY) pushes FEED and KILL apart, so its darks and its lights grow different species (DARK / LIGHT sets how far, and which way), and it PLANTS new growth along its edges, where it moves, or in its lights. FOLLOW MOTION carries the living pattern along the picture's own movement. The pattern comes back in a LOOK : THROUGH (the picture seen through the pattern), INK (the pattern drawn over it in the ink color), EMBOSS (the picture carved by it), MATTE (the layer shows only where it grows) or WARP (the picture bent along its slopes); AMOUNT is how strong. SPARKS are the source's sparse random seeds, PATTERN SIZE and RATE as in the source, RELIEF lights it. A STEERED BY layer picked in the Inspector (a Noise, a film) does the steering while this layer is what it shows. REGROW starts over. Any rack.",
+      CATEGORIES: ['FX', 'Organic', 'Texture'],
+      INPUTS: [
+        { NAME: 'look', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['through', 'ink', 'emboss', 'matte', 'warp'], DEFAULT: 0, LABEL: 'look' },
+        { NAME: 'amount', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.8, LABEL: 'amount' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 1.0, LABEL: 'mix' },
+        { NAME: 'steer', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['brightness', 'color', 'nothing'], DEFAULT: 0, LABEL: 'patterns by' },
+        { NAME: 'bias', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'dark / light' },
+        { NAME: 'feed', TYPE: 'float', MIN: 0.008, MAX: 0.09, DEFAULT: 0.0456, LABEL: 'feed' },
+        { NAME: 'kill', TYPE: 'float', MIN: 0.03, MAX: 0.07, DEFAULT: 0.0635, LABEL: 'kill' },
+        { NAME: 'plant', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'plant' },
+        { NAME: 'plantFrom', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['edges', 'motion', 'lights'], DEFAULT: 0, LABEL: 'plant from' },
+        { NAME: 'seed', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.15, LABEL: 'sparks' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'follow motion' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.45, LABEL: 'pattern size' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 4.0, DEFAULT: 2.0, LABEL: 'rate' },
+        { NAME: 'sharp', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'sharpness' },
+        { NAME: 'ink', TYPE: 'color', DEFAULT: [0.12, 0.11, 0.1, 1.0] },
+        { NAME: 'relief', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'relief' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0.0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'reseed', TYPE: 'event', LABEL: 'regrow ▸' }
+      ]
+    })}*/`,
+    curated: {
+      amount: [0.5, 1], mix: [0.7, 1], bias: [-0.9, 0.9], feed: [0.03, 0.055], kill: [0.057, 0.065], plant: [0.2, 0.8],
+      seed: [0.05, 0.4], follow: [0.3, 0.9], scale: [0.25, 0.75], rate: [1.2, 3], sharp: [0.3, 0.8], relief: [0.3, 0.8], lightAngle: [0, 6.2832]
+    }
+  },
+  {
+    id: 'node-fluid',
+    name: 'Current',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        "Current : a real fluid that carries the picture. The Fluid source's own solver runs on its own grid (the water keeps its size and speed at 1080p, 4K and on the dome) and the picture is the dye it carries. Where the picture MOVES, the water is dragged along with it, so a dancer or a pan stirs it; LIGHT RISES lifts the bright parts like warm smoke (below 0 they sink; under the full dome they rise to the zenith); CHURN is the water's own restlessness, so a still picture or a generator still gets curled and smeared; SWIRL keeps the eddies spinning, VISCOSITY thickens it. MEMORY is how long the water keeps carrying the old picture before the live one refreshes it (short smears to long marbled drifts), KEEP STILL lets the sharp live picture through where the water is still, MIX the blend. DETAIL is the grid (fine curls or broad flows), RATE how fast it all goes. A sidechain layer can move the water (its motion and its light) while this layer is what it carries. STIR gives it a sudden turn, CLEAR starts from still water. Any rack.",
+      CATEGORIES: ['FX', 'Organic', 'Distortion'],
+      INPUTS: [
+        { NAME: 'motion', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'motion' },
+        { NAME: 'rise', TYPE: 'float', MIN: -1.0, MAX: 1.0, DEFAULT: 0.0, LABEL: 'light rises' },
+        { NAME: 'churn', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.35, LABEL: 'churn' },
+        { NAME: 'swirl', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'swirl' },
+        { NAME: 'viscosity', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.2, LABEL: 'viscosity' },
+        { NAME: 'memory', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.6, LABEL: 'memory' },
+        { NAME: 'keep', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.4, LABEL: 'keep still' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 1.0, LABEL: 'mix' },
+        { NAME: 'detail', TYPE: 'float', MIN: 0.0, MAX: 1.0, DEFAULT: 0.5, LABEL: 'detail' },
+        { NAME: 'rate', TYPE: 'float', MIN: 0.0, MAX: 2.0, DEFAULT: 1.0, LABEL: 'rate' },
+        { NAME: 'stir', TYPE: 'event', LABEL: 'stir ▸' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear ▸' }
+      ]
+    })}*/`,
+    curated: {
+      motion: [0.3, 0.9], rise: [-0.4, 0.6], churn: [0.15, 0.6], swirl: [0.25, 0.8], viscosity: [0.05, 0.4],
+      memory: [0.35, 0.85], keep: [0.1, 0.6], mix: [0.7, 1], detail: [0.3, 0.7], rate: [0.6, 1.3]
+    }
+  },
   {
     id: 'node-toile',
     name: 'Toile',
@@ -939,6 +1015,82 @@ export const NATIVE_NODES: IsfShader[] = [
       ]
     })}*/`,
     curated: { mode: [0, 2], size: [0.7, 1.05], crumple: [0.1, 0.6], gravity: [0.3, 0.7], wind: [0.1, 0.6], gust: [0.3, 0.8], stiffness: [0.5, 0.9], damping: [0.15, 0.4], grab: [0.1, 0.25], audio: [0, 0.4], people: [0, 0], material: [0, 1], sheen: [0.3, 0.8], folds: [0.4, 0.8], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], tilt: [-0.1, 0.35], behind: [0, 0], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8] }
+  },
+  {
+    // Native (engine/touchNode.ts) : a displacement field the hand pushes (the mouse,
+    // every pinching hand, the Room's people, OSC, its own point), relaxed by a spring.
+    id: 'node-touch',
+    name: 'Touch',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Touch : makes any picture touchable. Lay a hand on the preview (the mouse, or pinch with the Body page\'s pinch = click) and the picture answers : RINGS a shockwave bursting from the touch and traveling out (drag for a wake of rings), SPREAD pushed away from the hand, SWIRL twisted round it, DRAG carried along with it, LENS a lens under it, ATTRACT pulled in. FOLLOW is how closely the touch keeps up with the hand (low trails behind it, elastic), FADE how fast the picture comes back, SPRING whether it creeps back or wobbles like jelly, SOFT how wide the push spreads. FIRE does the mode\'s touch once at the center, the point or a random place (a pad, a modulator, an OSC message); SOUND HITS fire it on every onset (a shockwave on the kick). The Room\'s people push where they stand, BY ITSELF its own hand wanders through the picture; PRESS holds the point down (move it with a modulator). SHADE darkens what the push bunches up and lightens what it stretches. On the dome it works on the dome itself : rings stay round to the rim.',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['rings', 'spread', 'swirl', 'drag', 'lens', 'attract'], DEFAULT: 3, LABEL: 'mode' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.02, MAX: 0.8, DEFAULT: 0.18, LABEL: 'size' },
+        { NAME: 'strength', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'strength' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.75, LABEL: 'follow' },
+        { NAME: 'fade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'fade' },
+        { NAME: 'spring', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'spring' },
+        { NAME: 'soft', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'soft' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'ring speed' },
+        { NAME: 'width', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'ring width' },
+        { NAME: 'fire', TYPE: 'event', LABEL: 'fire' },
+        { NAME: 'fireAt', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['center', 'the point', 'anywhere'], DEFAULT: 0, LABEL: 'fire at' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound hits' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people push' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'by itself' },
+        { NAME: 'press', TYPE: 'bool', DEFAULT: false, LABEL: 'press the point', COMPACT: true },
+        { NAME: 'point', TYPE: 'point2D', MIN: [0, 0], MAX: [1, 1], DEFAULT: [0.5, 0.5], LABEL: 'point' },
+        { NAME: 'shade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'shade' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'color split' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear' }
+      ]
+    })}*/`,
+    curated: { mode: [0, 5], size: [0.1, 0.35], strength: [0.4, 0.8], follow: [0.5, 1], fade: [0.2, 0.6], spring: [0.1, 0.7], soft: [0.1, 0.5], speed: [0.3, 0.7], width: [0.2, 0.6], fireAt: [0, 2], audio: [0, 0], people: [0, 0], wander: [0.3, 0.8], press: [0, 0], shade: [0.15, 0.5], split: [0, 0.3], mix: [1, 1] }
+  },
+  {
+    // Native (engine/rippleNode.ts) : a wave height field the picture is seen through;
+    // rain, the sound's hits, the hand, the Room and the picture's own motion stir it.
+    id: 'node-ripple',
+    name: 'Ripple',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Ripple : the picture seen through water. RAIN drops at random places, SOUND HITS drop a stone on every onset (on the kick), STONE drops one now at the center, the point or a random place, ITS OWN MOTION lets what changes in the picture stir the water, and the hand plays it (click : a stone, drag : a finger trailing through the water; or pinch with the Body page\'s pinch = click). The Room\'s people wade where they stand, BY ITSELF a finger of its own trails slowly through the water. The rings travel at WAVE SPEED and die away by CALM; the frame\'s edges are the pool\'s walls (REFLECT) or a soft shore (ABSORB). REFRACTION is how much the water bends the picture, COLOR SPLIT how far its colors part, CREST LIGHT the matte light on the crests, WATER COLOR and DEPTH the tint in the troughs. On the dome the water lies on the dome itself and its rim is the wall : rings come back from all round.',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'rain', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'rain' },
+        { NAME: 'dropSize', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'drop size' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound hits' },
+        { NAME: 'motion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'its own motion' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people wade' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'by itself' },
+        { NAME: 'stone', TYPE: 'event', LABEL: 'stone' },
+        { NAME: 'stoneAt', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['center', 'the point', 'anywhere'], DEFAULT: 0, LABEL: 'stone at' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'follow' },
+        { NAME: 'press', TYPE: 'bool', DEFAULT: false, LABEL: 'press the point', COMPACT: true },
+        { NAME: 'point', TYPE: 'point2D', MIN: [0, 0], MAX: [1, 1], DEFAULT: [0.5, 0.5], LABEL: 'point' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'wave speed' },
+        { NAME: 'calm', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'calm' },
+        { NAME: 'edges', TYPE: 'long', VALUES: [0, 1], LABELS: ['reflect', 'absorb'], DEFAULT: 0, LABEL: 'edges' },
+        { NAME: 'refract', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'refraction' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'color split' },
+        { NAME: 'shade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'crest light' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.55, 0.68, 0.72, 1], LABEL: 'water color' },
+        { NAME: 'deep', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'water depth' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' },
+        { NAME: 'still', TYPE: 'event', LABEL: 'still' }
+      ]
+    })}*/`,
+    curated: { rain: [0.1, 0.5], dropSize: [0.2, 0.6], audio: [0, 0], motion: [0, 0.5], people: [0, 0], wander: [0, 0.5], stoneAt: [0, 2], follow: [0.6, 1], press: [0, 0], speed: [0.25, 0.6], calm: [0.2, 0.55], edges: [0, 1], refract: [0.35, 0.75], split: [0, 0.35], shade: [0.2, 0.5], lightAngle: [0, 6.2832], deep: [0, 0.3], mix: [1, 1] }
   },
   {
     // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
@@ -1299,6 +1451,18 @@ export const GENERATORS: IsfShader[] = [
     category: 'Generator',
     source: ramps,
     curated: { freq: [1, 6], steps: [1, 16], rate: [-0.8, 0.8], angle: [0, 6.2832] }
+  },
+  {
+    id: 'noise',
+    name: 'Noise',
+    category: 'Generator',
+    source: noise,
+    // matte, never plasma : a dice keeps the contrast and the bands tasteful, never
+    // the focus (blur is set by hand), the map, the key or the seamless repeat
+    curated: {
+      scale: [2, 14], octaves: [2, 6], rough: [0.35, 0.65], seed: [0, 1], contrast: [1, 2.6], level: [-0.25, 0.2],
+      steps: [1, 6], focus: [0, 0], drift: [0.03, 0.4], angle: [0, 6.2832], evolve: [0.03, 0.3], glide: [0.3, 1]
+    }
   },
   {
     id: 'rgb-osc',
@@ -2333,6 +2497,43 @@ export const FX_SHADERS: IsfShader[] = [
     id: 'fx-pixelsort', name: 'Pixel Sort', category: 'FX', source: pixelSort,
     // angle pinned : a dice keeps the classic axis-aligned sort (tilt by hand).
     curated: { low: [0.1, 0.4], high: [0.6, 0.9], length: [0.1, 0.4], angle: [0, 0] }
+  },
+  // ── Time Glitch, Break, Key, Droste (11-11) ──
+  {
+    // the tempo sync and the audio are staging : by hand
+    id: 'fx-time-glitch', name: 'Time Glitch', category: 'FX', source: timeGlitch,
+    curated: {
+      time: [0.35, 0.85], mode: [0, 2], drift: [-0.3, 0.4], chaos: [0.2, 0.6], rate: [2, 10], sync: [0, 0],
+      blocks: [8, 32], shift: [0.15, 0.7], split: [0.1, 0.6], crush: [0, 0.5], inside: [0.4, 0.9], after: [0.1, 0.5],
+      burstLen: [0.4, 1.5], audio: [0, 0], amount: [0.85, 1]
+    }
+  },
+  {
+    // A dice never holds a picture broken (hold) : drift, fall or heal, every few
+    // seconds, near the middle. Click the preview to break it where you point.
+    // EVERY stays past the longest run TIME allows (a fall ends 1.15 x time + 0.5 s
+    // after its hit : 3.4 s at 2.5), so an automatic hit never snaps a half-fallen
+    // frame whole in one frame.
+    id: 'fx-break', name: 'Break', category: 'FX', source: breakFx,
+    pointer: { x: 'hitX', y: 'hitY', fire: 'impact', hint: 'click : break the picture here' },
+    curated: {
+      every: [3.5, 8], sync: [0, 0], after: [1, 3], time: [1, 2.5], force: [0.3, 0.7], shards: [8, 20], rings: [3, 6],
+      wander: [0.3, 0.8], broken: [0.2, 0.5], tilt: [0.3, 0.8], refract: [0.2, 0.6], bevel: [0.3, 0.8],
+      light: [0, 6.2832], behind: [0, 0.5], scatter: [0.2, 0.7], amount: [1, 1], hitX: [0.35, 0.65], hitY: [0.35, 0.65]
+    }
+  },
+  {
+    // Kept out of every dice (randomize.ts HAND_FX) : a key is a staging choice.
+    id: 'fx-key', name: 'Key', category: 'FX', source: keyFx,
+    curated: { mode: [0, 0], tolerance: [0.2, 0.4], softness: [0.08, 0.25], despill: [0.4, 0.8], choke: [0, 0.3], feather: [0.05, 0.3], amount: [1, 1] }
+  },
+  {
+    // Kept out of every dice (randomize.ts HAND_FX) : the whole frame folded into
+    // a spiral reads as a deliberate move, not a texture. Click the preview to
+    // set its center.
+    id: 'fx-droste', name: 'Droste', category: 'FX', source: droste,
+    pointer: { x: 'cx', y: 'cy', drag: true, hint: 'click or drag : the center of the spiral' },
+    curated: { scale: [3, 9], strands: [-2, 2], arms: [1, 2], zoom: [-0.3, 0.3], spin: [-0.05, 0.05], twist: [-0.5, 0.5], depth: [0, 1], shape: [0, 1], edge: [0, 0.4], cx: [0.4, 0.6], cy: [0.4, 0.6], amount: [1, 1] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
   // layer's frame as a video-rate FM input (an A→B→C→A cross-oscillator

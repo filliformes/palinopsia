@@ -1,9 +1,19 @@
-# Palinopsia — Spout sender addon
+# Palinopsia — Spout sender and receiver addon
 
 A minimal N-API addon wrapping **Spout2**'s `spoutDX` (DirectX 11) class, so the
 app can publish its composite as a **Spout** source (Resolume, OBS, …) straight
 from the readback pixels. DX11 needs no OpenGL context, so it runs headless in
-the Electron **main** process.
+the main window's preload (or the **main** process as a fallback).
+
+It also **receives** (the layer source *Spout / Syphon Input…*, `src/preload/shareIn.ts`) :
+`senders()`, `recvOpen(name, gpu)`, `recvState`, `recvRing` / `recvTake` / `recvRetire`
+(GPU route : every new frame copied on the graphics card into one of four textures
+shared by NT handle, imported once by Electron's `sharedTexture`), `recvRead` (copy route :
+read back on the receiver's thread, copied into the page's buffer off the JS thread),
+`recvClose`. Each receiver runs on a thread of its own with its own D3D11 device (on the
+high-performance graphics card, the one Chromium draws with), and finds its sender again
+by name when it closes, restarts or changes size. `adapters()` lists the graphics cards,
+and `open(name, format, adapter)` lets a test sender pick a format and a card.
 
 `sdk/` vendors the required Spout2 SDK sources (BSD-3-Clause,
 [leadedge/Spout2](https://github.com/leadedge/Spout2)). `spout_addon.cpp` exposes

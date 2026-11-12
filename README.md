@@ -62,7 +62,7 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 
 **The instrument**
 - [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files, live inputs and NDI® sources into Sonify's mix
-- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio)
+- [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio) · [Spout / Syphon input](#spout--syphon-input)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
 - [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
@@ -73,11 +73,11 @@ its Generate theme. The older shots stay in `docs/images/`.)*
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (147 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (162 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
-- [Sources](#sources-50) (50 : 49 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (61 FX) ·
+- [Sources](#sources-51) (51 : 50 generators and the [Audio](#audio-sources) source of a sound file) · [Effects](#effects) (65 FX) ·
   [Native nodes](#native-nodes) (30) · [Master finalizers](#master-finalizers--pinned-always-last)
 - [Blend modes](#blend-modes) (20)
 - [Source Editor](#source-editor--your-own-shaders-alte) : write your own generators and effects, or start from a copy of any built-in one
@@ -222,7 +222,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 140 themed recipes that build a coherent
+   **Generate** in the toolbar : 162 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click. Its
    first entry, **Init**, is the opposite : a blank session to start from (empty
    layers, no effects, eight plain modulators ready to bind).
@@ -341,14 +341,21 @@ mapper.
 
 A source can take the mouse : click, hold or drag on the **preview** (the big preview,
 `V`, too) and you play on the picture itself. Those sources are **Relief** (a drag draws in its brush), **Fur** (a click parts it, a drag combs it), **Sand Plate** (a click rings the plate, a drag is a finger through the sand) and **Marbling** (see
-[Sources](#sources-50)), and one effect, **Drape** (a drag grabs the cloth, let go and it
-falls); with none on the picture the cursor stays the arrow and a click does nothing, as
+[Sources](#sources-51)), and five effects, **Drape** (a drag grabs the cloth, let go and it
+falls), **Touch** (the hand pushes, swirls, drags or magnifies the picture, or sends a
+shockwave out from it), **Ripple** (a click drops a stone in the water, a drag is a
+finger trailing through it), **Break** (a click breaks the picture right there) and **Droste** (a click or a drag
+puts the spiral's center there); with none on the picture the cursor stays the arrow and a click does nothing, as
 ever.
 
 - **Where it goes.** To the source or effect selected in the Inspector when it takes a
-  click, else to what takes it on top : a Drape on the Master FX, then from the topmost
+  click, else to what takes it on top : an effect on the Master FX that takes a click
+  (Drape, Touch, Ripple, Break, Droste : it is over everything, so with one there a
+  source only gets the click once you select it in the Inspector), then from the topmost
   visible layer down, its effects (they sit over its sources) and then its sources, the
-  Background last. An effect's gesture is live : it never enters the undo history. The
+  Background last. Drape's gesture is live : it never enters the undo history; Break's and
+  Droste's set their point like a slider (undoable, saved; a pinch's is live, and never
+  breaks a fader drag of yours into steps), Break's hit itself is a pulse. The
   preview's corner says which one and what a click does there ("L1 A · Marbling · click :
   a drop · hold : pour · drag : a trail · 25 drops · 16K points"), and the cursor turns
   into a crosshair over it.
@@ -365,7 +372,13 @@ ever.
 - **A pinching hand is a pointer too** : the Body page's **Pinch = click** (TRACK row).
   Each hand is its own pointer, so two hands and the mouse can play at once.
 - **OSC** : `/opsia/layer{n}/source/{A|B}/drop x y [size]` (and `/opsia/bg/source/drop`)
-  drops paint at a place from a controller.
+  drops paint at a place from a controller. `/opsia/touch x y [s]` taps every Touch and
+  Ripple in the composition (a shockwave, a stone), `/opsia/touch/hold x y` holds a finger
+  there (it drags, swirls, wades as it moves) and `/opsia/touch/up` lets it go. A held
+  finger lets go by itself 3 s after the last `/hold` (a controller that holds keeps
+  sending it), and New, Open and PANIC let it go.
+- **The Room's people** touch too : Drape's *people press*, Touch's *people push* and
+  Ripple's *people wade* put each person tracked by the Body page's Room where they stand.
 
 ---
 
@@ -404,7 +417,7 @@ typical layer takes about a third less height than before. Each of the **4 layer
 | **Speed** (`SPEED`) | The layer's own clock multiplier (0–20×) over global speed (double-click → 1). |
 | **Vary** | The global [Vary](#randomize--vary) aimed at this layer alone : its sources, its racks and their parameters nudge around where they already sit, by the amount beside the button (0.15 by default; double-click resets). The button is a modulation target that fires as its modulator crosses the middle going up, so a Euclid or a Spastic re-varies the layer on a pattern, and an auto-fire stays out of the undo history. It blinks each time it fires, however it was fired. |
 | **Feedback** (`TRAIL`) | Samples the layer's own previous frame (ping-pong FBO decay-feedback) : the Out stage's **feedback** tab, its on/off and its trail (the tab reads `fb off` or its trail, `fb 0.85`, with a `↻` when effects run inside the loop). |
-| **Loop** (`LOOP`) | Under the trail, the layer's **Loop rack** : effects that run on the **returning picture** (the last frame) on every pass, before it meets the new frame, so they **compound**, like a camera pointed at its own monitor with a mixer in between. A 1% zoom becomes a tunnel, a small turn a spiral, a hue nudge a slow drift of color. Any effect goes in (the sidechain nodes too); one put in by hand starts gentle (Transform at a 1% zoom and a small turn, Hue Rotate at 0.01 : the layer's defaults would do nothing or strobe). The **loop blend** says how the return meets the new frame : **mix** (the plain trail, as before), **add**, **screen**, **lighten** (bright parts linger), **darken**, **multiply** (the loop burns darker), **difference**, **XOR** (digital, stepped edges), **key** (the loop shows only through the new picture's dark and transparent parts : the studio feedback key). Difference and XOR settle over two frames, so a still picture never strobes. **Recipes** : ready loops, each with its blend and amount (feedback turns on) : Spiral, Tunnel, Echo key, Hue drift, Melt, Swirl, Drip, Rise, Chroma trail, XOR bloom, Burn; the turning ones sit off center (never a mandala). Where the loop's effects leave the picture empty (a zoom out), the empty part is the dark room around the monitor, not a hole in the layer. The trail's amount is how much of each pass comes back. **DELAY** sets when it comes back : 0 is the last frame, else up to 4000 ms later, or in beats on the tempo (`1/16`, `1/8`, `1/4`, `1/2`, `1 bar`; Link included) : the loop's effects then compound once per echo, so a zoom that shrinks makes copies falling away on the beat (**Beat echo**, **Slow echo**). The past frames wait in a ring kept small (about half the layer's size, within ~64 MB a layer, freed when the delay goes back to 0), so each echo softens a little, like tape. With a delay, **lighten**, **screen** or **key** keep the present whole and add the echoes; **mix** fades the present under them. The loop sleeps while feedback is off; Vary leaves it alone (a jittered zoom empties the layer in a second). Copy an effect into a layer's loop from its right-click menu; `Ctrl+K` lists the recipes (**loops**, onto the selected layer); the Agent addresses it `L1.loop` / `L1.loop.fx.1`; the Generate theme **Monitor Loop** and ten others deal loops, the layer dice a third of the time it turns feedback on. |
+| **Loop** (`LOOP`) | Under the trail, the layer's **Loop rack** : effects that run on the **returning picture** (the last frame) on every pass, before it meets the new frame, so they **compound**, like a camera pointed at its own monitor with a mixer in between. A 1% zoom becomes a tunnel, a small turn a spiral, a hue nudge a slow drift of color. Any effect goes in (the sidechain nodes too); one put in by hand starts gentle (Transform at a 1% zoom and a small turn, Hue Rotate at 0.01 : the layer's defaults would do nothing or strobe). The **loop blend** says how the return meets the new frame : **mix** (the plain trail, as before), **add**, **screen**, **lighten** (bright parts linger), **darken**, **multiply** (the loop burns darker), **difference**, **XOR** (digital, stepped edges), **key** (the loop shows only through the new picture's dark and transparent parts : the studio feedback key). Difference and XOR settle over two frames, so a still picture never strobes. **Recipes** : ready loops, each with its blend and amount (feedback turns on), in three groups in the menu. **feedback** : Spiral, Tunnel, Echo key, Hue drift, Melt, Swirl, Drip, Rise, Chroma trail, XOR bloom, Burn; the turning ones sit off center (never a mandala). **glitch** : the damage runs inside the loop, so every pass remembers it and smears it further : **Bit rot** (values crushed and channels scrambled in blocks, piling up into tinted bricks), **Recompress** (saved again as a cheap compressed file on every pass, the color draining toward gray), **Tear drift** (bands that go on tearing sideways), **Band slip** (bands of the stream slip and stick), **Sort drip** (pixel sort run again and again, the middle tones running down), **Freeze bands** (a slow spiral whose bands freeze at random), **Tape rot** (a tape dubbed again every 90 ms), **Scan relief** (scan lines lifted by brightness into a ridged relief), **Slice drag** (slices that jump and smear), **Ink latch** (what passes the level stays inked until the picture darkens it), **Crawl stain** (the trail stained by how long ago each place changed). **echoes and beats** : Beat echo, Slow echo, **Torn echo** (an echo every eighth note, its slices torn), **Bar grab** (every bar a still held in scattered cells), **Beat stutter** (echoes a sixteenth apart, bands of them freezing) and **Step spiral** (the loop moves only on the eighth note : a stop-motion spiral). Each glitch and beat loop was soaked a minute on a film and on a generator : none goes black, white, flat or still, and none flashes 3 times a second. Bit rot, Recompress, Ink latch and Crawl stain wreck the picture furthest, and Tape rot rings the dome's rim : the menu has these five, the dice and Generate leave them alone. Where the loop's effects leave the picture empty (a zoom out), the empty part is the dark room around the monitor, not a hole in the layer. The trail's amount is how much of each pass comes back. **DELAY** sets when it comes back : 0 is the last frame, else up to 4000 ms later, or in beats on the tempo (`1/16`, `1/8`, `1/4`, `1/2`, `1 bar`; Link included) : the loop's effects then compound once per echo, so a zoom that shrinks makes copies falling away on the beat (**Beat echo**, **Slow echo**). The past frames wait in a ring kept small (about half the layer's size, within ~64 MB a layer, freed when the delay goes back to 0), so each echo softens a little, like tape. With a delay, **lighten**, **screen** or **key** keep the present whole and add the echoes; **mix** fades the present under them. The loop sleeps while feedback is off; Vary leaves it alone (a jittered zoom empties the layer in a second). Copy an effect into a layer's loop from its right-click menu; `Ctrl+K` lists the recipes (**loops**, onto the selected layer); the Agent addresses it `L1.loop` / `L1.loop.fx.1`; the Generate themes **Monitor Loop** and **Glitch Loop** (every layer through a glitch loop) and sixteen others deal loops, the layer dice a third of the time it turns feedback on. |
 | **Solo / Mute** (`S` / `⊘`) | Per-layer isolation; per-layer dice `⚄`. (Mute moved off the letter `M` so it never reads as the Modulate **M** chips. The same `S` / `⊘` chips now also ride each column of the **Mixer** view.) |
 
 Shader hot-swaps preserve feedback buffers : no reset-to-black mid-performance.
@@ -679,7 +692,7 @@ hour-long file costs the same as a short one. Presets, and three master chains t
 flatter it (**Sound** : Phosphor, Tape Floor, Relief). It plays on Sonify's output
 device (recordings do not carry it yet), and a muted layer is silent.
 
-Live **captures** (webcam / screen / device), [NDI](#ndi) sources and **HIVE**
+Live **captures** (webcam / screen / device), [NDI](#ndi) sources, [Spout / Syphon](#spout--syphon-input) senders on this computer and **HIVE**
 (HEVC-over-TCP network streams) fill slots the same way, and every video/capture slot
 has its own **framing** and Source-FX rack. A camera that drops out
 (unplugged, or reset by USB power saving) **reconnects by itself** : it is tried again
@@ -688,12 +701,53 @@ comes back under another id; its last frame holds meanwhile. A camera that is **
 there yet** when the session opens (an installation whose camera powers up after the
 computer) is looked for the same way.
 
+### Spout / Syphon input
+
+Another program's picture **on this computer** (TouchDesigner, Resolume, Unity, a
+VJ app, another Palinopsia) as a layer source, at full quality and almost no delay :
+nothing is compressed (NDI) or grabbed off the screen. A layer's source menu →
+**Spout / Syphon Input…** lists the **Spout** senders running on this PC (on a Mac, the
+**Syphon** servers), with their size; pick one and it plays in the layer like a camera
+(framing, People, FX, blend), the right way up; **Switch input** in the Inspector changes
+it. Several layers can show the same sender (one receiver). The session remembers it by
+name (`spout:<name>`, `syphon:<name>` on a Mac : either one opens on either computer, a Mac
+finding the server by its own name too), and
+a sender that is **not running yet**, **closes**, **restarts** or **changes size** is
+picked up again by itself; the last frame holds meanwhile. The Inspector shows what
+arrives : size, frames per second and the route.
+
+- **Shared on the graphics card** (Windows) : each new frame is copied, on the GPU, into
+  a texture Palinopsia shares with Chromium, so no pixel ever goes through memory.
+  Measured on the Aero (RTX 4070) with a test sender drawing a time code : a 1080p 60 fps sender reaches the layer **13 ms** after it sent the frame (95 % within 23 ms), a 4K one in **21 ms** (32), the app holding 60 fps; the upload costs 0.2 ms a frame (0.4 at 4K), the receiving about 10 % of one CPU core (its own thread, never the app's) and a few % more on the GPU.
+- **Copied**, when the sender draws on **another graphics card** (a laptop's integrated
+  one) or sends 8-bit BGRX, which the shared texture cannot hold : the frame is read back on the
+  receiver's own thread and copied into the layer off the app's thread : 1080p arrives in 21 ms (28), 4K in 42 ms (52) at about 47 frames a second, the app still at 60 fps, for about a quarter (1080p) to half (4K) of a CPU core.
+  On a laptop with two graphics cards, set the sending program to the high-performance
+  one (Windows Settings → Display → Graphics) to keep the shared route.
+- The picture keeps the sender's **alpha** : a transparent sender shows the layers below.
+- **Pixel formats** : 8-bit senders (RGBA, BGRA, BGRX) come in by either route; 16-bit
+  float only shared on the graphics card (the sender on the same card). A **10-bit** or
+  **32-bit float** sender is refused and the Inspector says so : set its output to 8-bit
+  (or 16-bit float). A sender that shares **through memory** (an old Spout setting) cannot
+  be received either : the Inspector says it is running but cannot be opened.
+- **macOS (Syphon)** : written the same way (the server's IOSurface shared with the
+  window; a copy route reading the surface if that fails) but **not yet tried on a Mac**.
+  If the picture comes in upside down, **mirror → upside down** in the framing fixes it
+  (and tell us).
+- Not offered by Generate or the dice (like the NDI input : a live input is your choice).
+- Palinopsia's own **Spout / Syphon output** (the Output page) appears in the list too :
+  picking it makes a loop through the whole picture.
+
 **Framing** (under a video, capture, Assemble or HIVE source in the Inspector) : **fit** sets how the
 whole picture sits in the layer (*stretch* fills it whatever its shape, the default;
 *cover* fills it with its shape kept, cutting what sticks out; *contain* shows all of
 it, transparent around), and **mirror** which way it faces (*left-right* is the selfie
 view of a webcam, *upside down* is for a camera hung upside down, *both* is half a
-turn; it stays through *reset*, since it is how the camera hangs), then **zoom** and
+turn; it stays through *reset*, since it is how the camera hangs). **A camera opens in
+the selfie view** (*left-right* : raise your left arm, it shows on the left of the
+screen), and **its mirror is remembered for that camera on this computer** : set a
+capture card or a camera filming the stage to *off* once and it opens that way every
+time. Screens and NDI open as they arrive. Then **zoom** and
 **pan**. **Crop** cuts the picture's edges
 away where they are : what is left neither moves nor stretches. **Feather** softens
 whatever edge remains, the crop's or the picture's own (0 to half the layer's height).
@@ -923,14 +977,30 @@ Macro knob picked in `Ctrl+K` shows the row. `Ctrl+K` → **Macro knobs** toggle
 A flat bank of 16 macro knobs. Each tile is a 270° dial (drag vertically, Shift =
 fine, double-click resets), with a destination count, a rename, an output **curve**
 (linear / log / exp / eases / sigmoid / smoothstep / db / gamma / step / invert), a
-**CC** MIDI-learn, and an **M** button binding one modulator to the knob. In the gap at
-the bottom of the dial, what the knob sends **now** through its curve (`0.00` to `1.00`),
-live as you drag, as it glides, from MIDI or a modulator (in the modulated color then). Each knob
-can drive up to 8 destinations. `⚄` shuffles knob positions while keeping bindings.
+**range**, a **CC** MIDI-learn, and an **M** button binding one modulator to the knob.
+In the gap at the bottom of the dial, what the knob sends **now** through its curve and
+its range (`0.00` to `1.00`), live as you drag, as it glides, from MIDI or a modulator
+(in the modulated color then). Each knob can drive up to 8 destinations.
+
+The **range** (under the curve : the order the value takes) is where a full turn of the
+knob lands, as a part of each destination's own range : min `0.25`, max `0.6` and the
+knob sweeps its destinations from a quarter to six tenths, the whole turn for just that
+part. Drag either end of the bar, or type the two numbers under it; double-click the bar
+for the full range again. Min above max turns the knob the other way. The destinations
+follow at once, whether the knob is at rest or moving, and the range travels with the
+session, its scenes and morphs (it glides with them). OSC : `/opsia/macro/n/min` and
+`/max`.
+
+**The capsules** along the Macro title bar show every destination in use, knob by
+knob (`K3 L1·A freq`), like the Modulation row's chips : what the knobs drive is in view
+even with the row folded. Point at a capsule and its knob lights up; **×** takes that
+destination off its knob. Under the name, how many destinations the knobs hold. `⚄` shuffles knob positions while keeping bindings.
 **Randomize Macro Knobs** deals a fresh bank : one to four destinations per knob that
 no other knob holds, never a seed, a flip or the pinned Vibe and Finalizer, each knob
 set where every one of its destinations sits inside its curated range (a knob spans
-the whole declared range, so turning it is where the extremes are).
+the whole declared range, so turning it is where the extremes are). A dealt knob starts
+on the full range (min 0, max 1 : its old range was for its old destinations), and its
+place is chosen through its curve, so a curved knob lands in the zone too.
 
 The **`⊞ XY` toggle** (Macro title bar) turns **knobs 13–16 into two XY
 performance pads** (knob 13/14 drive pad 1's X/Y, 15/16 pad 2's) for
@@ -1906,7 +1976,8 @@ bottom:
   Windows, Syphon on macOS, both built in : nothing to install. Sends the clean
   picture (before keystone) at the full render size, every frame (4K : ~58 fps
   measured, ~3 ms of the frame). Syphon is built in CI but not yet tried with a Syphon
-  client.
+  client. The other way, another program's Spout / Syphon output plays in a layer :
+  see [Spout / Syphon input](#spout--syphon-input).
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the
@@ -1917,7 +1988,9 @@ bottom:
   accidents) is held to a soft, gentle pulse until it stops, while cuts, motion and a
   steady image pass untouched (on a very bright scene it can soften film flutter too).
   One slider plus **off / mild / strong / max**; it ships **on** at **mild** (0.35),
-  applies to the preview and every output, and its section starts collapsed. Left at
+  applies to the preview and every output, and its section starts collapsed. The DMX
+  lights have the same limiter on every LED (see [Lights](#lights--dmx-fixtures-on-the-picture-key-t)),
+  at this strength, and at its gentlest when this is off. Left at
   mild, it goes to **strong** (0.7) while the Fulldome output is on (a flash fills the
   whole view on a dome) and back to mild when the dome goes off; a level you set
   yourself, before or during, stays.
@@ -2219,6 +2292,18 @@ speed, background) make the whole bar one color; its 3-channel mode is **RGB lig
 channels**. The channel orders are those of this family of bars as their makers publish
 them : the **test** tells in a minute whether yours agrees.
 
+**Ask the lights (RDM)** (under the guide) : lights that speak RDM answer back over the
+DMX cable, through the Enttec DMX USB Pro. **ask the lights on the line** finds every one
+(a few seconds) and lists each with its name, its **mode** (how many channels it takes)
+and its **address**. From there : **blink** makes one flash to find it in the room (it
+stops when the page closes), the mode menu changes its mode (set the 30-zone bars to
+90CH), the address box sets its address, **address in a row** gives them addresses one
+after the other from 1 in the list's order (the arrows arrange it), **put on the map**
+adds them as lights at their own addresses, each of the kind its mode suggests (90 or 94
+channels : the 30-zone bar; 3, 4, 5 or 8 : the matching kinds; anything else holds its
+channels at 0 until you pick its kind). Lights that do not speak RDM do not answer : set
+those on their own menu.
+
 **Setups** (top of the left column) : a light setup is the whole page : the lights and
 where they are, the outputs, the groups, and what they show (looks, cues, masters). Give
 it a name and **save**; click one in the list to switch to it. The picture and the rest of
@@ -2304,7 +2389,9 @@ lost. **save to a file…** and **open a file…** carry one to another computer
     (a long pixel bar's spill into the next universe counted). A pixel never straddles
     two universes (170 RGB pixels to a universe, as pixel controllers expect); past an
     Enttec's 512 channels the rest is not sent and the patch says so. On a WLED output a
-    light always goes out as red, green and blue.
+    light always goes out as red, green and blue, three channels an LED (its head and
+    tail are not sent) : the patch and the next free address count it so. A white-only
+    light (`W`, `D W`) shows the color's brightness.
   - **Look** : **picture** (the master where it sits), **layer** (L1 to L4, that
     layer's own picture), **color**, **gradient** (2 to 5 colors running across the
     room at an angle, a scale, an offset and a drift, or **along** each light; **from
@@ -2319,6 +2406,12 @@ lost. **save to a file…** and **open a file…** carry one to another computer
     Body page tracks, dim away from them (**near** : how near; the Room tracker's
     everyone, or the one pose)), and its **level**. **to all** gives every light this
     look. Effects never change more than three times a second, at any rate and speed.
+    And **whatever feeds a light** (the picture, a layer that strobes, an effect, a cue,
+    a modulator on its level), **it never flashes more than three times a second** :
+    every LED goes through the same limiter as the picture's Flash safety, last, on what
+    is sent. A light flashing faster is held to a gentle pulse until it stops, slower
+    changes pass untouched. It holds sooner with Flash safety's strength, and it stays
+    on (at its gentlest) when Flash safety is off : the lights fill the room.
     **travels** : an effect goes **through the room** (by where each pixel is, at a
     **direction**) or **light by light**, as a lighting console spreads a phase over a
     group : **left to right**, **from the center**, **at random** or **odd and even**
@@ -2976,8 +3069,8 @@ and bound to nothing : M1 a slow sine, M2 a triangle, M3 a square (on / off), M4
 (a rise and a drop), M5 random steps, M6 smooth random, M7 a looping envelope, M8 a slow
 ramp. The M beside any control binds one. It morphs in like any Generate; what you
 pinned and the session's mappings ride through, and Sonify is left as it is. Then a
-dropdown of **147 visual themes** in 18 families
-(Analog Video Synthesis, Glitch/Datamosh, Cameraless/Direct Film, Optical/Op-Art,
+dropdown of **162 visual themes** in 18 families
+(Analog Video Synthesis, Glitch/Datamosh (Glitch Loop : the damage goes round the feedback), Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage (Monitor Loop and Cross
 Loop : effects inside the feedback, two layers playing each other), **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
@@ -2989,9 +3082,10 @@ Compression (Codec Rot : a real video codec starved of keyframes, through Codec 
 paint on water from Marbling : Marbled Paper and Night Bath; Drapery, Liquid Metal, Mercury,
 Clay Studio, Engraver, Geometer, Soap Skin, Chrome Type, Holo Foil, Print Shop, Glasshouse and
 Oil on Water from Relief, Inflate, Drape, Thin Film, the glass and the print; Pelt, Big Cat,
-Gale and Furred Letters from Fur; Singing Plate, Listening Plate and Sand Over from Sand Plate),
+Gale and Furred Letters from Fur; Singing Plate, Listening Plate and Sand Over from Sand Plate;
+Pond (a picture under water, from Ripple) and A Hand in It (an unseen hand pushing the picture, from Touch)),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
-overhead), **Film Wall** (your own films through a Collage, graded and damaged, or cut
+overhead; Pool Overhead : rings that come back from the rim), **Film Wall** (your own films through a Collage, graded and damaged, or cut
 out and piled at different heights in **Paste-Up**, or the people in them treated apart
 through the Silhouette effect : **Cut Out** sets them over a painted ground, **Shadow
 Theatre** blacks them out, **Absent** takes them out of their rooms, **Afterimages**
@@ -3185,7 +3279,7 @@ don't flood your history.
 
 ---
 
-## Sources (50)
+## Sources (51)
 
 50 sources : 49 generators that produce an image from nothing (all but two : Collage
 plays a folder of films, Silhouette reads the Body camera), and **Audio**, the waveform of
@@ -3222,6 +3316,7 @@ Randomize sub-ranges and its own preset bank. Your own generators from the
 | **Congeal** | A self-referential feedback field: sparse seeds injected, then a domain-warped, decayed copy resampled each frame : material congeals and dissolves. |
 | **Slit Scan** | A slit-scan of an internal oscillator : each column is the signal frozen at an earlier moment (time = position), a scrolling time-history. |
 | **Ramps** | Clean voltage-style gradient signals (H / V / diagonal / radial / diamond), optionally stepped and drifting : raw material to colorize or key. |
+| **Noise** | A **raw noise field** shaped into a matte, the raw material for masks and for the effects that read another layer (Remap, Matte, Lookup, Luma Blur, Displace, Morphogen, Current), like Ramps. **kind** : value (soft blotches), gradient (rolling hills), cellular (cells), cracks (the borders between cells), ridged, billow (puffed, cloudy) or warped (a field folded through itself). **scale** (cells across the frame height), **octaves** (finer copies on top; fractions fade the last one in), **rough**, **seed**. Shaped by **contrast**, **level**, **steps** (posterized bands with clean edges at any size), **invert**, and **focus** : an analytic defocus with no blur pass (each octave keeps only what a blur would leave of it, so the field never aliases at 4K or on the dome; set by hand only, Randomize never touches it). Moves by **drift** along an **angle** and **evolve** (each lattice point on its own slow cycle : it morphs in place, never scrolls, never loops), or on the tempo with **sync** (a new field every bar, 1/2, 1/4 or 1/8, **glide** from a cut to a melt, at most three a second). **seamless** repeats it exactly across the width for the dome's wrap mode; under the full dome (fill) it lies round on the disc and its drift turns round the zenith. **field = map** gives two separate fields in red and green (a map for Remap or Displace), **key** makes the darks see-through. Twelve presets (Soft hills … Key mask), the **Noise Matte** Generate theme (Analog Video Synthesis) and the **Noise Garden** and **Noise Water** themes (Node Workshop), where a hidden Noise steers Morphogen or stirs Current. Per pixel, no state : about 0.3 ms at 1080p, 1.7 ms at 4K and 0.8 ms on the dome at its defaults (warped, the heaviest : 1.2 / 4.0 / 1.9 ms). |
 | **RGB Oscillators** | Each channel its own 2D oscillator (waveform × frequency × phase), detuned so colour separates into drifting interference : the analog-video register, kept matte. |
 | **Recurse** | Recursive geometry : a shape redrawn into a space shrunk, slightly rotated and shifted off-centre, cascading inward (a spiral, deliberately not a radial kaleidoscope). |
 | **Shapes** | Hard-edged primitive fields (circle / ring / bar / cross / triangle), tiled and animatable : a matte source, or a stencil keyed through the A/B mixer. |
@@ -3387,7 +3482,7 @@ An effect's position in a rack matters: effects apply top-to-bottom. Source FX t
 one slot before the A/B mix; Layer FX treat the mixed layer before its blend; Master
 FX treat the whole composite before the finalizers.
 
-### The catalogue (61 effects)
+### The catalogue (65 effects)
 
 <details>
 <summary><b>The full effect catalogue</b> (click to expand)</summary>
@@ -3455,6 +3550,10 @@ FX treat the whole composite before the finalizers.
 | **Compress** | Real intra-frame compression artefacts (the JPEG/MPEG keyframe look): macroblocks crushed toward DC + coarse low-frequency reconstruction, chroma subsampled so colour bleeds across luma edges. |
 | **Databend** | The byte-editing register (the stream, not the motion): bands tear and jump on a stepped clock, some hold-and-repeat their top line, channels rotate out of registration. |
 | **Pixel Sort** | The signature glitch pixel-sort : contiguous runs inside a threshold band pulled toward their brightest value along an axis, streaks stopping dead at the band edges. |
+| **Time Glitch** | Time smeared, then **broken inside its own memory** (asked as "a kind of time effect mixed with chaotic glitch, so you drop it, it warps time a bit like Sediment / Wide Time / trails, but then glitches those trails inside its feedback loop and post too"). The picture keeps a memory of its recent past (**time** : from a two-frame smear to about eight seconds; **mode** : **lights** held, the default, a **smear** (the mean) or the **darks** held; **drift** breathes it in or out) and on a stepped clock (**rate** up to 16 a second, or **sync** to a bar, 1/2, 1/4, 1/8, 1/16 of the tempo) **chaos** picks blocks of that memory to damage **inside** the loop : moved along a coarse compass (**shift** : how far the memory is dragged), torn sideways along their row, stuck (they stop fading : frozen in **smear**, while with **lights** or **darks** a brighter or darker live picture still gets in), crushed to a few levels (**crush**), red and blue pulled apart (**split**). The memory feeds back, so every glitch is smeared and remembered and glitched again on the next step. **after** deals a second round on the way out, not kept (whole-block jumps, torn rows, the color split, the channels turned). **blocks** is the grain of it. **burst ▸** is a fit of chaos that dies away over **burst length** (bind a beat or an onset), **audio** raises the damage per block column from its band of the sound, **clear ▸** empties the memory. 8-bit memory with stochastic rounding (as Wide Time), the step folded again in the output pass so the newest light shows this frame. Ten presets (Lit memory, Smeared memory, Light painting gone wrong, Dark residue, Codec rot, Torn tape, On the beat, Burst only, Breathing outward, Audio damage), the chains **Glitched Memory** and **Rotten Trails**, the theme **Glitched Memory**. |
+| **Break** *(Glass)* | The picture **cracks like a pane hit by a stone** : one hit and cracks race out from the **impact** (**shards** of them) and round it (**rings**, fine near the hit, wide far out), **wander** off a straight line, some segments missing (**broken** : neighbors join into long spikes and odd pieces). The pieces **tilt** and catch the room's light (**light**, which never moves with them) on their faces and on the chamfered edge of every crack (**bevel** : a mirror highlight, mixed toward the room's pale light, never added : no glow), bending what they show like thick glass (**refract**). **then** : **hold** (they stay cracked until the next hit), **drift** (they float apart, turning, and the pane is whole again after **time**), **fall** (one after another under gravity, out to the rim on the full dome) or **heal** (out and back together over **time**, the default). **force** is how hard the hit is, **behind** what shows in the gaps (nothing, so the layers below, up to the picture in shadow). Hit it with **break ▸** (a beat, a kick, MIDI, OSC, a Body rule), a **click on the preview** (it breaks where you click : [Clicking the preview](#clicking-the-preview)), a pinch, or let it break by itself **every** few seconds or on the tempo (**sync**, at most three hits a second : the flash rule), landing round the **impact x / y** by **scatter**. **PANIC** leaves the pane whole until the next hit (it used to land a new one on top of the recovery). On the **Master FX** the gaps and the crack lines show black (with **behind** at 0), on the preview and on every output alike. Bind a hand's position to **impact x / y** and it breaks where you point. One fragment shader : polar cells round the hit with noise wander, the piece under each pixel found by walking back along the way the pieces move. A different crack pattern for every hit. (The frame-store **Shatter** is another effect, unchanged.) Ten presets (Pane, Cracked and held, Falling glass, Drifting shards, Windscreen, Every bar, Heavy stone, Hairline, Ice, Smash on the half note), the chains **Smashed Screen** and **Healing Glass**, the theme **Broken Glass**. |
+| **Key** *(Utility)* | Cuts part of the picture to **transparency** so the layers below show through (it complements the AI Silhouette : a performer on a green cloth, things that are not people, a keyed feed). **mode** : **color** keys out one **key color** by its angle off that hue in the color plane, so a cloth keys in its folds and its lit parts alike (a green or blue screen, a colored costume, a projected color), with **despill** taking the key's cast off what stays; **saturation** keeps the colored things and cuts the grays; **edges** keeps only the outlines (the brightness spread round each pixel); **channel** makes brightness, red, green, blue or the picture's own alpha the transparency. **tolerance** is where the cut lies, **softness** its edge, **choke** eats the matte in (or grows it out below 0), **feather** softens it, **invert** keeps what was cut (keep only the red costume), **show matte** draws it white on black to set it up. On the **Master FX** what it cuts shows black, on the preview and on every output alike (the projector, NDI, Spout / Syphon, a recording, the dome), before the finishing stages (Vibe, Context, Finalizer). Per pixel, nine reads (under a millisecond at 4K). Never dealt by Randomize. Ten presets (Green cloth, Blue cloth, Tight green, Keep the red costume, Colors on gray, Only the vivid, Outlines, Bold outlines, Brightness as alpha, Black cut out), the chains **Outlines Only** and **Color Isolate**, the theme **Cut by Color**. |
+| **Droste** *(Distortion)* | The picture **inside itself, forever, wound into a spiral** (the Droste effect, one pass of complex log and exp). Each turn goes one level deeper : a copy of the whole frame **level scale** times smaller. **strands** is how many arms it winds in (0 = plain nested frames, negative winds the other way), **arms** how many copies go round, **zoom** flies into it without end (levels a second, negative flies out), **spin** turns it, **twist** is a fixed turn, **level offset** scrubs the flight by hand. **center x / y** is where it winds to : a click or a drag on the preview sets it, a hand can be bound to it. **shape** nests the whole **frames** or a round window (**circle**); **edge** draws a thin dark line where the levels meet. Where a level shrinks under two pixels the spiral settles to the picture's mean (no crawling at the vanishing point). Never dealt by Randomize (dealt into random scenes it vanished into the texture or took the whole layer). Ten presets (Spiral, Nested frames, Two strands, Wound backward, Round window, Deep and slow, Turning, Three arms, Framed, Off center), the chains **Droste Spiral** and **Frames in Frames** (Space), the theme **Endless Spiral**. |
 
 </details>
 
@@ -3474,7 +3573,7 @@ labelled picker in the Inspector (**map**, **control**, **palette**; the three-i
 none is picked, so all five run in any rack.
 
 <details>
-<summary><b>The full node catalogue (30)</b> (click to expand)</summary>
+<summary><b>The full node catalogue (34)</b> (click to expand)</summary>
 
 | Node | Description |
 |---|---|
@@ -3502,7 +3601,11 @@ none is picked, so all five run in any rack.
 | **Toile** | Reworks the picture as a **painting that follows its own structure** : a structure tensor finds each contour's orientation, and the image is smoothed into strokes running **along** it (anisotropic Kuwahara), so forms flatten into coherent paint (steady frame-to-frame, not speckling) while the **edges are preserved**, not washed out. **line** adds flow-XDoG ink : clean outlines measured across each contour and smoothed along it, following the image's own structure. **brush** size, **flatten** hardness, **paint** amount, **line edge** threshold. The real *Peint* + *Griffé* as a rack effect. |
 | **Silhouette** | The Silhouette source's looks on **any picture** : the people in whatever enters (a film, a camera layer, an NDI input) are found by the body model beside the picture and drawn as a **cutout** (background removal), a white **matte**, a flat **shadow** or a **hole**, with **trail**, **trail color**, **over the picture** and **mix**; **people** 1-4, **detail**, **smooth**, **hold to the mask**, **threshold**, **softness** (see [Video sources](#video-sources)). **fill** (picked in its Inspector) draws another layer where the people are, with **shade** keeping their own light on it. One body model for every Silhouette effect, taking turns; resting when bypassed or unseen. 19 presets (Cutout … Fitted cutout, and Bodies of light, Made of film, Stained figure, Wake for a fill), the **People** master chains, the **Cut Out**, **Shadow Theatre**, **Absent**, **Afterimages** and **Inhabited** Generate themes (Film Wall). |
 | **Drape** | Whatever enters is printed on a **sheet of cloth you grab** : drag it on the preview (or pinch it with the Body page's *pinch = click*), let go and it falls. A Verlet cloth (adapted from Holocloth by Dmitry Kurash, MIT) : **hang** pins its top edge (a curtain, a banner), **flag** its left side (streaming in the wind), **float** none (a sheet drifting, always coming back). **size**, **crumple**, **stiffness**, **damping**, **grab size**; **gravity**, **wind** on the folds with **gusts**, **sound pokes** (each onset a push), **people press** (the Room's people push into it where they stand). **material** : cloth, satin, plastic, chrome, foil (the foil's **rainbow**, **flakes** and **glints**), with a **cloth color** where the picture is transparent, **sheen**, **fold shadow**, the lamp's **angle** and **height**, a **view tilt**; **behind** brings the picture back around the sheet (0 : nothing). **poke** and **reset** are triggers. Any rack; on the Master the whole picture hangs (the chains **Hung Picture** and **Picture in the Wind**), the theme **Drapery** hangs one. The sim runs 44 points across at 120 steps a second (about 1-2 ms), drawn four times finer with smooth (bicubic) folds, square under dome fill. |
+| **Touch** | Makes **any picture touchable** : lay a hand on the preview (the mouse, or pinch with the Body page's *pinch = click*) and the picture answers. **mode** : **rings** (a shockwave bursting from the touch and traveling out; drag for a wake of rings), **spread** (pushed away from the hand), **swirl** (twisted round it), **drag** (carried along with it : what is under the hand travels with it), **lens** (a lens under it), **attract** (pulled in). **size**, **strength**; **follow** (1 right under the hand, lower trails behind it, elastic), **fade** (how fast the picture comes back; 0 : it stays pushed), **spring** (creeps back or wobbles like jelly), **soft** (how far a push spreads); the rings' **speed** and **width**. **fire** does the mode's touch once (a shockwave in rings) **at** the center (the zenith on the dome), the **point** or anywhere : bind a pad, a beat modulator or OSC to it; **sound hits** fire it on every onset (a shockwave on the kick). **people push** (the Room's people, where they stand), **by itself** (a hand of its own wanders slowly through the picture), **press the point** (holds the XY **point** down : move it with a modulator). **shade** (matte : what the push bunches up darkens, what it stretches lightens), **color split**, **mix**, **clear**. The pushes live in a displacement field at half the picture's height (at most 720 rows), relaxed by a damped spring every frame; the rings and lenses are drawn over it from a few numbers each. On the dome the field lies on the dome's disc : rings stay round to the rim, a swirl turns round the touch as you see it. Any rack; chains **Touch the Picture**, **Shockwave on the Kick**, **Jelly Picture**, **A Hand of Its Own**, **Water You Touch**; the theme **A Hand in It**. |
+| **Ripple** | The picture **seen through water**. A wave height field a third of the picture's height (200 to 720 rows, 32 bits), stepped by the wave equation so rings travel at the same speed at any size; the picture is bent by the water's slope (**refraction**, its colors a little apart : **color split**) and lit **matte** (**crest light** : the side facing the lamp, at **light angle**, goes pale, the far side darker; never a shine), the troughs tinted by the **water color** as deep as **water depth**. What makes rings : **rain** (drops at random places, **drop size**), **sound hits** (a stone on every onset), the **stone** trigger (**at** the center, the **point** or anywhere), **its own motion** (what changes in the picture stirs the water), the hand (click : a stone; drag : a finger trailing through the water; a Body pinch the same), **people wade** (the Room's people, walking leaves a wake), **by itself** (a finger of its own trailing slowly through), **press the point**, and `/opsia/touch` over OSC. **wave speed**, **calm** (how fast rings die away), **edges** : **reflect** (the frame's edges are the pool's walls) or **absorb** (a soft shore); **still** flattens it. On the dome the water lies on the dome's disc and **its rim is the wall** : a stone at the zenith rings out to the rim and comes back from all round. Any rack, placed by hand (the dice leave it out : it takes the preview's clicks, and dealt blind it would take them from a source you play by hand); chains **Through the Water**, **Drops on the Kick**, **Downpour**, **Water You Touch**, **Dome · Pool**; themes **Pond** and **Pool Overhead** (Dome). |
 | **Inflate** | Blows the layer up into **volume**. Its shape (**shape from** its alpha, what is bright, what is dark) gets a real height, as a skin blown up takes its form : **puff** is how far in it rises, **round** its section (low keeps a flat top and a mitred bevel), **volume** how much the light finds. **material** : clay, plastic, metal, chrome, soap film, glass (with a **glass color split** that widens at the rim and a bright **glass rim**; the preset **Prism glass**), **foil** (holographic : **foil rainbow** 0 is silver, **foil flakes**, **foil glints** that fire as the light orbits; the reflections themselves turn iridescent). **cavity** darkens the creases between swellings. **keep colors** or a **tint**, **gloss**, an **oil film** over anything shiny, a **shadow** on what is outside the shape, the lamp's **angle**, **height** and **orbit**. **flowing** turns what it reflects into bands of light running by themselves, wrapped round the real volume (**flow speed**, **bands**, **ripple**, and **color split** for a prism along their edges).  Text, a logo or a silhouette comes out as live chrome. Runs in any rack; pick a layer as **reflects** and the metal reflects it, the glass bends it. |
+| **Morphogen** | **Reaction-diffusion as an effect** : the Reaction source's own simulation (one shared code path) runs on its own grid, so the pattern keeps its size at 1080p, 4K and on the dome, and the layer's picture **feeds and steers** it. its brightness (or its warm and cool **color** : **patterns by**) pushes feed and kill apart, so its darks and its lights grow different species (**dark / light** : how far and which way); it **plants** new growth along its **edges**, where it **moves** or in its **lights**; **follow motion** carries the living pattern along the picture's own movement (its optical flow). The pattern comes back in a **look** : **through** (the picture seen through the pattern, its grooves sinking dark), **ink** (the pattern drawn over it in the **ink** color, growing into transparency), **emboss** (the picture carved by it), **matte** (the layer shows only where it grows) or **warp** (the picture bent along its slopes); **amount**, **mix**, **sparks**, **feed**, **kill**, **pattern size**, **rate**, **sharpness**, **relief** and **light angle** as in the source, **regrow ▸**. Pick a **steered by** layer in its Inspector (a Noise, a film) and that layer does the steering while this one is what the pattern shows. Any rack. 11 presets, the **Field effects** master chains (Grown Picture, Coral Print, Carved Program, Wet Growth, Steered Growth), the **Grown Over**, **Coral Print** and **Noise Garden** Generate themes. |
+| **Current** | **A real fluid that carries the picture** : the Fluid source's own stable-fluids solver (one shared code path) runs on its own grid (96 to 384 rows by **detail**, so the water keeps its size and speed at any resolution and on the dome) and the layer's picture is the **dye**. Where the picture **moves**, the water is dragged along with it (its optical flow); **light rises** lifts the bright parts like warm smoke (below 0 they sink; under the full dome they rise to the zenith); **churn** is the water's own restlessness (a few wandering pushes), so a still picture or a generator still gets curled; **swirl** (vorticity confinement), **viscosity**. **memory** is how long the water keeps carrying the old picture before the live one refreshes it (short smears … long marbled drifts), **keep still** lets the sharp live picture through where the water is still, **mix**, **rate**, **stir ▸**, **clear ▸**. Pick a **moved by** layer in its Inspector and its motion and light push the water while this layer is what it carries. Any rack. 10 presets, the **Field effects** chains (Ink Water, Smoke Program, Wet Growth, Stirred by the Top), the **Ink Current**, **Rising Smoke** and **Noise Water** Generate themes. |
 | **Remap** | TouchDesigner's **Remap TOP** : another layer's red and green channels become the coordinates each pixel of this layer reads from (red = x, green = y). A gradient layer bends the picture smoothly, a noisy one shatters it. **absolute** is TD's behaviour, **offset** displaces around mid-grey instead; **scale** / **offset x·y** reshape the map, **extend** picks hold / repeat / mirror past the edge, **swap roles** makes this layer the map. |
 | **Luma Blur** | TouchDesigner's **Luma Blur TOP** : a blur whose width follows a control image's brightness : **black width** where the control is dark, **white width** where it is bright (pixels at 1080p). The control is another layer, or this layer's own brightness. **control = depth focus** reads the shared depth map around a **focus** plane instead : one depth stays sharp and the rest melts, a real **depth-of-field** blur (Resolume 7.28's Depth Blur, from a node you already have). |
 | **Gooey** | The **blur-then-threshold** recipe : the picture is blurred (at half resolution) and cut at a brightness **level**, so shapes that sit close together melt into soft single blobs, the metaball / lava-lamp look. **blur** sets how far shapes reach for each other, **softness** the edge; **fill** shows the crisp source, the blurred colour pushed to full strength, or a white matte; **outside** keeps some of the source around the blobs. |
@@ -3513,11 +3616,18 @@ none is picked, so all five run in any rack.
 
 ### Master finalizers : pinned, always last
 
+The outputs keep no transparency (the projector, NDI, Spout / Syphon, a recording, the
+dome), and neither does Context : the finished frame is laid over black, so they show
+exactly what the preview shows. A **Key** or a **Break** on the Master FX is laid over
+black where your effects end and the three stages begin : what it cuts reads as black, the
+black the layers sit on, through the stages that follow (before, Context passed the
+picture under the cut, so Outlines Only and Color Isolate did nothing).
+
 | Stage | Description |
 |---|---|
 | **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
 | **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe / Arc or a modulator add blur, haze, trails or depth on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce`), and its **neutral** button puts those macros back to 0.5. |
-| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (on the dome, its film and digital grain is drawn after the mapping, in the master's pixels; its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-61-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
+| **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (on the dome, its film and digital grain is drawn after the mapping, in the master's pixels; its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-65-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
 
 In the **Finishing** view (key `F`) each stage is split into labeled sections : Vibe
 Palette (palette · color chord · tone · split-tone), Context (softness · distance ·
@@ -3830,6 +3940,8 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/mod/<n>/in` · `/opsia/mod/<n>/take` | f 0..1 | A modulator slot's **controller input** (the `controller` type) or its **takeover**, played straight in (no learning); `…/in/note` · `…/take/note` : a pad, its velocity (0 = off) played as the input's envelope |
 | `/opsia/black` | f | **Black** : ≥ 0.5 fades the whole show (picture and sound) to black over the Morph time, < 0.5 brings it back; a message with no value turns it over (key `.` / the ■ Black button); answered by the outbound feedback |
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
+| `/opsia/touch` | f f [f] | **Touch** and **Ripple**, every one in the composition : a tap at `x y` (0..1, y up : a shockwave, a stone in the water); a third number its strength (1 = the effect's own) |
+| `/opsia/touch/hold` · `/opsia/touch/up` | f f · trigger | A finger held at `x y` (it drags, swirls, wades as it moves; send it again to move it; it lets go 3 s after the last one, and on New, Open and PANIC) · let it go |
 | `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
 | `/opsia/surface/active` | bool | Enable / disable the Metasurface |
 | `/opsia/surface/play` | bool | **Draw sequencer** : auto-trace the drawn path |
@@ -3972,18 +4084,43 @@ tab has the whole setup :
 - **network** : every other node, online or remembered (dataflou never forgets a node
   that went offline; **forget** removes it from the whole mesh), with what it publishes
   (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
-  wires that source to one of Palinopsia's destinations, **← Palinopsia…** feeds that
-  destination from one of Palinopsia's sources.
-- **data** : what flows in and out, live. Each of Palinopsia's destinations a node feeds
-  (↙ : from which node and parameter) and each of its sources a node listens to (↗ : to
-  where), with the value now, its last seconds as a small line (a swatch for a color), and
-  how many values a second. A row goes grey when nothing has arrived for two seconds or
-  the other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a
-  SETVAL) show too, for ten seconds. Click **data** to fold it (remembered); it only asks
-  for the values while it is open.
+  wires that source to **◈ a free Macro knob** (the first with no destination and no wire,
+  named after it, "glove-l pitch", the Macro row opening : give it any controls with
+  their M, its range and curve shape it), to **◈ a free modulator** (it becomes a
+  Controller played by that value : bind it to any control with its M, with depth,
+  curve and shaping), or to one of Palinopsia's destinations; **← Palinopsia…** feeds that
+  destination from one of Palinopsia's sources, and **◉** watches it in the data view
+  (wired or not : a glove's sensors before you decide what they play).
+- **data** : what matters in a connected show, live, in three parts. **into Palinopsia** :
+  each destination another node feeds (↙ : from which node and parameter); **watching** :
+  the outside values you picked with ◉ (✕ stops one; kept on this computer, per
+  universe); **from Palinopsia** : each of its values wired to another node (↗ : to where).
+  Each row has the value now, its last seconds as a small line (a swatch for a color) and
+  how many values a second; it goes grey when nothing has arrived for two seconds or the
+  other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a SETVAL)
+  show too, for ten seconds. Palinopsia's own values that a node merely monitors (a
+  visualizer page open on it asks for every value) are not wires : one line says who and
+  how many (**monitored : 256 values by gloves**). Click **data** to fold it (remembered);
+  it only asks for the values while it is open.
 - **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
   the other nodes announce), with ✕ to unwire. The header shows the values received and
-  sent per second.
+  sent per second. A wire into Palinopsia has a **⚙** : the part of the destination's range
+  it covers (**range** 0.2 to 0.4 : the source's whole sweep lands there), **invert**,
+  **smooth** (the control glides to each new value over that many ms : a jittery sensor),
+  and **on loss** : **hold** the last value, or **glide back** (over a few seconds) to where
+  the control was before the wire began to play it, once the source has been quiet for
+  2 s (a glove out of battery, a computer asleep). Kept with the wire.
+
+**Mapping from the mesh, wherever you are** : every control's **M** panel has a **◈** under
+"macro" : click it, move the thing on the other node (a glove, a fader in Max), and the
+value that moved the most plays this control through a free Macro knob (named after it,
+its range and curve to shape it, its capsule in the Macro title bar). A **Controller**
+modulator's input row has the same ◈ : the moved value plays that modulator (beside or
+instead of a learned MIDI / OSC control; the session keeps it). A control another node
+plays shows a **◈** beside it (the layer strip's opacity, A/B mix and vary, the
+Background's opacity, the Macro tiles) : lit while values arrive, its tooltip says from
+where, right-click unwires. The values a modulator plays stream only to Palinopsia (they
+add nothing to Palinopsia's own parameter list on the mesh).
 - **visualizer ↗** opens the dataflou project's mesh visualizer (by Alexandre Burton) in
   your browser : every node a colored arc of its parameters around one circle, the wires
   between them, the values live; drag a source onto a destination to wire them, click a
@@ -3994,6 +4131,22 @@ tab has the whole setup :
   `THIRD_PARTY_NOTICES.md`); `npm run build:visualizer` rebuilds it from a dataflou checkout
   beside this repo (or give the path to its `web/` folder). Its editor panel needs
   dataflou's sibling Atelier project; without it the page runs without that panel.
+  The page's status bar shows this computer's address and the universe : picking another
+  universe there moves Palinopsia's node to it (the Connect tab follows). Its video inside
+  the ring needs dataflou's own NDI bridge (`ndi-pont`), not part of Palinopsia.
+
+**Scenes** (dataflou's own, not Palinopsia's scenes) : a scene is a state of the mesh's
+**connections**, recalled by a number, like a MIDI program change. Each node keeps its own
+part, its incoming connections, in 16 numbered slots; the universe shares only the cue.
+**store n** (from any node : the visualizer's **scenes** panel, a Max patch, another
+Palinopsia) makes every node online save its own connections in slot n; **recall n** makes
+every node apply its slot n (it removes the connections the slot lacks, then makes the
+ones it has). A node away during a recall catches up when it comes back; a node without
+slot n keeps its connections (**missing**); connections changed by hand after a recall
+read **modified**; a node that restarts in the same scene keeps its hand changes. Values
+are not in scenes (Palinopsia's own scenes and presets keep those). Palinopsia's two
+nodes (the main one and `-session`) each keep their own slots, per universe, beside the
+bindings in the app's `dataflou` folder.
 
 **When a node drops out and comes back** (a computer asleep, a cable pulled, the Wi-Fi
 gone for a moment), Palinopsia calls it back by itself : every node it lost without a

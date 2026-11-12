@@ -880,6 +880,49 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
     vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Glitch : time broken, the pane broken, the picture keyed ──
+  {
+    name: 'Glitched Memory', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-time-glitch', inputs: { time: 0.6, mode: 1, drift: 0.15, chaos: 0.35, rate: 6, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Rotten Trails', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-time-glitch', inputs: { time: 0.75, mode: 1, drift: 0.3, chaos: 0.5, rate: 8, sync: 0, blocks: 24, shift: 0.6, split: 0.4, crush: 0.6, inside: 0.85, after: 0.35, burstLen: 0.8, audio: 0, amount: 1 } },
+      { shaderId: 'fx-compress', inputs: { block: 8, quality: 0.45, ring: 0.3, chroma: 0.5, grid: 0, vary: 0.2 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.06, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Smashed Screen', group: 'Glitch',
+    fx: [{ shaderId: 'fx-break', inputs: { every: 5, sync: 0, after: 2, time: 2.2, force: 0.6, shards: 15, rings: 5, wander: 0.5, broken: 0.35, tilt: 0.7, refract: 0.4, bevel: 0.55, light: 2.3, behind: 0.2, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Healing Glass', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-break', inputs: { every: 4, sync: 0, after: 3, time: 2, force: 0.45, shards: 14, rings: 4, wander: 0.5, broken: 0.3, tilt: 0.6, refract: 0.5, bevel: 0.6, light: 2.3, behind: 0.35, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95, lift: 0.01 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Outlines Only', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-key', inputs: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.18, softness: 0.22, despill: 0, choke: 0.2, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Color Isolate', group: 'Glitch',
+    fx: [{ shaderId: 'fx-key', inputs: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0, choke: 0.1, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } }],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1.1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Glass : the whole picture behind a pane ──
   {
     name: 'Behind Fluted Glass', group: 'Relief',
@@ -890,6 +933,56 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Rainy Window', group: 'Relief',
     fx: [{ shaderId: 'fx-rain-pane', inputs: {drops: 0.6, size: 0.45, slide: 0.35, trails: 0.6, fog: 0.5, bend: 0.6, shine: 0.4, tint: [0.9, 0.94, 1, 1]} }],
     vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.85, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
+  },
+  // ── Touch and water : the whole picture pushed by the hand, or under water ──
+  {
+    name: 'Touch the Picture', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.18, strength: 0.6, follow: 0.75, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Shockwave on the Kick', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-touch', inputs: {mode: 0, size: 0.2, strength: 0.8, follow: 1, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.6, width: 0.45, fireAt: 0, audio: 0.85, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.4, split: 0.2, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 1, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Jelly Picture', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.25, strength: 0.7, follow: 0.6, fade: 0.4, spring: 0.9, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.35, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'A Hand of Its Own', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.22, strength: 0.55, follow: 0.4, fade: 0.3, spring: 0.55, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0.7, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.98, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Through the Water', group: 'Touch and water',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.25, dropSize: 0.35, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.35, edges: 0, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Drops on the Kick', group: 'Touch and water',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.05, dropSize: 0.35, audio: 0.9, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.5, calm: 0.3, edges: 0, refract: 0.6, split: 0.15, shade: 0.4, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Downpour', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-ripple', inputs: {rain: 0.85, dropSize: 0.2, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.45, calm: 0.55, edges: 0, refract: 0.45, split: 0.15, shade: 0.3, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.02, contrast: 1.04, saturation: 0.88, lift: 0.02, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.9, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
+  },
+  {
+    name: 'Water You Touch', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-ripple', inputs: {rain: 0, dropSize: 0.35, audio: 0, motion: 0, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.2, edges: 0, refract: 0.6, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+      { shaderId: 'node-touch', inputs: {mode: 4, size: 0.2, strength: 0.6, follow: 0.55, fade: 0.4, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.15, split: 0.1, mix: 1} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.05 }
   },
   // ── Relief : volume and film over the whole picture ──
   {
@@ -1163,6 +1256,12 @@ export const MASTER_PRESETS: MasterPreset[] = [
     context: { depth: 0 }
   },
   {
+    name: 'Dome · Pool', group: 'Dome',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.05, dropSize: 0.35, audio: 0.9, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.5, calm: 0.3, edges: 0, refract: 0.6, split: 0.15, shade: 0.4, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { contrast: 1.03, saturation: 0.96, gamma: 1, autoLevel: 0.15 },
+    context: { depth: 0 }
+  },
+  {
     name: 'Dome · Film', group: 'Dome',
     fx: [
       { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.14, size: 1.6, chroma: 0 } },
@@ -1230,6 +1329,19 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-rutt', inputs: { lines: 90, amp: 0.12, width: 0.22, color: 0.7, relief: 1 } }
     ],
     vibe: { contrast: 1.1, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Droste Spiral', group: 'Space',
+    fx: [
+      { shaderId: 'fx-droste', inputs: { scale: 5, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.4, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Frames in Frames', group: 'Space',
+    fx: [{ shaderId: 'fx-droste', inputs: { scale: 3, strands: 0, arms: 1, zoom: 0.08, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0.6, cx: 0.5, cy: 0.5, amount: 1 } }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
   {
     name: 'Space · Floor', group: 'Space',
@@ -1337,6 +1449,71 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0.1 },
     context: { bloom: 0.2 }
+  },
+  // ── Field effects : Morphogen grows the program, Current carries it (they keep its
+  // colors : mixSrc 1; the Steered / Stirred chains read the top layer, a Noise there
+  // makes the best field). ──
+  {
+    name: 'Grown Picture', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 0, amount: 0.8, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.04, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Coral Print', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 1, amount: 0.9, mix: 1, steer: 0, bias: 0.4, feed: 0.0545, kill: 0.062, plant: 0.5, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.86, 0.8, 0.7, 1], relief: 0.6, lightAngle: 2.36 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 0.92, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.1 }
+  },
+  {
+    name: 'Carved Program', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', inputs: { look: 2, amount: 0.7, mix: 1, steer: 0, bias: 0.8, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.6, scale: 0.4, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.1, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Ink Water', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0, churn: 0.45, swirl: 0.7, viscosity: 0.2, memory: 0.9, keep: 0.1, mix: 1, detail: 0.5, rate: 1 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 0.96, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Smoke Program', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0.6, churn: 0.2, swirl: 0.6, viscosity: 0.2, memory: 0.7, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.5, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.08 }
+  },
+  {
+    name: 'Wet Growth', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', inputs: { motion: 0.6, rise: 0, churn: 0.3, swirl: 0.5, viscosity: 0.2, memory: 0.7, keep: 0.5, mix: 0.8, detail: 0.5, rate: 1 } },
+      { shaderId: 'node-reaction', inputs: { look: 0, amount: 0.7, mix: 1, steer: 0, bias: 0.6, feed: 0.0456, kill: 0.0635, plant: 0.6, plantFrom: 0, seed: 0.15, follow: 0.8, scale: 0.5, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Steered Growth', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-reaction', reads: 'top', inputs: { look: 0, amount: 0.85, mix: 1, steer: 0, bias: 0.9, feed: 0.0456, kill: 0.0635, plant: 0.7, plantFrom: 2, seed: 0.15, follow: 0.7, scale: 0.45, rate: 2, sharp: 0.5, ink: [0.12, 0.11, 0.1, 1], relief: 0.5, lightAngle: 2.36 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Stirred by the Top', group: 'Field effects',
+    fx: [
+      { shaderId: 'node-fluid', reads: 'top', inputs: { motion: 1, rise: 0.3, churn: 0.2, swirl: 0.5, viscosity: 0.2, memory: 0.75, keep: 0.3, mix: 1, detail: 0.5, rate: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
   {
     name: 'Outline', group: 'People',
