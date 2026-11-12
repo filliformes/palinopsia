@@ -557,6 +557,36 @@ that CI builds into cross-platform releases.
   goodbye : values flowed again after 7.2 s and 6.7 s. **Not verified : a real sleep with
   Max** (to do on his machines).
 
+- **dataflou : the mesh mapping plays as it is set, and the mesh knows Palinopsia's
+  wires** (the v1.3.3 audit, 11 findings). A smoothed or glide-back wire on the scene
+  number swept through every scene on the way (each step a recall, an undo step and a
+  restarted morph, and again every half second while the source held still) : `scene/recall`
+  is now `discrete` (`DfDest`), played once per whole step, never smoothed nor glided
+  back (the gear hides those two), and a smoothed wire's repeated value no longer plays
+  again. A scene recall that made a shaped wire again made it plain : slots now keep a
+  shaped wire's options as a 4th element (ours, the core never reads that file). Range and
+  invert did nothing on a wire from one of Palinopsia's own sources, and such a wire was
+  dead after a restart, a mesh off and on, a rename or a universe change (no local stream
+  was made when the bindings came back). Smoothing and on loss followed the first shaped
+  wire of a destination : they are now the destination's (the longest smoothing of its
+  wires, a glide back when any asks), said so in the gear. A glide back cut short by the
+  source returning remembered the mid-glide value as "before" : it keeps the place it was
+  going back to. A glide back could miss its end by a rounding hair and then send the same
+  value every frame forever; the 16 ms animation timer kept running while any glide-back
+  wire existed : both stop when nothing glides. After a quick reconnect (inside one
+  second) the watched, listened and monitored values waited up to 15 s for the keepalive :
+  they are asked again on the HELLO. A learn from the mesh left running by a window reload
+  streamed every remote value forever : it ends 25 s after the app last asked about it.
+  Randomize re-rolled a modulator played by the mesh into another type : it is kept, with
+  its bindings, like the World's. And with dataflou core 8.3 : a node's "clear"
+  announcement (after its DECLARE) now empties what we knew of its connections before its
+  own list follows (a wire removed while we were away no longer lingers), and Palinopsia
+  follows each of its own DECLAREs the same way (a clear, then one announcement per wire
+  into it), so a node that joins later sees Palinopsia's wires; older cores ignore the
+  clear. Proven in Node with three nodes of our class on a private universe and the
+  renderer bridge with its app modules stubbed, each check failing on master and passing
+  after (scratch harness `dffix/`).
+
 ### Docs
 
 - **The docs catch up with v1.3.2** (after publishing, the sweep) : six new gallery frames
