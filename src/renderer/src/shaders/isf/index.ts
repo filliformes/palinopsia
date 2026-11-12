@@ -110,6 +110,10 @@ import perspective from './fx/Perspective.fs?raw'
 import shatter from './fx/Shatter.fs?raw'
 import crawl from './fx/Crawl.fs?raw'
 import storeZoom from './fx/StoreZoom.fs?raw'
+import timeGlitch from './fx/TimeGlitch.fs?raw'
+import breakFx from './fx/Break.fs?raw'
+import keyFx from './fx/Key.fs?raw'
+import droste from './fx/Droste.fs?raw'
 import vibe from './fx/Vibe.fs?raw'
 import context from './fx/Context.fs?raw'
 import finalizer from './fx/Finalizer.fs?raw'
@@ -129,6 +133,10 @@ export interface IsfShader {
   /** A native GENERATOR that needs nothing from the user (no text, film pool or
    *  camera) : it stays in Randomize's source pool like an ISF generator. */
   dice?: boolean
+  /** An ISF effect that takes the preview pointer (pointerInput.ts) : a click or
+   *  a pinch sets the inputs `x` / `y` (frame 0..1, y up) and, with `fire`, pulses
+   *  that event; `drag` keeps following while held. Natives take it their own way. */
+  pointer?: { x: string; y: string; fire?: string; drag?: boolean; hint: string }
 }
 
 // ── Native convolution nodes (visual-convolution spec) ──────────────────
@@ -2333,6 +2341,40 @@ export const FX_SHADERS: IsfShader[] = [
     id: 'fx-pixelsort', name: 'Pixel Sort', category: 'FX', source: pixelSort,
     // angle pinned : a dice keeps the classic axis-aligned sort (tilt by hand).
     curated: { low: [0.1, 0.4], high: [0.6, 0.9], length: [0.1, 0.4], angle: [0, 0] }
+  },
+  // ── Time Glitch, Break, Key, Droste (11-11) ──
+  {
+    // the tempo sync and the audio are staging : by hand
+    id: 'fx-time-glitch', name: 'Time Glitch', category: 'FX', source: timeGlitch,
+    curated: {
+      time: [0.35, 0.85], mode: [0, 2], drift: [-0.3, 0.4], chaos: [0.2, 0.6], rate: [2, 10], sync: [0, 0],
+      blocks: [8, 32], shift: [0.15, 0.7], split: [0.1, 0.6], crush: [0, 0.5], inside: [0.4, 0.9], after: [0.1, 0.5],
+      burstLen: [0.4, 1.5], audio: [0, 0], amount: [0.85, 1]
+    }
+  },
+  {
+    // A dice never holds a picture broken (hold) : drift, fall or heal, every few
+    // seconds, near the middle. Click the preview to break it where you point.
+    id: 'fx-break', name: 'Break', category: 'FX', source: breakFx,
+    pointer: { x: 'hitX', y: 'hitY', fire: 'impact', hint: 'click : break the picture here' },
+    curated: {
+      every: [2.5, 8], sync: [0, 0], after: [1, 3], time: [1, 3], force: [0.3, 0.7], shards: [8, 20], rings: [3, 6],
+      wander: [0.3, 0.8], broken: [0.2, 0.5], tilt: [0.3, 0.8], refract: [0.2, 0.6], bevel: [0.3, 0.8],
+      light: [0, 6.2832], behind: [0, 0.5], scatter: [0.2, 0.7], amount: [1, 1], hitX: [0.35, 0.65], hitY: [0.35, 0.65]
+    }
+  },
+  {
+    // Kept out of every dice (randomize.ts HAND_FX) : a key is a staging choice.
+    id: 'fx-key', name: 'Key', category: 'FX', source: keyFx,
+    curated: { mode: [0, 0], tolerance: [0.2, 0.4], softness: [0.08, 0.25], despill: [0.4, 0.8], choke: [0, 0.3], feather: [0.05, 0.3], amount: [1, 1] }
+  },
+  {
+    // Kept out of every dice (randomize.ts HAND_FX) : the whole frame folded into
+    // a spiral reads as a deliberate move, not a texture. Click the preview to
+    // set its center.
+    id: 'fx-droste', name: 'Droste', category: 'FX', source: droste,
+    pointer: { x: 'cx', y: 'cy', drag: true, hint: 'click or drag : the center of the spiral' },
+    curated: { scale: [3, 9], strands: [-2, 2], arms: [1, 2], zoom: [-0.3, 0.3], spin: [-0.05, 0.05], twist: [-0.5, 0.5], depth: [0, 1], shape: [0, 1], edge: [0, 0.4], cx: [0.4, 0.6], cy: [0.4, 0.6], amount: [1, 1] }
   }
   // PHASE 9 (post-MVP experiment): Cross-FM : a source that takes ANOTHER
   // layer's frame as a video-rate FM input (an A→B→C→A cross-oscillator

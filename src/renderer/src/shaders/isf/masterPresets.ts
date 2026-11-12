@@ -880,6 +880,49 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
     vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Glitch : time broken, the pane broken, the picture keyed ──
+  {
+    name: 'Glitched Memory', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-time-glitch', inputs: { time: 0.6, mode: 1, drift: 0.15, chaos: 0.35, rate: 6, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0, amount: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.5, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Rotten Trails', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-time-glitch', inputs: { time: 0.75, mode: 1, drift: 0.3, chaos: 0.5, rate: 8, sync: 0, blocks: 24, shift: 0.6, split: 0.4, crush: 0.6, inside: 0.85, after: 0.35, burstLen: 0.8, audio: 0, amount: 1 } },
+      { shaderId: 'fx-compress', inputs: { block: 8, quality: 0.45, ring: 0.3, chroma: 0.5, grid: 0, vary: 0.2 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.06, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Smashed Screen', group: 'Glitch',
+    fx: [{ shaderId: 'fx-break', inputs: { every: 5, sync: 0, after: 2, time: 2.2, force: 0.6, shards: 15, rings: 5, wander: 0.5, broken: 0.35, tilt: 0.7, refract: 0.4, bevel: 0.55, light: 2.3, behind: 0.2, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Healing Glass', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-break', inputs: { every: 4, sync: 0, after: 3, time: 2, force: 0.45, shards: 14, rings: 4, wander: 0.5, broken: 0.3, tilt: 0.6, refract: 0.5, bevel: 0.6, light: 2.3, behind: 0.35, scatter: 0.5, amount: 1, hitX: 0.5, hitY: 0.5 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.05, saturation: 0.95, lift: 0.01 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Outlines Only', group: 'Glitch',
+    fx: [
+      { shaderId: 'fx-key', inputs: { mode: 2, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.18, softness: 0.22, despill: 0, choke: 0.2, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } },
+      { shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1.05, lift: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Color Isolate', group: 'Glitch',
+    fx: [{ shaderId: 'fx-key', inputs: { mode: 1, color: [0.1, 0.72, 0.28, 1], channel: 0, tolerance: 0.3, softness: 0.15, despill: 0, choke: 0.1, feather: 0.15, invert: 0, showMatte: 0, amount: 1 } }],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1.1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Glass : the whole picture behind a pane ──
   {
     name: 'Behind Fluted Glass', group: 'Relief',
@@ -1230,6 +1273,19 @@ export const MASTER_PRESETS: MasterPreset[] = [
       { shaderId: 'fx-rutt', inputs: { lines: 90, amp: 0.12, width: 0.22, color: 0.7, relief: 1 } }
     ],
     vibe: { contrast: 1.1, saturation: 1, gamma: 1, autoLevel: 0.15 }
+  },
+  {
+    name: 'Droste Spiral', group: 'Space',
+    fx: [
+      { shaderId: 'fx-droste', inputs: { scale: 5, strands: 1, arms: 1, zoom: 0.1, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0, cx: 0.5, cy: 0.5, amount: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.4, chroma: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Frames in Frames', group: 'Space',
+    fx: [{ shaderId: 'fx-droste', inputs: { scale: 3, strands: 0, arms: 1, zoom: 0.08, spin: 0, twist: 0, depth: 0, shape: 0, edge: 0.6, cx: 0.5, cy: 0.5, amount: 1 } }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
   {
     name: 'Space · Floor', group: 'Space',

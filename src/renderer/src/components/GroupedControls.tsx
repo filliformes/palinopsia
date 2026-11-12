@@ -163,6 +163,23 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'dispersion', 'rim', 'cavity'),
     g('light and flow', 'shadow', 'lightAngle', 'lightHeight', 'orbit', 'flow', 'flowSpeed', 'bands', 'split', 'ripple')
   ],
+  // Time Glitch : the memory · the damage · where it lands (three balanced columns)
+  'fx-time-glitch': [
+    g('time', 'time', 'mode', 'drift', 'clear', 'amount'),
+    g('damage', 'chaos', 'rate', 'sync', 'blocks', 'shift', 'audio'),
+    g('where', 'inside', 'after', 'split', 'crush', 'burst', 'burstLen')
+  ],
+  // Break : the hit · the cracks · the pieces and their light
+  'fx-break': [
+    g('hit', 'impact', 'every', 'sync', 'scatter', 'hitX', 'hitY'),
+    g('cracks', 'shards', 'rings', 'wander', 'broken', 'force', 'bevel'),
+    g('pieces', 'after', 'time', 'tilt', 'refract', 'light', 'behind', 'amount')
+  ],
+  // Droste : the spiral · its flight
+  'fx-droste': [
+    g('spiral', 'scale', 'strands', 'arms', 'shape', 'edge', 'amount'),
+    g('flight', 'zoom', 'spin', 'twist', 'depth', 'cx', 'cy')
+  ],
   // Glass : the pane · the light
   'fx-glass': [
     g('pane', 'pattern', 'scale', 'angle', 'depth', 'dispersion', 'frost', 'drift'),
@@ -358,6 +375,27 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('side')) put(d, ['sideUse'], 'Sidechain is at 0.')
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0.')
     if (zero('flow')) put(d, ['flowSpeed', 'bands', 'split', 'ripple'], 'Flowing is at 0.')
+    return d
+  },
+  // Time Glitch : with no damage inside or after, the clock and the damage
+  // controls have nothing to hit (split still drifts the trails a touch)
+  'fx-time-glitch': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('sync', 0)) d.rate = 'Sync is on : the tempo sets the pace.'
+    if (zero('inside') && zero('after')) put(d, ['chaos', 'rate', 'sync', 'blocks', 'shift', 'crush', 'burst', 'burstLen', 'audio'], 'Inside and after are at 0 : no damage is dealt.')
+    return d
+  },
+  'fx-break': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('sync', 0)) d.every = 'Sync is on : the tempo sets when it breaks by itself.'
+    else if (zero('every')) d.scatter = 'Every is at 0 and sync is free : it only breaks when hit, right on the point.'
+    if (is('after', 0)) d.time = 'Hold : the pieces stay cracked until the next hit.'
+    return d
+  },
+  'fx-key': ({ isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 0)) put(d, ['color', 'despill'], 'Only the color mode keys a color and takes its cast off.')
+    if (isnt('mode', 3)) d.channel = 'Only the channel mode reads one channel.'
     return d
   },
   'fx-dither': ({ is, isnt }) => {

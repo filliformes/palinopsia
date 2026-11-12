@@ -7,6 +7,59 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Time Glitch, Break, Key and Droste : four new effects** (Vincent, quoting a user : "a
+  kind of time effect mixed with chaotic glitch, so you drop it, it warps time a bit like
+  Sediment / Wide Time / trails, but then glitches those trails inside its feedback loop
+  and post too"; and from the shelf : Shatter (impact fracture), one Key FX with modes, the
+  Droste spiral).
+  - **Time Glitch** (`fx/TimeGlitch.fs`, ISF, `fx-time-glitch`) : a memory of the recent
+    past (8-bit, stochastic rounding, as Wide Time; mode lights / smear / darks, drift) in
+    which a stepped clock (`PH_timeGlitch` : rate up to 16 Hz or a tempo division) damages
+    blocks INSIDE the loop (moved, torn along their row, stuck, crushed, red and blue split),
+    so each glitch is smeared, remembered and glitched again; `after` deals a second round
+    on the way out (block jumps, row tears, the split, channels turned), not kept. A 1x1
+    latch carries the layer clock and the `burst ▸` envelope (`burstLen`); `audio` per
+    block column. The memory step is folded again in the output pass (no frame late). The
+    split first ran a touch everywhere every frame : it streamed every trail into a
+    rainbow, so it acts in the damaged blocks only; the default mode is **lights** (the
+    mean smeared sparse light-on-black sources to nothing : murmuration 0.03 mean
+    brightness, 0.26 with lights). 2.9 ms at 4K (shader rig).
+  - **Break** (`fx/Break.fs`, ISF, `fx-break`; the frame-store Shatter keeps its name) :
+    one fragment shader. Polar cells round the impact (radial cracks, rings in a geometric
+    run, both wandering on value noise, a `broken` share of segments missing), the piece
+    under each pixel found by walking back along the way the pieces move (14 steps), each
+    piece moved / turned / tilted per **then** (hold, drift, fall, heal; fall runs out to
+    the rim on the full dome through `domeDir`), its face lit from a fixed room light, the
+    chamfer within a few pixels of each crack sloping outward (a mirror highlight mixed
+    toward a pale room light, never added), refraction by the tilt. A 4x1 state pass keeps
+    the age (16 bits), the hit count (a new crack pattern each hit), the latched impact
+    point, the layer clock and the automatic step (`PH_breakAuto` : every N s or a tempo
+    division). The hit : `break ▸`, a click on the preview, a pinch, or automatic, round
+    `hitX` / `hitY` by `scatter`. 4.0 ms at 4K (shader rig), 60 fps at 1080p.
+  - **Key** (`fx/Key.fs`, ISF, `fx-key`, Utility) : color (the angle off the key's hue in
+    Cb / Cr, a minimum chroma, despill of only the excess along the key), saturation,
+    edges (the brightness spread over a ring), channel (brightness / R / G / B / alpha);
+    tolerance, softness, choke (min / max over the ring), feather, invert, show matte; the
+    alpha goes to the layer blend. Nine reads, 0.9 ms at 4K.
+  - **Droste** (`fx/Droste.fs`, ISF, `fx-droste`) : log space times
+    `gamma = arms - i strands log(scale) / 2pi` (whole numbers keep it seamless), folded
+    into one level against the frame's own box or a circle, `PH_zoom` / `PH_spin`
+    integrated; edge line and a vanishing point that settles to the mean. 0.8 ms at 4K.
+  - **The preview pointer takes ISF effects** (`pointerInput.ts`, registry field
+    `pointer`) : a click on the preview sets Break's impact point and fires it, a click or
+    a drag sets Droste's center (the mouse : an undoable edit; a pinch : live).
+  - Key and Droste stay out of every dice (`HAND_FX` in `randomize.ts`; Droste dealt into
+    six random scenes vanished into the textures or took the whole layer); Key's color,
+    mode, channel and views are never rolled. Time Glitch and Break deal (Break never into
+    hold).
+  - 10 presets each, Inspector groups and grey-outs (`GroupedControls.tsx`), the chain
+    group **Glitch** (Glitched Memory, Rotten Trails, Smashed Screen, Healing Glass,
+    Outlines Only, Color Isolate) and Droste Spiral / Frames in Frames (Space), the
+    Generate themes **Glitched Memory**, **Broken Glass** (Glitch / Datamosh), **Endless
+    Spiral** (Optical / Op-Art), **Cut by Color** (Minimal / Structural).
+  - Fulldome gate : all four PASS (60 fps flat and on the dome, p95 17-17.3 ms, 59.7
+    updates a second at the defaults and at the heaviest settings).
+
 - **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
   nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
   his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this

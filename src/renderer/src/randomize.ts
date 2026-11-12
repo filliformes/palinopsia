@@ -169,6 +169,8 @@ function randomizeOneInput(
 // Film damage is a deliberate "worn print" choice too : since it no longer waits
 // for Film Hold, a dice roll would leave every Finishing randomize dirty.
 const RANDOMIZE_SKIP: Record<string, RegExp> = {
+  // Key : what it keys is the show's (the cloth's color, the channel, the views)
+  'fx-key': /^(color|mode|channel|invert|showMatte)$/,
   'fx-context': /^(pbr|lightOrder$|blur$)/,
   // Finalizer staging intent : anaglyph 3D, the film-hold / draw clock, leader
   // blanks and splices, film damage and the output shape are deliberate show
@@ -339,7 +341,14 @@ const SELF_NODE_IDS = [
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 /** The effects a blind rack is dealt from (the convolution nodes join the layer rack). */
-export const DICE_FX_IDS = (): string[] => [...FX_SHADERS, ...SELF_NODES].map((f) => f.id)
+// Effects a blind dice never deals (they stay in the pickers, chains, themes and
+// OSC) : Key cuts holes by a color it was never shown, and Droste folds the whole
+// frame into one spiral, a deliberate move rather than a texture (dealt into six
+// random scenes, 11-11 : over the busy textures a dice deals it vanished into
+// them, and where it showed it took the whole layer : it plays when chosen).
+const HAND_FX = new Set(['fx-key', 'fx-droste'])
+const DICE_FX = (): typeof FX_SHADERS => FX_SHADERS.filter((f) => !HAND_FX.has(f.id))
+export const DICE_FX_IDS = (): string[] => [...DICE_FX(), ...SELF_NODES].map((f) => f.id)
 const randSidechain = (): SidechainRef => ({ kind: 'layer', layer: Math.floor(rnd() * 4) })
 
 /** Build a rack of n DISTINCT random FX, each with randomized params.
@@ -351,7 +360,7 @@ function randomRack(
   includeConv = false
 ): FxInstance[] {
   const n = drawCount(countWeights)
-  const pool = [...FX_SHADERS, ...SELF_NODES, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
+  const pool = [...DICE_FX(), ...SELF_NODES, ...(includeConv ? CONV_NODES : [])].filter((f) => !exclude.includes(f.id))
   const picked: typeof FX_SHADERS = []
   let convUsed = 0
   for (let i = 0; i < n && pool.length > 0; i++) {

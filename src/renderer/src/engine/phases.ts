@@ -67,10 +67,28 @@ const INTEGRANDS: Record<string, (v: Get) => number> = {
   // cycle per `band` seconds of history, plus the `cycle` rotation, so at cycle 0
   // a stamped pixel keeps its color).
   PH_crawlClock: () => 1,
-  PH_crawlIdx: (v) => 1 / Math.max(v('band'), 0.05) + v('cycle')
+  PH_crawlIdx: (v) => 1 / Math.max(v('band'), 0.05) + v('cycle'),
+  // Time Glitch : the damage clock (one step per whole unit), at `rate` Hz or on a
+  // beat division of the tempo (sync 1 bar · 1/2 · 1/4 · 1/8 · 1/16), capped at
+  // 16 steps a second.
+  PH_timeGlitch: (v) => {
+    const s = Math.round(v('sync'))
+    const hz = s > 0 ? (tempoBpm() / 60) * (TIME_GLITCH_PER_BEAT[s] ?? 1) : v('rate')
+    return Math.min(Math.max(hz, 0), 16)
+  },
+  // Break : the automatic hits, every `every` seconds (0 = none) or on the tempo
+  // (sync 4 bars · 2 bars · 1 bar · 1/2 · 1/4), at most four a second.
+  PH_breakAuto: (v) => {
+    const s = Math.round(v('sync'))
+    const every = v('every')
+    const hz = s > 0 ? tempoBpm() / 60 / (BREAK_BEATS[s] ?? 4) : every > 0.05 ? 1 / every : 0
+    return Math.min(Math.max(hz, 0), 4)
+  }
 }
 
 const SHATTER_PER_BEAT = [0, 0.25, 0.5, 1, 2]
+const TIME_GLITCH_PER_BEAT = [0, 0.25, 0.5, 1, 2, 4]
+const BREAK_BEATS = [0, 16, 8, 4, 2, 1]
 
 function smooth(a: number, b: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
