@@ -728,6 +728,48 @@ that CI builds into cross-platform releases.
   last, gone after PANIC and New; Current's mean water speed across a detail step 9 to 14
   cells/s, 1.4 to 7 with the old still start; 60 fps with detail swept every frame).
 
+- **Time Glitch, Break, Key and Droste, from an audit.** **Key** and **Break** on the
+  Master FX cut nothing anywhere : Context (the pinned finishing stage) drops alpha, so
+  the chains **Outlines Only** and **Color Isolate** only graded the picture and Break's
+  gaps showed the picture at 30 % instead of black, its crack lines gone; and with Context
+  bypassed the preview alone showed the cut while the projector, NDI, Spout / Syphon, the
+  recording and the dome got the uncut picture. The master is now laid over black where
+  the effects end and the finishing stages begin when a Key or a Break ran
+  (`FxRack.flatten`, `CUT_FX`), and the finished master always, so the preview and every
+  output agree whatever master effect leaves transparency (an opaque pixel passes bit for
+  bit; the other effects that leave alpha on the master, Perspective's fade, Drape,
+  Inflate, Silhouette, Matte, Transform, keep the look they had through Context). A
+  surveyed 1,435 master set-ups (99 effects at their defaults and every preset, the 179
+  chains) : with Context on, only the Key and Break ones reach the flatten with any
+  transparency, every other flatten pass is identical to its input to the last bit;
+  preview against the captures (rgbx, rgba-up) : mean difference 52 levels (Outlines Only,
+  Context bypassed) and up to 145 (Break's lines), now 0 in all 16 flat and 16 dome cases;
+  Outlines Only's luma 64 against 63 unkeyed, now 1 (outlines on black, on the dome too);
+  0.15 ms a pass at 4K (GPU timer), 60 fps kept. **PANIC** no longer breaks the picture : the
+  flush zeroed Break's state, read as a first frame, and landed a new hit on top of the
+  recovery (a held pane replaced : 77 % of the pixels changed); an empty state now starts
+  the pane whole unless it is the effect's very first frame (`FRAMEINDEX`), which still
+  lands with a hit. Break's automatic hits stop at **three a second** (four at 1/4 from
+  240 bpm, or every under 1/3 s : the flash rule). The dice no longer deals a Break whose
+  hits come before its fall ends (every 2.5 s with a 3 s fall snapped a half-fallen frame
+  whole) : every 3.5 to 8 s, time 1 to 2.5 s. **Time Glitch**'s audio dealt damage with
+  inside and after at 0 (30 % of the pixels moved, loud), as the grey-outs said none was
+  dealt : its share is now scaled by inside and after like the chaos (the preset Audio
+  damage goes to audio 1 to keep its bite), and split greys out with the rest; the copy
+  no longer says stuck blocks stop taking the live picture (only in smear : lights and
+  darks still let a brighter or darker one in) or that crushed blocks swap channels in
+  the loop (AFTER does). A pinch dragging **Droste**'s center wrote the store through
+  `runSilently` every tracker frame, closing a fader drag made meanwhile at every frame :
+  two seconds of both left 100 undo steps and evicted the history, now one
+  (`undo.writeLive`, the Link tempo's way). The walk, Variation and a random modulator no
+  longer re-wind Droste (strands, arms, shape, center) or re-cut Break's pane (shards,
+  rings, then, sync, every, time) : 400 Variations moved them 130 to 400 times, now never
+  (`NUDGE_SKIP`; a full roll still deals them). The manual says which master effects take
+  the click first (Drape, Touch, Ripple, Break, Droste) and that selecting a source gives
+  it back. Proven with esbuild checks (the real phases, registry, randomize, undo and
+  pointer code) and on the test copy (readbacks of the composite, the canvas and the
+  capture rings, RTX 4070).
+
 ### Docs
 
 - **The docs catch up with v1.3.2** (after publishing, the sweep) : six new gallery frames
