@@ -556,6 +556,41 @@ export function clearFinalizerFilm(c: CompositionState): CompositionState {
   }
 }
 
+// ── A camera's mirror, per camera, on this computer ──
+// Some cameras (their driver, a maker's app, a Windows camera setting) send the
+// picture already turned left to right. Palinopsia shows a camera as it
+// arrives; the mirror chosen in its framing is kept for THAT camera (by its name)
+// and used every time it is opened again here. Screens and NDI are left alone.
+const CAMERA_MIRROR_KEY = 'opsia.cameraMirror'
+type Mirror = 'off' | 'x' | 'y' | 'xy'
+function cameraKeyOf(spec: string, name: string): string | null {
+  if (spec === 'webcam') return 'webcam'
+  if (spec.startsWith('device:') && !spec.startsWith('device:avf:')) return `device:${name || spec.slice(7)}`
+  if (spec.startsWith('device:avf:')) return spec
+  return null
+}
+function cameraMirror(spec: string, name: string): Mirror | null {
+  const k = cameraKeyOf(spec, name)
+  if (!k) return null
+  try {
+    const v = (JSON.parse(localStorage.getItem(CAMERA_MIRROR_KEY) ?? '{}') as Record<string, Mirror>)[k]
+    return v === 'x' || v === 'y' || v === 'xy' || v === 'off' ? v : null
+  } catch {
+    return null
+  }
+}
+function rememberCameraMirror(spec: string, name: string, m: Mirror): void {
+  const k = cameraKeyOf(spec, name)
+  if (!k) return
+  try {
+    const all = JSON.parse(localStorage.getItem(CAMERA_MIRROR_KEY) ?? '{}') as Record<string, Mirror>
+    all[k] = m
+    localStorage.setItem(CAMERA_MIRROR_KEY, JSON.stringify(all))
+  } catch {
+    /* storage blocked : this time only */
+  }
+}
+
 export function makeDefaultMetaKnobs(): MetaKnobState[] {
   return Array.from({ length: META_KNOB_COUNT }, (_, i) => ({
     name: `Knob ${i + 1}`,
@@ -3434,7 +3469,9 @@ export const useStore = create<StoreState>((set, get) => ({
               shaderId: null,
               inputs: {},
               mediaId: spec,
-              mediaName: name
+              mediaName: name,
+              // the way this camera was last turned on this computer (set once)
+              ...((m) => (m ? { mirror: m } : {}))(cameraMirror(spec, name))
             }
             if (slot === 'A') return { ...l, sourceA: cap, sourceAFx: [] }
             return { ...l, sourceB: cap, sourceBFx: [] }
@@ -3685,6 +3722,8 @@ export const useStore = create<StoreState>((set, get) => ({
           // video / capture only : Compositor.setFraming).
           if (!cur || (cur.kind !== 'video' && cur.kind !== 'capture' && cur.kind !== 'assemble' && cur.kind !== 'hive')) return l
           const next = { ...cur, ...patch }
+          // a camera's mirror is remembered for that camera, on this computer
+          if (patch.mirror && cur.kind === 'capture') rememberCameraMirror(cur.mediaId ?? '', cur.mediaName ?? '', patch.mirror)
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }

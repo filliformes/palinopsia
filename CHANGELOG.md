@@ -438,6 +438,15 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **A camera opens the way you last turned it** (Vincent : "when a Webcam or Live Input is
+  opened, its always mirrored by default, correct this"). Checked first : Palinopsia does
+  not mirror a camera (a fake camera, white on its left half, came out white on the left :
+  255 left, 104 right, mirror unset), so the flip comes from the camera, its driver or a
+  camera setting. The framing's **mirror** is now remembered per camera on this computer
+  (localStorage `opsia.cameraMirror`, keyed by the camera's name; Webcam, Live Input and
+  the macOS USB input) and applied every time that camera is opened again
+  (`setSourceCapture` / `setSourceTransform`). Screens and NDI are left alone.
+
 - **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
   move the macro knob mapped to a parameter, this parameter's slider doesnt update in
   realtime, like when the Modulators are in use"). A knob's gesture plays engine-side
