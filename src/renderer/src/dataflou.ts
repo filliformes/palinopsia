@@ -109,6 +109,53 @@ function play(path: string, value: DfValue): void {
   routeOsc(d.osc, [{ type: 'f', value: n }])
 }
 
+// ── watched outside values (◉ in the node list) : kept on this computer, per
+// universe, sent to main whenever they change and when the node starts ──
+type Watch = { sku: string; path: string }
+const WATCH_KEY = 'opsia.dfWatch'
+let watchAll: Record<string, Watch[]> = (() => {
+  try {
+    const j = JSON.parse(localStorage.getItem(WATCH_KEY) ?? '{}') as Record<string, Watch[]>
+    return j && typeof j === 'object' ? j : {}
+  } catch {
+    return {}
+  }
+})()
+const watchListeners = new Set<() => void>()
+let watchVersion = 0
+const universeNow = (): string => useStore.getState().dataflou.universe || 'default'
+export function dfWatches(): Watch[] {
+  return watchAll[universeNow()] ?? []
+}
+function sendWatches(): void {
+  window.api.dataflouWatch(dfWatches())
+}
+/** Watch (or stop watching) another node's value in the data view. */
+export function toggleDfWatch(sku: string, path: string): void {
+  const u = universeNow()
+  const list = watchAll[u] ?? []
+  const i = list.findIndex((w) => w.sku === sku && w.path === path)
+  watchAll = { ...watchAll, [u]: i >= 0 ? list.filter((_, j) => j !== i) : [...list, { sku, path }].slice(-64) }
+  try {
+    localStorage.setItem(WATCH_KEY, JSON.stringify(watchAll))
+  } catch {
+    /* storage blocked : this session only */
+  }
+  watchVersion++
+  watchListeners.forEach((l) => l())
+  sendWatches()
+}
+export function useDfWatches(): Watch[] {
+  useSyncExternalStore(
+    (cb) => {
+      watchListeners.add(cb)
+      return () => watchListeners.delete(cb)
+    },
+    () => watchVersion
+  )
+  return dfWatches()
+}
+
 /** Turn the node on or off (or rename it, or move it to another universe). */
 export async function applyDataflou(): Promise<void> {
   const cfg = useStore.getState().dataflou
@@ -116,6 +163,7 @@ export async function applyDataflou(): Promise<void> {
   sendActions(true)
   try {
     setStatus(await window.api.dataflouConfigure(cfg))
+    sendWatches() // (the node may be new : its universe's list)
   } catch (e) {
     setStatus({ ...EMPTY, error: (e as Error).message })
   }

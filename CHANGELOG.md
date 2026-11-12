@@ -395,6 +395,20 @@ that CI builds into cross-platform releases.
   build aborts at start with 0xc0000409, a stack-buffer check; its Debug build hangs
   before listening), so the cross-check against C++ is by code : an older core
   ignores the SCENE message and the new keys and keeps the connection.
+- **dataflou : watch any outside value, and a data view for a connected show**
+  (Vincent : "add the watch toggle to the data view" and "I see a lot of Palinopsia
+  parameters that I can already monitor elsewhere [...] I want to see useful stuff for a
+  dataflou connected scenario"). A **◉** on every parameter of another node streams it
+  to Palinopsia only to be seen (a stream with no destination, as the visualizer's
+  monitors, 30 a second, kept whether a page is open : `DataflouNode.setWatches`,
+  `pollMonitors` now keeps watches beside the page's monitors); the list is the
+  renderer's (localStorage `opsia.dfWatch`, per universe, IPC `dataflou:watch`). The
+  data view is now **into Palinopsia** / **watching** / **from Palinopsia**; the
+  streams other nodes open to MONITOR Palinopsia (a visualizer on them asks for all 256
+  of its values : Macro knobs, vision, audio, body, modulators) were each a ↗ row, now
+  one line (`DfIo.watchedBy`). Tested with a stand-in gloves node (2 × 6 IMU values,
+  monitoring Palinopsia) on the test copy : 256 monitor rows gone to one line, two
+  watched values at ~22/s with their lines, a wired one in "into Palinopsia".
 
 ### Fixed
 

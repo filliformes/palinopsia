@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { dataflouBind, openDataflouVisualizer, useDataflouStatus } from '../dataflou'
+import { dataflouBind, openDataflouVisualizer, toggleDfWatch, useDataflouStatus, useDfWatches } from '../dataflou'
 import { showToast } from './Toast'
 import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfValue } from '@shared/dataflou'
 
@@ -224,10 +224,13 @@ export function DataflouSection(): JSX.Element {
 }
 
 // ── the data view : what flows in and out, live ─────────────────────────────
-// Each of our destinations with what feeds it (in ↙) and each of our sources
-// someone streams (out ↗) : the value now, its last seconds as a line, where it
-// comes from or goes, how many a second. Asked of main ten times a second, only
-// while it is open.
+// What a connected scenario needs to see : what comes INTO Palinopsia over a
+// wire (in ↙), the outside values you chose to WATCH (◉, from the node list :
+// wired or not), and what Palinopsia SENDS over a wire (out ↗); each with its
+// value now, its last seconds as a line, where it comes from or goes, how many a
+// second. Palinopsia's own values that other nodes merely monitor (a visualizer
+// page asks for all of them) are not wires : one line says who, and how many.
+// Asked of main ten times a second, only while it is open.
 const HIST = 80
 function numOf(v: DfValue | null): number | null {
   if (v === null || v === undefined) return null
@@ -269,7 +272,7 @@ function DataView({ running }: { running: boolean }): JSX.Element {
         if (!alive) return
         const keep = new Set<string>()
         for (const n of list) {
-          for (const [dir, rows] of [['in', n.in], ['out', n.out]] as const) {
+          for (const [dir, rows] of [['in', n.in], ['out', n.out], ['watch', n.watched ?? []]] as const) {
             for (const r of rows) {
               const k = `${n.sku}|${dir}|${r.path}|${r.peers.join(',')}`
               keep.add(k)
@@ -290,15 +293,15 @@ function DataView({ running }: { running: boolean }): JSX.Element {
     const id = window.setInterval(tick, 100)
     return () => { alive = false; window.clearInterval(id) }
   }, [open, running])
-  const total = io.reduce((n, x) => n + x.in.length + x.out.length, 0)
-  const row = (sku: string, dir: 'in' | 'out', r: DfIoRow): JSX.Element => {
+  const total = io.reduce((n, x) => n + x.in.length + x.out.length + (x.watched?.length ?? 0), 0)
+  const row = (sku: string, dir: 'in' | 'out' | 'watch', r: DfIoRow): JSX.Element => {
     const k = `${sku}|${dir}|${r.path}|${r.peers.join(',')}`
     const stale = !r.live || r.ageMs === null || r.ageMs > 2000
     const colour = Array.isArray(r.value) && r.value.length >= 3
     return (
       <div key={k} className={`flex min-w-0 items-center gap-1.5 font-mono text-[9px] ${stale ? 'text-muted' : 'text-text'}`}
         title={`${dir === 'in' ? `${r.peers.join(', ')} → ${r.path}` : `${r.path} → ${r.peers.join(', ')}`}${r.ageMs !== null ? ` · last ${(r.ageMs / 1000).toFixed(1)} s ago` : ' · nothing yet'}${r.live ? '' : ' · not connected'}`}>
-        <span className={`w-3 shrink-0 ${dir === 'in' ? 'text-accent2' : 'text-accent'}`}>{dir === 'in' ? '↙' : '↗'}</span>
+        <span className={`w-3 shrink-0 ${dir === 'in' ? 'text-accent2' : dir === 'watch' ? 'text-text' : 'text-accent'}`}>{dir === 'in' ? '↙' : dir === 'watch' ? '◉' : '↗'}</span>
         <span className="w-28 shrink-0 truncate">{r.label}</span>
         {colour ? (
           <span className="h-3 w-16 shrink-0 rounded-sm border border-border" style={{ background: `rgb(${(r.value as number[]).slice(0, 3).join(',')})` }} />
@@ -306,8 +309,13 @@ function DataView({ running }: { running: boolean }): JSX.Element {
           <Spark pts={hist.current.get(k) ?? []} />
         )}
         <span className="w-14 shrink-0 truncate text-right">{fmt(r.value)}</span>
-        <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : 'to '}{r.peers.join(', ')}</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : dir === 'watch' ? '' : 'to '}{r.peers.join(', ')}</span>
         <span className="w-9 shrink-0 text-right text-muted">{r.perSec}/s</span>
+        {dir === 'watch' && r.sku && (
+          <button onClick={() => toggleDfWatch(r.sku!, r.path)} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Stop watching this value">
+            ✕
+          </button>
+        )}
       </div>
     )
   }
@@ -316,18 +324,30 @@ function DataView({ running }: { running: boolean }): JSX.Element {
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left" title="What flows in and out of Palinopsia on the mesh, live">
         <span className={`font-mono text-[9px] text-muted transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
         <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-text">data</span>
-        <span className="font-mono text-[9px] text-muted">in ↙ · out ↗{open ? ` (${total})` : ''}</span>
+        <span className="font-mono text-[9px] text-muted">in ↙ · watching ◉ · out ↗{open ? ` (${total})` : ''}</span>
       </button>
       {open && (
         <>
-          {total === 0 && <span className="font-mono text-[9px] text-muted">nothing flows yet : wire a source to Palinopsia (or Palinopsia to a destination) and its values show here</span>}
-          {io.map((n) => (n.in.length || n.out.length ? (
-            <div key={n.sku} className="flex min-w-0 flex-col gap-0.5">
-              {io.length > 1 && <span className="font-mono text-[9px] text-muted">{n.label} · ↙ {n.rxPerSec}/s ↗ {n.txPerSec}/s</span>}
-              {n.in.map((r) => row(n.sku, 'in', r))}
-              {n.out.map((r) => row(n.sku, 'out', r))}
-            </div>
-          ) : null))}
+          {total === 0 && (
+            <span className="font-mono text-[9px] text-muted">
+              nothing flows yet : wire a source to Palinopsia (or Palinopsia to a destination), or open a node in the network above and watch one of its values (◉)
+            </span>
+          )}
+          {/* in : what plays Palinopsia over a wire, from either of its nodes */}
+          {io.some((n) => n.in.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">into Palinopsia</span>}
+          {io.flatMap((n) => n.in.map((r) => row(n.sku, 'in', r)))}
+          {/* watched : outside values, wired or not */}
+          {io.some((n) => n.watched?.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">watching</span>}
+          {io.flatMap((n) => (n.watched ?? []).map((r) => row(n.sku, 'watch', r)))}
+          {/* out : Palinopsia's values wired to other nodes */}
+          {io.some((n) => n.out.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">from Palinopsia</span>}
+          {io.flatMap((n) => n.out.map((r) => row(n.sku, 'out', r)))}
+          {/* monitored, not wired : one line */}
+          {io.some((n) => n.watchedBy?.length) && (
+            <span className="mt-0.5 font-mono text-[9px] text-muted" title="A visualizer page (or a node watching) asks for every value of Palinopsia to show it : these are not wires, and they cost nothing on Palinopsia's side to speak of">
+              monitored : {io.flatMap((n) => n.watchedBy ?? []).map((w) => `${w.count} values by ${w.label}`).join(' · ')}
+            </span>
+          )}
         </>
       )}
     </div>
@@ -373,6 +393,7 @@ function NodeRow({ n, open, onToggle, ourSku }: { n: DfNodeView; open: boolean; 
 }
 
 function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string }): JSX.Element {
+  const watching = useDfWatches().some((w) => w.sku === n.sku && w.path === p.path)
   // dataflou casts between bool, numbers, vectors and colors, never into a string
   const castable = p.type !== 'string' && p.type !== 'blob'
   const isSource = p.flow !== 'destination' && castable
@@ -392,6 +413,13 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
       </span>
       <span className="shrink-0 text-muted">{range}</span>
       <div className="flex-1" />
+      <button
+        onClick={() => toggleDfWatch(n.sku, p.path)}
+        className={`shrink-0 rounded px-1 ${watching ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'text-muted hover:text-text'}`}
+        title={watching ? 'Watched in the data view : click to stop' : 'Watch this value in the data view, live (wired or not)'}
+      >
+        ◉
+      </button>
       {isSource && (
         <select
           value=""

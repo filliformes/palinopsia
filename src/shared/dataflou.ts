@@ -67,12 +67,18 @@ export interface DfIoRow {
   ageMs: number | null // since the last value (null : none yet)
   perSec: number
   live: boolean // connected to the node(s) it talks with
+  sku?: string // a watched row : the node it belongs to
 }
 export interface DfIo {
   sku: string
   label: string
   in: DfIoRow[]
   out: DfIoRow[]
+  /** Outside values watched (◉ in the node list) : streamed here only to be seen. */
+  watched: DfIoRow[]
+  /** The nodes that monitor ours (a visualizer page on them asks for every value) :
+   *  how many of our values each takes. Not wires : shown as one line. */
+  watchedBy: Array<{ label: string; count: number }>
   rxPerSec: number
   txPerSec: number
 }
