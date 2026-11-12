@@ -51,6 +51,7 @@ import { DOME_MOD_RANGE, sanitizeDome } from '@shared/dome'
 import { OUT_IDENTITY, OUTX_MOD_RANGE, sanitizeOutXform, type OutXform } from '@shared/outXform'
 import {
   GROUP_PREFIX,
+  GROUP_TUNE_DEFAULT,
   LIGHT_MOD_RANGE,
   LOOK_DEFAULT as LIGHT_LOOK_DEFAULT,
   profilePatch,
@@ -5018,10 +5019,12 @@ export const useStore = create<StoreState>((set, get) => ({
         id: sid,
         name: `Cue ${L.scenes.length + 1}`,
         looks: { ...L.looks, ...Object.fromEntries(s.lightRig.fixtures.map((f) => [f.id, L.looks[f.id] ?? LIGHT_LOOK_DEFAULT])) },
-        master: { brightness: L.master.brightness, speed: L.master.speed },
+        // (every master the console shows, every group's grade and, when the tuning
+        // travels with the look, every light's : a neutral one comes back neutral)
+        master: { brightness: L.master.brightness, speed: L.master.speed, gain: L.master.gain, saturation: L.master.saturation, contrast: L.master.contrast },
         groups: { ...(L.groups ?? {}), ...Object.fromEntries(s.lightRig.groups.map((g) => [g.id, L.groups?.[g.id] ?? 1])) },
-        ...(L.groupTunes ? { groupTunes: { ...L.groupTunes } } : {}),
-        ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}) } } : {})
+        groupTunes: { ...(L.groupTunes ?? {}), ...Object.fromEntries(s.lightRig.groups.map((g) => [g.id, L.groupTunes?.[g.id] ?? GROUP_TUNE_DEFAULT])) },
+        ...(s.lightRig.tuneScope === 'look' ? { tunes: { ...(L.tunes ?? {}), ...Object.fromEntries(s.lightRig.fixtures.map((f) => [f.id, L.tunes?.[f.id] ?? f.tune])) } } : {})
       }
       return { lightsSession: { ...L, scenes: [...L.scenes, scene] } }
     }),
@@ -5048,7 +5051,19 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
   renameLightScene: (id, name) =>
     set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) || x.name } : x)) } })),
-  deleteLightScene: (id) => set((s) => ({ lightsSession: { ...s.lightsSession, scenes: s.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: s.lightCue === id ? null : s.lightCue })),
+  deleteLightScene: (id) => {
+    const s = get()
+    const at = s.lightsSession.scenes.findIndex((x) => x.id === id)
+    const inPlay = s.lightCue === id
+    set((q) => ({ lightsSession: { ...q.lightsSession, scenes: q.lightsSession.scenes.filter((x) => x.id !== id) }, lightCue: q.lightCue === id ? null : q.lightCue }))
+    // (the cue in play deleted while they follow on : the one after it goes, or
+    // following stops when nothing is left to follow)
+    if (inPlay && s.lightCueRun) {
+      const list = get().lightsSession.scenes
+      if (list.length && list.some((c) => (c.follow ?? 0) > 0)) get().recallLightScene(list[Math.max(0, at) % list.length].id)
+      else set({ lightCueRun: false })
+    }
+  },
   applyLightShow: (id, ids) =>
     set((s) => {
       const layers = s.composition.layers.map((l, i) => ((l.sourceA.shaderId || l.sourceA.kind !== 'none' || l.sourceB) && !l.mute ? i : -1)).filter((i) => i >= 0)
@@ -6416,6 +6431,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   sequenceTo: (id, variation, crossfadeMs) => {
     let sound = null as SoniConfig | null
+    let went = false
     set((s) => {
       const scene = s.scenes.find((x) => x.id === id)
       if (!scene) return s
@@ -6439,6 +6455,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // (and the room's EQ and glue : they tune the room, not the patch, like presets)
         sound = { ...defaultSoniConfig(), ...(scene.sonify as Partial<SoniConfig>), on: cur.on, sinkId: cur.sinkId, eq: cur.eq } as SoniConfig
       }
+      went = true
       return { composition, activeSceneId: id, worlds, world, variationBaseline: null }
     })
     // The sound lands inside this same call, after the composition : the
@@ -6447,6 +6464,12 @@ export const useStore = create<StoreState>((set, get) => ({
     if (sound) {
       sonifyEngine.loadingSound() // (a line-in closed now stays closed : sonify.ts)
       get().setSonify(sound)
+    }
+    // a light cue tied to this scene goes with it (here too, as recallScene does :
+    // inside this call, so the sequencer's silence covers it)
+    if (went) {
+      const cue = get().lightsSession.scenes.find((c) => c.link === id)
+      if (cue) get().recallLightScene(cue.id)
     }
   },
   sequencePageOpen: false,

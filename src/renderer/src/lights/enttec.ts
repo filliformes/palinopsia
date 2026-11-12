@@ -172,6 +172,13 @@ class EnttecLink {
     this.write(dmx)
   }
 
+  /** Open it if it is not (nothing written) : the page shows whether it is
+   *  plugged in, and RDM can ask the line before any light is patched. */
+  poke(): void {
+    if (this.closed || this.writer || this.opening || performance.now() < this.retryAt) return
+    void this.open()
+  }
+
   private write(dmx: Uint8Array): void {
     const w = this.writer
     if (!w) return
@@ -277,6 +284,13 @@ export const enttec = {
     if (!l) { l = new EnttecLink(index); links.set(index, l) }
     l.send(dmx, must)
   },
+  /** Keep a link to the Pro at `index` and open it, without sending a frame. */
+  ensure(index: number): void {
+    watch()
+    let l = links.get(index)
+    if (!l) { l = new EnttecLink(index); links.set(index, l) }
+    l.poke()
+  },
   /** The way to RDM through the Pro at `index` (null : not open, or it reads nothing). */
   rdm(index: number): EnttecRdm | null {
     const l = links.get(index)
@@ -313,6 +327,12 @@ export const enttec = {
  *  branch), the answer's bytes after the Pro's status byte. */
 export class EnttecRdm implements RdmTransport {
   constructor(private l: { exchange: (label: number, data: Uint8Array, ms?: number) => Promise<{ label: number; data: Uint8Array } | null>; serial: number | null }) {}
+
+  /** The link it talks through : a controller made on another one (closed since,
+   *  the lights off and on) must be made again. */
+  get link(): unknown {
+    return this.l
+  }
 
   async request(packet: Uint8Array, discovery: boolean): Promise<Uint8Array | null> {
     const m = await this.l.exchange(discovery ? 11 : 7, packet)

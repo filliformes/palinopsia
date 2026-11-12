@@ -28,6 +28,7 @@ import {
 import { lightModKey, lightMods } from './lightMods'
 import { middleOf } from './lightStore'
 import { Automaton, cloud, ECHO_SLOTS, ECHO_STEP, GLITCH_COLORS, Life, makeFx, mirror01, STATEFUL, type FxState } from './lightFx'
+import { limitFlashes, limitState } from './lightLimit'
 
 export interface LightGrid {
   w: number
@@ -58,6 +59,10 @@ export interface LightInputs {
    *  room, red, then green, blue, white : every light shows where it is and
    *  whether its colors are in the right order. */
   test?: number | null
+  /** Flash safety's strength (0..1, the Output page's slider; absent or 0 : off
+   *  there). The lights are always held under three flashes a second; a strength
+   *  holds them sooner and gentler, as it does the picture. */
+  flashSafe?: number
 }
 
 /** A frame's DMX : Enttec buffers by device index, network universes by output. */
@@ -289,6 +294,9 @@ function gradientAt(stops: number[][], t: number, out: number[]): void {
 // The effects stay under three changes a second at any rate and speed : the
 // common guidance for flashing light (the same as the picture's Flash safety).
 const MAX_HZ = 3
+// (the least time between two random flashes on the same light or LED : three a
+// second at most, with room for a frame's jitter)
+const MIN_GAP = 0.34
 
 interface FixtureState {
   sig: string // its geometry : the points are rebuilt when it changes
@@ -302,6 +310,9 @@ interface FixtureState {
   ph: number // its own effect phase, while its rate is modulated (cycles)
   phOwn: boolean
   fx?: FxState // a digital effect's state (lightFx.ts)
+  lim: Float64Array // Flash safety's state per pixel (lightLimit.ts)
+  trig: Float64Array // sparkle, hold : when each pixel (or the light, [0]) last drew (s)
+  glitchAt: number // glitch : when the light's last break began (s)
 }
 
 export class LightEngine {
@@ -390,7 +401,7 @@ export class LightEngine {
       // dragged during a show stays lit, its part of a fade goes on)
       if (s && s.pts.length === pts.length) { s.sig = sig; s.pts = pts }
       else {
-        s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0, beatAt: -1e9, ph: 0, phOwn: false }
+        s = { sig, pts, cur: new Float32Array(n * 3), spark: new Float32Array(n), from: null, beatIdx: -1, beatEnv: 0, beatAt: -1e9, ph: 0, phOwn: false, lim: limitState(n), trig: new Float64Array(n).fill(-1e9), glitchAt: -1e9 }
         this.st.set(f.id, s)
       }
     }
@@ -583,7 +594,9 @@ export class LightEngine {
         ffK = 2.4 * (0.5 - 0.5 * Math.cos((2 * Math.PI * this.clock) / 45)) ** 2
       } else if (E === 'glitch' && fx) {
         fx.events = fx.events.filter((e) => e.until > nowS)
-        if (fx.events.length < 3 && Math.random() < rate * 0.6 * dt) {
+        // (never two breaks on the light within a third of a second)
+        if (fx.events.length < 3 && nowS - s.glitchAt >= MIN_GAP && Math.random() < rate * 0.6 * dt) {
+          s.glitchAt = nowS
           const len = n === 1 ? 1 : Math.max(1, Math.round(n * (0.06 + 0.3 * Math.random())))
           const from = Math.floor(Math.random() * Math.max(1, n - len + 1))
           const modes = n === 1 ? [0, 1, 3] : [0, 1, 2, 2, 3]
@@ -594,7 +607,8 @@ export class LightEngine {
           })
         }
       } else if (E === 'hold' && fx) {
-        fx.draw = Math.random() < rate * dt
+        fx.draw = nowS - s.trig[0] >= MIN_GAP && Math.random() < rate * dt
+        if (fx.draw) s.trig[0] = nowS
       }
       const travel = E === 'scan' ? ph * 0.25 : 0 // the read head's way (room widths)
       // the beat : every 1/rate beats (rate 0 : every beat), the flash decaying in a quarter of it
@@ -617,7 +631,7 @@ export class LightEngine {
       const people = look.effect === 'presence' ? inp.people ?? [] : []
       // (light by light, a sparkle is the whole light's)
       if (look.effect === 'sparkle' && op) {
-        if (Math.random() < rate * dt * 0.5) s.spark[0] = 1
+        if (nowS - s.trig[0] >= MIN_GAP && Math.random() < rate * dt * 0.5) { s.spark[0] = 1; s.trig[0] = nowS }
         s.spark[0] *= Math.exp(-dt * 6)
       }
       const colors = new Float32Array(n * 3)
@@ -663,7 +677,10 @@ export class LightEngine {
             const o3 = i * 3
             if (E === 'hold') {
               // it freezes what it saw, and looks again now and then
-              if (!fx.ok || (op ? fx.draw : Math.random() < rate * dt)) { fx.a[o3] = r; fx.a[o3 + 1] = gg; fx.a[o3 + 2] = b }
+              // (an LED never looks again within a third of a second)
+              const again = op ? fx.draw : nowS - s.trig[i] >= MIN_GAP && Math.random() < rate * dt
+              if (again && !op) s.trig[i] = nowS
+              if (!fx.ok || again) { fx.a[o3] = r; fx.a[o3 + 1] = gg; fx.a[o3 + 2] = b }
               r += (fx.a[o3] - r) * depth; gg += (fx.a[o3 + 1] - gg) * depth; b += (fx.a[o3 + 2] - b) * depth
             } else if (E === 'afterimage') {
               // a slow trace of the picture; where the picture has moved on, the
@@ -732,7 +749,9 @@ export class LightEngine {
             const j = op ? 0 : i
             if (!op || i === 0) {
               const pull = (ffK * this.ffMean[0] * Math.sin(2 * Math.PI * (this.ffMean[1] - fx.a[j]))) / (2 * Math.PI)
-              fx.a[j] = fract(fx.a[j] + dt * (rate * (1 + 0.14 * fx.b[j]) + pull * rate))
+              // (its own tempo and the pull together never pass three flashes a second :
+              // a little under, so a frame's jitter never fits a fourth into one)
+              fx.a[j] = fract(fx.a[j] + dt * Math.min(MAX_HZ * 0.95, Math.max(0, rate * (1 + 0.14 * fx.b[j]) + pull * rate)))
               this.ffSum[0] += Math.cos(2 * Math.PI * fx.a[j]); this.ffSum[1] += Math.sin(2 * Math.PI * fx.a[j]); this.ffSum[2]++
             }
             m *= 1 - depth + depth * Math.exp(-fx.a[j] * 5.5)
@@ -740,7 +759,7 @@ export class LightEngine {
             // twinkles : a pixel lights at random (rate : how often), then decays
             if (op) m *= 1 - depth + depth * s.spark[0]
             else {
-              if (Math.random() < rate * dt * 0.5) s.spark[i] = 1
+              if (nowS - s.trig[i] >= MIN_GAP && Math.random() < rate * dt * 0.5) { s.spark[i] = 1; s.trig[i] = nowS }
               s.spark[i] *= Math.exp(-dt * 6)
               m *= 1 - depth + depth * s.spark[i]
             }
@@ -794,6 +813,8 @@ export class LightEngine {
         colors[o + 2] = fb * gm
       }
       if (fx) fx.ok = true
+      // Flash safety : whatever made these colors, never more than three flashes a second
+      limitFlashes(s.lim, colors, inp.flashSafe ?? 0, dt)
       out.colors.set(f.id, colors)
       // into its universes
       const o = outputs.get(f.out)
@@ -865,7 +886,11 @@ export class LightEngine {
     }
     /** One block of tokens for a color (0..1, linear) : its dimmer, white,
      *  complements and luminance worked out from it. */
-    const emit = (tokens: string[], hasW: boolean, r: number, g: number, b: number, normD: boolean): void => {
+    // (a white-only light, W with no R G B or C M Y beside it : W is its luminance,
+    // or a saturated color would leave it dark)
+    const noColor = ![...head, ...tok, ...tail].some((t) => 'RGBCMY'.includes(t[0]))
+    const wOnly = noColor && tokW, wOnlyHead = noColor && headW, wOnlyTail = noColor && tailW
+    const emit = (tokens: string[], hasW: boolean, r: number, g: number, b: number, normD: boolean, onlyW = false): void => {
       let dim = 1
       if (normD) {
         dim = Math.max(r, g, b)
@@ -877,7 +902,8 @@ export class LightEngine {
       // (beside a dimmer that carries the level, the luminance is the full color's)
       const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
       let w = 0
-      if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
+      if (onlyW) w = lum
+      else if (hasW) { w = Math.min(r, g, b); r -= w; g -= w; b -= w }
       for (const t of tokens) {
         let v: number
         switch (t[0]) {
@@ -908,15 +934,15 @@ export class LightEngine {
     const hw = layoutChannels(head), pw = layoutChannels(tok), tw = layoutChannels(tail)
     if (hw) {
       if (!room(hw)) return
-      emit(head, headW, ar, ag, ab, false)
+      emit(head, headW, ar, ag, ab, false, wOnlyHead)
     }
     for (let i = 0; i < n; i++) {
       if (!room(pw)) return
-      emit(tok, tokW, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD)
+      emit(tok, tokW, colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2], pixD, wOnly)
     }
     if (tw) {
       if (!room(tw)) return
-      emit(tail, tailW, ar, ag, ab, false)
+      emit(tail, tailW, ar, ag, ab, false, wOnlyTail)
     }
   }
 }
