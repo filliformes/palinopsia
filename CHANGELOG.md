@@ -593,7 +593,10 @@ that CI builds into cross-platform releases.
     the receiver thread copies to a staging texture and maps it at once (not the SDK's
     two-staging read, a frame late : 33 → 18 ms at 1080p in Node), BGRA swapped to RGBA,
     then `recvRead` copies it into the page's pooled buffer on a worker thread (the NDI
-    input's transfer shape, `opsia:shareinport`).
+    input's transfer shape, `opsia:shareinport`). 10-bit and 32-bit float senders are
+    refused on both routes (the readout says to set them to 8-bit); a listed sender that
+    shares through memory, or whose texture no card here can open, is said so after
+    ~1.5 s.
   - **Reconnection** : a sender that is not there yet, closes, restarts or changes size is
     found again by name (new shared textures, imported again; the old ones freed once
     their imports are released); looked for 20 times a second while absent. Polling
@@ -612,7 +615,8 @@ that CI builds into cross-platform releases.
     reload stops its receivers (addon cleanup hook) and starts new ones. Under the dome
     (4096 master, 210° fill, 2048² composition) 60 fps and 51.5 new frames/s, as flat.
   - **macOS (Syphon), UNTESTED (no Mac here)** : `native/syphon` gains a client
-    (`SyphonServerDirectory` + `SyphonMetalClient`, labels "app : name"), run in MAIN
+    (`SyphonServerDirectory` + `SyphonMetalClient`, labels "app : name", or found by the
+    server's own name, so a `spout:` name saved on Windows opens), run in MAIN
     (`main/syphonIn.ts` : Syphon's notifications need its run loop) which imports each
     server's IOSurface with `sharedTexture.importSharedTexture` and sends it to the window
     once per size (`sendSharedTexture`), then a small tick per frame; the window's copy
@@ -695,6 +699,31 @@ that CI builds into cross-platform releases.
   clear. Proven in Node with three nodes of our class on a private universe and the
   renderer bridge with its app modules stubbed, each check failing on master and passing
   after (scratch harness `dffix/`).
+
+- **Spout / Syphon input : no old frame flashing in, no stall on a 4K copy, honest
+  messages** (the v1.3.3 audit, 8 findings). When a sender held its texture longer than
+  the Spout library waits (67 ms : a program loading, a GPU stall), the receiver got no
+  copy yet still published a slot, so the layer jumped back to an older frame (or showed
+  an empty one right after a resize) : a frame is now published only when the sender's
+  frame number moved (both routes). Measured in the test copy with the sender's texture
+  held 100 ms five times a second for 20 s : the layer went back to an older frame 67
+  times on master, 0 now. The receiver's poll pacing now estimates per sender frame and
+  grows slowly through a stall (with those stalls it took 704 of ~750 frames in Node,
+  where master took 616 real ones plus 71 stale). The copy route copied each frame into
+  the page's buffer while holding the receiver's lock, so the page's status calls waited
+  up to 6 ms at 4K : the buffer is now lent out and copied unlocked (status calls 0.11 ms
+  at most; 4K from the other card now about 47 frames/s instead of 37, 42 / 52 ms).
+  A sender that is listed but cannot be opened (memory share, an unreachable texture)
+  said "waiting for X : start it" forever : after ~1.5 s it now says it is running but
+  cannot be opened; a 10-bit or 32-bit float sender is told to switch to 8-bit. On a Mac
+  : without a working Syphon module the layer waited for its server forever with no
+  word (it now says the module is missing, with the toast); a session saved on Windows
+  found nothing, as Syphon lists "app : name" (a server is now found by its own name
+  too, and the picker marks this app's own output); each reopened receiver added a
+  window listener for good (now one per window). The Syphon changes are compiled on the
+  mac CI leg only. Not changed : the preload's `VideoFrame` (closing it closes the
+  page's, measured : the bridge shares one frame, so the page's close already releases
+  it) and the Syphon `kIOReturnSuccess` compare (CI run 43191252414 built and loaded it).
 
 ### Docs
 
