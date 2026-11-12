@@ -31,6 +31,7 @@ import { HivePicker } from './HivePicker'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { FxAddSelect, FxChips } from './FxRackPanel'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MeshBadge } from './MeshBadge'
 import { MarginLabel } from './MarginLabel'
 import { SearchSelect, type SearchOption } from './SearchSelect'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -278,6 +279,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
           />
         </span>
         </PinZone>
+        <MeshBadge dest={`layer/${index + 1}/opacity`} />
         {modChip('opacity', 'layer opacity')}
         <div className="flex shrink-0 gap-1">
           <ToggleChip label="S" active={layer.solo} onClick={() => toggleSolo(index)} title="Solo" />
@@ -442,6 +444,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                       ≈
                     </button>
                   )}
+                  <MeshBadge dest={`layer/${index + 1}/mix`} />
                   {modChip('mix', 'A-B mix')}
                 </div>
                 {modAssign('mix')}
@@ -689,6 +692,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
               Vary
               <Blink n={varyPulse} color="accent2" />
             </button>
+            <MeshBadge dest={`layer/${index + 1}/vary`} />
             {modChip('vary', 'Vary (a modulator fires it)')}
             <input
               type="range"

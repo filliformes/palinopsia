@@ -38,6 +38,58 @@ export interface DfParam {
 export interface DfSub {
   sku: string
   path: string
+  /** How a wire into Palinopsia plays (ours only : the connections list's ⚙). */
+  opt?: DfWireOpt
+}
+
+/** A wire into Palinopsia, shaped : the part of the destination's range it covers
+ *  (lo..hi, 0..1 of that range), turned the other way, smoothed (a slew in ms,
+ *  the renderer's), and what happens when its source goes quiet : hold the last
+ *  value, or glide back over returnSec to where the control was before the wire
+ *  began to play it. */
+export interface DfWireOpt {
+  lo?: number
+  hi?: number
+  invert?: boolean
+  slewMs?: number
+  onLoss?: 'hold' | 'return'
+  returnSec?: number
+}
+
+/** Clean a wire's options : only what differs from the plain wire is kept
+ *  (null : a plain wire). */
+export function cleanWireOpt(o: unknown): DfWireOpt | null {
+  if (!o || typeof o !== 'object') return null
+  const x = o as Record<string, unknown>
+  const num = (v: unknown, lo: number, hi: number): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : undefined)
+  const out: DfWireOpt = {}
+  const lo = num(x.lo, 0, 1), hi = num(x.hi, 0, 1)
+  if (lo !== undefined && lo !== 0) out.lo = lo
+  if (hi !== undefined && hi !== 1) out.hi = hi
+  if (x.invert === true) out.invert = true
+  const slew = num(x.slewMs, 0, 10_000)
+  if (slew) out.slewMs = Math.round(slew)
+  if (x.onLoss === 'return') {
+    out.onLoss = 'return'
+    out.returnSec = num(x.returnSec, 0.1, 60) ?? 2
+  }
+  return Object.keys(out).length ? out : null
+}
+
+/** A value of a remote parameter as 0..1 of its declared range (a vector : its
+ *  first part; a colour : its brightness). */
+export function remote01(v: DfValue, p: { type: DfType; min: number; max: number } | null | undefined): number | null {
+  let n: number
+  if (typeof v === 'boolean') return v ? 1 : 0
+  if (typeof v === 'number') n = v
+  else if (Array.isArray(v)) {
+    if (p?.type === 'colour') return v.length >= 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : null
+    n = typeof v[0] === 'number' ? v[0] : NaN
+  } else return null
+  if (!Number.isFinite(n)) return null
+  const lo = p ? p.min : 0, hi = p ? p.max : 1
+  if (!(hi > lo)) return Math.max(0, Math.min(1, n))
+  return Math.max(0, Math.min(1, (n - lo) / (hi - lo)))
 }
 
 /** Another node as Palinopsia sees it (the monitor). */

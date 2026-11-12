@@ -28,6 +28,9 @@ let config: DfConfig | null = null
 let lastError: string | null = null
 let win: () => BrowserWindow | null = () => null
 let inBuffer: Array<{ path: string; value: DfValue }> = []
+// remote values a modulator plays (its mesh input), for the renderer once a frame
+let remoteBuffer = new Map<string, { sku: string; path: string; v: number }>()
+let listens: DfSub[] = []
 let statusDirty = false
 let lastStatusAt = 0
 // The Body rule picker's actions, as the renderer last listed them; how many of
@@ -270,6 +273,10 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
         },
         saveSubs: (subs) => saveSubsTo(universe, '', subs),
         saveScenes: (s) => saveScenesTo(universe, '', s),
+        // (the newest of each a frame : a modulator plays the latest)
+        onRemote: (sku, path, v) => {
+          if (remoteBuffer.size < 512 || remoteBuffer.has(`${sku}\n${path}`)) remoteBuffer.set(`${sku}\n${path}`, { sku, path, v })
+        },
         // the page this node serves hears every cue it applies
         onScene: (op, slot, st) => {
           log('info', `[dataflou] scene ${op} ${slot} : ${st.state}${st.skipped ? `, ${st.skipped} skipped` : ''}`)
@@ -282,6 +289,7 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
       node = n
       n.visualizerClients = visClients
       n.setWatches(watches)
+      n.setListens(listens)
       visualizerNodeChanged()
       log('info', `[dataflou] on the mesh as ${label} (universe ${universe}), DECLARE ${n.declareBytes()} bytes`)
     } catch (e) {
@@ -352,6 +360,27 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
       .map((m) => ({ sku: m.sku, path: m.path }))
     node?.setWatches(watches)
   })
+  // the remote values the modulators play (their mesh inputs)
+  ipcMain.on('dataflou:listen', (_e, list: unknown) => {
+    if (!Array.isArray(list)) return
+    listens = list
+      .filter((m): m is DfSub => !!m && typeof m.sku === 'string' && typeof m.path === 'string' && m.path.length < 200)
+      .slice(0, 64)
+      .map((m) => ({ sku: m.sku, path: m.path }))
+    node?.setListens(listens)
+  })
+  // learn from the mesh : start, peek (the value that moved the most), stop
+  ipcMain.handle('dataflou:learn', (_e, op: unknown) => {
+    if (!node) return null
+    if (op === 'start') node.learnStart()
+    else if (op === 'stop') node.learnStop()
+    else if (op === 'peek') return node.learnPeek()
+    return null
+  })
+  // a wire into Palinopsia : its range, invert, smoothing, on loss
+  ipcMain.handle('dataflou:wireOpt', (_e, a: { dest?: unknown; sku?: unknown; path?: unknown; opt?: unknown }) =>
+    !!node && typeof a?.dest === 'string' && typeof a.sku === 'string' && typeof a.path === 'string' && node.setWireOpt(a.dest, a.sku, a.path, a.opt)
+  )
   // Back from sleep, or the network changed under us : each node looks for the
   // mesh again (its lost peers dialled at once, mDNS from the address we have now).
   const wakeAll = (why: string): void => {
@@ -380,6 +409,11 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
       const batch = inBuffer
       inBuffer = []
       win()?.webContents.send('dataflou:in', batch)
+    }
+    if (remoteBuffer.size) {
+      const batch = [...remoteBuffer.values()]
+      remoteBuffer = new Map()
+      win()?.webContents.send('dataflou:remote', batch)
     }
     const now = Date.now()
     if ((statusDirty && now - lastStatusAt > 250) || (node && now - lastStatusAt > 1000)) pushStatus()

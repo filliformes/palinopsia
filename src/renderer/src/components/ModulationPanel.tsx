@@ -10,6 +10,7 @@ import type { ArpMode, AudioFeature, BodyFeature, ControlInputConfig, LfoShape, 
 import { BODY_FEATURE_GROUPS, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, MOTION_SHAPES } from '@shared/types'
 import { DEFAULT_CONTROLLER, DEFAULT_TAKEOVER, DIVISIONS, modEngine } from '../engine/modulation'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { learnFromMesh, meshName, useDataflouStatus, useMeshLearning } from '../dataflou'
 import { describeBinding } from '../midi'
 import { CLUTCH_AT_DEFAULT, CLUTCH_BAND } from '../engine/bodyClutch'
 import { condLabel, parseStepCond, randomStepPattern, STEP_MAX, STEP_PROBS, stepLength, stepsOf, SWING_MAX, SWING_MIN, type ParsedCond } from '../engine/stepSeq'
@@ -1526,6 +1527,10 @@ function InputRows({ index, which }: { index: number; which: 'in' | 'take' }): J
     take ? update(index, { takeover: { ...(c as TakeoverConfig), ...p } }) : update(index, { controller: { ...c, ...p } })
   const note = kind === 'note'
   const st = useStore.getState
+  // the Controller's own input can be a value of another dataflou node
+  const mesh = take ? undefined : m.mesh
+  const meshOn = useDataflouStatus().running
+  const meshLearn = useMeshLearning() === `mod:${index}`
   return (
     <>
       <Row label={take ? 'TAKE' : 'INPUT'} title={take
@@ -1533,10 +1538,35 @@ function InputRows({ index, which }: { index: number; which: 'in' | 'take' }): J
         : 'The control this modulator is : learn, then move a fader, a knob or hit a pad (MIDI or OSC). Also /opsia/mod/' + (index + 1) + '/in'}>
         <span className="relative flex min-w-0 flex-1">
           <MidiLearnOverlay id={id} />
-          <span className={`min-w-0 flex-1 truncate font-mono text-[9px] ${armed ? 'text-accent2' : learned ? 'text-accent' : 'text-muted'}`} title={learned ? what : 'none learned yet'}>
-            {armed ? 'move a control…' : learned ? what : 'none'}
-          </span>
+          {mesh ? (
+            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-accent2" title={`Played by the dataflou mesh : ${mesh.path} on another node${learned ? ` · also ${what}` : ''}`}>
+              ◈ {mesh.label}
+            </span>
+          ) : (
+            <span className={`min-w-0 flex-1 truncate font-mono text-[9px] ${armed || meshLearn ? 'text-accent2' : learned ? 'text-accent' : 'text-muted'}`} title={learned ? what : 'none learned yet'}>
+              {armed ? 'move a control…' : meshLearn ? 'move it on the mesh…' : learned ? what : 'none'}
+            </span>
+          )}
         </span>
+        {!take && meshOn && !mesh && (
+          <button
+            onClick={() =>
+              void learnFromMesh(`mod:${index}`).then((r) => {
+                if (r) update(index, { mesh: { sku: r.sku, path: r.path, label: meshName(r.path, r.label) } })
+              })
+            }
+            className={`shrink-0 rounded px-1 font-mono text-[9px] ${meshLearn ? 'animate-pulse bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent2'}`}
+            title={meshLearn ? 'Listening to the dataflou mesh : move the thing (click : stop)' : 'Learn from the dataflou mesh : move something on another node (a glove axis) and it plays this modulator'}
+          >
+            ◈
+          </button>
+        )}
+        {mesh && (
+          <button onClick={() => update(index, { mesh: undefined })} className="shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-danger" title="Forget the mesh value">
+            ✕
+          </button>
+        )}
+        {!mesh && (
         <button
           onClick={() => (armed ? (st().learnOnce ? st().setMidiLearnMode(false) : st().setMidiLearnTarget(null)) : st().learnModInput(id))}
           className={`shrink-0 rounded px-1 font-mono text-[9px] ${armed ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted hover:text-accent'}`}
@@ -1544,7 +1574,8 @@ function InputRows({ index, which }: { index: number; which: 'in' | 'take' }): J
         >
           {armed ? '…' : 'learn'}
         </button>
-        {learned && (
+        )}
+        {learned && !mesh && (
           <button onClick={() => st().forgetModInput(id)} className="shrink-0 px-0.5 font-mono text-[9px] text-muted hover:text-danger" title="Forget this control">
             ✕
           </button>
