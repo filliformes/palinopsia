@@ -409,11 +409,11 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   // Time Glitch : with no damage inside or after, the clock and the damage
-  // controls have nothing to hit (split still drifts the trails a touch)
+  // controls have nothing to hit (the audio's share is scaled by them too)
   'fx-time-glitch': ({ zero, isnt }) => {
     const d: Why = {}
     if (isnt('sync', 0)) d.rate = 'Sync is on : the tempo sets the pace.'
-    if (zero('inside') && zero('after')) put(d, ['chaos', 'rate', 'sync', 'blocks', 'shift', 'crush', 'burst', 'burstLen', 'audio'], 'Inside and after are at 0 : no damage is dealt.')
+    if (zero('inside') && zero('after')) put(d, ['chaos', 'rate', 'sync', 'blocks', 'shift', 'split', 'crush', 'burst', 'burstLen', 'audio'], 'Inside and after are at 0 : no damage is dealt.')
     return d
   },
   'fx-break': ({ zero, is, isnt }) => {

@@ -220,6 +220,15 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'fx-feedback-zoom': /^center$/
 }
 
+// What the walk, Variation and a random modulator never move, though a full roll
+// deals it : inputs that re-cut or re-wind the whole picture in one frame when
+// nudged (Break's pane and its pace, Droste's winding and the center put there by
+// hand). The themes' motion skips the same (Broken Glass, Endless Spiral).
+const NUDGE_SKIP: Record<string, RegExp> = {
+  'fx-break': /^(every|sync|after|time|shards|rings)$/,
+  'fx-droste': /^(strands|arms|shape|cx|cy)$/
+}
+
 // Solid Color : one rolled hue drives the whole gradient (a dark end tinted
 // with it, the hue itself mid-way, a pale end), so a dice never lands on
 // three clashing hues.
@@ -482,7 +491,7 @@ export function collectFloatTargets(c: CompositionState): ModTarget[] {
       // the film stage, blur…) is not handed to a random modulator either.
       const skip = RANDOMIZE_SKIP[inst.shaderId]
       for (const d of inputsForShader(inst.shaderId)) {
-        if (d.type === 'float' && !skip?.test(d.name)) out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
+        if (d.type === 'float' && !skip?.test(d.name) && !NUDGE_SKIP[inst.shaderId]?.test(d.name)) out.push({ kind: 'fx', scope, instId: inst.id, input: d.name })
       }
     }
   }
@@ -1308,7 +1317,7 @@ function jitterOneInput(
   // The same "never touch" rules as a full Randomize : skipped inputs, pinned
   // curated spans, and on the locked finalizers their brightness-critical levels
   // and every switch (3D, film hold, output shape, surface) stay as set.
-  if (RANDOMIZE_SKIP[shaderId]?.test(d.name)) return keep()
+  if (RANDOMIZE_SKIP[shaderId]?.test(d.name) || NUDGE_SKIP[shaderId]?.test(d.name)) return keep()
   if (locked && (d.type === 'bool' || d.type === 'long' || FINISHING_SAFE[shaderId]?.[d.name])) return keep()
   if (d.type === 'float' || d.type === 'bool' || d.type === 'long') {
     const dl = typeof d.min === 'number' ? d.min : 0

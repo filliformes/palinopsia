@@ -2511,10 +2511,13 @@ export const FX_SHADERS: IsfShader[] = [
   {
     // A dice never holds a picture broken (hold) : drift, fall or heal, every few
     // seconds, near the middle. Click the preview to break it where you point.
+    // EVERY stays past the longest run TIME allows (a fall ends 1.15 x time + 0.5 s
+    // after its hit : 3.4 s at 2.5), so an automatic hit never snaps a half-fallen
+    // frame whole in one frame.
     id: 'fx-break', name: 'Break', category: 'FX', source: breakFx,
     pointer: { x: 'hitX', y: 'hitY', fire: 'impact', hint: 'click : break the picture here' },
     curated: {
-      every: [2.5, 8], sync: [0, 0], after: [1, 3], time: [1, 3], force: [0.3, 0.7], shards: [8, 20], rings: [3, 6],
+      every: [3.5, 8], sync: [0, 0], after: [1, 3], time: [1, 2.5], force: [0.3, 0.7], shards: [8, 20], rings: [3, 6],
       wander: [0.3, 0.8], broken: [0.2, 0.5], tilt: [0.3, 0.8], refract: [0.2, 0.6], bevel: [0.3, 0.8],
       light: [0, 6.2832], behind: [0, 0.5], scatter: [0.2, 0.7], amount: [1, 1], hitX: [0.35, 0.65], hitY: [0.35, 0.65]
     }

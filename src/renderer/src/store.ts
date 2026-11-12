@@ -2812,6 +2812,17 @@ function updateFxArray(
   }
 }
 
+/** Some inputs of one FX unit set, immutably (the pointer's live writes, undo.ts
+ *  writeLive : the same change made to the store and to the undo baseline). */
+export function withFxInputs(
+  c: CompositionState,
+  scope: FxScope,
+  instId: string,
+  inputs: Record<string, number | number[]>
+): CompositionState {
+  return updateFxArray(c, scope, (fx) => fx.map((f) => (f.id === instId ? { ...f, inputs: { ...f.inputs, ...inputs } } : f)))
+}
+
 // Startup: seed a random one-layer scene, then apply the active World so the
 // composition matches the World selector on a cold launch (else it'd say e.g.
 // "Musical" while the layers are uncoupled).

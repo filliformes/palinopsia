@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Time Glitch : time smeared, then broken inside its own memory. The picture keeps a memory of its recent past (TIME : from a short smear to seconds of trails; MODE : a mean, the lights held, or the darks held) and, on a stepped clock (RATE, or the tempo with SYNC), CHAOS picks blocks of that memory to damage INSIDE the loop : moved by SHIFT, torn sideways along their row, stuck (they stop taking the live picture), crushed to a few levels with their channels swapped, the colors pulled apart by SPLIT. The memory feeds back, so every glitch is smeared and remembered, and the trails it leaves are glitched again on the next step. AFTER glitches the result once more on its way out (block moves, row tears, the color split), without keeping it. BLOCKS is the grain of the damage, DRIFT breathes the memory in or out, CRUSH how hard it bit-crushes. BURST ▸ is a fit of chaos that dies away over BURST LENGTH (bind it to a beat or an onset); AUDIO raises the chaos per block column from its band of the sound. CLEAR empties the memory.",
+  "DESCRIPTION": "Time Glitch : time smeared, then broken inside its own memory. The picture keeps a memory of its recent past (TIME : from a short smear to seconds of trails; MODE : a mean, the lights held, or the darks held) and, on a stepped clock (RATE, or the tempo with SYNC), CHAOS picks blocks of that memory to damage INSIDE the loop : moved by SHIFT, torn sideways along their row, stuck (they stop fading : in SMEAR they freeze, with LIGHTS or DARKS only a brighter or darker live picture still gets in), crushed to a few levels, the colors pulled apart by SPLIT. The memory feeds back, so every glitch is smeared and remembered, and the trails it leaves are glitched again on the next step. AFTER glitches the result once more on its way out (block moves, row tears, the color split, the channels swapped), without keeping it. BLOCKS is the grain of the damage, DRIFT breathes the memory in or out, CRUSH how hard it bit-crushes. BURST ▸ is a fit of chaos that dies away over BURST LENGTH (bind it to a beat or an onset); AUDIO raises the chaos per block column from its band of the sound. CLEAR empties the memory.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glitch", "Time", "Feedback"],
@@ -109,15 +109,17 @@ float spec(float u) {
 
 // The damage a block takes at this step. x : is it hit; y : which kind
 // (0 move, 1 tear, 2 stick, 3 crush); zw : its way, on a coarse compass (whole
-// steps, mostly sideways : the codec's rows), never zero.
-vec4 damage(vec2 uv, float stepI, float seed, float share) {
+// steps, mostly sideways : the codec's rows), never zero. auK : how much of the
+// audio's share lands here (inside, or after), as the chaos's own share is scaled,
+// so inside and after at 0 deal no damage, loud or not.
+vec4 damage(vec2 uv, float stepI, float seed, float share, float auK) {
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 grid = vec2(floor(blocks * aspect + 0.5), floor(blocks + 0.5));
   vec2 cell = floor(uv * grid);
   // a block holds its damage for one to three steps, so some smears run long
   float hold = floor(stepI / (1.0 + floor(hash12(cell + vec2(seed, 7.0)) * 3.0)));
   float h0 = hash12(cell + vec2(hold * 1.37 + seed, 19.0));
-  float au = audio > 0.0 ? audio * spec((cell.x + 0.5) / grid.x) : 0.0;
+  float au = audio > 0.0 ? audio * auK * spec((cell.x + 0.5) / grid.x) : 0.0;
   float hit = step(1.0 - clamp(share + au, 0.0, 1.0), h0);
   float kind = floor(hash12(cell + vec2(seed + 3.0, hold)) * 4.0);
   vec2 r2 = (vec2(hash12(cell + vec2(hold, seed + 5.0)), hash12(cell + vec2(seed + 9.0, hold))) - 0.5) * 2.0;
@@ -134,7 +136,7 @@ vec4 memStep(vec2 uv, vec4 lat, float dts) {
   float stepI = mod(floor(PH_timeGlitch), 4096.0);
   float burstE = lat.a > 0.5 ? lat.b : 0.0;
   float share = clamp(chaos * 0.55 + burstE * 0.6, 0.0, 1.0) * inside;
-  vec4 dmg = damage(uv, stepI, 11.0, share);
+  vec4 dmg = damage(uv, stepI, 11.0, share, inside);
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   float isMove = dmg.x * (1.0 - step(0.5, dmg.y));
   float isTear = dmg.x * step(0.5, dmg.y) * (1.0 - step(1.5, dmg.y));
@@ -170,7 +172,8 @@ vec4 memStep(vec2 uv, vec4 lat, float dts) {
   // about 8 seconds of trails), on the layer's clock.
   float width = mix(1.5, 480.0, time * time * time);
   float k = pow(width / (width + 1.0), dts);
-  // a STUCK block stops taking the live picture : it holds what it had
+  // a STUCK block stops fading : it holds what it had (frozen in smear; lights /
+  // darks still let a brighter / darker live picture in)
   k = mix(k, 1.0, isStick);
   vec4 o;
   if (mode == 1) o = max(live, hist * k);                       // lights held
@@ -208,7 +211,7 @@ void main() {
   float stepI = mod(floor(PH_timeGlitch), 4096.0);
   float burstE = lat.a > 0.5 ? lat.b : 0.0;
   float shareA = clamp(chaos * 0.55 + burstE * 0.6, 0.0, 1.0) * after;
-  vec4 dmg = damage(uv, stepI, 53.0, shareA * 0.6);
+  vec4 dmg = damage(uv, stepI, 53.0, shareA * 0.6, after * 0.6);
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   vec2 grid = vec2(floor(blocks * aspect + 0.5), floor(blocks + 0.5));
   float rowY = floor(uv.y * floor(blocks * 2.0 + 0.5));
