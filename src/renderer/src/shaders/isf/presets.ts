@@ -1253,7 +1253,7 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'On the beat', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.3, rate: 6, sync: 3, blocks: 16, shift: 0.45, split: 0.3, crush: 0.3, inside: 0.7, after: 0.4, burstLen: 0.5, audio: 0, amount: 1 } },
     { name: 'Burst only', values: { time: 0.65, mode: 0, drift: 0.15, chaos: 0.05, rate: 8, sync: 0, blocks: 14, shift: 0.4, split: 0.3, crush: 0.25, inside: 0.9, after: 0.2, burstLen: 1.5, audio: 0, amount: 1 } },
     { name: 'Breathing outward', values: { time: 0.8, mode: 0, drift: 0.8, chaos: 0.3, rate: 4, sync: 0, blocks: 12, shift: 0.3, split: 0.35, crush: 0.15, inside: 0.7, after: 0.2, burstLen: 0.8, audio: 0, amount: 1 } },
-    { name: 'Audio damage', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.15, rate: 8, sync: 0, blocks: 20, shift: 0.5, split: 0.3, crush: 0.3, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 0.6, amount: 1 } }
+    { name: 'Audio damage', values: { time: 0.6, mode: 0, drift: 0.15, chaos: 0.15, rate: 8, sync: 0, blocks: 20, shift: 0.5, split: 0.3, crush: 0.3, inside: 0.7, after: 0.3, burstLen: 0.8, audio: 1, amount: 1 } }
   ],
   'fx-break': [
     { name: 'Pane', values: { every: 3.5, sync: 0, after: 3, time: 1.8, force: 0.5, shards: 13, rings: 4, wander: 0.5, broken: 0.35, tilt: 0.55, refract: 0.4, bevel: 0.5, light: 2.3, behind: 0, scatter: 0.4, amount: 1, hitX: 0.5, hitY: 0.5 } },
