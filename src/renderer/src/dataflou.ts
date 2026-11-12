@@ -92,7 +92,7 @@ export const dfLastIn = new Map<string, { value: DfValue; at: number }>()
 const lastPlayed = new Map<string, number>()
 
 function play(path: string, value: DfValue): void {
-  const n = typeof value === 'boolean' ? (value ? 1 : 0) : typeof value === 'number' ? value : Array.isArray(value) ? (value[0] ?? 0) : Number(value) || 0
+  let n = typeof value === 'boolean' ? (value ? 1 : 0) : typeof value === 'number' ? value : Array.isArray(value) ? (value[0] ?? 0) : Number(value) || 0
   if (!Number.isFinite(n)) return
   const act = actionByPath.get(path)
   if (act) {
@@ -105,25 +105,33 @@ function play(path: string, value: DfValue): void {
   }
   const d = DEST_BY_PATH.get(path)
   if (!d) return
+  // a number that picks one thing (a scene) : played once per whole step, and
+  // never smoothed nor glided back (the steps on the way would each be recalled)
+  if (d.discrete) n = Math.round(n)
+  const glides = d.type === 'number' && !d.discrete
   const now = performance.now()
   // where the control was before a wire began to play it (a first value, or the
   // first after a quiet spell) : what a glide back on loss returns to, even when
-  // that option is turned on later
+  // that option is turned on later. A glide back cut short by the source coming
+  // back is not a new start : the place it was going back to stays.
   const last = dfLastIn.get(path)
-  if (d.type === 'number' && (!last || now - last.at > LOSS_MS)) preOf.set(path, rawNow(d))
+  const back = anims.get(path)?.kind === 'back'
+  if (glides && !back && (!last || now - last.at > LOSS_MS)) preOf.set(path, rawNow(d))
   dfLastIn.set(path, { value: n, at: now })
-  const opt = wireOptOf(path)
+  const opt = glides ? wireOptOf(path) : undefined
   // on loss : the first value after a quiet spell remembers where the control
   // was, so the wire can give it back when its source goes quiet again
-  if (opt?.onLoss === 'return' && d.type === 'number') {
+  if (opt?.onLoss === 'return') {
     const w = wired.get(path)
-    if (!w || !w.live) wired.set(path, { pre: preOf.get(path) ?? rawNow(d), live: true, at: now })
+    if (!w || !w.live) wired.set(path, { pre: back && w ? w.pre : preOf.get(path) ?? rawNow(d), live: true, at: now })
     else w.at = now
     anims.delete(path) // (a glide back stops : the source is here again)
   }
   // smoothing : the value is a target the control glides to (a slew)
-  if (opt?.slewMs && d.type === 'number') {
+  if (opt?.slewMs) {
     const a = anims.get(path)
+    // a value sent again (a source repeats itself) : the control is there already
+    if (!a && lastPlayed.get(path) === n) return
     const from = a ? a.cur : lastPlayed.get(path) ?? rawNow(d)
     anims.set(path, { kind: 'slew', cur: from, to: n, ms: opt.slewMs, from, t0: now, osc: d.osc })
     startAnims()
@@ -148,9 +156,24 @@ let animTimer = 0
 let lastAnim = 0
 const LOSS_MS = 2000 // as the data view : quiet this long, the source is gone
 
+/** How the wires into a destination glide here. The values reach the renderer
+ *  by destination, not by wire, so smoothing and on loss belong to the control :
+ *  the longest smoothing of its wires, and a glide back when any of them asks for
+ *  one (over the longest time). Range and invert stay each wire's (main). */
 function wireOptOf(path: string): DfWireOpt | undefined {
   const me = status.nodes.find((x) => x.local)
-  return me?.subs[path]?.find((s) => s.opt)?.opt
+  let slewMs = 0, returnSec = 0, back = false
+  for (const s of me?.subs[path] ?? []) {
+    const o = s.opt
+    if (!o) continue
+    if (o.slewMs && o.slewMs > slewMs) slewMs = o.slewMs
+    if (o.onLoss === 'return') {
+      back = true
+      returnSec = Math.max(returnSec, o.returnSec ?? 2)
+    }
+  }
+  if (!slewMs && !back) return undefined
+  return { ...(slewMs ? { slewMs } : {}), ...(back ? { onLoss: 'return' as const, returnSec } : {}) }
 }
 
 /** A destination's value now, in its own units (as the OSC tree reports it). */
@@ -180,14 +203,17 @@ function stepAnims(): void {
     } else {
       const u = Math.min(1, (now - a.t0) / Math.max(1, a.ms))
       const e = u * u * (3 - 2 * u)
-      next = a.from + (a.to - a.from) * e
+      // (exactly there at the end : from + (to - from) can miss `to` by a hair,
+      // and the glide would then never end, the same value sent every frame)
+      next = u >= 1 ? a.to : a.from + (a.to - a.from) * e
     }
     a.cur = next
     lastPlayed.set(path, next)
     routeOsc(a.osc, [{ type: 'f', value: next }])
     if (next === a.to) anims.delete(path)
   }
-  if (!anims.size && !wired.size) {
+  // (nothing gliding : the loss check below starts it again for a glide back)
+  if (!anims.size) {
     window.clearInterval(animTimer)
     animTimer = 0
   }

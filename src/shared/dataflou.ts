@@ -280,6 +280,9 @@ export interface DfDest {
   max?: number
   init?: number
   bidir?: string // also a source : the signal it reads (see DfSource.signal)
+  // a number that picks one thing (a scene) : played once per whole step, never
+  // smoothed nor glided back (each step on the way would recall another one)
+  discrete?: boolean
 }
 
 /** A source : a signal Palinopsia publishes (read like the Resolume mapper's rows). */
@@ -307,7 +310,7 @@ export const DF_DESTS: DfDest[] = [
   { path: 'feel/coalesce', label: 'dispersal / coalescence', osc: '/opsia/coalesce', type: 'number', init: 0.5 },
   { path: 'feel/flow', label: 'flow / interruption', osc: '/opsia/flow', type: 'number', init: 0.5 },
   { path: 'feel/drift', label: 'drift', osc: '/opsia/drift', type: 'number' },
-  { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9 },
+  { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9, discrete: true },
   { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'bool' },
   { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'bool' },
   { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'bool' },
@@ -380,7 +383,7 @@ export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[
     addGroups(d.path)
     out.push(param(d.path, d.label, {
       type: d.type,
-      mode: d.type === 'bool' || d.path === 'scene/recall' ? 'discrete' : 'streaming',
+      mode: d.type === 'bool' || d.discrete ? 'discrete' : 'streaming',
       flow: d.bidir ? 'bidir' : 'destination',
       min: d.min ?? 0, max: d.max ?? (d.type === 'bool' ? 1 : 1), init: d.init ?? 0,
       rate: d.type === 'bool' ? 0 : 60

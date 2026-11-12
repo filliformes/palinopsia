@@ -598,6 +598,10 @@ function targetOnLayer(t: ModTarget, li: number): boolean {
   return s.kind !== 'master' && s.kind !== 'background' && s.layer === li
 }
 
+/** A modulator played by a value from the dataflou mesh (a glove axis mapped with
+ *  its ◈) : Randomize leaves it and its bindings as they are, like the World's. */
+const isMeshMod = (m: ModulatorConfig): boolean => m.type === 'controller' && !!m.mesh
+
 /** Roll a fresh matrix: 1–2 assignments per enabled mod, capped, deduped.
  *  Then GUARANTEE MOTION : every layer with an active source gets at least one
  *  assignment — a random draw that leaves a layer untargeted reads as a static,
@@ -611,6 +615,7 @@ function randomMatrix(c: CompositionState): ModAssignment[] {
   c.modulators.forEach((m, mi) => {
     if (!m.enabled) return
     if (m.fromWorld) return // the World's audio routing : its own, whatever its slot
+    if (isMeshMod(m)) return // played by a mesh value : its bindings are the performer's
     enabledMods.push(mi)
     const n = drawCount([0.1, 0.5, 0.4]) // 0..2 assignments per mod
     for (let i = 0; i < n; i++) {
@@ -1236,15 +1241,18 @@ function randomizeStructural(
     // The World's audio modulator (its flag, whatever its slot) and the
     // bindings it installed are left out of the randomizer, so a World's bond
     // survives. Every other slot is yours to re-roll, M8 included.
+    // A modulator played by the mesh is left too, with its bindings.
     const wm = worldModIndex(next)
-    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => s !== wm)
+    const was = next.modulators
+    const keep = (i: number): boolean => i === wm || (!!was[i] && isMeshMod(was[i]))
+    const slots = [0, 1, 2, 3, 4, 5, 6, 7].filter((s) => !keep(s))
     for (let i = slots.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1))
       ;[slots[i], slots[j]] = [slots[j], slots[i]]
     }
     const chosen = new Set(slots.slice(0, enabledCount))
-    const worldRows = next.modMatrix.filter((a) => isWorldRow(next, a))
-    const modulators = next.modulators.map((m, i) => (i === wm ? m : freshModulator(m, chosen.has(i))))
+    const worldRows = next.modMatrix.filter((a) => isWorldRow(next, a) || (a.mod !== wm && keep(a.mod)))
+    const modulators = next.modulators.map((m, i) => (keep(i) ? m : freshModulator(m, chosen.has(i))))
     next = { ...next, modulators }
     next = { ...next, modMatrix: [...worldRows, ...randomMatrix(next)] }
   }
