@@ -97,12 +97,14 @@ const INTEGRANDS: Record<string, (v: Get) => number> = {
     return Math.min(Math.max(hz, 0), 16)
   },
   // Break : the automatic hits, every `every` seconds (0 = none) or on the tempo
-  // (sync 4 bars · 2 bars · 1 bar · 1/2 · 1/4), at most four a second.
+  // (sync 4 bars · 2 bars · 1 bar · 1/2 · 1/4), at most three a second : each hit
+  // re-cracks the whole frame, and three whole-frame changes a second is the
+  // flash rule (1/4 at 180 bpm and up, or every under 1/3 s, used to reach four).
   PH_breakAuto: (v) => {
     const s = Math.round(v('sync'))
     const every = v('every')
     const hz = s > 0 ? tempoBpm() / 60 / (BREAK_BEATS[s] ?? 4) : every > 0.05 ? 1 / every : 0
-    return Math.min(Math.max(hz, 0), 4)
+    return Math.min(Math.max(hz, 0), 3)
   }
 }
 

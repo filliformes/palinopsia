@@ -32,7 +32,7 @@
 }*/
 
 // The automatic hits (engine/phases.ts) : one per whole step, every EVERY seconds
-// or on a division of the tempo (SYNC), at most four a second. Integrated, so
+// or on a division of the tempo (SYNC), at most three a second. Integrated, so
 // moving the knob changes the pace from here on. Used as mod(floor(), 256.) :
 // wrapped at that.
 uniform float PH_breakAuto; // wrap 256
@@ -211,8 +211,8 @@ void main() {
   if (PASSINDEX == 0) {
     // The state : [0] seconds since the hit (16 bits, to 64 s) + the hit count,
     // [1] where it hit, [2] the layer clock + the automatic step, [3] the
-    // trigger as it was (for its rising edge). The layer clock : Speed, freeze
-    // and the background's slow clock carry through.
+    // trigger as it was (for its rising edge) + "whole" (no hit since a flush).
+    // The layer clock : Speed, freeze and the background's slow clock carry through.
     float dt = written ? min(abs(fract(TIME - dec16(s2.rg) + 0.5) - 0.5), 0.1) : 0.0;
     float age = dec16(s0.rg) * 64.0;
     float sd = floor(s0.b * 255.0 + 0.5);
@@ -220,9 +220,15 @@ void main() {
     bool autoOn = sync > 0 || every > 0.05;
     bool fireAuto = written && autoOn && abs(autoStep - floor(s2.b * 255.0 + 0.5)) > 0.5;
     bool fireHand = impact && s3.r < 0.5;
-    bool fire = fireAuto || fireHand || !written;
+    // An empty state is the effect's first frame (it lands with a hit) or a PANIC
+    // flush, which zeroes every buffer : that one must not break the picture on
+    // top of the recovery (a held pane replaced), so the pane starts whole and
+    // waits for the next hit.
+    bool fresh = !written && FRAMEINDEX == 0;
+    bool fire = fireAuto || fireHand || fresh;
+    bool whole0 = !fire && (written ? s3.g > 0.5 : true);
     float nsd = fire ? mod(sd + 1.0, 256.0) : sd;
-    float nage = fire ? 0.0 : min(age + dt, 63.9);
+    float nage = fire ? 0.0 : written ? min(age + dt, 63.9) : 63.9;
     vec2 pt = written ? vec2(dec16(s1.rg), dec16(s1.ba)) : vec2(hitX, hitY);
     if (fire) {
       pt = vec2(hitX, hitY);
@@ -234,12 +240,12 @@ void main() {
     if (ix < 0.5) gl_FragColor = vec4(enc16(nage / 64.0), nsd / 255.0, 1.0);
     else if (ix < 1.5) gl_FragColor = vec4(enc16(pt.x), enc16(pt.y));
     else if (ix < 2.5) gl_FragColor = vec4(enc16(fract(TIME)), autoStep / 255.0, 1.0);
-    else gl_FragColor = vec4(impact ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+    else gl_FragColor = vec4(impact ? 1.0 : 0.0, whole0 ? 1.0 : 0.0, 0.0, 1.0);
     return;
   }
 
   vec4 live = IMG_NORM_PIXEL(inputImage, uv);
-  if (!written) { gl_FragColor = live; return; }
+  if (!written || s3.g > 0.5) { gl_FragColor = live; return; }
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
   float t = dec16(s0.rg) * 64.0;
   float sd = floor(s0.b * 255.0 + 0.5);
