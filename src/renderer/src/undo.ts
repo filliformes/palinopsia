@@ -264,6 +264,23 @@ export function writeLinkTempo(bpm: number): void {
   else committed = { ...committed, composition: { ...committed.composition, bpm } }
 }
 
+/** A live change to the composition (a pinch dragging an effect's point) : nobody's
+ *  edit, so never an undo step, and like writeLinkTempo it leaves an edit still in
+ *  its quiet window alone. A pinch writes every tracker frame (30 to 60 a second) :
+ *  through runSilently each write closed the edit in progress, so a fader dragged
+ *  meanwhile became one undo step per frame and the 100 levels were gone in
+ *  seconds. The baseline takes the same change, so the edit's step never carries it. */
+export function writeLive(change: (c: CompositionState) => CompositionState): void {
+  applying = true
+  try {
+    useStore.setState((s) => ({ composition: change(s.composition) }))
+  } finally {
+    applying = false
+  }
+  if (!quietTimer || !committed) committed = snap()
+  else committed = { ...committed, composition: change(committed.composition) }
+}
+
 /** Flush any pending quiet-timer commit immediately (called before undo and
  *  before a silent change). True when it committed a step. */
 function flushPending(): boolean {

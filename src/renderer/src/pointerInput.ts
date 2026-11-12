@@ -21,8 +21,8 @@
 // - Nothing changes for a session with no source that takes the pointer : the
 //   cursor stays the arrow and a click does what it always did (nothing).
 
-import { useStore } from './store'
-import { commitNow, runSilently } from './undo'
+import { useStore, withFxInputs } from './store'
+import { commitNow, runSilently, writeLive } from './undo'
 import { showToast } from './components/Toast'
 import { SHADER_BY_ID } from './shaders/isf'
 import type { Compositor } from './engine/Compositor'
@@ -90,8 +90,10 @@ function takerOf(comp: Compositor, t: Target): Taker | null {
 // ── ISF effects that take the pointer (Break, Droste) ───────────────────
 // Their registry entry names two inputs the click sets (the frame's u, v) and,
 // for Break, an event it fires : written through the store like a slider (a
-// mouse click is an edit you can undo, a pinch is live). One taker per unit,
-// kept while it plays the same shader, so a gesture's target keeps its identity.
+// mouse click is an edit you can undo, a pinch is live : writeLive, which never
+// closes an edit in progress, so a fader dragged during a pinch stays one undo
+// step). One taker per unit, kept while it plays the same shader, so a
+// gesture's target keeps its identity.
 const scopeWord = (s: FxScope): string => (s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`)
 const isfTakers = new Map<string, { sid: string; taker: Taker }>()
 const firePulses = new Map<string, number>()
@@ -103,10 +105,13 @@ function isfTaker(fx: FxScope, instId: string): Taker | null {
   const key = `${scopeWord(fx)}:${instId}`
   const had = isfTakers.get(key)
   if (had && had.sid === sid) return had.taker
-  const set = (name: string, v: number, live: boolean): void => {
-    const w = (): void => useStore.getState().setFxInput(fx, instId, name, v)
-    if (live) runSilently(w)
-    else w()
+  const set = (u01: number, v01: number, live: boolean): void => {
+    if (live) writeLive((c) => withFxInputs(c, fx, instId, { [spec.x]: u01, [spec.y]: v01 }))
+    else {
+      const st = useStore.getState()
+      st.setFxInput(fx, instId, spec.x, u01)
+      st.setFxInput(fx, instId, spec.y, v01)
+    }
   }
   const fire = (name: string): void => {
     // a pulse, as its FIRE ▸ button (on, then off 140 ms later) : silent
@@ -126,8 +131,7 @@ function isfTaker(fx: FxScope, instId: string): Taker | null {
       const live = ev.pid !== MOUSE_PID
       const u01 = Math.max(0, Math.min(1, ev.u))
       const v01 = Math.max(0, Math.min(1, ev.v))
-      set(spec.x, u01, live)
-      set(spec.y, v01, live)
+      set(u01, v01, live)
       if (ev.phase === 'down' && spec.fire) fire(spec.fire)
     },
     pointerHint: () => spec.hint
