@@ -93,6 +93,26 @@ that CI builds into cross-platform releases.
 
     **A Hand in It** (Living Surfaces) and **Pool Overhead** (Dome). (Ripple first joined
     the dice's effects; the audit below kept it hand-placed.)
+- **Glitch loops : fifteen new Loop rack recipes** (Vincent : "I'd also want more recipes for the
+  Feedback layer, and more experimental, glitchy ones"). `loopRecipes.ts`. The glitch family runs INSIDE
+  the loop, so the damage compounds, is remembered and smeared by every pass : **Bit rot** (Byte Corrupt +
+  a creeping Transform), **Recompress** (Compress), **Tear drift** (Slice Shuffle, a hair a frame), **Band slip**
+  (Databend), **Sort drip** (Pixel Sort + a downward pan), **Freeze bands** (a slow spiral through Stutter),
+  **Tape rot** (Tracking, 90 ms delay), **Scan relief** (Rutt, lighten), **Slice drag** (Streak + Slice
+  Shuffle), **Ink latch** (Threshold + Displace, half back), **Crawl stain** (Crawl); and loops on the
+  tempo : **Torn echo** (an eighth-note echo through Slice Shuffle), **Bar grab** (Shatter grabbing on the
+  bar), **Beat stutter** (a sixteenth delay through Stutter), **Step spiral** (Decimate on the eighth
+  note before the zoom : a stop-motion spiral). Each soaked 60 s on a film and on a generator (mean light,
+  near-black and near-white shares at 5 s and 60 s, flashes a second per sixth of the frame, change over
+  a second) : none collapses, none flashes 3 times a second. Mosh Blocks stays out of every recipe.
+  Each ran 20 s more under the full dome (fisheye fill) : same numbers, except that Tape rot's band runs
+  in rings there (Tracking's dome form), so its loop builds a pale ring at the rim.
+  - The recipe menu is grouped (`<optgroup>` : feedback, glitch, echoes and beats; `LOOP_GROUPS`).
+  - `dice: false` keeps a recipe to the menu : Bit rot, Recompress, Ink latch and Crawl stain (the most
+    destructive) are never dealt by the layer dice (`DICE_LOOP_RECIPES`) or a theme.
+  - Generate : new theme **Glitch Loop** (Glitch / Datamosh : every layer feeds back through a glitch or
+    beat loop), and glitch loops for Signal Loss, Dropout, Cut-Up, Databent, Pixel Sort and Scan Processor.
+
 - **Lights : DMX fixtures on the picture, a page of their own (key `T`)** (Vincent : "une
   nouvelle page d'output de lumières complète pour pouvoir gérer le mapping de lumières";
   his rig : an Enttec DMX USB Pro). `shared/lights.ts` (the model : the RIG is this
@@ -639,6 +659,9 @@ that CI builds into cross-platform releases.
   `setSourceCapture` / `setSourceTransform`) : a capture card set to *off* once stays
   off. Screens and NDI open as they arrive. Sessions keep the mirror they were saved
   with.
+- **The loop menu named Tunnel "Spiral"** : both are a Transform and a Displace in a mixing loop, and the
+  menu matched recipes by their effects and blend alone. `loopRecipeOf` now breaks a tie by the delay and
+  the nearest values.
 
 - **A slider a Macro knob drives follows the knob as it moves** (Vincent : "when you
   move the macro knob mapped to a parameter, this parameter's slider doesnt update in

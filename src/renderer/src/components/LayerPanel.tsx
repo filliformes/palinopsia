@@ -9,7 +9,7 @@ import { TBTN, TBTN_IDLE, TBTN_IDLE_ON, TBTN_LIT, TBTN_MOD } from './buttonStyle
 import type { LayerMask, ModTarget, SourceKind, SourceSlot } from '@shared/types'
 import { DEFAULT_LAYER_VARY, LOOP_BLENDS, LOOP_SYNCS, LOOP_SYNC_NAMES, type LoopBlend } from '@shared/types'
 import { LOOP_DELAY_MAX_MS } from '../engine/loopDelay'
-import { LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
+import { LOOP_GROUPS, LOOP_RECIPES, loopRecipeOf } from '../loopRecipes'
 import { blendAt, blendLabel, couplingWords, mixTitle, mixWord } from './abMix'
 import { BlendSelect } from './BlendSelect'
 import { GENERATORS_ALPHA, SHADER_BY_ID, inPickerOrder, sourceIcon, sourceSection } from '../shaders/isf'
@@ -91,7 +91,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
   // (a scene saved before the Loop rack holds none)
   const loopFx = layer.loopFx ?? []
   const loopOn = loopFx.filter((f) => f.enabled).length
-  const recipe = loopRecipeOf(loopFx, layer.loopBlend)
+  const recipe = loopRecipeOf(loopFx, layer.loopBlend, layer)
   // the loop's delay as it plays : beats on the tempo when synced, else its ms
   const loopSync = layer.loopSync ?? 0
   const delayMs = loopSync > 0 ? Math.min(LOOP_DELAY_MAX_MS, Math.round((loopSync * 60000) / Math.max(1, bpm || 120))) : layer.loopDelay ?? 0
@@ -590,10 +590,15 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                         <option value="" disabled>
                           {loopFx.length ? 'own loop' : 'recipes'}
                         </option>
-                        {LOOP_RECIPES.map((r) => (
-                          <option key={r.id} value={r.id} title={r.blurb}>
-                            {r.name}
-                          </option>
+                        {/* in groups : the plain feedback loops, the glitch loops, the echoes */}
+                        {LOOP_GROUPS.map((g) => (
+                          <optgroup key={g.label} label={g.label}>
+                            {LOOP_RECIPES.filter((r) => r.group === g.group).map((r) => (
+                              <option key={r.id} value={r.id} title={r.blurb}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </Row>

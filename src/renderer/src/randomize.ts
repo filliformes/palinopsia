@@ -32,7 +32,7 @@ import { BG_SOURCES, BG_DEFAULT_SPEED } from './bgPresets'
 import type { MotionRecipe } from './themes'
 import { randomSteps } from './engine/stepSeq'
 import { shapeCurve } from './engine/modulation'
-import { LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
+import { DICE_LOOP_RECIPES, type LoopRecipe } from './loopRecipes'
 
 export type RandomizeScope =
   | 'all'
@@ -922,8 +922,9 @@ function randomLoop(feedback: boolean, amount: number, ground: Ground = 'dark'):
   // The loops that brighten (lighten, screen : 0.7 to 0.96 of each pass back) were
   // made for light on black; over a lit or mid ground they climb to white in a
   // second (a Rise on Swell over Solid Color came out white). Those layers take the
-  // mixing, keying, XOR and multiplying loops.
-  const pool = ground === 'dark' ? LOOP_RECIPES : LOOP_RECIPES.filter((r) => r.blend !== 'lighten' && r.blend !== 'screen')
+  // mixing, keying, XOR and multiplying loops. (The most destructive glitch loops,
+  // `dice: false`, are never dealt : DICE_LOOP_RECIPES.)
+  const pool = ground === 'dark' ? DICE_LOOP_RECIPES : DICE_LOOP_RECIPES.filter((r) => r.blend !== 'lighten' && r.blend !== 'screen')
   if (feedback && chance(0.35) && pool.length) return loopFromRecipe(pick(pool))
   return { loopFx: [], loopBlend: 'mix', feedbackAmount: amount, loopDelay: 0, loopSync: 0 }
 }
