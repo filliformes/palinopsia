@@ -32,6 +32,8 @@ const SELF_CONTAINED = new Set([
   'node-silhouette', // finds the people in whatever picture enters
   'node-inflate', // the picture's own shape; a sidechain only as what it reflects
   'node-drape', // whatever enters, printed on the cloth
+  'node-touch', // whatever enters, pushed by the hand
+  'node-ripple', // whatever enters, seen through water
   // The sidechain recipes read an optional sidechain but fall back to the
   // host itself, so they run anywhere too.
   'node-remap',

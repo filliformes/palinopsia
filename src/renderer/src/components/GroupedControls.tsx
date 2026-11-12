@@ -158,6 +158,18 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('forces', 'gravity', 'wind', 'gust', 'audio', 'people', 'poke', 'reset'),
     g('look', 'material', 'color', 'sheen', 'folds', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'tilt', 'behind')
   ],
+  // Touch : the touch · how it moves and looks · what fires it
+  'node-touch': [
+    g('touch', 'mode', 'size', 'strength', 'follow', 'soft', 'mix'),
+    g('motion and look', 'fade', 'spring', 'speed', 'width', 'shade', 'split', 'clear'),
+    g('fired by', 'fire', 'fireAt', 'audio', 'people', 'wander', 'press', 'point')
+  ],
+  // Ripple : the water · what stirs it · how it looks
+  'node-ripple': [
+    g('water', 'rain', 'dropSize', 'motion', 'speed', 'calm', 'edges', 'still'),
+    g('stirred by', 'audio', 'people', 'wander', 'stone', 'stoneAt', 'follow', 'press', 'point'),
+    g('look', 'refract', 'split', 'shade', 'lightAngle', 'tint', 'deep', 'mix')
+  ],
   'node-inflate': [
     g('shape', 'from', 'threshold', 'puff', 'round', 'volume', 'mix'),
     g('material', 'material', 'keep', 'tint', 'gloss', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'dispersion', 'rim', 'cavity'),
@@ -385,6 +397,21 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('mode', 2)) put(d, ['gravity'], 'Float has no gravity : the sheet drifts and comes back.')
     if (isnt('material', 0) && isnt('material', 1)) put(d, ['sheen'], 'Sheen is the cloth\'s : plastic, chrome and foil shine their own way.')
     if (isnt('material', 4)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
+    return d
+  },
+  'node-touch': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('mode', 0)) put(d, ['speed', 'width'], 'Only the rings travel.')
+    if (is('mode', 0)) put(d, ['fade', 'spring', 'soft'], 'Rings travel out and die away by themselves : nothing is pushed to come back.')
+    if (is('mode', 4)) put(d, ['spring', 'soft'], 'A lens is drawn fresh each frame : nothing is pushed to spring back (FADE is how fast it closes).')
+    if (isnt('fireAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : fire at the point, or press it.')
+    return d
+  },
+  'node-ripple': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('stoneAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : drop the stone at the point, or press it.')
+    if (zero('refract')) put(d, ['split'], 'Refraction is at 0 : nothing is bent to split.')
+    if (zero('deep')) put(d, ['tint'], 'Water depth is at 0 : the water has no color.')
     return d
   },
   'node-inflate': ({ zero, is, isnt }) => {

@@ -31,7 +31,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
       ['V', 'Big preview : fold the panels under it (and back)'],
-      ['Click the preview', 'Play on a source or effect that takes a click (Marbling : a drop · hold : pour · drag : a trail, its comb tool : drag a stylus, ⇧-drag a five-tine comb · Relief : drag to draw · Fur : drag to comb, click to part · Sand Plate : click rings it, drag a finger through the sand · Drape : grab the cloth, let go and it falls) · Body’s Pinch = click : a pinch does the same']
+      ['Click the preview', 'Play on a source or effect that takes a click (Marbling : a drop · hold : pour · drag : a trail, its comb tool : drag a stylus, ⇧-drag a five-tine comb · Relief : drag to draw · Fur : drag to comb, click to part · Sand Plate : click rings it, drag a finger through the sand · Drape : grab the cloth, let go and it falls · Touch : push, swirl, drag or magnify the picture, a shockwave in rings · Ripple : click a stone, drag a finger through the water) · Body’s Pinch = click : a pinch does the same']
     ]
   },
   {

@@ -941,6 +941,82 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { mode: [0, 2], size: [0.7, 1.05], crumple: [0.1, 0.6], gravity: [0.3, 0.7], wind: [0.1, 0.6], gust: [0.3, 0.8], stiffness: [0.5, 0.9], damping: [0.15, 0.4], grab: [0.1, 0.25], audio: [0, 0.4], people: [0, 0], material: [0, 1], sheen: [0.3, 0.8], folds: [0.4, 0.8], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75], tilt: [-0.1, 0.35], behind: [0, 0], rainbow: [0, 0.6], flakes: [140, 320], glint: [0.2, 0.8] }
   },
   {
+    // Native (engine/touchNode.ts) : a displacement field the hand pushes (the mouse,
+    // every pinching hand, the Room's people, OSC, its own point), relaxed by a spring.
+    id: 'node-touch',
+    name: 'Touch',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Touch : makes any picture touchable. Lay a hand on the preview (the mouse, or pinch with the Body page\'s pinch = click) and the picture answers : RINGS a shockwave bursting from the touch and traveling out (drag for a wake of rings), SPREAD pushed away from the hand, SWIRL twisted round it, DRAG carried along with it, LENS a lens under it, ATTRACT pulled in. FOLLOW is how closely the touch keeps up with the hand (low trails behind it, elastic), FADE how fast the picture comes back, SPRING whether it creeps back or wobbles like jelly, SOFT how wide the push spreads. FIRE does the mode\'s touch once at the center, the point or a random place (a pad, a modulator, an OSC message); SOUND HITS fire it on every onset (a shockwave on the kick). The Room\'s people push where they stand, BY ITSELF its own hand wanders through the picture; PRESS holds the point down (move it with a modulator). SHADE darkens what the push bunches up and lightens what it stretches. On the dome it works on the dome itself : rings stay round to the rim.',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'mode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['rings', 'spread', 'swirl', 'drag', 'lens', 'attract'], DEFAULT: 3, LABEL: 'mode' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.02, MAX: 0.8, DEFAULT: 0.18, LABEL: 'size' },
+        { NAME: 'strength', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'strength' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.75, LABEL: 'follow' },
+        { NAME: 'fade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'fade' },
+        { NAME: 'spring', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'spring' },
+        { NAME: 'soft', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'soft' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'ring speed' },
+        { NAME: 'width', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'ring width' },
+        { NAME: 'fire', TYPE: 'event', LABEL: 'fire' },
+        { NAME: 'fireAt', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['center', 'the point', 'anywhere'], DEFAULT: 0, LABEL: 'fire at' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound hits' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people push' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'by itself' },
+        { NAME: 'press', TYPE: 'bool', DEFAULT: false, LABEL: 'press the point', COMPACT: true },
+        { NAME: 'point', TYPE: 'point2D', MIN: [0, 0], MAX: [1, 1], DEFAULT: [0.5, 0.5], LABEL: 'point' },
+        { NAME: 'shade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'shade' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'color split' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' },
+        { NAME: 'clear', TYPE: 'event', LABEL: 'clear' }
+      ]
+    })}*/`,
+    curated: { mode: [0, 5], size: [0.1, 0.35], strength: [0.4, 0.8], follow: [0.5, 1], fade: [0.2, 0.6], spring: [0.1, 0.7], soft: [0.1, 0.5], speed: [0.3, 0.7], width: [0.2, 0.6], fireAt: [0, 2], audio: [0, 0], people: [0, 0], wander: [0.3, 0.8], press: [0, 0], shade: [0.15, 0.5], split: [0, 0.3], mix: [1, 1] }
+  },
+  {
+    // Native (engine/rippleNode.ts) : a wave height field the picture is seen through;
+    // rain, the sound's hits, the hand, the Room and the picture's own motion stir it.
+    id: 'node-ripple',
+    name: 'Ripple',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Ripple : the picture seen through water. RAIN drops at random places, SOUND HITS drop a stone on every onset (on the kick), STONE drops one now at the center, the point or a random place, ITS OWN MOTION lets what changes in the picture stir the water, and the hand plays it (click : a stone, drag : a finger trailing through the water; or pinch with the Body page\'s pinch = click). The Room\'s people wade where they stand, BY ITSELF a finger of its own trails slowly through the water. The rings travel at WAVE SPEED and die away by CALM; the frame\'s edges are the pool\'s walls (REFLECT) or a soft shore (ABSORB). REFRACTION is how much the water bends the picture, COLOR SPLIT how far its colors part, CREST LIGHT the matte light on the crests, WATER COLOR and DEPTH the tint in the troughs. On the dome the water lies on the dome itself and its rim is the wall : rings come back from all round.',
+      CATEGORIES: ['FX', 'Distortion', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'rain', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'rain' },
+        { NAME: 'dropSize', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'drop size' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound hits' },
+        { NAME: 'motion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'its own motion' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'people wade' },
+        { NAME: 'wander', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'by itself' },
+        { NAME: 'stone', TYPE: 'event', LABEL: 'stone' },
+        { NAME: 'stoneAt', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['center', 'the point', 'anywhere'], DEFAULT: 0, LABEL: 'stone at' },
+        { NAME: 'follow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'follow' },
+        { NAME: 'press', TYPE: 'bool', DEFAULT: false, LABEL: 'press the point', COMPACT: true },
+        { NAME: 'point', TYPE: 'point2D', MIN: [0, 0], MAX: [1, 1], DEFAULT: [0.5, 0.5], LABEL: 'point' },
+        { NAME: 'speed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'wave speed' },
+        { NAME: 'calm', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'calm' },
+        { NAME: 'edges', TYPE: 'long', VALUES: [0, 1], LABELS: ['reflect', 'absorb'], DEFAULT: 0, LABEL: 'edges' },
+        { NAME: 'refract', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'refraction' },
+        { NAME: 'split', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'color split' },
+        { NAME: 'shade', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'crest light' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'tint', TYPE: 'color', DEFAULT: [0.55, 0.68, 0.72, 1], LABEL: 'water color' },
+        { NAME: 'deep', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'water depth' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' },
+        { NAME: 'still', TYPE: 'event', LABEL: 'still' }
+      ]
+    })}*/`,
+    curated: { rain: [0.1, 0.5], dropSize: [0.2, 0.6], audio: [0, 0], motion: [0, 0.5], people: [0, 0], wander: [0, 0.5], stoneAt: [0, 2], follow: [0.6, 1], press: [0, 0], speed: [0.25, 0.6], calm: [0.2, 0.55], edges: [0, 1], refract: [0.35, 0.75], split: [0, 0.35], shade: [0.2, 0.5], lightAngle: [0, 6.2832], deep: [0, 0.3], mix: [1, 1] }
+  },
+  {
     // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
     // lit with Relief's materials.
     id: 'node-inflate',

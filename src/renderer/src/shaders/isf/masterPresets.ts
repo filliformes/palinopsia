@@ -891,6 +891,56 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-rain-pane', inputs: {drops: 0.6, size: 0.45, slide: 0.35, trails: 0.6, fog: 0.5, bend: 0.6, shine: 0.4, tint: [0.9, 0.94, 1, 1]} }],
     vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.85, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
   },
+  // ── Touch and water : the whole picture pushed by the hand, or under water ──
+  {
+    name: 'Touch the Picture', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.18, strength: 0.6, follow: 0.75, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Shockwave on the Kick', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-touch', inputs: {mode: 0, size: 0.2, strength: 0.8, follow: 1, fade: 0.35, spring: 0.35, soft: 0.25, speed: 0.6, width: 0.45, fireAt: 0, audio: 0.85, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.4, split: 0.2, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 1, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Jelly Picture', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.25, strength: 0.7, follow: 0.6, fade: 0.4, spring: 0.9, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.35, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'A Hand of Its Own', group: 'Touch and water',
+    fx: [{ shaderId: 'node-touch', inputs: {mode: 3, size: 0.22, strength: 0.55, follow: 0.4, fade: 0.3, spring: 0.55, soft: 0.3, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0.7, press: 0, point: [0.5, 0.5], shade: 0.3, split: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.98, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Through the Water', group: 'Touch and water',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.25, dropSize: 0.35, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.35, edges: 0, refract: 0.5, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Drops on the Kick', group: 'Touch and water',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.05, dropSize: 0.35, audio: 0.9, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.5, calm: 0.3, edges: 0, refract: 0.6, split: 0.15, shade: 0.4, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Downpour', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-ripple', inputs: {rain: 0.85, dropSize: 0.2, audio: 0, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.45, calm: 0.55, edges: 0, refract: 0.45, split: 0.15, shade: 0.3, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.02, contrast: 1.04, saturation: 0.88, lift: 0.02, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.0, saturation: 0.9, gamma: 1.02, autoLevel: 0, splitTone: 0.12 }
+  },
+  {
+    name: 'Water You Touch', group: 'Touch and water',
+    fx: [
+      { shaderId: 'node-ripple', inputs: {rain: 0, dropSize: 0.35, audio: 0, motion: 0, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.4, calm: 0.2, edges: 0, refract: 0.6, split: 0.15, shade: 0.35, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} },
+      { shaderId: 'node-touch', inputs: {mode: 4, size: 0.2, strength: 0.6, follow: 0.55, fade: 0.4, spring: 0.35, soft: 0.25, speed: 0.45, width: 0.5, fireAt: 0, audio: 0, people: 0, wander: 0, press: 0, point: [0.5, 0.5], shade: 0.15, split: 0.1, mix: 1} }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',
@@ -1160,6 +1210,12 @@ export const MASTER_PRESETS: MasterPreset[] = [
     name: 'Dome · Clean', group: 'Dome',
     fx: [{ shaderId: 'fx-grade', inputs: { contrast: 1.1, saturation: 1, lift: 0.01 } }],
     vibe: { contrast: 1.05, saturation: 1, gamma: 1, autoLevel: 0.25 },
+    context: { depth: 0 }
+  },
+  {
+    name: 'Dome · Pool', group: 'Dome',
+    fx: [{ shaderId: 'node-ripple', inputs: {rain: 0.05, dropSize: 0.35, audio: 0.9, motion: 0.25, people: 0, wander: 0, stoneAt: 0, follow: 0.8, press: 0, point: [0.5, 0.5], speed: 0.5, calm: 0.3, edges: 0, refract: 0.6, split: 0.15, shade: 0.4, lightAngle: 2.36, tint: [0.55, 0.68, 0.72, 1], deep: 0.1, mix: 1} }],
+    vibe: { contrast: 1.03, saturation: 0.96, gamma: 1, autoLevel: 0.15 },
     context: { depth: 0 }
   },
   {

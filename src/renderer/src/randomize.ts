@@ -332,7 +332,7 @@ const CONV_NODES = NATIVE_NODES.filter((n) => CONV_NODE_IDS.includes(n.id))
 const SELF_NODE_IDS = [
   'node-reponse', 'node-datamosh', 'node-feedback', 'node-chronoscan', 'node-sediment',
   'node-scanner', 'node-autocutter', 'node-eternalism', 'node-afterimage',
-  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile',
+  'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-ripple',
   // Sidechain recipes safe to draw blind (Remap and Matte can scramble or hide the
   // whole picture with an arbitrary sidechain, so they stay hand-placed).
   'node-lumablur', 'node-gooey', 'node-lookup'
