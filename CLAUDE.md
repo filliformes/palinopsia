@@ -30,3 +30,16 @@ creative work. This comes before any feature.
   them.
 - **No borrowed names.** Never name a preset, mode or feature after a living artist, a
   commercial product or a product's own modes.
+
+## What people build with Palinopsia (decided 2026-11-14)
+
+- **The future plugin SDK will be MIT.** It covers the plugins the picture controls, so
+  anyone can build plugins and release them under any license. Like the shaders people
+  write in the Source Editor, what they build is theirs.
+- **Code in the SDK must be Vincent's own or under a permissive license** (MIT, BSD,
+  ISC, Apache-2.0, zlib, CC0).
+  - Never move GPL or LGPL code into it: Ableton Link, FFmpeg, datamoshing-GLSL,
+    transflow and the rest of the app stay GPL.
+  - An SDK file that holds third-party permissive code keeps that code's notice, and
+    the SDK gets its own `THIRD_PARTY_NOTICES` section.
+- **Palinopsia itself stays GPL-3.0-or-later.**
