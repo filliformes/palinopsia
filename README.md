@@ -22,6 +22,9 @@ work: **never cheap psychedelia, never a 3D game engine.**
 - **Played, not patched** : every parameter reachable over OSC, MIDI, or the UI,
   through a single write path.
 
+<!-- support-top -->
+<!-- /support-top -->
+
 ![The Palinopsia compositor](docs/images/interface-compositor.jpg)
 
 *The instrument: live preview and scene bank at the top left, the Inspector for
@@ -4461,6 +4464,8 @@ not cheap psychedelia.*
 ## Credits & license
 
 Built by **Vincent Fillion** ([filliformes](https://github.com/filliformes)).
+<!-- support -->
+<!-- /support -->
 Vendors the [Spout2](https://github.com/leadedge/Spout2) SDK (BSD) for the native
 sender; bundles [`ffmpeg-static`](https://github.com/eugeneware/ffmpeg-static) for
 video ingest and recording delivery; PBR materials from

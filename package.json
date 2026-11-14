@@ -19,6 +19,8 @@
     "fetch:pose": "node scripts/fetch-pose.mjs",
     "build:visualizer": "node scripts/build-dataflou-visualizer.mjs",
     "notices": "node scripts/notices.mjs",
+    "support-link": "node scripts/support-link.mjs",
+    "release-check": "node scripts/release-check.mjs",
     "check:notices": "node scripts/notices.mjs --check",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview"

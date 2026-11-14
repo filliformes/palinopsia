@@ -59,6 +59,7 @@ import { FeelPanel } from './components/FeelPanel'
 import { MetaBar } from './components/MetaBar'
 import { MidiLearnOverlay } from './components/MidiLearnOverlay'
 import { BlackButton } from './components/BlackButton'
+import { SupportButton } from './components/SupportButton'
 import { ModulationPanel } from './components/ModulationPanel'
 import { OscPanel } from './components/OscPanel'
 import { AudioPanel } from './components/AudioPanel'
@@ -2355,6 +2356,8 @@ export default function App(): JSX.Element {
         </span>
         {/* Black : the whole show to black over the Morph time, and back (black.ts). */}
         <BlackButton />
+        {/* ☕ Buy Me a Coffee : quiet, last, absent until an address is set */}
+        <SupportButton />
         </div>
       </div>
       </header>
