@@ -200,6 +200,11 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **The Windows shortcuts' icon.** The desktop and Start menu shortcuts (and so the taskbar)
+  showed a blank page instead of Palinopsia's icon : the installer wrote the app's long
+  description into each shortcut, which Windows cut short while keeping its length, so
+  every field after it (the icon too) was read shifted. The description is one short
+  sentence now, and a release build refuses a long one again.
 - **Tracking no longer carries any CC BY 3.0 code** (GPL-incompatible). The freeze line,
   the chroma bleed and its tints are rewritten from scratch:
   - the freeze line wanders on smooth value noise and holds its upper edge;
