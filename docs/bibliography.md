@@ -340,6 +340,14 @@ Fayet, M., Schwarz, D., & Tiffon, V. (2024). VIVO: Video analysis for corpus-bas
 
 ↳ Assemble's descriptor set (`shared/assemble.ts` follows VIVO's table 1).
 
+Gross, S., Wei, X., & Zhu, J. (2019). *Automatic realistic music video generation from segments of YouTube videos* [Preprint]. arXiv. https://arxiv.org/abs/1905.12245
+
+↳ Research plate 13 : a music video assembled from existing footage, judged against professional and amateur ones; a cue for Assemble (coherence between shots and the music's structure matter more than transitions).
+
+Liao, Z., Yu, Y., Gong, B., & Cheng, L. (2015). Audeosynth: Music-driven video montage. *ACM Transactions on Graphics, 34*(4). https://doi.org/10.1145/2766966
+
+↳ Research plate 08 : cutting video to music, with Chion's synchresis named as its principle.
+
 Schödl, A., & Essa, I. A. (2002). Controlled animation of video sprites. In *Proceedings of the 2002 ACM SIGGRAPH/Eurographics Symposium on Computer Animation* (pp. 121–127). ACM. https://doi.org/10.1145/545261.545281
 
 ↳ Assemble's follow-the-live-output mode (`assemble/liveMatch.ts`), which steers clip selection toward a target.
@@ -356,6 +364,14 @@ Schwarz, D., Beller, G., Verbrugghe, B., & Britton, S. (2006). Real-time corpus-
 
 ↳ Assemble as a whole (CataRT ported to video) and its spatial sibling, the Mosaïque node.
 
+Wang, Y., Wang, Y., Chen, X., & Xu, C. (2026). *BEAT: Rhythm-elastic alignment for agentic music-guided movie trailer generation* [Preprint]. arXiv. https://arxiv.org/abs/2605.27067
+
+↳ Research plate 10 : choosing and ordering shots from a whole film to a piece of music, many shots to one musical bar.
+
+Zhang, X., Gong, D., Duan, Z., van den Hengel, A., & Liu, L. (2025). *Let your video listen to your music! Beat-aligned, content-preserving video editing with arbitrary music* [Preprint]. arXiv. https://arxiv.org/abs/2506.18881
+
+↳ Research plate 11 (MVAA) : editing an existing video so its motion keyframes land on the music's beats.
+
 ## 11. Audio analysis and sonification
 
 Bello, J. P., Daudet, L., Abdallah, S., Duxbury, C., Davies, M., & Sandler, M. B. (2005). A tutorial on onset detection in music signals. *IEEE Transactions on Speech and Audio Processing, 13*(5), 1035–1047. https://doi.org/10.1109/TSA.2005.851998
@@ -369,6 +385,10 @@ Bristow-Johnson, R. (2021). *Audio EQ cookbook* (R. Toy, Ed.) [W3C Working Group
 Chamberlin, H. (1985). *Musical applications of microprocessors* (2nd ed.). Hayden Book Company.
 
 ↳ The state-variable filters of the Sonify worklet (the Raster tone control and the Filter voice's band-pass bank).
+
+Dattorro, J. (1997). Effect design, part 1: Reverberator and other filters. *Journal of the Audio Engineering Society, 45*(9), 660–684.
+
+↳ The Sonify reverb's modulated tank delays and the allpass diffusers inside its loop.
 
 Gruy, E., & Berthaut, F. (2026). Extended reality audio-visual instruments: Design framework and case study. In B. Gaster, J. Tragtenberg, A. Xambó, & T. Mitchell (Eds.), *Proceedings of the International Conference on New Interfaces for Musical Expression* (pp. 788–797). https://doi.org/10.5281/zenodo.20784281
 
@@ -406,6 +426,14 @@ Pelletier, J.-M. (2008). Sonified motion flow fields as a means of musical expre
 
 ↳ The Flow voice (motion blocks to grains) and its onset dithering across the frame interval.
 
+Pulkki, V. (1997). Virtual sound source positioning using vector base amplitude panning. *Journal of the Audio Engineering Society, 45*(6), 456–466.
+
+↳ Space (`shared/spatial.ts`) : Sonify's voices placed on a dome of speakers (VBAP).
+
+Pulkki, V. (1999). Uniform spreading of amplitude panned virtual sources. In *Proceedings of the 1999 IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (WASPAA)*. IEEE.
+
+↳ Space : a voice spread over several speakers (MDAP).
+
 Rabiner, L. (1977). On the use of autocorrelation analysis for pitch detection. *IEEE Transactions on Acoustics, Speech, and Signal Processing, 25*(1), 24–33. https://doi.org/10.1109/TASSP.1977.1162905
 
 ↳ The autocorrelation pitch feature of the audio bus.
@@ -414,9 +442,25 @@ Roads, C. (2001). *Microsound*. MIT Press. https://doi.org/10.7551/mitpress/4601
 
 ↳ The grain model of the Flow voice and of the Granular FX.
 
+Schroeder, M. R. (1962). Natural sounding artificial reverberation. *Journal of the Audio Engineering Society, 10*(3), 219–223.
+
+↳ The Sonify reverb's allpass sections (input diffusion and inside its tank).
+
+Stautner, J., & Puckette, M. (1982). Designing multi-channel reverberators. *Computer Music Journal, 6*(1), 52–65. https://doi.org/10.2307/3680358
+
+↳ The Sonify reverb's feedback delay network : delay lines fed back through an orthogonal matrix, several outputs for a stereo image.
+
 Verplank, B., Mathews, M., & Shaw, R. (2000). Scanned synthesis. In *Proceedings of the 2000 International Computer Music Conference* (pp. 368–371). International Computer Music Association.
 
 ↳ The surface-readout family of Sonify voices, to which Orbit belongs (a slowly moving image read as a waveform).
+
+Välimäki, V., Parker, J. D., Savioja, L., Smith, J. O., & Abel, J. S. (2012). Fifty years of artificial reverberation. *IEEE Transactions on Audio, Speech, and Language Processing, 20*(5), 1421–1448. https://doi.org/10.1109/TASL.2012.2189567
+
+↳ The Sonify reverb's choices : a Hadamard feedback matrix and mutually prime delay lengths.
+
+Waghorne, J., et al. (2023). The applicability of transperceptual and deep learning approaches to the study and mimicry of complex cartilaginous tissues. *Frontiers in Materials, 10*. https://doi.org/10.3389/fmats.2023.1092647 (preprint : https://arxiv.org/abs/2211.14314)
+
+↳ Research plate 06 : a 255-voice synthesiser playing an image's luminance histogram, and the phase interference between its close frequencies : what Spectra avoids.
 
 Yeo, W. S., & Berger, J. (2006). Raster scanning: A new approach to image sonification, sound visualization, sound analysis and synthesis. In *Proceedings of the 2006 International Computer Music Conference*. International Computer Music Association. https://quod.lib.umich.edu/i/icmc/bbp2372.2006.008
 
@@ -656,6 +700,9 @@ Entries above whose details could not all be confirmed against a primary source:
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
 - Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).
+- Waghorne et al. (2023): the full author list was not checked (only the first author and the title, against the arXiv preprint).
+- Pulkki (1999): page numbers and DOI not checked.
+- Stautner & Puckette (1982) and Välimäki et al. (2012): DOIs written from memory, to check against the publishers' pages.
 - Kucinkas et al. (2026): published online on 3 December 2025; the publisher cites it as volume 11 (2026), PubMed dates the issue 2025. Authors' initials checked against secondary listings only.
 - Fayet, Schwarz and Tiffon (2024): title and authors match the HAL record (hal-04576894); the page range (257–264) in the JIM 2024 proceedings is not confirmed.
 - Corbeil-Perron (2021): title and Papyrus handle (1866/26965) confirmed; the record's date may be 2022 rather than 2021, not checked against the record itself.
