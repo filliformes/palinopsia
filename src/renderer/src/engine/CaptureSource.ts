@@ -10,6 +10,7 @@ import { ndiInAcquire, ndiInLatest, ndiInRelease, ndiInStats, type NdiInStats } 
 import { AVF_PREFIX, avfInAcquire, avfInLatest, avfInRelease } from './avfIn'
 import { shareInAcquire, shareInLatest, shareInRelease, type ShareFrame } from './shareIn'
 import { shareInName } from '@shared/shareIn'
+import { cameraKey, captureFormat, onCaptureFormat, registerCapture, unregisterCapture, videoConstraints } from './captureFormat'
 
 // A live-capture start can fail silently (permission denied, no device, screen
 // picker cancelled) and the slot just renders transparent — the most confusing
@@ -42,6 +43,10 @@ export class CaptureSource {
   // finding the camera again by name if it comes back under another id.
   private spec = ''
   private label = ''
+  // the camera's key for its capture format (resolution, frame rate), and the
+  // listener that applies a new one to the open track
+  private fmtKey: string | null = null
+  private offFormat: (() => void) | null = null
   private retries = 0
   private retryTimer = 0
   private readonly onDevices = (): void => {
@@ -121,15 +126,20 @@ export class CaptureSource {
         } as unknown as MediaStreamConstraints)
       } else if (spec.startsWith('device:')) {
         const id = spec.slice('device:'.length)
-        // A specific camera / capture device by id, at its highest resolution.
+        // A specific camera / capture device by id, in the format chosen for it
+        // (by its name) : at its highest resolution unless asked otherwise.
+        const name = this.label || (await md.enumerateDevices().catch(() => [] as MediaDeviceInfo[])).find((d) => d.kind === 'videoinput' && d.deviceId === id)?.label || ''
+        this.fmtKey = cameraKey(spec, name)
         stream = await md.getUserMedia({
           audio: false,
-          video: { deviceId: { exact: id }, width: { ideal: 3840 }, height: { ideal: 2160 } }
+          video: { deviceId: { exact: id }, ...videoConstraints(captureFormat(this.fmtKey), true) }
         })
       } else if (spec === 'screen') {
         stream = await md.getDisplayMedia({ video: true, audio: false })
       } else {
-        stream = await md.getUserMedia({ video: true, audio: false })
+        this.fmtKey = cameraKey(spec, '')
+        const c = videoConstraints(captureFormat(this.fmtKey), false)
+        stream = await md.getUserMedia({ video: Object.keys(c).length ? c : true, audio: false })
       }
       // The permission prompt / screen picker can sit open for seconds. If the
       // slot was switched or cleared in that window, dispose() already ran while
@@ -147,6 +157,25 @@ export class CaptureSource {
         this.label = track.label
         this.retries = 0
         track.addEventListener('ended', () => this.lost())
+        // its format : shown as it really is, and a new one applied to the open
+        // track (no reopening; a camera that cannot keeps what it has)
+        if (spec.startsWith('device:')) this.fmtKey = cameraKey(spec, track.label)
+        const key = this.fmtKey
+        if (key) {
+          registerCapture(this, key, () => {
+            const t = this.stream?.getVideoTracks()[0]
+            if (!t) return null
+            return { w: this.video.videoWidth, h: this.video.videoHeight, fps: t.getSettings().frameRate ?? 0 }
+          })
+          this.offFormat?.()
+          this.offFormat = onCaptureFormat((k, f) => {
+            if (k !== this.fmtKey) return
+            const t = this.stream?.getVideoTracks()[0]
+            t?.applyConstraints(videoConstraints(f, this.spec.startsWith('device:'))).catch((e) =>
+              console.warn('[capture] the camera kept its format :', (e as Error).message)
+            )
+          })
+        }
       }
       await this.video.play().catch(() => {})
     } catch (e) {
@@ -306,6 +335,9 @@ export class CaptureSource {
   dispose(): void {
     this.disposed = true
     window.clearTimeout(this.retryTimer)
+    this.offFormat?.()
+    this.offFormat = null
+    unregisterCapture(this)
     navigator.mediaDevices?.removeEventListener('devicechange', this.onDevices)
     if (this.ndiName) {
       ndiInRelease(this.ndiName)

@@ -33,6 +33,7 @@ import type {
   World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
 import { parsePick, pickKey, type ChPick } from './audio/channelPick'
+import { formatKey, parseFormat, type AudioFormat } from './audio/audioFormat'
 import type { MappingScope, OscAlias, OscBinding, SessionMappings } from '@shared/types'
 import { sanitizeMidiMap, sanitizeOscMap, sessionMappingsOut } from './mappingModel'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
@@ -2202,6 +2203,10 @@ interface StoreState {
   setSoniOutCh: (p: ChPick) => void
   audioMonitorCh: ChPick
   setAudioMonitorCh: (p: ChPick) => void
+  // The audio engine's sample rate and buffer (per computer; 0 : the device's
+  // rate / the automatic lowest buffer)
+  audioFormat: AudioFormat
+  setAudioFormat: (f: AudioFormat) => void
   // USB-noise denoiser : adaptive notch filter. On/off + the learned notch
   // frequencies (Hz). Machine-local (the noise is per-rig), persisted.
   audioDenoise: boolean
@@ -4741,6 +4746,11 @@ export const useStore = create<StoreState>((set, get) => ({
   setAudioMonitorCh: (p) => {
     localStorage.setItem('opsia.audioMonitorCh', pickKey(p))
     set({ audioMonitorCh: p })
+  },
+  audioFormat: parseFormat(localStorage.getItem('opsia.audioFormat')),
+  setAudioFormat: (f) => {
+    localStorage.setItem('opsia.audioFormat', formatKey(f))
+    set({ audioFormat: f })
   },
   audioDenoise: localStorage.getItem('opsia.audioDenoise') === '1',
   setAudioDenoise: (on) => {

@@ -7,6 +7,7 @@ import type { SourceSlot } from '@shared/types'
 import { defaultSourceFit, isDomeFill } from '@shared/dome'
 import { useStore } from '../store'
 import { personStatus, type PersonStatus } from '../engine/personMask'
+import { CAPTURE_FPS, CAPTURE_RES, cameraKey, captureFormat, captureStatus, resLabel, setCaptureFormat, type CaptureFormat, type CaptureRes, type CaptureStatus } from '../engine/captureFormat'
 
 function Slider({
   label,
@@ -125,6 +126,54 @@ function Choice<T extends string>({
   )
 }
 
+/** A camera's capture format (per camera) and what it really delivers : the
+ *  lag of a live camera is mostly its resolution and frame rate. */
+function CameraFormat({ camKey }: { camKey: string }): JSX.Element {
+  const [f, setF] = useState<CaptureFormat>(() => captureFormat(camKey))
+  const [st, setSt] = useState<CaptureStatus | null>(() => captureStatus(camKey))
+  useEffect(() => {
+    setF(captureFormat(camKey))
+    const t = window.setInterval(() => setSt(captureStatus(camKey)), 500)
+    return () => window.clearInterval(t)
+  }, [camKey])
+  const pick = (next: CaptureFormat): void => {
+    setF(next)
+    setCaptureFormat(camKey, next)
+  }
+  const sel = 'input select-compact min-w-0 flex-1 text-[10px]'
+  return (
+    <div className="mb-1 flex items-center gap-1.5">
+      <span className="w-12 shrink-0 font-mono text-[9px] uppercase text-muted">camera</span>
+      <select
+        className={sel}
+        value={f.res}
+        onChange={(e) => pick({ ...f, res: e.target.value as CaptureRes })}
+        title="The resolution asked of this camera (kept for it, by its name). Lower is lighter and often quicker : at its highest resolution many webcams fall to a low frame rate, and each frame waits longer. Auto : a picked camera at its highest, the default camera at the system's own."
+      >
+        {CAPTURE_RES.map((r) => (
+          <option key={r} value={r}>{resLabel(r)}</option>
+        ))}
+      </select>
+      <select
+        className={sel}
+        value={f.fps}
+        onChange={(e) => pick({ ...f, fps: Number(e.target.value) })}
+        title="The frame rate asked of this camera (kept for it). More frames a second : each one waits less, the lag shortens. Auto : what the camera chooses."
+      >
+        {CAPTURE_FPS.map((r) => (
+          <option key={r} value={r}>{r ? `${r} fps` : 'auto fps'}</option>
+        ))}
+      </select>
+      <span
+        className="w-[5.5rem] shrink-0 text-right font-mono text-[9px] text-muted"
+        title="What the camera really delivers now (it may not have the format asked : it gives the nearest it has)"
+      >
+        {st && st.w ? `${st.w}×${st.h} · ${Math.round(st.fps)}` : 'not open'}
+      </span>
+    </div>
+  )
+}
+
 /** What People finds, under its controls. */
 function PeopleReadout({ layer, slot }: { layer: number; slot: 'A' | 'B' }): JSX.Element {
   const [s, setS] = useState<PersonStatus | null>(null)
@@ -185,9 +234,12 @@ export function SourceFraming({
   const people = state.personCount ?? 2
   const blur = state.personBlur ?? 0.5
   const soft = state.personSoft ?? 0.3
+  // a camera (not a screen, NDI or a USB input on the Mac) : its capture format
+  const camKey = state.kind === 'capture' ? cameraKey(state.mediaId ?? '', state.mediaName ?? '') : null
 
   return (
     <div className="flex flex-col gap-1 border-t border-border px-2 py-2">
+      {camKey && <CameraFormat camKey={camKey} />}
       <div className="mb-0.5 flex items-center gap-2">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted">framing</span>
         <div className="flex-1" />

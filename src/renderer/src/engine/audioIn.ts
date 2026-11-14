@@ -15,6 +15,7 @@
 // the salient signal dominates cross-modal perception.
 
 import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, stereoDestination, type ChPick } from '../audio/channelPick'
+import { AUDIO_FORMAT_DEFAULT, contextOptions, formatKey, latencyOf, type AudioFormat, type LatencyInfo } from '../audio/audioFormat'
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
 
@@ -262,6 +263,10 @@ class AudioBus {
   private monitorNodes: AudioNode[] = []
   /** How many channels the open input delivers (0 : none open). */
   inChannels = 0
+  // The sample rate and buffer asked of the device; the one the input was
+  // opened with (another reopens it : App compares them).
+  private fmt: AudioFormat = { ...AUDIO_FORMAT_DEFAULT }
+  openedFormat = ''
 
   // USB-noise denoiser : an adaptive multi-notch filter. `learnNoise` measures
   // the input's average spectrum, finds the narrowband peaks (mains hum + its
@@ -334,7 +339,9 @@ class AudioBus {
         noiseSuppression: false,
         autoGainControl: false,
         // every channel the device gives, so one of them can be picked
-        channelCount: { ideal: 32 }
+        channelCount: { ideal: 32 },
+        // the buffer asked for, as a latency (the capture is told too)
+        ...(this.fmt.frames ? { latency: { ideal: this.fmt.frames / (this.fmt.rate || 48000) } } : {})
       }
       // The chosen device by its id; else found again by its name (an id is
       // not stable : another build of the app, another USB port); else the
@@ -377,7 +384,8 @@ class AudioBus {
         this.lost = { id: this.requested, label: tr.label || (label ?? '') }
         this.watchDevices()
       })
-      const ctx = new AudioContext()
+      const ctx = new AudioContext(contextOptions(this.fmt))
+      this.openedFormat = formatKey(this.fmt)
       const raw = ctx.createMediaStreamSource(stream)
       // the picked channels : a pair, or one on both sides
       const nIn = Math.max(1, Math.min(32, tr?.getSettings().channelCount ?? 2))
@@ -469,6 +477,7 @@ class AudioBus {
     this.monitorNodes = []
     this.inRoute = null
     this.inChannels = 0
+    this.openedFormat = ''
     this.preSplit = null
     this.srcNode = null
     this.srcOut = null
@@ -641,6 +650,21 @@ class AudioBus {
   setMonitorSink(deviceId: string): void {
     this.monitorSink = deviceId || ''
     if (this.ctx) this.applySink(this.ctx, this.monitorSink)
+  }
+
+  /** The sample rate and buffer for the next open (App reopens the input when
+   *  it differs from the one it was opened with). */
+  setFormat(f: AudioFormat): void {
+    this.fmt = { ...f }
+  }
+
+  get formatWanted(): string {
+    return formatKey(this.fmt)
+  }
+
+  /** What the device really gives (null : no input open). */
+  latencyInfo(): LatencyInfo | null {
+    return latencyOf(this.ctx)
   }
 
   /** Which channels of the input it listens to (a pair, or one on both sides). */

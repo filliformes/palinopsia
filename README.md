@@ -756,7 +756,13 @@ turn; it stays through *reset*, since it is how the camera hangs). **A camera op
 the selfie view** (*left-right* : raise your left arm, it shows on the left of the
 screen), and **its mirror is remembered for that camera on this computer** : set a
 capture card or a camera filming the stage to *off* once and it opens that way every
-time. Screens and NDI open as they arrive. Then **zoom** and
+time. Screens and NDI open as they arrive. A camera's **resolution** and **frame
+rate** sit above the framing (**camera** : auto, 4K, 1080p, 720p, 480p; auto fps or 24
+to 120), kept for that camera on this computer and applied to it at once, with what
+it really delivers beside them (*1280×720 · 60*). The lag of a live camera is mostly
+there : at its highest resolution many webcams fall to a low frame rate, so a lower
+resolution at 60 fps is often much quicker. *Auto* is as before (a picked camera at
+its highest resolution, the default camera at the system's own). Then **zoom** and
 **pan**. **Crop** cuts the picture's edges
 away where they are : what is left neither moves nor stretches. **Feather** softens
 whatever edge remains, the crop's or the picture's own (0 to half the layer's height).
@@ -1481,6 +1487,16 @@ The **Connect** right-column tab (key `A`) holds the control panels
     name, else the default input) on the same channels; it used to open the default
     input whatever was chosen. With the Audio Layer as the input, it opens the
     default input as before.
+  - **Latency** (under the devices) : the audio engine's **sample rate** (the device's
+    own, or 44.1, 48, 88.2, 96 kHz : another than the device's is converted on the
+    way) and the **buffer** asked of the device (auto : the lowest; or 128 to 4096
+    samples : smaller is quicker, larger rides out a busy computer without clicks).
+    Both audio contexts take them : Sonify's (with the Audio Layer and a recording's
+    sound) and the input's with its monitor. A change starts the sound over on a new
+    context (after the take, while one records) and reopens the input. The system has
+    the last word, so the line under the menus says what you really get : the rate,
+    the engine's buffer and the output's own latency (*out 48 kHz · 10.0 + 42.0 ms*;
+    Windows in shared mode holds about 10 ms at the least). Kept per computer.
   - **Audio Layer** as the input (its entry in the input menu, under Default input) :
     the analyser listens to the [Audio Layer](#the-audio-layer)'s whole sound (both
     slots mixed, after their volumes) instead of a device, so the coupling rows and

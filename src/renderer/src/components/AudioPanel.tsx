@@ -14,6 +14,7 @@ import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
 import { ChannelSelect, useOutputChannels } from '../audio/channelPick'
 import { sonifyEngine } from '../audio/sonify'
+import { AUDIO_BUFFERS, AUDIO_RATES, bufferLabel, rateLabel, type LatencyInfo } from '../audio/audioFormat'
 
 const SOURCES: Array<{ id: 'both' | 'osc' | 'local'; label: string; title: string }> = [
   { id: 'both', label: 'Both', title: 'OSC (Pandore) primary, local input as fallback' },
@@ -66,6 +67,11 @@ export function AudioPanel(): JSX.Element {
   // read twice a second while the tab shows
   const inN = usePolled(() => audioBus.inChannels, 500)
   const spaceOn = usePolled(() => sonifyEngine.spaceOn, 500)
+  // the engine's sample rate and buffer, and what the devices really give
+  const fmt = useStore((s) => s.audioFormat)
+  const setFmt = useStore((s) => s.setAudioFormat)
+  const outLat = usePolled(() => latKey(sonifyEngine.latencyInfo()), 1000)
+  const inLat = usePolled(() => latKey(audioBus.latencyInfo()), 1000)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
@@ -206,6 +212,38 @@ export function AudioPanel(): JSX.Element {
         </div>
         {enabled && <Meters />}
       </div>
+      {/* The engine's sample rate and buffer (both audio contexts take them; a
+          change starts the sound over), and what the devices really give. */}
+      <div className="flex min-w-0 items-center gap-1">
+        <span className="w-12 shrink-0 font-mono text-[9px] uppercase text-muted" title="The audio engine's sample rate and buffer, on this computer">latency</span>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={fmt.rate}
+          onChange={(e) => setFmt({ ...fmt, rate: Number(e.target.value) })}
+          title="The sample rate the audio runs at (Sonify, the Audio Layer, a recording's sound, the input and its monitor). The device's rate is the safest; another one is converted on the way, which adds a little latency. A change starts the sound over (after the take, while one records)."
+        >
+          {AUDIO_RATES.map((r) => (
+            <option key={r} value={r}>{rateLabel(r)}</option>
+          ))}
+        </select>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={fmt.frames}
+          onChange={(e) => setFmt({ ...fmt, frames: Number(e.target.value) })}
+          title="The buffer asked of the device, in samples : smaller is quicker, larger rides out a busy computer without clicks. Auto asks for the lowest. The system has the last word (Windows often holds 10 ms at the least) : the line under it says what you really get."
+        >
+          {AUDIO_BUFFERS.map((b) => (
+            <option key={b} value={b}>{bufferLabel(b)}</option>
+          ))}
+        </select>
+      </div>
+      <p
+        className="pl-[52px] font-mono text-[9px] leading-tight text-muted"
+        title="What the devices really give : the sample rate, the engine's buffer, and the output's own latency (the device and the system, when the browser knows it). Sonify's line is shown once its sound has started; the input's once it is open."
+      >
+        {outLat ? `out ${outLat}` : 'out : not running'}
+        {inLat ? ` · in ${inLat}` : ''}
+      </p>
       {enabled && (
         <p className="font-mono text-[9px] leading-tight text-muted">
           Assign to parameters via the <span className="text-accent">audio</span> modulator type
@@ -328,6 +366,12 @@ export function AudioPanel(): JSX.Element {
       </div>
     </div>
   )
+}
+
+/** A latency for the line under the menus : "48 kHz · 10.0 + 12.0 ms". */
+function latKey(l: LatencyInfo | null): string {
+  if (!l) return ''
+  return `${(l.rate / 1000).toFixed(l.rate % 1000 ? 1 : 0)} kHz · ${l.baseMs.toFixed(1)}${l.outMs ? ` + ${l.outMs.toFixed(1)}` : ''} ms`
 }
 
 /** A value only an engine knows, read every `ms` while shown. */

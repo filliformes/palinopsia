@@ -23,6 +23,7 @@ import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
 import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
 import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, type ChPick } from './channelPick'
+import { AUDIO_FORMAT_DEFAULT, contextOptions, formatKey, latencyOf, type AudioFormat, type LatencyInfo } from './audioFormat'
 import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
 import { SIGNAL_DEPTH_PARAMS, defaultSignalPatch, normalizeSignalPatch, signalHit, signalModOf, signalPlayerCfg, type SignalRow } from './signalPlay'
 
@@ -702,6 +703,8 @@ class SonifyEngine {
   private healNextAt = 0
   private healOkSince = 0
   private healAfterTake = false // a rebuild waits for the take holding the bus
+  // the sample rate and buffer asked of the device (per computer)
+  private fmt: AudioFormat = { ...AUDIO_FORMAT_DEFAULT }
   private watchTimer = 0
   private lastClock = -1
   private tap: AudioWorkletNode | null = null
@@ -954,7 +957,7 @@ class SonifyEngine {
   private ensureCtx(): Promise<AudioContext> {
     if (this.ctxReady) return this.ctxReady
     this.ctxReady = (async (): Promise<AudioContext> => {
-      const ctx = new AudioContext({ latencyHint: 'interactive' })
+      const ctx = new AudioContext(contextOptions(this.fmt))
       try {
         // the Synth's engine first : the soni processor builds it from the
         // shared worklet scope (globalThis.OpsiaSynth). On its own catch : if
@@ -1431,6 +1434,21 @@ class SonifyEngine {
    *  the pieces' own frame coordinates (null : no Collage voice). */
   collageGroupPos(): Float32Array | null {
     return this.collage?.groupPos ?? null
+  }
+
+  /** The sample rate and buffer asked of the device : a new one starts the
+   *  sound over on a fresh context (after the take, while one records). */
+  setEngineFormat(f: AudioFormat): void {
+    if (formatKey(f) === formatKey(this.fmt)) return
+    this.fmt = { ...f }
+    if (!this.ctx) return
+    if (this.bus > 0) { this.healAfterTake = true; return }
+    void this.rebuild()
+  }
+
+  /** What the device really gives (null : no audio context open). */
+  latencyInfo(): LatencyInfo | null {
+    return latencyOf(this.ctx)
   }
 
   /** Space places the channels itself (on speakers, or heard on headphones). */

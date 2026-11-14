@@ -247,6 +247,10 @@ useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
     audioBus.setInChannels(st.audioInCh)
     audioBus.setMonitorChannels(st.audioMonitorCh)
     sonifyEngine.setOutChannels(st.soniOutCh)
+    // the sample rate and buffer : Sonify starts over on a new context; the
+    // input takes it on its next open (reopened below)
+    sonifyEngine.setEngineFormat(st.audioFormat)
+    audioBus.setFormat(st.audioFormat)
     const layer = st.audioDeviceId === LAYER_INPUT
     sonifyEngine.setLineInput(layer ? '' : st.audioDeviceId ?? '', layer ? '' : st.audioDeviceLabel ?? '', layer ? CH_DEFAULT : st.audioInCh)
   }
@@ -878,6 +882,8 @@ export default function App(): JSX.Element {
   const audioSource = useStore((s) => s.audioSource)
   const audioDeviceId = useStore((s) => s.audioDeviceId)
   const audioDeviceLabel = useStore((s) => s.audioDeviceLabel)
+  // (a new sample rate or buffer reopens the input on it)
+  const audioFormatKey = useStore((s) => `${s.audioFormat.rate}:${s.audioFormat.frames}`)
   useEffect(() => {
     if (!audioEnabled) {
       audioBus.mode = 'off'
@@ -893,7 +899,7 @@ export default function App(): JSX.Element {
     // (an open overtaken by another device or Audio off says nothing : the bus
     // let it go)
     let current = true
-    if (wantLocal && (!audioBus.localActive || audioBus.requested !== want)) {
+    if (wantLocal && (!audioBus.localActive || audioBus.requested !== want || (!audioBus.fromLayer && audioBus.openedFormat !== audioBus.formatWanted))) {
       void audioBus.startLocal(audioDeviceId, audioDeviceLabel).then((ok) => {
         if (!current) return
         // (said in Both too : there it fell back to nothing, silently)
@@ -910,7 +916,7 @@ export default function App(): JSX.Element {
       current = false
       audioBus.mode = 'off'
     }
-  }, [audioEnabled, audioSource, audioDeviceId, audioDeviceLabel])
+  }, [audioEnabled, audioSource, audioDeviceId, audioDeviceLabel, audioFormatKey])
 
   // ── Audio monitoring / passthrough : push the (machine-local) monitor config
   //    to the bus. It re-applies to a fresh input on its own (startLocal reads
