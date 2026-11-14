@@ -420,6 +420,11 @@ methods are free to build on; naming them is a matter of respect.
     Chord and its Chord bank (`sonify.ts`);
   - its **Granular** layer (grains whose sound comes from the picture's colours) → Flow
     and its colour-steered grain timbre.
+  - its circular and spiral **reading paths** → the radial and spiral paths and the
+    breathing sweep of Spectra and Filter.
+
+  These were designed after Aural Mirror on 2026-08-25. Each was implemented
+  independently, and no code was taken from it.
 - **The image-to-sound lineage** named beside Spectra: Evgeny Murzin's **ANS**
   photoelectronic synthesizer (1958), **MetaSynth** (Eric Wenger, U&I Software) and
   Peter Meijer's **The vOICe** (1992).
