@@ -2810,7 +2810,7 @@ wolfy87-eventemitter@5.2.9  (Unlicense)
 (this package ships no license file; its package.json declares Unlicense)
 
 ------------------------------------------------------------------------------
-ws@8.18.0  (MIT)
+ws@8.23.0  (MIT)
 
 Copyright (c) 2011 Einar Otto Stangvik <einaros@gmail.com>
 Copyright (c) 2013 Arnout Kazemier and contributors

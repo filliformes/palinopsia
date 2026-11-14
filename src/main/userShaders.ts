@@ -6,7 +6,7 @@
 
 import { app, dialog, ipcMain, shell } from 'electron'
 import { promises as fs, mkdirSync } from 'fs'
-import { basename, extname, join } from 'path'
+import { basename, dirname, extname, join, resolve } from 'path'
 import { userFilesBase } from './paths'
 import { lastDir, rememberDir } from './lastDir'
 import { fileNameOf, userShaderId } from '@shared/userShaderId'
@@ -99,6 +99,8 @@ export function registerUserShaders(): void {
   ipcMain.handle('shaders:save', async (_e, name: string, source: string) => {
     const n = fileNameOf(String(name ?? ''))
     const file = join(shadersDir(), `${n}.fs`)
+    // Never outside the Shaders folder, whatever the name held.
+    if (dirname(resolve(file)) !== resolve(shadersDir())) return { ok: false, name: n, file, error: 'That name cannot be a file name.' }
     const src = String(source ?? '')
     try {
       // what it replaces (this file, its twins) goes to the history first

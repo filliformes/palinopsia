@@ -47,6 +47,21 @@ that CI builds into cross-platform releases.
   - **Measured.** RT60 is within 7 % of the decay law. The 30-second freeze holds within
     0.1 dB. 240 extreme settings stay stable. It runs about 60× faster than real time.
 
+### Security
+
+- **Electron 44.11.3** (from 44.5.1) : six patch releases of Chromium fixes.
+- **OSCQuery** : web pages and DNS-rebound names are refused, on HTTP and on the
+  WebSocket (the same Host and Origin check as the MCP server). The WebSocket also gets
+  a 64 KB frame cap and a cap on how many addresses one client may LISTEN to. `ws` is
+  8.23.0, the osc library's included.
+- **HIVE output** : a client that stops reading is dropped past 8 MB of backlog, instead
+  of the app buffering for it until it runs out of memory.
+- **Shader names** : a backslash or leading dots can no longer take a saved shader
+  outside the Shaders folder (Windows), and the main process checks it again.
+- **CI** : the build job, which runs every dependency's install script, is read-only and
+  keeps no token in `.git/config`. Only the release job may write, and its release
+  action is pinned to a commit.
+
 ### Fixed
 
 - **Tracking no longer carries any CC BY 3.0 code** (GPL-incompatible). The freeze line,

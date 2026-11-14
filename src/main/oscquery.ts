@@ -37,6 +37,21 @@ interface WsClient {
   listen: Set<string>
 }
 
+
+/** The most addresses one WebSocket client may LISTEN to (the whole tree is a
+ *  few thousand). */
+const LISTEN_MAX = 8192
+
+/** Only this computer, and never a web page : the Host must be this machine (DNS
+ *  rebinding), an Origin, if any, a local one. As the MCP server (mcp.ts). */
+function localOnly(req: IncomingMessage): boolean {
+  const host = String(req.headers.host ?? '').toLowerCase()
+  const hostOk = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)
+  const origin = req.headers.origin
+  const originOk = !origin || /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(origin)
+  return hostOk && originOk
+}
+
 export class OscQueryServer {
   private tree: OscQueryNode[] = []
   private server: Server | null = null
@@ -112,7 +127,10 @@ export class OscQueryServer {
       const server = createServer((req, res) => {
         // No wildcard CORS: OSCQuery clients are native, and the server is
         // localhost-bound below : we don't want arbitrary web origins reading
-        // the live parameter tree.
+        // the live parameter tree. A web page (an Origin that isn't this
+        // machine) or a rebound DNS name (a Host that isn't this machine) is
+        // refused outright.
+        if (!localOnly(req)) { res.statusCode = 403; res.end(); return }
         res.setHeader('Content-Type', 'application/json')
         const url = req.url ?? '/'
         if (url.includes('HOST_INFO')) {
@@ -141,8 +159,11 @@ export class OscQueryServer {
 
       // Value-stream: upgrade WS on the same server (loopback-bound like the HTTP
       // side). Clients LISTEN/IGNORE per path; we push value frames via pushValues.
-      const wss = new WebSocketServer({ noServer: true })
+      // Control frames are a few bytes of JSON : 64 KB is generous, and a page
+      // or a peer can no longer send 100 MB frames at the main process.
+      const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 })
       server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+        if (!localOnly(req)) { socket.destroy(); return }
         wss.handleUpgrade(req, socket, head, (ws) => {
           const client: WsClient = { ws, listen: new Set() }
           this.clients.add(client)
@@ -151,7 +172,8 @@ export class OscQueryServer {
             try {
               const msg = JSON.parse(data.toString()) as { COMMAND?: string; DATA?: string }
               const cmd = msg.COMMAND?.toUpperCase()
-              if (cmd === 'LISTEN' && msg.DATA) client.listen.add(msg.DATA)
+              // Capped : a client cannot grow its listen set without bound.
+              if (cmd === 'LISTEN' && typeof msg.DATA === 'string' && client.listen.size < LISTEN_MAX) client.listen.add(msg.DATA)
               else if (cmd === 'IGNORE' && msg.DATA) client.listen.delete(msg.DATA)
             } catch {
               /* ignore malformed control frames */

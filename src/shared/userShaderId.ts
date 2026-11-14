@@ -24,5 +24,7 @@ export function userShaderId(name: string): string {
 /** The name a file can carry (a shader's name IS its file name) : main saves
  *  under it, so the page computes the id from it too (a long name, or one made
  *  of reserved characters, is another shader than its raw spelling says). */
+//  Both slashes go (a backslash is a folder on Windows), and leading dots too
+//  (no ".." : the file always stays in the Shaders folder).
 export const fileNameOf = (name: string): string =>
-  name.replace(/[\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'shader'
+  name.replace(/[\/\\:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[.\s]+/, '').slice(0, 80) || 'shader'

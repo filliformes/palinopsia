@@ -78,6 +78,8 @@ export function hiveSendStart(
   })
 }
 
+const HIVE_MAX_BACKLOG = 8 * 1024 * 1024
+
 /** A HEVC Annex-B chunk from the encoder → fan out to live clients. */
 export function hiveSendChunk(key: boolean, data: Uint8Array): void {
   if (clients.length === 0) return
@@ -87,6 +89,10 @@ export function hiveSendChunk(key: boolean, data: Uint8Array): void {
       if (!key) continue // pending clients wait for the first keyframe
       c.live = true
     }
+    // A client that stops reading would make Node buffer every frame for it
+    // (about 10 MB a second at 80 Mbit/s) until the app runs out of memory :
+    // past 8 MB unread, it is dropped (it can connect again, from a keyframe).
+    if (c.sock.writableLength > HIVE_MAX_BACKLOG) { c.sock.destroy(); continue }
     try {
       c.sock.write(buf)
     } catch {
