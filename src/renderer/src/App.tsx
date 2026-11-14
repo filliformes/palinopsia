@@ -18,6 +18,7 @@ import { applyFrameWeave, resetFrameWeave } from './engine/frameWeave'
 import { setPainting } from './engine/frameWatch'
 import { pushMarkSignal } from './engine/markSignal'
 import { installOscMonitor, sendOsc as sendOscMsg } from './oscMonitor'
+import { destsFor, feedbackWanted } from './oscDests'
 import { applyMetaGlides, applyModulation, flushVaryEdges, modEngine, setVaryTrigger } from './engine/modulation'
 import { onSessionLoaded } from './sessionEvents'
 import { modPin } from './persist'
@@ -684,9 +685,11 @@ export default function App(): JSX.Element {
     const pending: Array<{ g: BodyGesture; due: number }> = []
     const within = (t: number | undefined, now: number): boolean => t != null && t > 0 && now - t <= COMBO_MS
     const oscSafe = (s: string): string => (s || 'rule').replace(/[^A-Za-z0-9_]/g, '_')
+    // (to every destination that takes the Body rules' OSC)
     const sendOsc = (addr: string): void => {
-      const s = useStore.getState()
-      try { void sendOscMsg(s.oscOutHost, s.oscOutPort, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
+      for (const d of destsFor('body')) {
+        try { void sendOscMsg(d.host, d.port, addr, [{ type: 'i', value: 1 }]) } catch { /* socket busy */ }
+      }
     }
     type Rule = ReturnType<typeof useStore.getState>['bodyControl']['rules'][number]
     const fireRule = (r: Rule, oscOut: boolean): void => {
@@ -1807,7 +1810,7 @@ export default function App(): JSX.Element {
           c.layers.some((l) => l.sourceA.kind === 'assemble' || l.sourceB?.kind === 'assemble')
         if (
           now - lastVisionSample > 33 &&
-          (st.oscOutEnabled ||
+          (feedbackWanted() ||
             assembleLive ||
             // the Resolume mapper reading picture features
             (st.resolume.enabled && st.resolume.inputs.some((i) => i.source.startsWith('vision:'))) ||

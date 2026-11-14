@@ -121,7 +121,9 @@ import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { colorOf, hsvaOf, PART_INDEX, PART_OF_WORD, PART_WORD, withPart } from './engine/colorParts'
 import type { ColorChannel } from '@shared/types'
 import { modTargetKey, useStore } from './store'
-import { sendOsc } from './oscMonitor'
+import { sendOsc, sendOscBatch, type OscArg } from './oscMonitor'
+import { destsFor } from './oscDests'
+import { aliasesFor, aliasValue } from './oscAliases'
 import type { RandomizeScope } from './randomize'
 import { setKnobTarget, commitKnob } from './metaSmooth'
 import { firePanic, fireVariation } from './commands'
@@ -323,6 +325,16 @@ function route(address: string, args: Args, host = ''): void {
   // or plays what it was learned on (oscLearn.ts). /opsia/… never goes there,
   // so a learned address can never replace or hide a built-in one.
   if (segs[0] !== 'opsia') {
+    // An alias (the map table) plays its /opsia address, scaled; a learned
+    // mapping of the same address still plays too.
+    const al = aliasesFor(address)
+    if (al) {
+      for (const a of al) {
+        const raw = args[a.arg]
+        const v = typeof raw?.value === 'number' ? raw.value : raw?.value === true ? 1 : raw?.value === false ? 0 : NaN
+        if (Number.isFinite(v)) route(a.target, [{ type: 'f', value: aliasValue(a, v) }], host)
+      }
+    }
     oscLearn.handle(address, args, host)
     return
   }
@@ -1969,31 +1981,41 @@ export function publishOscQuery(): void {
 // modulator sweeping opacity, a scene recall, a hand on a slider). Symmetric
 // with the inbound map: same `/opsia/...` addresses, same 0..1 convention.
 
-const lastSent = new Map<string, number>()
+// One memory per destination (host:port) : each receiver gets everything it has
+// not seen yet, so a destination added later syncs from scratch on its own.
+const lastSent = new Map<string, Map<string, number>>()
 let feedbackTimer: ReturnType<typeof setInterval> | null = null
 const EPS = 0.0015 // ~1/650 : below the noise floor of a modulator at rest
 
 function pushFeedback(): void {
-  const st = useStore.getState()
-  if (!st.oscOutEnabled || !st.oscOutHost) return
-  const host = st.oscOutHost
-  const port = st.oscOutPort
-  let sent = 0
-  for (const leaf of enumerateLeaves()) {
-    if (!leaf.stream) continue
-    const prev = lastSent.get(leaf.path)
-    if (prev !== undefined && Math.abs(prev - leaf.value) < EPS) continue
-    // Cap the burst on the very first pass (nothing cached) so we don't flood.
-    // Record as "sent" only AFTER we actually transmit : otherwise capped leaves
-    // get cached here and then skipped forever (prev matches value on every later
-    // tick), so anything past the cap would never reach Pandore.
-    if (prev === undefined && sent > 96) continue
-    const arg = leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }
-    void sendOsc(host, port, leaf.path, [arg])
-    if (leaf.alias) void sendOsc(host, port, leaf.alias, [arg])
-    lastSent.set(leaf.path, leaf.value)
-    sent++
+  const dests = destsFor('feedback')
+  if (!dests.length) return
+  const leaves = enumerateLeaves() // once a tick, for every destination
+  for (const d of dests) {
+    const key = `${d.host}:${d.port}`
+    let mem = lastSent.get(key)
+    if (!mem) lastSent.set(key, (mem = new Map()))
+    const msgs: Array<{ address: string; args: OscArg[] }> = []
+    let fresh = 0
+    for (const leaf of leaves) {
+      if (!leaf.stream) continue
+      if (d.prefixes.length && !d.prefixes.some((p) => leaf.path.startsWith(p))) continue
+      const prev = mem.get(leaf.path)
+      if (prev !== undefined && Math.abs(prev - leaf.value) < EPS) continue
+      // Cap the burst on the very first pass (nothing cached) so we don't flood.
+      // Record as "sent" only AFTER it is sent : a capped leaf cached here would be
+      // skipped forever (prev matches value on every later tick).
+      if (prev === undefined && fresh > 96) continue
+      if (prev === undefined) fresh++
+      const arg: OscArg = leaf.int ? { type: 'i', value: Math.round(leaf.value) } : { type: 'f', value: leaf.value }
+      msgs.push({ address: leaf.path, args: [arg] })
+      if (leaf.alias) msgs.push({ address: leaf.alias, args: [arg] })
+      mem.set(leaf.path, leaf.value)
+    }
+    if (msgs.length) sendOscBatch(d.host, d.port, msgs)
   }
+  // forget destinations that are gone (their next return starts from scratch)
+  if (lastSent.size > dests.length) for (const k of [...lastSent.keys()]) if (!dests.some((d) => `${d.host}:${d.port}` === k)) lastSent.delete(k)
 }
 
 /** Start/stop the outbound feedback loop to match the store's oscOut config. */
@@ -2003,8 +2025,8 @@ export function applyOscOutput(): void {
     clearInterval(feedbackTimer)
     feedbackTimer = null
   }
-  lastSent.clear() // force a full resend on (re)start so Pandore syncs from scratch
-  if (st.oscOutEnabled && st.oscOutHost) {
+  lastSent.clear() // force a full resend on (re)start so every receiver syncs from scratch
+  if (st.oscOutEnabled) {
     feedbackTimer = setInterval(pushFeedback, Math.max(40, st.oscOutIntervalMs || 100))
   }
 }

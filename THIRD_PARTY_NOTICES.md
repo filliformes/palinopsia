@@ -63,7 +63,7 @@ asio 1.38.2 (standalone) is the networking library Ableton Link is built on. Cop
 
 The Windows texture sharing (the Spout sender and receiver) compiles the Spout2 SDK sources
 (https://github.com/leadedge/Spout2) into `spout.node`. Copyright (c) 2014-2024, Lynn
-Jarvis; `SpoutCommon.h` credits Malcolm Bechard (https://github.com/mbechard). BSD
+Jarvis (2014-2025 across its files); `SpoutCommon.h` credits Malcolm Bechard (https://github.com/mbechard). BSD
 2-Clause License. Each SDK file carries the notice, and its text is in
 [`licenses/Spout2-License.txt`](licenses/Spout2-License.txt). Spout is Lynn Jarvis' and
 Leading Edge's project (https://spout.zeal.co).
@@ -103,6 +103,20 @@ own, and none of either shader's lines remain:
 - the tints and the drift are new.
 
 Both works are credited here for the model they gave.
+
+### BENDR (`src/renderer/src/engine/convNodes.ts` : the Melt node)
+
+BENDR is a circuit-bent video processor in the browser, by Steve Blythe
+(https://github.com/clickysteve/bendr). Copyright (c) 2026 Steve Blythe, MIT License.
+- **The Melt node** (`F_MELT`, `MeltNode`) is adapted from BENDR's melting edge: an edge
+  band and its normal, the node's own last frame dissolved back inside the band, and the
+  creep.
+- **Ideas only, no code taken:**
+  - the NTSC effect;
+  - Faultline (BENDR's dirty mixer);
+  - the panic flush (key 0);
+  - the Datamosh node's mosh gate, edge repel and re-sharp. The node was rewritten
+    clean-room in v1.3.4; earlier versions adapted these three from BENDR's code.
 
 ### Hash without Sine (many shaders)
 
@@ -433,6 +447,43 @@ methods are free to build on; naming them is a matter of respect.
   taken.
 - **unity-vhsglitch** by Staffan Widegarn Åhlvik and VIDVOX's **VHS Glitch**: the model of
   the Tracking effect (Part 1).
+- **ffglitch** (Ramiro Polla, https://ffglitch.org; ffglitch-core LGPL-2.1+ / GPL-2+,
+  ffglitch-scripts Unlicense) and **Datamosher-Pro** (Akash Bora,
+  https://github.com/Akascape/Datamosher-Pro, MIT). Behind the Datamosh node:
+  - motion vectors averaged, rotated and reversed;
+  - the bloom fired by hand or on a pulse;
+  - the triggerable glitch family.
+
+  No code was taken.
+- **Nuvotion** (Nuvotion Visuals' web VJ app): the XY pads over the Macro knobs.
+- **Tixl** (https://github.com/tixl3d/tixl, MIT) and **nw_wrld**
+  (https://github.com/aagentah/nw_wrld, GPL-3.0): the light output and the installation
+  mode. No code taken.
+- **LZX Industries**, with no code taken:
+  - Videomancer's generative operators, behind the Euclid, Turing and Cellular
+    modulators;
+  - Memory Palace's feedback, behind the Feedback node's chroma key, placement and
+    saturation drift;
+  - the ramp generators and colorizers (Ramps, Colorizer).
+- **The Turing Machine** by Tom Whitwell, Music Thing Modular
+  (https://github.com/TomWhitwell/TuringMachine): the looping shift register whose bits flip
+  by chance, behind the Turing modulator. Idea only.
+- **EYESY** by Critter & Guitari (https://github.com/critterandguitari/EYESY_Modes_OSv3,
+  BSD-2-Clause): the reseed gesture and per-element audio, in Ten Print, Slabs, Grid
+  Drift, Shapes, Filaments and Ash. Ideas only.
+- **SpatGRIS** (GRIS, Université de Montréal, https://github.com/GRIS-UdeM/SpatGRIS,
+  GPL-3.0): its OSC and speaker-setup format, read so Space can talk to it. No code.
+- **VBAP and MDAP** (`shared/spatial.ts`): V. Pulkki, "Virtual sound source positioning
+  using vector base amplitude panning", *JAES* 45(6), 1997; V. Pulkki, "Uniform spreading
+  of amplitude panned virtual sources", IEEE WASPAA, 1999.
+- **The ideas behind early effects**, with no code taken:
+  - Signal Culture's apps, Lumen and Cathodemer;
+  - cacheflowe's haxademic (its pseudo pixel-sort, behind Smear);
+  - exeldro's obs-shaderfilter (behind Scanlines);
+  - libretro's common-shaders (behind Dither);
+  - Hydra (the fused passes);
+  - the visual work of Norman McLaren, John Whitney, Stan Brakhage, Bridget Riley, Victor
+    Vasarely and Jesús Rafael Soto.
 - **The Sonify Synth's published methods**, built from the sources, not from code:
   - the complex one-pole modal bank (M. Mathews and J. O. Smith, "Methods for
     synthesizing very high Q parametrically well behaved two pole filters", 2003);

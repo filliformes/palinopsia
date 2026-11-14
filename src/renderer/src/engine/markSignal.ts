@@ -11,7 +11,8 @@
 //   /opsia/av/mark-flux      f    frame-to-frame change (onset-ish)
 
 import { useStore } from '../store'
-import { sendOsc } from '../oscMonitor'
+import { sendOscBatch } from '../oscMonitor'
+import { destsFor } from '../oscDests'
 import { perfMeter } from './perfMeter'
 
 const N = 32 // scanline samples sent per frame
@@ -32,7 +33,8 @@ interface StripReader {
  *  step. No-op unless enabled + an outbound host is set. */
 export function pushMarkSignal(comp: StripReader, nowMs: number): void {
   const st = useStore.getState()
-  if (!st.markSignalEnabled || !st.oscOutHost) {
+  const dests = destsFor('mark')
+  if (!st.markSignalEnabled || !dests.length) {
     // Switched off : forget the rows still in flight, or the first one sent when
     // it comes back on would be a picture from before.
     if (reading) { reading = false; comp.dropMarkStrip() }
@@ -45,11 +47,11 @@ export function pushMarkSignal(comp: StripReader, nowMs: number): void {
     comp.kickMarkStrip(st.markSignalY ?? 0.5)
   }
   const strip = comp.takeMarkStrip(N)
-  if (strip) sendStrip(strip, st.oscOutHost, st.oscOutPort)
+  if (strip) sendStrip(strip, dests)
   perfMeter.end('mark')
 }
 
-function sendStrip(strip: Float32Array, host: string, port: number): void {
+function sendStrip(strip: Float32Array, dests: Array<{ host: string; port: number }>): void {
   let sum = 0, csum = 0
   for (let i = 0; i < N; i++) {
     sum += strip[i]
@@ -61,8 +63,12 @@ function sendStrip(strip: Float32Array, host: string, port: number): void {
   prevLevel = level
 
   const arg = (v: number): { type: 'f'; value: number } => ({ type: 'f', value: v })
-  sendOsc(host, port, '/opsia/av/mark-signal', Array.from(strip, arg))
-  sendOsc(host, port, '/opsia/av/mark-level', [arg(level)])
-  sendOsc(host, port, '/opsia/av/mark-centroid', [arg(centroid)])
-  sendOsc(host, port, '/opsia/av/mark-flux', [arg(flux)])
+  // built once, one batch to each destination that takes MARK
+  const msgs = [
+    { address: '/opsia/av/mark-signal', args: Array.from(strip, arg) },
+    { address: '/opsia/av/mark-level', args: [arg(level)] },
+    { address: '/opsia/av/mark-centroid', args: [arg(centroid)] },
+    { address: '/opsia/av/mark-flux', args: [arg(flux)] }
+  ]
+  for (const d of dests) sendOscBatch(d.host, d.port, msgs)
 }

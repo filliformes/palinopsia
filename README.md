@@ -3977,6 +3977,42 @@ a color's part → its address plus `/hue`, `/saturation`, `/brightness` or `/al
 
 ### Outbound (instrument → control, "feedback")
 
+**Destinations.** Palinopsia can send to several places at once (Pandore, dataFLOU,
+TouchDesigner…), listed under ↗ out in the OSC section.
+- **Each destination has** a name, its host:port, an on/off and its own content:
+  - **F**: the feedback below, optionally only under some address prefixes (⋯ or a
+    right-click on F, e.g. `/opsia/layer1, /opsia/meta`);
+  - **M**: MARK, the output's scanline as sound;
+  - **B**: the Body rules' OSC.
+- **The masters.** The FEEDBACK and MARK buttons, and the Body page's OSC switch, stay
+  the masters: a destination gets a kind only while its master is on.
+- **The same host:port twice** is sent to once (`= name`).
+- **Palinopsia's own input** is never sent to (`own input`, so no loops).
+- **The list is per computer** (it belongs to this network). The first destination is the
+  old single one: an existing setup carries over as it was.
+
+**links** (beside monitor) shows the connections:
+- **every sender** (host:port), with its msg/s and when it was last heard. Open one to see
+  each address it sends, with its last value and what Palinopsia makes of it:
+  - `✓` an advertised `/opsia` address;
+  - `✓ learned → …` an OSC Learn mapping;
+  - `✓ alias → …` an alias;
+  - the Resolume mapper's;
+  - `/opsia, unlisted` (a routed family, or a typo);
+  - `? not mapped`, with **map…** to make it an alias;
+- **every place Palinopsia sends to**, with its msg/s.
+
+The lists are kept only while links or the monitor is open.
+
+**map** is every address Palinopsia answers to, in one table with a filter:
+- **Aliases** are a controller's own addresses played onto any `/opsia` address, so they
+  reach everything, effect and source inputs included. Each takes the argument number,
+  the controller's range, the output range, a curve and invert. They are kept per
+  computer, and an alias plays alongside a learned mapping of the same address.
+- **What OSC Learn learned**, with its input range editable and a ✕ to forget it.
+- **The built-in `/opsia` addresses**, read-only, found by typing.
+
+
 When enabled, the instrument diffs its streamable parameters and pushes the changed
 ones to a peer (e.g. Pandore's UI mirrors yours). Same `/opsia/…` addresses
 (layers in the canonical `layer{n}` form), same `0..1` convention; **every

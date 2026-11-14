@@ -5,6 +5,28 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **OSC : several destinations, a connections view, a map.**
+  - **Several destinations.** Each has a name, host:port and on/off, and its own
+    content: F feedback (optionally only under some address prefixes), M MARK, B the
+    Body rules' OSC. FEEDBACK, MARK and the Body page's switch stay the masters.
+    - The same host:port is sent to once, and Palinopsia's own input never.
+    - The old single destination becomes the first one.
+    - Feedback goes out as one batch per destination per tick.
+  - **links**, the connections view.
+    - **Senders:** every sender (host:port, as the receiver now passes the sender's
+      port too), with its msg/s and last heard. Opened, it shows each address it sends
+      and what Palinopsia makes of it: `/opsia`, learned, alias, Resolume, unlisted,
+      or `? not mapped` with **map…**.
+    - **Destinations:** every place sent to, with its msg/s.
+  - **map**, one table of every address answered to:
+    - **aliases** play a controller's own address onto any `/opsia` address, with its
+      argument, input and output range, curve and invert (per computer; the router
+      plays them before OSC Learn);
+    - **OSC Learn's mappings**, with their input range editable;
+    - **the built-in `/opsia` addresses**, read-only, searchable.
+
 ### Changed
 
 - **dataflou : one node, and you choose what it shows.**

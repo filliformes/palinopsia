@@ -32,13 +32,15 @@ import type {
   SourceSlot,
   World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
-import type { MappingScope, OscBinding, SessionMappings } from '@shared/types'
+import type { MappingScope, OscAlias, OscBinding, SessionMappings } from '@shared/types'
 import { sanitizeMidiMap, sanitizeOscMap, sessionMappingsOut } from './mappingModel'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
 import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, cleanPublish, type DfConfig } from '@shared/dataflou'
+import { loadOscDests, makeDest, saveOscDests, type OscDest } from './oscDests'
+import { loadOscAliases, saveOscAliases } from './oscAliases'
 import { LOOP_BLENDS, LOOP_SYNCS, type LoopBlend } from '@shared/types'
 import { LOOP_DELAY_MAX_MS } from './engine/loopDelay'
 import { isLayerRackKind, LAYER_RACK_PROP, layerRackOf } from './layerRack'
@@ -849,6 +851,9 @@ function saveMap(key: string, map: object): void {
     /* quota : the mappings just won't survive the restart */
   }
 }
+
+// Where Palinopsia sends : loaded once (oscDests.ts), the first one mirrored below.
+const initialOscDests = loadOscDests()
 
 // The reply port of each OSC controller (by its IP), per computer.
 function loadOscReplies(): Record<string, { port: number; on: boolean }> {
@@ -2419,6 +2424,13 @@ interface StoreState {
   oscOutPort: number
   oscOutIntervalMs: number
   setOscOutConfig: (partial: Partial<{ enabled: boolean; host: string; port: number; intervalMs: number }>) => void
+  // Where Palinopsia sends (oscDests.ts) : several destinations, each its own
+  // content. oscOutHost/Port mirror the first one (older readers, MCP tools).
+  oscDests: OscDest[]
+  setOscDests: (list: OscDest[]) => void
+  // OSC aliases (oscAliases.ts) : controller addresses played onto /opsia ones
+  oscAliases: OscAlias[]
+  setOscAliases: (list: OscAlias[]) => void
 
   // User shader presets : app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
@@ -6084,11 +6096,9 @@ export const useStore = create<StoreState>((set, get) => ({
     }),
 
   oscOutEnabled: localStorage.getItem('opsia.oscOutEnabled') === '1',
-  oscOutHost: localStorage.getItem('opsia.oscOutHost') || '127.0.0.1',
-  oscOutPort: (() => {
-    const p = lsNum('opsia.oscOutPort')
-    return Number.isInteger(p) && p >= 1 && p <= 65535 ? p : 9001
-  })(),
+  // (the first destination's, for the readers of the single address)
+  oscOutHost: initialOscDests[0]?.host ?? '127.0.0.1',
+  oscOutPort: initialOscDests[0]?.port ?? 9001,
   oscOutIntervalMs: (() => {
     const m = lsNum('opsia.oscOutIntervalMs')
     return Number.isFinite(m) && m >= 40 && m <= 1000 ? m : 100
@@ -6097,16 +6107,36 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       if (partial.enabled !== undefined)
         localStorage.setItem('opsia.oscOutEnabled', partial.enabled ? '1' : '0')
-      if (partial.host !== undefined) localStorage.setItem('opsia.oscOutHost', partial.host)
-      if (partial.port !== undefined) localStorage.setItem('opsia.oscOutPort', String(partial.port))
       if (partial.intervalMs !== undefined)
         localStorage.setItem('opsia.oscOutIntervalMs', String(partial.intervalMs))
+      // a host or port (the MCP tools, an older call) : the first destination's
+      let oscDests = s.oscDests
+      if (partial.host !== undefined || partial.port !== undefined) {
+        const first = oscDests[0] ?? makeDest()
+        oscDests = [{ ...first, host: partial.host ?? first.host, port: partial.port ?? first.port }, ...oscDests.slice(1)]
+        saveOscDests(oscDests)
+      }
       return {
         oscOutEnabled: partial.enabled ?? s.oscOutEnabled,
-        oscOutHost: partial.host ?? s.oscOutHost,
-        oscOutPort: partial.port ?? s.oscOutPort,
-        oscOutIntervalMs: partial.intervalMs ?? s.oscOutIntervalMs
+        oscOutHost: oscDests[0]?.host ?? s.oscOutHost,
+        oscOutPort: oscDests[0]?.port ?? s.oscOutPort,
+        oscOutIntervalMs: partial.intervalMs ?? s.oscOutIntervalMs,
+        oscDests
       }
+    }),
+  oscDests: initialOscDests,
+  oscAliases: loadOscAliases(),
+  setOscAliases: (list) =>
+    set(() => {
+      const oscAliases = list.slice(0, 256)
+      saveOscAliases(oscAliases)
+      return { oscAliases }
+    }),
+  setOscDests: (list) =>
+    set(() => {
+      const oscDests = list.slice(0, 16)
+      saveOscDests(oscDests)
+      return { oscDests, oscOutHost: oscDests[0]?.host ?? '127.0.0.1', oscOutPort: oscDests[0]?.port ?? 9001 }
     }),
   collapsed: (() => {
     // Fresh-load layout: Meta and Modulation start collapsed (deep controls,

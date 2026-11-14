@@ -2637,6 +2637,7 @@ export class Compositor {
    *  (Light Trails, Wide Time, Slit Buffer, Context's trails ...), which an 8-bit
    *  decay can leave holding a ghost for good. Generator buffers (reaction-
    *  diffusion, Colony, latches) are left alone : they ARE the picture. */
+  // third-party: BENDR (the panic flush : an idea, no code)
   panic(): void {
     for (const layer of this.layers) layer.flush();
     this.masterRack.flushNodes();

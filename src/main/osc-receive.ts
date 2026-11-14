@@ -12,6 +12,7 @@ export type OscInMessage = {
   address: string
   args: Array<{ type: string; value: number | string | boolean }>
   host?: string // the sender's IP (OSC Learn answers learned controls there)
+  port?: number // the sender's UDP port (the connections view)
 }
 
 export class OscReceiver {
@@ -56,10 +57,12 @@ export class OscReceiver {
         const m = msg as osc.OscMessage
         if (!this.onMessage || !m || typeof m.address !== 'string') return
         const from = (info as { address?: unknown } | undefined)?.address
+        const fromPort = (info as { port?: unknown } | undefined)?.port
         this.onMessage({
           timestamp: Date.now(),
           address: m.address,
           ...(typeof from === 'string' ? { host: from } : {}),
+          ...(typeof fromPort === 'number' ? { port: fromPort } : {}),
           args: (m.args ?? []).map((a) => ({
             type: String(a.type),
             value: (a.value as number | string | boolean) ?? 0

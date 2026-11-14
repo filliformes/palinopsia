@@ -12,6 +12,9 @@ import { useStore } from '../store'
 import { applyOscListen, applyOscOutput } from '../oscInput'
 import { oscCounts, oscRates } from '../oscMonitor'
 import { OscMonitor } from './OscMonitor'
+import { OscDestinations } from './OscDestinations'
+import { OscConnections } from './OscConnections'
+import { OscMapTable } from './OscMapTable'
 import { numberBoxCh, numberBoxChars } from './numberBox'
 
 // a UDP port's box : as wide as "65535"
@@ -24,28 +27,22 @@ export function OscPanel(): JSX.Element {
   const oscAddresses = useStore((s) => s.oscAddresses)
   const setOscConfig = useStore((s) => s.setOscConfig)
   const oscOutEnabled = useStore((s) => s.oscOutEnabled)
-  const oscOutHost = useStore((s) => s.oscOutHost)
-  const oscOutPort = useStore((s) => s.oscOutPort)
   const setOscOutConfig = useStore((s) => s.setOscOutConfig)
   const markSignalEnabled = useStore((s) => s.markSignalEnabled)
   const setMarkSignal = useStore((s) => s.setMarkSignal)
   const collapsed = useStore((s) => !!s.collapsed['osc'])
   const toggleSection = useStore((s) => s.toggleSection)
   const [portStr, setPortStr] = useState(String(oscPort))
-  const [outHostStr, setOutHostStr] = useState(oscOutHost)
-  const [outPortStr, setOutPortStr] = useState(String(oscOutPort))
   const [last, setLast] = useState('')
   // A rejected port/host edit briefly flashes the field red instead of silently
   // snapping back with no explanation.
-  const [invalid, setInvalid] = useState<'port' | 'outHost' | 'outPort' | null>(null)
-  const flashInvalid = (f: 'port' | 'outHost' | 'outPort'): void => {
+  const [invalid, setInvalid] = useState<'port' | null>(null)
+  const flashInvalid = (f: 'port'): void => {
     setInvalid(f)
     window.setTimeout(() => setInvalid((c) => (c === f ? null : c)), 700)
   }
 
   useEffect(() => setPortStr(String(oscPort)), [oscPort])
-  useEffect(() => setOutHostStr(oscOutHost), [oscOutHost])
-  useEffect(() => setOutPortStr(String(oscOutPort)), [oscOutPort])
 
   // Activity lights, msg/s and the last inbound address : polled from the
   // monitor's counters, never a re-render per message.
@@ -53,7 +50,13 @@ export function OscPanel(): JSX.Element {
   const outDot = useRef<HTMLSpanElement | null>(null)
   const lastRef = useRef('')
   const [rate, setRate] = useState({ in: 0, out: 0 })
-  const [monitorOpen, setMonitorOpen] = useState(false)
+  // one pane at a time under the section : the monitor, the connections, the map
+  const [pane, setPane] = useState<'monitor' | 'links' | 'map' | null>(null)
+  const [mapPrefill, setMapPrefill] = useState<string | null>(null)
+  const openPane = (p: 'monitor' | 'links' | 'map'): void => {
+    setPane(pane === p && !collapsed ? null : p)
+    if (collapsed) toggleSection('osc')
+  }
   useEffect(() => {
     const unsub = window.api.onOscReceived((batch) => {
       if (batch.length) lastRef.current = batch[batch.length - 1].address
@@ -92,27 +95,6 @@ export function OscPanel(): JSX.Element {
     setOscOutConfig({ enabled: !oscOutEnabled })
     applyOscOutput()
   }
-  function commitOutHost(): void {
-    const h = outHostStr.trim()
-    if (h) {
-      setOscOutConfig({ host: h })
-      if (oscOutEnabled) applyOscOutput()
-    } else {
-      setOutHostStr(oscOutHost)
-      flashInvalid('outHost')
-    }
-  }
-  function commitOutPort(): void {
-    const p = parseInt(outPortStr, 10)
-    if (Number.isInteger(p) && p >= 1 && p <= 65535) {
-      setOscOutConfig({ port: p })
-      if (oscOutEnabled) applyOscOutput()
-    } else {
-      setOutPortStr(String(oscOutPort))
-      flashInvalid('outPort')
-    }
-  }
-
   const inState = oscEnabled && oscListening ? 'live' : oscEnabled ? 'bind failed' : 'off'
   const outOn = oscOutEnabled || markSignalEnabled
   const enterBlurs = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -147,9 +129,27 @@ export function OscPanel(): JSX.Element {
         </span>
         <div className="flex-1" />
         <button
-          onClick={() => { setMonitorOpen(!monitorOpen || collapsed); if (collapsed) toggleSection('osc') }}
+          onClick={() => openPane('links')}
           className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
-            monitorOpen && !collapsed ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+            pane === 'links' && !collapsed ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title="Connections : who sends to Palinopsia (each sender, what it sends, what is understood and what is not) and where Palinopsia sends"
+        >
+          links
+        </button>
+        <button
+          onClick={() => openPane('map')}
+          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+            pane === 'map' && !collapsed ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
+          }`}
+          title="The map : every address Palinopsia answers to (aliases, OSC Learn, the built-in /opsia ones), editable"
+        >
+          map
+        </button>
+        <button
+          onClick={() => openPane('monitor')}
+          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] transition-colors ${
+            pane === 'monitor' && !collapsed ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel2 text-muted hover:text-text'
           }`}
           title="OSC monitor : see every message coming in and going out"
         >
@@ -216,72 +216,55 @@ export function OscPanel(): JSX.Element {
             )}
           </div>
 
-          {/* ── OUT : what Palinopsia sends ── */}
+          {/* ── OUT : what Palinopsia sends, to one or more destinations ── */}
           <div className="flex min-w-0 flex-col gap-1 rounded border border-accent2/30 bg-panel2/40 p-1.5">
             <div className="flex min-w-0 items-center gap-1.5">
               <span
                 className="w-9 shrink-0 font-mono text-[9px] font-semibold uppercase tracking-wide text-accent2"
-                title="Messages Palinopsia sends (to Pandore or any OSC receiver)"
+                title="Messages Palinopsia sends, to every destination below (Pandore, dataFLOU, any OSC receiver)"
               >
                 ↗ out
               </span>
-              <span className="font-mono text-[9px] uppercase text-muted">to</span>
-              <input
-                value={outHostStr}
-                onChange={(e) => setOutHostStr(e.target.value)}
-                onBlur={commitOutHost}
-                onKeyDown={enterBlurs}
-                className={`input w-24 px-1 py-0.5 text-[11px] ${invalid === 'outHost' ? 'ring-1 ring-danger' : ''}`}
-                title="Destination host (Pandore's IP : 127.0.0.1 if same machine). Used by FEEDBACK, MARK and the body rules' OSC."
-              />
-              <span className="font-mono text-[9px] text-muted">:</span>
-              <input
-                value={outPortStr}
-                onChange={(e) => setOutPortStr(e.target.value.replace(/[^0-9]/g, ''))}
-                onBlur={commitOutPort}
-                onKeyDown={enterBlurs}
-                className={`input box-content px-1 py-0.5 text-right text-[11px] tabular-nums ${invalid === 'outPort' ? 'ring-1 ring-danger' : ''}`}
-                style={{ width: PORT_W }}
-                title="Destination UDP port : 1–65535"
-              />
-              <div className="flex-1" />
-              <span className="font-mono text-[9px] text-muted">{rate.out ? `${rate.out} msg/s` : ''}</span>
-            </div>
-            <div className="flex min-w-0 items-center gap-1.5">
               <button
                 onClick={toggleOut}
-                className={`w-[78px] shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
                   oscOutEnabled ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel2 text-muted hover:text-text'
                 }`}
-                title={oscOutEnabled ? 'FEEDBACK on : stop mirroring the live state' : 'FEEDBACK : mirror the live state over OSC'}
+                title={
+                  oscOutEnabled
+                    ? 'FEEDBACK on : stop mirroring the live state'
+                    : 'FEEDBACK : mirror the live state over OSC (every /opsia value that changes) to each destination ticked F'
+                }
               >
                 {oscOutEnabled ? 'FEEDBACK ●' : 'FEEDBACK'}
               </button>
-              <span className="min-w-0 truncate font-mono text-[9px] text-muted" title="Every /opsia value that changes is sent, so the receiver's UI follows Palinopsia">
-                mirrors every /opsia value that changes
-              </span>
-            </div>
-            <div className="flex min-w-0 items-center gap-1.5">
               <button
                 onClick={() => setMarkSignal({ enabled: !markSignalEnabled })}
-                className={`w-[78px] shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
+                className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
                   markSignalEnabled ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel2 text-muted hover:text-text'
                 }`}
-                title={markSignalEnabled ? 'MARK on : stop sending the drawn optical soundtrack' : 'MARK : send a scanline of the output as sound (/opsia/av/mark-*), the animated-sound loop'}
+                title={
+                  markSignalEnabled
+                    ? 'MARK on : stop sending the drawn optical soundtrack'
+                    : 'MARK : send a scanline of the output as sound (/opsia/av/mark-signal, mark-level, mark-centroid, mark-flux) to each destination ticked M'
+                }
               >
                 {markSignalEnabled ? 'MARK ●' : 'MARK'}
               </button>
-              <span className="min-w-0 truncate font-mono text-[9px] text-muted" title="A scanline of the output, as sound : /opsia/av/mark-signal, mark-level, mark-centroid, mark-flux">
-                a scanline of the output, as sound
-              </span>
+              <div className="flex-1" />
+              <span className="font-mono text-[9px] text-muted">{rate.out ? `${rate.out} msg/s` : ''}</span>
             </div>
+            <OscDestinations />
             <span className="font-mono text-[8.5px] leading-snug text-muted/70">
-              The body rules' OSC goes here too; the Resolume mapper sends to its own address (Resolume section).
+              F feedback · M mark · B the Body rules' OSC. OSC Learn answers each controller at its own reply port (MIDI section); the Resolume mapper
+              sends to its own address (Resolume section).
             </span>
           </div>
 
           {/* ── MONITOR : the traffic both ways ── */}
-          {monitorOpen && <OscMonitor />}
+          {pane === 'monitor' && <OscMonitor />}
+          {pane === 'links' && <OscConnections onAlias={(addr) => { setMapPrefill(addr); setPane('map') }} />}
+          {pane === 'map' && <OscMapTable prefill={mapPrefill} onPrefillUsed={() => setMapPrefill(null)} />}
         </>
       )}
     </div>

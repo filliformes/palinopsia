@@ -1053,6 +1053,23 @@ export interface OscBinding {
   host: string // the sender's IP when it was learned ('' : unknown)
 }
 
+// An OSC alias : a controller's own address (never /opsia, never /composition)
+// played onto an /opsia address, with its own ranges and curve (the OSC map
+// table). Kept per computer (localStorage 'opsia.oscAliases').
+export interface OscAlias {
+  id: string
+  on: boolean
+  address: string // '/1/fader3'
+  arg: number // which argument (0-based)
+  inMin: number // the controller's range
+  inMax: number
+  outMin: number // the /opsia value range it covers (0..1 for most)
+  outMax: number
+  curve: number // exponent on the normalised value : 1 linear, < 1 fast start, > 1 slow start
+  invert: boolean
+  target: string // '/opsia/layer1/opacity'
+}
+
 // Where a mapping lives : this computer (localStorage, every session) or this
 // session (its file : a piece's own controller setup).
 export type MappingScope = 'computer' | 'session'
@@ -1426,6 +1443,8 @@ export interface OscInEvent {
   args: Array<{ type: string; value: number | string | boolean }>
   // the sender's IP (OSC Learn records it : learned controls answer there)
   host?: string
+  // the sender's UDP port (the connections view tells two senders on one host apart)
+  port?: number
 }
 
 export interface OscListenResult {
