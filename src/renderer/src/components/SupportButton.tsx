@@ -1,4 +1,4 @@
-// The top bar's ☕ : Vincent's Buy Me a Coffee page, in the browser (the window's
+// The top bar's ☕ : Vincent's support page (Stripe), in the browser (the window's
 // open handler hands http(s) links to the system, never inside the app). Quiet on
 // purpose : a small icon at the far right, after Black, and absent while no
 // address is set (src/shared/links.ts).
