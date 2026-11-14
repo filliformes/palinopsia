@@ -949,7 +949,8 @@ run fetch:depth` (see [Building from source](#getting-started)).
 Nine dials that bend the **whole picture at once**, on top of your layers and Finishing,
 in their own right-column tab : each a wide slider with its poles, a live readout and a
 one-line description. They write the engine each frame, never your sliders (they stack
-with modulators and each other), and each rests at a point that changes nothing. **They
+with modulators and each other), and each rests at a point that changes nothing. None of
+them blurs : blur is yours to set (Context), and each right side has its own character. **They
 belong to the session** : Density, Proximity and its `◑`, Gesture ⇄ Texture, Coalesce,
 Tonicity, Wander and Interruption ⇄ Flow are saved with it and come back with it, are
 undoable, New sets them to rest, and a Generate sets them for the session it makes (an
@@ -971,14 +972,14 @@ as they can.
 |---|---|---|
 | **Density** | sparse ↔ dense | The stack is too busy : pull left until one voice is left (the upper layers fade first, L4 first); too thin : push right (every layer toward full). The faders stay put. |
 | **Proximity** | far ↔ close | Far : hazy, soft, a deeper vignette. Close : sharp, with more bloom. **◑** : the brighter the sound, the closer the picture comes. |
-| **Gesture ⇄ Texture** | crisp ↔ smeared | Left sharpens, so movement reads as clean strokes; right adds trails, so it churns into a surface. |
-| **Coalesce** | grain ↔ mass | Left breaks the picture into dither grain; right melts it into one soft mass (it adds blur). |
+| **Gesture ⇄ Texture** | crisp ↔ surface | Left sharpens, so movement reads as clean strokes; right lays the picture on a lit material that slowly moves (Context's relief and evolution : the material chosen in Context, else paper). |
+| **Coalesce** | grain ↔ mass | Left breaks the picture into dither grain; right gathers it into flat fields of the palette's colors (the Vibe palette banded : stronger the more Vibe is mixed in). |
 
 **Temperament : time and color** (rest at 0, except Interruption ⇄ Flow in the middle):
 
 | Dial | Poles | When and what |
 |---|---|---|
-| **Interruption ⇄ Flow** | interruption ↔ flow | Left stutters (held frames, breakup, short black cuts); right runs liquid (trails, softness, less grain). |
+| **Interruption ⇄ Flow** | interruption ↔ flow | Left stutters (held frames, breakup, short black cuts); right runs liquid (trails, less grain), still sharp. |
 | **Tonicity** | off ↔ full | With the audio input on : tonal sound brings color in, noisy sound drains it toward gray. |
 | **Shutter** | off ↔ 24 fps | Stop-motion over the whole output. Just past off is the choppiest (2 fps); further right gets smoother (24 fps at the end). |
 | **Wander** | off ↔ wander | The grade sways on its own (gamma, warm and cool, contrast), never repeating, with rare short glitches : a still passage breathes. (It was called Drift : `/opsia/drift` and its MIDI binding still answer.) |

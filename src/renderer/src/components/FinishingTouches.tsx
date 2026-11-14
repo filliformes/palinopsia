@@ -137,9 +137,9 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
 // values). Each stage : the inputs to compare, and who writes it.
 type Stage = 'vibe' | 'context' | 'finalizer'
 const STAGE_LIVE: Record<Stage, Array<[string, string]>> = {
-  vibe: [['saturation', 'saturation'], ['chroma', 'chroma'], ['dither', 'dither'], ['contrast', 'contrast']],
+  vibe: [['saturation', 'saturation'], ['chroma', 'chroma'], ['dither', 'dither'], ['blend', 'bands'], ['mixSrc', 'source mix'], ['contrast', 'contrast']],
   // (the World's own keys : what its amount can take back off)
-  context: [['blur', 'blur'], ...WORLD_CONTEXT_KEYS.map((x): [string, string] => [x.k, x.label])],
+  context: [['blur', 'blur'], ...WORLD_CONTEXT_KEYS.map((x): [string, string] => [x.k, x.label]), ['pbrEvolve', 'evolution']],
   finalizer: [
     ['sharpen', 'sharpen'], ['grain', 'grain'], ['parasites', 'parasites'], ['gamma', 'gamma'], ['rGain', 'red'], ['bGain', 'blue'],
     ['black', 'black'], ['white', 'white'], ...WORLD_FILM_KEYS.map((x): [string, string] => [x.k, x.label.toLowerCase()])
@@ -157,14 +157,13 @@ function stageFrom(stage: Stage, st: LiveSt): string[] {
     if (st.drift > 0.02) from.push('Wander')
   } else if (stage === 'context') {
     if (!NEUTRAL(st.proximity) || st.proximityAudio) from.push('Proximity')
-    if (!NEUTRAL(st.coalesce)) from.push('Coalesce')
     if (st.flow > 0.52) from.push('Interruption ⇄ Flow')
-    if (!NEUTRAL(st.gestureTexture)) from.push('Gesture ⇄ Texture')
+    if (st.gestureTexture > 0.52) from.push('Gesture ⇄ Texture')
     if (world) from.push('World amount')
     const seq = st.sequence
     if ((seq.breathe?.amount ?? 0) > 0.001 || seq.arc?.enabled) from.push('sequencer')
   } else {
-    if (!NEUTRAL(st.gestureTexture)) from.push('Gesture ⇄ Texture')
+    if (st.gestureTexture < 0.48) from.push('Gesture ⇄ Texture')
     if (!NEUTRAL(st.flow)) from.push('Interruption ⇄ Flow')
     if (st.drift > 0.02) from.push('Wander')
     if (world) from.push('World amount')

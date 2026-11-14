@@ -2770,13 +2770,19 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
           onClick={() => setRightView(t.id)}
           title={t.title}
           // no-sheen : the selected tab's glass is the sliding lens, the others are plain words
-          className={`no-sheen rounded-full border border-transparent px-2 py-0.5 font-mono text-[9px] transition-colors ${
+          className={`no-sheen relative rounded-full border border-transparent px-2 py-0.5 font-mono text-[9px] transition-colors ${
             rightView === t.id ? 'text-accent' : 'text-muted hover:text-text'
           }`}
         >
           {t.label}
-          {/* a dial off rest : the dot says Feel is changing the picture */}
-          {t.id === 'feel' && feelOff && <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />}
+          {/* a dial off rest : the dot says Feel is changing the picture. Laid over
+              the tab's corner, so the tab never changes width and the glass lens
+              never has to follow it. */}
+          {t.id === 'feel' && (
+            <span
+              className={`pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-accent transition-opacity duration-200 ${feelOff ? 'opacity-100' : 'opacity-0'}`}
+            />
+          )}
         </button>
       ))}
       <div ref={lensRef} className="glass-tab" />

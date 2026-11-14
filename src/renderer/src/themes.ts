@@ -2301,7 +2301,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-coalesce', name: 'Coalesce', family: 'Feel Studies',
-    blurb: 'STUDY · A detailed field. Sweep COALESCE : left breaks it into grain / dither, right pulls it into smooth mass (blur).',
+    blurb: 'STUDY · A detailed field. Sweep COALESCE : left breaks it into grain / dither, right gathers it into flat fields of the palette colors.',
     world: 'synthetic',
     palette: [K, [0.2, 0.22, 0.26, 1], [0.85, 0.85, 0.8, 1]],
     sources: ['op-art', 'interference', 'contour'],
@@ -2337,7 +2337,7 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-flow', name: 'Flow ⇄ Interruption', family: 'Feel Studies',
-    blurb: 'STUDY · Moving content. Sweep FLOW : left (interruption) stutters (frame-holds, breakup, blank stabs); right (flow) softens to a liquid image.',
+    blurb: 'STUDY · Moving content. Sweep FLOW : left (interruption) stutters (frame-holds, breakup, blank stabs); right (flow) runs liquid : trails, still sharp.',
     world: 'incongruent',
     palette: [K, [0.18, 0.14, 0.24, 1], [0.75, 0.78, 0.85, 1]],
     sources: ['particle-drift', 'murmuration'],

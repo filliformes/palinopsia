@@ -182,10 +182,10 @@ export function applyFlowInterrupt(comp: MacroComp, c: CompositionState, flow: n
   let freeze = false
 
   if (flow > 0.5) {
-    // FLOW : soften toward a liquid, continuous image. Pulling the breakup tools
+    // FLOW : a liquid, continuous image through time. Pulling the breakup tools
     // down is invisible when they're already near zero (the common case), so Flow
-    // also ADDS its liquid ingredients : Context trails (temporal echo) + a touch
-    // of blur — additive on the live values, like the sequencer overlays.
+    // also ADDS its liquid ingredient : Context trails (temporal echo), additive
+    // on the live values. No blur : the picture stays sharp (blur is set by hand).
     const a = (flow - 0.5) * 2
     if (fin) {
       set(fin.id, 'sharpen', Math.max(0, finLive('sharpen', 0) * (1 - a)))
@@ -198,7 +198,6 @@ export function applyFlowInterrupt(comp: MacroComp, c: CompositionState, flow: n
         frameVals.get(`fx:master:${ctx.id}:${name}`) ??
         (liveModValues.get(`fx:master:${ctx.id}:${name}`) as number | undefined) ?? num(ctx.inputs[name], d)
       set(ctx.id, 'trails', clamp01(ctxLive('trails', 0) + a * 0.5))
-      set(ctx.id, 'blur', clamp01(ctxLive('blur', 0) + a * 0.12))
     }
   } else {
     // INTERRUPTION : stutter — stochastic frame-holds + breakup + brief blank stabs.

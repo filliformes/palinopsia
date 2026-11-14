@@ -1989,6 +1989,12 @@ export class Compositor {
   private fdBurst = 0; // filmBurst event (momentary 0/1) : a dirt burst on its rising edge
   private fdBurstPrev = 0;
   private pbrLib: PbrLib | null = null; // Context PBR material maps (lazy)
+  // The material Feel's Texture lays the picture on while the session's Context
+  // has none (0 : none; set each frame by the field macros, used the next).
+  private feelMaterial = 0;
+  setFeelMaterial(idx: number): void {
+    this.feelMaterial = Math.max(0, Math.round(idx));
+  }
   // Outside fill = the Background slab, only meaningful with a shape active.
   private get fzBgLayer(): boolean {
     return this.fzShape > 0 && this.fzBgSrc === 1;
@@ -3408,8 +3414,11 @@ export class Compositor {
     const ctx = c.master.find((f) => f.shaderId === 'fx-context');
     if (ctx) {
       if (!this.pbrLib) this.pbrLib = new PbrLib(this.gl);
-      const idx = Math.round(numf(ctx.inputs.pbrTexture, 0));
+      const own = Math.round(numf(ctx.inputs.pbrTexture, 0));
+      const idx = own > 0 ? own : this.feelMaterial;
       const maps = idx > 0 ? this.pbrLib.get(idx) : this.pbrLib.neutralMaps();
+      // (Feel's Texture : the shader is told the material too)
+      if (own === 0 && idx > 0) this.masterRack.setUnitInput(ctx.id, 'pbrTexture', idx);
       this.masterRack.setUnitImage(ctx.id, 'pbrNormal', maps.normal);
       this.masterRack.setUnitImage(ctx.id, 'pbrHeight', maps.height);
       this.masterRack.setUnitImage(ctx.id, 'pbrAO', maps.ao);

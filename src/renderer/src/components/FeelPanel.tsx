@@ -162,21 +162,21 @@ export function FeelPanel(): JSX.Element {
           }
         />
         <FeelRow
-          label="Gesture ⇄ Texture" left="crisp" right="smeared" value={gestureTexture} neutral={0.5} midiId="field:gestureTexture" onChange={setGestureTexture}
-          desc="Left sharpens, so movement reads as clean strokes. Right adds trails, so it churns into a surface."
-          hint="Gesture ⇄ Texture : sharpen on the left, trails on the right."
+          label="Gesture ⇄ Texture" left="crisp" right="surface" value={gestureTexture} neutral={0.5} midiId="field:gestureTexture" onChange={setGestureTexture}
+          desc="Left sharpens, so movement reads as clean strokes. Right lays the picture on a lit material that slowly moves (Context's own, or paper)."
+          hint="Gesture ⇄ Texture : sharpen on the left, a moving material on the right (pick one in Context to choose it)."
         />
         <FeelRow
           label="Coalesce" left="grain" right="mass" value={coalesce} neutral={0.5} midiId="field:coalesce" onChange={setCoalesce}
-          desc="Left breaks the picture into dither grain. Right melts it into one soft mass (it adds blur)."
-          hint="Coalesce : dither on the left, blur on the right."
+          desc="Left breaks the picture into dither grain. Right gathers it into flat fields of the palette's colors."
+          hint="Coalesce : dither on the left, the Vibe palette banded into flat masses on the right (stronger the more Vibe is mixed in)."
         />
       </section>
       <section className="flex flex-col gap-1.5">
         <span className="font-mono text-[9px] uppercase tracking-wide text-muted" title="How the picture moves through time, and how the sound and chance move its color">Temperament · time and color</span>
         <FeelRow
           label="Interruption ⇄ Flow" left="interruption" right="flow" value={flow} neutral={0.5} midiId="field:flow" onChange={setFlow}
-          desc="Left stutters : held frames, breakup, short black cuts. Right runs liquid : trails, softness, less grain."
+          desc="Left stutters : held frames, breakup, short black cuts. Right runs liquid : trails, less grain, still sharp."
           hint="Interruption ⇄ Flow : a broken passage on the left, a liquid one on the right."
         />
         <FeelRow

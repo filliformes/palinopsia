@@ -27,7 +27,13 @@ export interface ContextProx {
 type MacroComp = {
   setFxInput: (scope: { kind: 'master' }, instId: string, name: string, v: number) => void
   layers: Array<{ opacity: number }>
+  /** The material Context's relief draws while the session has none (0 : none). */
+  setFeelMaterial?: (idx: number) => void
 }
+// Texture's material when the session has none of its own : "paper rough"
+// (Context.fs pbrTexture VALUES), a painterly surface. Pick a material in Context
+// and Texture deepens that one instead.
+const FEEL_MATERIAL = 2
 const MASTER = { kind: 'master' as const }
 
 /**
@@ -35,11 +41,12 @@ const MASTER = { kind: 'master' as const }
  * after modulation/proximity so they own their params while engaged:
  *  - **Density** : sparse↔dense: fades the upper layers out toward
  *    a single voice (sparse), or pushes every layer's opacity up (dense).
- *  - **Gesture⇄Texture** : motion character: texture adds
- *    Context trails (internalised churn/flux), gesture sharpens (externalised,
- *    clean trajectory).
- *  - **Coalesce** : grain↔mass: mass blurs/smooths, grain adds
- *    Vibe dither (discrete particles).
+ *  - **Gesture⇄Texture** : crisp sharpens (clean strokes); texture lays the
+ *    picture on Context's lit material and sets it moving (relief + evolution).
+ *  - **Coalesce** : grain adds Vibe dither (discrete particles); mass bands the
+ *    Vibe palette (flat color masses).
+ *  None of them blurs or smears : blur is set by hand (Context), trails belong to
+ *  Interruption ⇄ Flow.
  */
 export function applyFieldMacros(
   comp: MacroComp,
@@ -76,20 +83,34 @@ export function applyFieldMacros(
     })
   }
 
-  // ── Gesture⇄Texture → Context trails (texture) vs Finalizer sharpen (gesture). ──
+  // ── Gesture⇄Texture → Finalizer sharpen (crisp) vs Context's material (texture). ──
+  let feelMaterial = 0
   if (Math.abs(gestureTexture - 0.5) > 0.02) {
-    const t = (gestureTexture - 0.5) * 2 // -1 gesture .. +1 texture
-    if (ctx) setF(ctx, 'trails', clamp01(liveVal(ctx, 'trails', 0.2) + t * 0.4))
-    // Finalizer sharpen spans 0..2 : clamp to the DECLARED range (clamp01 used to
-    // crush any base above 1 down to 1 the moment the macro engaged).
-    if (fin) setF(fin, 'sharpen', clamp(liveVal(fin, 'sharpen', 0) - t * 0.8, 0, 2))
+    const t = (gestureTexture - 0.5) * 2 // -1 crisp .. +1 texture
+    if (t < 0) {
+      // Finalizer sharpen spans 0..2 : clamp to the DECLARED range.
+      if (fin) setF(fin, 'sharpen', clamp(liveVal(fin, 'sharpen', 0) - t * 0.8, 0, 2))
+    } else if (ctx) {
+      // the picture laid on a lit material that slowly moves : the session's own
+      // material deepened, else paper (no material of its own : relief from 0)
+      const own = Math.round(num(ctx.inputs.pbrTexture, 0)) > 0
+      if (!own) feelMaterial = FEEL_MATERIAL
+      setF(ctx, 'pbrAmount', clamp01((own ? liveVal(ctx, 'pbrAmount', 0.5) : 0) + t * (own ? 0.5 : 0.75)))
+      setF(ctx, 'pbrEvolve', clamp01(liveVal(ctx, 'pbrEvolve', 0) + t * 0.6))
+    }
   }
+  comp.setFeelMaterial?.(feelMaterial)
 
-  // ── Coalesce → Context blur (mass) vs Vibe dither (grain). ──
-  if (Math.abs(coalesce - 0.5) > 0.02) {
+  // ── Coalesce → Vibe dither (grain) vs Vibe palette bands (mass). ──
+  if (Math.abs(coalesce - 0.5) > 0.02 && vibe) {
     const t = (coalesce - 0.5) * 2 // -1 grain .. +1 mass
-    if (ctx) setF(ctx, 'blur', clamp01(liveVal(ctx, 'blur', 0) + t * 0.18))
-    if (vibe) setF(vibe, 'dither', clamp01(liveVal(vibe, 'dither', 0) - t * 0.5))
+    if (t < 0) setF(vibe, 'dither', clamp01(liveVal(vibe, 'dither', 0) - t * 0.5))
+    // bands : the palette snaps the picture into flat fields of its colors, and
+    // the original mixed back over it (source mix) withdraws so the fields read
+    else {
+      setF(vibe, 'blend', clamp01(liveVal(vibe, 'blend', 1) * (1 - t * 0.9)))
+      setF(vibe, 'mixSrc', clamp01(liveVal(vibe, 'mixSrc', 0.5) * (1 - t * 0.85)))
+    }
   }
 }
 
