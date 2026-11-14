@@ -24,7 +24,7 @@ work: **never cheap psychedelia, never a 3D game engine.**
 
 <!-- support-top -->
 **Palinopsia is free and open source.** If it plays a part in your work, you can
-[buy its author a coffee ☕](https://buy.stripe.com/14A3cw06Y9LweuM3zO08g00).
+[buy its author a coffee ☕](https://buymeacoffee.com/filliformes).
 <!-- /support-top -->
 
 ![The Palinopsia compositor](docs/images/interface-compositor.jpg)
@@ -4571,7 +4571,7 @@ not cheap psychedelia.*
 
 Built by **Vincent Fillion** ([filliformes](https://github.com/filliformes)).
 <!-- support -->
-If Palinopsia plays a part in your work : [buy me a coffee ☕](https://buy.stripe.com/14A3cw06Y9LweuM3zO08g00).
+If Palinopsia plays a part in your work : [buy me a coffee ☕](https://buymeacoffee.com/filliformes).
 <!-- /support -->
 Vendors the [Spout2](https://github.com/leadedge/Spout2) SDK (BSD) for the native
 sender; bundles [`ffmpeg-static`](https://github.com/eugeneware/ffmpeg-static) for
