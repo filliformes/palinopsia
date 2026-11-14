@@ -88,7 +88,8 @@ function npmDependencies() {
 const npmText = npmDependencies()
 const NPM_FILE = 'licenses/npm-dependencies.txt'
 if (CHECK) {
-  const cur = fs.existsSync(path.join(ROOT, NPM_FILE)) ? read(NPM_FILE) : ''
+  // A Windows checkout (core.autocrlf, the windows CI runner too) has CRLF line endings.
+  const cur = fs.existsSync(path.join(ROOT, NPM_FILE)) ? read(NPM_FILE).replace(/\r\n/g, '\n') : ''
   if (cur !== npmText) problems.push(`${NPM_FILE} is stale : run \`npm run notices\` and commit it`)
 } else {
   fs.writeFileSync(path.join(ROOT, NPM_FILE), npmText)
