@@ -10,8 +10,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { dataflouBind, meshToModulator, openDataflouVisualizer, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
 import { BoundedNumberInput } from './BoundedNumberInput'
+import { DataflouPublish } from './DataflouPublish'
 import { showToast } from './Toast'
-import { DF_DECLARE_SMALL, DF_DESTS, DF_SOURCES, dfSessionLabel, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -36,8 +37,7 @@ export function DataflouSection(): JSX.Element {
   useEffect(() => setName(cfg.label), [cfg.label])
   useEffect(() => setUniv(cfg.universe), [cfg.universe])
 
-  // (our session node is ours : not one of the others)
-  const others = st.nodes.filter((n) => !n.local && n.sku !== st.companion?.sku)
+  const others = st.nodes.filter((n) => !n.local)
   const online = others.filter((n) => n.online).length
   const nameOf = (sku: string): string => (sku === st.sku ? st.label || 'palinopsia' : st.nodes.find((n) => n.sku === sku)?.label ?? sku.slice(0, 8))
   const connections = st.nodes.flatMap((n) =>
@@ -108,18 +108,6 @@ export function DataflouSection(): JSX.Element {
               title="Only nodes of the same universe see each other"
             />
             <button
-              onClick={() => setCfg({ actions: !cfg.actions })}
-              className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] ${cfg.actions ? 'border-accent/60 text-accent' : 'border-border text-muted hover:text-text'}`}
-              title={
-                'Every action of the Body rule list as a destination, a trigger each under act/ : it fires once as it goes on. ' +
-                'The layers, Randomize, Generate, Macro, Feel, tempo and sound, Sonify, the transport and the output on this node; ' +
-                'the scenes, Worlds, modulators, Body rules and the triggers of what is loaded (they follow the session) on a second node, ' +
-                `${dfSessionLabel(cfg.label)}. On by default. Turn it off on a mesh that has a small board (Teensy, M5) : the trees then grow past what it takes.`
-              }
-            >
-              actions : {cfg.actions ? 'on' : 'off'}
-            </button>
-            <button
               onClick={() =>
                 void openDataflouVisualizer().then((r) => {
                   if (!r.ok) showToast(r.error ?? 'The visualizer could not open', 'warn')
@@ -142,30 +130,15 @@ export function DataflouSection(): JSX.Element {
             {state === 'on' ? (
               <>
                 on the mesh as <span className="text-accent">{st.label}</span> at{' '}
-                <span className="text-text">{st.address}</span>:<span className="text-text">{st.tcpPort}</span> · publishes{' '}
-                <span className="text-text">{DF_SOURCES.length}</span> sources and takes{' '}
-                <span className="text-text">{DF_DESTS.length}</span> destinations (Macro knobs, layers, background, feel, scenes, randomize, output transform, BPM)
+                <span className="text-text">{st.address}</span>:<span className="text-text">{st.tcpPort}</span> · one node, publishing{' '}
+                <span className="text-text">{st.published}</span> {st.published === 1 ? 'parameter' : 'parameters'}
                 {st.actions > 0 && (
                   <>
                     {' '}
-                    + <span className="text-text">{st.actions}</span> actions from the Body rule list
-                    {st.companion && (
-                      <>
-                        {' '}
-                        (<span className="text-text">{st.actions - st.companion.actions}</span> here,{' '}
-                        <span className="text-text">{st.companion.actions}</span> on <span className="text-accent">{st.companion.label}</span> : the scenes, Worlds,
-                        modulators, Body rules and loaded triggers)
-                      </>
-                    )}
+                    (<span className="text-text">{st.actions}</span> of them actions from the Body rule list)
                   </>
                 )}
-                {st.actionsDropped > 0 && <span className="text-danger"> ({st.actionsDropped} left out : too many for one frame)</span>}
-                {st.declareBytes > DF_DECLARE_SMALL && (
-                  <span className="text-accent2">
-                    {' '}
-                    · {(st.declareBytes / 1024).toFixed(1)} KB : too big for a small board (Teensy, ESP32) on this universe
-                  </span>
-                )}
+                {' '}: choose them under publish
               </>
             ) : state === 'error' ? (
               <span className="text-danger">{st.error}</span>
@@ -173,6 +146,9 @@ export function DataflouSection(): JSX.Element {
               'join the mesh : the nodes on this network (same universe) see what Palinopsia senses and what plays it, and can wire to it'
             )}
           </div>
+
+          {/* ── what this node shows the mesh ── */}
+          <DataflouPublish />
 
           {st.running && (
             <>
@@ -199,7 +175,7 @@ export function DataflouSection(): JSX.Element {
                   <span className="font-mono text-[9px] text-muted">nothing wired yet : open a node above to wire it to Palinopsia</span>
                 )}
                 {connections.map(({ node, dest, src }) => {
-                  const ours = node.local || node.sku === st.companion?.sku || src.sku === st.sku
+                  const ours = node.local || src.sku === st.sku
                   const key = `${node.sku}/${dest}<${src.sku}/${src.path}`
                   // a wire into Palinopsia's main node : shaped here (⚙)
                   const shapeable = node.local && DF_DESTS.some((d) => d.path === dest)
@@ -507,7 +483,7 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
             else if (v) void dataflouBind(ourSku, v, n.sku, p.path, true)
           }}
           className={select}
-          title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations"
+          title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations. Wiring to a destination that is not published publishes it."
         >
           <option value="">→ Palinopsia…</option>
           <option value="__macro__">◈ a free Macro knob</option>
@@ -526,7 +502,7 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
           value=""
           onChange={(e) => e.target.value && void dataflouBind(n.sku, p.path, ourSku, e.target.value, true)}
           className={select}
-          title="Feed this from one of Palinopsia's sources"
+          title="Feed this from one of Palinopsia's sources (an unpublished one is published as it is wired)"
         >
           <option value="">← Palinopsia…</option>
           {OUR_SOURCES.map((s) => (

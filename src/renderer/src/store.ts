@@ -38,7 +38,7 @@ import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assembl
 import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
-import { DF_DEFAULT_CONFIG, type DfConfig } from '@shared/dataflou'
+import { DF_DEFAULT_CONFIG, cleanPublish, type DfConfig } from '@shared/dataflou'
 import { LOOP_BLENDS, LOOP_SYNCS, type LoopBlend } from '@shared/types'
 import { LOOP_DELAY_MAX_MS } from './engine/loopDelay'
 import { isLayerRackKind, LAYER_RACK_PROP, layerRackOf } from './layerRack'
@@ -313,9 +313,10 @@ function loadDataflou(): DfConfig {
         enabled: !!j.enabled,
         label: typeof j.label === 'string' && j.label.trim() ? j.label.slice(0, 32) : DF_DEFAULT_CONFIG.label,
         universe: typeof j.universe === 'string' && j.universe.trim() ? j.universe.slice(0, 32) : DF_DEFAULT_CONFIG.universe,
-        // (on for everyone once : it first shipped off, and every action belongs
-        // on the mesh; `v` 2 marks a choice made since)
-        actions: (j as { v?: number }).v === 2 ? !!j.actions : true
+        // What the node publishes. Before v3 every parameter was on the mesh,
+        // the actions on a second node : from v3 one node, the Macro knobs alone
+        // until more is chosen (the section's publish list).
+        publish: (j as { v?: number }).v === 3 ? cleanPublish(j.publish) : [...DF_DEFAULT_CONFIG.publish]
       }
     }
   } catch {
@@ -5295,7 +5296,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const dataflou = { ...s.dataflou, ...patch }
       try {
-        localStorage.setItem('opsia.dataflou', JSON.stringify({ ...dataflou, v: 2 }))
+        localStorage.setItem('opsia.dataflou', JSON.stringify({ ...dataflou, v: 3 }))
       } catch {
         /* a full quota must never break an edit */
       }

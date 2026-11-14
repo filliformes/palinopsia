@@ -7,6 +7,22 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **dataflou : one node, and you choose what it shows.**
+  - **One node.** The second node, `<name>-session`, is gone. It used to appear with
+    the actions and carry the ones that follow the session.
+  - **The publish list.** It sits in the dataflou section. Tick a whole group (Macro
+    knobs, Layers, Feel, Scenes, Randomize, Output, the sources Audio, Picture, Body and
+    Modulators, each heading of the Body rule list's actions), or open a group and tick
+    single parameters.
+  - **The defaults.** Only the 16 Macro knobs are published, for a new install and after
+    the update. Shortcuts : *Macros only*, *all but actions*, *none*.
+  - **Wiring publishes.** Wiring one of Palinopsia's parameters from the section
+    publishes it.
+  - **A gauge** shows how full the node's one 32 KB frame is : amber past a
+    microcontroller's 8 KB, red when published actions had to be left out.
+
+### Changed
+
 - **One register for everything borrowed.** `THIRD_PARTY_NOTICES.md` is now organised in
   seven parts: code, shipped programs, models and their training data, fonts, media,
   ideas and research, and license texts.

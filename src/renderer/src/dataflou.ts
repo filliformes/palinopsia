@@ -5,8 +5,9 @@
 //     like the Resolume mapper's rows and sent to main 30 times a second, but
 //     only the ones some node listens to;
 //   · the node's status (the monitor) is kept here, outside the store;
-//   · the Body rule picker's actions, when they are on : listed for main (which
-//     declares one trigger each, act/...), fired here when one goes on.
+//   · the Body rule picker's actions : listed for main while the node runs (it
+//     declares one trigger each, act/..., for the ones the section publishes),
+//     fired here when one goes on.
 
 import { useSyncExternalStore } from 'react'
 import { useStore } from './store'
@@ -14,7 +15,7 @@ import { routeOsc } from './oscInput'
 import { readSource } from './resolume'
 import { fireTrigger } from './midi'
 import { triggerOptions } from './triggerCatalog'
-import { DF_DESTS, DF_SOURCES, dfActionPath, type DfAction, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, dfActionPath, dfGroupOf, dfPublished, type DfAction, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
 import type { ModTarget } from '@shared/types'
 import { oscLeafValues } from './oscInput'
 import { controlBus } from './engine/controlBus'
@@ -29,7 +30,7 @@ const SIGNAL_BY_PATH = new Map<string, string>([
 
 const EMPTY: DfStatus = {
   running: false, error: null, sku: '', label: '', universe: '', address: '', tcpPort: 0, udpPort: 0,
-  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, actions: 0, actionsDropped: 0, companion: null,
+  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, published: 0, actions: 0, actionsDropped: 0,
   visualizer: 0, visualizerAvailable: false
 }
 
@@ -53,10 +54,11 @@ export function dataflouActions(): DfAction[] {
   return out
 }
 
-/** Hand main the list when it changed (and only while the actions are on). */
+/** Hand main the list when it changed (while the node is on : main declares the
+ *  published ones). */
 function sendActions(force = false): void {
   const cfg = useStore.getState().dataflou
-  if (!cfg.enabled || !cfg.actions) {
+  if (!cfg.enabled) {
     actionsSent = ''
     actionByPath = new Map()
     return
@@ -524,6 +526,28 @@ export async function openDataflouVisualizer(): Promise<{ ok: boolean; error?: s
 }
 
 /** Bind a destination (any node's) to a source (any node's). */
-export function dataflouBind(destSku: string, destPath: string, srcSku: string, srcPath: string, on: boolean): Promise<boolean> {
+export async function dataflouBind(destSku: string, destPath: string, srcSku: string, srcPath: string, on: boolean): Promise<boolean> {
+  // Wiring one of ours publishes it : the node only takes wires to what it declares.
+  if (on) {
+    const mine = [destSku === status.sku ? destPath : null, srcSku === status.sku ? srcPath : null].filter((x): x is string => !!x)
+    await ensurePublished(mine)
+  }
   return window.api.dataflouBind({ destSku, destPath, srcSku, srcPath, on })
+}
+
+/** Is one of our paths on the mesh now (the section's publish list) ? */
+export function isDfPublished(path: string): boolean {
+  const pub = new Set(useStore.getState().dataflou.publish)
+  const action = path.startsWith('act/') ? dataflouActions().find((a) => a.path === path) : undefined
+  return dfPublished(pub, dfGroupOf(path, action?.group), path)
+}
+
+/** Publish these paths (one by one) if they are not yet, and wait for the node's
+ *  new tree. */
+async function ensurePublished(paths: string[]): Promise<void> {
+  const missing = paths.filter((p) => !isDfPublished(p))
+  if (!missing.length) return
+  const cfg = useStore.getState().dataflou
+  useStore.getState().setDataflou({ publish: [...cfg.publish, ...missing.map((p) => `p:${p}`)] })
+  await applyDataflou()
 }

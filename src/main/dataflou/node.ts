@@ -1472,9 +1472,9 @@ export class DataflouNode {
       rxPerSec: this.rxPerSec,
       txPerSec: this.txPerSec,
       declareBytes: this.declSize,
+      published: 0,
       actions: 0,
       actionsDropped: 0,
-      companion: null,
       visualizer: this.visualizerClients,
       visualizerAvailable: false
     }

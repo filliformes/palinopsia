@@ -150,43 +150,43 @@ export interface DfStatus {
   rxPerSec: number // UDP values received per second
   txPerSec: number // UDP values sent per second
   declareBytes: number // our whole tree, as one DECLARE frame
-  actions: number // the actions on the mesh now, on both our nodes (0 when they are off)
-  actionsDropped: number // actions left out : a tree would have been too big
-  // our second node, carrying the actions that follow the session (null when off)
-  companion: DfCompanion | null
+  published: number // the parameters on the mesh now (groups aside)
+  actions: number // of which actions (Body rule list triggers)
+  actionsDropped: number // published actions left out : the tree would pass one frame
   visualizer: number // visualizer pages open on this node now
   visualizerAvailable: boolean // does this build carry the visualizer page ?
-}
-
-/** Palinopsia's second node : the session's actions (see DF_SESSION_GROUPS). */
-export interface DfCompanion {
-  sku: string
-  label: string
-  running: boolean
-  actions: number
-  actionsDropped: number
-  declareBytes: number
 }
 
 export interface DfConfig {
   enabled: boolean
   label: string
   universe: string
-  // Every action of the Body rule picker as a destination too (act/...). On by
-  // default; off for a mesh with a small board (Teensy, M5) : the trees then
-  // outgrow what it takes.
-  actions: boolean
+  // What this node shows the mesh, chosen in the dataflou section : one node
+  // only, carrying just these. Each entry is a whole group, `g:<group>` (it
+  // follows the group : a new scene's action appears by itself), or one
+  // parameter, `p:<path>`. Groups : the first segment of a fixed path (meta,
+  // layer, feel, scene, bg, randomize, output, bpm, audio, vision, body, mod),
+  // or `act:<heading>` for a heading of the Body rule list's actions.
+  publish: string[]
 }
 
-export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', actions: true }
+export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', publish: ['g:meta'] }
 
-// The Body rule picker's headings whose entries follow the session (its scenes,
-// its Worlds, its modulators, its rules, the triggers of what is loaded). They
-// ride on a second node, `<label>-session`, so the first keeps a tree of a steady
-// size under one frame, every heading always lands on the same node, and a wire
-// to an action never moves. Any heading not named here is fixed : the first node.
-export const DF_SESSION_GROUPS: ReadonlySet<string> = new Set(['Scenes', 'Worlds', 'Triggers (what is loaded)', 'Modulators', 'Body rules'])
-export const dfSessionLabel = (label: string): string => `${label.slice(0, 24)}-session`
+/** A publish list as it may be stored : strings of the two forms, deduplicated. */
+export function cleanPublish(x: unknown): string[] {
+  if (!Array.isArray(x)) return [...DF_DEFAULT_CONFIG.publish]
+  const out = new Set<string>()
+  for (const e of x) if (typeof e === 'string' && e.length < 200 && /^(g|p):\S/.test(e)) out.add(e)
+  return [...out].slice(0, 4000)
+}
+
+/** The publish group of a fixed path (its first segment) or of an action. */
+export const dfGroupOf = (path: string, actionGroup?: string): string =>
+  actionGroup !== undefined ? `act:${actionGroup}` : path.split('/')[0]
+
+/** Is this parameter on the mesh ? */
+export const dfPublished = (publish: ReadonlySet<string>, group: string, path: string): boolean =>
+  publish.has(`g:${group}`) || publish.has(`p:${path}`)
 
 /** One action of the Body rule picker, as the renderer hands it to the node. */
 export interface DfAction {
@@ -352,6 +352,24 @@ const GROUP_LABELS: Record<string, string> = {
   act: 'Actions (the Body rule list)'
 }
 
+/** The fixed groups the dataflou section offers to publish, in tree order, with
+ *  their parameters (destinations, then sources). */
+export const DF_PUBLISH_GROUPS: Array<{ key: string; label: string; items: Array<{ path: string; label: string; source: boolean }> }> = (() => {
+  const out: Array<{ key: string; label: string; items: Array<{ path: string; label: string; source: boolean }> }> = []
+  const at = new Map<string, number>()
+  const push = (path: string, label: string, source: boolean): void => {
+    const key = dfGroupOf(path)
+    if (!at.has(key)) {
+      at.set(key, out.length)
+      out.push({ key, label: GROUP_LABELS[key] ?? (key === 'bpm' ? 'Tempo' : key), items: [] })
+    }
+    out[at.get(key)!].items.push({ path, label, source })
+  }
+  for (const d of DF_DESTS) push(d.path, d.label, !!d.bidir)
+  for (const s of DF_SOURCES) push(s.path, s.label, true)
+  return out
+})()
+
 function param(path: string, label: string, p: Partial<DfParam>): DfParam {
   return {
     path, kind: 'param', type: 'number', mode: 'streaming', flow: 'destination', access: 'readwrite',
@@ -360,11 +378,12 @@ function param(path: string, label: string, p: Partial<DfParam>): DfParam {
   }
 }
 
-/** The tree Palinopsia declares : groups before their children, depth first.
- *  The actions come last : a reference node keeps the first 128 entries of a
- *  tree, so it still sees the whole of the rest. `fixed` false : the actions
- *  alone (the session node's tree). */
-export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[] {
+/** The tree Palinopsia declares : what `publish` names, groups before their
+ *  children, depth first. The actions come last : a reference node keeps the
+ *  first 128 entries of a tree, so it still sees the whole of the rest. The
+ *  actions given are the ones to declare (already chosen and fitted). */
+export function palinopsiaTree(actions: DfAction[] = [], publish: readonly string[] = DF_DEFAULT_CONFIG.publish): DfParam[] {
+  const pub = new Set(publish)
   const out: DfParam[] = []
   const groups = new Set<string>()
   const groupLabel = new Map<string, string>()
@@ -379,7 +398,7 @@ export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[
       out.push(param(g, label, { kind: 'group', rate: 0, flow: 'source', access: 'read', mode: 'discrete' }))
     }
   }
-  for (const d of fixed ? DF_DESTS : []) {
+  for (const d of DF_DESTS.filter((x) => dfPublished(pub, dfGroupOf(x.path), x.path))) {
     addGroups(d.path)
     out.push(param(d.path, d.label, {
       type: d.type,
@@ -389,7 +408,7 @@ export function palinopsiaTree(actions: DfAction[] = [], fixed = true): DfParam[
       rate: d.type === 'bool' ? 0 : 60
     }))
   }
-  for (const s of fixed ? DF_SOURCES : []) {
+  for (const s of DF_SOURCES.filter((x) => dfPublished(pub, dfGroupOf(x.path), x.path))) {
     addGroups(s.path)
     out.push(param(s.path, s.label, { flow: 'source', access: 'read', rate: 30 }))
   }

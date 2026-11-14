@@ -4154,9 +4154,8 @@ every node apply its slot n (it removes the connections the slot lacks, then mak
 ones it has). A node away during a recall catches up when it comes back; a node without
 slot n keeps its connections (**missing**); connections changed by hand after a recall
 read **modified**; a node that restarts in the same scene keeps its hand changes. Values
-are not in scenes (Palinopsia's own scenes and presets keep those). Palinopsia's two
-nodes (the main one and `-session`) each keep their own slots, per universe, beside the
-bindings in the app's `dataflou` folder.
+are not in scenes (Palinopsia's own scenes and presets keep those). Palinopsia's node keeps
+its slots per universe, beside the bindings in the app's `dataflou` folder.
 
 **When a node drops out and comes back** (a computer asleep, a cable pulled, the Wi-Fi
 gone for a moment), Palinopsia calls it back by itself : every node it lost without a
@@ -4169,40 +4168,43 @@ connections that went quiet, announces itself again from its new address and cal
 lost node at once. A node that leaves properly (it closes, or leaves the mesh) is not
 called back.
 
-What Palinopsia declares (119 entries, 7.1 KB, small enough for microcontroller
-nodes, whose frames stop at 8 KB; a field whose value is every decoder's default is
-left out, as the core's own terse DECLARE does) :
+**What Palinopsia shows the mesh is yours to choose : one node, carrying what you tick
+under publish.**
+- **The default is the 16 Macro knobs only.** They are destinations and sources at once,
+  so anything on the mesh can play Palinopsia through them, and they can play the mesh.
+- **Tick a whole group,** such as Layers, Feel or each heading of the Body rule list's
+  actions. A ticked group follows itself : a new scene's action appears by itself.
+- **Or open a group and tick single parameters.**
+- **Wiring one of Palinopsia's parameters from the section publishes it.**
+- **A gauge shows how full the node's one frame is.** A frame holds 32 KB, and a
+  microcontroller node takes about 8 KB : the gauge turns amber past that, and red when
+  published actions had to be left out to fit.
+
+Before v1.3.4, every parameter was published, and the actions rode on a second node,
+`<name>-session`. Both are gone : there is one node, and the Macro knobs until you choose
+more. Re-wire what played the old second node's actions to the same actions, published
+here. A field whose value is every decoder's default is left out, as the core's own terse
+DECLARE does.
+
+Everything that can be published :
 
 | | Paths | Notes |
 |---|---|---|
 | ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
-**actions** (beside the universe, on by default) adds every action of the Body rule list
-as a destination too, all of them : the layers' moves, Randomize, scenes, Worlds, Generate,
-the Macro knobs and modulators, Feel, tempo and key, the Audio Layer, the Sonify voices, the
-transport, the output, the session, your own Body rules and the triggers of what is loaded,
-under `act/<heading>/<action>` (`act/l1/mute`, `act/scene/3`, `act/sonify/voice-8`,
-`act/feel/density-up`...). Each is a trigger : it fires once as it goes on (0.5 or more), and
-again only after it went off. The list follows the session (a new scene, a rule, an effect
-with a trigger) and the other nodes see the new tree a moment later.
+**The actions** (a group per heading of the Body rule list, under publish) cover the
+layers' moves, Randomize, scenes, Worlds, Generate, the Macro knobs and modulators, Feel,
+tempo and key, the Audio Layer, the Sonify voices, the transport, the output, the session,
+your own Body rules and the triggers of what is loaded. They appear under
+`act/<heading>/<action>` (`act/l1/mute`, `act/scene/3`, `act/sonify/voice-8`,
+`act/feel/density-up`...). Each is a trigger : it fires once as it goes on (0.5 or more),
+and again only after it went off. A ticked heading follows the session (a new scene, a
+rule, an effect with a trigger), and the other nodes see the new tree a moment later.
 
-One node's tree travels in one frame, and a frame stops at 32 KB : the whole list does not
-fit in one. So Palinopsia runs **two nodes** while the actions are on. The first, under your
-name, carries the destinations and sources above and the actions that are always there (the
-layers, the Background, Randomize, the effects' chains, Generate, Macro, Feel, tempo and
-sound, Sonify, the transport, the output, the session) : about 240 actions, 23 KB. The
-second, `<name>-session`, carries the ones that follow the session : the scenes, the Worlds,
-the modulators, the Body rules and the triggers of what is loaded (120 scenes and 40 rules
-make about 270 actions, 20 KB). Each heading always lands on the same node and the second
-node keeps the same identity from run to run, so a wire to an action never moves; its wires
-are kept like the first node's. The section counts both (and says if a list ever outgrew
-its frame) and leaves the second node out of the other nodes. Turning **actions** off
-stops it and has every node forget it.
-
-Too big for a microcontroller node (it takes 8 KB frames, and the section warns past it) :
-turn **actions** off on a universe that has one. A reference C++ node keeps the first 128
-entries of a tree : it sees all of the destinations and sources above, not the actions.
+All of it does not fit in one frame (about 500 actions with a large session) : publish
+the headings you play. A reference C++ node keeps the first 128 entries of a tree, and the
+actions come last.
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1
 here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own destinations
