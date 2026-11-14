@@ -1486,7 +1486,9 @@ The **Connect** right-column tab (key `A`) holds the control panels
     monitored or analysed.
   - **Output EQ & glue** (under USB denoise) : the room EQ and the compressor on
     everything that leaves, Sonify and the Audio Layer (see
-    [Sonify](#sonify--image-to-sound-key-s)). Above them, the **Output levels** :
+    [Sonify](#sonify--image-to-sound-key-s)). Both are off until you turn them on, and
+    each card folds to its header with its ▶ (folded at first, remembered on this
+    computer). Above them, the **Output levels** :
     Sonify, the Audio Layer (to 200 %) and the input monitor, each with its on/off and
     its level.
 - **MIDI** : controller input picker + the learned-bindings ledger, plus the
@@ -2599,7 +2601,7 @@ channel cards : on/off, **volume**, and a per-voice **HP/LP filter** (a DJ-style
 tilt, ported from the Essaim instrument : one knob sweeps a 3-stage lowpass down or
 a highpass up, centre = bypass), plus the FX-tail send / delay / reverb mix.
 **Output EQ** : in the **audio tab** (A), Audio section, its own **Output EQ & glue**
-part under USB denoise (it used to sit under the FX tail in Sonify's mixer : it shapes
+part under USB denoise (off by default, its card folded : the ▶ opens it) (it used to sit under the FX tail in Sonify's mixer : it shapes
 everything that leaves now, Sonify and the [Audio Layer](#the-audio-layer)), a
 twelve-band parametric EQ after everything, to **tune the room** it plays in : a **low cut**, a **low shelf**,
 **eight bells**, a **high shelf** and a **high cut**, each with its frequency, gain (the

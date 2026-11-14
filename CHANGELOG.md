@@ -35,6 +35,10 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Output EQ and Glue : off by default, and they fold.** In the Connect tab's audio
+  section, the Output EQ now starts off like the Glue, and each card folds to its header
+  with a ▶ (folded at first, remembered on this computer). A session saved with the EQ on
+  keeps it on.
 - **dataflou : one node, and you choose what it shows.**
   - **One node.** The second node, `<name>-session`, is gone. It used to appear with
     the actions and carry the ones that follow the session.
