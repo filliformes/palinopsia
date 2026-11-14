@@ -22,6 +22,7 @@
     "support-link": "node scripts/support-link.mjs",
     "release-check": "node scripts/release-check.mjs",
     "check:notices": "node scripts/notices.mjs --check",
+    "check:catalog": "node scripts/catalog-check.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview"
   },

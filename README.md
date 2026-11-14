@@ -4494,6 +4494,13 @@ dataflou mesh visualizer is the dataflou project's own page, by **Alexandre Burt
 and video conversion run [FFmpeg](https://ffmpeg.org) (GPL-3.0 builds), and the fonts are
 OFL-1.1 and Apache-2.0.
 
+**What you make with Palinopsia is yours.** That covers shaders, presets, recordings,
+and Sonify generators, mappers and effects. The GPL covers the app, not what you make
+with it (see [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md)). To share a work, list it in
+the **community catalog**: it stays in your own repository under your name, and a pull
+request adds its entry (see [CONTRIBUTING.md](CONTRIBUTING.md)). The coming plugin SDK
+will be MIT.
+
 **Everything Palinopsia borrows is listed in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**, with its authors and license. That
 covers code, shaders, binaries, models and their training data, fonts, textures, and the

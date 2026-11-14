@@ -127,6 +127,8 @@ jobs:
           node -e "const l = require('./build/Release/link.node'); l.setTempo(123); console.log(JSON.stringify(l.state(4))); l.close()"
       # THIRD_PARTY_NOTICES.md must cover everything the build ships (scripts/notices.mjs).
       - run: npm run check:notices
+      # The community catalog : every entry pinned, credited, under an accepted license.
+      - run: npm run check:catalog
       # A release (a v* tag) must carry what a public release needs (the support link).
       - if: startsWith(github.ref, 'refs/tags/')
         run: npm run release-check

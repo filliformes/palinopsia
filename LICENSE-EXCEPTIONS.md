@@ -22,6 +22,29 @@ runtime used, as well as that of the covered work.
 
 NDI® is a registered trademark of Vizrt NDI AB.
 
+## What you make with Palinopsia is yours
+
+These works belong to the person who makes them, who chooses their license (or keeps
+all rights):
+- a shader written in the Source Editor or elsewhere;
+- a preset, a scene or a session;
+- a picture, a film, a sound or a recording made with the app;
+- a Sonify generator, a visual mapper or an effect written for it.
+
+The GPL covers Palinopsia's own code, not its output.
+
+**Additional permission under GNU GPL version 3 section 7.** A shader or plugin may:
+- use the inputs, uniforms, functions and shared GLSL that Palinopsia supplies or
+  inserts when it runs it (the `// @dome` hook, the ISF built-ins);
+- be loaded, compiled and run by Palinopsia.
+
+Doing so does not make it a covered work, and does not by itself place it under the
+GPL. A built-in Palinopsia shader that you copy and modify is still derived from
+Palinopsia's code, and stays under the GPL.
+
+To share your work with everyone, see [CONTRIBUTING.md](CONTRIBUTING.md): the
+community catalog lists works by their authors, in their authors' own repositories.
+
 ## Earlier releases
 
 Palinopsia up to and including v1.2.10 was released under the MIT License, and

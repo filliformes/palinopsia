@@ -1,0 +1,27 @@
+name: checks
+
+# On every pull request and push : the credits register and the community catalog.
+# Read-only, no install scripts (npm ci --ignore-scripts), so it is safe to run on
+# pull requests from forks (catalog submissions).
+
+on:
+  pull_request:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm run check:catalog
+      - run: npm run check:notices

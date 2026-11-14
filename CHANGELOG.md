@@ -47,6 +47,25 @@ that CI builds into cross-platform releases.
   - **Measured.** RT60 is within 7 % of the decay law. The 30-second freeze holds within
     0.1 dB. 240 extreme settings stay stable. It runs about 60× faster than real time.
 
+### Added
+
+- **What you make is yours, and a catalog to share it.**
+  - **The statement.** `LICENSE-EXCEPTIONS.md` now says that shaders, presets,
+    recordings, Sonify generators, mappers and effects belong to their authors. Its new
+    section 7 permission says that using what Palinopsia supplies when it runs a work
+    does not make that work GPL.
+  - **The catalog.** `CONTRIBUTING.md` describes it. `catalog/catalog.json` lists each
+    work in its author's own repository, pinned to a commit. Like Schwung's catalog, an
+    author adds a work with a pull request.
+  - **The check.** `npm run check:catalog` checks each entry: pinned, credited, and
+    under an accepted license (no non-commercial, no-derivatives, CC BY 3.0 or older,
+    or unlicensed work).
+  - **A `checks` workflow** runs the catalog and credits checks on every pull request.
+    It is read-only and runs no install scripts.
+- **A ☕ in the top bar.** It links to the author's Buy Me a Coffee page, set with `npm
+  run support-link <username>`. The same command also fills the README, the site and
+  GitHub's Sponsor button. A release build fails while the address is missing.
+
 ### Security
 
 - **Electron 44.11.3** (from 44.5.1) : six patch releases of Chromium fixes.
