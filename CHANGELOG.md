@@ -115,6 +115,13 @@ that CI builds into cross-platform releases.
   of the app buffering for it until it runs out of memory.
 - **Shader names** : a backslash or leading dots can no longer take a saved shader
   outside the Shaders folder (Windows), and the main process checks it again.
+- **Electron fuses** in every packaged build :
+  - no `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS` or `--inspect`, so no other program can
+    run code with Palinopsia's camera, microphone and screen permissions;
+  - the app code loads only from `app.asar`, checked against its hash on macOS and
+    Windows.
+
+  Checked on a Linux package : the app starts, and `ELECTRON_RUN_AS_NODE` is ignored.
 - **CI** : the build job, which runs every dependency's install script, is read-only and
   keeps no token in `.git/config`. Only the release job may write, and its release
   action is pinned to a commit.

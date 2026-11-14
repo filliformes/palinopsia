@@ -24,6 +24,19 @@ files:
   - "!**/*.map"
   - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
 asar: true
+# Electron fuses, flipped in the packaged binary (security review, v1.3.4) : no other
+# program can start Palinopsia's binary as plain Node (ELECTRON_RUN_AS_NODE), hand it
+# NODE_OPTIONS or --inspect, or swap its code : so none can borrow the camera,
+# microphone and screen permissions given to Palinopsia. The app code loads only from
+# app.asar, checked against its hash (macOS, Windows). utilityProcess.fork (the USB
+# input) does not need runAsNode. grantFileProtocolExtraPrivileges is left as it is :
+# the page loads from file://.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 asarUnpack:
   - native/spout/build/Release/*.node
   - native/syphon/build/Release/**
