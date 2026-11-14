@@ -12,6 +12,8 @@ import { layerSounds } from '../audio/audioLayer'
 import { EqCard, GlueCard } from './SonifyEq'
 import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
+import { ChannelSelect, useOutputChannels } from '../audio/channelPick'
+import { sonifyEngine } from '../audio/sonify'
 
 const SOURCES: Array<{ id: 'both' | 'osc' | 'local'; label: string; title: string }> = [
   { id: 'both', label: 'Both', title: 'OSC (Pandore) primary, local input as fallback' },
@@ -51,6 +53,19 @@ export function AudioPanel(): JSX.Element {
   const notches = useStore((s) => s.audioDenoiseNotches)
   const setNotches = useStore((s) => s.setAudioDenoiseNotches)
   const [learning, setLearning] = useState(false)
+  // The channels picked on each device (per computer)
+  const inCh = useStore((s) => s.audioInCh)
+  const setInCh = useStore((s) => s.setAudioInCh)
+  const outCh = useStore((s) => s.soniOutCh)
+  const setOutCh = useStore((s) => s.setSoniOutCh)
+  const monCh = useStore((s) => s.audioMonitorCh)
+  const setMonCh = useStore((s) => s.setAudioMonitorCh)
+  const outN = useOutputChannels(sonify.sinkId ?? '')
+  const monN = useOutputChannels(monitorSink)
+  // what the engines know (the input's channels once it is open, Space on) :
+  // read twice a second while the tab shows
+  const inN = usePolled(() => audioBus.inChannels, 500)
+  const spaceOn = usePolled(() => sonifyEngine.spaceOn, 500)
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const showDevice = source === 'local' || source === 'both'
@@ -135,8 +150,9 @@ export function AudioPanel(): JSX.Element {
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           {enabled && showDevice && (
+            <div className="flex min-w-0 items-center gap-1">
             <select
-              className="input select-compact w-full min-w-0 text-[10px]"
+              className="input select-compact min-w-0 flex-1 text-[10px]"
               value={deviceId ?? ''}
               onChange={(e) => {
                 const id = e.target.value || null
@@ -159,14 +175,34 @@ export function AudioPanel(): JSX.Element {
                 </option>
               )}
             </select>
+            {!fromLayer && (
+              <ChannelSelect
+                n={inN || 2}
+                value={inCh}
+                onChange={setInCh}
+                title={`Which of the input's channels it listens to : a stereo pair, or one channel (mono, on both sides). The analysis, the monitor, learn noise and the Filter voice's line-in all take these. ${inN ? `The device gives ${inN} channel${inN === 1 ? '' : 's'}${inN <= 2 ? ' : an interface often shows its other inputs as devices of their own (pick the device), or gives them all only through its own driver' : ''}.` : 'Its channels show once it is open.'}`}
+              />
+            )}
+            </div>
           )}
-          <AudioOutputSelect
-            className="input select-compact w-full min-w-0 text-[10px]"
-            defaultLabel="Default output (Sonify)"
-            value={sonify.sinkId}
-            onChange={(id) => setSonify({ ...useStore.getState().sonify, sinkId: id })}
-            title="Which output device Sonify plays to (the same choice as on the Sonify page)"
-          />
+          <div className="flex min-w-0 items-center gap-1">
+            <AudioOutputSelect
+              className="input select-compact min-w-0 flex-1 text-[10px]"
+              defaultLabel="Default output (Sonify)"
+              value={sonify.sinkId}
+              onChange={(id) => setSonify({ ...useStore.getState().sonify, sinkId: id })}
+              title="Which output device Sonify plays to (the same choice as on the Sonify page)"
+            />
+            <ChannelSelect
+              n={outN}
+              value={outCh}
+              onChange={setOutCh}
+              disabled={spaceOn}
+              title={spaceOn
+                ? 'Space is on : it places the voices on the channels itself (turn Space off to pick the channels here)'
+                : `Which of the output's channels Sonify and the Audio Layer play on : a stereo pair, or one channel (the two sides summed). The device takes ${outN} channel${outN === 1 ? '' : 's'}. The films' and audio players' own sound stays on 1+2.`}
+            />
+          </div>
         </div>
         {enabled && <Meters />}
       </div>
@@ -222,6 +258,12 @@ export function AudioPanel(): JSX.Element {
               value={monitorSink}
               onChange={setMonitorSink}
               title="Which output device the input monitor plays to (Sonify has its own, above)"
+            />
+            <ChannelSelect
+              n={monN}
+              value={monCh}
+              onChange={setMonCh}
+              title={`Which of the output's channels the monitor plays on : a stereo pair, or one channel (the two sides summed). The device takes ${monN} channel${monN === 1 ? '' : 's'}.`}
             />
           </label>
         )}
@@ -286,6 +328,18 @@ export function AudioPanel(): JSX.Element {
       </div>
     </div>
   )
+}
+
+/** A value only an engine knows, read every `ms` while shown. */
+function usePolled<T>(read: () => T, ms: number): T {
+  const [v, setV] = useState(read)
+  const ref = useRef(read)
+  ref.current = read
+  useEffect(() => {
+    const id = window.setInterval(() => setV(ref.current()), ms)
+    return () => window.clearInterval(id)
+  }, [ms])
+  return v
 }
 
 // One on/off + level fader (Sonify · Audio Layer · input monitor). `max` : the

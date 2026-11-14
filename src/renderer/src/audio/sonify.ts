@@ -22,6 +22,7 @@ import type { AssembleSoundInfo } from '../engine/AssembleSource'
 import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
 import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
+import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, type ChPick } from './channelPick'
 import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
 import { SIGNAL_DEPTH_PARAMS, defaultSignalPatch, normalizeSignalPatch, signalHit, signalModOf, signalPlayerCfg, type SignalRow } from './signalPlay'
 
@@ -708,7 +709,14 @@ class SonifyEngine {
   private tapFlush: (() => void) | null = null
   private cfg: SoniConfig = defaultSoniConfig()
   private starting = false
-  private lineSrc: MediaStreamAudioSourceNode | null = null
+  // the line-in's source and its channel pick, let go together
+  private lineSrc: { disconnect: () => void } | null = null
+  private lineRoute: InputPick | null = null
+  // The input it opens : the Audio section's device and channels ('' : the default)
+  private lineDev = { id: '', label: '', pick: { ...CH_DEFAULT } as ChPick }
+  // Where the stereo output lands on the device (1+2 : as it always did)
+  private outPick: ChPick = { ...CH_DEFAULT }
+  private outNodes: AudioNode[] = []
   private lineStream: MediaStream | null = null
   private lineWanted = false
   private lineReq = 0 // the latest line-in request (an older one resolving late is dropped)
@@ -1425,6 +1433,33 @@ class SonifyEngine {
     return this.collage?.groupPos ?? null
   }
 
+  /** Space places the channels itself (on speakers, or heard on headphones). */
+  get spaceOn(): boolean {
+    return this.spaceRoute.on
+  }
+
+  /** Where the stereo output lands on the device : a pair, or summed onto one
+   *  channel (Space, when on, places the channels itself). */
+  setOutChannels(p: ChPick): void {
+    if (p.l === this.outPick.l && p.r === this.outPick.r) return
+    this.outPick = { ...p }
+    if (this.ctx && this.node && this.outG) this.reroute(() => this.applySpaceRoute())
+  }
+
+  /** The input the Filter's line-in opens : the Audio section's device ('' :
+   *  the default input) and its channels. An open line-in follows at once. */
+  setLineInput(id: string, label: string, pick: ChPick): void {
+    const d = this.lineDev
+    const devChanged = d.id !== id
+    this.lineDev = { id, label, pick: { ...pick } }
+    if (!devChanged) { this.lineRoute?.set(pick); return }
+    if (this.lineWanted) {
+      // open again on the new device
+      this.lineWanted = false
+      this.syncLineIn(true)
+    }
+  }
+
   /** The most channels the output device takes (Web Audio stops at 32). */
   outputChannels(): number {
     return Math.min(SPACE_MAX_CH, this.ctx?.destination.maxChannelCount ?? 2)
@@ -1436,6 +1471,15 @@ class SonifyEngine {
     const dst = ctx.destination
     try { node.disconnect(out) } catch { /* not connected */ }
     try { this.eqNode?.disconnect(out) } catch { /* not connected */ }
+    // the channel pick's nodes go; the output gain feeds the device again below
+    // (nodes of an older context, Sonify started again : nothing to unwire)
+    if (this.outNodes.length && this.outNodes[0].context !== ctx) this.outNodes = []
+    if (this.outNodes.length) {
+      try { out.disconnect() } catch { /* not connected */ }
+      for (const x of this.outNodes) { try { x.disconnect() } catch { /* gone */ } }
+      this.outNodes = []
+      out.connect(dst)
+    }
     this.previewLast = []
     // the output gain carries the channels as the device takes them
     const layout = (n: number, discrete: boolean): void => {
@@ -1491,9 +1535,20 @@ class SonifyEngine {
       } else if (this.spaceRoute.on) {
         layout(Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH)), true)
         node.connect(out, 1)
-      } else {
+      } else if (isDefaultPick(this.outPick)) {
         layout(Math.min(2, dst.maxChannelCount), false)
         this.eqNode?.connect(out)
+      } else {
+        // the stereo onto the picked channels of the device (outputs 3+4 of an
+        // interface), or summed onto one : the output gain stays stereo, the
+        // device takes all its channels
+        layout(Math.min(2, dst.maxChannelCount), false)
+        try { out.disconnect() } catch { /* not connected */ }
+        const r = outputRoute(ctx, dst, this.outPick)
+        out.connect(r.input)
+        this.eqNode?.connect(out)
+        // (the first node is what the output gain feeds : kept to unwire it)
+        this.outNodes = r.nodes
       }
     } catch (e) {
       console.warn('[sonify] space route', e)
@@ -1730,16 +1785,33 @@ class SonifyEngine {
     }
     const ctx = this.ctx
     if (!ctx || !this.node) return
-    navigator.mediaDevices
-      .getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+    // the Audio section's input (by its id, else by its name, else the default),
+    // every channel it gives so the picked ones can be taken
+    const audio: MediaTrackConstraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 32 } }
+    const dev = this.lineDev
+    const md = navigator.mediaDevices
+    const open = async (): Promise<MediaStream> => {
+      if (!dev.id) return md.getUserMedia({ audio })
+      try {
+        return await md.getUserMedia({ audio: { ...audio, deviceId: { exact: dev.id } } })
+      } catch {
+        const same = dev.label ? (await md.enumerateDevices()).find((d) => d.kind === 'audioinput' && d.label === dev.label) : undefined
+        return md.getUserMedia({ audio: same ? { ...audio, deviceId: { exact: same.deviceId } } : audio })
+      }
+    }
+    open()
       .then((stream) => {
         if (req !== this.lineReq || !this.lineWanted || !this.ctx || !this.node) { stream.getTracks().forEach((t) => t.stop()); return }
         // never two mics summed into the Filter : anything still open goes first
         this.lineSrc?.disconnect()
         this.lineStream?.getTracks().forEach((t) => t.stop())
         this.lineStream = stream
-        this.lineSrc = this.ctx.createMediaStreamSource(stream)
-        this.lineSrc.connect(this.node)
+        const raw = this.ctx.createMediaStreamSource(stream)
+        const n = Math.max(1, Math.min(32, stream.getAudioTracks()[0]?.getSettings().channelCount ?? 2))
+        const route = new InputPick(this.ctx, raw, n, this.lineDev.pick)
+        route.out.connect(this.node)
+        this.lineRoute = route
+        this.lineSrc = { disconnect: () => { try { raw.disconnect() } catch { /* gone */ } route.dispose(); if (this.lineRoute === route) this.lineRoute = null } }
       })
       .catch((e) => console.warn('[sonify] line-in unavailable, noise only', e))
   }

@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
-import { audioBus } from './engine/audioIn'
+import { audioBus, LAYER_INPUT } from './engine/audioIn'
+import { CH_DEFAULT, InputPick, outputRoute, probeOutputChannels } from './audio/channelPick'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
 import { clearFrameVals } from './engine/frameVals'
@@ -238,6 +239,20 @@ clipAudio.setPlayheads((layer, slot) => {
 // Sonify's output device.
 setMediaSink(useStore.getState().sonify.sinkId ?? '')
 useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
+// The channels picked in the audio tab (per computer) : the input it listens
+// to (the Filter's line-in opens the same device and channels), the main
+// output's and the monitor's.
+{
+  const push = (st: ReturnType<typeof useStore.getState>): void => {
+    audioBus.setInChannels(st.audioInCh)
+    audioBus.setMonitorChannels(st.audioMonitorCh)
+    sonifyEngine.setOutChannels(st.soniOutCh)
+    const layer = st.audioDeviceId === LAYER_INPUT
+    sonifyEngine.setLineInput(layer ? '' : st.audioDeviceId ?? '', layer ? '' : st.audioDeviceLabel ?? '', layer ? CH_DEFAULT : st.audioInCh)
+  }
+  push(useStore.getState())
+  useStore.subscribe(push)
+}
 // The Synth's radial pitch reads the composition's frame and the dome.
 {
   const frame = (st: ReturnType<typeof useStore.getState>): void => sonifyEngine.setFrame(st.compW / Math.max(1, st.compH), st.dome ?? null)
@@ -1296,7 +1311,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -2309,11 +2324,11 @@ export default function App(): JSX.Element {
           }
           title={
             midiLearnMode
-              ? 'MIDI Learn ON : click a highlighted control, then move a knob / hit a pad, or move a control on an OSC controller (any address outside /opsia), to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
-              : 'Enter MIDI Learn mode (shortcut : L, from any tab) : map hardware knobs and pads, and OSC controllers in their own addresses (OSC Learn), to Macro knobs, transport controls, Vary / Randomize / Sonify and scenes.'
+              ? 'Learn ON : click a highlighted control, then move a knob / hit a pad on a MIDI controller, or move a control on an OSC controller (any address outside /opsia), to bind it. Right-click a green one to clear. Click here (or press L / Esc) to exit.'
+              : 'Learn (shortcut : L, from any tab) : map MIDI knobs and pads, and OSC controllers in their own addresses, to Macro knobs, transport controls, Vary / Randomize / Sonify and scenes.'
           }
         >
-          MIDI<span className="tb-long"> Learn</span>
+          Learn
         </button>
         {/* while it is on : where what it learns goes (this computer / this session) */}
         {midiLearnMode && <LearnScopeSwitch short />}

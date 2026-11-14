@@ -322,7 +322,7 @@ export function MidiPanel(): JSX.Element {
           {/* The bindings ledger : MIDI and OSC, the session's, the knobs', this computer's. */}
           {rows.length === 0 ? (
             <div className="rounded border border-border bg-panel2/40 p-1.5 font-mono text-[9px] leading-relaxed text-muted">
-              No mappings yet. Press <span className="text-text">MIDI Learn</span> in the top bar,
+              No mappings yet. Press <span className="text-text">Learn</span> in the top bar,
               click a highlighted control (Macro knobs, transport sliders, Vary / Randomize /
               Sonify, scene chips), then move a knob, hit a pad or move a control on an OSC
               controller (any address outside /opsia).

@@ -32,6 +32,7 @@ import type {
   SourceSlot,
   World, LightPath } from '@shared/types'
 import type { MetaKnobState, MidiBinding, BodyControlConfig, BodyRuleSource, AudioLayerSlot, AudioLayerState, HandGestureLog } from '@shared/types'
+import { parsePick, pickKey, type ChPick } from './audio/channelPick'
 import type { MappingScope, OscAlias, OscBinding, SessionMappings } from '@shared/types'
 import { sanitizeMidiMap, sanitizeOscMap, sessionMappingsOut } from './mappingModel'
 import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assemble'
@@ -2192,6 +2193,15 @@ interface StoreState {
   setAudioMonitorLevel: (v: number) => void
   audioMonitorSink: string // output device id ('' = system default)
   setAudioMonitorSink: (id: string) => void
+  // Which channels of each device (a pair or one, mono) : the input it listens
+  // to, the main output (Sonify and the Audio Layer) and the monitor's output.
+  // Per computer, like the devices.
+  audioInCh: ChPick
+  setAudioInCh: (p: ChPick) => void
+  soniOutCh: ChPick
+  setSoniOutCh: (p: ChPick) => void
+  audioMonitorCh: ChPick
+  setAudioMonitorCh: (p: ChPick) => void
   // USB-noise denoiser : adaptive notch filter. On/off + the learned notch
   // frequencies (Hz). Machine-local (the noise is per-rig), persisted.
   audioDenoise: boolean
@@ -4716,6 +4726,21 @@ export const useStore = create<StoreState>((set, get) => ({
   setAudioMonitorSink: (id) => {
     localStorage.setItem('opsia.audioMonitorSink', id)
     set({ audioMonitorSink: id })
+  },
+  audioInCh: parsePick(localStorage.getItem('opsia.audioInCh')),
+  setAudioInCh: (p) => {
+    localStorage.setItem('opsia.audioInCh', pickKey(p))
+    set({ audioInCh: p })
+  },
+  soniOutCh: parsePick(localStorage.getItem('opsia.soniOutCh')),
+  setSoniOutCh: (p) => {
+    localStorage.setItem('opsia.soniOutCh', pickKey(p))
+    set({ soniOutCh: p })
+  },
+  audioMonitorCh: parsePick(localStorage.getItem('opsia.audioMonitorCh')),
+  setAudioMonitorCh: (p) => {
+    localStorage.setItem('opsia.audioMonitorCh', pickKey(p))
+    set({ audioMonitorCh: p })
   },
   audioDenoise: localStorage.getItem('opsia.audioDenoise') === '1',
   setAudioDenoise: (on) => {

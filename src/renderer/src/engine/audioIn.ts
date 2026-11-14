@@ -14,6 +14,7 @@
 // Design rule for the chapter: prefer DISCONTINUITY (transient/flux) over gain —
 // the salient signal dominates cross-modal perception.
 
+import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, stereoDestination, type ChPick } from '../audio/channelPick'
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
 
@@ -253,6 +254,14 @@ class AudioBus {
   private monitorOn = false
   private monitorLevel = 0.8
   private monitorSink = '' // output device id ('' = system default)
+  // The channels : the input's picked pair (or one, on both sides) and where the
+  // monitor lands on its output device. Remembered for the next open.
+  private inPick: ChPick = { ...CH_DEFAULT }
+  private inRoute: InputPick | null = null
+  private monitorPick: ChPick = { ...CH_DEFAULT }
+  private monitorNodes: AudioNode[] = []
+  /** How many channels the open input delivers (0 : none open). */
+  inChannels = 0
 
   // USB-noise denoiser : an adaptive multi-notch filter. `learnNoise` measures
   // the input's average spectrum, finds the narrowband peaks (mains hum + its
@@ -264,7 +273,7 @@ class AudioBus {
   private notches: NoiseNotch[] = [] // learned notch targets (freq + Q)
   private preSplit: GainNode | null = null // feeds analyser + monitor
   private filterNodes: AudioNode[] = [] // hp + notches (rebuilt on change)
-  private srcNode: MediaStreamAudioSourceNode | null = null
+  private srcNode: AudioNode | null = null // the picked channels (two)
   private srcOut: AudioNode | null = null // what src currently feeds (for disconnect)
   private learnAnalyser: AnalyserNode | null = null // taps RAW src (for learning)
   private learnBuf: Float32Array<ArrayBuffer> | null = null
@@ -323,7 +332,9 @@ class AudioBus {
       const audioC: MediaTrackConstraints = {
         echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: false
+        autoGainControl: false,
+        // every channel the device gives, so one of them can be picked
+        channelCount: { ideal: 32 }
       }
       // The chosen device by its id; else found again by its name (an id is
       // not stable : another build of the app, another USB port); else the
@@ -367,7 +378,11 @@ class AudioBus {
         this.watchDevices()
       })
       const ctx = new AudioContext()
-      const src = ctx.createMediaStreamSource(stream)
+      const raw = ctx.createMediaStreamSource(stream)
+      // the picked channels : a pair, or one on both sides
+      const nIn = Math.max(1, Math.min(32, tr?.getSettings().channelCount ?? 2))
+      const route = new InputPick(ctx, raw, nIn, this.inPick)
+      const src = route.out
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 2048 // 2048 samples ≈ 46ms : enough window for pitch
       analyser.smoothingTimeConstant = 0.5
@@ -386,11 +401,13 @@ class AudioBus {
       const monitorGain = ctx.createGain()
       monitorGain.gain.value = this.monitorOn ? this.monitorLevel : 0
       preSplit.connect(monitorGain)
-      monitorGain.connect(ctx.destination)
       this.monitorGain = monitorGain
-      if (this.monitorSink) this.applySink(ctx, this.monitorSink)
       this.stream = stream
       this.ctx = ctx
+      this.inRoute = route
+      this.inChannels = nIn
+      this.routeMonitor()
+      if (this.monitorSink) this.applySink(ctx, this.monitorSink)
       this.srcNode = src
       this.preSplit = preSplit
       this.learnAnalyser = learnAnalyser
@@ -449,6 +466,9 @@ class AudioBus {
     this.ctx = null
     this.analyser = null
     this.monitorGain = null
+    this.monitorNodes = []
+    this.inRoute = null
+    this.inChannels = 0
     this.preSplit = null
     this.srcNode = null
     this.srcOut = null
@@ -623,10 +643,49 @@ class AudioBus {
     if (this.ctx) this.applySink(this.ctx, this.monitorSink)
   }
 
+  /** Which channels of the input it listens to (a pair, or one on both sides). */
+  setInChannels(p: ChPick): void {
+    this.inPick = { ...p }
+    this.inRoute?.set(p)
+  }
+
+  /** Where the monitor lands on its output device (a pair, or summed onto one). */
+  setMonitorChannels(p: ChPick): void {
+    if (p.l === this.monitorPick.l && p.r === this.monitorPick.r) return
+    this.monitorPick = { ...p }
+    this.routeMonitor()
+  }
+
+  // The monitor to its channels : plain stereo for 1+2, else onto the picked
+  // channels of the device (read again after the device changed).
+  private routeMonitor(): void {
+    const ctx = this.ctx, g = this.monitorGain
+    if (!ctx || !g) return
+    try { g.disconnect() } catch { /* not wired yet */ }
+    for (const n of this.monitorNodes) { try { n.disconnect() } catch { /* gone */ } }
+    this.monitorNodes = []
+    const dst = ctx.destination
+    try {
+      if (isDefaultPick(this.monitorPick)) {
+        stereoDestination(dst)
+        g.connect(dst)
+        return
+      }
+      const r = outputRoute(ctx, dst, this.monitorPick)
+      g.connect(r.input)
+      this.monitorNodes = r.nodes
+    } catch (e) {
+      console.warn('[audio] monitor channels', e)
+      stereoDestination(dst)
+      g.connect(dst)
+    }
+  }
+
   // AudioContext.setSinkId (Chromium 110+) isn't in the TS DOM lib yet.
+  // Another device can have another channel count : the monitor routes again.
   private applySink(ctx: AudioContext, id: string): void {
     const set = (ctx as unknown as { setSinkId?: (id: string) => Promise<void> }).setSinkId
-    if (set) set.call(ctx, id).catch(() => { /* device gone / not permitted */ })
+    if (set) set.call(ctx, id).then(() => { if (this.ctx === ctx) this.routeMonitor() }).catch(() => { /* device gone / not permitted */ })
   }
 
   private computeLocal(dt: number): void {

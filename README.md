@@ -285,8 +285,8 @@ In **Sonify** (also in the cheat-sheet) :
 | Drag an output-EQ point | Frequency across, gain up and down (it moves once dragged past 3 px, so a click only selects it); the wheel over a point sets its Q, a double-click switches its band, `Delete` turns the selected band off. While the editor is open the app's one-key shortcuts wait; `Esc` closes it |
 | Drag a Space number | Up or down to change it; drag a voice's dot on the Room map to place it |
 
-**MIDI:** the **MIDI Learn** toolbar button (top bar), or the `L` key from
-anywhere : maps any controller; see [MIDI](#midi).
+**MIDI:** the **Learn** button (top bar), or the `L` key from anywhere : maps any
+MIDI or OSC controller; see [MIDI](#midi).
 **Everywhere:** double-click a slider/knob to reset it to its neutral value : including the A/B mix, harmony, coupling, background opacity / depth and the
 video **in / out** trim handles. In a **number box**, what you type takes effect on
 `Enter` or when you leave the box; `Esc` goes back to the value from before the edit and
@@ -1465,6 +1465,22 @@ The **Connect** right-column tab (key `A`) holds the control panels
   that is not there plays the **default input** instead, said in a message and in
   the menu (it used to stay silent). Picking another device while the input runs
   switches to it at once.
+  - **Channels** : beside each device, a menu picks which of its channels : a
+    **stereo pair** (1+2, 3+4…) or **one channel** (mono). For the **input**, the
+    pair is what the analysis, the monitor, **learn noise** and the Filter voice's
+    line-in hear (a mono channel plays on both sides); it lists the channels the
+    device delivers once it is open (most drivers on Windows give one or two per
+    device : an interface often shows its other inputs as devices of their own). For
+    **Sonify's output** (Sonify and the Audio Layer) and the **monitor's output**, the
+    stereo lands on the picked pair of a device with more channels (an interface's
+    outputs 3+4), or is summed onto one channel; the menu reads how many channels
+    the device takes. While **Space** is on it places the channels itself and the
+    output's menu waits. The films' and audio players' own sound stays on 1+2. All
+    three are kept per computer, with the devices.
+  - **The Filter voice's line-in** opens the input chosen here (by its id, else its
+    name, else the default input) on the same channels; it used to open the default
+    input whatever was chosen. With the Audio Layer as the input, it opens the
+    default input as before.
   - **Audio Layer** as the input (its entry in the input menu, under Default input) :
     the analyser listens to the [Audio Layer](#the-audio-layer)'s whole sound (both
     slots mixed, after their volumes) instead of a device, so the coupling rows and
@@ -1573,7 +1589,7 @@ Learnable targets:
   deleted.
 
 **Where a mapping lives : this computer or this session.** While Learn is on, a
-**computer | session** switch beside the MIDI Learn button (and in the MIDI section) says
+**computer | session** switch beside the **Learn** button (and in the MIDI section) says
 where what you learn goes, for MIDI and OSC alike :
 
 - **this computer** (the default, as before) : the mapping works in every session on this

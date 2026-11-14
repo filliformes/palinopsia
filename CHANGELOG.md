@@ -7,6 +7,13 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Pick an interface's channels.** In the Connect tab's Audio section, each device gets
+  a channel menu : a stereo pair (1+2, 3+4…) or one channel (mono). The input's pick
+  feeds the analysis, the monitor, learn noise and the Filter voice's line-in. Sonify's
+  output (with the Audio Layer) and the monitor's output land on the picked pair of a
+  device with more channels, or are summed onto one. Kept per computer; 1+2 as before
+  until you pick. The Filter voice's line-in now opens the input chosen in the Audio
+  section (it always opened the default input).
 - **OSC : several destinations, a connections view, a map.**
   - **Several destinations.** Each has a name, host:port and on/off, and its own
     content: F feedback (optionally only under some address prefixes), M MARK, B the
@@ -35,6 +42,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The top bar's MIDI Learn button is now just Learn.** It learns MIDI and OSC
+  controllers alike; the L key and everything it does are unchanged.
 - **Output EQ and Glue : off by default, and they fold.** In the Connect tab's audio
   section, the Output EQ now starts off like the Glue, and each card folds to its header
   with a ▶ (folded at first, remembered on this computer). A session saved with the EQ on
