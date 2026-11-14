@@ -49,6 +49,8 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **The whole Audio section folds** to its header with its ▶, like MIDI and OSC (it
+  keeps listening and playing; remembered on this computer).
 - **The top bar's MIDI Learn button is now just Learn.** It learns MIDI and OSC
   controllers alike; the L key and everything it does are unchanged.
 - **Output EQ and Glue : off by default, and they fold.** In the Connect tab's audio

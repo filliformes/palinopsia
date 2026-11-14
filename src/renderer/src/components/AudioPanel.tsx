@@ -54,6 +54,9 @@ export function AudioPanel(): JSX.Element {
   const notches = useStore((s) => s.audioDenoiseNotches)
   const setNotches = useStore((s) => s.setAudioDenoiseNotches)
   const [learning, setLearning] = useState(false)
+  // the whole section folds to its header (kept, like the other sections)
+  const collapsed = useStore((s) => !!s.collapsed['audio'])
+  const toggleSection = useStore((s) => s.toggleSection)
   // The channels picked on each device (per computer)
   const inCh = useStore((s) => s.audioInCh)
   const setInCh = useStore((s) => s.setAudioInCh)
@@ -97,6 +100,13 @@ export function AudioPanel(): JSX.Element {
   return (
     <div className="flex min-w-0 flex-col gap-1.5 border-t border-border bg-panel px-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={() => toggleSection('audio')}
+          className="-mr-1 shrink-0"
+          title={collapsed ? 'Expand Audio' : 'Collapse Audio (it keeps listening and playing)'}
+        >
+          <span className={`inline-block font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+        </button>
         <button
           onClick={() => setEnabled(!enabled)}
           className={`flex shrink-0 items-center gap-1.5`}
@@ -149,6 +159,7 @@ export function AudioPanel(): JSX.Element {
           </>
         )}
       </div>
+      {!collapsed && (<>
       {/* The devices, one above the other at the same width : the input it
           analyses, and the output Sonify plays to (the same setting as the
           Sonify page's menu; shown even with the analyser off). The meters
@@ -364,6 +375,7 @@ export function AudioPanel(): JSX.Element {
         <EqCard />
         <GlueCard />
       </div>
+      </>)}
     </div>
   )
 }

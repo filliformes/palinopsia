@@ -1458,7 +1458,8 @@ the composite live.
 The **Connect** right-column tab (key `A`) holds the control panels
 (**Audio · MIDI · OSC · dataflou · Ableton Link · Resolume · Agent (MCP)**), and the **performance** tab beside it the load meter:
 
-- **Audio** : enable the local analyser (input device picker), or receive
+- **Audio** (its ▶ folds the whole section to its header, which keeps the on / off
+  dot and what is sounding) : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **≈ coupling**
   button (pinned right) is the coupling master switch, the same as the Mixer's : it
   pauses every layer's A/B coupling at once (on at each launch). Live meters show
