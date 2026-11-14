@@ -594,7 +594,7 @@ The right column switches between **seven views** (tabs, or keys `M` / `F` / `G`
 layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
 blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
 Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
-Resolume, dataflou, Ableton Link and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu) and
+dataflou, Ableton Link, Resolume and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu) and
 **assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
 kept), double-click the edge to fit it again.
@@ -1450,7 +1450,7 @@ the composite live.
 ## Audio in
 
 The **Connect** right-column tab (key `A`) holds the control panels
-(**Audio · MIDI · OSC · Resolume · dataflou · Ableton Link · Agent (MCP)**), and the **performance** tab beside it the load meter:
+(**Audio · MIDI · OSC · dataflou · Ableton Link · Resolume · Agent (MCP)**), and the **performance** tab beside it the load meter:
 
 - **Audio** : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **≈ coupling**

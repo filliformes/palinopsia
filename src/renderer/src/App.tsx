@@ -2466,9 +2466,9 @@ export default function App(): JSX.Element {
               <AudioPanel />
               <MidiPanel />
               <OscPanel />
-              <ResolumeSection />
               <DataflouSection />
               <LinkSection />
+              <ResolumeSection />
               <McpSection />
             </>
           ) : rightView === 'perf' ? (

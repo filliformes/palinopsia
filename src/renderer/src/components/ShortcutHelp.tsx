@@ -26,7 +26,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['F', 'Finishing'],
       ['G', 'Feel (global macros)'],
       ['E', 'Assemble tab (again : back to the layers)'],
-      ['A', 'Connect tab : audio · MIDI · OSC · Resolume · dataflou · Ableton Link · Agent (again : back to the layers)'],
+      ['A', 'Connect tab : audio · MIDI · OSC · dataflou · Ableton Link · Resolume · Agent (again : back to the layers)'],
       ['D', 'Fold Modulation'],
       ['X', 'Fold Master FX'],
       ['I', 'Fold Inspector'],
