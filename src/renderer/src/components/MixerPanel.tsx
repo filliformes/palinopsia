@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import { useShallow } from 'zustand/react/shallow'
 import type { AudioFeature, CouplingMode, LayerState, ModTarget, SourceSlot } from '@shared/types'
 import { modTargetKey, useStore } from '../store'
+import { densityFactors } from '../feelState'
 import { AUDIO_FEATURES, AUDIO_BANDS, audioBus } from '../engine/audioIn'
 import { liveCoupledMix, liveCouplingFeature } from '../engine/coupling'
 import { liveModValues } from '../engine/modulation'
@@ -137,6 +138,9 @@ export function MixerPanel(): JSX.Element {
           </button>
         </div>
       </div>
+
+      {/* What Feel's Density does to the faders (fixed row : nothing jumps) */}
+      <DensityNote layers={layers.length} />
 
       {/* Four columns : one per layer : filling the section height */}
       <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
@@ -702,5 +706,28 @@ function VFader({
         className="input shrink-0 !px-0.5 !py-0.5 text-center !text-[9px]"
       />
     </div>
+  )
+}
+
+/** Feel's Density on the layers : each fader's share at sparse, the push toward
+ *  full at dense (the engine's own law, feelState.densityFactors). A click opens
+ *  Feel (G). */
+function DensityNote({ layers }: { layers: number }): JSX.Element {
+  const density = useStore((s) => s.density)
+  const rest = Math.abs(density - 0.5) <= 0.02
+  const t = (density - 0.5) * 2
+  const text = rest
+    ? 'Density (Feel) at rest : every layer plays at its fader'
+    : t < 0
+      ? `Density ${density.toFixed(2)} (Feel) : ${densityFactors(density, layers).map((f, i) => `L${i + 1} ${Math.round(f * 100)}`).join(' · ')} %`
+      : `Density ${density.toFixed(2)} (Feel) : every layer ${Math.round(t * 60)} % nearer full`
+  return (
+    <button
+      onClick={() => useStore.getState().setRightView('feel')}
+      className={`shrink-0 truncate text-left font-mono text-[9px] ${rest ? 'text-muted/70' : 'text-accent'} hover:underline`}
+      title="Feel's Density thins the upper layers out (or fills them in) on top of the faders, which stay where they are : what each layer plays, as a share of its fader. Click : open Feel (G)."
+    >
+      {text}
+    </button>
   )
 }

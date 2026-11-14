@@ -113,7 +113,7 @@ export const BUILTIN_WORLDS: World[] = [
     id: 'monomedia',
     name: 'Monomedia',
     builtin: true,
-    blurb: 'Absence as tension : stark, near-black, uncoupled.',
+    blurb: 'Absence as tension : stark and uncoupled, no glow, no haze, a deep vignette.',
     coupling: { mode: 'off', amount: 0.5, tightness: 0.7, feature: 'level' },
     context: { trails: 0.1, bloom: 0.0, depth: 0.5, haze: 0.0 },
     autoMod: null
@@ -579,6 +579,41 @@ export function applyWorldToComposition(c: CompositionState, world: World, prev?
 
 /** What applying `world` to `c` changes, line by line (the editor shows it
  *  under Apply). */
+/** The World's film is not playing as it sets it (New and launch start
+ *  without it; or its film values were changed since) : false for a World
+ *  without film. */
+export function worldFilmOff(w: World, c: CompositionState): boolean {
+  const film = Object.entries(w.finalizer ?? {}).filter(([, v]) => finite(v) && Math.abs(v) > 1e-6)
+  if (!film.length) return false
+  const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')
+  if (!fin) return false
+  return film.some(([k, v]) => Math.abs((typeof fin.inputs[k] === 'number' ? (fin.inputs[k] as number) : 0) - v) > 0.01)
+}
+
+/** Why a World does little now, each with what fixes it : the audio input off
+ *  (its coupling and audio modulator wait for sound), the layers its coupling
+ *  moves that have no B source, its film not playing. Empty : ready. */
+export function worldReadyNotes(w: World, c: CompositionState, audioOn: boolean, active: boolean): Array<{ text: string; fix?: 'audio' | 'apply' }> {
+  const out: Array<{ text: string; fix?: 'audio' | 'apply' }> = []
+  const use = worldLayers(w)
+  const couples = w.coupling.mode !== 'off' && use.some(Boolean)
+  const listens = !!w.autoMod && w.autoMod.target !== 'none'
+  if (!audioOn && (couples || listens))
+    out.push({ text: `Audio is off : ${couples && listens ? 'the coupling and the audio modulator wait' : couples ? 'the coupling waits' : 'the audio modulator waits'} for it`, fix: 'audio' })
+  if (couples) {
+    // (the layers that play something : an empty one is not worth naming)
+    const noB = use.map((u, i) => {
+      const L = c.layers[i]
+      return u && L && L.sourceA.kind !== 'none' && (!L.sourceB || L.sourceB.kind === 'none') ? `L${i + 1}` : ''
+    }).filter(Boolean)
+    const list = noB.length > 1 ? `${noB.slice(0, -1).join(', ')} and ${noB[noB.length - 1]}` : noB[0]
+    if (noB.length)
+      out.push({ text: `The coupling moves a layer between its A and B sources : ${list} ${noB.length > 1 ? 'have' : 'has'} no B source` })
+  }
+  if (active && worldFilmOff(w, c)) out.push({ text: 'Its film is not playing as it sets it (New and launch start without it)', fix: 'apply' })
+  return out
+}
+
 export function worldEffects(world: World, c: CompositionState): string[] {
   const out: string[] = []
   const use = worldLayers(world)

@@ -1425,7 +1425,12 @@ export interface Session {
   // The Feel macros (field macros + temperament) : the session's own, so a
   // Generate's Density no longer follows you into every session after. Absent
   // (an older file) : neutral. Shutter and Superimposition stay out (strobes).
-  feel?: { density: number; gestureTexture: number; coalesce: number; tonicity: number; drift: number; flow: number }
+  // Proximity and its ◑ (follow the sound) joined them in v1.3.4 (they were this
+  // computer's) : absent, neutral.
+  feel?: { density: number; gestureTexture: number; coalesce: number; tonicity: number; drift: number; flow: number; proximity?: number; proximityAudio?: boolean }
+  // How much of the World is on (the World amount), the session's since v1.3.4
+  // (it was this computer's). Absent : 1, all of it.
+  worldAmount?: number
   // The session's own MIDI and OSC mappings (Learn into : this session) : a
   // piece's custom controller setup. On an input it uses, it silences this
   // computer's mappings. Absent (no session mapping, every older file) : none.

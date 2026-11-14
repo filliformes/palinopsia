@@ -41,7 +41,7 @@
 
 import type { FxInstance, FxScope, LayerState, SourceSlot } from '@shared/types'
 import { BLEND_MODES, LOOP_BLENDS } from '@shared/types'
-import { useStore, FEEL_NEUTRAL } from './store'
+import { useStore } from './store'
 import { layerPin, layerSpeedPin, modPin, slotPin, isPinnedTarget } from './persist'
 import { DICE_SOURCES, randomizeInputs } from './randomize'
 import { SHADER_BY_ID, inPickerOrder } from './shaders/isf'
@@ -421,12 +421,13 @@ function fireMeta(k: number, v: MetaVerb): void {
 
 const FEEL: Array<{ key: string; label: string; neutral: number; set: (st: St, v: number) => void; get: (st: St) => number }> = [
   { key: 'density', label: 'density', neutral: 0.5, set: (s, v) => s.setDensity(v), get: (s) => s.density },
+  { key: 'proximity', label: 'proximity', neutral: 0.5, set: (s, v) => s.setProximity(v), get: (s) => s.proximity },
   { key: 'gestureTexture', label: 'gesture↔texture', neutral: 0.5, set: (s, v) => s.setGestureTexture(v), get: (s) => s.gestureTexture },
   { key: 'coalesce', label: 'coalesce', neutral: 0.5, set: (s, v) => s.setCoalesce(v), get: (s) => s.coalesce },
-  { key: 'flow', label: 'flow↔interruption', neutral: 0.5, set: (s, v) => s.setFlow(v), get: (s) => s.flow },
+  { key: 'flow', label: 'interruption↔flow', neutral: 0.5, set: (s, v) => s.setFlow(v), get: (s) => s.flow },
   { key: 'tonicity', label: 'tonicity', neutral: 0, set: (s, v) => s.setTonicity(v), get: (s) => s.tonicity },
   { key: 'shutter', label: 'shutter', neutral: 0, set: (s, v) => s.setShutter(v), get: (s) => s.shutter },
-  { key: 'drift', label: 'drift', neutral: 0, set: (s, v) => s.setDrift(v), get: (s) => s.drift },
+  { key: 'drift', label: 'wander', neutral: 0, set: (s, v) => s.setDrift(v), get: (s) => s.drift },
   { key: 'superFlicker', label: 'superimposition', neutral: 0, set: (s, v) => s.setSuperFlicker(v), get: (s) => s.superFlicker }
 ]
 const FEEL_STEP = 0.1
@@ -571,7 +572,7 @@ export function fireAction(id: string): void {
       return
     }
     case 'feel': {
-      if (p[2] === 'reset') { for (const f of FEEL) f.set(st, FEEL_NEUTRAL[f.key as keyof typeof FEEL_NEUTRAL] ?? f.neutral); return }
+      if (p[2] === 'reset') { for (const f of FEEL) f.set(st, f.neutral); st.setProximityAudio(false); return }
       const f = FEEL.find((x) => x.key === p[2])
       if (!f) return
       const d = p[3] === 'up' ? FEEL_STEP : p[3] === 'down' ? -FEEL_STEP : 0

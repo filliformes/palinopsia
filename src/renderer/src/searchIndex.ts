@@ -772,7 +772,7 @@ function parameterItems(s: St, units: UnitInfo[]): SearchItem[] {
 // The full pages, then the right column's tabs.
 const PAGES: Array<{ id: string; label: string; key: string; hint: string; keywords: string[]; open: (s: St) => void }> = [
   { id: 'output', label: 'Output', key: 'O', hint: 'mapping, the dome, the fullscreen output, recording, the senders', keywords: ['mapping', 'dome', 'record', 'projector', 'keystone', 'ndi', 'spout'], open: (s) => s.setOutputPageOpen(true) },
-  { id: 'world', label: 'World', key: 'W', hint: 'the World editor : the mood, the coupling, the film', keywords: ['diegesis', 'mood'], open: (s) => s.setWorldPageOpen(true) },
+  { id: 'world', label: 'World', key: 'W', hint: 'how the picture listens to the sound : the coupling, the air, the film', keywords: ['diegesis', 'mood', 'coupling', 'listen', 'film', 'amount'], open: (s) => s.setWorldPageOpen(true) },
   { id: 'sequence', label: 'Sequence', key: 'Q', hint: 'macro-form : the scenes over time', keywords: ['macro', 'form', 'scenes', 'sequencer'], open: (s) => s.setSequencePageOpen(true) },
   { id: 'sonify', label: 'Sonify', key: 'S', hint: 'the picture as sound : voices, mixer, sequencers, Space', keywords: ['sound', 'audio', 'voices', 'synth'], open: (s) => s.setSonifyPageOpen(true) },
   { id: 'lights', label: 'Lights', key: 'T', hint: 'DMX fixtures on the picture : bars, spots, matrices, shows, light scenes', keywords: ['dmx', 'led', 'enttec', 'artnet', 'sacn', 'wled', 'fixture', 'light', 'strip', 'lighting'], open: (s) => s.setLightsPageOpen(true) },
@@ -785,7 +785,7 @@ const TABS: Array<{ id: RightView; label: string; key: string; hint: string; key
   { id: 'layers', label: 'Layers', key: '', hint: 'the Background, the four layers, the Audio Layer', keywords: ['strips', 'stack'] },
   { id: 'mixer', label: 'Mixer', key: 'M', hint: 'levels, A·B, hue, coupling, blends', keywords: ['mix', 'coupling', 'faders'] },
   { id: 'finishing', label: 'Finishing', key: 'F', hint: 'the Vibe Palette, Context and the Finalizer', keywords: ['vibe', 'context', 'finalizer', 'grade', 'grain'] },
-  { id: 'feel', label: 'Feel', key: 'G', hint: 'the global macros', keywords: ['macros', 'density', 'proximity', 'temperament'] },
+  { id: 'feel', label: 'Feel', key: 'G', hint: 'whole-picture dials', keywords: ['macros', 'density', 'proximity', 'temperament', 'gesture', 'texture', 'coalesce', 'flow', 'interruption', 'tonicity', 'shutter', 'wander', 'drift', 'superimposition', 'strobe', 'stop-motion'] },
   { id: 'io', label: 'Connect', key: 'A', hint: 'audio, MIDI, OSC, Resolume, dataflou, Ableton Link, the agent', keywords: ['audio', 'midi', 'osc', 'link', 'dataflou', 'agent', 'eq'] },
   { id: 'perf', label: 'Performance', key: '', hint: 'the load meter and what the picture reports', keywords: ['fps', 'cpu', 'gpu', 'meter', 'picture'] },
   { id: 'assemble', label: 'Assemble', key: 'E', hint: 'the automatic editor : a folder of films cut into an edit', keywords: ['corpus', 'films', 'edit', 'cut'] }

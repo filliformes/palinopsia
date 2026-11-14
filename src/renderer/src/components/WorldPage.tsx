@@ -16,8 +16,9 @@ import { AUDIO_FEATURES } from '../engine/audioIn'
 import { modTargetKey, useStore } from '../store'
 import { SHADER_BY_ID } from '../shaders/isf'
 import {
-  builtinChanged, sanitizeWorld, WORLD_CONTEXT_KEYS, WORLD_COUPLING_MODES, WORLD_FILM_KEYS, worldEffects, worldLayers
+  builtinChanged, sanitizeWorld, WORLD_CONTEXT_KEYS, WORLD_COUPLING_MODES, WORLD_FILM_KEYS, worldEffects, worldLayers, worldReadyNotes
 } from '../worlds'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { WorldVisualizer, WORLD_SOURCE_PAIRS, liveAudio, simAudio, type SimAudio } from './WorldVisualizer'
 import { AssignContext, AssignRow, ModButton, useBound } from './AutoControls'
 import { ErrorBoundary } from './ErrorBoundary'
@@ -59,7 +60,7 @@ export function WorldPage(): JSX.Element {
           ◵ World
         </span>
         <span className="font-mono text-[10px] text-muted">
-          diegesis : the proposed world biasing coupling · Context · film · audio routing
+          how the picture answers the sound (each layer's A and B), and the air and film it sits in
         </span>
         <div className="flex-1" />
         <WorldAmount />
@@ -185,6 +186,8 @@ function WorldEditor(): JSX.Element {
   }
   const layersOn = worldLayers(w)
   const effects = worldEffects(w, composition)
+  const audioOn = useStore((s) => s.audioEnabled)
+  const notes = worldReadyNotes(w, composition, audioOn, isActive)
 
   return (
       <div className="flex min-h-0 flex-1">
@@ -307,6 +310,26 @@ function WorldEditor(): JSX.Element {
               <span key={e} className={/skipped/.test(e) ? 'text-[rgb(217_164_65)]' : 'text-text'}>{e}</span>
             ))}
           </div>
+          {/* Why it does little now, with what fixes it (one row each, amber) */}
+          {notes.length > 0 && (
+            <div className="flex max-w-6xl flex-col gap-0.5 rounded border border-[rgb(217_164_65)]/50 bg-[rgb(217_164_65)]/10 px-3 py-1.5 font-mono text-[10px] text-[rgb(217_164_65)]" title="What keeps this World from acting fully now">
+              {notes.map((n) => (
+                <div key={n.text} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">{n.text}</span>
+                  {n.fix === 'audio' && (
+                    <button className="shrink-0 rounded border border-current px-1.5 hover:bg-[rgb(217_164_65)]/20" onClick={() => useStore.getState().setAudioEnabled(true)} title="Turn the audio input on (Connect, A) : it listens to the input chosen there">
+                      turn audio on
+                    </button>
+                  )}
+                  {n.fix === 'apply' && (
+                    <button className="shrink-0 rounded border border-current px-1.5 hover:bg-[rgb(217_164_65)]/20" onClick={() => setWorld(w.id)} title="Apply this World again : its film, its air and its coupling, over the Morph time">
+                      apply it again
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="world-grid grid min-h-0 max-w-6xl flex-1 grid-cols-[minmax(260px,320px)_minmax(260px,320px)_minmax(280px,1fr)] gap-4">
            <div className="world-col no-scrollbar flex min-h-0 flex-col gap-3 overflow-y-auto">
@@ -545,9 +568,10 @@ function WorldEditor(): JSX.Element {
   )
 }
 
-/** The World amount : how much of the active World's mood is on, live (0 = the
- *  mood it found). A slider, its M (any modulator), OSC /opsia/world/amount. */
-function WorldAmount(): JSX.Element {
+/** The World amount : how much of the active World's mood is on, live. A slider,
+ *  its M (any modulator), Learn, OSC /opsia/world/amount. `compact` : the
+ *  Transport's (beside the World menu). */
+export function WorldAmount({ compact = false }: { compact?: boolean }): JSX.Element {
   const amount = useStore((s) => s.worldAmount)
   const setAmount = useStore((s) => s.setWorldAmount)
   const key = modTargetKey(AMOUNT_TARGET)
@@ -555,22 +579,30 @@ function WorldAmount(): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <AssignContext.Provider value={{ onAssign: () => setOpen((o) => !o), activeKey: open ? key : null }}>
-      <div className="relative flex items-center gap-2" title="How much of the active World's mood is on : 0 = the mood it found, 1 = all of it. Fades the Context mood and the film the World set; modulatable, OSC /opsia/world/amount">
-        <span className="font-mono text-[9px] uppercase tracking-wide text-muted">amount</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
-          onDoubleClick={() => setAmount(1)}
-          className="w-32 accent-accent"
-        />
-        <span className="w-8 font-mono text-[10px] text-text">{amount.toFixed(2)}</span>
+      <div
+        className={`relative flex shrink-0 items-center ${compact ? 'gap-1' : 'gap-2'}`}
+        title="World amount : how much of this World is on. 1 : all of it. 0 : its push on the Context air and the film taken back off (what you moved since stays yours). The coupling and its audio modulator stay on. Saves with the session. Double-click : 1."
+      >
+        {/* (the Transport's sits right after the World menu : no label of its own,
+            the Randomize amount already reads AMT there) */}
+        {!compact && <span className="font-mono text-[9px] uppercase tracking-wide text-muted">amount</span>}
+        <span className="relative flex">
+          <MidiLearnOverlay id="field:worldAmount" />
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            onDoubleClick={() => setAmount(1)}
+            className={`${compact ? 'w-14' : 'w-32'} min-w-0 accent-accent`}
+          />
+        </span>
+        {!compact && <span className="w-8 font-mono text-[10px] text-text">{amount.toFixed(2)}</span>}
         <ModButton target={AMOUNT_TARGET} bound={bound} label="World amount" />
         {open && (
-          <div className="absolute right-0 top-full z-50 mt-1 w-[360px] rounded border border-border bg-panel p-2 shadow-lg">
+          <div className={`absolute right-0 z-50 w-[360px] rounded border border-border bg-panel p-2 shadow-lg ${compact ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
             <AssignRow target={AMOUNT_TARGET} bound={bound} />
           </div>
         )}

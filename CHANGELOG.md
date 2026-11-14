@@ -7,6 +7,23 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **World and Feel, clear to use.**
+  - **You can see what Feel is doing.** A dot on the feel tab while a dial is off rest
+    (its hover lists them); a line under the Mixer's header saying what Density leaves of
+    each layer's fader; a live line on each Finishing stage (Vibe, Context, Finalizer)
+    with the values the picture really gets, the dials adding them and a **rest** button.
+    Tonicity greys while the audio input is off, Superimposition under two visible layers.
+  - **The World amount is a performance fader.** Beside the World menu in the Transport
+    (**amt**, with Learn and its M) as well as in the World page; saved with the session
+    and undoable (it was this computer's).
+  - **A World says why it does little.** An amber line under *apply sets* : the audio
+    input off (**turn audio on**), the layers its coupling moves that have no B source,
+    its film not playing (**apply it again**). The Transport's menu reads *· film off*
+    on the active World when New or launch started it without its film.
+  - **Proximity joins Feel.** Saved with the session (it was this computer's), undoable,
+    reset with the others, OSC `/opsia/proximity/follow` for its ◑; its Transport slot
+    is the World amount's now. dataflou gains Tonicity, Shutter, Superimposition and the
+    World amount.
 - **Latency, for sound and cameras.** In the Audio section, the audio engine's sample
   rate (the device's, or 44.1 to 96 kHz) and the buffer asked of the device (auto, or
   128 to 4096 samples), for Sonify (with the Audio Layer and a recording's sound) and
@@ -49,6 +66,14 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **Feel's labels say what the dials do.** "Interruption ⇄ Flow" (its interruption end is
+  on the left), Shutter's ends read off and 24 fps (just past off is the choppiest, 2 fps),
+  Gesture ⇄ Texture reads crisp ⇄ smeared, the header says "whole-picture dials", one name
+  for Coalesce everywhere, Monomedia's description matches what it sets, OSC Proximity reads
+  far ⇄ close. **Drift is now Wander** (`/opsia/wander`; `/opsia/drift` and its MIDI
+  binding still answer). The World page's subtitle says what a World is.
+- **Generate no longer turns Shutter or Superimposition on** (a session never kept them, so
+  the look did not come back when it was opened again); it sets both to 0.
 - **The whole Audio section folds** to its header with its ▶, like MIDI and OSC (it
   keeps listening and playing; remembered on this computer).
 - **The top bar's MIDI Learn button is now just Learn.** It learns MIDI and OSC

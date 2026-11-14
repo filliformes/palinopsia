@@ -73,7 +73,7 @@ Generate theme. The older shots stay in `docs/images/`.)*
 - [The layer stack](#the-layer-stack) : each strip in four steps (IN · MIX · FX · OUT) : sources · A/B mix · racks · blends · masks · feedback · [the Mixer](#the-mixer) : A·B crossfader · hue harmony · coupling to the sound · [the Audio Layer](#the-audio-layer) : sound files, live inputs and NDI® sources into Sonify's mix
 - [Video sources](#video-sources) : import (DXV/HAP/ProRes…) · transport · modulatable playhead · granulation · the clip's own sound (level, volume) · [sound files](#audio-sources) (Import audio) · [Spout / Syphon input](#spout--syphon-input)
 - [Collage](#collage--a-wall-of-films-key-source-gen-collage) : a wall of films cut up by the Autocutter partition · four shapes (cut-up, mosaic, torn, shaped) · stack · warp · folder or Assemble-bank feed
-- [The Transport bar](#the-transport-bar-bottom) · [Feel : the global macros](#feel--the-global-macros-key-g)
+- [The Transport bar](#the-transport-bar-bottom) · [Feel : whole-picture dials](#feel--whole-picture-dials-key-g)
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline · light cues) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
@@ -213,9 +213,9 @@ first-ever launch pays this once; it persists on disk afterwards.
 1. **Launch.** You land on a fresh random one-layer scene. Press **`R`** a few
    times : each press re-rolls the whole instrument (sources, racks, blends,
    modulators) from curated ranges, crossfading over the **MORPH** time.
-2. **Open the Feel tab (`G`).** Drag **Density**, **Flow ⇄ Interruption**,
-   **Drift** : these are the instrument's whole-image "feel" macros. Double-click
-   any slider to reset it.
+2. **Open the Feel tab (`G`).** Drag **Density**, **Interruption ⇄ Flow**,
+   **Wander** : these are the instrument's whole-picture dials, on top of everything.
+   Double-click any slider to put it back to rest.
 3. **Click a layer's source** (the **A** button) and play with its parameters in the
    **Inspector** below the preview. Every slider has a dice `⚄`, presets, and an
    **M** button to bind a modulator. The busiest sources and effects sort their
@@ -593,7 +593,7 @@ The right column switches between **seven views** (tabs, or keys `M` / `F` / `G`
 `E` / `A`), in this order : **Layers** (the strips + background), **Mixer** (the four
 layers side by side : their A/B meeting, hue and coupling, then opacity, speed and
 blend; see [the Mixer](#the-mixer)), **Finishing** (the Vibe · Context ·
-Finalizer stack), **Feel** (the global macros), **Connect** (the Audio, MIDI, OSC,
+Finalizer stack), **Feel** (the whole-picture dials), **Connect** (the Audio, MIDI, OSC,
 dataflou, Ableton Link, Resolume and Agent (MCP) panels), **performance** (the live load meter, the picture readout and the depth menu) and
 **assemble** (the automatic editor). The column is exactly as wide as its seven tabs on one line,
 measured on your computer's own font : drag its edge to make it wider (the width is
@@ -852,9 +852,9 @@ Left → right:
   **LINK n** badge beside it says the tempo is shared with [Ableton Link](#ableton-link) ·
   **SPD** global speed (1/64×–64×, log; double-click → 1×) · **MORPH** time (0–30 s,
   default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
-  Generate all morph over this, live) · **PROX** proximity (far ↔ close depth zone) + `◑` audio-brightness follow.
+  Generate all morph over this, live). (**Proximity** and its `◑` moved to [Feel](#feel--whole-picture-dials-key-g) in v1.3.4.)
 - **`{ }`** (opens the [Source Editor](#source-editor--your-own-shaders-alte), also
-  `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector · **❄ Freeze** :
+  `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector (the active World reads *· film off* when its film is not playing as it sets it, as after New) + its **amt** : the [World amount](#worlds--diegesis-key-w), a fader with Learn and its **M** · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
   learned pad). Messages (a refused effect drop, a saved recording) pass over the top of
   the picture; with a page over it they appear in the toolbar's empty middle, always in the
@@ -944,37 +944,45 @@ model's thread and frees its graphics memory; picking AI again starts it in unde
 second. A copy built from source without the model says so when AI is picked : run `npm
 run fetch:depth` (see [Building from source](#getting-started)).
 
-## Feel : the global macros (key `G`)
+## Feel : whole-picture dials (key `G`)
 
-Eight whole-image macros in their own right-column tab, each a wide slider with
-poles, a live readout, and a one-line description. They write **on top of** the
-composition each frame (they stack with modulators and each other, never
-clobber) and are all OSC endpoints. **They belong to the session** : Density,
-Gesture ⇄ Texture, Coalesce, Tonicity, Drift and Flow are saved with it and come
-back with it, New sets them neutral, and a Generate sets them for the session it
-makes (an older session opens with them neutral). The strobing ones (Shutter,
-Superimposition) always start at 0, and Proximity stays this computer's.
+Nine dials that bend the **whole picture at once**, on top of your layers and Finishing,
+in their own right-column tab : each a wide slider with its poles, a live readout and a
+one-line description. They write the engine each frame, never your sliders (they stack
+with modulators and each other), and each rests at a point that changes nothing. **They
+belong to the session** : Density, Proximity and its `◑`, Gesture ⇄ Texture, Coalesce,
+Tonicity, Wander and Interruption ⇄ Flow are saved with it and come back with it, are
+undoable, New sets them to rest, and a Generate sets them for the session it makes (an
+older session opens with them at rest). The two strobes (Shutter, Superimposition) start
+at 0 and are never set by Generate (a session does not keep them). **↺** puts every dial
+back to rest.
 
-**Field : spatial + material** (bipolar, neutral 0.5):
+**You can see what Feel is doing** : a dot on the **feel** tab while a dial is off rest
+(its hover lists them); a line under the Mixer's header says what Density leaves of each
+layer's fader (*L1 85 %, L2 70 %… of their faders*); a live line on each Finishing stage
+(Vibe, Context, Finalizer) shows the values the picture really gets and which dials add
+them (with a **rest** button). **Tonicity** greys while the audio input is off, and
+**Superimposition** while fewer than two layers show : they still move, and act as soon
+as they can.
 
-| Macro | Poles | What it does |
+**Field : space and matter** (rest in the middle, 0.5):
+
+| Dial | Poles | When and what |
 |---|---|---|
-| **Density** | sparse ↔ dense | Fades the upper layers out or fills them in. |
-| **Gesture ⇄ Texture** | gesture ↔ texture | Clean directional movement (sharpen) ↔ internalised churn (trails). |
-| **Coalesce** | grain ↔ mass | Broken into grain/dither ↔ pulled into smooth mass (blur). |
+| **Density** | sparse ↔ dense | The stack is too busy : pull left until one voice is left (the upper layers fade first, L4 first); too thin : push right (every layer toward full). The faders stay put. |
+| **Proximity** | far ↔ close | Far : hazy, soft, a deeper vignette. Close : sharp, with more bloom. **◑** : the brighter the sound, the closer the picture comes. |
+| **Gesture ⇄ Texture** | crisp ↔ smeared | Left sharpens, so movement reads as clean strokes; right adds trails, so it churns into a surface. |
+| **Coalesce** | grain ↔ mass | Left breaks the picture into dither grain; right melts it into one soft mass (it adds blur). |
 
-**Temperament : film character** (neutral 0, except Flow at 0.5):
+**Temperament : time and color** (rest at 0, except Interruption ⇄ Flow in the middle):
 
-| Macro | Poles | What it does |
+| Dial | Poles | When and what |
 |---|---|---|
-| **Flow ⇄ Interruption** | interruption ↔ flow | Stutter : frame-holds, breakup, blank stabs ↔ a liquid, continuous image. |
-| **Tonicity** | off ↔ colour | Tonal/harmonic audio pulls colour in; noise pulls toward black-and-white (needs Audio on). |
-| **Shutter** | off ↔ stepped | Global full-freeze stop-motion: low = chunky (~2 fps) → high = fluid (~24 fps). |
-| **Drift** | off ↔ wander | Slow analog-instability wander over the grade + rare accidents. |
-| **Superimposition** | off ↔ strobe | Hypnagogic flicker: cross-cuts which layer shows on the drawn cadence. |
-
-**Proximity** (in the Transport bar) is the ninth macro: it pushes the Context
-mood into a near/far depth zone, optionally following audio brightness.
+| **Interruption ⇄ Flow** | interruption ↔ flow | Left stutters (held frames, breakup, short black cuts); right runs liquid (trails, softness, less grain). |
+| **Tonicity** | off ↔ full | With the audio input on : tonal sound brings color in, noisy sound drains it toward gray. |
+| **Shutter** | off ↔ 24 fps | Stop-motion over the whole output. Just past off is the choppiest (2 fps); further right gets smoother (24 fps at the end). |
+| **Wander** | off ↔ wander | The grade sways on its own (gamma, warm and cool, contrast), never repeating, with rare short glitches : a still passage breathes. (It was called Drift : `/opsia/drift` and its MIDI binding still answer.) |
+| **Superimposition** | off ↔ hard cut | With two or more layers : flickers between them, one at a time, at the film rate. |
 
 ## Macro Controller (16 knobs + XY pads)
 
@@ -1438,12 +1446,18 @@ the composite live.
 - **The visualizer** reads the World on real generators, **your layers** included, driven
   by simulated audio or the **live sound** (the audio tab's input).
 - **The live code (JSON)** is folded until you open it (remembered).
-- **World amount** (the header, with its **M**, and OSC `/opsia/world/amount`) : how much
-  of the active World's mood is on, 0 = the mood it found when it was applied (your own
-  values, or a Generate theme's), 1 = all of it. It fades only the World's own change to
-  the Context mood and the film, frame by frame (`engine/worldAmount.ts`) : below 1 your
-  sliders, your modulators and the field macros still move those keys, and a switch (film
-  hold, gauge, dirt) set by hand stays yours. Per machine, like the field macros.
+- **World amount** (the header, and the Transport's **amt** beside the World menu, each
+  with its **M**; Learn; OSC `/opsia/world/amount`) : how much of this World is on. 1 :
+  all of it. 0 : its push on the Context air and the film taken back off. It fades only
+  the World's own change to those keys, frame by frame (`engine/worldAmount.ts`) : below
+  1 your sliders, your modulators and the Feel dials still move them, and a switch (film
+  hold, gauge, dirt) set by hand stays yours. The coupling and the audio modulator stay
+  on. **It saves with the session** and is undoable (it was this computer's before
+  v1.3.4); New and Generate start at 1.
+- **Ready line** : an amber row under *apply sets* says why the World does little now,
+  with what fixes it : the audio input off (its coupling and audio modulator wait for
+  sound; **turn audio on**), the layers its coupling moves that have no B source, its film
+  not playing as it sets it (New and launch start without it; **apply it again**).
 - **The World's modulator** carries ⊛ wherever it sits. Change it or its binding and it
   is yours : Worlds and Randomize leave it alone from then on. A full modulation matrix
   says so (a toast, an amber line) instead of skipping the routing silently.
@@ -1578,8 +1592,8 @@ Learnable targets:
 - **Macro knobs** (all 16, CC only) : hardware drives them through the same
   per-knob smoothing as a mouse drag. These bindings live **in the session**
   (the per-knob **CC** button still works as a direct shortcut).
-- **Transport** : BPM (CC → 40–240), SPD, MORPH, PROX (each mirrors its
-  slider's curve).
+- **Transport** : BPM (CC → 40–240), SPD, MORPH (each mirrors its slider's curve), the
+  World amount. Proximity (in Feel since v1.3.4) keeps its binding.
 - **Continuous (CC)** : each of the **4 layer opacities**, their **A/B mix** and
   their A/B **hue** harmony (in the Mixer), the **Background**'s opacity, speed and
   shadow, the **8 Feel dials**, the **Metasurface XY**, the **Sonify master**, and
@@ -3946,10 +3960,11 @@ unless the slot actually holds a video or a sound file (Import audio).
 
 **Coupling master switch** : `/opsia/coupling` (≥ 0.5 : every layer's A/B coupling on; below : paused).
 
-**Feel macros & temperament** : each a single `0..1` float:
-`/opsia/density`, `/gesture`, `/coalesce`, `/proximity` (field macros; 0.5 = centre)
-· `/opsia/flow` (0.5 = centre) · `/tonicity`, `/shutter`, `/drift`,
-`/superflicker` (temperament; 0 = off).
+**Feel dials** : each a single `0..1` float:
+`/opsia/density`, `/gesture`, `/coalesce`, `/proximity` (0.5 = rest)
+· `/opsia/flow` (Interruption ⇄ Flow, 0.5 = rest) · `/tonicity`, `/shutter`, `/wander`
+(its old name `/drift` still answers), `/superflicker` (0 = off) ·
+`/opsia/proximity/follow` (≥ 0.5 : Proximity follows the sound, its `◑`).
 
 **Macro / transport / structure**
 
@@ -3958,7 +3973,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/macro/{1..16}` | f | Drives Macro knob *n* (smoothed). The old `/opsia/meta/{1..16}` still works (in, and in the feedback out) |
 | `/opsia/bpm` | f | Tempo : **raw**, clamped 20..800 |
 | `/opsia/world` | s / i | Select World (name, or 1-based index) |
-| `/opsia/world/amount` | f 0..1 | World amount : how much of the active World's mood is on (0 = the mood it found) |
+| `/opsia/world/amount` | f 0..1 | World amount : 1 = all of the World, 0 = its push taken back off (saved with the session) |
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
 | `/opsia/seq/play` | level | The Seq page's transport : ≥ 0.5 plays every lane marked "with transport", below stops them all |

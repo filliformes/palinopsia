@@ -56,6 +56,8 @@ const FIELD_SETTERS: Record<string, (v: number) => void> = {
   'field:flow': (v) => useStore.getState().setFlow(v),
   'field:shutter': (v) => useStore.getState().setShutter(v),
   'field:superFlicker': (v) => useStore.getState().setSuperFlicker(v),
+  // the World amount (the Transport and the World page)
+  'field:worldAmount': (v) => useStore.getState().setWorldAmount(v),
   // the Lights page's console
   'lights:master': (v) => useStore.getState().setLightsMaster({ brightness: v }),
   'lights:speed': (v) => useStore.getState().setLightsMaster({ speed: v * 4 }),
@@ -67,8 +69,8 @@ const FIELD_SETTERS: Record<string, (v: number) => void> = {
 }
 const FIELD_LABELS: Record<string, string> = {
   'field:density': 'DENSITY', 'field:gestureTexture': 'GESTURE↔TEXTURE', 'field:coalesce': 'COALESCE',
-  'field:tonicity': 'TONICITY', 'field:drift': 'DRIFT', 'field:flow': 'FLOW↔INTERRUPT',
-  'field:shutter': 'SHUTTER', 'field:superFlicker': 'SUPERIMPOSE',
+  'field:tonicity': 'TONICITY', 'field:drift': 'WANDER', 'field:flow': 'INTERRUPTION↔FLOW',
+  'field:shutter': 'SHUTTER', 'field:superFlicker': 'SUPERIMPOSE', 'field:worldAmount': 'WORLD amount',
   'lights:master': 'LIGHTS master', 'lights:speed': 'LIGHTS speed', 'lights:gain': 'LIGHTS brightness', 'lights:sat': 'LIGHTS saturation', 'lights:contrast': 'LIGHTS contrast', 'lights:fade': 'LIGHTS scene fade', 'lights:blacksec': 'LIGHTS black time'
 }
 
@@ -855,10 +857,10 @@ export function applyContinuous(id: string, t: number): boolean {
   return false
 }
 
-const FIELD_KEYS: Record<string, 'density' | 'gestureTexture' | 'coalesce' | 'tonicity' | 'drift' | 'flow' | 'shutter' | 'superFlicker'> = {
+const FIELD_KEYS: Record<string, 'density' | 'gestureTexture' | 'coalesce' | 'tonicity' | 'drift' | 'flow' | 'shutter' | 'superFlicker' | 'worldAmount'> = {
   'field:density': 'density', 'field:gestureTexture': 'gestureTexture', 'field:coalesce': 'coalesce',
   'field:tonicity': 'tonicity', 'field:drift': 'drift', 'field:flow': 'flow',
-  'field:shutter': 'shutter', 'field:superFlicker': 'superFlicker'
+  'field:shutter': 'shutter', 'field:superFlicker': 'superFlicker', 'field:worldAmount': 'worldAmount'
 }
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : Number.isFinite(v) ? v : 0)
 

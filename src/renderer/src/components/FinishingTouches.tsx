@@ -22,6 +22,7 @@ import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { ContextLightPad } from './ContextLightPad'
 import { VibePaletteStrip } from './VibePaletteStrip'
+import { WORLD_CONTEXT_KEYS, WORLD_FILM_KEYS } from '../worlds'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -131,41 +132,80 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
 
 // The Vibe Palette's dry/wet, surfaced as the FIRST control of its section : how
 // much the palette re-colours the picture (1 = full grade, 0 = untouched).
-// Context params the performance macros add onto (they write the engine, not the
-// store, so the sliders keep showing the base).
-const CONTEXT_LIVE: Array<[string, string, number]> = [
-  ['blur', 'blur', 0], ['trails', 'trails', 0.2], ['haze', 'haze', 0.15], ['depth', 'depth', 0.35], ['bloom', 'bloom', 0.3]
-]
+// What the Feel dials and the World amount add on top of each finishing stage
+// (they write the engine, never the store, so the sliders keep showing your
+// values). Each stage : the inputs to compare, and who writes it.
+type Stage = 'vibe' | 'context' | 'finalizer'
+const STAGE_LIVE: Record<Stage, Array<[string, string]>> = {
+  vibe: [['saturation', 'saturation'], ['chroma', 'chroma'], ['dither', 'dither'], ['contrast', 'contrast']],
+  // (the World's own keys : what its amount can take back off)
+  context: [['blur', 'blur'], ...WORLD_CONTEXT_KEYS.map((x): [string, string] => [x.k, x.label])],
+  finalizer: [
+    ['sharpen', 'sharpen'], ['grain', 'grain'], ['parasites', 'parasites'], ['gamma', 'gamma'], ['rGain', 'red'], ['bGain', 'blue'],
+    ['black', 'black'], ['white', 'white'], ...WORLD_FILM_KEYS.map((x): [string, string] => [x.k, x.label.toLowerCase()])
+  ]
+}
 const NEUTRAL = (v: number): boolean => Math.abs(v - 0.5) <= 0.02
+type LiveSt = ReturnType<typeof useStore.getState>
+/** Who adds on top of this stage now (the dials writing it, off rest). */
+function stageFrom(stage: Stage, st: LiveSt): string[] {
+  const from: string[] = []
+  const world = st.worldAmount < 0.995 && !!st.composition.worldBase
+  if (stage === 'vibe') {
+    if (st.tonicity > 0.02 && st.audioEnabled) from.push('Tonicity')
+    if (!NEUTRAL(st.coalesce)) from.push('Coalesce')
+    if (st.drift > 0.02) from.push('Wander')
+  } else if (stage === 'context') {
+    if (!NEUTRAL(st.proximity) || st.proximityAudio) from.push('Proximity')
+    if (!NEUTRAL(st.coalesce)) from.push('Coalesce')
+    if (st.flow > 0.52) from.push('Interruption ⇄ Flow')
+    if (!NEUTRAL(st.gestureTexture)) from.push('Gesture ⇄ Texture')
+    if (world) from.push('World amount')
+    const seq = st.sequence
+    if ((seq.breathe?.amount ?? 0) > 0.001 || seq.arc?.enabled) from.push('sequencer')
+  } else {
+    if (!NEUTRAL(st.gestureTexture)) from.push('Gesture ⇄ Texture')
+    if (!NEUTRAL(st.flow)) from.push('Interruption ⇄ Flow')
+    if (st.drift > 0.02) from.push('Wander')
+    if (world) from.push('World amount')
+  }
+  return from
+}
+/** Each dial back to rest (the "rest" button of a live line). */
+function restDial(name: string, st: LiveSt): void {
+  if (name === 'Proximity') { st.setProximity(0.5); if (st.proximityAudio) st.setProximityAudio(false) }
+  else if (name === 'Coalesce') st.setCoalesce(0.5)
+  else if (name === 'Interruption ⇄ Flow') st.setFlow(0.5)
+  else if (name === 'Gesture ⇄ Texture') st.setGestureTexture(0.5)
+  else if (name === 'Tonicity') st.setTonicity(0)
+  else if (name === 'Wander') st.setDrift(0)
+  else if (name === 'World amount') st.setWorldAmount(1)
+}
 
-/** What the ENGINE is using for Context when something adds on top of the
- *  sliders : Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe
- *  / Arc, a modulator. The sliders show the base, so without this "every slider at
- *  0" could still blur. Polled a few times a second; hidden when nothing adds. A
- *  click puts the macros that are adding back to neutral. */
-function ContextLiveRow({ inst }: { inst: FxInstance }): JSX.Element | null {
+/** What the ENGINE uses for a finishing stage when something adds on top of
+ *  its sliders : the Feel dials, the World amount, the sequencer's Breathe / Arc
+ *  (Context), a modulator. The sliders show your values, so without this "every
+ *  slider at 0" could still blur. Polled a few times a second; hidden when
+ *  nothing adds. "rest" puts the dials that are adding back to rest. */
+function StageLiveRow({ inst, stage }: { inst: FxInstance; stage: Stage }): JSX.Element | null {
   const [info, setInfo] = useState<{ vals: string; from: string[] } | null>(null)
   useEffect(() => {
+    const defs: Record<string, unknown> = inst.shaderId ? defaultInputs(inst.shaderId) : {}
     const read = (): void => {
       const st = useStore.getState()
       const cur = st.composition.master.find((f) => f.id === inst.id)
       if (!cur || !cur.enabled) { setInfo(null); return }
       const parts: string[] = []
-      for (const [name, label, def] of CONTEXT_LIVE) {
+      for (const [name, label] of STAGE_LIVE[stage]) {
         const key = `fx:master:${inst.id}:${name}`
         const eff = frameVals.get(key) ?? liveModValues.get(key)
         if (eff === undefined) continue
-        const base = typeof cur.inputs[name] === 'number' ? (cur.inputs[name] as number) : def
+        const d = defs[name]
+        const base = typeof cur.inputs[name] === 'number' ? (cur.inputs[name] as number) : typeof d === 'number' ? d : eff
         if (Math.abs(eff - base) > 0.01) parts.push(`${label} ${eff.toFixed(2)}`)
       }
       if (!parts.length) { setInfo(null); return }
-      const from: string[] = []
-      if (!NEUTRAL(st.proximity) || st.proximityAudio) from.push('Proximity')
-      if (!NEUTRAL(st.coalesce)) from.push('Coalesce')
-      if (st.flow > 0.52) from.push('Flow')
-      if (!NEUTRAL(st.gestureTexture)) from.push('Gesture⇄Texture')
-      const seq = st.sequence
-      if ((seq.breathe?.amount ?? 0) > 0.001 || seq.arc?.enabled) from.push('sequencer')
+      const from = stageFrom(stage, st)
       if (st.composition.modMatrix.some((a) => a.target.kind === 'fx' && 'instId' in a.target && a.target.instId === inst.id)) from.push('a modulator')
       const vals = parts.join(' · ')
       setInfo((prev) => (prev && prev.vals === vals && prev.from.join() === from.join() ? prev : { vals, from }))
@@ -173,31 +213,28 @@ function ContextLiveRow({ inst }: { inst: FxInstance }): JSX.Element | null {
     read()
     const id = window.setInterval(read, 250)
     return () => window.clearInterval(id)
-  }, [inst.id])
+  }, [inst.id, inst.shaderId, stage])
   if (!info) return null
-  const macros = info.from.filter((f) => f !== 'sequencer' && f !== 'a modulator')
+  const dials = info.from.filter((f) => f !== 'sequencer' && f !== 'a modulator')
   return (
     <div
       className="flex items-center gap-1.5 border-b border-border bg-accent2/10 px-2 py-1 font-mono text-[10px] text-accent2"
-      title="The sliders show Context's base values. These performance controls add on top of them, so this is what the picture actually gets."
+      title="The sliders show your values. These controls add on top of them, so this is what the picture actually gets."
     >
       <span className="min-w-0 flex-1 truncate">
         live {info.vals}
         {info.from.length ? ` ← ${info.from.join(', ')}` : ''}
       </span>
-      {macros.length > 0 && (
+      {dials.length > 0 && (
         <button
           className="shrink-0 rounded border border-accent2/50 px-1 hover:bg-accent2/20"
           onClick={() => {
             const st = useStore.getState()
-            if (macros.includes('Proximity')) { st.setProximity(0.5); if (st.proximityAudio) st.setProximityAudio(false) }
-            if (macros.includes('Coalesce')) st.setCoalesce(0.5)
-            if (macros.includes('Flow')) st.setFlow(0.5)
-            if (macros.includes('Gesture⇄Texture')) st.setGestureTexture(0.5)
+            for (const d of dials) restDial(d, st)
           }}
-          title={`Put ${macros.join(', ')} back to neutral (0.5) : Context then uses exactly its sliders`}
+          title={`Put ${dials.join(', ')} back to rest : this stage then uses exactly its sliders`}
         >
-          neutral
+          rest
         </button>
       )}
     </div>
@@ -323,9 +360,9 @@ function FinalizerSection({ inst }: { inst: FxInstance }): JSX.Element {
           widthCh={FT_PRESET_WIDTH_CH}
         />
       </div>
-      {/* Context : what the engine uses when a macro adds on top of the sliders
+      {/* Each stage : what the engine uses when a dial adds on top of the sliders
           (shown collapsed or not : it is the answer to "why is it soft"). */}
-      {isContext && <ContextLiveRow inst={inst} />}
+      {(isVibe || isContext || shaderId === 'fx-finalizer') && <StageLiveRow inst={inst} stage={isVibe ? 'vibe' : isContext ? 'context' : 'finalizer'} />}
       {!collapsed && (
         <div className="border-t border-border">
           {/* Vibe : global dry/wet FIRST : how much the palette re-colors the picture. */}

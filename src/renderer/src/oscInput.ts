@@ -596,9 +596,14 @@ function route(address: string, args: Args, host = ''): void {
     case 'coupling': st.setCouplingOn(n >= 0.5); return
     case 'gesture': st.setGestureTexture(clamp01(n)); return
     case 'coalesce': st.setCoalesce(clamp01(n)); return
-    case 'proximity': st.setProximity(clamp01(n)); return
+    case 'proximity':
+      // /opsia/proximity/follow ≥ 0.5 : Proximity follows the sound (its ◑)
+      if (segs[2] === 'follow') { st.setProximityAudio(n >= 0.5); return }
+      st.setProximity(clamp01(n)); return
     case 'tonicity': st.setTonicity(clamp01(n)); return
     case 'shutter': st.setShutter(clamp01(n)); return
+    // Wander (its old name Drift still answers)
+    case 'wander':
     case 'drift': st.setDrift(clamp01(n)); return
     case 'flow': st.setFlow(clamp01(n)); return
     case 'superflicker': st.setSuperFlicker(clamp01(n)); return
@@ -1816,20 +1821,22 @@ function enumerateLeaves(): Leaf[] {
     }
   }
   // Global field macros + Proximity (0.5 = deadzone).
-  add('/opsia/density', 0, 1, st.density ?? 0.5, 'Density macro (sparse ⇄ dense)')
+  add('/opsia/density', 0, 1, st.density ?? 0.5, 'Density : sparse ⇄ dense (0.5 = rest)')
   add('/opsia/coupling', 0, 1, st.couplingOn ? 1 : 0, 'A/B coupling master switch (>= 0.5 : on)')
-  add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture macro')
-  add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Dispersal ⇄ Coalescence macro')
-  add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity (near ⇄ far)')
-  add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity : tonal audio → colour, noise → mono (0 = off)')
-  add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter : stop-motion frame stepping (0 = off)')
-  add('/opsia/drift', 0, 1, st.drift ?? 0, 'Drift : analog-instability temperament (0 = off)')
-  add('/opsia/flow', 0, 1, st.flow ?? 0.5, 'Flow ⇄ Interruption : liquid ↔ stutter/decimate/blank (0.5 = neutral)')
-  add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition flicker : layer cross-cut strobe (0 = off)')
+  add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture : crisp ⇄ smeared (0.5 = rest)')
+  add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Coalesce : grain ⇄ mass (0.5 = rest)')
+  add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity : far ⇄ close (0.5 = rest)')
+  add('/opsia/proximity/follow', 0, 1, st.proximityAudio ? 1 : 0, 'Proximity follows the sound, its ◑ (>= 0.5 : on)')
+  add('/opsia/tonicity', 0, 1, st.tonicity ?? 0, 'Tonicity : tonal sound brings color in, noise drains it (0 = off)')
+  add('/opsia/shutter', 0, 1, st.shutter ?? 0, 'Shutter : stop-motion, 2 fps just past 0 to 24 fps at 1 (0 = off)')
+  add('/opsia/wander', 0, 1, st.drift ?? 0, 'Wander : the grade sways on its own (0 = off; /opsia/drift too)')
+  add('/opsia/drift', 0, 1, st.drift ?? 0, 'Wander, by its old name (a layout made for it keeps working)')
+  add('/opsia/flow', 0, 1, st.flow ?? 0.5, 'Interruption ⇄ Flow : stutter ⇄ liquid (0.5 = rest)')
+  add('/opsia/superflicker', 0, 1, st.superFlicker ?? 0, 'Superimposition : flicker between the layers, one at a time (0 = off)')
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
-  add('/opsia/world/amount', 0, 1, st.worldAmount, "World amount : how much of the active World's mood is on (0 = the mood it found)")
+  add('/opsia/world/amount', 0, 1, st.worldAmount, 'World amount : 1 = all of the World, 0 = its push taken back off')
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/seq/play', 0, 1, seqTransportPlaying() ? 1 : 0, 'The Seq transport : >= 0.5 plays every lane it starts, < 0.5 stops them all')

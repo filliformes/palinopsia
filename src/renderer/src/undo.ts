@@ -47,6 +47,9 @@ interface Snapshot {
   drift: number
   flow: number
   superFlicker: number
+  proximity: number
+  proximityAudio: boolean
+  worldAmount: number
   // The Audio Layer (its files and inputs, levels, mix) : New and Open replace
   // it too. Which live inputs are open is not in it (see apply).
   audioLayer: FullState['audioLayer']
@@ -84,6 +87,9 @@ function snap(): Snapshot {
     drift: s.drift,
     flow: s.flow,
     superFlicker: s.superFlicker,
+    proximity: s.proximity,
+    proximityAudio: s.proximityAudio,
+    worldAmount: s.worldAmount,
     audioLayer: s.audioLayer,
     pins: s.pins,
     ruleSeq: s.ruleSeq,
@@ -124,6 +130,9 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.drift !== b.drift ||
     a.flow !== b.flow ||
     a.superFlicker !== b.superFlicker ||
+    a.proximity !== b.proximity ||
+    a.proximityAudio !== b.proximityAudio ||
+    a.worldAmount !== b.worldAmount ||
     a.audioLayer !== b.audioLayer ||
     a.pins !== b.pins ||
     a.ruleSeq !== b.ruleSeq ||
@@ -171,6 +180,9 @@ function apply(s: Snapshot): void {
     drift: s.drift,
     flow: s.flow,
     superFlicker: s.superFlicker,
+    proximity: s.proximity,
+    proximityAudio: s.proximityAudio,
+    worldAmount: s.worldAmount,
     audioLayer: s.audioLayer,
     audioLayerArmed: armed,
     pins: s.pins,
@@ -363,8 +375,10 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   if (
     a.density !== b.density || a.gestureTexture !== b.gestureTexture || a.coalesce !== b.coalesce ||
     a.tonicity !== b.tonicity || a.shutter !== b.shutter || a.drift !== b.drift ||
-    a.flow !== b.flow || a.superFlicker !== b.superFlicker
+    a.flow !== b.flow || a.superFlicker !== b.superFlicker ||
+    a.proximity !== b.proximity || a.proximityAudio !== b.proximityAudio
   ) return 'feel'
+  if (a.worldAmount !== b.worldAmount) return 'World amount'
   // a control or a layer made persistent, or let go
   if (a.pins !== b.pins) return 'persistent'
   if (a.vibePresetName !== b.vibePresetName) return 'vibe'

@@ -55,11 +55,9 @@ export interface Theme {
   gestureTexture: number
   coalesce: number
   tonicity: number
-  shutter: number
   drift: number
   /** Flow ↔ Interruption (bipolar, 0.5 = neutral) : liquid ↔ stutter. */
   flow: number
-  superFlicker: number
   /** Context finalizer overrides, on before the World (the mood it finds) and
    *  again after it (theme wins). */
   context?: Record<string, number | number[]>
@@ -222,10 +220,8 @@ const DEF = {
   gestureTexture: 0.5,
   coalesce: 0.5,
   tonicity: 0,
-  shutter: 0,
   drift: 0,
-  flow: 0.5,
-  superFlicker: 0
+  flow: 0.5
 }
 const mk = (t: ThemeIn): Theme => ({ ...DEF, ...t })
 
@@ -332,8 +328,7 @@ export const THEMES: Theme[] = [
     palette: [INK, [0.9, 0.1, 0.1, 1], [0.95, 0.95, 0.95, 1]],
     sources: ['shapes', 'slabs', 'op-art'],
     layerFx: ['fx-byte-corrupt', 'fx-mosh-blocks', 'fx-stutter', 'fx-threshold'],
-    blends: ['difference', 'exclusion'], gestureTexture: 0.7, coalesce: 0.25,
-    shutter: 0.35, flow: 0.3, density: 0.5,
+    blends: ['difference', 'exclusion'], gestureTexture: 0.7, coalesce: 0.25, flow: 0.3, density: 0.5,
     nativeNodes: ['node-decimate']
   }),
   mk({
@@ -375,7 +370,7 @@ export const THEMES: Theme[] = [
     sources: ['slabs', 'shapes', 'op-art'],
     layerFx: ['fx-slice-shuffle', 'fx-threshold'],
     nativeNodes: ['node-autocutter'], nativeChance: 0.9,
-    blends: ['difference', 'exclusion'], shutter: 0.35, gestureTexture: 0.6, coalesce: 0.25
+    blends: ['difference', 'exclusion'], gestureTexture: 0.6, coalesce: 0.25
   }),
   mk({
     id: 'chronoscan', name: 'Chronoscan', family: 'Glitch / Datamosh',
@@ -446,7 +441,7 @@ export const THEMES: Theme[] = [
     palette: [INK, [0.9, 0.9, 0.86, 1]],
     sources: ['direct-marks', 'shapes'],
     layerFx: ['fx-grain', 'fx-decay', 'fx-streak', 'fx-aperture', 'fx-triangle-flicker'],
-    blends: ['screen', 'lighten', 'lumakey'], useB: 0.15, coalesce: 0.3, superFlicker: 0.3
+    blends: ['screen', 'lighten', 'lumakey'], useB: 0.15, coalesce: 0.3
   }),
   mk({
     id: 'emulsion', name: 'Emulsion', family: 'Cameraless / Direct Film',
@@ -465,7 +460,7 @@ export const THEMES: Theme[] = [
     palette: [INK, [0.85, 0.2, 0.15, 1], [0.92, 0.9, 0.82, 1]],
     sources: ['direct-marks', 'shapes', 'op-art'],
     layerFx: ['fx-grain', 'fx-stutter', 'fx-aperture', 'fx-triangle-flicker'],
-    blends: ['screen', 'difference'], shutter: 0.45, superFlicker: 0.4, coalesce: 0.3,
+    blends: ['screen', 'difference'], coalesce: 0.3,
     nativeNodes: ['node-decimate']
   }),
   mk({
@@ -820,7 +815,7 @@ export const THEMES: Theme[] = [
     sources: ['organic', 'shapes', 'op-art'],
     layerFx: ['fx-wide-time'],
     nativeNodes: ['node-eternalism'], nativeChance: 0.85,
-    blends: ['screen', 'lighten'], superFlicker: 0.4, drift: 0.2, density: 0.4
+    blends: ['screen', 'lighten'], drift: 0.2, density: 0.4
   }),
   mk({
     id: 'phase-drift', name: 'Phase Drift', family: 'Feedback / Afterimage',
@@ -2324,16 +2319,16 @@ export const THEMES: Theme[] = [
   }),
   mk({
     id: 'test-shutter', name: 'Shutter', family: 'Feel Studies',
-    blurb: 'STUDY · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps. Low = chunky (~2fps), high = fluid.',
+    blurb: 'STUDY · Fast motion. Sweep SHUTTER : the whole frame stop-motion-steps. Just past off is the choppiest (2 fps), the right end the smoothest (24 fps).',
     world: 'synthetic',
     palette: [K, [0.16, 0.18, 0.22, 1], [0.8, 0.82, 0.86, 1]],
     sources: ['murmuration', 'particle-drift', 'swell'],
     layerFx: ['fx-grade'],
-    blends: ['screen'], layers: [2, 2], useB: 0, shutter: 0.4
+    blends: ['screen'], layers: [2, 2], useB: 0
   }),
   mk({
-    id: 'test-drift', name: 'Drift', family: 'Feel Studies',
-    blurb: 'STUDY · A calm graded image. Sweep DRIFT : the grade slowly wanders (gamma / RGB) with rare analog accidents. Watch over ~10s.',
+    id: 'test-drift', name: 'Wander', family: 'Feel Studies',
+    blurb: 'STUDY · A calm graded image. Sweep WANDER : the grade slowly wanders (gamma / RGB) with rare analog accidents. Watch over ~10s.',
     world: 'sublimated',
     palette: [K, [0.3, 0.16, 0.12, 1], [0.85, 0.75, 0.6, 1]],
     sources: ['organic', 'membrane'],
@@ -2356,7 +2351,7 @@ export const THEMES: Theme[] = [
     palette: [K, [0.5, 0.3, 0.2, 1], [0.2, 0.5, 0.6, 1], [0.85, 0.85, 0.5, 1]],
     sources: ['shapes', 'op-art', 'contour', 'grid-drift'],
     layerFx: ['fx-grade'],
-    blends: ['screen', 'lighten'], layers: [3, 3], useB: 0, superFlicker: 0.4
+    blends: ['screen', 'lighten'], layers: [3, 3], useB: 0
   })
 
 ]

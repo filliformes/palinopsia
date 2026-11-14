@@ -24,7 +24,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     rows: [
       ['M', 'Mixer ↔ Layers'],
       ['F', 'Finishing'],
-      ['G', 'Feel (global macros)'],
+      ['G', 'Feel : whole-picture dials'],
       ['E', 'Assemble tab (again : back to the layers)'],
       ['A', 'Connect tab : audio · MIDI · OSC · dataflou · Ableton Link · Resolume · Agent (again : back to the layers)'],
       ['D', 'Fold Modulation'],

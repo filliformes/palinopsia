@@ -1069,17 +1069,21 @@ function persistMacro(key: string, v: number): void {
 // brings its own back. They used to live on this computer (localStorage), so a
 // Generate's Density went on dimming the upper layers of every session after.
 type FeelMacros = NonNullable<Session['feel']>
-export const FEEL_NEUTRAL: FeelMacros = { density: 0.5, gestureTexture: 0.5, coalesce: 0.5, tonicity: 0, drift: 0, flow: 0.5 }
-function sanitizeFeel(f: unknown): FeelMacros {
+export const FEEL_NEUTRAL: Required<FeelMacros> = { density: 0.5, gestureTexture: 0.5, coalesce: 0.5, tonicity: 0, drift: 0, flow: 0.5, proximity: 0.5, proximityAudio: false }
+function sanitizeFeel(f: unknown): Required<FeelMacros> {
   const o = (f && typeof f === 'object' ? f : {}) as Record<string, unknown>
-  const v = (k: keyof FeelMacros): number => {
+  const v = (k: Exclude<keyof FeelMacros, 'proximityAudio'>): number => {
     const n = Number(o[k])
     return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : FEEL_NEUTRAL[k]
   }
-  return { density: v('density'), gestureTexture: v('gestureTexture'), coalesce: v('coalesce'), tonicity: v('tonicity'), drift: v('drift'), flow: v('flow') }
+  return {
+    density: v('density'), gestureTexture: v('gestureTexture'), coalesce: v('coalesce'), tonicity: v('tonicity'), drift: v('drift'), flow: v('flow'),
+    proximity: v('proximity'), proximityAudio: o.proximityAudio === true
+  }
 }
-// (the keys they were kept under on this computer : gone, so none comes back)
-for (const k of ['opsia.density', 'opsia.gestureTexture', 'opsia.coalesce', 'opsia.tonicity', 'opsia.drift', 'opsia.flow']) {
+// (the keys they were kept under on this computer : gone, so none comes back;
+// Proximity, its ◑ and the World amount joined the session in v1.3.4)
+for (const k of ['opsia.density', 'opsia.gestureTexture', 'opsia.coalesce', 'opsia.tonicity', 'opsia.drift', 'opsia.flow', 'opsia.proximity', 'opsia.proximityAudio', 'opsia.worldAmount']) {
   try { localStorage.removeItem(k) } catch { /* private storage */ }
 }
 
@@ -4771,19 +4775,12 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   couplingOn: true,
   setCouplingOn: (on) => set({ couplingOn: on }),
-  proximity: (() => {
-    const p = localStorage.getItem('opsia.proximity')
-    return p !== null && Number.isFinite(Number(p)) ? Number(p) : 0.5
-  })(),
-  setProximity: (v) => {
-    persistMacro('opsia.proximity', v)
-    set({ proximity: v })
-  },
-  proximityAudio: localStorage.getItem('opsia.proximityAudio') === '1',
-  setProximityAudio: (on) => {
-    localStorage.setItem('opsia.proximityAudio', on ? '1' : '0')
-    set({ proximityAudio: on })
-  },
+  // Proximity and its ◑ are the session's (Session.feel), like the other Feel
+  // dials : neutral at launch, undoable, New resets them.
+  proximity: FEEL_NEUTRAL.proximity,
+  setProximity: (v) => set({ proximity: v }),
+  proximityAudio: FEEL_NEUTRAL.proximityAudio,
+  setProximityAudio: (on) => set({ proximityAudio: on }),
   // Field macros (Slab 2c): each 0.5 = neutral deadzone. density (sparse↔dense),
   // gestureTexture (gesture↔texture motion character), coalesce (grain↔mass).
   // The Feel macros are the session's (FEEL_NEUTRAL, Session.feel) : neutral at launch.
@@ -4834,15 +4831,12 @@ export const useStore = create<StoreState>((set, get) => ({
     const skip = worldRouteSkip(s.composition, w)
     if (skip) showToast(`World ${w.name} : audio routing skipped, ${skip}`, 'warn', 5200)
   },
-  worldAmount: (() => {
-    const v = lsNum('opsia.worldAmount')
-    const a = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1
-    setWorldAmountBase(a)
-    return a
-  })(),
+  // The World amount is the session's (Session.worldAmount) : 1 at launch, New
+  // and Generate, undoable. The engine reads it through setWorldAmountBase (a
+  // subscription in App keeps them together).
+  worldAmount: 1,
   setWorldAmount: (v) => {
     const a = Math.max(0, Math.min(1, Number.isFinite(v) ? v : 1))
-    try { localStorage.setItem('opsia.worldAmount', String(a)) } catch { /* private storage */ }
     setWorldAmountBase(a)
     set({ worldAmount: a })
   },
@@ -6647,6 +6641,7 @@ export const useStore = create<StoreState>((set, get) => ({
         name: 'Untitled',
         composition: built,
         ...FEEL_NEUTRAL, // the Feel macros start neutral (they are the session's)
+        worldAmount: 1,
         pins: [], // New is a clean slate : nothing persistent
         selection: { type: 'source', layer: 0, slot: 'A' },
         scenes: [],
@@ -6710,7 +6705,8 @@ export const useStore = create<StoreState>((set, get) => ({
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
         ...FEEL_NEUTRAL,
         shutter: 0,
-        superFlicker: 0
+        superFlicker: 0,
+        worldAmount: 1
       }
     })
     notePatterns(prevMods, get().composition.modulators)
@@ -6783,10 +6779,15 @@ export const useStore = create<StoreState>((set, get) => ({
         gestureTexture: theme.gestureTexture,
         coalesce: theme.coalesce,
         tonicity: theme.tonicity,
-        shutter: theme.shutter,
         drift: theme.drift,
         flow: theme.flow,
-        superFlicker: theme.superFlicker
+        proximity: FEEL_NEUTRAL.proximity,
+        proximityAudio: FEEL_NEUTRAL.proximityAudio,
+        // the strobes stay off : a theme never turns them on (a session does not
+        // keep them, so the look would not come back when it is opened again)
+        shutter: 0,
+        superFlicker: 0,
+        worldAmount: 1
       }
     })
     // a new session (it may reuse the Collage films of the one before) : its
@@ -6837,6 +6838,8 @@ export const useStore = create<StoreState>((set, get) => ({
       name: s.name,
       // the session's Feel macros (an older file : neutral)
       ...sanitizeFeel(s.feel),
+      // how much of its World is on (an older file : all of it)
+      worldAmount: typeof s.worldAmount === 'number' && Number.isFinite(s.worldAmount) ? Math.max(0, Math.min(1, s.worldAmount)) : 1,
       theme: savedTheme ?? cur.theme,
       worlds,
       world,
@@ -6960,7 +6963,8 @@ export const useStore = create<StoreState>((set, get) => ({
       composition: s.composition,
       scenes: s.scenes,
       ...(s.pins.length ? { pins: s.pins } : {}),
-      feel: { density: s.density, gestureTexture: s.gestureTexture, coalesce: s.coalesce, tonicity: s.tonicity, drift: s.drift, flow: s.flow },
+      feel: { density: s.density, gestureTexture: s.gestureTexture, coalesce: s.coalesce, tonicity: s.tonicity, drift: s.drift, flow: s.flow, proximity: s.proximity, proximityAudio: s.proximityAudio },
+      ...(s.worldAmount < 0.999 ? { worldAmount: s.worldAmount } : {}),
       world: s.worlds.find((w) => w.id === s.world) ?? null,
       sequence: s.sequence,
       // (the Synth's parts left out while they were never touched : a session

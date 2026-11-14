@@ -10,6 +10,7 @@ import { Compositor } from './engine/Compositor'
 import { hiveEncoder } from './hiveEncoder'
 import { audioBus, LAYER_INPUT } from './engine/audioIn'
 import { CH_DEFAULT, InputPick, outputRoute, probeOutputChannels } from './audio/channelPick'
+import { feelOffRest } from './feelState'
 import { applyCoupling } from './engine/coupling'
 import { applyProximity, applyFieldMacros } from './engine/field'
 import { clearFrameVals } from './engine/frameVals'
@@ -49,7 +50,7 @@ import { tickKeySeq } from './audio/soniKeySeq'
 import { ruleSeqPlayhead, seqTransportPlay, seqTransportStop, tickRuleSeq } from './engine/ruleSeq'
 import { soniBeats, soniClockTick } from './audio/soniClock'
 import { linkBeats, linkPlay, linkQuantum, linkSettings, linkShared, setLinkPlaying, setLinkSettings, tickLink } from './link'
-import { applyWorldAmount } from './engine/worldAmount'
+import { applyWorldAmount, setWorldAmountBase } from './engine/worldAmount'
 import { Collapsible } from './components/Collapsible'
 import { FxAddSelect, FxChips } from './components/FxRackPanel'
 import { SearchSelect } from './components/SearchSelect'
@@ -257,6 +258,10 @@ useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
   push(useStore.getState())
   useStore.subscribe(push)
 }
+// The World amount is the session's : whatever sets it (the fader, New, Open,
+// Generate, an undo, OSC) reaches the engine.
+setWorldAmountBase(useStore.getState().worldAmount)
+useStore.subscribe((s, p) => { if (s.worldAmount !== p.worldAmount) setWorldAmountBase(s.worldAmount) })
 // The Synth's radial pitch reads the composition's frame and the dome.
 {
   const frame = (st: ReturnType<typeof useStore.getState>): void => sonifyEngine.setFrame(st.compW / Math.max(1, st.compH), st.dome ?? null)
@@ -2728,6 +2733,8 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     void document.fonts?.ready.then(measure)
     return () => ro.disconnect()
   }, [onNeed])
+  // the Feel dials off rest (a dot on its tab, listed in its hover)
+  const feelOff = useStore((s) => feelOffRest(s).join(' · '))
   const tabs: Array<{
     id: 'layers' | 'mixer' | 'finishing' | 'feel' | 'io' | 'perf' | 'assemble'
     label: string
@@ -2736,7 +2743,11 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     { id: 'layers', label: 'layers', title: 'The 4 layer strips' },
     { id: 'mixer', label: 'mixer', title: 'Compact opacity/speed/blend for all 4 layers (M)' },
     { id: 'finishing', label: 'finishing', title: 'Finishing Touches : Vibe Palette · Context · Finalizer' },
-    { id: 'feel', label: 'feel', title: 'Feel : the global macros, Field + Temperament (G)' },
+    {
+      id: 'feel',
+      label: 'feel',
+      title: `Feel (G) : whole-picture dials over everything at once. They ride on top of your settings and save with the session.${feelOff ? ` Not at rest : ${feelOff}` : ' All at rest.'}`
+    },
     { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, Resolume, dataflou and Ableton Link, each a collapsible section' },
     {
       id: 'perf',
@@ -2764,6 +2775,8 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
           }`}
         >
           {t.label}
+          {/* a dial off rest : the dot says Feel is changing the picture */}
+          {t.id === 'feel' && feelOff && <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />}
         </button>
       ))}
       <div ref={lensRef} className="glass-tab" />

@@ -4,9 +4,9 @@
 // know which randomize you're about to play. Every draw comes from curated
 // aesthetic ranges (brief) : the taste layer, not raw min/max.
 //
-// Layout : BPM · SPD · MORPH · PROX · Output ── Body · Seq · Sonify · Vary+amt ·
-// Randomize. All command buttons share ONE look (sans, semibold) : no more
-// mono-caps zoo. The World section lives in the TOP bar now.
+// Layout : BPM · SPD · MORPH · Output · { } · World [menu] [amount] ── Body · Seq ·
+// Sonify · Vary+amt · Randomize. All command buttons share ONE look (sans,
+// semibold) : no more mono-caps zoo. Proximity is a Feel dial (G) since v1.3.4.
 
 import { useEffect, useRef, useState } from 'react'
 import { SONIFY_PIN } from '../persist'
@@ -27,6 +27,8 @@ import { Blink } from './Blink'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { showToast } from './Toast'
 import { SOURCE_EDITOR_KEY } from '../shaders/userShaders'
+import { WorldAmount } from './WorldPage'
+import { worldFilmOff } from '../worlds'
 
 const SCOPES: Array<{ scope: RandomizeScope; label: string }> = [
   { scope: 'all', label: 'Randomize All' },
@@ -179,10 +181,6 @@ export function Transport(): JSX.Element {
   ]
   const setBodyPageOpen = useStore((s) => s.setBodyPageOpen)
   const bodyOn = useStore((s) => s.bodyControl.enabled)
-  const proximity = useStore((s) => s.proximity)
-  const setProximity = useStore((s) => s.setProximity)
-  const proximityAudio = useStore((s) => s.proximityAudio)
-  const setProximityAudio = useStore((s) => s.setProximityAudio)
   // World : moved down from the top bar. The label toggles the editor (also W);
   // the select swaps the active World.
   const worlds = useStore((s) => s.worlds)
@@ -192,6 +190,12 @@ export function Transport(): JSX.Element {
   const sourceEditorOpen = useStore((s) => s.sourceEditorOpen)
   const setWorldPageOpen = useStore((s) => s.setWorldPageOpen)
   const activeWorld = worlds.find((w) => w.id === world)
+  // the active World's film not playing as it sets it (New and launch start
+  // without it) : said in the menu
+  const filmOff = useStore((s) => {
+    const w = s.worlds.find((x) => x.id === s.world)
+    return !!w && worldFilmOff(w, s.composition)
+  })
   const setComposition = useStore.setState
   const applyVariation = useStore((s) => s.applyVariation)
   const globalVaryPulse = useStore((s) => s.varyPulse[4] ?? 0)
@@ -333,38 +337,6 @@ export function Transport(): JSX.Element {
         <span className="w-8 shrink-0 font-mono text-[9px] text-muted">{fmtMorph(morphMs)}</span>
       </div>
 
-      {/* Proximity (Field macro) : one knob places the image in a depth zone,
-          far/vista ↔ close/personal, by pushing the Context mood. */}
-      <div className="relative flex min-w-0 items-center gap-1">
-        <MidiLearnOverlay id="transport:prox" />
-        <span
-          className="font-mono text-[10px] text-muted"
-          title="Proximity : one knob places the image in a depth zone (vista/far ↔ personal/close) by pushing the Context mood. Double-click the slider for neutral."
-        >
-          PROX
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={proximity}
-          onChange={(e) => setProximity(Number(e.target.value))}
-          onDoubleClick={() => setProximity(0.5)}
-          className="w-16 min-w-0 accent-accent"
-          title={`Proximity ${proximity < 0.48 ? 'far' : proximity > 0.52 ? 'close' : 'neutral'} : vista ↔ personal (double-click: neutral)`}
-        />
-        <button
-          onClick={() => setProximityAudio(!proximityAudio)}
-          className={`shrink-0 rounded px-1 py-0.5 font-mono text-[9px] ${
-            proximityAudio ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'
-          }`}
-          title="Auto-proximity : when ON (lit), the image's audio brightness (spectral centroid) drives the Prox depth zone automatically : brighter sound pulls the image closer. Off = Prox stays where you set it."
-        >
-          ◑
-        </button>
-      </div>
-
       {/* The Source Editor (Alt+E, Cmd+Option+E on a Mac) : your own shaders */}
       <button
         onClick={() => useStore.getState().setSourceEditorOpen(!useStore.getState().sourceEditorOpen)}
@@ -373,12 +345,13 @@ export function Transport(): JSX.Element {
       >
         {'{ }'}
       </button>
-      {/* World : the active-World editor (label toggles it, also W) + the World
-          selector. Moved down from the top bar; ml-3 keeps it off the Prox slider. */}
+      {/* World : the active-World editor (label toggles it, also W), the World
+          selector and its amount (a performance fader : Learn, M, saved with the
+          session). */}
       <button
         onClick={() => setWorldPageOpen(!worldPageOpen)}
         className={`${TBTN} ml-3 ${worldPageOpen ? TBTN_LIT : TBTN_IDLE_ON}`}
-        title="Open the World editor (W) : coupling character + Context mood + audio routing"
+        title="World (W) : how the picture listens to the sound. It sets each layer's A and B coupling, the Context air, the film and one audio modulator. Pick one in the menu to apply it over the Morph time; the amount beside it fades it."
       >
         World
       </button>
@@ -390,10 +363,11 @@ export function Transport(): JSX.Element {
       >
         {worlds.map((w) => (
           <option key={w.id} value={w.id}>
-            {w.name}
+            {w.id === world && filmOff ? `${w.name} · film off` : w.name}
           </option>
         ))}
       </select>
+      <WorldAmount compact />
 
       {/* Freeze : latch that holds the output (render loop ORs it in). Also a
           learn target so a pad can grab-and-hold the frame live. */}
