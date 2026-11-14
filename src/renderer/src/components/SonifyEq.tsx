@@ -375,24 +375,41 @@ function EqPresetMenu({ eq, setEq, className = '' }: { eq: SoniEq; setEq: (next:
 
 // ── The miniature (Mixer view) ───────────────────────────────────────────────
 
+/** A card folded to its header, remembered on this computer (folded at first). */
+function useFold(key: string): [boolean, () => void] {
+  const k = `opsia.fold.${key}`
+  const [folded, setFolded] = useState(() => {
+    try { return localStorage.getItem(k) !== '0' } catch { return true }
+  })
+  const toggle = useCallback((): void => {
+    setFolded((f) => {
+      try { localStorage.setItem(k, f ? '0' : '1') } catch { /* private storage : not kept */ }
+      return !f
+    })
+  }, [k])
+  return [folded, toggle]
+}
+
 // (memo : the page re-renders on every Sonify change, the card only on the EQ's)
 export const EqCard = memo(function EqCard(): JSX.Element {
   const [eq, setEq] = useEq()
   const [open, setOpen] = useState(false)
+  const [folded, toggleFold] = useFold('outputEq')
   const cvRef = useRef<HTMLCanvasElement | null>(null)
   const eqRef = useRef(eq)
   eqRef.current = eq
-  // observed once (a new observer per change painted twice each time)
+  // observed once per unfold (a new observer per change painted twice each time;
+  // folded, the canvas is not there)
   useEffect(() => {
     const cv = cvRef.current
     if (!cv) return
     const ro = new ResizeObserver(() => drawEq(cv, eqRef.current, { selected: -1, compact: true }))
     ro.observe(cv)
     return () => ro.disconnect()
-  }, [])
+  }, [folded])
   useEffect(() => {
     if (cvRef.current) drawEq(cvRef.current, eq, { selected: -1, compact: true })
-  }, [eq])
+  }, [eq, folded])
   const active = eq.bands.filter((b) => b.on).length
   return (
     <>
@@ -403,6 +420,8 @@ export const EqCard = memo(function EqCard(): JSX.Element {
         onToggle={() => setEq({ ...eq, on: !eq.on })}
         toggleTitle={eq.on ? 'EQ on (click : bypass)' : 'EQ bypassed (click : on)'}
         open
+        collapsed={folded}
+        onCollapse={toggleFold}
         right={
           <span className="flex items-center gap-1.5">
             <EqPresetMenu eq={eq} setEq={setEq} className="w-[7.5rem]" />
@@ -443,6 +462,7 @@ const glueGr = (): number => sonifyEngine.glueGr
 
 export const GlueCard = memo(function GlueCard(): JSX.Element {
   const [eq, setEq] = useEq()
+  const [folded, toggleFold] = useFold('glue')
   const g = eq.glue
   const setGlue = (p: Partial<SoniGlue>): void => setEq({ ...eq, glue: { ...g, ...p } })
   return (
@@ -453,6 +473,8 @@ export const GlueCard = memo(function GlueCard(): JSX.Element {
       onToggle={() => setGlue({ on: !g.on })}
       toggleTitle={g.on ? 'Glue on (click : off)' : 'Glue off (click : on)'}
       open
+      collapsed={folded}
+      onCollapse={toggleFold}
     >
       <RangeRow
         label="amount" value={g.amount} min={0} max={1} step={0.01} neutral={0.4}

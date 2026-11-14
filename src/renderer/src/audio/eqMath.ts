@@ -56,7 +56,8 @@ const BELL_FREQS = [60, 120, 250, 500, 1000, 2000, 4000, 8000]
 export function defaultEq(): SoniEq {
   let bell = 0
   return {
-    on: true,
+    // off until asked for (a flat EQ changes nothing, its soft ceiling aside)
+    on: false,
     inGain: 0,
     outGain: 0,
     glue: { on: false, amount: 0.4, voice: 'clean' },
