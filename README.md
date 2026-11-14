@@ -3268,8 +3268,11 @@ effects on each source and on the layer), enables
 2–5 modulators and rolls a fresh mod-matrix. **Randomize All** deals a budget of
 effects over all its racks together (most presses four to eight, a dense one now and
 then; the master chain stays at four or fewer : alone, Randomize Master FX may run to
-six), so a press never stacks a dozen degrading passes. Every float draw comes from the
-shader's **curated aesthetic sub-range**; colors stay matte.
+six), so a press never stacks a dozen degrading passes. **Randomize All re-rolls the
+Background too** while it plays a source (a new source and rack, as its own dice;
+its opacity, speed, depth and blend stay yours; an empty background stays empty;
+at a lower intensity it is re-rolled with a layer's chance). Every float draw comes
+from the shader's **curated aesthetic sub-range**; colors stay matte.
 
 Scopes (the `▾` next to the button): **All · Sources · Source Parameters ·
 Source+FX · Source FX · Layers · Layer FX · Master FX · Finishing · Modulators ·

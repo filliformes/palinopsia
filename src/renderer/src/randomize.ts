@@ -959,8 +959,8 @@ export function randomizeSingleLayer(l: LayerState): LayerState {
   }
 }
 
-/** Re-roll the Background slab (its own dice : the GLOBAL Randomize never
- *  touches the background: the ground stays put while the layers churn).
+/** Re-roll the Background slab : its own dice, and Randomize All while the
+ *  background plays a source (an empty ground stays empty).
  *  Draws from the curated background source set; keeps opacity + speed +
  *  depth + blendMode (the user's framing of the ground survives the dice). */
 export function randomizeBackground(cur: BackgroundState | undefined): BackgroundState {
@@ -1086,11 +1086,23 @@ function trimToBudget(c: CompositionState, budget: number): CompositionState {
   return { ...c, layers, master }
 }
 
+/** A modulation row aimed at the Background (its source or its rack). */
+const isBgRow = (a: CompositionState['modMatrix'][number]): boolean =>
+  a.target.kind === 'bgSource' || (a.target.kind === 'fx' && a.target.scope.kind === 'background')
+
 function randomizeStructural(
   c: CompositionState,
   scope: RandomizeScope
 ): CompositionState {
   let next = c
+
+  // Randomize All re-rolls the ground too, when it plays one : a new source and
+  // rack (its opacity, speed, depth and blend stay yours), so All is a new scene
+  // and not a variation over the same ground. The rows aimed at the old ground go
+  // with it. An empty background stays empty (All never adds one).
+  if (scope === 'all' && c.background?.source?.shaderId) {
+    next = { ...next, background: randomizeBackground(c.background), modMatrix: next.modMatrix.filter((a) => !isBgRow(a)) }
+  }
 
   // Source PARAMETERS only : keep the chosen generators, re-roll their ISF
   // inputs within curated ranges (unlike 'sources', which picks new ones).
@@ -1460,8 +1472,12 @@ export function randomizeComposition(
   if (intensity >= 0.999) return target
   const p = Math.max(0, Math.min(1, intensity))
   const area = scopeAreas(scope)
+  // (the ground re-rolled with a layer's chance : a gentle amount often keeps it,
+  // with its own modulation rows)
+  const keepBg = scope === 'all' && target.background !== c.background && !chance(p)
   const mixed: CompositionState = {
     ...target,
+    background: keepBg ? c.background : target.background,
     layers: area.layers
       ? c.layers.map((cl, i) => (chance(p) ? target.layers[i] : jitterLayer(cl, p)))
       : target.layers,
@@ -1472,6 +1488,11 @@ export function randomizeComposition(
         : jitterMods(c.modulators, p)
       : target.modulators,
     modMatrix: area.mods ? (chance(p) ? target.modMatrix : c.modMatrix) : target.modMatrix
+  }
+  // the rows aimed at the ground follow the ground that was dealt
+  if (target.background !== c.background) {
+    const rows = mixed.modMatrix.filter((a) => !isBgRow(a))
+    mixed.modMatrix = keepBg ? [...rows, ...c.modMatrix.filter(isBgRow)] : rows
   }
   // The per-layer coin-flip can keep a modMatrix from one structural roll while
   // the racks came from the other, leaving `fx`-kind rows pointing at instance
