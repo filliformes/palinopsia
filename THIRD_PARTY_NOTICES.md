@@ -193,13 +193,6 @@ carries a short credit comment where it is used.
 The rest of the engine is built from published methods (Part 6). klaine/amino and
 klaine/bizar were read for reference; no code is taken from them.
 
-### datamoshing-GLSL and transflow (`src/renderer/src/engine/convNodes.ts`, the Datamosh node)
-
-- **datamoshing-GLSL** by Alexandre Rivaux (https://github.com/alexr4/datamoshing-GLSL),
-  GPL-3.0: the GPU optical-flow approach the Datamosh node's flow pass starts from.
-- **transflow** by Yohan Chalier (https://github.com/ychalier/transflow), GPL-3.0: the
-  Datamosh node's sticky and melt modes and its stochastic reseed.
-
 ### FFmpeg dxvenc (`src/renderer/src/engine/dxvFrame.ts`)
 
 The DXV writer's op-word layout follows FFmpeg's `libavcodec/dxvenc.c` (PUSH_OP): a fresh op
@@ -469,6 +462,23 @@ methods are free to build on; naming them is a matter of respect.
   taken.
 - **unity-vhsglitch** by Staffan Widegarn Åhlvik and VIDVOX's **VHS Glitch**: the model of
   the Tracking effect (Part 1).
+- **The Datamosh node** (`engine/datamoshNode.ts`, `engine/flowEstimator.ts`), rewritten
+  clean-room for v1.3.4 from a specification, by a writer who never saw the earlier
+  code. Its methods:
+  - brightness constancy (B. K. P. Horn and B. G. Schunck, "Determining optical flow",
+    *Artificial Intelligence* 17, 1981);
+  - windowed least squares, Lucas–Kanade (B. D. Lucas and T. Kanade, IJCAI 1981);
+  - a coarse and a fine level (J.-Y. Bouguet, "Pyramidal implementation of the Lucas
+    Kanade feature tracker", Intel, 2000);
+  - semi-Lagrangian advection (J. Stam, "Stable Fluids", SIGGRAPH 1999);
+  - the codec's macroblocks, P-frame vectors, I-frame refresh and 4:2:0 chroma
+    (ITU-T H.264);
+  - the look of datamosh (W. Brown and M. Kutty, *Convergence* 18(2), 2012).
+
+  Earlier versions started from Alexandre Rivaux's **datamoshing-GLSL**
+  (https://github.com/alexr4/datamoshing-GLSL, GPL-3.0) and took the sticky and melt
+  modes and the stochastic reseed from Yohan Chalier's **transflow**
+  (https://github.com/ychalier/transflow, GPL-3.0). Both remain credited for the ideas.
 - **ffglitch** (Ramiro Polla, https://ffglitch.org; ffglitch-core LGPL-2.1+ / GPL-2+,
   ffglitch-scripts Unlicense) and **Datamosher-Pro** (Akash Bora,
   https://github.com/Akascape/Datamosher-Pro, MIT). Behind the Datamosh node:
@@ -555,7 +565,7 @@ methods are free to build on; naming them is a matter of respect.
 
 | file | for |
 |---|---|
-| [LICENSE](LICENSE) | Palinopsia (GPL-3.0); also FFmpeg's GPL-3.0 builds, Rivaux's and Chalier's GPL-3.0 works |
+| [LICENSE](LICENSE) | Palinopsia (GPL-3.0); also FFmpeg's GPL-3.0 builds |
 | [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt) | the Apache-2.0 entries (MediaPipe, MMPose / RTMO, Transformers.js, Depth Anything V2 Small, the NCA notebook, Permanent Marker, Special Elite) |
 | [`licenses/OFL-1.1.txt`](licenses/OFL-1.1.txt) | the OFL fonts |
 | [`licenses/LGPL-2.1.txt`](licenses/LGPL-2.1.txt) | FFmpeg's dxvenc |

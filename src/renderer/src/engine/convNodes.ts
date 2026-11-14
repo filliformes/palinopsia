@@ -18,6 +18,7 @@ import { InflateNode } from './inflateNode'
 import { DrapeNode } from './drapeNode'
 import { TouchNode } from './touchNode'
 import { RippleNode } from './rippleNode'
+import { DatamoshNode } from './datamoshNode'
 import { MorphogenNode } from './morphogenNode'
 import { CurrentNode } from './currentNode'
 import { F_DOWNSAMPLE, F_FLOW, F_BLUR } from './pictureFlow'
@@ -454,184 +455,6 @@ const F_UNPREMUL = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
 void main(){ vec4 c = texture(uTex, vUV); o = vec4(c.a > 1e-5 ? c.rgb / c.a : vec3(0.0), clamp(c.a, 0.0, 1.0)); }`
-
-// third-party: datamoshing-GLSL
-// third-party: transflow
-// ── Datamosh engine ──────────────────────────────────────────────────────
-// The real datamosh look, faked in real time (no codec): a per-MACROBLOCK motion
-// field (optical flow of the live signal, or a sidechain layer, quantized to a
-// block grid) advects an accumulator buffer each frame, so the picture keeps
-// sliding along motion (the P-frame smear). A `refresh` term lerps the buffer back
-// to the live frame (the I-frame); dropping it low lets a new scene's motion drag
-// the PREVIOUS scene's texture around (the bloom). `residual` re-injects live
-// texture (the mosh↔mush line); a block-granular stochastic `reseed` keeps it from
-// mushing. STICKY mode slides each block as a rigid tile (crisp, real-datamosh
-// tearing); MELT mode is a softer per-pixel smear. Chroma `bleed` = codec color
-// bleed. Block-constant vectors tear at block edges : the macroblock signature.
-// The accumulator is straight RGBA (a transparent layer moshes its coverage too)
-// and every per-frame constant is raised to uFrames (= dt*60), so the smear
-// lingers the same time at any frame rate and holds still on a frozen layer.
-const F_DATAMOSH = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uHost, uPrev, uFlow, uEnergy, uActantMask;
-uniform vec2 uRes;
-uniform float uBlock, uMotion, uRefresh, uResidual, uReseed, uDecay, uBleed, uThresh, uSeed, uAutoBloom, uBloom, uSwirl, uActant, uManifest;
-uniform float uMoshGate, uRepel, uResharp, uFrames;
-uniform int uMode, uFlowInvert;
-${GLSL_HASH}
-${GLSL_PM}
-float lumD(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
-float inFrame(vec2 u){ return step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0); }
-// A per-frame blend weight w, applied f times : 1 - (1 - w)^f.
-float perFrames(float w){ return 1.0 - pow(max(1.0 - w, 1e-6), uFrames); }
-void main(){
-  // BLOOM : a detected cut (auto, held in the 1×1 energy state) OR a manual/beat
-  // BLOOM TRIGGER (uBloom, a decaying envelope) momentarily drives the I-frame
-  // refresh toward 0 and boosts persistence, so the picture blooms : the current
-  // motion keeps dragging the held texture around (the classic datamosh burst).
-  float bloom = max(uAutoBloom * texture(uEnergy, vec2(0.5)).r, uBloom);
-  float refresh = uRefresh * (1.0 - bloom);
-  vec2 texel = 1.0 / uRes;
-  vec2 blk = max(uBlock, 1.0) * texel;                 // macroblock size in UV
-  vec2 blockCenter = (floor(vUV / blk) + 0.5) * blk;
-  // STICKY = one vector per macroblock (block-constant → the whole block slides as
-  // a rigid tile, tearing at block edges : the real datamosh look), read as the
-  // mean of 4 taps around the block center. MELT/FLUID = the per-pixel flow → a
-  // softer warp/smear (FLUID feeds a temporally-averaged flow).
-  vec2 rawmv;
-  if (uMode == 1) {
-    vec2 q = blk * 0.25;
-    vec2 b0 = blockCenter - q, b1 = blockCenter + vec2(q.x, -q.y), b2 = blockCenter + vec2(-q.x, q.y), b3 = blockCenter + q;
-    rawmv = (texture(uFlow, b0).rg + texture(uFlow, b1).rg + texture(uFlow, b2).rg + texture(uFlow, b3).rg) * 0.25;
-  } else rawmv = texture(uFlow, vUV).rg;
-  rawmv *= uMotion;
-  // EDGE REPEL : push the motion by the host's own luma gradient, so the smear
-  // slides along / away from content edges instead of purely along motion (a more
-  // liquid, contour-hugging melt). Signed : +away from bright, −toward.
-  if (abs(uRepel) > 0.001) {
-    float rx = lumD(texture(uHost, vUV + vec2(texel.x, 0.0)).rgb) - lumD(texture(uHost, vUV - vec2(texel.x, 0.0)).rgb);
-    float ry = lumD(texture(uHost, vUV + vec2(0.0, texel.y)).rgb) - lumD(texture(uHost, vUV - vec2(0.0, texel.y)).rgb);
-    rawmv += vec2(rx, ry) * uRepel * 0.06;
-  }
-  // Motion-vector manipulation (as ffglitch does, on our flow field) : invert the
-  // direction (reverse-smear) and/or rotate every vector (vortex mosh).
-  if (uFlowInvert == 1) rawmv = -rawmv;
-  if (abs(uSwirl) > 0.001) { float cs = cos(uSwirl), sn = sin(uSwirl); rawmv = mat2(cs, -sn, sn, cs) * rawmv; }
-  float fmag = length(rawmv);
-  // Suppress sub-threshold flow noise so still areas don't creep; above it, the
-  // block advects. NOT an output gate : the accumulator always shows through, so
-  // the smear PERSISTS after motion stops (real datamosh) and only fades via decay.
-  vec2 mv = rawmv * smoothstep(uThresh, uThresh * 2.0 + 0.001, fmag);
-
-  vec2 dispUV = vUV - mv;                               // advect along motion
-  vec2 cb = mv * uBleed * 3.0;                          // chroma bleed keyed to motion
-  vec2 uvR = dispUV + cb, uvB = dispUV - cb;
-  vec4 ag = texture(uPrev, dispUV);
-  vec4 advected = vec4(texture(uPrev, uvR).r, ag.g, texture(uPrev, uvB).b, ag.a);
-
-  vec4 hostS = texture(uHost, vUV);
-  vec3 host = hostS.rgb;
-  vec4 H = pm(hostS);
-  // Advection from past the frame takes the live picture (no border streaks).
-  vec4 A = mix(H, pm(advected), inFrame(dispUV));
-
-  // ACTANTS : sparse localized patches (seeded by a trigger, advecting along the
-  // flow in their own mask) that FREEZE and drag their texture : autonomous
-  // persistent blocks. Where the mask is high, force near-total persistence and
-  // immunity to reset/reseed, so the patch sticks and smears.
-  float act = uActant * texture(uActantMask, vUV).r;
-
-  // Accumulator persists by DECAY. Still areas (mv≈0) sample themselves and
-  // converge back to host over ~1/(1-decay) frames : the smear LINGERS where the
-  // motion was, then cleans up. Moving areas keep sliding (the P-frame smear).
-  float dec = mix(uDecay, 0.985, bloom * 0.6);         // bloom boosts persistence
-  dec = mix(dec, 0.99, act);                           // actants : near-total hold
-  // MOSH GATE : bias the hold toward MOVING parts (+) or STILL parts (−). Positive
-  // freezes the smear only where there's motion (the rest stays live); negative
-  // holds the still background and lets the moving figures read through clean.
-  if (abs(uMoshGate) > 0.001) {
-    float mg = smoothstep(uThresh, uThresh * 8.0 + 0.01, fmag);
-    dec *= mix(1.0, (uMoshGate > 0.0) ? mg : (1.0 - mg), abs(uMoshGate)) * (1.0 - act) + act;
-  }
-  dec = pow(max(dec, 1e-6), uFrames);                   // per-frame hold, at any frame rate
-  vec4 outP = mix(H, A, dec);
-  outP = mix(outP, H, perFrames(uResidual * 0.5 * (1.0 - act))); // extra live-texture re-inject
-
-  // MANIFESTATION : instead of a clean I-frame cut, the live frame re-enters only
-  // where there's MOTION : the new source completes itself out of the retained
-  // frame along the flow. Still regions stay frozen; moving edges reveal the live.
-  float mo = smoothstep(uThresh, uThresh * 4.0 + 0.001, fmag);
-  float reset = clamp(refresh + uManifest * mo, 0.0, 1.0) * (1.0 - act);
-  outP = mix(outP, H, perFrames(reset));               // I-frame reset / manifestation
-
-  // Stochastic block reseed : whole blocks snap back to host, re-introducing
-  // detail so the smear never fully mushes (the random-reset idea of optical-flow
-  // transfer tools). The per-block chance is per 1/60 s.
-  vec3 bid = vec3(floor(vUV * uRes / max(uBlock, 1.0)), uSeed);
-  float rs = step(1.0 - perFrames(uReseed * 0.3), hash13(bid)) * (1.0 - act);
-  outP = mix(outP, H, rs);
-  vec4 outc = unpm(outP);
-
-  // RE-SHARP : the smear softens the picture; add the host's own high-frequency
-  // detail back so edges crisp up again without breaking the mosh (unsharp mask
-  // against a 4-tap box of the live frame).
-  if (uResharp > 0.001) {
-    vec3 hb = (texture(uHost, vUV + vec2(texel.x, 0.0)).rgb + texture(uHost, vUV - vec2(texel.x, 0.0)).rgb
-             + texture(uHost, vUV + vec2(0.0, texel.y)).rgb + texture(uHost, vUV - vec2(0.0, texel.y)).rgb) * 0.25;
-    outc.rgb += (host - hb) * uResharp * 2.0 * min(uFrames, 4.0);
-  }
-
-  o = vec4(clamp(outc.rgb, 0.0, 1.0), clamp(outc.a, 0.0, 1.0));
-}`
-
-// Actant mask : a single-channel field of localized "sticky" patches. Each frame
-// it ADVECTS along the same motion field as the mosh (so the patches drift with
-// the picture) and DECAYS; on a trigger frame it STAMPS a burst of soft blobs at
-// random centers. The datamosh pass reads this mask to freeze + hold those spots.
-const F_ACTANT = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uPrev, uFlow;
-uniform vec2 uRes, uCenters[6];
-uniform float uDecay, uMotion, uStamp, uRad, uNStamp;
-uniform int uFlowInvert;
-void main(){
-  vec2 mv = texture(uFlow, vUV).rg * uMotion;
-  if (uFlowInvert == 1) mv = -mv;
-  // advect + decay the mask (a half-float buffer, with a tiny floor so it truly
-  // reaches 0 : an 8-bit mask stalled at a permanent partial freeze)
-  float m = max(texture(uPrev, vUV - mv).r * uDecay - 1e-4, 0.0);
-  if (uStamp > 0.5) {
-    float aspect = uRes.x / uRes.y;
-    for (int i = 0; i < 6; i++) {
-      if (float(i) < uNStamp) {
-        vec2 d = vUV - uCenters[i]; d.x *= aspect;      // aspect-correct blobs
-        m = max(m, 1.0 - smoothstep(uRad * 0.25, uRad, length(d)));
-      }
-    }
-  }
-  o = vec4(clamp(m, 0.0, 1.0), 0.0, 0.0, 1.0);
-}`
-
-// Cut detector → decaying bloom state (rendered to a 1×1 buffer). Averages the
-// flow field's magnitude (a scene cut spikes it everywhere); the state holds a
-// level that jumps to 1 on a cut and decays over frames, so the bloom is
-// SUSTAINED (a cut lasts many frames), all on the GPU (no readback stall).
-const F_ENERGY = `#version 300 es
-precision highp float; in vec2 vUV; out vec4 o;
-uniform sampler2D uFlow, uPrevE;
-uniform float uCutSense, uEDecay;
-void main(){
-  float m = 0.0;
-  for (int j = 0; j < 8; j++){
-    for (int i = 0; i < 8; i++){
-      m += length(texture(uFlow, (vec2(float(i), float(j)) + 0.5) / 8.0).rg);
-    }
-  }
-  m /= 64.0;
-  float spike = smoothstep(uCutSense, uCutSense * 2.0, m * 4.0);
-  float prev = texture(uPrevE, vec2(0.5)).r;
-  o = vec4(max(prev * uEDecay, spike), 0.0, 0.0, 1.0);
-}`
 
 // ── Scanner (flatbed slit-scan) ──────────────────────────────────────────
 // A scan head sweeps the frame over one pass; as it crosses each line, that line
@@ -1227,6 +1050,7 @@ void main(){
 // (motion-driven, full-frame) this is EDGE-driven and self-feeding : it keeps going
 // on a still picture. Premultiplied, so melted forms spill into transparency.
 // One ping-pong buffer holds the last output. ──
+// third-party: BENDR
 const F_MELT = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uPrev; uniform vec2 uRes;
@@ -1856,9 +1680,6 @@ class NodeGL {
   copy: Prog
   echo: Prog
   feedback: Prog
-  datamosh: Prog
-  actant: Prog
-  energy: Prog
   scan: Prog
   scanout: Prog
   autocut: Prog
@@ -1917,9 +1738,6 @@ class NodeGL {
     this.copy = this.build(F_COPY)
     this.echo = this.build(F_ECHO)
     this.feedback = this.build(F_FEEDBACK)
-    this.datamosh = this.build(F_DATAMOSH)
-    this.actant = this.build(F_ACTANT)
-    this.energy = this.build(F_ENERGY)
     this.scan = this.build(F_SCAN)
     this.scanout = this.build(F_SCANOUT)
     this.autocut = this.build(F_AUTOCUT(false))
@@ -2783,264 +2601,6 @@ export class FeedbackNode implements ConvNode {
   }
 }
 
-// ── Datamosh engine (real-time faux-codec mosh) ──────────────────────────
-// Optical flow of the live signal (or a sidechain layer, for cross-layer motion
-// transfer) → block-quantized macroblock vectors → advect an RGBA16F accumulator
-// (F_DATAMOSH). Reuses the flow pipeline (downsample + F_FLOW) like Transfert and
-// the ping-pong accumulator like Feedback. Any rack.
-export class DatamoshNode implements ConvNode {
-  private res = 0
-  private lumaA!: RG
-  private lumaB!: RG
-  private lumaCurIsA = true
-  private flowT!: RG
-  private flowStateA!: RG // temporally-averaged flow (FLUID mode)
-  private flowStateB!: RG
-  private flowStateCur = true
-  private accum: [RGBA, RGBA] | null = null
-  private energyBuf: [RGBA, RGBA] | null = null // 1×1 decaying cut-bloom state
-  private energyCur = 0
-  private w = 0
-  private h = 0
-  private cur = 0
-  private seeded = false
-  private frame = 0
-  private bloomEnv = 0 // decaying bloom-trigger envelope
-  private prevTrig = 0
-  private pulseT = 0
-  private actBuf: [RGBA, RGBA] | null = null // actant mask ping-pong (localized sticky patches)
-  private actW = 0
-  private actH = 0
-  private actCur = 0
-  private prevActTrig = 0
-  private actPulseT = 0
-  private actCenters = new Float32Array(12) // up to 6 stamp centers (vec2 each)
-  private lastFrame = -1
-  private disposed = false
-  constructor(private gl: WebGL2RenderingContext) {}
-
-  private ensureFlow(n: number): void {
-    if (this.res === n) return
-    this.freeFlow()
-    const gl = this.gl
-    this.lumaA = makeRG(gl, n)
-    this.lumaB = makeRG(gl, n)
-    this.flowT = makeRG(gl, n)
-    this.flowStateA = makeRG(gl, n)
-    this.flowStateB = makeRG(gl, n)
-    this.res = n
-  }
-  private freeFlow(): void {
-    const gl = this.gl
-    for (const t of [this.lumaA, this.lumaB, this.flowT, this.flowStateA, this.flowStateB]) {
-      if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo) }
-    }
-    this.res = 0
-  }
-  private ensureAccum(w: number, h: number): void {
-    if (this.accum && this.w === w && this.h === h) return
-    const gl = this.gl
-    if (this.accum) for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
-    this.accum = [makeRGBA(gl, w, h, true), makeRGBA(gl, w, h, true)]
-    this.w = w; this.h = h; this.cur = 0; this.seeded = false
-  }
-
-  render(ctx: NodeContext): WebGLTexture {
-    if (this.disposed) return ctx.host
-    const gl = ctx.gl, g = nodeGL(gl)
-    const inp = ctx.inputs
-    const W = ctx.chain.w, H = ctx.chain.h
-    const n = FLOW_RES[Math.max(0, Math.min(2, Math.round(num(inp.flowRes, 1))))]
-    // Fresh flow buffers or a gap in the frame counter (inserted, re-enabled, a
-    // flow-res change, PANIC) : prime the previous luma with this frame (no false
-    // flow jolt or false cut-bloom), and on a gap restart the accumulator from the
-    // live frame instead of replaying what it held when switched off.
-    const gap = resumed(this.lastFrame, ctx)
-    const prime = this.res !== n || gap
-    this.lastFrame = ctx.frame ?? 0
-    this.ensureFlow(n)
-    this.ensureAccum(W, H)
-    if (gap) this.seeded = false
-    this.frame++
-    const f = frames60(ctx)
-
-    // Bloom trigger : a rising edge on `trig` (or the `pulse` auto-clock) sets a
-    // decaying bloom envelope that the shader turns into an I-frame hold + a
-    // persistence boost : the classic datamosh burst, fireable on the beat.
-    const trig = num(inp.trig, 0)
-    if (trig >= 0.5 && this.prevTrig < 0.5) this.bloomEnv = 1
-    this.prevTrig = trig
-    const pulse = clampf(num(inp.pulse, 0), 0, 8)
-    if (pulse > 0) {
-      this.pulseT += ctx.dt
-      if (this.pulseT >= 1 / pulse) { this.pulseT = Math.min(this.pulseT - 1 / pulse, 1 / pulse); this.bloomEnv = 1 }
-    }
-    this.bloomEnv *= Math.exp(-ctx.dt / 0.4) // ~0.4s bloom tail
-
-    // Actant spawn : a rising edge on `actantTrig` (or the `actantRate` clock) seeds
-    // a burst of localized sticky patches at random centers. Fill the center array
-    // and flag how many to stamp this frame (0 = advect+decay only).
-    const actStrength = clampf(num(inp.actant, 0), 0, 1)
-    const actTrig = num(inp.actantTrig, 0)
-    const actRate = clampf(num(inp.actantRate, 0), 0, 8)
-    let spawn = 0
-    if (actStrength > 0.001) {
-      if (actTrig >= 0.5 && this.prevActTrig < 0.5) spawn = 3
-      if (actRate > 0) {
-        this.actPulseT += ctx.dt
-        if (this.actPulseT >= 1 / actRate) { this.actPulseT = Math.min(this.actPulseT - 1 / actRate, 1 / actRate); spawn = 3 }
-      }
-    }
-    this.prevActTrig = actTrig
-    if (spawn > 0) {
-      for (let i = 0; i < spawn; i++) {
-        this.actCenters[i * 2] = 0.12 + Math.random() * 0.76
-        this.actCenters[i * 2 + 1] = 0.12 + Math.random() * 0.76
-      }
-    }
-
-    const bind = (unit: number, tex: WebGLTexture): void => bindUnit(gl, unit, tex)
-
-    // Seed the accumulator with the live frame so the mosh never starts from a
-    // black buffer (which, with high persistence, would take ~12 frames to fill).
-    if (!this.seeded) {
-      const cp = g.use(g.copy)
-      bind(0, ctx.host); gl.uniform1i(cp.u('uTex'), 0)
-      for (const b of this.accum!) drawFull(gl, b.fbo, W, H)
-      this.seeded = true
-    }
-
-    const lumaCur = this.lumaCurIsA ? this.lumaA : this.lumaB
-    const lumaPrev = this.lumaCurIsA ? this.lumaB : this.lumaA
-    // Flow source : a sidechain layer (motion transfer / "diegetic datamosh") if
-    // present + enabled, else the host's own motion.
-    const flowSrc = ctx.sidechain && num(inp.sidechainFlow, 0) >= 0.5 ? ctx.sidechain : ctx.host
-
-    // 1) downsample flow source → luma (one bilinear tap : the fine-texture flow
-    //    noise is part of the mosh's creep)
-    let p = g.use(g.downsample)
-    bind(0, flowSrc); gl.uniform1i(p.u('uTex'), 0)
-    gl.uniform1f(p.u('uBox'), 0)
-    drawFull(gl, lumaCur.fbo, n, n)
-    if (prime) {
-      drawFull(gl, lumaPrev.fbo, n, n)
-      clearTarget(gl, this.flowStateA.fbo); clearTarget(gl, this.flowStateB.fbo)
-      if (this.energyBuf) for (const b of this.energyBuf) clearTarget(gl, b.fbo)
-      if (this.actBuf) for (const b of this.actBuf) clearTarget(gl, b.fbo)
-    }
-    // 2) flow(cur, prev), in 256-field texels whatever the flow res
-    p = g.use(g.flow)
-    bind(0, lumaCur.tex); bind(1, lumaPrev.tex)
-    gl.uniform1i(p.u('uCur'), 0); gl.uniform1i(p.u('uPrev'), 1)
-    gl.uniform2f(p.u('uRes'), n, n)
-    gl.uniform1f(p.u('uLambda'), 0.002)
-    gl.uniform1f(p.u('uClamp'), 0.06) // max per-frame flow (must exceed the motion gate)
-    gl.uniform1f(p.u('uScale'), 256 / n)
-    drawFull(gl, this.flowT.fbo, n, n)
-
-    // 2a) FLUID mode : temporally average the flow (ffglitch's "average motion") →
-    //     a smooth liquid melt. melt/sticky feed the RAW flow (response 1 = no avg).
-    const mode = Math.round(num(inp.mode, 1))
-    const fsRead = this.flowStateCur ? this.flowStateA : this.flowStateB
-    const fsWrite = this.flowStateCur ? this.flowStateB : this.flowStateA
-    p = g.use(g.condition)
-    bind(0, this.flowT.tex); bind(1, fsRead.tex)
-    gl.uniform1i(p.u('uFlow'), 0); gl.uniform1i(p.u('uPrev'), 1)
-    gl.uniform1f(p.u('uResponse'), mode === 2 ? 1 - Math.pow(0.88, f) : 1.0)
-    drawFull(gl, fsWrite.fbo, n, n)
-
-    // 2b) cut detector → 1×1 decaying bloom state (scene-cut auto-mosh).
-    // 16F : an 8-bit exponential decay quantize-sticks at a faint non-zero level.
-    if (!this.energyBuf) { this.energyBuf = [makeRGBA(gl, 1, 1, true), makeRGBA(gl, 1, 1, true)]; this.energyCur = 0 }
-    const eRead = this.energyBuf[this.energyCur], eWrite = this.energyBuf[1 - this.energyCur]
-    p = g.use(g.energy)
-    bind(0, this.flowT.tex); bind(1, eRead.tex)
-    gl.uniform1i(p.u('uFlow'), 0); gl.uniform1i(p.u('uPrevE'), 1)
-    gl.uniform1f(p.u('uCutSense'), clampf(num(inp.cutSense, 0.35), 0.02, 1))
-    gl.uniform1f(p.u('uEDecay'), Math.pow(0.92, f)) // bloom sustains ~0.4–0.5 s after a cut
-    drawFull(gl, eWrite.fbo, 1, 1)
-
-    // 2c) actant mask : advect the sticky-patch field along the conditioned flow,
-    //     decay it, and stamp any spawn burst. Only when actants are enabled.
-    //     Half float : an 8-bit mask stalled at a permanent partial freeze.
-    let actMask: WebGLTexture = ctx.host // fallback tex (unused when uActant = 0)
-    if (actStrength > 0.001) {
-      if (!this.actBuf || this.actW !== W || this.actH !== H) {
-        if (this.actBuf) for (const b of this.actBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) }
-        this.actBuf = [makeRGBA(gl, W, H, true), makeRGBA(gl, W, H, true)]
-        this.actW = W; this.actH = H; this.actCur = 0
-      }
-      const aRead = this.actBuf[this.actCur], aWrite = this.actBuf[1 - this.actCur]
-      p = g.use(g.actant)
-      bind(0, aRead.tex); bind(1, fsWrite.tex)
-      gl.uniform1i(p.u('uPrev'), 0); gl.uniform1i(p.u('uFlow'), 1)
-      gl.uniform2f(p.u('uRes'), W, H)
-      const life = clampf(num(inp.actantLife, 0.6), 0, 1)
-      gl.uniform1f(p.u('uDecay'), Math.exp(-ctx.dt / (0.15 + life * life * 6))) // ~0.15–6s life
-      gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
-      gl.uniform1i(p.u('uFlowInvert'), num(inp.flowInvert, 0) >= 0.5 ? 1 : 0)
-      gl.uniform1f(p.u('uStamp'), spawn > 0 ? 1 : 0)
-      gl.uniform1f(p.u('uNStamp'), spawn)
-      gl.uniform1f(p.u('uRad'), clampf(num(inp.block, 16) * Math.max(1, Math.floor(H / 1080 + 0.5)) / Math.min(W, H) * 4, 0.03, 0.4))
-      gl.uniform2fv(p.u('uCenters'), this.actCenters)
-      drawFull(gl, aWrite.fbo, W, H)
-      actMask = aWrite.tex
-      this.actCur = 1 - this.actCur
-    }
-    // Macroblocks scale with the render size (in whole pixels : 16 px at 1080p,
-    // 32 px at 4K), so the mosh has the same grain at every output size.
-    const pxs = Math.max(1, Math.floor(H / 1080 + 0.5))
-
-    // 3) datamosh advection → accumulator write
-    const read = this.accum![this.cur], write = this.accum![1 - this.cur]
-    p = g.use(g.datamosh)
-    bind(0, ctx.host); bind(1, read.tex); bind(2, fsWrite.tex); bind(3, eWrite.tex) // conditioned flow
-    bind(4, actMask)
-    gl.uniform1i(p.u('uHost'), 0); gl.uniform1i(p.u('uPrev'), 1); gl.uniform1i(p.u('uFlow'), 2); gl.uniform1i(p.u('uEnergy'), 3)
-    gl.uniform1i(p.u('uActantMask'), 4)
-    gl.uniform1f(p.u('uActant'), actStrength)
-    gl.uniform1f(p.u('uManifest'), clampf(num(inp.manifest, 0), 0, 1))
-    gl.uniform1f(p.u('uAutoBloom'), clampf(num(inp.autoBloom, 0.7), 0, 1))
-    gl.uniform1f(p.u('uBloom'), Math.min(1, this.bloomEnv))
-    gl.uniform1i(p.u('uFlowInvert'), num(inp.flowInvert, 0) >= 0.5 ? 1 : 0)
-    gl.uniform1f(p.u('uSwirl'), clampf(num(inp.swirl, 0), -1, 1) * 1.5708)
-    gl.uniform2f(p.u('uRes'), W, H)
-    gl.uniform1f(p.u('uBlock'), clampf(num(inp.block, 16), 2, 64) * pxs)
-    gl.uniform1f(p.u('uMotion'), clampf(num(inp.motion, 1), 0, 4))
-    gl.uniform1f(p.u('uRefresh'), clampf(num(inp.refresh, 0.06), 0, 1))
-    gl.uniform1f(p.u('uResidual'), clampf(num(inp.residual, 0.15), 0, 1))
-    gl.uniform1f(p.u('uReseed'), clampf(num(inp.reseed, 0.1), 0, 1))
-    gl.uniform1f(p.u('uDecay'), clampf(num(inp.decay, 0.92), 0, 1))
-    gl.uniform1f(p.u('uBleed'), clampf(num(inp.bleed, 0.2), 0, 1))
-    // The gate compares per-frame motion : at a higher frame rate the same motion
-    // moves less per frame, so the threshold follows the frame step.
-    gl.uniform1f(p.u('uThresh'), clampf(num(inp.thresh, 0.012), 0, 0.1) * clampf(f, 0.25, 4))
-    gl.uniform1f(p.u('uFrames'), f)
-    gl.uniform1i(p.u('uMode'), Math.round(num(inp.mode, 1)))
-    gl.uniform1f(p.u('uMoshGate'), clampf(num(inp.moshGate, 0), -1, 1))
-    gl.uniform1f(p.u('uRepel'), clampf(num(inp.edgeRepel, 0), -1, 1))
-    gl.uniform1f(p.u('uResharp'), clampf(num(inp.resharp, 0), 0, 1))
-    gl.uniform1f(p.u('uSeed'), this.frame % 1024)
-    drawFull(gl, write.fbo, W, H)
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-    this.lumaCurIsA = !this.lumaCurIsA
-    this.cur = 1 - this.cur
-    this.energyCur = 1 - this.energyCur
-    this.flowStateCur = !this.flowStateCur
-    return write.tex
-  }
-
-  dispose(): void {
-    this.disposed = true
-    this.freeFlow()
-    const gl = this.gl
-    if (this.accum) { for (const b of this.accum) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.accum = null }
-    if (this.energyBuf) { for (const b of this.energyBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.energyBuf = null }
-    if (this.actBuf) { for (const b of this.actBuf) { gl.deleteTexture(b.tex); gl.deleteFramebuffer(b.fbo) } this.actBuf = null }
-  }
-}
-
 // ── Scanner (flatbed slit-scan) ──────────────────────────────────────────
 // A scan head sweeps the frame; the band it crosses each frame is captured live
 // into a persistent buffer and held until the head passes again, so motion during
@@ -3893,6 +3453,7 @@ export class AfterimageNode implements ConvNode {
 // safe pattern as Datamosh : it's only re-read next frame, after the flip), or a
 // MIX pass over the live frame when mix < 1. Sizes are in 1080p pixels and the
 // creep in pixels per second, so it looks the same at any size and frame rate.
+// third-party: BENDR
 export class MeltNode implements ConvNode {
   private acc: [RGBA, RGBA] | null = null
   private w = 0
@@ -3976,6 +3537,7 @@ export class MeltNode implements ConvNode {
 // law, moved from per-parameter to the blend stage). One discrete fault per fire.
 // Bands and static are counted in 1080-line units (the same grain at any size),
 // hashed on whole-number cells (never quantizes or stripes).
+// third-party: BENDR (the dirty mixer : an idea, no code)
 const F_FAULTLINE = `#version 300 es
 precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uHost, uFreeze;

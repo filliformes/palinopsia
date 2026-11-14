@@ -43,8 +43,8 @@ creative work. This comes before any feature.
   write in the Source Editor, what they build is theirs.
 - **Code in the SDK must be Vincent's own or under a permissive license** (MIT, BSD,
   ISC, Apache-2.0, zlib, CC0).
-  - Never move GPL or LGPL code into it: Ableton Link, FFmpeg, datamoshing-GLSL,
-    transflow and the rest of the app stay GPL.
+  - Never move GPL or LGPL code into it: Ableton Link, FFmpeg and the rest of the app
+    stay GPL.
   - An SDK file that holds third-party permissive code keeps that code's notice, and
     the SDK gets its own `THIRD_PARTY_NOTICES` section.
 - **Palinopsia itself stays GPL-3.0-or-later.**

@@ -208,7 +208,7 @@ Cascone, K. (2000). The aesthetics of failure: "Post-digital" tendencies in cont
 
 Chalier, Y. (2024). *transflow: Optical flow transfer* [Computer software, GPL-3.0]. GitHub. https://github.com/ychalier/transflow
 
-↳ The Datamosh node's sticky and melt modes and its stochastic reseed.
+↳ The Datamosh node's sticky and melt modes and its stochastic reseed, before v1.3.4 (the node is now a clean-room rewrite; the ideas stay credited).
 
 Denson, S. (2020). *Discorrelated images*. Duke University Press. https://doi.org/10.1215/9781478012412
 
@@ -228,7 +228,7 @@ Morgan, C. (2019). Calculated error: Glitch art, compression artefacts, and digi
 
 Rivaux, A. (2019). *datamoshing-GLSL* [Computer software, GPL-3.0]. GitHub. https://github.com/alexr4/datamoshing-GLSL
 
-↳ The GPU optical-flow approach the Datamosh node's flow pass starts from.
+↳ The GPU optical-flow approach the Datamosh node's flow pass started from, before v1.3.4 (now Lucas–Kanade, `engine/flowEstimator.ts`).
 
 ## 8. Perception and optics
 

@@ -70,6 +70,20 @@ that CI builds into cross-platform releases.
     - a `third-party:` tag in the code names something the register lacks;
     - a file carries someone else's copyright line or a Shadertoy link without a tag.
 
+- **Datamosh, rewritten : Palinopsia's own.** The node is written clean-room, from the
+  published methods, by a writer who never saw the earlier code. That code started from
+  Rivaux's datamoshing-GLSL and took ideas from transflow and BENDR.
+  - **How it works.** Its motion is Lucas–Kanade optical flow on two levels
+    (`flowEstimator.ts`). The P-frame smear is semi-Lagrangian advection. Refresh and
+    residual act on separate coarse and detail bands, and chroma travels at half
+    resolution.
+  - **What stays the same.** The 25 controls, presets and OSC addresses are unchanged.
+  - **Tested.**
+    - Motion is read at 80 % of the true displacement, with the right sign 96 % of
+      the time.
+    - The picture is frozen exactly at a frozen clock.
+    - The look matches at 30, 60 and 120 fps.
+    - A scene cut fires the bloom.
 - **A new reverb for Sonify, Palinopsia's own.**
   - **What changed.** The shared FX tail's reverb is rewritten from scratch, from the
     published feedback-delay-network literature (Schroeder 1962, Stautner & Puckette 1982,
