@@ -946,7 +946,7 @@ app.whenReady().then(async () => {
   // Start/stop the inbound OSC listener (and, alongside it, the OSCQuery HTTP
   // server). Returns the bound port + this machine's addresses so the UI can
   // tell the user where to point Pandore.
-  safeHandle('osc:listen', async (_e, port, enabled) => {
+  safeHandle('osc:listen', async (_e, port, enabled, multicast) => {
     const addresses = localIPv4s()
     if (!enabled) {
       oscReceiver.stop()
@@ -958,9 +958,10 @@ app.whenReady().then(async () => {
       // OSCQuery's HTTP server sits on port+1; if the OSC port is the last valid
       // one, host it on port-1 instead so it can't overflow to an invalid 65536.
       const httpPort = p >= 65535 ? p - 1 : p + 1
-      await oscReceiver.start(p)
+      const groups = Array.isArray(multicast) ? multicast.filter((g): g is string => typeof g === 'string').slice(0, 8) : []
+      await oscReceiver.start(p, groups)
       await oscquery.start(httpPort, p)
-      return { ok: true, listening: true, port: p, addresses }
+      return { ok: true, listening: true, port: p, addresses, multicast: { joined: oscReceiver.joined, failed: oscReceiver.failed } }
     } catch (e) {
       oscReceiver.stop()
       oscquery.stop()

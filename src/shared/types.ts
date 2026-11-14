@@ -1453,6 +1453,8 @@ export interface OscListenResult {
   port: number
   addresses: string[]
   error?: string
+  // the multicast groups asked for : joined, or refused (with why)
+  multicast?: { joined: string[]; failed: Array<{ group: string; error: string }> }
 }
 
 /** One leaf of the OSCQuery address tree the renderer publishes to main. */
@@ -1649,7 +1651,7 @@ export interface ExposedApi {
   resolumeParse: (path: string) => Promise<import('./resolume').ResoParseResult>
 
   // OSC input : start/stop the listener + OSCQuery, and subscribe to messages
-  oscListen: (port: number, enabled: boolean) => Promise<OscListenResult>
+  oscListen: (port: number, enabled: boolean, multicast?: string[]) => Promise<OscListenResult>
   onOscReceived: (cb: (batch: OscInEvent[]) => void) => () => void
   oscQueryPublish: (nodes: OscQueryLeaf[]) => Promise<void>
   // OSCQuery WebSocket value-stream: push live value diffs; be told when a

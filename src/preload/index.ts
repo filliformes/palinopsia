@@ -75,7 +75,7 @@ const api: ExposedApi = {
   oscSendBatch: (ip, port, msgs) => ipcRenderer.send('osc:sendBatch', ip, port, msgs),
 
   // ── OSC input (Pandore → instrument) ─────────────────────────────
-  oscListen: (port, enabled) => ipcRenderer.invoke('osc:listen', port, enabled),
+  oscListen: (port, enabled, multicast) => ipcRenderer.invoke('osc:listen', port, enabled, multicast ?? []),
   onOscReceived: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, batch: OscInEvent[]): void => cb(batch)
     ipcRenderer.on('osc:received', h)

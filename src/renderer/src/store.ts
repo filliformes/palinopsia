@@ -852,6 +852,16 @@ function saveMap(key: string, map: object): void {
   }
 }
 
+/** A stored list of short strings (per computer). */
+function loadStrList(key: string, max: number): string[] {
+  try {
+    const a = JSON.parse(localStorage.getItem(key) || '[]') as unknown[]
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length < 64).slice(0, max) : []
+  } catch {
+    return []
+  }
+}
+
 // Where Palinopsia sends : loaded once (oscDests.ts), the first one mirrored below.
 const initialOscDests = loadOscDests()
 
@@ -2428,6 +2438,15 @@ interface StoreState {
   // content. oscOutHost/Port mirror the first one (older readers, MCP tools).
   oscDests: OscDest[]
   setOscDests: (list: OscDest[]) => void
+  // OSC in : multicast groups joined beside the port (per computer), and what the
+  // last listen made of them; senders muted in the connections view (host:port,
+  // or a whole host), heard and shown but never played
+  oscMulticast: string[]
+  setOscMulticast: (groups: string[]) => void
+  oscMulticastStatus: { joined: string[]; failed: Array<{ group: string; error: string }> } | null
+  setOscMulticastStatus: (s: { joined: string[]; failed: Array<{ group: string; error: string }> } | null) => void
+  oscMuted: string[]
+  toggleOscMuted: (key: string) => void
   // OSC aliases (oscAliases.ts) : controller addresses played onto /opsia ones
   oscAliases: OscAlias[]
   setOscAliases: (list: OscAlias[]) => void
@@ -6125,6 +6144,22 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     }),
   oscDests: initialOscDests,
+  oscMulticast: loadStrList('opsia.oscMulticast', 8),
+  setOscMulticast: (groups) =>
+    set(() => {
+      const oscMulticast = [...new Set(groups.map((g) => g.trim()).filter(Boolean))].slice(0, 8)
+      try { localStorage.setItem('opsia.oscMulticast', JSON.stringify(oscMulticast)) } catch { /* quota */ }
+      return { oscMulticast }
+    }),
+  oscMulticastStatus: null,
+  setOscMulticastStatus: (oscMulticastStatus) => set({ oscMulticastStatus }),
+  oscMuted: loadStrList('opsia.oscMuted', 64),
+  toggleOscMuted: (key) =>
+    set((s) => {
+      const oscMuted = s.oscMuted.includes(key) ? s.oscMuted.filter((k) => k !== key) : [...s.oscMuted, key].slice(-64)
+      try { localStorage.setItem('opsia.oscMuted', JSON.stringify(oscMuted)) } catch { /* quota */ }
+      return { oscMuted }
+    }),
   oscAliases: loadOscAliases(),
   setOscAliases: (list) =>
     set(() => {

@@ -1385,7 +1385,10 @@ export function routeOsc(address: string, args: Args): void {
  *  with the structure). Returns an unsubscribe fn. */
 export function initOscInput(): () => void {
   const off = window.api.onOscReceived((batch) => {
+    const muted = useStore.getState().oscMuted
     for (const m of batch) {
+      // a muted sender (the connections view) : seen there, never played
+      if (muted.length && (muted.includes(`${m.host ?? '?'}:${m.port}`) || muted.includes(m.host ?? '?'))) continue
       try {
         route(m.address, m.args, m.host)
       } catch {
@@ -1407,8 +1410,9 @@ export function initOscInput(): () => void {
 export async function applyOscListen(): Promise<void> {
   const st = useStore.getState()
   try {
-    const res = await window.api.oscListen(st.oscPort, st.oscEnabled)
+    const res = await window.api.oscListen(st.oscPort, st.oscEnabled, st.oscMulticast)
     st.setOscConfig({ listening: res.listening, addresses: res.addresses })
+    st.setOscMulticastStatus(res.multicast ?? null)
     if (res.listening) publishOscQuery()
   } catch {
     st.setOscConfig({ listening: false })

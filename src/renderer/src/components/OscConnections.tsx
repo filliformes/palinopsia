@@ -30,6 +30,8 @@ const CLASS_STYLE: Record<OscClass['kind'], string> = {
 
 export function OscConnections({ onAlias }: { onAlias?: (address: string) => void }): JSX.Element {
   const dests = useStore((s) => s.oscDests)
+  const muted = useStore((s) => s.oscMuted)
+  const toggleMuted = useStore((s) => s.toggleOscMuted)
   const [, setTick] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
   // keep the per-address lists while this view is open; redraw 4 times a second
@@ -60,11 +62,14 @@ export function OscConnections({ onAlias }: { onAlias?: (address: string) => voi
     const name = dir === 'out' ? destName.get(p.key) : destHosts.get(p.key.split(':')[0])
     const isOpen = open === `${dir}|${p.key}`
     const live = p.rate > 0
+    const host = p.key.slice(0, p.key.lastIndexOf(':') > 0 ? p.key.lastIndexOf(':') : undefined)
+    const isMuted = dir === 'in' && (muted.includes(p.key) || muted.includes(host))
     return (
       <div key={`${dir}|${p.key}`} className="flex min-w-0 flex-col">
+        <div className="flex min-w-0 items-center gap-1">
         <button
           onClick={() => setOpen(isOpen ? null : `${dir}|${p.key}`)}
-          className="flex min-w-0 items-center gap-1.5 font-mono text-[9px] hover:text-text"
+          className={`flex min-w-0 flex-1 items-center gap-1.5 font-mono text-[9px] hover:text-text ${isMuted ? 'opacity-50' : ''}`}
           title={dir === 'in' ? 'Open : every address it sends, and what Palinopsia makes of it' : 'Open : every address sent there'}
         >
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${live ? (dir === 'in' ? 'bg-accent' : 'bg-accent2') : 'bg-panel3'}`} />
@@ -75,6 +80,21 @@ export function OscConnections({ onAlias }: { onAlias?: (address: string) => voi
           <span className="w-10 shrink-0 text-right tabular-nums text-muted">{ago(p.lastAt)}</span>
           <span className={`shrink-0 text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}>▸</span>
         </button>
+        {dir === 'in' && (
+          <button
+            onClick={() => toggleMuted(muted.includes(host) ? host : p.key)}
+            onContextMenu={(e) => { e.preventDefault(); toggleMuted(host) }}
+            className={`shrink-0 rounded px-1 font-mono text-[9px] ${isMuted ? 'bg-danger/20 text-danger ring-1 ring-danger' : 'bg-panel2 text-muted hover:text-text'}`}
+            title={
+              isMuted
+                ? `Muted${muted.includes(host) ? ` (the whole host ${host})` : ''} : still shown here, never played. Click to hear it again.`
+                : `Mute this sender (${p.key}) : still shown here, never played. Right-click : mute the whole host ${host} (every program on that machine).`
+            }
+          >
+            {isMuted ? 'muted' : 'mute'}
+          </button>
+        )}
+        </div>
         {isOpen && <AddressList dir={dir} peer={p.key} onAlias={onAlias} />}
       </div>
     )

@@ -3993,6 +3993,21 @@ TouchDesigner…), listed under ↗ out in the OSC section.
 - **The list is per computer** (it belongs to this network). The first destination is the
   old single one: an existing setup carries over as it was.
 
+**What reaches Palinopsia.** OSC travels over UDP to one machine. Palinopsia hears:
+- messages sent to it (its address, the IN port);
+- broadcasts on the local network (`x.x.x.255`, same port);
+- since v1.3.4, a **multicast group** you join under ↗ in. Type one or more groups
+  (`239.0.0.1`, up to 8), and whatever any device sends to them on that port arrives
+  here, with nothing to change on the senders. Each group shows ✓ joined, or ✗ with the
+  reason.
+
+A message sent to another machine never reaches it: add Palinopsia as a destination on
+the sender, broadcast, multicast, or forward it.
+
+**Muting a sender.** In **links**, **mute** on a sender keeps it listed, with its
+addresses, but never plays what it sends. Right-click mute to silence the whole machine
+(every program on that IP). Kept per computer.
+
 **links** (beside monitor) shows the connections:
 - **every sender** (host:port), with its msg/s and when it was last heard. Open one to see
   each address it sends, with its last value and what Palinopsia makes of it:

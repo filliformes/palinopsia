@@ -15,6 +15,47 @@ import { OscMonitor } from './OscMonitor'
 import { OscDestinations } from './OscDestinations'
 import { OscConnections } from './OscConnections'
 import { OscMapTable } from './OscMapTable'
+
+/** The IN section's multicast groups : joined beside the port, so messages sent to
+ *  a group on the local network reach Palinopsia without being sent to it. */
+function MulticastRow(): JSX.Element {
+  const groups = useStore((s) => s.oscMulticast)
+  const setGroups = useStore((s) => s.setOscMulticast)
+  const status = useStore((s) => s.oscMulticastStatus)
+  const enabled = useStore((s) => s.oscEnabled)
+  const [txt, setTxt] = useState(groups.join(', '))
+  useEffect(() => setTxt(groups.join(', ')), [groups])
+  const commit = (): void => {
+    const next = txt.split(/[,\s]+/).map((g) => g.trim()).filter(Boolean)
+    if (next.join(',') === groups.join(',')) return
+    setGroups(next)
+    if (enabled) void applyOscListen()
+  }
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1 font-mono text-[9px]">
+      <span className="shrink-0 uppercase text-muted">multicast</span>
+      <input
+        value={txt}
+        onChange={(e) => setTxt(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        placeholder="none (e.g. 239.0.0.1)"
+        className="input min-w-[90px] flex-1 px-1 py-0 text-[10px]"
+        title="Multicast groups to join (224.0.0.0 to 239.255.255.255, separated by commas) : whatever is sent to a group on this network, on the port above, reaches Palinopsia without being sent to it. Broadcasts (x.x.x.255) arrive without this."
+      />
+      {status?.joined.map((g) => (
+        <span key={g} className="shrink-0 text-accent" title={`Joined ${g} : its messages arrive here`}>
+          ✓ {g}
+        </span>
+      ))}
+      {status?.failed.map((f) => (
+        <span key={f.group} className="shrink-0 text-danger" title={f.error}>
+          ✗ {f.group}
+        </span>
+      ))}
+    </div>
+  )
+}
 import { numberBoxCh, numberBoxChars } from './numberBox'
 
 // a UDP port's box : as wide as "65535"
@@ -203,6 +244,7 @@ export function OscPanel(): JSX.Element {
               <span className="text-text">0–1</span> · e.g. <span className="text-text">/opsia/macro/1</span> · OSCQuery{' '}
               <span className="text-text">:{oscPort + 1}</span>
             </div>
+            <MulticastRow />
             <div
               className="font-mono text-[9px] leading-relaxed text-muted"
               title="Any address outside /opsia (a phone or tablet layout, a patch, another program) : turn on MIDI Learn, click a control, move the controller's. Its mappings, ranges and reply ports are in the MIDI section's list."

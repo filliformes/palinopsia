@@ -20,6 +20,12 @@ that CI builds into cross-platform releases.
       and what Palinopsia makes of it: `/opsia`, learned, alias, Resolume, unlisted,
       or `? not mapped` with **map…**.
     - **Destinations:** every place sent to, with its msg/s.
+  - **Multicast:** OSC in joins up to 8 groups (224.0.0.0 to 239.255.255.255) beside
+    its port, so anything sent to a group on the local network arrives without being
+    addressed to Palinopsia. Each group's status is shown, and a refused one never stops
+    the listener.
+  - **Muted senders:** in **links**, mute a sender (host:port, or right-click for its
+    whole host). It stays listed but is never played.
   - **map**, one table of every address answered to:
     - **aliases** play a controller's own address onto any `/opsia` address, with its
       argument, input and output range, curve and invert (per computer; the router

@@ -15,8 +15,17 @@ export type OscInMessage = {
   port?: number // the sender's UDP port (the connections view)
 }
 
+/** A multicast group address (224.0.0.0 to 239.255.255.255). */
+export function isMulticastGroup(a: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a)
+  return !!m && m.slice(1).every((o) => Number(o) <= 255) && Number(m[1]) >= 224 && Number(m[1]) <= 239
+}
+
 export class OscReceiver {
   private udp: osc.UDPPort | null = null
+  // the multicast groups the socket joined, and the ones it could not
+  joined: string[] = []
+  failed: Array<{ group: string; error: string }> = []
   private onMessage: ((m: OscInMessage) => void) | null = null
 
   setOnMessage(cb: (m: OscInMessage) => void): void {
@@ -28,8 +37,10 @@ export class OscReceiver {
    * Resolves once the socket is ready; rejects on a bind failure (e.g. the
    * port is already taken). Closes any existing socket first.
    */
-  start(port: number): Promise<void> {
+  start(port: number, groups: string[] = []): Promise<void> {
     this.stop()
+    this.joined = []
+    this.failed = []
     return new Promise((resolve, reject) => {
       const udp = new osc.UDPPort({ localAddress: '0.0.0.0', localPort: port, metadata: true })
       // Track the socket from the moment it's created, not only on 'ready', so a
@@ -38,6 +49,14 @@ export class OscReceiver {
       this.udp = udp
       let settled = false
       udp.on('ready', () => {
+        // Join the multicast groups asked for (the socket listens on every interface :
+        // a group's messages on the local network now reach it too). One refused
+        // group never stops the others, nor the listener.
+        const sock = (udp as unknown as { socket?: { addMembership(g: string): void } }).socket
+        for (const g of groups.slice(0, 8)) {
+          if (!isMulticastGroup(g)) { this.failed.push({ group: g, error: 'not a multicast address (224.0.0.0 to 239.255.255.255)' }); continue }
+          try { sock?.addMembership(g); this.joined.push(g) } catch (e) { this.failed.push({ group: g, error: (e as Error).message }) }
+        }
         settled = true
         resolve()
       })
