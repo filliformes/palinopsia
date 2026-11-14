@@ -24,6 +24,7 @@ OUT.bin is 5,856 little-endian float32, laid out for the runtime shader
 A preview PNG (the NCA grown on a 256x256 grid) is written next to it.
 """
 
+# third-party: Self-Organising Textures notebook
 import argparse
 import time
 

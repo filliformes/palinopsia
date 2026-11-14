@@ -11,6 +11,7 @@
 //
 // ffmpeg is resolved from (in order): the OPSIA_FFMPEG env var, the optional
 // `ffmpeg-static` package (if installed), then `ffmpeg` on PATH.
+// third-party: FFmpeg (the ffmpeg-static binary)
 
 import { app, ipcMain } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'

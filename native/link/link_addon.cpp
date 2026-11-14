@@ -1,3 +1,4 @@
+// third-party: Ableton Link
 // Ableton Link for Palinopsia : one Link instance for the whole app, in the main
 // process (src/main/link.ts). Polled, never calling back : state() is read about
 // 30 times a second and the page carries the beat on between two reads, so no

@@ -53,6 +53,8 @@ extraResources:
     to: LICENSE-EXCEPTIONS.md
   - from: THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
+  - from: licenses
+    to: licenses
   # MediaPipe embodied-control assets (Hands + Pose). Self-hosted so tracking
   # works OFFLINE and in a kiosk install : the renderer loads them over the
   # opsia-asset:// scheme (main/assets.ts), never Google's CDN. wasm is the SIMD

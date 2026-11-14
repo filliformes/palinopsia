@@ -23,6 +23,7 @@ import { join, dirname } from 'path'
 import { userFilesBase } from './paths'
 import { children } from './videoConvert'
 
+// third-party: FFmpeg (the ffmpeg-static binary)
 // ffmpeg-static ships a per-platform binary; unpack it from the asar when packaged.
 function ffmpegPath(): string | null {
   try {

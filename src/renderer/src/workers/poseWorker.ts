@@ -1,5 +1,6 @@
 // The Room tracker's own thread (engine/roomTracker.ts starts it).
 //
+// third-party: RTMO-s
 // RTMO, a one-stage multi-person pose model (OpenMMLab MMPose, Apache-2.0) : one
 // pass finds every person in the frame with a box and 17 body points (COCO order),
 // near or far, facing the camera or not. Run by onnxruntime-web 1.30 on the graphics

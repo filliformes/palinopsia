@@ -119,6 +119,8 @@ jobs:
           # arm64 code must carry a signature to load at all : an ad-hoc one is enough.
           if [ "$(uname)" = Darwin ]; then codesign --force --sign - build/Release/link.node; fi
           node -e "const l = require('./build/Release/link.node'); l.setTempo(123); console.log(JSON.stringify(l.state(4))); l.close()"
+      # THIRD_PARTY_NOTICES.md must cover everything the build ships (scripts/notices.mjs).
+      - run: npm run check:notices
       - run: npm run typecheck
       - run: npm run ${{ matrix.script }}
       # The mac app must carry an ad-hoc signature, its ffmpeg included : an

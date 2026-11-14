@@ -150,6 +150,7 @@ void main() {
     // glass : a picked layer bent by the shape, else the picture itself, the room on its shoulders
     // red bends least, blue most (DISPERSION) : the split is widest at the rim, where
     // the surface turns away (the idea after Orb, MIT; no code taken)
+    // third-party: Orb (an idea, no code)
     vec2 bo = N.xy * 0.14;
     vec2 bur = vUV + bo * (1.0 - 0.3 * uDisp), bug = vUV + bo, bub = vUV + bo * (1.0 + 0.35 * uDisp);
     vec3 bent = uHasSide > 0.5

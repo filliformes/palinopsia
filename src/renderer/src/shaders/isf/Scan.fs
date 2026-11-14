@@ -30,6 +30,7 @@ uniform float PH_scanDX;
 uniform float PH_scanDY;
 
 // The maps are pushed by the compositor (engine/Compositor.ts pushScanMaps) :
+// third-party: Mikkelsen hex tiling
 // 1K, REPEAT, mipmapped. Hex tiling after Mikkelsen, JCGT 2022 ("Practical
 // Real-Time Hex-Tiling") : the plane is cut into a hex lattice; each pixel blends
 // three samples, one per surrounding lattice vertex, each vertex with its own

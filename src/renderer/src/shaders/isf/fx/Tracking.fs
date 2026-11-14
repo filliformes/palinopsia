@@ -1,6 +1,6 @@
 /*{
-  "DESCRIPTION": "Tracking : VHS tracking error, rebuilt on an open-source VHS-glitch shader model (credited in THIRD_PARTY_NOTICES.md). The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that smears one row across the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (red channel dragged sideways through magenta↔cyan, warbling with the scan).",
-  "CREDIT": "Palinopsia; derived from an MIT / CC BY 3.0 VHS-glitch shader, attribution in THIRD_PARTY_NOTICES.md",
+  "DESCRIPTION": "Tracking : VHS tracking error. The classic noisy band (head-switch tear, per-line wobble, dropout dashes) placed by POSITION and crept by ROLL : plus an auto-wandering FREEZE line that holds one row across a stripe of the frame, per-pixel analog x-distortion, and the tape's tinted chroma BLEED (the red channel trailing to the right, as a tape's narrow chroma band smears it, tinted between magenta and cyan, drifting with the scan).",
+  "CREDIT": "Palinopsia; the set of features follows VIDVOX's MIT 'VHS Glitch' (ISF-Files), see THIRD_PARTY_NOTICES.md",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Analog", "Glitch"],
   "INPUTS": [
@@ -25,12 +25,19 @@ uniform float PH_roll; // wrap 16.666666666666668
 
 // @dome
 
+// third-party: VIDVOX VHS Glitch (the feature set; the code is Palinopsia's own)
 const float TAU = 6.28318530718;
 
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
+}
+// Smooth 1D value noise over time, in 0..1 (for the freeze line's wander).
+float tnoise(float x) {
+  float i = floor(x), f = fract(x);
+  float u = f * f * (3.0 - 2.0 * f);
+  return mix(hash(vec2(i, 5.0)), hash(vec2(i + 1.0, 5.0)), u);
 }
 float rand3(vec3 co) {
   vec3 p3 = fract(co * 0.1031);
@@ -67,20 +74,18 @@ void main() {
   float d = wd(yy, center);
   float inBand = 1.0 - smoothstep(bandHalf * 0.4, bandHalf, d);
 
-  // ── Auto-wandering FREEZE line (the reference's actualXLine): a narrow row
-  // that drifts on stacked incommensurate sines; inside its width the sampled
-  // row snaps to the line : one row smeared across a stripe of the frame. ──
-  float fLine = mod(0.5 + ((1.0 + sin(0.34 * TIME)) / 2.0 + (1.0 + sin(TIME)) / 3.0 +
-    (1.0 + cos(2.1 * TIME)) / 3.0 + (1.0 + cos(0.027 * TIME)) / 2.0) / 3.5, 1.0);
-  float fWidth = freeze * 0.06 * lk * ((1.0 + sin(1.2 * TIME)) / 2.0 +
-    (1.0 + cos(3.91 * TIME)) / 3.0 + (1.0 + cos(0.014 * TIME)) / 2.0) / 3.5;
+  // ── Auto-wandering FREEZE line : a narrow stripe that drifts on two octaves
+  // of smooth value noise (a slow wander and a quicker nervous one); inside it
+  // every pixel reads the stripe's upper edge : one row held across it. ──
+  float fLine = fract(0.5 + 0.8 * (tnoise(TIME * 0.07) - 0.5) + 0.25 * (tnoise(TIME * 0.41 + 31.0) - 0.5));
+  float fWidth = freeze * 0.03 * lk * (0.3 + 0.7 * tnoise(TIME * 0.6 + 77.0));
 
   // Per-line wobble: strong inside the band, a whisper elsewhere.
   float wob = (hash(vec2(line, t)) - 0.5) * 2.0;
   float shift = wob * wobble * (inBand + 0.06);
 
   // Analog distortion: random per-line x displacement, everywhere (the tape's
-  // never-still jitter), scaled like the reference's analogDistort/RENDERSIZE.
+  // never-still jitter), a few pixels of the frame per line.
   // The hash needs whole-number inputs (a continuous uv.y makes it a sawtooth) :
   // one draw per tape line (480, like the parasites) and per field, wrapped.
   float rX = rand3(vec3(floor(yy * 480.0 / lk), floor(fLine * 4096.0), mod(floor(TIME * 59.94), 4096.0)));
@@ -90,11 +95,12 @@ void main() {
 
   vec2 c = vec2(fract(uv.x + shift), uv.y);
   bool frozen = freeze > 0.001 && wd(yy, fLine) < fWidth;
-  if (frozen) c.y = fLine; // the frozen row
+  float fRow = fract(fLine + fWidth); // the stripe's upper edge : the held row
+  if (frozen) c.y = fRow;
   if (dome) {
     // the ring turned as far round as a flat line shifts across at the horizon;
     // the frozen line is a ring, read at its own radius
-    c = domeFrame(domeRot(domeDisc(uv) * ((1.0 - (frozen ? fLine : yy)) / max(pol.y, 1e-5)), 2.0 * shift / domeHorizon()));
+    c = domeFrame(domeRot(domeDisc(uv) * ((1.0 - (frozen ? fRow : yy)) / max(pol.y, 1e-5)), 2.0 * shift / domeHorizon()));
   }
   vec4 s = IMG_NORM_PIXEL(inputImage, c);
 
@@ -104,25 +110,26 @@ void main() {
     step(hash(vec2(floor(xx * (dome ? 64.0 : 24.0)), line + t)), 0.4);
   vec3 col = s.rgb * flutter + vec3(0.9) * dash;
 
-  // ── Tinted chroma bleed (the reference's signature): the red channel
-  // dragged through offset taps, tinted magenta at the edges / cyan center,
-  // warbling with the scan. Coords hoisted to bare vec2s (runtime rule). ──
+  // ── Tinted chroma bleed : a tape's chroma has a fraction of the luma's
+  // bandwidth and lags it, so colour trails to the RIGHT of what made it. The
+  // red channel is read through a one-sided tail of taps to the left, weighted
+  // by an exponential decay, then tinted between magenta and cyan by a phase
+  // that drifts down the frame. Coords hoisted to bare vec2s (runtime rule). ──
   if (bleed > 0.001) {
-    vec2 b1 = c + bleedRange * vec2(0.02, 0.0);
-    vec2 b2 = c + bleedRange * vec2(0.01, 0.01);
-    vec2 b3 = c + bleedRange * vec2(-0.02, 0.02);
-    vec2 b4 = c + bleedRange * vec2(0.0, -0.03);
-    float bl = (IMG_NORM_PIXEL(inputImage, b1).r + IMG_NORM_PIXEL(inputImage, b2).r +
-                IMG_NORM_PIXEL(inputImage, b3).r + IMG_NORM_PIXEL(inputImage, b4).r) / 6.0;
-    bl *= bleed * 3.0;
-    // Soft gate (a hard bl > 0.1 cut left a contour line across red gradients).
+    float stp = 0.008 * bleedRange;
+    float acc = 0.0, wsum = 0.0;
+    for (int i = 1; i <= 5; i++) {
+      float w = exp(-0.45 * float(i));
+      vec2 bc = c - vec2(stp * float(i), 0.0);
+      acc += w * IMG_NORM_PIXEL(inputImage, bc).r;
+      wsum += w;
+    }
+    float bl = acc / wsum * bleed * 2.0;
+    // Soft gate (a hard cut left a contour line across red gradients).
     bl *= smoothstep(0.05, 0.15, bl);
     if (bl > 0.0) {
-      float bx = c.x + (0.05 + (1.5 + cos(TIME / 13.0 + TAU * (0.5 + (1.0 - c.y)))) / 2.0) *
-        sin((TIME / 9.0 + 0.5) * TAU + c.y * c.y * TAU) / 8.0;
-      vec3 tintL = vec3(0.8, 0.0, 0.4);
-      vec3 tintC = vec3(0.0, 0.5, 0.9);
-      vec3 tint = (bx < 0.5) ? mix(tintL, tintC, 2.0 * bx) : mix(tintL, tintC, 2.0 - 2.0 * bx);
+      float ph = 0.5 + 0.5 * sin(TAU * (c.y * 1.3 + TIME * 0.05) + 1.7 * sin(TIME * 0.13 + c.y * 4.0));
+      vec3 tint = mix(vec3(0.85, 0.08, 0.55), vec3(0.08, 0.6, 0.85), ph);
       col += bl * max(inBand, 0.35) * tint;
     }
   }

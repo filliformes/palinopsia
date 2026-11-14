@@ -38,6 +38,7 @@ float sdNgon(vec2 p, float r, float sides) {
   return d;
 }
 // Exact heart : lobes up, tip at the origin, 1.1 tall (after Quilez).
+// third-party: Inigo Quilez, heart distance
 float sdHeart(vec2 p) {
   p.x = abs(p.x);
   if (p.y + p.x > 1.0) return length(p - vec2(0.25, 0.75)) - 0.35355339;

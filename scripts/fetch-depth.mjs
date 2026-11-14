@@ -1,3 +1,4 @@
+// third-party: Depth Anything V2 Small
 // Fetch the AI depth engine into resources/depth, so the next build (npm run
 // build:win / build:mac / build:linux) ships it inside the app and Depth AI
 // works offline, in a kiosk, on a machine that never reached the internet.

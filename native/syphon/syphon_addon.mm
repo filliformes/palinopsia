@@ -1,3 +1,4 @@
+// third-party: Syphon (Syphon-Framework)
 // Palinopsia Syphon sender AND client : a minimal N-API addon over the Syphon
 // framework (macOS), the twin of native/spout. SENDER : SyphonMetalServer, the
 // app publishes its composite as a Syphon source (Resolume, MadMapper,

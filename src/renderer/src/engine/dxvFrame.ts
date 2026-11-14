@@ -30,6 +30,7 @@ export function buildDxvFrame(words: Uint32Array, bpr: number): { buf: ArrayBuff
   dv.setUint32(12, words[0], true)
   dv.setUint32(16, words[1], true)
   let o = 20
+  // third-party: FFmpeg dxvenc
   // The op word being filled (0 = none yet) and its bits. As PUSH_OP in FFmpeg's
   // dxvenc : a fresh op word goes in BEFORE the op's own offset bytes, when the
   // previous one holds 16 ops.

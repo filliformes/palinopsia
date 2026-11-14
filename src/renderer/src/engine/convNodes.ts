@@ -455,6 +455,8 @@ precision highp float; in vec2 vUV; out vec4 o;
 uniform sampler2D uTex;
 void main(){ vec4 c = texture(uTex, vUV); o = vec4(c.a > 1e-5 ? c.rgb / c.a : vec3(0.0), clamp(c.a, 0.0, 1.0)); }`
 
+// third-party: datamoshing-GLSL
+// third-party: transflow
 // ── Datamosh engine ──────────────────────────────────────────────────────
 // The real datamosh look, faked in real time (no codec): a per-MACROBLOCK motion
 // field (optical flow of the live signal, or a sidechain layer, quantized to a

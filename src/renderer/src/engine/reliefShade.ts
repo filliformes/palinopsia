@@ -1,3 +1,5 @@
+// third-party: Holocloth
+// third-party: Paper Shaders (an idea, no code)
 // The materials that Relief (a source), Inflate and Drape (effects) share : a height
 // given a light, as paint, plastic, chrome, a soap film or a holographic foil. GLSL ES
 // 3.00, math only. The foil after Holocloth by Dmitry Kurash (MIT,

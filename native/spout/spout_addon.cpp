@@ -1,3 +1,4 @@
+// third-party: Spout2 (native/spout/sdk)
 // Palinopsia Spout sender AND receiver : a minimal N-API addon over Spout2's
 // spoutDX (DX11) class. Vendored Spout SDK : leadedge/Spout2 (BSD-2-Clause).
 //

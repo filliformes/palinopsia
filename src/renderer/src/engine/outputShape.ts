@@ -47,6 +47,7 @@ float sdStar(vec2 p, float r, float pts){
   float rad = mix(r * 0.42, r, abs(wed - 0.5) * 2.0);
   return length(p) - rad;
 }
+// Exact heart, after Inigo Quilez (MIT). third-party: Inigo Quilez, heart distance
 float sdHeart(vec2 p){ p.x = abs(p.x);
   if (p.y + p.x > 1.0) return length(p - vec2(0.25, 0.75)) - 0.35355339;
   vec2 a = p - vec2(0.0, 1.0); vec2 b = p - 0.5 * max(p.x + p.y, 0.0);

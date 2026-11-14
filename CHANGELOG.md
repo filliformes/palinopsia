@@ -5,6 +5,44 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Changed
+
+- **One register for everything borrowed.** `THIRD_PARTY_NOTICES.md` is now organised in
+  seven parts: code, shipped programs, models and their training data, fonts, media,
+  ideas and research, and license texts.
+  - **New entries:**
+    - Spout2 and Syphon (BSD);
+    - FFmpeg (the GPL-3.0 ffmpeg-static builds with x264 and x265, with a source offer
+      and a codec-patent note);
+    - Inigo Quilez's gradient noise, Voronoi border distance and heart distance (MIT);
+    - Mikkelsen's hex tiling (MIT);
+    - Chris Wilson's PitchDetect (MIT);
+    - Rivaux's datamoshing-GLSL and Chalier's transflow (GPL-3.0);
+    - FFmpeg's dxvenc (LGPL-2.1+);
+    - the Self-Organising Textures notebook (Apache-2.0);
+    - RTMO's seven training datasets;
+    - Electron and Chromium;
+    - the 62 fonts, ambientCG, Remo DeVico's Aural Mirror, HIVE.
+  - **New `licenses/` folder** (shipped in every build): the Apache-2.0, OFL-1.1, LGPL-2.1,
+    Spout2 and Syphon texts, every font's copyright line, and every npm package's license
+    file (generated).
+  - **New `npm run check:notices`** (`scripts/notices.mjs`, run by CI before every
+    build). It fails when:
+    - a dependency, font or shipped folder is missing from the register;
+    - a `third-party:` tag in the code names something the register lacks;
+    - a file carries someone else's copyright line or a Shadertoy link without a tag.
+
+### Fixed
+
+- **Tracking no longer carries any CC BY 3.0 code** (GPL-incompatible). The freeze line,
+  the chroma bleed and its tints are rewritten from scratch:
+  - the freeze line wanders on smooth value noise and holds its upper edge;
+  - the bleed is a one-sided exponential chroma tail, trailing to the right as a tape's
+    narrow chroma band does.
+
+  The knobs are the same. VIDVOX's VHS Glitch (MIT) and staffantan's unity-vhsglitch
+  remain credited as the effect's model.
+
 ## v1.3.3 — 2026-11-12
 
 ### Added

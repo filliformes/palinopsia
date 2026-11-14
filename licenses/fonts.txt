@@ -1,0 +1,255 @@
+Fonts bundled with Palinopsia (src/renderer/src/fonts)
+=====================================================
+
+Each font below is shipped as its authors (or Google Fonts / Fontsource) distribute it; Palinopsia does not rename them or use their Reserved Font Names for anything else.
+Fonts under the SIL Open Font License 1.1 : see OFL-1.1.txt (in this folder).
+Fonts under the Apache License 2.0 : see Apache-2.0.txt (in this folder).
+The copyright line is the one the font itself carries (its 'name' table).
+
+AbrilFatface.ttf : Abril Fatface
+  Copyright (c) 2011, Copyright (c) 2011, TypeTogether (www.type-together.com), with Reserved Font Names "Abril" and "Abril Fatface"
+  License : OFL-1.1
+
+AlfaSlabOne.ttf : Alfa Slab One
+  Copyright 2016 The Alfa Slab One Project Authors (http://www.jmsole.cl | info@jmsole.cl), with Reserved Font Name "Alfa Slab".
+  License : OFL-1.1
+
+Anton.ttf : Anton
+  Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git)
+  License : OFL-1.1
+
+ArchivoBlack.ttf : Archivo Black
+  Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)
+  License : OFL-1.1
+
+Bangers.ttf : Bangers
+  Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers)
+  License : OFL-1.1
+
+BebasNeue.ttf : Bebas Neue
+  Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
+  License : OFL-1.1
+
+Bungee.ttf : Bungee
+  Copyright 2023 The Bungee Project Authors (https://github.com/djrrb/Bungee)
+  License : OFL-1.1
+
+Caveat.ttf : Caveat
+  Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
+  License : OFL-1.1
+
+Cinzel.ttf : Cinzel
+  Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)
+  License : OFL-1.1
+
+Comfortaa.ttf : Comfortaa
+  Copyright 2011 The Comfortaa Project Authors (https://github.com/alexeiva/comfortaa), with Reserved Font Name "Comfortaa".
+  License : OFL-1.1
+
+Cormorant.ttf : Cormorant
+  Copyright 2015 The Cormorant Project Authors (github.com/CatharsisFonts/Cormorant)
+  License : OFL-1.1
+
+CourierPrime.ttf : Courier Prime
+  Copyright 2015 The Courier Prime Project Authors (https://github.com/quoteunquoteapps/CourierPrime).
+  License : OFL-1.1
+
+Creepster.ttf : Creepster
+  Copyright (c) 2011, Font Diner, Inc (diner@fontdiner.com), with Reserved Font Names "Creepster"
+  License : OFL-1.1
+
+CrimsonPro.ttf : Crimson Pro
+  Copyright 2018 The Crimson Pro Project Authors (https://github.com/Fonthausen/CrimsonPro)
+  License : OFL-1.1
+
+DMSans.ttf : DM Sans
+  Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
+  License : OFL-1.1
+
+DMSerifDisplay.ttf : DM Serif Display
+  Copyright 2014 - 2017 Adobe Systems Incorporated (http://www.adobe.com/), with Reserved Font Name 'Source'. Copyright 2019 Google LLC.
+  License : OFL-1.1
+
+EBGaramond.ttf : EB Garamond
+  Copyright 2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12)
+  License : OFL-1.1
+
+FiraCode.ttf : Fira Code
+  Copyright 2014-2020 The Fira Code Project Authors (https://github.com/tonsky/FiraCode)
+  License : OFL-1.1
+
+Fraunces.ttf : Fraunces
+  Copyright 2020 The Fraunces Project Authors (github.com/undercasetype/Fraunces)
+  License : OFL-1.1
+
+JetBrainsMono.ttf : JetBrains Mono
+  Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+  License : OFL-1.1
+
+JosefinSans.ttf : Josefin Sans
+  Copyright 2010 The Josefin Sans Project Authors (https://github.com/ThomasJockin/JosefinSansFont-master), with Reserved Font Name "Josefin Sans".
+  License : OFL-1.1
+
+Lexend.ttf : Lexend
+  Copyright 2019 The Lexend Project Authors (https://github.com/googlefonts/lexend)
+  License : OFL-1.1
+
+LibreBaskerville.ttf : Libre Baskerville
+  Copyright 2012 The Libre Baskerville Project Authors (https://github.com/impallari/Libre-Baskerville)
+  License : OFL-1.1
+
+Lobster.ttf : Lobster
+  Copyright 2010 The Lobster Project Authors (https://github.com/impallari/The-Lobster-Font), with Reserved Font Name "Lobster".
+  License : OFL-1.1
+
+MajorMonoDisplay.ttf : Major Mono Display
+  Copyright 2018 The Major Mono Project Authors (https://github.com/googlefonts/majormono)
+  License : OFL-1.1
+
+Manrope.ttf : Manrope
+  Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
+  License : OFL-1.1
+
+Monoton.ttf : Monoton
+  Copyright (c) 2011 by vernon adams. All rights reserved.
+  License : OFL-1.1 (the font carries no license field; Google Fonts publishes it under OFL-1.1)
+
+Orbitron.ttf : Orbitron
+  Copyright 2018 The Orbitron Project Authors (https://github.com/theleagueof/orbitron), with Reserved Font Name: "Orbitron".
+  License : OFL-1.1
+
+Oswald.ttf : Oswald
+  Copyright 2016 The Oswald Project Authors (https://github.com/googlefonts/OswaldFont)
+  License : OFL-1.1
+
+Outfit.ttf : Outfit
+  Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+  License : OFL-1.1
+
+Pacifico.ttf : Pacifico
+  Copyright 2018 The Pacifico Project Authors (https://github.com/googlefonts/Pacifico)
+  License : OFL-1.1
+
+PermanentMarker.ttf : Permanent Marker
+  Copyright (c) 2010 by Font Diner, Inc. All rights reserved.
+  License : Apache-2.0
+
+PixelifySans.ttf : Pixelify Sans
+  Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans)
+  License : OFL-1.1
+
+PlayfairDisplay.ttf : Playfair Display
+  Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair-Display), with Reserved Font Name "Playfair Display".
+  License : OFL-1.1
+
+PressStart2P.ttf : Press Start 2P
+  Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P"
+  License : OFL-1.1
+
+Raleway.ttf : Raleway
+  Copyright 2010 The Raleway Project Authors (impallari@gmail.com), with Reserved Font Name "Raleway".
+  License : OFL-1.1
+
+Righteous.ttf : Righteous
+  Copyright (c) 2011 by Brian J. Bonislawsky DBA Astigmatic (AOETI) (astigma@astigmatic.com), with ReservedFont Name "Righteous"
+  License : OFL-1.1
+
+Rubik.ttf : Rubik
+  Copyright 2015 The Rubik Project Authors (https://github.com/googlefonts/rubik)
+  License : OFL-1.1
+
+RubikMonoOne.ttf : Rubik Mono One
+  Copyright 2015 The Rubik Project Authors (mail@hubertfischer.com)
+  License : OFL-1.1
+
+Shrikhand.ttf : Shrikhand
+  Copyright (c) 2015 Jonny Pinhorn (jonpinhorn.typedesign@gmail.com)
+  License : OFL-1.1
+
+Silkscreen.ttf : Silkscreen
+  Copyright 2001 The Silkscreen Project Authors (https://github.com/googlefonts/silkscreen)
+  License : OFL-1.1
+
+SpaceGrotesk.ttf : Space Grotesk
+  Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)
+  License : OFL-1.1
+
+SpecialElite.ttf : Special Elite
+  Copyright (c) 2010 by Brian J. Bonislawsky DBA Astigmatic (AOETI). All rights reserved. Available under the Apache 2.0 licence.http://www.apache.org/licenses/LICENSE-2.0.html
+  License : Apache-2.0
+
+Staatliches.ttf : Staatliches
+  Copyright 2018 The Staatliches Project Authors (https://github.com/googlefonts/staatliches)
+  License : OFL-1.1
+
+Syne.ttf : Syne
+  Copyright 2019 The Syne Project Authors (https://gitlab.com/bonjour-monde/fonderie/syne-typeface)
+  License : OFL-1.1
+
+Tektur.ttf : Tektur
+  Copyright 2023 The Tektur Project Authors (https://www.github.com/hyvyys/Tektur)
+  License : OFL-1.1
+
+Unbounded.ttf : Unbounded
+  Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded)
+  License : OFL-1.1
+
+VT323.ttf : VT323
+  Copyright 2011, The VT323 Project Authors (peter.hull@oikoi.com)
+  License : OFL-1.1
+
+ZillaSlab.ttf : Zilla Slab
+  Copyright 2017, The Mozilla Foundation
+  License : OFL-1.1
+
+inter-400.woff2 : Inter
+  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  License : OFL-1.1
+
+inter-500.woff2 : Inter
+  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  License : OFL-1.1
+
+inter-600.woff2 : Inter
+  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  License : OFL-1.1
+
+inter-700.woff2 : Inter
+  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+  License : OFL-1.1
+
+plexsans-400.woff2 : IBM Plex Sans
+  Copyright 2019 IBM Corp. All rights reserved.
+  License : OFL-1.1
+
+plexsans-500.woff2 : IBM Plex Sans
+  Copyright 2019 IBM Corp. All rights reserved.
+  License : OFL-1.1
+
+plexsans-600.woff2 : IBM Plex Sans
+  Copyright 2019 IBM Corp. All rights reserved.
+  License : OFL-1.1
+
+roboto-400.woff2 : Roboto
+  Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+  License : OFL-1.1
+
+roboto-500.woff2 : Roboto
+  Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+  License : OFL-1.1
+
+roboto-700.woff2 : Roboto
+  Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+  License : OFL-1.1
+
+worksans-400.woff2 : Work Sans
+  Copyright 2019 The Work Sans Project Authors (https://github.com/weiweihuanghuang/Work-Sans)
+  License : OFL-1.1
+
+worksans-500.woff2 : Work Sans
+  Copyright 2019 The Work Sans Project Authors (https://github.com/weiweihuanghuang/Work-Sans)
+  License : OFL-1.1
+
+worksans-600.woff2 : Work Sans
+  Copyright 2019 The Work Sans Project Authors (https://github.com/weiweihuanghuang/Work-Sans)
+  License : OFL-1.1

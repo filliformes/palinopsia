@@ -4482,5 +4482,13 @@ runs the RTMO-s model from [MMPose](https://github.com/open-mmlab/mmpose) (Apach
 on ONNX Runtime Web. Drape's cloth and the foil finish are adapted from
 [Holocloth](https://github.com/dmitrykurash/holocloth) by Dmitry Kurash (MIT). The
 dataflou mesh visualizer is the dataflou project's own page, by **Alexandre Burton**
-(Artificiel), shipped with his permission, with [d3](https://d3js.org) (ISC). See
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+(Artificiel), shipped with his permission, with [d3](https://d3js.org) (ISC). Recording
+and video conversion run [FFmpeg](https://ffmpeg.org) (GPL-3.0 builds), and the fonts are
+OFL-1.1 and Apache-2.0.
+
+**Everything Palinopsia borrows is listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**, with its authors and license. That
+covers code, shaders, binaries, models and their training data, fonts, textures, and the
+ideas and research behind the features. License texts are in [`licenses/`](licenses/), and
+both ship inside every build. `npm run check:notices` (run by CI) fails the build when
+something is missing from it.

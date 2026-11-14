@@ -181,6 +181,7 @@ export interface SoniConfig {
     path: number; pace: number // reading path + breathing pace (see spectra)
     loOct: number; hiOct: number; quantize: boolean
   }
+  // third-party: Aural Mirror (an inspiration, no code)
   // Chord bank (Aural Mirror's additive layer) : a few scale-tuned oscillators,
   // each following the brightness of a horizontal band → a sustained chord that
   // swells and fades with the image (sings even on a STILL frame).

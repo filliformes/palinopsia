@@ -5,6 +5,7 @@
 // bit ops, constant loop bounds. Everything is prefixed og_ because the shaders
 // keep their own hash / vnoise.
 //   hashes : sine-free (Dave Hoskins, MIT) : no banding on large grids
+//   third-party: Hash without Sine
 //   og_noised : gradient noise with analytic derivatives (Inigo Quilez, MIT)
 //   og_voronoi : distance to the cell border (Quilez's two-pass method, second
 //     pass 3x3 : near-exact, a third of the cost), so cracks and walls keep one
@@ -30,6 +31,7 @@ float og_vnoise(vec2 p) {
 }
 
 // Gradient noise, ~[-0.7, 0.7], with its derivative in .yz.
+// third-party: Inigo Quilez, gradient noise with derivatives
 vec3 og_noised(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
@@ -62,6 +64,7 @@ float og_fbm(vec2 p, float octaves) {
 }
 
 // Voronoi : x = distance to the nearest border, y = cell id (0..1), z = F1.
+// third-party: Inigo Quilez, Voronoi border distance
 vec3 og_voronoi(vec2 x) {
   vec2 n = floor(x), f = fract(x);
   vec2 mg = vec2(0.0), mr = vec2(0.0);

@@ -1,3 +1,4 @@
+// third-party: Holocloth
 // Drape (the native node 'node-drape') : whatever enters the rack, printed on a
 // sheet of cloth you can grab. A Verlet cloth on the CPU (structural, shear and
 // bend constraints, a fixed 1/120 s step) adapted from Holocloth by Dmitry

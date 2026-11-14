@@ -18,6 +18,8 @@
     "fetch:depth": "node scripts/fetch-depth.mjs",
     "fetch:pose": "node scripts/fetch-pose.mjs",
     "build:visualizer": "node scripts/build-dataflou-visualizer.mjs",
+    "notices": "node scripts/notices.mjs",
+    "check:notices": "node scripts/notices.mjs --check",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview"
   },

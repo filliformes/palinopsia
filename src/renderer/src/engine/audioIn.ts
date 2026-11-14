@@ -69,6 +69,7 @@ const OSC_STALE_MS = 500 // in 'both', OSC older than this yields to local
 const LOG_FMIN = Math.log2(55)
 const LOG_FMAX = Math.log2(1760)
 
+// third-party: Chris Wilson PitchDetect
 // Autocorrelation pitch detection (ACF + RMS gate + parabolic interpolation),
 // after Chris Wilson's PitchDetect. Returns the fundamental in Hz, or -1 when
 // the frame is too quiet / unvoiced to trust. Lag search is bounded to the

@@ -1,3 +1,4 @@
+// third-party: The Sonify Synth's engines
 // The Sonify Synth's sound engine (plain JS, no imports : loaded into the
 // Sonify AudioWorklet's global scope with its own addModule, BEFORE
 // soni.worklet.js, and testable in Node the same way). It hands itself over as
