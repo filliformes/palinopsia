@@ -208,11 +208,11 @@ function ringCutoffOf(cfg: SoniConfig, hz: number, part: { loOct: number; hiOct:
   return Math.max(0, Math.min(1, (12 * Math.log2(Math.max(1, hz) / f0) + 6) / (span + 18)))
 }
 
-/** The Prism reverb's two crossovers for its `crossover` (0..1), as the worklet
- *  sets them (FDNReverb : 400 / 5500 Hz at 0.3, x4 per unit, clamped). */
-function prismSplits(c: number): [number, number] {
+/** The Strates reverb's two crossovers for its `crossover` (0..1), as the worklet
+ *  sets them (FDNReverb : 250 / 4000 Hz at 0.3, x4 per unit, clamped). */
+function strataSplits(c: number): [number, number] {
   const k = Math.pow(4, c - 0.3)
-  return [Math.max(60, Math.min(3000, 400 * k)), Math.max(1500, Math.min(14000, 5500 * k))]
+  return [Math.max(60, Math.min(2000, 250 * k)), Math.max(1500, Math.min(12000, 4000 * k))]
 }
 function hzLabel(f: number): string {
   return f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 1 : 2)} kHz` : `${Math.round(f)} Hz`
@@ -2180,10 +2180,10 @@ export function SonifyPage({
           <VoiceGroup id={SONI_TAIL.id} color={SONI_TAIL.color} hint={SONI_TAIL.hint} tight={voiceW < 280} playing={cfg.fx.send > 0.0001 ? `send ${cfg.fx.send.toFixed(2)}` : 'off'}>
           <VoiceShell
             title="Reverb / Delay" on={cfg.fx.send > 0.0001}
-            hint="a shared FX tail : the whole mix sends into an analog delay → Quartz/Prism reverb"
+            hint="a shared FX tail : the whole mix sends into an analog delay → Nappe / Strates reverb"
             onToggle={() => pfx({ send: cfg.fx.send > 0.0001 ? 0 : 0.05 })}
             onDice={diceFx}
-            diceTitle="Randomize the Reverb / Delay : a new delay (mode, time, feedback, tone) and reverb (Quartz or Prism, size, decay, damp, predelay, shimmer, width, low-cut and the mode's own controls), and their levels in the tail. The send stays yours (an off tail comes on at 0.05); freeze is left as it is"
+            diceTitle="Randomize the Reverb / Delay : a new delay (mode, time, feedback, tone) and reverb (Nappe or Strates, size, decay, damp, predelay, shimmer, width, low-cut and the mode's own controls), and their levels in the tail. The send stays yours (an off tail comes on at 0.05); freeze is left as it is"
           >
             <Slider label="send" value={cfg.fx.send} min={0} max={1} neutral={0.05} onChange={(v) => pfx({ send: v })} mod={chip('fxSend')} title="How much of the sonify mix feeds the shared reverb / delay tail" />
             <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">delay (BBD / analog)</div>
@@ -2198,10 +2198,10 @@ export function SonifyPage({
             <Slider label="feedback" value={cfg.fx.dlyFb} min={0} max={0.95} neutral={0.35} onChange={(v) => pfx({ dlyFb: v })} title="Echo regeneration (companded, self-limiting)" />
             <Slider label="tone" value={cfg.fx.dlyTone} min={0} max={1} neutral={0.5} onChange={(v) => pfx({ dlyTone: v })} title="BBD darkness : low = dark analog repeats, high = bright" />
             <Slider label="delay mix" value={cfg.fx.dlyMix} min={0} max={1} neutral={0.35} onChange={(v) => pfx({ dlyMix: v })} mod={chip('fxDelay')} title="Echo level in the tail" />
-            <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">reverb (Quartz / Prism)</div>
+            <div className="mt-1 font-mono text-[8px] uppercase tracking-wide text-muted/70">reverb (Nappe / Strates)</div>
             <Row label="mode" fit={152}>
-              <button onClick={() => pfx({ rvMode: 0 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 0 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Quartz : dual-band damped pad-verb">Quartz</button>
-              <button onClick={() => pfx({ rvMode: 1 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 1 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Prism : per-band frequency-dependent decay">Prism</button>
+              <button onClick={() => pfx({ rvMode: 0 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 0 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Nappe : a dense pad, its lows and highs damped apart">Nappe</button>
+              <button onClick={() => pfx({ rvMode: 1 })} className={`rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvMode === 1 ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'bg-panel3/60 text-muted'}`} title="Strates : three bands, each with its own decay">Strates</button>
               <button onClick={() => pfx({ rvFreeze: !cfg.fx.rvFreeze })} className={`ml-auto rounded px-1.5 py-0.5 font-mono text-[9px] ${cfg.fx.rvFreeze ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : 'bg-panel3/60 text-muted'}`} title="Infinite freeze (hold the tail)">❄ freeze</button>
             </Row>
             <Slider label="size" value={cfg.fx.rvSize} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvSize: v })} title="The reverb's room size : small and close to a vast hall" />
@@ -2214,14 +2214,14 @@ export function SonifyPage({
             <Slider label="low-cut" value={cfg.fx.rvLocut} min={20} max={2000} neutral={220} fmt={(v) => Math.round(v) + 'Hz'} onChange={(v) => pfx({ rvLocut: v })} title="Wet low-cut (keeps the tail airy)" />
             {cfg.fx.rvMode === 0 ? (
               <>
-                <Slider label="diffusion" value={cfg.fx.rvDiff} min={0} max={1} neutral={0.85} onChange={(v) => pfx({ rvDiff: v })} title="Quartz : input diffusion (smears transients)" />
-                <Slider label="low damp" value={cfg.fx.rvLowDamp} min={0} max={1} neutral={0.5} onChange={(v) => pfx({ rvLowDamp: v })} title="Quartz : LF damping" />
+                <Slider label="diffusion" value={cfg.fx.rvDiff} min={0} max={1} neutral={0.85} onChange={(v) => pfx({ rvDiff: v })} title="Nappe : input diffusion (smears transients)" />
+                <Slider label="low damp" value={cfg.fx.rvLowDamp} min={0} max={1} neutral={0.5} onChange={(v) => pfx({ rvLowDamp: v })} title="Nappe : LF damping" />
               </>
             ) : (
               <>
-                <Slider label="crossover" value={cfg.fx.rvCross} min={0} max={1} step={0.002} neutral={0.3} fmt={(v) => hzLabel(prismSplits(v)[0])} parse={(t) => { const f = parseHz(t, 400); return f === null ? null : 0.3 + Math.log(f / 400) / Math.log(4) }} onChange={(v) => pfx({ rvCross: v })} title={`Prism : where its three bands split, the low and the high crossover moving together : now ${hzLabel(prismSplits(cfg.fx.rvCross)[0])} and ${hzLabel(prismSplits(cfg.fx.rvCross)[1])} (the readout is the low one; click it to type a frequency)`} />
-                <Slider label="low ×" value={cfg.fx.rvLowMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvLowMult: v })} title="Prism : low-band decay multiplier" />
-                <Slider label="high ×" value={cfg.fx.rvHighMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvHighMult: v })} title="Prism : high-band decay multiplier" />
+                <Slider label="crossover" value={cfg.fx.rvCross} min={0} max={1} step={0.002} neutral={0.3} fmt={(v) => hzLabel(strataSplits(v)[0])} parse={(t) => { const f = parseHz(t, 250); return f === null ? null : 0.3 + Math.log(f / 250) / Math.log(4) }} onChange={(v) => pfx({ rvCross: v })} title={`Strates : where its three bands split, the low and the high crossover moving together : now ${hzLabel(strataSplits(cfg.fx.rvCross)[0])} and ${hzLabel(strataSplits(cfg.fx.rvCross)[1])} (the readout is the low one; click it to type a frequency)`} />
+                <Slider label="low ×" value={cfg.fx.rvLowMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvLowMult: v })} title="Strates : low-band decay multiplier" />
+                <Slider label="high ×" value={cfg.fx.rvHighMult} min={0.05} max={4} neutral={1} fmt={(v) => v.toFixed(2)} onChange={(v) => pfx({ rvHighMult: v })} title="Strates : high-band decay multiplier" />
               </>
             )}
             <Slider label="reverb mix" value={cfg.fx.rvMix} min={0} max={1} neutral={0.6} onChange={(v) => pfx({ rvMix: v })} mod={chip('fxReverb')} title="Reverb level in the tail (0.6 = the usual level, 1 = wetter)" />

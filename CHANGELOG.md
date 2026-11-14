@@ -32,6 +32,21 @@ that CI builds into cross-platform releases.
     - a `third-party:` tag in the code names something the register lacks;
     - a file carries someone else's copyright line or a Shadertoy link without a tag.
 
+- **A new reverb for Sonify, Palinopsia's own.**
+  - **What changed.** The shared FX tail's reverb is rewritten from scratch, from the
+    published feedback-delay-network literature (Schroeder 1962, Stautner & Puckette 1982,
+    Jot & Chaigne 1991, Dattorro 1997, Välimäki et al. 2012). It replaces the earlier
+    reverb, whose two modes were modelled on another product's reverb. It was written
+    clean-room: from a specification, by a writer who never saw the old code.
+  - **Design.** An 8-line Hadamard feedback delay network, with two allpasses inside each
+    line, modulated delays and three-band absorption.
+  - **The modes get new names.** Nappe (a dense pad, its lows and highs damped apart) and
+    Strates (three bands, each with its own decay). Saved sessions keep their choice.
+  - **Strates' crossover** now sits at 250 Hz and 4 kHz by default.
+  - **Same knobs and OSC addresses.** Level at the default settings is the same.
+  - **Measured.** RT60 is within 7 % of the decay law. The 30-second freeze holds within
+    0.1 dB. 240 extreme settings stay stable. It runs about 60× faster than real time.
+
 ### Fixed
 
 - **Tracking no longer carries any CC BY 3.0 code** (GPL-incompatible). The freeze line,

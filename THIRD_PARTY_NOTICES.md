@@ -443,6 +443,22 @@ methods are free to build on; naming them is a matter of respect.
   - antiderivative anti-aliasing for the wavefolder and the shapers (J. D. Parker, V.
     Zavalishin and E. Le Bivic, 2016);
   - the Kaiser-windowed halfband of the 2x drive.
+- **The Sonify reverb** (`FDNReverb` in `soni.worklet.js`, the Nappe and Strates modes), written
+  for Palinopsia in v1.3.4 from the published methods alone, with every length, gain law and
+  constant its own:
+  - the allpass section (M. R. Schroeder, "Natural sounding artificial reverberation", *JAES*
+    10(3), 1962);
+  - delay lines fed back through an orthogonal matrix, with several outputs for a stereo
+    image (J. Stautner and M. Puckette, "Designing multi-channel reverberators", *Computer
+    Music Journal* 6(1), 1982);
+  - the lossless prototype and its per-line absorbent filters (J.-M. Jot and A. Chaigne,
+    "Digital delay networks for designing artificial reverberators", AES 90th Convention,
+    preprint 3030, 1991);
+  - modulated tank delays and allpass diffusers inside the loop (J. Dattorro, "Effect Design,
+    Part 1: Reverberator and other filters", *JAES* 45(9), 1997);
+  - the choice of the Hadamard matrix and mutually prime lengths (V. Välimäki, J. D. Parker,
+    L. Savioja, J. O. Smith and J. S. Abel, "Fifty years of artificial reverberation",
+    *IEEE TASLP* 20(5), 2012).
 - **Self-organising textures**: E. Niklasson, A. Mordvintsev, E. Randazzo and M. Levin,
   "Self-Organising Textures", *Distill*, 2021 (the Grown generator).
 - **Hex-tiling**: M. S. Mikkelsen, "Practical Real-Time Hex-Tiling", *JCGT*, 2022 (Scan).

@@ -115,7 +115,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     title: 'In Sonify & the audio tab',
     rows: [
       ['⇧ drag a slider', 'Finer : a tenth of the speed'],
-      ['Click a value', "Type it (the Collage's levels and filters, the Ring cutoff, the Prism crossover : 4250, 4.2k, -6)"],
+      ['Click a value', "Type it (the Collage's levels and filters, the Ring cutoff, the Strates crossover : 4250, 4.2k, -6)"],
       ['Drag a Space number', 'Up / down to change it (⇧ : finer) · drag a voice on the Room map to place it'],
       ['Drag an EQ point', 'The output EQ (audio tab) : frequency across, gain up and down · wheel over it : Q · double-click : band on / off, or a new bell · Delete : band off · Esc : close']
     ]

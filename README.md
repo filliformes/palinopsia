@@ -2557,12 +2557,15 @@ sequencer and Space list the voices in the same order.
 analog **BBD delay** → a high-quality **reverb**, returned to the master (the tail
 rings out when you pull the send back; it starts on, the send at a low **0.05**; its
 🎲 re-rolls the delay and the reverb, the send staying yours).
-Both are ported from the Essaim / Res
-instruments. The delay is bucket-brigade: tape-glided **time**, **feedback**,
+The delay is ported from the Essaim instrument; the
+reverb is Palinopsia's own, written from the published feedback-delay-network
+literature (Schroeder, Stautner & Puckette, Jot & Chaigne, Dattorro). The delay is
+bucket-brigade: tape-glided **time**, **feedback**,
 BBD **tone** (dark analog repeats ↔ bright) with wow/flutter, mono / stereo /
-ping-pong. The reverb is a modulated 8-line FDN with two colourings : **Quartz**
-(a dual-band-damped pad-verb) and **Prism** (per-band frequency-dependent decay), with full control : **size · decay · damp · predelay · shimmer · width · low-cut ·
-freeze**, plus Quartz's **diffusion / low-damp** or Prism's **crossover** (shown in Hz : its low split, 400 Hz by default, the high one moving with it; typeable) / **low× /
+ping-pong. The reverb is a modulated 8-line FDN, with two allpasses inside each line, in two
+colourings : **Nappe** (a dense pad, its lows and highs damped apart) and **Strates** (three
+bands, each with its own decay), with full control : **size · decay · damp · predelay · shimmer · width · low-cut ·
+freeze**, plus Nappe's **diffusion / low-damp** or Strates' **crossover** (shown in Hz : its low split, 250 Hz by default, the high one moving with it; typeable) / **low× /
 high×**, and its **mix** (its level in the tail : 0.6 is the usual level, 1 is
 wetter). A `❄ freeze` holds the tail forever. The tail plays out every echo before it
 stops : the delay line empties before it goes quiet.

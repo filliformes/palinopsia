@@ -57,127 +57,558 @@ function sinT(ph) { return tab(SIN_T, ph); }
 let noiseSeed = 1;
 function noise() { noiseSeed = (Math.imul(noiseSeed, 1103515245) + 12345) & 0x7fffffff; return noiseSeed / 0x40000000 - 1; }
 
-// ── Shared FX tail : reverb + analog delay, ported from the Essaim / Res
-// instruments (abl.dsp.quartz~ / abl.dsp.prism~ reverb + a BBD delay). ────────
+// ── Shared FX tail : reverb + analog delay. The delay is a port of the author's own
+// Essaim instrument (fx.c). The reverb is written for Palinopsia from the published
+// FDN literature (see THIRD_PARTY_NOTICES.md, Part 6).
 
-// Dual-mode modulated 8-line Hadamard FDN reverb (Quartz : dual-band damping ·
-// Prism : per-line frequency-dependent decay). Faithful port of res_reverb.c.
-const RV_NL = 8, RV_NAP = 4, RV_APMAX = 1024;
-const RV_BASELEN = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
-const RV_APLEN = [225, 341, 441, 556];
-const RV_APG = [0.72, 0.70, 0.68, 0.66];
+// ─────────────────────────────────────────────────────────────────────────────
+// FDNReverb : stereo feedback delay network reverb, written from the literature.
+//
+// Sources used (methods only, no code) :
+//   - M. R. Schroeder, "Natural sounding artificial reverberation",
+//     J. Audio Eng. Soc. 10(3), 1962 : the allpass section, used in the input
+//     diffuser and inside the tank.
+//   - J. Stautner and M. Puckette, "Designing multi-channel reverberators",
+//     Computer Music Journal 6(1), 1982 : delay lines fed back through an
+//     orthogonal matrix, several inputs and outputs for a stereo image.
+//   - J.-M. Jot and A. Chaigne, "Digital delay networks for designing artificial
+//     reverberators", AES 90th Convention, preprint 3030, 1991 : the lossless
+//     prototype, and one absorbent filter per line whose gain follows the line
+//     length, g = 10^(-3 * len / (RT60 * sr)), for a decay time set per band.
+//   - J. Dattorro, "Effect Design, Part 1 : Reverberator and other filters",
+//     J. Audio Eng. Soc. 45(9), 1997 : slow modulation of the tank delay lengths,
+//     read with an interpolated tap, to break up the modes ; allpass diffusers
+//     placed inside the feedback loop.
+//   - V. Välimäki, J. D. Parker, L. Savioja, J. O. Smith and J. S. Abel, "Fifty
+//     years of artificial reverberation", IEEE Trans. Audio, Speech, Lang.
+//     Process. 20(5), 2012 : overview used to choose the Hadamard matrix and
+//     mutually prime lengths.
+//
+// Signal path : in → predelay → Schroeder allpasses (4 per channel) → 8-line FDN
+// (each line : modulated delay, two allpasses, three-band absorption ; Hadamard
+// feedback) → two orthogonal tap sums → low-cut → width.
+// Every length, gain law and constant below is this project's own choice.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RVB_LINES = 8
+const RVB_TICK = 16 // control rate : coefficients move every 16 samples
+const RVB_TANK_SIZE = 32768 // per line ; holds the longest line at 96 kHz plus modulation
+const RVB_TANK_MASK = RVB_TANK_SIZE - 1
+const RVB_PRE_SIZE = 32768 // 255 ms at 96 kHz is 24480 samples
+const RVB_PRE_MASK = RVB_PRE_SIZE - 1
+const RVB_AP_COUNT = 4
+const RVB_AP_SIZE = 2048
+
+// Tank lengths in samples at 48 kHz and size = 1 : primes, about 15 % apart,
+// 120 ms on average. Size scales them down to a sixth (20 ms on average).
+const RVB_TANK_LEN = [3371, 3889, 4441, 5147, 5867, 6803, 7741, 8929]
+const RVB_SIZE_MIN = 1 / 6
+// Diffuser lengths in samples at 48 kHz : primes, different on each side.
+const RVB_AP_LEN_L = [113, 263, 431, 677]
+const RVB_AP_LEN_R = [131, 293, 467, 719]
+const RVB_AP_GAIN_MAX = 0.75 // mode 0 at diffusion = 1
+const RVB_AP_GAIN_MODE1 = 0.5 // mode 1 : fixed, moderate
+// Two more allpasses inside each line of the tank : they multiply the echoes and the
+// resonant modes of the loop without lengthening the lines (denser, less metallic).
+// Their lengths are these fractions of the line's length at size = 1, different for
+// each line. They shrink less than the lines do with size, so that a small room
+// keeps enough modes for a long decay.
+const RVB_LOOP_AP_COUNT = 2
+const RVB_LOOP_AP_RATIO = [
+  0.683, 0.549, 0.641, 0.587, 0.719, 0.523, 0.661, 0.607,
+  0.397, 0.451, 0.343, 0.419, 0.317, 0.467, 0.371, 0.433,
+]
+const RVB_LOOP_AP_SIZE_MIN = 1 / 3
+const RVB_LOOP_AP_GAIN = 0.5
+const RVB_LOOP_AP_SIZE = 16384
+const RVB_LOOP_AP_MASK = RVB_LOOP_AP_SIZE - 1
+
+// Who feeds what : left input goes to the even lines, right input to the odd ones.
+const RVB_IN_SIGN = [1, 1, -1, 1, 1, -1, -1, -1]
+// Output taps : two rows of the Hadamard matrix, so orthogonal to each other.
+const RVB_TAP_L = [1, 1, -1, -1, 1, 1, -1, -1]
+const RVB_TAP_R = [1, -1, -1, 1, -1, 1, 1, -1]
+
+const RVB_GAIN_CAP = 0.9995 // highest loop gain of a line when not frozen
+const RVB_LN1000 = 6.907755278982137 // ln(10^3) : 60 dB
+const RVB_HADAMARD_NORM = 0.35355339059327373 // 1 / sqrt(8)
+const RVB_LOW_SPLIT_MODE0 = 250 // Hz : low_damp acts below
+const RVB_HIGH_SPLIT_MODE0 = 8000 // Hz at damp = 0 ...
+const RVB_HIGH_SPLIT_MODE0_DAMPED = 2500 // ... down to this at damp = 1
+const RVB_OUT_GAIN = [0.308, 0.4486] // per mode : level match with the app's reference
+const RVB_GLIDE_S = 0.12 // time constant of a size change
+const RVB_GLIDE_MAX = 0.5 // samples of length change per sample, at most
+const RVB_SLEW_S = 0.02 // time constant of the gains
+const RVB_TINY = 1e-25 // below this a filter state is set to zero (denormals)
+
 class FDNReverb {
   constructor(sr) {
-    this.sr = sr > 0 ? sr : 48000;
-    // Buffers sized from the sample rate : fixed 48k-sized lines clamped every
-    // line to the same length at 96k (a metallic comb), and the predelay to 128 ms.
-    this.lmax = Math.ceil(RV_BASELEN[RV_NL - 1] * 2 * this.sr / 44100) + 128;
-    this.pdmax = Math.ceil(0.26 * this.sr);
-    this.mode = 0;
-    this.size = 0.6; this.decay = 0.6; this.damp = 0.3; this.mix = 0.3;
-    this.predelay_ms = 20; this.mod_depth = 6; this.mod_rate = 0.5; this.width = 1;
-    this.diffusion = 0.85; this.low_damp = 0.5;
-    this.crossover = 0.3; this.lowmult = 1; this.highmult = 1;
-    this.freeze = 0; this.locut_hz = 220;
-    this.line = []; for (let i = 0; i < RV_NL; i++) this.line.push(new Float32Array(this.lmax));
-    // linelen_s is float64 : in float32 the size glide stalled ~0.2 samples short
-    // of its target, a fractional tap that dulled Prism's freeze after any size move.
-    this.linelen = new Int32Array(RV_NL); this.linelen_s = new Float64Array(RV_NL); this.lw = new Int32Array(RV_NL);
-    this.damp_z = new Float32Array(RV_NL); this.lo_z = new Float32Array(RV_NL);
-    this.ls_z = new Float32Array(RV_NL); this.hs_z = new Float32Array(RV_NL);
-    this.gain = new Float32Array(RV_NL); this.glow = new Float32Array(RV_NL); this.ghigh = new Float32Array(RV_NL);
-    this.modph = new Float64Array(RV_NL);
-    this.ap = []; for (let i = 0; i < RV_NAP; i++) this.ap.push(new Float32Array(RV_APMAX));
-    this.apw = new Int32Array(RV_NAP);
-    this.pd = [new Float32Array(this.pdmax), new Float32Array(this.pdmax)]; this.pdw = 0;
-    this.hp_x = new Float32Array(2); this.hp_y = new Float32Array(2);
-    this.ls_a = 0; this.hs_a = 0;
-    this.d = new Float32Array(RV_NL); this.a = new Float32Array(RV_NL); this.fb = new Float32Array(RV_NL);
-    this.wL = 0; this.wR = 0;
-    for (let i = 0; i < RV_NL; i++) this.modph[i] = i / RV_NL;
-    this.recompute();
-    for (let i = 0; i < RV_NL; i++) this.linelen_s[i] = this.linelen[i];
+    this.sr = sr
+    this.srScale = sr / 48000
+
+    // parameters : the host writes these fields
+    this.mode = 0
+    this.size = 0.6
+    this.decay = 0.6
+    this.damp = 0.3
+    this.mix = 0.6 // not used here : the host applies it
+    this.predelay_ms = 20
+    this.mod_depth = 6
+    this.mod_rate = 0.5
+    this.width = 1
+    this.locut_hz = 220
+    this.freeze = 0
+    this.diffusion = 0.85
+    this.low_damp = 0.5
+    this.crossover = 0.3
+    this.lowmult = 1
+    this.highmult = 1
+
+    // output
+    this.wL = 0
+    this.wR = 0
+
+    // predelay
+    this.preL = new Float32Array(RVB_PRE_SIZE)
+    this.preR = new Float32Array(RVB_PRE_SIZE)
+    this.preW = 0
+    this.preCur = 0 // delay in samples, slewed
+    this.preTgt = 0
+
+    // input diffuser : 4 Schroeder allpasses per channel
+    this.apL = new Float32Array(RVB_AP_COUNT * RVB_AP_SIZE)
+    this.apR = new Float32Array(RVB_AP_COUNT * RVB_AP_SIZE)
+    this.apLenL = new Int32Array(RVB_AP_COUNT)
+    this.apLenR = new Int32Array(RVB_AP_COUNT)
+    this.apIdxL = new Int32Array(RVB_AP_COUNT)
+    this.apIdxR = new Int32Array(RVB_AP_COUNT)
+    for (let k = 0; k < RVB_AP_COUNT; k++) {
+      this.apLenL[k] = Math.min(RVB_AP_SIZE, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_L[k] * this.srScale)))
+      this.apLenR[k] = Math.min(RVB_AP_SIZE, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_R[k] * this.srScale)))
+    }
+    this.apG = 0
+    this.apGTgt = 0
+
+    // tank
+    this.tank = new Float32Array(RVB_LINES * RVB_TANK_SIZE)
+    this.tankW = 0
+    this.lenTgt = new Float64Array(RVB_LINES) // prime length for the current size
+    this.lenCur = new Float64Array(RVB_LINES) // gliding length
+    this.del = new Float64Array(RVB_LINES) // delay read now : length + LFO
+    this.delTgt = new Float64Array(RVB_LINES) // where del lands at the next tick
+    this.delInc = new Float64Array(RVB_LINES)
+    this.lfoPhase = 0
+    this.depthCur = 0
+    // allpass inside each line : same glide as the line
+    const nAp = RVB_LINES * RVB_LOOP_AP_COUNT // index : allpass * 8 + line
+    this.loopAp = new Float32Array(nAp * RVB_LOOP_AP_SIZE)
+    this.apLenTgt = new Float64Array(nAp)
+    this.apLenCur = new Float64Array(nAp)
+    this.apDel = new Float64Array(nAp)
+    this.apDelInc = new Float64Array(nAp)
+    this.apAttTgt = new Float64Array(nAp) // absorption of the allpass's own delay
+    this.apAtt = new Float64Array(nAp)
+    // absorption : gain of each band, per line (target and slewed)
+    this.gLoTgt = new Float64Array(RVB_LINES)
+    this.gMidTgt = new Float64Array(RVB_LINES)
+    this.gHiTgt = new Float64Array(RVB_LINES)
+    this.gLo = new Float64Array(RVB_LINES)
+    this.gMid = new Float64Array(RVB_LINES)
+    this.gHi = new Float64Array(RVB_LINES)
+    this.kHi = new Float64Array(RVB_LINES) // the same gains in the form the loop uses
+    this.kMidHi = new Float64Array(RVB_LINES)
+    this.kLoMid = new Float64Array(RVB_LINES)
+    this.s1 = new Float64Array(RVB_LINES) // low-split filter state
+    this.s2 = new Float64Array(RVB_LINES) // high-split filter state
+    this.c1 = 0 // low-split coefficient
+    this.c2 = 0 // high-split coefficient
+    this.y = new Float64Array(RVB_LINES) // scratch : line outputs after absorption
+
+    // input and output stages
+    this.inG = 1 // input gain : 0 when frozen
+    this.inGTgt = 1
+    this.outG = RVB_OUT_GAIN[0]
+    this.outGTgt = RVB_OUT_GAIN[0]
+    this.widthCur = 1
+    this.hpC = 0 // low-cut coefficient, slewed
+    this.hpCTgt = 0
+    this.hpL = 0
+    this.hpR = 0
+
+    // slews
+    this.kSlew = 1 - Math.exp(-1 / (RVB_SLEW_S * sr)) // per sample
+    this.kSlewTick = 1 - Math.exp(-RVB_TICK / (RVB_SLEW_S * sr)) // per tick
+    this.kGlideTick = 1 - Math.exp(-RVB_TICK / (RVB_GLIDE_S * sr))
+
+    // last values seen, to detect the fields the host changes without recompute()
+    this.cMode = -1
+    this.cDamp = -1
+    this.cLowDamp = -1
+    this.cFreeze = -1
+    this.cLocut = -1
+
+    this.tick = 0
+    this.fresh = true // nothing played since reset : settings apply at once
+    this.recompute()
+    this.reset()
   }
+
+  // Smallest prime ≥ n.
+  static nextPrime(n) {
+    if (n < 2) return 2
+    for (let p = n | 0; ; p++) {
+      let prime = p % 2 !== 0 || p === 2
+      for (let d = 3; prime && d * d <= p; d += 2) if (p % d === 0) prime = false
+      if (prime) return p
+    }
+  }
+
+  // Coefficient of a one-pole low-pass in trapezoidal form : exactly 0 at Nyquist,
+  // which keeps the three bands complementary and each band gain ≤ 1.
+  onePole(hz) {
+    const t = Math.tan(Math.PI * clampf(hz, 5, this.sr * 0.45) / this.sr)
+    return t / (1 + t)
+  }
+
+  // Host calls this when size, decay, crossover, freeze, lowmult or highmult change.
   recompute() {
-    const scale = (0.35 + 1.65 * this.size) * (this.sr / 44100);
-    const rt60 = 0.25 + this.decay * this.decay * 11.75;
-    const lowsplit = clampf(400 * Math.pow(4, this.crossover - 0.3), 60, 3000);
-    const highsplit = clampf(5500 * Math.pow(4, this.crossover - 0.3), 1500, 14000);
-    this.ls_a = 1 - Math.exp(-TAU * lowsplit / this.sr);
-    this.hs_a = 1 - Math.exp(-TAU * highsplit / this.sr);
-    for (let i = 0; i < RV_NL; i++) {
-      let L = (RV_BASELEN[i] * scale) | 0;
-      if (L < 8) L = 8; if (L > this.lmax - 64) L = this.lmax - 64;
-      this.linelen[i] = L;
-      const t = L / this.sr;
-      if (this.freeze) { this.gain[i] = this.glow[i] = this.ghigh[i] = 1; }
-      else {
-        const lm = this.lowmult > 0.02 ? this.lowmult : 0.02, hm = this.highmult > 0.02 ? this.highmult : 0.02;
-        this.gain[i] = Math.pow(10, -3 * t / rt60);
-        this.glow[i] = Math.pow(10, -3 * t / (rt60 * lm));
-        this.ghigh[i] = Math.pow(10, -3 * t / (rt60 * hm));
-      }
+    // size → line lengths : distinct primes, so mutually prime
+    const scale = Math.pow(RVB_SIZE_MIN, 1 - clampf(this.size, 0, 1)) * this.srScale
+    const maxLen = RVB_TANK_SIZE - 256
+    let prev = 16
+    for (let i = 0; i < RVB_LINES; i++) {
+      let len = FDNReverb.nextPrime(Math.max(prev + 1, Math.round(RVB_TANK_LEN[i] * scale)))
+      if (len > maxLen) len = maxLen - (RVB_LINES - i)
+      this.lenTgt[i] = len
+      prev = len
     }
+    // in-loop allpass lengths : primes too, none equal to a line or to each other
+    const apScale = Math.pow(RVB_LOOP_AP_SIZE_MIN, 1 - clampf(this.size, 0, 1)) * this.srScale
+    for (let a = 0; a < RVB_LINES * RVB_LOOP_AP_COUNT; a++) {
+      let len = FDNReverb.nextPrime(Math.round(RVB_TANK_LEN[a % RVB_LINES] * RVB_LOOP_AP_RATIO[a] * apScale))
+      for (let j = 0; j < RVB_LINES + a; j++) {
+        const other = j < RVB_LINES ? this.lenTgt[j] : this.apLenTgt[j - RVB_LINES]
+        if (len === other) {
+          len = FDNReverb.nextPrime(len + 1)
+          j = -1
+        }
+      }
+      this.apLenTgt[a] = Math.min(len, RVB_LOOP_AP_SIZE - 8)
+    }
+    this.updateDecay()
   }
-  reset() { // clear all feedback state (recover from a NaN / blow-up)
-    for (let i = 0; i < RV_NL; i++) { this.line[i].fill(0); this.lw[i] = 0; this.damp_z[i] = this.lo_z[i] = this.ls_z[i] = this.hs_z[i] = 0; }
-    for (let i = 0; i < RV_NAP; i++) { this.ap[i].fill(0); this.apw[i] = 0; }
-    this.pd[0].fill(0); this.pd[1].fill(0); this.pdw = 0;
-    this.hp_x[0] = this.hp_x[1] = this.hp_y[0] = this.hp_y[1] = 0; this.wL = this.wR = 0;
+
+  // Band splits and per-line band gains (Jot) from the decay settings.
+  // Runs from recompute(), and from process() when mode, damp, low_damp or freeze move.
+  updateDecay() {
+    const mode = this.mode ? 1 : 0
+    const damp = clampf(this.damp, 0, 1)
+    const d = clampf(this.decay, 0, 1)
+    const rt = 0.25 + d * d * 11.75 // mid-band RT60 in seconds
+    let rtLo, rtHi, f1, f2
+    if (mode === 0) {
+      // dual-band damped : shorter highs (damp) and shorter lows (low_damp)
+      rtLo = rt * (1 - 0.6 * clampf(this.low_damp, 0, 1))
+      rtHi = rt * (1 - 0.85 * damp)
+      f1 = RVB_LOW_SPLIT_MODE0
+      f2 = RVB_HIGH_SPLIT_MODE0 * Math.pow(RVB_HIGH_SPLIT_MODE0_DAMPED / RVB_HIGH_SPLIT_MODE0, damp)
+    } else {
+      // three-band decay : each band has its own RT60
+      const x = Math.pow(4, clampf(this.crossover, 0, 1) - 0.3)
+      rtLo = rt * clampf(this.lowmult, 0.05, 8)
+      rtHi = rt * clampf(this.highmult, 0.05, 8) * (1 - 0.6 * damp)
+      f1 = clampf(250 * x, 60, 2000)
+      f2 = clampf(4000 * x, 1500, 12000)
+    }
+    this.c1 = this.onePole(f1)
+    this.c2 = this.onePole(f2)
+
+    // Each delay loses 60 dB in RT60 seconds, whatever its length (Jot). The delays
+    // inside the allpasses take the loss of the longest-lived band ; the three band
+    // gains of the line take the rest, for the line and for its allpasses.
+    const frozen = this.freeze ? 1 : 0
+    const k = -RVB_LN1000 / this.sr
+    const rtMax = Math.max(rtLo, rt, rtHi)
+    for (let i = 0; i < RVB_LINES; i++) {
+      let apLen = 0
+      for (let a = i; a < RVB_LINES * RVB_LOOP_AP_COUNT; a += RVB_LINES) {
+        apLen += this.apLenTgt[a]
+        this.apAttTgt[a] = frozen ? 1 : Math.exp(k * this.apLenTgt[a] / rtMax)
+      }
+      const kl = k * (this.lenTgt[i] + apLen), ka = k * apLen / rtMax
+      // freeze : every gain at exactly 1, the loop is lossless
+      this.gLoTgt[i] = frozen ? 1 : Math.min(RVB_GAIN_CAP, Math.exp(kl / rtLo - ka))
+      this.gMidTgt[i] = frozen ? 1 : Math.min(RVB_GAIN_CAP, Math.exp(kl / rt - ka))
+      this.gHiTgt[i] = frozen ? 1 : Math.min(RVB_GAIN_CAP, Math.exp(kl / rtHi - ka))
+    }
+    this.inGTgt = frozen ? 0 : 1
+    this.outGTgt = RVB_OUT_GAIN[mode]
+
+    this.cMode = this.mode
+    this.cDamp = this.damp
+    this.cLowDamp = this.low_damp
+    this.cFreeze = this.freeze
   }
-  lineRead(i, delay) {
-    const LM = this.lmax;
-    let rp = this.lw[i] - delay; while (rp < 0) rp += LM;
-    let i0 = rp | 0; const frac = rp - i0; if (i0 >= LM) i0 -= LM;
-    let i1 = i0 + 1; if (i1 >= LM) i1 -= LM;
-    return this.line[i][i0] * (1 - frac) + this.line[i][i1] * frac;
+
+  // Control tick, every RVB_TICK samples : picks up changed fields, slews the
+  // per-line gains and lengths, advances the LFOs. No allocation.
+  control() {
+    this.tick = RVB_TICK
+    const fresh = this.fresh
+    this.fresh = false
+    const sr = this.sr
+
+    if (this.mode !== this.cMode || this.damp !== this.cDamp || this.low_damp !== this.cLowDamp || this.freeze !== this.cFreeze) {
+      this.updateDecay()
+    }
+    if (this.locut_hz !== this.cLocut) {
+      this.cLocut = this.locut_hz
+      this.hpCTgt = this.onePole(clampf(this.locut_hz, 20, 2000))
+    }
+    const frozen = this.freeze ? 1 : 0
+    this.preTgt = Math.min(RVB_PRE_SIZE - 4, clampf(this.predelay_ms, 0, 255) * 0.001 * sr)
+    this.apGTgt = this.mode ? RVB_AP_GAIN_MODE1 : RVB_AP_GAIN_MAX * clampf(this.diffusion, 0, 1)
+
+    // modulation depth : none when frozen, a fractional read would wear the tail down
+    const depthTgt = frozen ? 0 : clampf(this.mod_depth, 0, 40) * this.srScale
+    let depth = this.depthCur + (depthTgt - this.depthCur) * this.kSlewTick
+    if (fresh || Math.abs(depthTgt - depth) < 1e-4) depth = depthTgt
+    this.depthCur = depth
+    let ph = this.lfoPhase + clampf(this.mod_rate, 0.01, 8) * RVB_TICK / sr
+    ph -= Math.floor(ph)
+    this.lfoPhase = ph
+
+    if (fresh) {
+      this.preCur = this.preTgt
+      this.apG = this.apGTgt
+      this.inG = this.inGTgt
+      this.outG = this.outGTgt
+      this.hpC = this.hpCTgt
+      this.widthCur = clampf(this.width, 0, 1)
+    }
+
+    const ks = this.kSlewTick, kg = this.kGlideTick
+    const maxStep = RVB_GLIDE_MAX * RVB_TICK
+    const s1 = this.s1, s2 = this.s2
+    for (let i = 0; i < RVB_LINES; i++) {
+      // band gains : slew, then land exactly (freeze needs an exact 1)
+      let gl = this.gLo[i] + (this.gLoTgt[i] - this.gLo[i]) * ks
+      let gm = this.gMid[i] + (this.gMidTgt[i] - this.gMid[i]) * ks
+      let gh = this.gHi[i] + (this.gHiTgt[i] - this.gHi[i]) * ks
+      if (fresh || Math.abs(this.gLoTgt[i] - gl) < 1e-7) gl = this.gLoTgt[i]
+      if (fresh || Math.abs(this.gMidTgt[i] - gm) < 1e-7) gm = this.gMidTgt[i]
+      if (fresh || Math.abs(this.gHiTgt[i] - gh) < 1e-7) gh = this.gHiTgt[i]
+      this.gLo[i] = gl
+      this.gMid[i] = gm
+      this.gHi[i] = gh
+      this.kHi[i] = gh
+      this.kMidHi[i] = gm - gh
+      this.kLoMid[i] = gl - gm
+
+      // length : glide to the new size at a bounded speed, then land on the prime
+      const lt = this.lenTgt[i]
+      let step = (lt - this.lenCur[i]) * kg
+      if (step > maxStep) step = maxStep
+      else if (step < -maxStep) step = -maxStep
+      let len = this.lenCur[i] + step
+      if (fresh || Math.abs(lt - len) < 1e-3) len = lt
+      this.lenCur[i] = len
+
+      // in-loop allpasses : same glide for the length, same slew for the absorption
+      for (let a = i; a < RVB_LINES * RVB_LOOP_AP_COUNT; a += RVB_LINES) {
+        const at = this.apLenTgt[a]
+        step = (at - this.apLenCur[a]) * kg
+        if (step > maxStep) step = maxStep
+        else if (step < -maxStep) step = -maxStep
+        let alen = this.apLenCur[a] + step
+        if (fresh || Math.abs(at - alen) < 1e-3) alen = at
+        this.apDel[a] = this.apLenCur[a] // lands exactly on the last tick's value
+        this.apDelInc[a] = (alen - this.apLenCur[a]) / RVB_TICK
+        this.apLenCur[a] = alen
+        if (fresh) {
+          this.apDel[a] = alen
+          this.apDelInc[a] = 0
+        }
+        let att = this.apAtt[a] + (this.apAttTgt[a] - this.apAtt[a]) * ks
+        if (fresh || Math.abs(this.apAttTgt[a] - att) < 1e-7) att = this.apAttTgt[a]
+        this.apAtt[a] = att
+      }
+
+      // LFO : one sine per line, phases an eighth of a cycle apart (Dattorro)
+      let target = len + depth * sinT(ph + i * 0.125)
+      if (target < 4) target = 4
+      if (fresh) this.delTgt[i] = target
+      this.del[i] = this.delTgt[i] // lands exactly, no drift
+      this.delTgt[i] = target
+      this.delInc[i] = (target - this.del[i]) / RVB_TICK
+
+      // denormals : drop filter states that have decayed to nothing
+      if (s1[i] < RVB_TINY && s1[i] > -RVB_TINY) s1[i] = 0
+      if (s2[i] < RVB_TINY && s2[i] > -RVB_TINY) s2[i] = 0
+    }
+    if (this.hpL < RVB_TINY && this.hpL > -RVB_TINY) this.hpL = 0
+    if (this.hpR < RVB_TINY && this.hpR > -RVB_TINY) this.hpR = 0
   }
+
+  // One stereo sample in ; the wet signal comes out in wL and wR.
   process(inL, inR) {
-    const moddepth = this.freeze ? 0 : this.mod_depth;
-    const damp_a = clampf(1 - this.damp * 0.85, 0.05, 1);
-    const dscale = 0.15 + 0.85 * this.diffusion;
-    const ingain = this.freeze ? 0 : 1;
-    const lowkeep = clampf(1 - this.low_damp * 0.9, 0.05, 1);
-    let locut_a = TAU * this.locut_hz / this.sr; if (locut_a > 0.5) locut_a = 0.5;
-    const PM = this.pdmax;
-    let pdlen = (this.predelay_ms * 0.001 * this.sr) | 0; if (pdlen < 1) pdlen = 1; if (pdlen > PM - 1) pdlen = PM - 1;
-    let rp = this.pdw - pdlen; while (rp < 0) rp += PM;
-    const pdL = this.pd[0][rp], pdR = this.pd[1][rp];
-    this.pd[0][this.pdw] = inL; this.pd[1][this.pdw] = inR; this.pdw = (this.pdw + 1) % PM;
-    let x = 0.5 * (pdL + pdR);
-    for (let i = 0; i < RV_NAP; i++) { const r = this.apw[i], g = RV_APG[i] * dscale, buf = this.ap[i][r], y = -g * x + buf; this.ap[i][r] = x + g * y; this.apw[i] = (r + 1) % RV_APLEN[i]; x = y; }
-    const d = this.d;
-    for (let i = 0; i < RV_NL; i++) {
-      const mod = moddepth * Math.sin(TAU * this.modph[i]);
-      const dl = this.linelen[i] - this.linelen_s[i];
-      this.linelen_s[i] = dl > -1e-3 && dl < 1e-3 ? this.linelen[i] : this.linelen_s[i] + dl * 0.0006;
-      d[i] = this.lineRead(i, this.linelen_s[i] - 2 - mod);
-      this.modph[i] += this.mod_rate * (0.7 + 0.09 * i) / this.sr;
-      if (this.modph[i] >= 1) this.modph[i] -= 1;
+    if (--this.tick <= 0) this.control()
+    if (inL - inL !== 0) inL = 0 // NaN or infinite input never enters the tank
+    if (inR - inR !== 0) inR = 0
+    const ks = this.kSlew
+
+    // ── predelay : linear-interpolated read, the delay time glides ──
+    const pw = this.preW
+    this.preL[pw] = inL
+    this.preR[pw] = inR
+    let pd = this.preCur
+    const pdDiff = this.preTgt - pd
+    if (pdDiff !== 0) {
+      pd = pdDiff < 1e-3 && pdDiff > -1e-3 ? this.preTgt : pd + pdDiff * ks * 0.25
+      this.preCur = pd
     }
-    const a = this.a; for (let i = 0; i < RV_NL; i++) a[i] = d[i];
-    for (let s = 1; s < RV_NL; s <<= 1) for (let j = 0; j < RV_NL; j += s << 1) for (let k = 0; k < s; k++) { const u = a[j + k], v = a[j + k + s]; a[j + k] = u + v; a[j + k + s] = u - v; }
-    const fb = this.fb; for (let i = 0; i < RV_NL; i++) fb[i] = a[i] * 0.35355339;
-    for (let i = 0; i < RV_NL; i++) {
-      let v = x * ingain + fb[i];
-      if (this.mode === 1) {
-        const low = (this.ls_z[i] += this.ls_a * (v - this.ls_z[i])); const rem = v - low;
-        const mid = (this.hs_z[i] += this.hs_a * (rem - this.hs_z[i])); const high = rem - mid;
-        v = low * this.glow[i] + mid * this.gain[i] + high * this.ghigh[i];
-      } else {
-        this.damp_z[i] += damp_a * (v - this.damp_z[i]); v = this.damp_z[i] * this.gain[i];
-        this.lo_z[i] += locut_a * (v - this.lo_z[i]); v = (v - this.lo_z[i]) + this.lo_z[i] * lowkeep;
+    const pi = pd | 0, pf = pd - pi
+    const pa = (pw - pi) & RVB_PRE_MASK, pb = (pw - pi - 1) & RVB_PRE_MASK
+    let xL = this.preL[pa] + (this.preL[pb] - this.preL[pa]) * pf
+    let xR = this.preR[pa] + (this.preR[pb] - this.preR[pa]) * pf
+    this.preW = (pw + 1) & RVB_PRE_MASK
+
+    // input gain : fades to 0 when frozen
+    const inG = (this.inG += (this.inGTgt - this.inG) * ks)
+    xL *= inG
+    xR *= inG
+
+    // ── input diffusion : Schroeder allpasses in series ──
+    const g = (this.apG += (this.apGTgt - this.apG) * ks)
+    const apL = this.apL, apR = this.apR
+    for (let k = 0; k < RVB_AP_COUNT; k++) {
+      const base = k * RVB_AP_SIZE
+      let idx = this.apIdxL[k]
+      let dl = apL[base + idx]
+      let v = xL - g * dl
+      apL[base + idx] = v
+      xL = dl + g * v
+      this.apIdxL[k] = ++idx >= this.apLenL[k] ? 0 : idx
+
+      idx = this.apIdxR[k]
+      dl = apR[base + idx]
+      v = xR - g * dl
+      apR[base + idx] = v
+      xR = dl + g * v
+      this.apIdxR[k] = ++idx >= this.apLenR[k] ? 0 : idx
+    }
+
+    // ── tank : read the 8 lines, absorb, sum the output taps ──
+    const tank = this.tank, w = this.tankW
+    const del = this.del, delInc = this.delInc
+    const s1 = this.s1, s2 = this.s2, c1 = this.c1, c2 = this.c2
+    const kHi = this.kHi, kMidHi = this.kMidHi, kLoMid = this.kLoMid
+    const y = this.y
+    const loopAp = this.loopAp, apDel = this.apDel, apDelInc = this.apDelInc, apAtt = this.apAtt
+    const aw = w & RVB_LOOP_AP_MASK
+    let sumL = 0, sumR = 0
+    for (let i = 0; i < RVB_LINES; i++) {
+      const base = i * RVB_TANK_SIZE
+      // modulated length, read with a 4-point Lagrange interpolation
+      const D = del[i]
+      del[i] = D + delInc[i]
+      const n = D | 0, f = D - n
+      const r = w - n
+      const a0 = tank[base + ((r + 1) & RVB_TANK_MASK)]
+      const a1 = tank[base + (r & RVB_TANK_MASK)]
+      const a2 = tank[base + ((r - 1) & RVB_TANK_MASK)]
+      const a3 = tank[base + ((r - 2) & RVB_TANK_MASK)]
+      const fm1 = f - 1, fm2 = f - 2, fp1 = f + 1
+      let o = a1 * fp1 * fm1 * fm2 * 0.5 - a2 * fp1 * f * fm2 * 0.5 + (a3 * fp1 * f * fm1 - a0 * f * fm1 * fm2) * 0.16666666666666666
+
+      // allpasses inside the loop (Schroeder sections) : lossless but for the
+      // absorption of their own delay, so the decay law holds. The delay is an
+      // integer at rest ; the linear read only acts during a size glide.
+      for (let a = i; a < RVB_LINES * RVB_LOOP_AP_COUNT; a += RVB_LINES) {
+        const A = apDel[a]
+        apDel[a] = A + apDelInc[a]
+        const an = A | 0
+        const ab = a * RVB_LOOP_AP_SIZE
+        let ad = loopAp[ab + ((aw - an) & RVB_LOOP_AP_MASK)]
+        ad = (ad + (loopAp[ab + ((aw - an - 1) & RVB_LOOP_AP_MASK)] - ad) * (A - an)) * apAtt[a]
+        const av = o - RVB_LOOP_AP_GAIN * ad
+        loopAp[ab + aw] = av
+        o = ad + RVB_LOOP_AP_GAIN * av
       }
-      if (v > 4) v = 4; else if (v < -4) v = -4;
-      this.line[i][this.lw[i]] = v; this.lw[i] = (this.lw[i] + 1) % this.lmax;
+
+      sumL += RVB_TAP_L[i] * o
+      sumR += RVB_TAP_R[i] * o
+
+      // absorption : split in three complementary bands, one gain each (Jot).
+      // Equal gains give back the input exactly.
+      let v = (o - s1[i]) * c1
+      const lo = v + s1[i]
+      s1[i] = lo + v
+      v = (o - s2[i]) * c2
+      const lm = v + s2[i] // low + mid
+      s2[i] = lm + v
+      y[i] = kHi[i] * o + kMidHi[i] * lm + kLoMid[i] * lo
     }
-    const Lo = (d[0] - d[1] + d[2] - d[3] + d[6] - d[7]) * 0.4082;
-    const Ro = (d[4] - d[5] + d[6] - d[7] + d[0] - d[2]) * 0.4082;
-    const mid = 0.5 * (Lo + Ro), w = this.width;
-    const oL = mid * (1 - w) + Lo * w, oR = mid * (1 - w) + Ro * w;
-    let ac = 1 - TAU * this.locut_hz / this.sr; if (ac < 0) ac = 0;
-    this.wL = ac * (this.hp_y[0] + oL - this.hp_x[0]); this.hp_x[0] = oL; this.hp_y[0] = this.wL;
-    this.wR = ac * (this.hp_y[1] + oR - this.hp_x[1]); this.hp_x[1] = oR; this.hp_y[1] = this.wR;
+
+    // ── feedback : normalized Hadamard matrix, as three butterfly stages ──
+    const b0 = y[0] + y[1], b1 = y[0] - y[1], b2 = y[2] + y[3], b3 = y[2] - y[3]
+    const b4 = y[4] + y[5], b5 = y[4] - y[5], b6 = y[6] + y[7], b7 = y[6] - y[7]
+    const d0 = b0 + b2, d1 = b1 + b3, d2 = b0 - b2, d3 = b1 - b3
+    const d4 = b4 + b6, d5 = b5 + b7, d6 = b4 - b6, d7 = b5 - b7
+    const h = RVB_HADAMARD_NORM
+    tank[w] = (d0 + d4) * h + xL * RVB_IN_SIGN[0]
+    tank[RVB_TANK_SIZE + w] = (d1 + d5) * h + xR * RVB_IN_SIGN[1]
+    tank[2 * RVB_TANK_SIZE + w] = (d2 + d6) * h + xL * RVB_IN_SIGN[2]
+    tank[3 * RVB_TANK_SIZE + w] = (d3 + d7) * h + xR * RVB_IN_SIGN[3]
+    tank[4 * RVB_TANK_SIZE + w] = (d0 - d4) * h + xL * RVB_IN_SIGN[4]
+    tank[5 * RVB_TANK_SIZE + w] = (d1 - d5) * h + xR * RVB_IN_SIGN[5]
+    tank[6 * RVB_TANK_SIZE + w] = (d2 - d6) * h + xL * RVB_IN_SIGN[6]
+    tank[7 * RVB_TANK_SIZE + w] = (d3 - d7) * h + xR * RVB_IN_SIGN[7]
+    this.tankW = (w + 1) & RVB_TANK_MASK
+
+    // ── output : gain, low-cut (one-pole high-pass), width as mid/side ──
+    const outG = (this.outG += (this.outGTgt - this.outG) * ks)
+    sumL *= outG
+    sumR *= outG
+    const hc = (this.hpC += (this.hpCTgt - this.hpC) * ks)
+    let v = (sumL - this.hpL) * hc
+    let lp = v + this.hpL
+    this.hpL = lp + v
+    sumL -= lp
+    v = (sumR - this.hpR) * hc
+    lp = v + this.hpR
+    this.hpR = lp + v
+    sumR -= lp
+
+    const wd = (this.widthCur += (clampf(this.width, 0, 1) - this.widthCur) * ks)
+    const mid = (sumL + sumR) * 0.5
+    const side = (sumL - sumR) * 0.5 * wd
+    this.wL = mid + side
+    this.wR = mid - side
+  }
+
+  // Clears every buffer and state.
+  reset() {
+    this.preL.fill(0)
+    this.preR.fill(0)
+    this.apL.fill(0)
+    this.apR.fill(0)
+    this.tank.fill(0)
+    this.loopAp.fill(0)
+    this.s1.fill(0)
+    this.s2.fill(0)
+    this.y.fill(0)
+    this.apIdxL.fill(0)
+    this.apIdxR.fill(0)
+    this.preW = 0
+    this.tankW = 0
+    this.hpL = 0
+    this.hpR = 0
+    this.lfoPhase = 0
+    this.wL = 0
+    this.wR = 0
+    this.tick = 0
+    this.fresh = true // the next sample starts from the current settings, no glide
   }
 }
 

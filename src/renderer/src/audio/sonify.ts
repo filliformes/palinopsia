@@ -274,8 +274,9 @@ export interface SoniConfig {
     accent: number // 0..1 : the resonators struck at every cut
     tape: boolean // a clip's speed changes its pitch (tape) instead of keeping it
   }
-  // Shared FX tail (send/return) : the whole mix feeds an analog delay → the
-  // Quartz/Prism FDN reverb, ported from Essaim/Res. `send` scales the input.
+  // Shared FX tail (send/return) : the whole mix feeds an analog delay (ported from
+  // Essaim) → the Nappe / Strates FDN reverb (written from the FDN literature).
+  // `send` scales the input.
   fx: {
     send: number
     // BBD delay
@@ -283,8 +284,8 @@ export interface SoniConfig {
     // reverb (shared)
     rvMode: number; rvMix: number; rvSize: number; rvDecay: number; rvDamp: number
     rvPre: number; rvMod: number; rvModRate: number; rvWidth: number; rvLocut: number; rvFreeze: boolean
-    rvDiff: number; rvLowDamp: number // Quartz
-    rvCross: number; rvLowMult: number; rvHighMult: number // Prism
+    rvDiff: number; rvLowDamp: number // Nappe
+    rvCross: number; rvLowMult: number; rvHighMult: number // Strates
   }
   // The Synth (synthPlay.ts, synth.engine.js) : the moving things in the
   // picture play it, each one a voice; its place picks the note, its looks

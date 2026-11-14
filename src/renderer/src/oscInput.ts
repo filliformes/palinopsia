@@ -1653,7 +1653,7 @@ function enumerateLeaves(): Leaf[] {
     add('/opsia/sonify/fx/delaytone', 0, 1, so.fx.dlyTone, 'Delay BBD tone')
     add('/opsia/sonify/fx/delaymix', 0, 1, so.fx.dlyMix, 'Delay level in the tail')
     addI('/opsia/sonify/fx/delaymode', 0, 2, so.fx.dlyMode, 'Delay routing : 0 mono · 1 stereo · 2 ping-pong')
-    add('/opsia/sonify/fx/reverbmode', 0, 1, so.fx.rvMode, 'Reverb : 0 Quartz · 1 Prism')
+    add('/opsia/sonify/fx/reverbmode', 0, 1, so.fx.rvMode, 'Reverb : 0 Nappe · 1 Strates')
     add('/opsia/sonify/fx/size', 0, 1, so.fx.rvSize, 'Reverb size')
     add('/opsia/sonify/fx/decay', 0, 1, so.fx.rvDecay, 'Reverb decay (RT60)')
     add('/opsia/sonify/fx/damp', 0, 1, so.fx.rvDamp, 'Reverb HF damping')
