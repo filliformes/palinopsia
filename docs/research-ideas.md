@@ -49,11 +49,14 @@ audio feature to the address; use the suggested polarity.
 |---|---|---|---|---|
 | Pitch / note | `/opsia/layer/{n}/source/A/count` (Differential) or a source `size` | pitch → element **size/count** | H3 | invert: high pitch = small/fewer |
 | Amplitude / RMS | `/opsia/layer/{n}/source/A/thickness` (Differential) | loud → **thicker** marks | H5 | direct |
-| Amplitude / RMS | `/opsia/master/vibe/saturation` | loud → more **purity** (brighter/saturated), soft → muted | H4/H16 | direct |
+| Amplitude / RMS | `/opsia/master/vibe/saturation` | loud → more **purity** (brighter/saturated), soft → muted | H4 | direct |
 | Spectral centroid / timbre | `/opsia/master/vibe/baseHue` (with `harmony` on) | timbre → **hue** of the colour chord | H1/H9 | curated |
 | Silence / sustain gate | `/opsia/layer/{n}/opacity` | rest → layer **recedes**, activity → returns | H11 (repose→rest) | invert |
 | Percussion accent (gated) | a `/opsia/meta/{k}` bound to a hue/flash macro | accent → brief colour **pulse** (not every beat) | Survage | trigger |
 | Musical structure (slow) vs. detail (fast) | hue via `/opsia/master/vibe/baseHue`; purity via `/opsia/master/vibe/contrast` | big changes shift **hue**, small changes shift **purity** | H6 (Fischinger) | dual mapping |
+
+Hypothesis numbers follow the H1–H14 performance hypotheses of Collopy (2020); they have not
+yet been rechecked one by one against the manuscript (see `bibliography.md`, *To verify*).
 
 The point (the thesis's core argument): **direct pitch→hue fails** (Collopy disproves it —
 too many unrelated hues, colour blends lose identity). Map pitch to *size/register*, hue

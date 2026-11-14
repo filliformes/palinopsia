@@ -219,7 +219,9 @@ Own window. Convolution-reverb workflow: capture → browse → shape → load.
 - **Niklaus, S., Mai, L. & Liu, F. (2017). « Video Frame Interpolation via
   Adaptive Separable Convolution ». ICCV 2017.** Noyaux séparables 1D estimés
   par pixel — flux et synthèse fusionnés dans la convolution : *le noyau encode
-  le mouvement*. L'erratum de l'auteur reconnaît Filter Flow comme antécédent.
+  le mouvement*. Une note ajoutée après coup sur la page du projet (sniklaus.com/sepconv)
+  reconnaît Filter Flow comme antécédent : les auteurs ne le connaissaient pas alors et
+  auraient dû le discuter. Ce n'est pas un erratum formel.
   → base du mode Traînée.
 - Hertzmann, A. et al. (2001). « Image Analogies ». SIGGRAPH 2001.
   (Transfert de transformation apprise d'une paire vers une nouvelle source.)

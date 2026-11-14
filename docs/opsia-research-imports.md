@@ -77,7 +77,10 @@ The browser flagged these as gaps because the skill it read predated them. They'
 6. **Vsynth brightness-band splitter** (multiband image processing). Split the frame into luminance
    bands, process each band with its own chain, recombine. Native to the concrète-background idea,
    absent from every VJ app.
-7. **Anisotropic Kuwahara** (Kyprianidis 2009) + **flow-based XDoG** (Kang/Lee/Chui). Structure-
+7. **Anisotropic Kuwahara** (Kyprianidis, Kang & Döllner 2009) + **flow-based XDoG** : the XDoG
+   operator is Winnemöller, Kyprianidis & Olsen (2012, *Computers & Graphics* 36(6)); the edge
+   tangent flow and flow-based DoG it runs along are Kang, Lee & Chui (NPAR 2007 "Coherent line
+   drawing"; IEEE TVCG 2009 "Flow-based image abstraction"). Structure-
    tensor-aligned painterly flattening (the temporally-coherent **Peint** upgrade) and edge-
    tangent-flow scratches (the **Griffé** upgrade that follows the image's own structure). The
    plates' clearest before/after (plate 11: isotropic DoG speckles → tangent-flow strokes).
@@ -105,10 +108,15 @@ Levin's slit-scan catalogue · Crutchfield "Space-Time Dynamics in Video Feedbac
 also on Hydra's reading list — could name a Feedback World whose states are fixed-point/periodic/
 chaotic) · *Live Visuals: History, Theory, Practice* (Routledge 2022 — the missing instrument half
 of the bibliography beside Chion→Coulter→Basanta→Boucher) · vOICe (IEEE TBME 1992) + the reversed-
-mapping study (npj 2026, licenses arbitrary mappings) + the sonification taxonomy (audification /
-parameter-mapping / model-based — a vocabulary for Sonify's modes) · Cinemetrics/Salt + Redfern's
-ASL critique · the "what reads as edited" study (spend Assemble's effort on rhythm + inter-shot
-coherence, not transitions; steal EDL/XML export to finish in an NLE).
+mapping study (Kucinkas et al., *npj Science of Learning* 11, 4, 2026, online Dec. 2025,
+doi:10.1038/s41539-025-00385-4 : the traditional and reversed vOICe mappings were learned equally
+well and both beat an arbitrary single-tone control, so it licenses *structured* alternative mappings,
+not arbitrary ones) + the sonification taxonomy (audification / parameter-mapping / model-based,
+after Hermann, Hunt & Neuhoff's *Sonification Handbook*, 2011 — a vocabulary for Sonify's modes) ·
+Cinemetrics/Salt + Redfern's ASL critique · the "what reads as edited" study (Gross, Wei & Zhu,
+arXiv:1905.12245, 2019 : 45% of generated music videos taken for professional ones; design cue :
+spend Assemble's effort on inter-shot coherence and the music's structure, not transitions; steal
+EDL/XML export to finish in an NLE).
 
 **The one conceptual reframe worth writing into the Sonify/Cameraless spec even if nothing is
 built: Oramics.** Oram's marks are **control curves, not waveforms** — which is exactly Opsia's

@@ -410,9 +410,22 @@ methods are free to build on; naming them is a matter of respect.
   of `reliefShade.ts`; Palinopsia's bands are its own, driven by the real surface's
   reflection.
 - **Aural Mirror** by Remo DeVico
-  (https://www.remodevicocomposer.eu/experimental-tools/aural-mirror/): an image-to-sound
-  instrument. Its granular, articulated and additive approaches inspired Sonify's Flow,
-  Events and Chord modes and the Chord bank (`sonify.ts`).
+  (https://www.remodevicocomposer.eu/experimental-tools/aural-mirror/), an instrument that
+  turns a painting into sound and musical structure. Four machines read the same picture
+  at once, and four of Sonify's voices follow the same division of labour:
+  - its **Spectral** layer (the picture read as a spectrogram) → Sonify's Spectra;
+  - its **Events** layer (edges and strokes, each played as its own sound with an attack
+    and a decay) → Events;
+  - its **Additive** layer (scale-tuned oscillators, one per band, following the ink) →
+    Chord and its Chord bank (`sonify.ts`);
+  - its **Granular** layer (grains whose sound comes from the picture's colours) → Flow
+    and its colour-steered grain timbre.
+- **The image-to-sound lineage** named beside Spectra: Evgeny Murzin's **ANS**
+  photoelectronic synthesizer (1958), **MetaSynth** (Eric Wenger, U&I Software) and
+  Peter Meijer's **The vOICe** (1992).
+- **Torso Electronics' S-4** sculpting sampler: the idea of ringing a sound through a bank
+  of resonant band-passes tuned to a key, behind the Collage voice's Ring bank. No code
+  taken.
 - **unity-vhsglitch** by Staffan Widegarn Åhlvik and VIDVOX's **VHS Glitch**: the model of
   the Tracking effect (Part 1).
 - **The Sonify Synth's published methods**, built from the sources, not from code:

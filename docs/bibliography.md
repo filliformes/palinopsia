@@ -172,7 +172,7 @@ Corbeil-Perron, M. (2021). *Créations audiovisuelles archéomédiatiques* [Medi
 
 ↳ The Finalizer's anaglyph 3D stage, Optical Rain, Phosphene, the Op-Art generator and the Tonicity, Shutter and Drift temperament controls (`engine/temperament.ts`).
 
-Della Noce, E., & Murari, L. (Eds.). (2025). *Expanded nature: Écologies du cinéma expérimental* [Expanded nature: Ecologies of experimental cinema]. Palgrave Macmillan. https://doi.org/10.1007/978-3-031-70729-2
+Della Noce, E., & Murari, L. (Eds.). (2025). *Expanded nature: Ecologies of experimental cinema*. Palgrave Macmillan. https://doi.org/10.1007/978-3-031-70729-2 (Original work published 2022)
 
 ↳ One of three texts behind the persistence and entropy shelf: Eternalism, Afterimage, Pulfrich, Corrode, Decimate, Frame-Weave, the Burial and Long-Take arcs, the Flow / Interruption temperament.
 
@@ -381,6 +381,10 @@ Hermann, T., Hunt, A., & Neuhoff, J. G. (Eds.). (2011). *The sonification handbo
 Jot, J.-M., & Chaigne, A. (1991). *Digital delay networks for designing artificial reverberators* [Paper presentation, Convention paper 3030]. 90th Convention of the Audio Engineering Society, Paris, France. https://aes2.org/publications/elibrary-page/?id=5663
 
 ↳ The feedback delay network reverb of Sonify's FX tail.
+
+Kucinkas, A., Retsa, C., Meijer, P. B. L., Wallace, M. T., Gori, M., & Murray, M. M. (2026). Learning visual to auditory sensory substitution reveals flexibility in image to sound mapping. *npj Science of Learning, 11*, Article 4. https://doi.org/10.1038/s41539-025-00385-4
+
+↳ The case for offering Sonify several structured image-to-sound mappings, not arbitrary ones: the traditional and reversed vOICe mappings were learned equally well, and both beat a single-tone control (research plate 02, `docs/opsia-research-plates.html`).
 
 Meijer, P. B. L. (1992). An experimental system for auditory image representations. *IEEE Transactions on Biomedical Engineering, 39*(2), 112–121. https://doi.org/10.1109/10.121642
 
@@ -652,3 +656,8 @@ Entries above whose details could not all be confirmed against a primary source:
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
 - Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).
+- Kucinkas et al. (2026): published online on 3 December 2025; the publisher cites it as volume 11 (2026), PubMed dates the issue 2025. Authors' initials checked against secondary listings only.
+- Fayet, Schwarz and Tiffon (2024): title and authors match the HAL record (hal-04576894); the page range (257–264) in the JIM 2024 proceedings is not confirmed.
+- Corbeil-Perron (2021): title and Papyrus handle (1866/26965) confirmed; the record's date may be 2022 rather than 2021, not checked against the record itself.
+- Basanta (2013): title, degree and year confirmed in Spectrum's 2013 thesis listings; the eprint number (976949) in the URL is not confirmed.
+- Collopy (2020): the manuscript is online at the URL given; the day (May 15) is not confirmed. Its performance hypotheses run H1–H14; the hypothesis numbers cited in `docs/research-ideas.md` have not been rechecked against it one by one.
