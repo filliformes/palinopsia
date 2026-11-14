@@ -215,6 +215,18 @@ notebook `texture_nca_pytorch.ipynb` from google-research/self-organising-system
 License 2.0 ([`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)). The method is credited in
 Part 6.
 
+### The dataflou core (`src/main/dataflou/node.ts`, `protocol.ts`, `stream.ts`)
+
+Palinopsia's dataflou node is a TypeScript port of the dataflou library's reference core,
+by **Alexandre Burton** (Artificiel). It follows these parts, message for message:
+- the node (`src/core/node.cpp`);
+- the topology protocol and its CBOR fields (`src/core/protocol.cpp`);
+- the UDP value stream (`stream_codec.cpp`).
+
+It is ported and shipped with its author's permission, given in November 2026. The
+mDNS announcer (`mdns.ts`) and the CBOR codec (`cbor.ts`) are Palinopsia's own, written
+to interoperate with it.
+
 ### The dataflou mesh visualizer (`resources/dataflou-visualizer`)
 
 The dataflou section's **visualizer** button opens the dataflou project's own web

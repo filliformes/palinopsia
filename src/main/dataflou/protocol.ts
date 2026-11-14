@@ -1,3 +1,4 @@
+// third-party: The dataflou core
 // The dataflou topology protocol (proto 2) : CBOR maps over TCP, each frame a
 // 4-byte big-endian length then the payload. Encoded field for field as
 // dataflou's own codec (src/core/protocol.cpp) writes them, since its QCBOR

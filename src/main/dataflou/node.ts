@@ -1,3 +1,4 @@
+// third-party: The dataflou core
 // A dataflou node in Node.js : Palinopsia's seat on the mesh. Follows dataflou's
 // reference core (src/core/node.cpp) message for message :
 //   · mDNS : `<label>-<sku8>._dataflou._tcp` with TXT sku / ver / core_ver / univ /
