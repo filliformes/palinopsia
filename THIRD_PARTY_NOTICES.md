@@ -454,6 +454,16 @@ methods are free to build on; naming them is a matter of respect.
 - **The image-to-sound lineage** named beside Spectra: Evgeny Murzin's **ANS**
   photoelectronic synthesizer (1958), **MetaSynth** (Eric Wenger, U&I Software) and
   Peter Meijer's **The vOICe** (1992).
+- **The Ring bank's voicings** (SEM, MS-20, Steiner, K35; the filters of the author's
+  Loopex). They are inspired by commercial filter designs whose plans are publicly
+  available:
+  - Oberheim's SEM state-variable filter;
+  - Korg's MS-20 filter and the Korg-35;
+  - the Steiner-Parker Synthacon filter.
+
+  They are modelled after those published circuits, with no code or material taken from
+  the products. The names only describe each character, and imply no link with the
+  makers.
 - **Torso Electronics' S-4** sculpting sampler: the idea of ringing a sound through a bank
   of resonant band-passes tuned to a key, behind the Collage voice's Ring bank. No code
   taken.

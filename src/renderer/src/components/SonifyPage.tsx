@@ -1948,7 +1948,7 @@ export function SonifyPage({
                     )}
                     <Slider label="detune" value={cfg.collage.detune ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('collage', { detune: v })} mod={chip('collageDetune')} title="The bands wander off their notes, the left and right sides in opposite directions : beating, width" />
                     <Row label="voicing">
-                      <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.collage.voicing ?? 0} onChange={(e) => pv('collage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35)">
+                      <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.collage.voicing ?? 0} onChange={(e) => pv('collage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35). SEM, MS-20, Steiner and K35 are inspired by commercial filter designs whose circuits are publicly documented (Oberheim's SEM, Korg's MS-20 and its Korg-35, the Steiner-Parker Synthacon) : modelled after their published plans, not taken from those products; the names only describe the character, with no link to their makers.">
                         {RING_VOICINGS.map((v, i) => <option key={v} value={i}>{v}</option>)}
                       </select>
                     </Row>
@@ -2143,7 +2143,7 @@ export function SonifyPage({
                     )}
                     <Slider label="detune" value={cfg.assemblage.detune ?? 0} min={0} max={1} neutral={0} onChange={(v) => pv('assemblage', { detune: v })} title="The bands wander off their notes, the left and right sides in opposite directions : beating, width" />
                     <Row label="voicing">
-                      <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.assemblage.voicing ?? 0} onChange={(e) => pv('assemblage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35)">
+                      <select className="input select-compact min-w-0 flex-1 text-[10px]" value={cfg.assemblage.voicing ?? 0} onChange={(e) => pv('assemblage', { voicing: Number(e.target.value) })} title="The filters' character : Clean, SEM (broader, rounder), and three driven ones whose ring clips (MS-20, Steiner, K35). SEM, MS-20, Steiner and K35 are inspired by commercial filter designs whose circuits are publicly documented (Oberheim's SEM, Korg's MS-20 and its Korg-35, the Steiner-Parker Synthacon) : modelled after their published plans, not taken from those products; the names only describe the character, with no link to their makers.">
                         {RING_VOICINGS.map((v, i) => <option key={v} value={i}>{v}</option>)}
                       </select>
                     </Row>

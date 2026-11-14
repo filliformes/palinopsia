@@ -30,6 +30,11 @@ creative work. This comes before any feature.
   them.
 - **No borrowed names.** Never name a preset, mode or feature after a living artist, a
   commercial product or a product's own modes.
+  - **Exception: classic circuits.** A name describing a classic circuit whose plans are
+    public is allowed (the Ring bank's SEM, MS-20, Steiner and K35 voicings). It must
+    be stated clearly, in the UI and in the register's Part 6, as inspired by that
+    commercial design and modelled after its published plans, with no link to the
+    maker.
 
 ## What people build with Palinopsia (decided 2026-11-14)
 
