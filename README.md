@@ -2039,6 +2039,13 @@ bottom:
   see [Spout / Syphon input](#spout--syphon-input).
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
+  - **HIVE out** follows HIVE's own connection rules: a receiver that hangs up is
+    seen at once, even before its first keyframe, and one that waits more than 5 s
+    for a keyframe is let go.
+  - **At 16 receivers** (`OPSIA_HIVE_MAX_CLIENTS` to change it), the oldest one still
+    waiting makes room, and a streaming one is never turned away for a newcomer.
+  - **Keyframes:** joins ask the encoder for one at most twice a second, however many
+    receivers arrive.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the
   chain, after the common flash-safety guidance (no more than three flashes a second).
   It measures brightness in linear light, plus saturated red, over regions of the
@@ -3428,6 +3435,15 @@ Two gestures mined from the EYESY lineage run through the field generators:
 > iPhone by USB), an [NDI](#ndi) source, an **Assemblage** (see
 > [Assemble](#assemble--the-automatic-editor-key-e)), or a **HIVE** HEVC-over-TCP
 > network stream : each treatable through the slot's own Source-FX rack.
+>
+> **HIVE in.** The picker lists the HIVE senders seen on the network (mDNS). A stream
+> picked from the list is followed by its name: if its sender comes back on another
+> address or port, Palinopsia finds it again. Or type a host and port.
+>
+> When a stream drops, Palinopsia reconnects by itself:
+> - it waits a random, growing time between attempts (from a quarter second up to 5 s);
+> - it starts again from short waits only once a connection has held;
+> - a link that goes silent for 5 s is dropped and retried.
 
 ---
 

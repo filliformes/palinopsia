@@ -363,7 +363,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   onPick={(id) => setSourceShader(index, 'A', id)}
                   onPickVideo={(url, name, path) => setSourceVideo(index, 'A', url, name, path)}
                   onPickCapture={(spec, name) => setSourceCapture(index, 'A', spec, name)}
-                  onPickHive={(host, port) => setSourceHive(index, 'A', host, port)}
+                  onPickHive={(host, port, name) => setSourceHive(index, 'A', host, port, name)}
                 />
                 {/* a thin line between A and B */}
                 <span className="w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
@@ -382,7 +382,7 @@ export function LayerPanel({ index }: { index: number }): JSX.Element {
                   onPick={(id) => setSourceShader(index, 'B', id)}
                   onPickVideo={(url, name, path) => setSourceVideo(index, 'B', url, name, path)}
                   onPickCapture={(spec, name) => setSourceCapture(index, 'B', spec, name)}
-                  onPickHive={(host, port) => setSourceHive(index, 'B', host, port)}
+                  onPickHive={(host, port, name) => setSourceHive(index, 'B', host, port, name)}
                 />
               </div>
             </div>
@@ -1030,7 +1030,7 @@ function SourceRow({
   onPick: (id: string | null) => void
   onPickVideo: (url: string, name: string, path?: string) => void
   onPickCapture: (spec: string, name: string) => void
-  onPickHive: (host: string, port: number) => void
+  onPickHive: (host: string, port: number, name?: string) => void
 }): JSX.Element {
   const userGens = useStore((s) => s.userShaders).filter((u) => u.category === 'Generator')
   const layerCount = useStore((s) => s.composition.layers.length)
@@ -1350,8 +1350,8 @@ function SourceRow({
       )}
       {showHive && (
         <HivePicker
-          onPick={(host, port) => {
-            onPickHive(host, port)
+          onPick={(host, port, name) => {
+            onPickHive(host, port, name)
             setShowHive(false)
           }}
           onCancel={() => setShowHive(false)}

@@ -88,6 +88,9 @@ export interface SourceSlot extends ShaderInstance {
   mediaId?: string
   // For kind:'video' : the file's display name, shown in the source picker.
   mediaName?: string
+  // For kind:'hive' : the sender's mDNS name, when it was picked from the list :
+  // the receiver finds it again there (a new address or port) on every reconnect.
+  hiveName?: string
   // For kind:'video' : the ORIGINAL file on disk (mediaId may point at a converted
   // cache copy) : the Inspector browses its folder for the next clip.
   mediaPath?: string
@@ -1818,7 +1821,8 @@ export interface ExposedApi {
   outputFrame: (frame: OutputWarp) => void
   onOutputFrame: (cb: (frame: OutputWarp) => void) => () => void
   // HIVE live-in.
-  hiveConnect: (id: string, host: string, port: number) => void
+  hiveConnect: (id: string, host: string, port: number, name?: string | null) => void
+  hiveBrowse: () => Promise<Array<{ name: string; host: string; port: number }>>
   hiveDisconnect: (id: string) => void
   onHiveAU: (cb: (au: HiveAU) => void) => () => void
   onHiveStatus: (cb: (s: HiveStatus) => void) => () => void

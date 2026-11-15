@@ -176,6 +176,34 @@ that CI builds into cross-platform releases.
   run support-link <username>`. The same command also fills the README, the site and
   GitHub's Sponsor button. A release build fails while the address is missing.
 
+### Changed
+
+- **HIVE, up to date with HIVE's own connection rules** (gllm/HIVE, commit d8b03bf, its
+  2026-10-05 sender/receiver lifecycle and stream identity RFCs; the rules written here,
+  no HIVE code).
+  - **Out:**
+    - a receiver that hangs up is seen at once, even before its first keyframe (the
+      socket is read, plus TCP keepalive);
+    - one waiting more than 5 s for a keyframe is let go;
+    - at the cap of 16 receivers (`OPSIA_HIVE_MAX_CLIENTS`), the oldest waiting one
+      makes room, and a streaming one is never refused;
+    - joins ask for a keyframe at most every 500 ms;
+    - the counters are logged.
+  - **In:**
+    - automatic reconnection, with exponential backoff and full jitter (250 ms to
+      5 s), reset only after a stable connection;
+    - a silent link is dropped after 5 s;
+    - the picker lists the senders seen over mDNS, and a stream picked by name is
+      found again at a new address or port on every reconnect.
+  - **Tested headless:**
+    - **join:** 20 joins give 1 keyframe request;
+    - **liveness:** waiting clients that hang up are reaped, and the 5 s timeout empties
+      the rest;
+    - **the cap:** with 16 streaming, the 17th is refused; at the cap with one waiting,
+      the waiting one makes room;
+    - **receiver:** its backoff grows with jitter, it reconnects by itself, and a named
+      stream with a stale port is found.
+
 ### Security
 
 - **Electron 44.11.3** (from 44.5.1) : six patch releases of Chromium fixes.

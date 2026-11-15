@@ -48,10 +48,13 @@ export class HiveSource {
   }
 
   start(spec: string): void {
-    // spec = "host:port"
-    const idx = spec.lastIndexOf(':')
-    const host = spec.slice(0, idx)
-    const port = Number(spec.slice(idx + 1))
+    // spec = "host:port", or "host:port#name" for a stream picked by its mDNS name
+    const hash = spec.indexOf('#')
+    const addr = hash >= 0 ? spec.slice(0, hash) : spec
+    const name = hash >= 0 ? spec.slice(hash + 1) : null
+    const idx = addr.lastIndexOf(':')
+    const host = addr.slice(0, idx)
+    const port = Number(addr.slice(idx + 1))
     if (!host || !Number.isFinite(port)) return
     this.id = spec
     try {
@@ -73,7 +76,7 @@ export class HiveSource {
       if (s.ok) console.info(`[hive] ${this.id} connected`)
       else console.warn(`[hive] ${this.id} link error: ${s.error ?? 'unknown'}`)
     })
-    window.api.hiveConnect(this.id, host, port)
+    window.api.hiveConnect(this.id, host, port, name)
   }
 
   private onAU(au: HiveAU): void {
