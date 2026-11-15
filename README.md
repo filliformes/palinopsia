@@ -119,6 +119,12 @@ tagged scenes.
 The papers, books and standards the instrument draws on are listed in
 [docs/bibliography.md](docs/bibliography.md) (APA 7).
 
+To see how it all connects, open the **[signal flow map](https://filliformes.github.io/palinopsia/signal-flow.html)**
+(`docs/signal-flow.html`): every input, the control plane, the picture path, the sound's
+paths, every output and every feedback loop, drawn from the code in the app's own
+themes. Hover a block to follow its links and see the code it comes from. Its content is
+`scripts/signal-flow/graph.mjs`; `npm run signal-flow` redraws it.
+
 ---
 
 ## Getting started

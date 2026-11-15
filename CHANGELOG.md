@@ -7,6 +7,15 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Signal flow map** (`docs/signal-flow.html`, the site's **⇄ Signal flow map** button):
+  - an interactive map of every input, the control plane, the picture path, the sound's
+    paths, every output and every feedback loop, plus the order of one frame, checked
+    against the code block by block;
+  - in the app's own themes and UI fonts, read from `styles.css` and `store.ts` (Studio
+    by default); the fonts are served from `docs/fonts/` with their license;
+  - its content is `scripts/signal-flow/graph.mjs`; `npm run signal-flow` redraws it, and
+    `npm run check:signal-flow` (in CI) fails when the page no longer matches it.
+
 - **World and Feel, clear to use.**
   - **You can see what Feel is doing.** A dot on the feel tab while a dial is off rest
     (its hover lists them); a line under the Mixer's header saying what Density leaves of

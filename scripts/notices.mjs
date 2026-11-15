@@ -6,7 +6,7 @@
 //
 // The check fails when :
 //   1. licenses/npm-dependencies.txt no longer matches the installed runtime dependencies;
-//   2. a font in src/renderer/src/fonts is not listed in licenses/fonts.txt;
+//   2. a font in src/renderer/src/fonts or docs/fonts is not listed in licenses/fonts.txt;
 //   3. a vendored or shipped third-party folder (native/*/sdk/*, resources/*) is not
 //      named in THIRD_PARTY_NOTICES.md;
 //   4. a `third-party: <name>` tag in the code names something THIRD_PARTY_NOTICES.md
@@ -98,9 +98,12 @@ if (CHECK) {
 
 // ── 2. fonts ────────────────────────────────────────────────────────────────
 const fontList = read('licenses/fonts.txt')
-for (const f of fs.readdirSync(path.join(ROOT, 'src/renderer/src/fonts'))) {
-  if (!/\.(ttf|otf|woff2?)$/i.test(f)) continue
-  if (!fontList.includes(`${f} :`)) problems.push(`font ${f} is not listed (with its copyright and license) in licenses/fonts.txt`)
+for (const dir of ['src/renderer/src/fonts', 'docs/fonts']) {
+  if (!fs.existsSync(path.join(ROOT, dir))) continue
+  for (const f of fs.readdirSync(path.join(ROOT, dir))) {
+    if (!/\.(ttf|otf|woff2?)$/i.test(f)) continue
+    if (!fontList.includes(`${f} :`)) problems.push(`font ${dir}/${f} is not listed (with its copyright and license) in licenses/fonts.txt`)
+  }
 }
 
 // ── 3. vendored and shipped third-party folders ─────────────────────────────

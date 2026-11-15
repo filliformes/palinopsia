@@ -400,6 +400,11 @@ Each file's family, copyright line and license are listed in
 [`licenses/fonts.txt`](licenses/fonts.txt). Thanks to their designers and to the
 Google Fonts and Fontsource projects that publish them.
 
+The site's signal-flow page (`docs/signal-flow.html`) serves copies of the interface's
+own faces (Inter, Roboto, IBM Plex Sans and Work Sans : 13 files, all OFL-1.1) from
+`docs/fonts/`, next to `docs/fonts/LICENSES.txt`, which repeats their copyright lines and
+the OFL. `scripts/signal-flow/build.mjs` copies them from `src/renderer/src/fonts`.
+
 ---
 
 ## 5. Images, textures and media
