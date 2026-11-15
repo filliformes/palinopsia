@@ -14,7 +14,10 @@ that CI builds into cross-platform releases.
   - in the app's own themes and UI fonts, read from `styles.css` and `store.ts` (Studio
     by default); the fonts are served from `docs/fonts/` with their license;
   - its content is `scripts/signal-flow/graph.mjs`; `npm run signal-flow` redraws it, and
-    `npm run check:signal-flow` (in CI) fails when the page no longer matches it.
+    `npm run check:signal-flow` (in CI) fails when the page no longer matches it;
+  - in the app, **signal flow ↗** beside the Performance tab's title opens it in the
+    browser, and Search (Ctrl+K) finds it as "Signal flow map". Its address is one
+    constant, `SIGNAL_FLOW_URL` in `src/shared/links.ts`.
 
 - **World and Feel, clear to use.**
   - **You can see what Feel is doing.** A dot on the feel tab while a dial is off rest

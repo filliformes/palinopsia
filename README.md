@@ -1559,7 +1559,10 @@ The **Connect** right-column tab (key `A`) holds the control panels
   preview (the wait plus copying each frame out). Both are taken out of the rows they happened in, so
   each of them shows only its own work and a full GPU reads as a full GPU, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
-  figure. The header reads the frame rate against the display's refresh rate, and
+  figure. **signal flow ↗**, beside its title, opens the site's
+  [signal flow map](https://filliformes.github.io/palinopsia/signal-flow.html) in your
+  browser, to see where each of these sections sits in the instrument (Search finds it
+  too : "signal flow map"). The header reads the frame rate against the display's refresh rate, and
   counts the frames the GPU backlog guard dropped (`skips`), which never reach the
   frame counter : a steady count there means the guard is throttling the render, and
   near zero means the frame rate is simply the display's own pace. The frame-budget
