@@ -9,8 +9,8 @@
 // actions past it are left out (named in the status), never put on a second node.
 
 import { app, type BrowserWindow, ipcMain, powerMonitor } from 'electron'
-import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { createHash, randomUUID } from 'crypto'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DataflouNode } from './node'
 import { primaryIPv4 } from './mdns'
@@ -18,7 +18,7 @@ import { encodeDeclare } from './protocol'
 import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged, visualizerScene } from './visualizer'
 import type { SceneFile } from './node'
 import {
-  DF_DECLARE_MAX, cleanPublish, dfGroupOf, dfPublished, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue
+  DF_DECLARE_MAX, cleanPublish, dfCppHidden, dfGroupOf, dfPublished, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue
 } from '@shared/dataflou'
 import { log } from '../log'
 
@@ -38,6 +38,7 @@ let actions: DfAction[] = []
 let actionsOn = 0
 let actionsDropped = 0
 let publishedCount = 0
+let cppHidden = 0
 let watches: DfSub[] = []
 
 const dir = (): string => {
@@ -56,6 +57,13 @@ function sku(): string {
   const s = randomUUID()
   writeFileSync(f, JSON.stringify({ sku: s }, null, 2))
   return s
+}
+
+/** The SKU the second node (`<name>-session`, gone since v1.3.4) had : made from
+ *  ours. A peer that still remembers it is asked to forget it. */
+function oldSessionSku(): string {
+  const h = createHash('sha1').update(`${sku()}:session`).digest('hex')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${((parseInt(h[16], 16) & 3) | 8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`
 }
 
 const subsFile = (universe: string, which = ''): string => join(dir(), `bindings-${universe.replace(/[^\w.-]+/g, '_')}${which}.json`)
@@ -97,19 +105,58 @@ function saveSubsTo(universe: string, which: string, subs: Record<string, DfSub[
   }
 }
 
+/** The second node's wires and scene slots (up to v1.3.3) join the one node's :
+ *  its actions are on this node now, at the same paths. Done once per universe
+ *  (the old files are renamed, never deleted). */
+export function adoptSessionFiles(universe: string): void {
+  const oldSubs = subsFile(universe, '-session')
+  if (existsSync(oldSubs)) {
+    try {
+      const mine = loadSubs(universe)
+      const theirs = loadSubs(universe, '-session')
+      for (const [dest, list] of Object.entries(theirs)) {
+        if (!Array.isArray(list)) continue
+        const into = Array.isArray(mine[dest]) ? mine[dest] : (mine[dest] = [])
+        for (const s of list) if (s && !into.some((x) => x.sku === s.sku && x.path === s.path)) into.push(s)
+      }
+      saveSubsTo(universe, '', mine)
+      renameSync(oldSubs, `${oldSubs}.v133`)
+      log('info', `[dataflou] the second node's wires (${Object.keys(theirs).length} destinations) joined this node's`)
+    } catch (e) {
+      log('warn', `[dataflou] could not take the second node's wires : ${(e as Error).message}`)
+    }
+  }
+  const oldScenes = scenesFile(universe, '-session')
+  if (existsSync(oldScenes)) {
+    try {
+      const mine = loadScenes(universe)
+      const theirs = loadScenes(universe, '-session')
+      // into the slots this node has (a slot it lacks stays lacking : a recall
+      // of it keeps this node's wires, as it did)
+      if (mine && theirs) {
+        for (const [slot, links] of Object.entries(theirs.slots)) if (mine.slots[slot]) mine.slots[slot] = [...mine.slots[slot], ...links]
+        saveScenesTo(universe, '', mine)
+      }
+      renameSync(oldScenes, `${oldScenes}.v133`)
+    } catch (e) {
+      log('warn', `[dataflou] could not take the second node's scenes : ${(e as Error).message}`)
+    }
+  }
+}
+
 let visClients = 0
 
 function status(): DfStatus {
   if (node) {
     return {
-      ...node.status(), published: publishedCount, actions: actionsOn, actionsDropped,
+      ...node.status(), published: publishedCount, actions: actionsOn, actionsDropped, cppHidden,
       visualizer: visClients, visualizerAvailable: visualizerAvailable()
     }
   }
   return {
     running: false, error: lastError, sku: '', label: config?.label ?? '', universe: config?.universe ?? '',
     address: '', tcpPort: 0, udpPort: 0, nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0,
-    declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, visualizer: visClients, visualizerAvailable: visualizerAvailable()
+    declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, cppHidden: 0, parked: [], visualizer: visClients, visualizerAvailable: visualizerAvailable()
   }
 }
 
@@ -143,6 +190,7 @@ function tree(): DfParam[] {
   actionsDropped = want.length - n
   const params = palinopsiaTree(want.slice(0, n), publish)
   publishedCount = params.filter((p) => p.kind !== 'group').length
+  cppHidden = dfCppHidden(params)
   return params
 }
 
@@ -182,8 +230,12 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
   node = null
   lastError = null
   if (want.enabled) {
+    adoptSessionFiles(universe)
     const n = new DataflouNode(
-      { sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe), scenes: loadScenes(universe) },
+      {
+        sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe), scenes: loadScenes(universe),
+        retired: [oldSessionSku()]
+      },
       {
         log: (m) => console.log(`[dataflou] ${m}`),
         onValues: (vs) => {

@@ -320,7 +320,10 @@ function loadDataflou(): DfConfig {
         // What the node publishes. Before v3 every parameter was on the mesh,
         // the actions on a second node : from v3 one node, the Macro knobs alone
         // until more is chosen (the section's publish list).
-        publish: (j as { v?: number }).v === 3 ? cleanPublish(j.publish) : [...DF_DEFAULT_CONFIG.publish]
+        publish: (j as { v?: number }).v === 3 ? cleanPublish(j.publish) : [...DF_DEFAULT_CONFIG.publish],
+        // (and what its saved wires play, the first time the node runs : the
+        // update must not cut a wire)
+        ...((j as { v?: number }).v !== 3 || j.migrate ? { migrate: true } : {})
       }
     }
   } catch {

@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { dataflouBind, meshToModulator, openDataflouVisualizer, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
+import { dataflouBind, meshToModulator, openDataflouVisualizer, publishableParked, publishParked, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { DataflouPublish } from './DataflouPublish'
 import { showToast } from './Toast'
@@ -173,6 +173,23 @@ export function DataflouSection(): JSX.Element {
                 </span>
                 {connections.length === 0 && (
                   <span className="font-mono text-[9px] text-muted">nothing wired yet : open a node above to wire it to Palinopsia</span>
+                )}
+                {/* saved wires into what is not published now : they wait, kept */}
+                {st.parked.length > 0 && (
+                  <div className="flex min-w-0 items-center gap-1 font-mono text-[9px] text-accent2">
+                    <span className="min-w-0 truncate" title={st.parked.join(', ')}>
+                      {st.parked.length} {st.parked.length === 1 ? 'wire waits' : 'wires wait'} : {st.parked.length === 1 ? 'its parameter is' : 'their parameters are'} not published ({st.parked.join(', ')})
+                    </span>
+                    {publishableParked().length > 0 && (
+                      <button
+                        onClick={() => void publishParked()}
+                        className="shrink-0 rounded border border-accent2/60 px-1 text-accent2 hover:text-text"
+                        title="Publish these parameters : their wires play again"
+                      >
+                        publish
+                      </button>
+                    )}
+                  </div>
                 )}
                 {connections.map(({ node, dest, src }) => {
                   const ours = node.local || src.sku === st.sku

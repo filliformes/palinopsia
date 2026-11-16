@@ -52,7 +52,8 @@ export function DataflouPublish(): JSX.Element {
 
   const toggleGroup = (g: Group): void => {
     const next = new Set(pub)
-    const all = pub.has(`g:${g.key}`)
+    // as it shows : all of it ticked (whole or one by one) unpublishes it all
+    const all = pub.has(`g:${g.key}`) || (g.items.length > 0 && countOn(g) === g.items.length)
     for (const i of g.items) next.delete(`p:${i.path}`)
     if (all) next.delete(`g:${g.key}`)
     else next.add(`g:${g.key}`)
@@ -110,6 +111,14 @@ export function DataflouPublish(): JSX.Element {
           </span>
         )}
       </div>
+      {st.running && st.cppHidden > 0 && (
+        <span
+          className="font-mono text-[9px] text-accent2"
+          title="A node built on the reference C++ core (a patch, a board) keeps the first 128 entries of a tree and 32 per group, and leaves the rest out without saying so. The actions come last."
+        >
+          {st.cppHidden} published {st.cppHidden === 1 ? 'parameter stays' : 'parameters stay'} hidden from a node on the C++ core : it sees 128 entries, 32 per group.
+        </span>
+      )}
       {st.running && st.actionsDropped > 0 && (
         <span className="font-mono text-[9px] text-danger">
           {st.actionsDropped} published actions left out : one frame holds no more. Untick a group to make room.

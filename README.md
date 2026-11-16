@@ -4335,15 +4335,17 @@ under publish.**
 
 Before v1.3.4, every parameter was published, and the actions rode on a second node,
 `<name>-session`. Both are gone : there is one node, and the Macro knobs until you choose
-more. Re-wire what played the old second node's actions to the same actions, published
-here. A field whose value is every decoder's default is left out, as the core's own terse
+more. The update keeps your wires : the first time the node runs, every destination a
+saved wire plays is published too (one by one), and the second node's wires and scene
+slots join the one node's (its actions are at the same paths). The other nodes are asked
+to forget the second node. A field whose value is every decoder's default is left out, as the core's own terse
 DECLARE does.
 
 Everything that can be published :
 
 | | Paths | Notes |
 |---|---|---|
-| ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow · drift`, `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
+| ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow`, `feel/drift` (Wander : it plays `/opsia/wander`, the path keeps its old name so a wire to it stays), `feel/tonicity · shutter`, `feel/superimposition` (plays `/opsia/superflicker`), `world/amount` (the World amount, 1 = all of the World), `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
 | ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
 
 **The actions** (a group per heading of the Body rule list, under publish) cover the
@@ -4356,8 +4358,13 @@ and again only after it went off. A ticked heading follows the session (a new sc
 rule, an effect with a trigger), and the other nodes see the new tree a moment later.
 
 All of it does not fit in one frame (about 500 actions with a large session) : publish
-the headings you play. A reference C++ node keeps the first 128 entries of a tree, and the
-actions come last.
+the headings you play. A reference C++ node keeps the first 128 entries of a tree and 32
+per group, and the actions come last : when what you publish passes that, a line under
+**publish** says how many parameters such a node cannot see.
+
+A wire into a parameter you stop publishing is not lost : it waits (kept, saved), the
+**connections** box says which parameters it waits for, with a **publish** button, and it
+plays again as soon as its parameter is published.
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1
 here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own destinations

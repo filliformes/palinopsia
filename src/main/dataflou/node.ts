@@ -191,6 +191,9 @@ export interface NodeConfig {
   params: DfParam[]
   subs: Record<string, DfSub[]>
   scenes?: SceneFile | null
+  /** SKUs of nodes of ours that are gone for good (the old second node) : a peer
+   *  that still remembers one is told to forget it (FLUSH). */
+  retired?: string[]
 }
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
@@ -203,7 +206,10 @@ export class DataflouNode {
   // last run did, so a node that only hears of us by gossip takes the new tree.
   private declVersion = Math.max(1, Math.floor((Date.now() - 1_704_067_200_000) / 1000))
   private params: DfParam[]
-  private savedSubs: Record<string, DfSub[]>
+  // Saved wires whose destination is not published now : kept (and saved) while
+  // they wait, played again as soon as their destination is published.
+  private parked = new Map<string, DfSub[]>()
+  private retired: Set<string>
   private declSize = 0
   // the visualizer : what arrived on our destinations, the remote values its
   // monitors stream, and those monitors (asked only while a page is open)
@@ -274,24 +280,58 @@ export class DataflouNode {
     this.universe = cfg.universe
     this.params = cfg.params
     for (const p of cfg.params) this.byPath.set(p.path, p)
-    this.savedSubs = cfg.subs ?? {}
+    for (const [k, v] of Object.entries(cfg.subs ?? {})) {
+      if (!Array.isArray(v)) continue
+      const list = v.filter((x) => !!x && typeof x.sku === 'string' && typeof x.path === 'string').slice(0, MAX_SUBS)
+      if (list.length) this.parked.set(k, list)
+    }
+    this.retired = new Set((cfg.retired ?? []).filter((x) => x && x !== cfg.sku))
     this.restoreSubs()
     this.skuHash = crc32Sku(cfg.sku)
     this.loadScenes(cfg.scenes ?? null)
     this.declSize = this.declareBytes()
   }
 
-  /** The saved bindings that end on a destination we have now (an action comes
-   *  back : so does the wire that played it). */
+  /** The waiting wires that end on a destination we have now (an action comes
+   *  back, a group is published again : so does the wire that played it), asked
+   *  to stream at once. */
   private restoreSubs(): void {
-    for (const [k, v] of Object.entries(this.savedSubs)) {
-      if (this.subs.has(k)) continue
+    const me = this.identity.sku
+    for (const [k, v] of [...this.parked]) {
       const p = this.byPath.get(k)
-      if (!(p && p.kind === 'param' && p.flow !== 'source' && Array.isArray(v))) continue
-      const list = v.slice(0, MAX_SUBS)
-      this.subs.set(k, list)
-      // one of our own sources : its stream straight back into us, as subscribe() makes it
-      for (const s of list) if (s.sku === this.identity.sku) this.addLocalTarget(s.path, k)
+      if (!(p && p.kind === 'param' && p.flow !== 'source')) continue
+      this.parked.delete(k)
+      const list = this.subs.get(k) ?? []
+      for (const s of v) {
+        if (list.length >= MAX_SUBS) break
+        if (list.some((x) => x.sku === s.sku && x.path === s.path)) continue
+        list.push(s)
+        // one of our own sources : its stream straight back into us, as subscribe() makes it
+        if (s.sku === me) this.addLocalTarget(s.path, k)
+        else this.sendStreamRequest(s, k)
+        this.announce(true, k, s)
+      }
+      if (list.length) this.subs.set(k, list)
+    }
+  }
+
+  /** The wires whose destination is no longer published wait (kept, saved) : their
+   *  streams stop and the mesh hears they are gone, until it is published again. */
+  private parkUnpublished(): void {
+    const me = this.identity.sku
+    for (const [k, list] of [...this.subs]) {
+      const p = this.byPath.get(k)
+      if (p && p.kind === 'param' && p.flow !== 'source') continue
+      this.subs.delete(k)
+      this.parked.set(k, [...(this.parked.get(k) ?? []), ...list])
+      for (const s of list) {
+        if (s.sku === me) this.targets = this.targets.filter((t) => !(t.destSku === me && t.localPath === s.path && t.destPath === k))
+        else {
+          const peer = this.peerOf(s.sku)
+          if (peer) this.send(peer, encodeStreamStop(++this.seq, me, s.path, k, me))
+        }
+        this.announce(false, k, s)
+      }
     }
   }
 
@@ -310,7 +350,14 @@ export class DataflouNode {
   setParams(params: DfParam[]): void {
     this.params = params
     this.byPath = new Map(params.map((p) => [p.path, p]))
+    this.parkUnpublished()
+    // a source no longer published : nothing streams it any more (its last value
+    // goes too, so it never plays again stale)
+    this.targets = this.targets.filter((t) => this.byPath.get(t.localPath)?.kind === 'param')
+    for (const k of [...this.values.keys()]) if (!this.byPath.has(k)) this.values.delete(k)
     this.restoreSubs()
+    // a wire from one of our sources published again : its stream back into us
+    for (const [k, list] of this.subs) for (const s of list) if (s.sku === this.identity.sku) this.addLocalTarget(s.path, k)
     this.declVersion++
     this.declSize = this.declareBytes()
     const me = this.world.get(this.identity.sku)
@@ -698,6 +745,7 @@ export class DataflouNode {
           w.address = peer.address
         }
         this.sendHello(peer)
+        this.forgetRetired(peer, m.versions)
         this.syncMissing(peer, m.versions)
         this.sendDeclare(peer, this.world.get(this.identity.sku)!)
         // our bindings sourced from it : ask it to stream again
@@ -714,6 +762,10 @@ export class DataflouNode {
       }
       case 'DECLARE': {
         if (m.about === this.identity.sku) break // our own tree, relayed back
+        if (this.retired.has(m.about)) {
+          this.forgetRetired(peer, new Map([[m.about, 0]]))
+          break
+        }
         let w = this.world.get(m.about)
         if (!w) {
           w = { identity: m.identity, declVersion: 0, local: false, online: false, lastSeen: now, params: [], byPath: new Map(), subs: new Map(), address: '', scene: NO_SCENE_STATUS }
@@ -741,6 +793,7 @@ export class DataflouNode {
         break
       }
       case 'DIGEST':
+        this.forgetRetired(peer, m.versions)
         this.syncMissing(peer, m.versions)
         this.mergeCue(m.scene) // anti-entropy : a missed cue arrives within a digest
         break
@@ -829,7 +882,19 @@ export class DataflouNode {
   }
 
   private persist(): void {
-    this.host.saveSubs(Object.fromEntries(this.subs))
+    // (the waiting wires too : a wire is never lost because its destination is
+    // not published now)
+    this.host.saveSubs({ ...Object.fromEntries(this.parked), ...Object.fromEntries(this.subs) })
+  }
+
+  /** A peer that still knows one of our retired nodes : tell it to forget it. */
+  private forgetRetired(peer: Peer, versions: Map<string, number>): void {
+    for (const sku of this.retired) {
+      if (!versions.has(sku)) continue
+      this.world.delete(sku)
+      this.send(peer, encodeFlush(++this.seq, this.identity.sku, sku))
+      this.host.log(`asked ${peer.sku || peer.address} to forget our retired node ${sku}`)
+    }
   }
 
   /** Bind one of OUR destinations to a source (any node, ourselves included).
@@ -1109,10 +1174,11 @@ export class DataflouNode {
       const interval = t.rateHz > 0 ? 1000 / t.rateHz : 0
       if (now - t.lastSent < interval) continue
       if (t.lastValue === v && now - t.lastSent < 500) continue
+      const p = this.byPath.get(t.localPath)
+      if (!p) continue // (no longer published)
       t.lastSent = now
       t.lastValue = v
       t.sent = (t.sent ?? 0) + 1
-      const p = this.byPath.get(t.localPath)!
       if (t.destSku === this.identity.sku) {
         const dest = this.byPath.get(t.destPath)
         // shaped like a wire from another node (its range, invert)
@@ -1476,6 +1542,8 @@ export class DataflouNode {
       published: 0,
       actions: 0,
       actionsDropped: 0,
+      cppHidden: 0,
+      parked: [...this.parked.keys()],
       visualizer: this.visualizerClients,
       visualizerAvailable: false
     }
