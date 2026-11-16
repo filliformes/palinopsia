@@ -252,7 +252,6 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
-<<<<<<< HEAD
 - **Audio channels and latency (before release).** A channel pick the device does not
   have (outputs 3+4 kept after the interface was unplugged) put both sides summed on the
   device's last channel, one speaker and up to twice as loud : it plays on 1+2 now, and
@@ -287,7 +286,6 @@ that CI builds into cross-platform releases.
     now unpublishes on the first click of its ✓; the World amount's group reads **World**.
   - The README's list of destinations gains `feel/tonicity`, `feel/shutter`,
     `feel/superimposition`, `world/amount`, and says `feel/drift` plays `/opsia/wander`.
-=======
 - **World and Feel, after the audit.**
   - **Gesture ⇄ Texture let go cleanly.** Turned right and back, it left the material
     swaying (its evolution) and, with a material of your own, the relief deeper than
@@ -309,7 +307,6 @@ that CI builds into cross-platform releases.
     crisp ⇄ surface) match the app; the docs no longer call the Transport's World amount
     fader "amt" and say Proximity's far side softens.
 
->>>>>>> fix134-worldfeel
 - **The Windows shortcuts' icon.** The desktop and Start menu shortcuts (and so the taskbar)
   showed a blank page instead of Palinopsia's icon : the installer wrote the app's long
   description into each shortcut, which Windows cut short while keeping its length, so
@@ -323,7 +320,6 @@ that CI builds into cross-platform releases.
 
   The knobs are the same. VIDVOX's VHS Glitch (MIT) and staffantan's unity-vhsglitch
   remain credited as the effect's model.
-<<<<<<< HEAD
 - **Credits that were missing or wrong (v1.3.4 audit).**
   - The mac app now carries Electron's license and Chromium's notices
     (`LICENSE.electron.txt`, `LICENSES.chromium.html` in its Resources) : electron-builder
@@ -356,7 +352,6 @@ that CI builds into cross-platform releases.
     predelay reaches 255 ms (it stopped near 170 ms). Unchanged up to 96 kHz.
   - The README's shortcut table names the Strates crossover; the rewrites are tagged in the
     code with their entries in the credits register.
-=======
 - **OSC destinations, links and map (the v1.3.4 audit).**
   - **No loop through a multicast group.** A destination on a group the input joined, on
     the input's port, sent the feedback straight back in (a gliding Macro knob was pulled
@@ -386,7 +381,6 @@ that CI builds into cross-platform releases.
     the feedback and sends many `/opsia` values back (two Palinopsias echoing each other).
   - **+ destination** after a row on port 65535 made a port 65536 row that sent nothing
     and vanished at the next launch : it takes 65534.
->>>>>>> fix134-osc
 
 ## v1.3.3 — 2026-11-12
 
