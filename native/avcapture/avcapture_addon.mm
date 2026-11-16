@@ -18,7 +18,7 @@
 #import <CoreMediaIO/CMIOHardware.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Accelerate/Accelerate.h>
-#include <napi.h>
+#include <napi.h> // third-party: node-addon-api
 #include <algorithm>
 #include <atomic>
 #include <cmath>

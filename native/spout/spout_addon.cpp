@@ -19,7 +19,7 @@
 //         input's route). Any graphics card, 8-bit formats.
 // A sender that closes, restarts or changes size is picked up again by name.
 
-#include <napi.h>
+#include <napi.h> // third-party: node-addon-api
 #include <atomic>
 #include <chrono>
 #include <map>

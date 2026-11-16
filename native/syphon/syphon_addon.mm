@@ -16,7 +16,7 @@
 #import <Syphon/SyphonMetalClient.h>
 #import <Syphon/SyphonServerDirectory.h>
 #import <IOSurface/IOSurface.h>
-#include <napi.h>
+#include <napi.h> // third-party: node-addon-api
 #include <atomic>
 #include <chrono>
 #include <map>

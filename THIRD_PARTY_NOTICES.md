@@ -76,6 +76,13 @@ The macOS texture sharing (the Syphon sender and client) loads the Syphon framew
 Butterworth) & vade (Anton Marini). BSD 2-Clause-style license, whose text is in
 [`licenses/Syphon-Framework-License.txt`](licenses/Syphon-Framework-License.txt).
 
+### node-addon-api (`native/*`)
+
+The four native addons (Spout, Syphon, the USB input and Ableton Link) are written
+against **node-addon-api** 8 (https://github.com/nodejs/node-addon-api), the C++ wrapper of
+Node's N-API. Its headers are compiled into `spout.node`, `syphon.node`, `avcapture.node`
+and `link.node`. Copyright (c) 2017 Node.js API collaborators, MIT License.
+
 ### Holocloth (`src/renderer/src/engine/drapeNode.ts`, `reliefShade.ts`)
 
 Two features are adapted from **Holocloth** (https://github.com/dmitrykurash/holocloth),

@@ -14,7 +14,7 @@
 //
 // Link (GPL-2.0-or-later) and asio (Boost) are vendored under sdk/.
 
-#include <napi.h>
+#include <napi.h> // third-party: node-addon-api
 
 #include <ableton/Link.hpp>
 
