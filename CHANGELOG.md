@@ -183,9 +183,10 @@ that CI builds into cross-platform releases.
   - **The catalog.** `CONTRIBUTING.md` describes it. `catalog/catalog.json` lists each
     work in its author's own repository, pinned to a commit. Like Schwung's catalog, an
     author adds a work with a pull request.
-  - **The check.** `npm run check:catalog` checks each entry: pinned, credited, and
-    under an accepted license (no non-commercial, no-derivatives, CC BY 3.0 or older,
-    or unlicensed work).
+  - **The check.** `npm run check:catalog` checks each entry: pinned, with an author,
+    and under an accepted license (no non-commercial, no-derivatives, CC BY 3.0 or
+    older, or unlicensed work). The credits of what a work borrows are checked in
+    review.
   - **A `checks` workflow** runs the catalog and credits checks on every pull request.
     It is read-only and runs no install scripts.
 - **A ☕ in the top bar.** It links to the author's Buy Me a Coffee page, set with `npm
