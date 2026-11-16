@@ -24,6 +24,13 @@ that CI builds into cross-platform releases.
     bands with sentence-case captions; a two-sentence intro, the longer one moved under
     the map ("Reading the map").
 
+### Fixed
+
+- **Macro knob CCs follow scene changes** : a CC learned on a Macro knob is kept through a
+  scene recall (and a Generate, a World, the dice). Each scene stored its own copy of the
+  knobs, so a scene saved before the Learn came back without the CC and the controller
+  stopped playing the knobs (`store.ts` `keep` → `withLiveCcs`).
+
 ## v1.3.4 — 2026-11-15
 
 ### Added

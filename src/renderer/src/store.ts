@@ -2781,7 +2781,18 @@ function dropLayerTargets(c: CompositionState, layer: number): CompositionState 
 // Persistence (persist.ts) : an arriving composition with the pins held from
 // the one playing now. Every bulk write goes through it.
 const keep = (s: { composition: CompositionState; pins: string[] }, c: CompositionState): CompositionState =>
-  keepPersistent(c, s.composition, s.pins)
+  withLiveCcs(keepPersistent(c, s.composition, s.pins), s.composition)
+
+// A Macro knob's MIDI CC is the controller in your hands, not a part of the
+// picture : it stays as it is now through a scene, a Generate, a World, the dice.
+// (Each scene stores a whole composition : a scene saved before a Learn brought
+// back its knobs without the CC, and the controller stopped playing them.)
+function withLiveCcs(c: CompositionState, live: CompositionState): CompositionState {
+  const same = (a: MetaKnobState['midiCc'], b: MetaKnobState['midiCc']): boolean =>
+    (a?.channel ?? -1) === (b?.channel ?? -1) && (a?.number ?? -1) === (b?.number ?? -1)
+  if (c.metaKnobs.every((k, i) => same(k.midiCc, live.metaKnobs[i]?.midiCc ?? null))) return c
+  return { ...c, metaKnobs: c.metaKnobs.map((k, i) => (same(k.midiCc, live.metaKnobs[i]?.midiCc ?? null) ? k : { ...k, midiCc: live.metaKnobs[i]?.midiCc ?? null })) }
+}
 
 // A scene recall, the scene sequencer or the dice that REPLACE a steps card's
 // pattern (its length, values, rests or conditions) start that card's passes

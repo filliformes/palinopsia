@@ -1651,8 +1651,10 @@ Where the session has a mapping on an input (the same channel and CC or note, or
 OSC address and value), it **stands in for this computer's mappings on that input only** :
 a piece's custom setup wins for the knobs it uses, every other mapping of the computer
 keeps working. Two session mappings may share an input (one knob, several controls). The
-Macro knobs' CCs are neither : they stay **on the knob**, in the session and its scenes,
-as they always did (and take no part in that precedence).
+Macro knobs' CCs are neither : they stay **on the knob**, in the session (and take no
+part in that precedence). They belong to the controller in your hands, not to a scene :
+recalling a scene, a Generate, a World or the dice keeps the CCs as they are now, even
+in a scene saved before the Learn.
 
 The **MIDI** section of the Connect tab (key `A`) has the **input dropdown** (all
 controllers, or just one : hot-plug is handled), a **live-activity readout** (last message
