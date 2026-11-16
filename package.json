@@ -1,6 +1,6 @@
 {
   "name": "palinopsia",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Palinopsia : an OSC-played visual instrument, a four-layer ISF compositor for live picture and sound.",
   "main": "out/main/index.js",
   "author": {
