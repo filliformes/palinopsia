@@ -17,6 +17,8 @@ import { N, E, W, H, IX, OX, TEXT, AUDITED } from './graph.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+// the support page, from the one place the app reads it (npm run support-link sets it)
+const SUPPORT_URL = (/export const SUPPORT_URL = '([^']*)'/.exec(read('src/shared/links.ts')) ?? [])[1] ?? ''
 const CHECK = process.argv.includes('--check')
 const OUT = 'docs/signal-flow.html'
 const SITE = 'https://filliformes.github.io/palinopsia/'
@@ -438,8 +440,7 @@ ${SVG}
 </section>
 
 <footer>
-  <span>Drawn from the code on branch ${AUDITED.branch} at commit ${AUDITED.commit} (${AUDITED.date}), and checked against it block by block. Each block's panel names the files and symbols it comes from.</span>
-  <span>Colours, fonts and themes are Palinopsia's own. Fonts: Inter, Roboto, IBM Plex Sans and Work Sans, under the SIL Open Font License (<a href="fonts/LICENSES.txt">licenses</a>). Palinopsia is free software under the GPL-3.0-or-later · <a href="https://github.com/filliformes/palinopsia">source</a> · <a href="${SITE}">site</a></span>
+  <span>Palinopsia is free software under the GPL-3.0-or-later · <a href="https://github.com/filliformes/palinopsia">source</a> · <a href="${SITE}">site</a> · <a href="${SUPPORT_URL}">Donate</a> to keep it going and free.</span>
 </footer>
 </main>
 
