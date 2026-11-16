@@ -1442,7 +1442,7 @@ export class ISFLayer {
     else { this.captureB = next; this.captureIdB = spec; }
   }
 
-  /** Load/swap/clear a live HIVE source (spec = 'host:port'). */
+  /** Load/swap/clear a live HIVE source (spec = 'host:port', or 'host:port#name'). */
   setHive(slot: 'A' | 'B', spec: string | null): void {
     const curId = slot === 'A' ? this.hiveIdA : this.hiveIdB;
     if (spec === curId) return;
@@ -3240,7 +3240,8 @@ export class Compositor {
       const wantA = l.sourceA.kind === 'generator' && !nativeA ? l.sourceA.shaderId : null;
       const wantVidA = l.sourceA.kind === 'video' ? (l.sourceA.mediaId ?? null) : null;
       const wantCapA = l.sourceA.kind === 'capture' ? (l.sourceA.mediaId ?? null) : null;
-      const wantHiveA = l.sourceA.kind === 'hive' ? (l.sourceA.mediaId ?? null) : null;
+      // (a named stream carries its name : 'host:port#name')
+      const wantHiveA = l.sourceA.kind === 'hive' && l.sourceA.mediaId ? l.sourceA.mediaId + (l.sourceA.hiveName ? `#${l.sourceA.hiveName}` : '') : null;
       const wantAsmA = l.sourceA.kind === 'assemble' ? (l.sourceA.mediaId ?? null) : null;
       if (wantA !== L.shaderIdA) L.setShader('A', wantA, wantA ? sourceById(wantA) : null);
       L.setVideo('A', wantVidA, i);
@@ -3263,7 +3264,7 @@ export class Compositor {
       const wantB = l.sourceB && l.sourceB.kind === 'generator' && !nativeB ? l.sourceB.shaderId : null;
       const wantVidB = l.sourceB && l.sourceB.kind === 'video' ? (l.sourceB.mediaId ?? null) : null;
       const wantCapB = l.sourceB && l.sourceB.kind === 'capture' ? (l.sourceB.mediaId ?? null) : null;
-      const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' ? (l.sourceB.mediaId ?? null) : null;
+      const wantHiveB = l.sourceB && l.sourceB.kind === 'hive' && l.sourceB.mediaId ? l.sourceB.mediaId + (l.sourceB.hiveName ? `#${l.sourceB.hiveName}` : '') : null;
       const wantAsmB = l.sourceB && l.sourceB.kind === 'assemble' ? (l.sourceB.mediaId ?? null) : null;
       if (wantB !== L.shaderIdB) L.setShader('B', wantB, wantB ? sourceById(wantB) : null);
       L.setVideo('B', wantVidB, i);

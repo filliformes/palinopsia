@@ -213,8 +213,9 @@ const api: ExposedApi = {
   },
 
   // ── HIVE live-in ─────────────────────────────────────────────────
-  hiveConnect: (id: string, host: string, port: number) =>
-    ipcRenderer.send('hive:connect', id, host, port),
+  hiveConnect: (id: string, host: string, port: number, name?: string | null) =>
+    ipcRenderer.send('hive:connect', id, host, port, name ?? null),
+  hiveBrowse: () => ipcRenderer.invoke('hive:browse'),
   hiveDisconnect: (id: string) => ipcRenderer.send('hive:disconnect', id),
   onHiveAU: (cb: (au: HiveAU) => void) => {
     const h = (_e: Electron.IpcRendererEvent, au: HiveAU): void => cb(au)

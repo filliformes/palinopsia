@@ -40,7 +40,7 @@ import { installSyphonIn } from './syphonIn'
 import { registerResolume } from './resolume'
 import { initDataflou } from './dataflou'
 import { closeLink, initLink } from './link'
-import { hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
+import { hiveBrowse, hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
 import { prepareNdi } from './ndi/prepare'
@@ -1150,9 +1150,10 @@ app.whenReady().then(async () => {
   safeHandle('screenshot:save', (_e, data) => recording.saveScreenshot(data as Uint8Array))
 
   // ---------- IPC: HIVE live-in ----------
-  safeOn('hive:connect', (e, id, host, port) =>
-    hiveConnect(e.sender, id as string, host as string, port as number)
+  safeOn('hive:connect', (e, id, host, port, name) =>
+    hiveConnect(e.sender, id as string, host as string, port as number, typeof name === 'string' ? name : null)
   )
+  safeHandle('hive:browse', () => hiveBrowse())
   safeOn('hive:disconnect', (_e, id) => hiveDisconnect(id as string))
 
   // ---------- IPC: HIVE output (sender) ----------

@@ -400,6 +400,11 @@ Each file's family, copyright line and license are listed in
 [`licenses/fonts.txt`](licenses/fonts.txt). Thanks to their designers and to the
 Google Fonts and Fontsource projects that publish them.
 
+The site's signal-flow page (`docs/signal-flow.html`) serves copies of the interface's
+own faces (Inter, Roboto, IBM Plex Sans and Work Sans : 13 files, all OFL-1.1) from
+`docs/fonts/`, next to `docs/fonts/LICENSES.txt`, which repeats their copyright lines and
+the OFL. `scripts/signal-flow/build.mjs` copies them from `src/renderer/src/fonts`.
+
 ---
 
 ## 5. Images, textures and media
@@ -550,8 +555,17 @@ methods are free to build on; naming them is a matter of respect.
   Color).
 - **Blackbody colour fit**: Tanner Helland's published approximation of a blackbody's
   colour by temperature (`organic.glsl`).
-- **HIVE** (https://codeberg.org/gllm/HIVE): the protocol Palinopsia's HIVE client
-  (`hive.ts`) speaks to exchange streams with HIVE peers.
+- **HIVE** (https://codeberg.org/gllm/HIVE, MPL-2.0): the protocol Palinopsia's HIVE
+  client (`hive.ts`, `hiveSend.ts`) speaks to exchange streams with HIVE peers.
+  - **What it follows:** the raw HEVC Annex-B over TCP, the `_hive._udp` mDNS
+    discovery, the keyframe-gated join.
+  - **Since v1.3.4,** it follows HIVE's connection contract
+    (`docs/RFC-sender-client-lifecycle.md` and `docs/RFC-stream-identity.md`, at commit
+    d8b03bf):
+    - the sender's liveness, admission and pending timeout;
+    - the receiver's jittered, stability-reset backoff and reconnection by name.
+
+    The rules are written for Palinopsia in TypeScript; no HIVE code is included.
 - **Corpus-based selection**: Diemo Schwarz's CataRT model (Assemble's matching), and VIVO
   and Dimopoulos & Winkler's per-pixel warmness (Assemble's analysis).
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia

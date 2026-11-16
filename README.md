@@ -119,6 +119,12 @@ tagged scenes.
 The papers, books and standards the instrument draws on are listed in
 [docs/bibliography.md](docs/bibliography.md) (APA 7).
 
+To see how it all connects, open the **[signal flow map](https://filliformes.github.io/palinopsia/signal-flow.html)**
+(`docs/signal-flow.html`): every input, the control plane, the picture path, the sound's
+paths, every output and every feedback loop, drawn from the code in the app's own
+themes. Hover a block to follow its links and see the code it comes from. Its content is
+`scripts/signal-flow/graph.mjs`; `npm run signal-flow` redraws it.
+
 ---
 
 ## Getting started
@@ -1553,7 +1559,10 @@ The **Connect** right-column tab (key `A`) holds the control panels
   preview (the wait plus copying each frame out). Both are taken out of the rows they happened in, so
   each of them shows only its own work and a full GPU reads as a full GPU, estimated VRAM, and active-feature chips, so you
   can see what a heavy session is spending, with units and hover tooltips on every
-  figure. The header reads the frame rate against the display's refresh rate, and
+  figure. **signal flow ↗**, beside its title, opens the site's
+  [signal flow map](https://filliformes.github.io/palinopsia/signal-flow.html) in your
+  browser, to see where each of these sections sits in the instrument (Search finds it
+  too : "signal flow map"). The header reads the frame rate against the display's refresh rate, and
   counts the frames the GPU backlog guard dropped (`skips`), which never reach the
   frame counter : a steady count there means the guard is throttling the render, and
   near zero means the frame rate is simply the display's own pace. The frame-budget
@@ -2039,6 +2048,13 @@ bottom:
   see [Spout / Syphon input](#spout--syphon-input).
 - **Send** : **NDI** (built in, see [NDI](#ndi) below) and **HIVE** HEVC-over-TCP
   network output + port.
+  - **HIVE out** follows HIVE's own connection rules: a receiver that hangs up is
+    seen at once, even before its first keyframe, and one that waits more than 5 s
+    for a keyframe is let go.
+  - **At 16 receivers** (`OPSIA_HIVE_MAX_CLIENTS` to change it), the oldest one still
+    waiting makes room, and a streaming one is never turned away for a newcomer.
+  - **Keyframes:** joins ask the encoder for one at most twice a second, however many
+    receivers arrive.
 - **Flash safety** : a photosensitivity limiter on the very last stage of the
   chain, after the common flash-safety guidance (no more than three flashes a second).
   It measures brightness in linear light, plus saturated red, over regions of the
@@ -3431,6 +3447,15 @@ Two gestures mined from the EYESY lineage run through the field generators:
 > iPhone by USB), an [NDI](#ndi) source, an **Assemblage** (see
 > [Assemble](#assemble--the-automatic-editor-key-e)), or a **HIVE** HEVC-over-TCP
 > network stream : each treatable through the slot's own Source-FX rack.
+>
+> **HIVE in.** The picker lists the HIVE senders seen on the network (mDNS). A stream
+> picked from the list is followed by its name: if its sender comes back on another
+> address or port, Palinopsia finds it again. Or type a host and port.
+>
+> When a stream drops, Palinopsia reconnects by itself:
+> - it waits a random, growing time between attempts (from a quarter second up to 5 s);
+> - it starts again from short waits only once a connection has held;
+> - a link that goes silent for 5 s is dropped and retried.
 
 ---
 

@@ -1698,7 +1698,7 @@ interface StoreState {
   // 'desktop:<sourceId>' for a specific window/screen; `name` labels it.
   setSourceCapture: (layer: number, slot: 'A' | 'B', spec: string, name: string) => void
   // Point a slot at a live HIVE stream (host:port).
-  setSourceHive: (layer: number, slot: 'A' | 'B', host: string, port: number) => void
+  setSourceHive: (layer: number, slot: 'A' | 'B', host: string, port: number, name?: string) => void
   // Native Text source (gen-text): the string + the glyph-fill sidechain.
   setSourceText: (layer: number, slot: 'A' | 'B', text: string) => void
   setSourceSidechain: (layer: number, slot: 'A' | 'B', ref: SidechainRef | null) => void
@@ -3552,7 +3552,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       selection: { type: 'source', layer, slot }
     })),
-  setSourceHive: (layer, slot, host, port) =>
+  setSourceHive: (layer, slot, host, port, name) =>
     set((s) => ({
       ...swapSlot(
         s,
@@ -3564,7 +3564,8 @@ export const useStore = create<StoreState>((set, get) => ({
               shaderId: null,
               inputs: {},
               mediaId: `${host}:${port}`,
-              mediaName: `HIVE ${host}:${port}`
+              mediaName: `HIVE ${name || `${host}:${port}`}`,
+              ...(name ? { hiveName: name } : {})
             }
             if (slot === 'A') return { ...l, sourceA: hv, sourceAFx: [] }
             return { ...l, sourceB: hv, sourceBFx: [] }

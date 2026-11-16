@@ -62,6 +62,7 @@ import {
 } from './commands'
 import { leaveSession, markClean } from './sessionGuard'
 import { redo, undo } from './undo'
+import { SIGNAL_FLOW_URL } from '@shared/links'
 
 type St = ReturnType<typeof useStore.getState>
 type Value = number | number[]
@@ -844,7 +845,17 @@ function pageItems(): SearchItem[] {
         'start'
       )
   }
-  return [...pages, ...tabs, depth]
+  // The site's signal flow map, in the browser (http(s) links never open inside the app).
+  const flow: SearchItem = {
+    key: 'link:signal-flow',
+    kind: 'page',
+    label: 'Signal flow map',
+    group: 'help · web',
+    keywords: ['signal', 'flow', 'map', 'diagram', 'how it works', 'pipeline', 'routing', 'feedback', 'loops', 'architecture'],
+    hint: 'opens in your browser : how a signal moves through Palinopsia and comes back, drawn from the code',
+    run: () => { window.open(SIGNAL_FLOW_URL, '_blank') }
+  }
+  return [...pages, ...tabs, depth, flow]
 }
 
 /** The Inspector's ⚄ on the selected unit, folded Inspector or not : its

@@ -7,6 +7,18 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Signal flow map** (`docs/signal-flow.html`, the site's **⇄ Signal flow map** button):
+  - an interactive map of every input, the control plane, the picture path, the sound's
+    paths, every output and every feedback loop, plus the order of one frame, checked
+    against the code block by block;
+  - in the app's own themes and UI fonts, read from `styles.css` and `store.ts` (Studio
+    by default); the fonts are served from `docs/fonts/` with their license;
+  - its content is `scripts/signal-flow/graph.mjs`; `npm run signal-flow` redraws it, and
+    `npm run check:signal-flow` (in CI) fails when the page no longer matches it;
+  - in the app, **signal flow ↗** beside the Performance tab's title opens it in the
+    browser, and Search (Ctrl+K) finds it as "Signal flow map". Its address is one
+    constant, `SIGNAL_FLOW_URL` in `src/shared/links.ts`.
+
 - **World and Feel, clear to use.**
   - **You can see what Feel is doing.** A dot on the feel tab while a dial is off rest
     (its hover lists them); a line under the Mixer's header saying what Density leaves of
@@ -179,6 +191,34 @@ that CI builds into cross-platform releases.
 - **A ☕ in the top bar.** It links to the author's Buy Me a Coffee page, set with `npm
   run support-link <username>`. The same command also fills the README, the site and
   GitHub's Sponsor button. A release build fails while the address is missing.
+
+### Changed
+
+- **HIVE, up to date with HIVE's own connection rules** (gllm/HIVE, commit d8b03bf, its
+  2026-10-05 sender/receiver lifecycle and stream identity RFCs; the rules written here,
+  no HIVE code).
+  - **Out:**
+    - a receiver that hangs up is seen at once, even before its first keyframe (the
+      socket is read, plus TCP keepalive);
+    - one waiting more than 5 s for a keyframe is let go;
+    - at the cap of 16 receivers (`OPSIA_HIVE_MAX_CLIENTS`), the oldest waiting one
+      makes room, and a streaming one is never refused;
+    - joins ask for a keyframe at most every 500 ms;
+    - the counters are logged.
+  - **In:**
+    - automatic reconnection, with exponential backoff and full jitter (250 ms to
+      5 s), reset only after a stable connection;
+    - a silent link is dropped after 5 s;
+    - the picker lists the senders seen over mDNS, and a stream picked by name is
+      found again at a new address or port on every reconnect.
+  - **Tested headless:**
+    - **join:** 20 joins give 1 keyframe request;
+    - **liveness:** waiting clients that hang up are reaped, and the 5 s timeout empties
+      the rest;
+    - **the cap:** with 16 streaming, the 17th is refused; at the cap with one waiting,
+      the waiting one makes room;
+    - **receiver:** its backoff grows with jitter, it reconnects by itself, and a named
+      stream with a stale port is found.
 
 ### Security
 

@@ -23,6 +23,8 @@
     "release-check": "node scripts/release-check.mjs",
     "check:notices": "node scripts/notices.mjs --check",
     "check:catalog": "node scripts/catalog-check.mjs",
+    "signal-flow": "node scripts/signal-flow/build.mjs",
+    "check:signal-flow": "node scripts/signal-flow/build.mjs --check",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview"
   },

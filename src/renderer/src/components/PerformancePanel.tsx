@@ -15,6 +15,7 @@ import type { PerfStats } from '@shared/types'
 import { perfMeter } from '../engine/perfMeter'
 import { currentFps, currentSkips, formatHz } from '../perf'
 import { useStore } from '../store'
+import { SIGNAL_FLOW_URL } from '@shared/links'
 import { setGlassEnabled, setMotionEnabled, useGlassEnabled, useMotionEnabled } from '../glass'
 
 const MB = 1024 * 1024
@@ -163,6 +164,17 @@ export function PerformancePanel(): JSX.Element {
         <span className="flex shrink-0 cursor-help items-center gap-1.5" title="Live processing load, per section. Hover any row, number or chip for what it measures.">
           <span className="font-mono text-[10px] uppercase tracking-wide text-muted">Performance</span>
         </span>
+        {/* Where each of these costs sits in the instrument : the site's signal flow
+            map, in the browser (http(s) links never open inside the app). */}
+        <a
+          href={SIGNAL_FLOW_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="min-w-0 truncate font-mono text-[9px] text-muted hover:text-accent"
+          title="The signal flow map : how a signal moves through Palinopsia and comes back. Every input, the control plane, the picture path, the sound, every output and feedback loop, and the order of one frame, so you can see where each row below sits. Opens in your browser."
+        >
+          signal flow ↗
+        </a>
         <div className="flex-1" />
         <span className={`cursor-help font-mono text-[9px] ${fpsLow ? 'text-danger' : 'text-accent'}`} title="Frames per second of the composition render (rolling average), followed by the refresh rate of the display this window is on. The render is locked to that refresh rate, so matching it means every frame is being drawn : 24 fps on a 24 Hz display is not a dropped frame. Red below 85% of the refresh rate.">{fps ? `${Math.round(fps)} fps${hzLabel}` : '-'}</span>
         <span className={`cursor-help font-mono text-[9px] ${skips >= 1 ? 'text-danger' : 'text-muted'}`} title="Frames per second the loop gave up on because the GPU had not finished the frame from two frames back. These are dropped before the frame counter runs, so they never show up in the figure to the left. A steady count here means the backlog guard is throttling the render ; near zero means the frame rate above is the display's own pace.">skips <span className={skips >= 1 ? '' : 'text-text'}>{skips >= 0.1 ? skips.toFixed(1) : '0'}</span>/s</span>
