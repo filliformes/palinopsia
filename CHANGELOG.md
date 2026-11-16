@@ -49,7 +49,7 @@ that CI builds into cross-platform releases.
   output (with the Audio Layer) and the monitor's output land on the picked pair of a
   device with more channels, or are summed onto one. Kept per computer; 1+2 as before
   until you pick. The Filter voice's line-in now opens the input chosen in the Audio
-  section (it always opened the default input).
+  section while the section listens to it (it always opened the default input).
 - **OSC : several destinations, a connections view, a map.**
   - **Several destinations.** Each has a name, host:port and on/off, and its own
     content: F feedback (optionally only under some address prefixes), M MARK, B the
@@ -244,6 +244,17 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **Audio channels and latency (before release).** A channel pick the device does not
+  have (outputs 3+4 kept after the interface was unplugged) put both sides summed on the
+  device's last channel, one speaker and up to twice as loud : it plays on 1+2 now, and
+  the menu says so. With an output pick, every start of Sonify or the Audio Layer
+  restarted the output device twice (mid-take too); it no longer touches the device when
+  nothing changes. A sample rate or buffer picked while the sound was starting (two quick
+  arrow presses in the menu) was dropped : the sound now starts over on the last one
+  picked. The Filter voice's line-in used the input device and channels hidden with the
+  analysis off or in OSC : it takes the default input on 1+2 then, and it hears the
+  whole pair (summed to mono) instead of its first channel only. A mono device's channel
+  menu no longer reads "1+2 stereo (not on this device)".
 - **The Windows shortcuts' icon.** The desktop and Start menu shortcuts (and so the taskbar)
   showed a blank page instead of Palinopsia's icon : the installer wrote the app's long
   description into each shortcut, which Windows cut short while keeping its length, so

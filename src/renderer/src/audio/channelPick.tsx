@@ -26,21 +26,32 @@ export function pickLabel(p: ChPick): string {
   return p.r < 0 ? `${p.l + 1} mono` : p.r === p.l + 1 ? `${p.l + 1}+${p.r + 1} stereo` : `${p.l + 1}+${p.r + 1}`
 }
 
+/** Is the pick on a device of `n` channels (both its sides there)? */
+export function pickFits(p: ChPick, n: number): boolean {
+  const m = Math.max(1, Math.min(CH_MAX, n))
+  return p.l >= 0 && p.l < m && (p.r < 0 || p.r < m)
+}
+
 /** The menu for a device of `n` channels : its pairs, then each channel alone.
- *  The current pick stays listed when the device has fewer channels. */
+ *  The current pick stays listed when the device has fewer channels (1+2
+ *  plays then). */
 export function pickOptions(n: number, cur: ChPick): Array<{ v: string; label: string; off?: boolean }> {
   const m = Math.max(1, Math.min(CH_MAX, n))
+  // one channel : the default pick is that channel (on both sides)
+  if (m === 1 && isDefaultPick(cur)) return [{ v: pickKey(cur), label: '1 mono' }]
   const opts: Array<{ v: string; label: string; off?: boolean }> = []
   for (let i = 0; i + 1 < m; i += 2) opts.push({ v: `${i}:${i + 1}`, label: `${i + 1}+${i + 2} stereo` })
   for (let i = 0; i < m; i++) opts.push({ v: `${i}:-1`, label: `${i + 1} mono` })
   const k = pickKey(cur)
-  if (!opts.some((o) => o.v === k)) opts.unshift({ v: k, label: `${pickLabel(cur)} (not on this device)`, off: true })
+  if (!opts.some((o) => o.v === k)) opts.unshift({ v: k, label: `${pickLabel(cur)} (not on this device : 1+2 plays)`, off: true })
   return opts
 }
 
-/** The pick on a device of `n` channels : [left, right], each kept on the
- *  device (a mono pick : the same channel on both sides). */
+/** The pick on a device of `n` channels : [left, right] (a mono pick : the
+ *  same channel on both sides). A pick the device does not have plays 1+2 (its
+ *  sides were squeezed onto the last channel : one speaker, both sides summed). */
 export function clampPick(p: ChPick, n: number): [number, number] {
+  if (!pickFits(p, n)) p = CH_DEFAULT
   const top = Math.max(0, Math.min(CH_MAX, n) - 1)
   const l = Math.min(top, Math.max(0, p.l))
   return [l, p.r < 0 ? l : Math.min(top, Math.max(0, p.r))]
@@ -86,6 +97,8 @@ export function outputRoute(ctx: BaseAudioContext, dst: AudioNode & { maxChannel
   dst.channelInterpretation = 'discrete'
   const merge = ctx.createChannelMerger(n)
   merge.connect(dst)
+  // (the callers play a pick that does not fit as plain stereo; kept safe here)
+  if (!pickFits(pick, n)) pick = CH_DEFAULT
   const [l, r] = clampPick(pick, n)
   if (pick.r < 0) {
     // one channel : the merger's input takes one channel, so the stereo is
