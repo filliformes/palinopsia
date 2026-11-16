@@ -122,21 +122,22 @@ const FONT_CSS = FONT_FILES.map((f) => {
 // The spine (the longest chain of picture links : sources, A/B mix, layer FX, stack,
 // master and finalizers, presentation, transform, keystone) is drawn large; bookkeeping
 // (graph.mjs BOOKKEEPING, and blocks whose every link is secondary) small, as labels;
-// everything else medium. The map's titles are set in IBM Plex Sans, whatever the theme.
-const MAP_FONT = 'IBM Plex Sans'
-// Its advance widths (docs/fonts/plexsans-500 and -600), in thousandths of an em,
-// measured once in Chromium, so each block fits its title.
+// everything else medium; inputs and outputs all take their column's width. The map's
+// titles are set in Work Sans, whatever the theme.
+const MAP_FONT = 'Work Sans'
+// Its advance widths (docs/fonts/worksans-500 and -600), in thousandths of an em,
+// measured once in Chromium, so each block fits its title. Change them with the font.
 const GLYPHS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~·→×↔…²←±’'
 const ADV = {
-  500: '234,297,453,672,594,953,703,250,344,344,516,594,281,406,281,422,594,594,594,594,594,594,594,594,594,594,313,313,594,594,594,484,891,656,656,641,688,594,563,703,719,406,531,656,516,813,719,719,625,719,656,594,578,688,625,922,641,609,594,328,422,328,594,563,594,547,594,516,594,563,344,531,578,266,266,547,281,875,578,563,594,594,391,500,359,578,516,797,531,516,484,359,359,359,594,344,1000,594,1000,844,344,1000,594,281',
-  600: '234,313,469,656,594,953,719,266,344,344,563,594,297,406,297,438,594,594,594,594,594,594,594,594,594,594,313,313,594,594,594,500,906,672,656,641,688,594,578,719,719,422,547,672,516,813,719,719,641,719,656,609,578,688,641,953,656,625,594,328,438,328,594,563,594,563,594,516,594,563,344,547,594,281,281,563,297,891,594,563,594,594,391,500,375,594,531,813,547,531,500,359,375,359,594,344,1000,594,1000,875,344,1000,594,297'
+  500: '328,281,422,656,625,875,625,234,359,359,578,609,266,516,266,453,625,406,594,594,625,578,609,578,625,609,297,297,609,609,609,563,953,672,656,688,719,641,609,719,734,297,578,672,594,875,734,750,625,750,672,641,625,703,656,969,625,594,625,359,453,359,578,531,500,563,625,563,625,578,406,547,625,281,281,578,313,953,625,594,625,625,406,531,422,625,531,859,547,531,531,375,266,375,563,234,1000,609,1000,891,375,1000,609,266',
+  600: '313,297,438,672,641,906,641,250,375,375,578,609,281,516,281,453,641,422,594,594,641,578,609,594,625,609,297,297,609,609,609,578,938,672,672,688,719,641,609,719,734,313,594,672,594,891,734,734,641,734,688,641,641,703,672,984,641,625,641,375,453,375,594,531,500,578,625,563,625,578,406,547,625,281,281,609,313,938,625,594,625,625,422,531,438,625,547,875,563,547,516,391,297,391,578,250,1000,609,1000,906,375,1000,609,281'
 }
 for (const k in ADV) ADV[k] = ADV[k].split(',').map(Number)
 const textW = (s, wt, px) => ([...s].reduce((a, c) => { const i = GLYPHS.indexOf(c); return a + (i < 0 ? 600 : ADV[wt][i]) }, 0) * px) / 1000
 const SZ = {
   L: { h: 48, fs: 16, wt: 600, pl: 17, pr: 17, rx: 17 },
   M: { h: 32, fs: 14.5, wt: 500, pl: 25, pr: 13, rx: 11 },
-  S: { h: 22, fs: 13, wt: 500, pl: 17, pr: 9, rx: 11 }
+  S: { h: 22, fs: 13, wt: 500, pl: 17, pr: 11, rx: 11 }
 }
 const picNext = (id) => E.filter((e) => e.a === id && e.t === 'pic' && N[e.b].kind === 'pic').map((e) => e.b)
 const picPrev = (id) => E.filter((e) => e.b === id && e.t === 'pic' && N[e.a].kind === 'pic').map((e) => e.a)
@@ -146,10 +147,12 @@ const PIC = Object.values(N).filter((n) => n.kind === 'pic').map((n) => n.id)
 const LONGEST = Math.max(...PIC.map(after))
 const SPINE = new Set(PIC.filter((id) => before(id) + after(id) - 1 === LONGEST))
 const SMALL = new Set(Object.keys(N).filter((id) => BOOKKEEPING.has(id) || E.filter((e) => e.a === id || e.b === id).every((e) => e.minor)))
+const fit = (n, z) => Math.round(textW(n.title, z.wt, z.fs) + z.pl + z.pr)
+const COLW = Object.fromEntries(['in', 'out'].map((k) => [k, Math.max(...Object.values(N).filter((n) => n.kind === k).map((n) => fit(n, SZ.M)))]))
 for (const n of Object.values(N)) {
-  n.size = SPINE.has(n.id) ? 'L' : SMALL.has(n.id) ? 'S' : 'M'
+  n.size = SPINE.has(n.id) ? 'L' : SMALL.has(n.id) && !COLW[n.kind] ? 'S' : 'M'
   const z = SZ[n.size]
-  n.w = Math.round(textW(n.title, z.wt, z.fs) + z.pl + z.pr)
+  n.w = COLW[n.kind] ?? fit(n, z)
   n.h = z.h
   n.x = n.kind === 'in' ? n.ax - n.w : n.kind === 'out' ? n.ax : Math.round(n.ax - n.w / 2)
   n.y = n.ay - n.h / 2
@@ -182,6 +185,19 @@ function planSides(e) {
   return b.y > a.y ? ['b', 't'] : ['t', 'b']
 }
 for (const e of E) e.spine = e.t === 'pic' && SPINE.has(e.a) && SPINE.has(e.b)
+// The control plane's links to the outputs : to the outputs beside it they gather into one
+// stream that splits near them; to those below, they join the river under the picture path.
+const CTL = (n) => n.kind === 'ctl' || n.kind === 'bus'
+for (const e of E) {
+  if (e.path || !CTL(N[e.a]) || N[e.b].kind !== 'out') continue
+  e.path = cy(N[e.b]) < PB.y ? 'stream' : 'river'
+}
+// Quiet links are drawn only while one of their blocks is picked : the secondary ones and
+// the control plane's fan to the outputs (sound excepted), so the map is calm at rest.
+for (const e of E) e.quiet = e.minor || (CTL(N[e.a]) && N[e.b].kind === 'out' && e.t !== 'snd')
+const STREAM = [CB.x + CB.w, (Math.min(...E.filter((e) => e.path === 'stream').map((e) => cy(N[e.b]))) + Math.max(...E.filter((e) => e.path === 'stream').map((e) => cy(N[e.b])))) / 2]
+const streamTail = (b) => { const p3 = [b.x - 2, cy(b)], d = Math.max(40, (p3[0] - STREAM[0]) * 0.5); return [[STREAM[0] + d, STREAM[1]], [p3[0] - d, p3[1]], p3] }
+const RIVER = { 'o-sonify': 0, 'o-media': 1, 'o-lights': 2 }
 // Links on one side of a spine block spread along it, ordered by where their other end is.
 const sides = new Map()
 for (const e of E) {
@@ -227,7 +243,8 @@ function smooth(pts, r) {
 const CUSTOM = {
   'read-vision': (a, b) => { // up between the finalizers and the film, along under the control plane, into the vision bus
     const x0 = N['p-final'].x + N['p-final'].w + (N['p-film'].x - right(N['p-final'])) / 2, y = bottom(b) + 46
-    return [smooth([[a.x, cy(a)], [x0, cy(a)], [x0, y], [right(b) + 50, y], [right(b) + 50, cy(b) - 5], [right(b) + 2, cy(b) - 5]], 34), [(x0 + right(b)) / 2 + 40, y]]
+    const from = x0 > a.x + 8 && x0 < right(a) - 8 ? [[x0, a.y]] : [[a.x, cy(a)], [x0, cy(a)]]
+    return [smooth([...from, [x0, y], [right(b) + 50, y], [right(b) + 50, cy(b) - 5], [right(b) + 2, cy(b) - 5]], 34), [(x0 + right(b)) / 2 + 40, y]]
   },
   'depth-vision': (a, b) => { // up between the stack and the master FX
     const x0 = right(N['p-stack']) + (N['p-master'].x - right(N['p-stack'])) / 2, y = bottom(b) + 56
@@ -247,15 +264,50 @@ const CUSTOM = {
   },
   'osc-echo': (a, b) => { // over the top, right to left, into OSC in from the left
     const x0 = a.x + 30
-    return [smooth([[x0, a.y], [x0, 40], [56, 40], [56, cy(b)], [b.x - 2, cy(b)]], 60), [900, 40]]
+    return [smooth([[x0, a.y], [x0, 40], [44, 40], [44, cy(b)], [b.x - 2, cy(b)]], 60), [900, 40]]
   },
-  'df-echo': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, 24], [40, 24], [40, cy(b)], [b.x - 2, cy(b)]], 60), [900, 24]],
-  'mcp-snap': (a, b) => [smooth([[cx(a), bottom(a)], [cx(a), H - 20], [36, H - 20], [36, cy(b)], [b.x - 2, cy(b)]], 150), [700, H - 20]],
-  'sound-back': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, H - 34], [50, H - 34], [50, cy(b)], [b.x - 2, cy(b)]], 150), [900, H - 34]],
-  'camera-back': (a, b) => [smooth([[right(a), cy(a)], [W - 20, cy(a)], [W - 20, H - 48], [64, H - 48], [64, cy(b)], [b.x - 2, cy(b)]], 150), [900, H - 48]],
-  'sound-under': (a, b, e) => { // the long ways of sound to the speakers, side by side under the picture path
-    const k = E.filter((x) => x.path === 'sound-under').indexOf(e), x0 = right(a) + 16 + k * 6, x3 = b.x - 22 - k * 6, y = PB.y + PB.h + 14 + k * 7
-    return [smooth([[right(a) + 2, cy(a)], [x0, cy(a)], [x0, y], [x3, y], [x3, cy(b)], [b.x - 2, cy(b)]], 40), [520 + k * 240, y]]
+  'df-echo': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, 24], [30, 24], [30, cy(b)], [b.x - 2, cy(b)]], 60), [900, 24]],
+  'mcp-snap': (a, b) => [smooth([[cx(a), bottom(a)], [cx(a), H - 20], [18, H - 20], [18, cy(b)], [b.x - 2, cy(b)]], 110), [700, H - 20]],
+  'sound-back': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, H - 34], [32, H - 34], [32, cy(b)], [b.x - 2, cy(b)]], 110), [900, H - 34]],
+  'camera-back': (a, b) => [smooth([[right(a), cy(a)], [W - 20, cy(a)], [W - 20, H - 48], [46, H - 48], [46, cy(b)], [b.x - 2, cy(b)]], 110), [900, H - 48]],
+  stream: (a, b) => { // to the stream's source at the control plane's edge, then out to the output
+    const p0 = [right(a), cy(a)], d = Math.max(40, (STREAM[0] - p0[0]) * 0.5), [c1, c2, p3] = streamTail(b)
+    const bz = [STREAM, c1, c2, p3]
+    return [`M${f1(p0[0])},${f1(p0[1])} C${f1(p0[0] + d)},${f1(p0[1])} ${f1(STREAM[0] - d)},${f1(STREAM[1])} ${f1(STREAM[0])},${f1(STREAM[1])} C${f1(c1[0])},${f1(c1[1])} ${f1(c2[0])},${f1(c2[1])} ${f1(p3[0])},${f1(p3[1])}`, pt(bz, 0.62)]
+  },
+  river: (a, b) => { // the ways to the speakers and the lights, three lanes under the picture path, never across the spine
+    const k = RIVER[b.id] ?? 0, xr = IX + 8 + k * 6, yc = PB.y + PB.h + 14 + k * 7, x3 = b.x - 22 - k * 6
+    let head, lp
+    if (a.kind === 'in') { head = [[right(a) + 2, cy(a)], [xr, cy(a)], [xr, yc]]; lp = [560 + k * 230, yc] }
+    else if (a.kind === 'pic') { const x = cx(a) + (k - 1) * 8; head = [[x, bottom(a)], [x, yc]]; lp = [x + 110, yc] }
+    else { // from the control plane : down a free way beside the block, left under the band, down its left edge
+      const yg = CB.y + CB.h + 8 + k * 6
+      const free = (x) => !Object.values(N).some((n) => n !== a && x > n.x - 6 && x < right(n) + 6 && bottom(n) > cy(a) && n.y < yg)
+      const xs = [a.x - 14, right(a) + 14].find(free) ?? a.x - 14
+      head = [[xs < a.x ? a.x : right(a), cy(a)], [xs, cy(a)], [xs, yg], [xr, yg], [xr, yc]]
+      lp = [(xs + xr) / 2, yg]
+    }
+    return [smooth([...head, [x3, yc], [x3, cy(b)], [b.x - 2, cy(b)]], 40), lp]
+  },
+  over: (a, b, e) => { // across the control plane along its top edge, so it passes over the columns between
+    const k = E.filter((x) => x.path === 'over').indexOf(e), ys = CB.y + 6 + k * 4, fwd = cx(b) > cx(a)
+    const free = (x, y0, y1) => !Object.values(N).some((n) => x > n.x - 6 && x < right(n) + 6 && n.y < y1 && bottom(n) > y0)
+    const walk = (x, step, y0, y1) => { for (let i = 0; i < 40 && !free(x, y0, y1); i++) x += step; return x }
+    const x0 = walk(fwd ? right(a) + 14 : a.x - 14, fwd ? 4 : -4, ys, a.y), x3 = walk(fwd ? b.x - 18 : right(b) + 10, fwd ? -4 : 4, ys, b.y)
+    const p0 = fwd ? [right(a), cy(a)] : [a.x, cy(a)], p3 = fwd ? [b.x - 2, cy(b)] : [right(b) + 2, cy(b)]
+    return [smooth([p0, [x0, cy(a)], [x0, ys], [x3, ys], [x3, cy(b)], p3], 40), [(x0 + x3) / 2, ys + 2]]
+  },
+  up: (a, b) => { // from an input below, up beside the picture band, along under the control plane, up into the block
+    const xu = IX + 30, yg = CB.y + CB.h + 14, x3 = b.x - 22
+    return [smooth([[right(a) + 2, cy(a)], [xu, cy(a)], [xu, yg], [x3, yg], [x3, cy(b)], [b.x - 2, cy(b)]], 40), [x3 - 60, yg]]
+  },
+  'out-right': (a, b) => { // up the outside of the output column, into the block's right side
+    const x = OX + COLW.out + 12
+    return [smooth([[right(a), cy(a)], [x, cy(a)], [x, cy(b)], [right(b) + 2, cy(b)]], 20), [x, (cy(a) + cy(b)) / 2]]
+  },
+  mark: (a, b) => { // up beside the output column
+    const x = OX - 20
+    return [smooth([[right(a), cy(a)], [x, cy(a)], [x, cy(b)], [b.x - 2, cy(b)]], 30), [x - 40, (cy(a) + cy(b)) / 2]]
   }
 }
 
@@ -289,7 +341,7 @@ E.map((e, i) => [e, i]).sort(([p], [q]) => (SPINE.has(p.a) ? before(p.a) : 99) -
   }
   const w = e.spine ? SPINE_W : WIDTH[e.t]
   const dash = DASH[e.t] ? ` stroke-dasharray="${DASH[e.t]}"` : ''
-  const cls = `e t-${e.t}${e.spine ? ' sp' : ''}${e.minor ? ' minor' : ''}`
+  const cls = `e t-${e.t}${e.spine ? ' sp' : ''}${e.quiet ? ' quiet' : ''}`
   paths[i] = `<path class="${cls}" data-i="${i}" d="${d}" style="--w:${w}"${dash}${e.spine ? '' : ` marker-end="url(#m-${e.t})"`}><title>${esc(N[e.a].title)} → ${esc(N[e.b].title)}${e.label ? ' : ' + esc(e.label) : ''}</title></path>`
   if (e.label && lp) labels.push([i, `<text class="el${e.always ? ' always' : ''} t-${e.t}" data-i="${i}" x="${f1(lp[0])}" y="${f1(lp[1] - 6)}" text-anchor="middle">${esc(e.label)}</text>`])
   // the glint passes through each block of the spine and on to the picture's outputs
@@ -299,6 +351,9 @@ E.map((e, i) => [e, i]).sort(([p], [q]) => (SPINE.has(p.a) ? before(p.a) : 99) -
     drifts.push(`<path d="${d}" style="stroke-width:${w};animation-delay:${waveDelay(start + len / 2)}"/>`)
   }
 })
+// at rest, the control plane's fan to the outputs beside it is drawn as one stream
+const fanTo = [...new Set(E.filter((e) => e.path === 'stream').map((e) => e.b))]
+const fan = fanTo.map((id) => { const [c1, c2, p3] = streamTail(N[id]); return `<path d="M${f1(STREAM[0])},${f1(STREAM[1])} C${f1(c1[0])},${f1(c1[1])} ${f1(c2[0])},${f1(c2[1])} ${f1(p3[0])},${f1(p3[1])}" marker-end="url(#m-net)"/>` }).join('') + `<circle cx="${f1(STREAM[0])}" cy="${f1(STREAM[1])}" r="3.4"/>`
 const nodes = Object.values(N).map((n) => {
   const z = SZ[n.size], my = n.y + n.h / 2, base = f1(my + z.fs * 0.35)
   const body = n.size === 'L'
@@ -320,6 +375,7 @@ ${rect('grp', LG, 22)}
 const SVG = `<svg id="map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Palinopsia's signal flow: external inputs on the left feed the store, buses and modulators of the control plane; every frame the control plane overlays its values on the GPU picture path, drawn as a thick spine from the sources to the presentation; the picture leaves on the right to projectors, streams, HIVE, recordings, Sonify and lights, and is read back into the vision bus and depth, closing feedback loops; dotted lines close only through the room, the network or an agent.">
 <defs>${markers}</defs>
 ${bands}
+<g class="fan t-net" aria-hidden="true">${fan}</g>
 <g class="edges">${paths.join('')}</g>
 <g class="drifts t-pic" aria-hidden="true">${drifts.join('')}</g>
 <g class="nodes">${nodes.join('')}</g>
@@ -334,7 +390,7 @@ const DATA = JSON.stringify({
 const LOOP_ST = { inside: ['in', 'inside'], room: ['ph', 'through the room'], network: ['ph', 'through the network'], agent: ['ph', 'through the agent'], 'not wired': ['no', 'not wired'] }
 const phases = TEXT.phases.map((p) => `<div class="phase" style="--strip: rgb(var(--f-${p.flow}))"><span class="label">${p.title}</span><ol>${p.items.map((li) => `<li>${li}</li>`).join('')}</ol></div>`).join('\n    ')
 const loops = TEXT.loops.map((r) => `<tr><td>${r.name}</td><td class="path">${r.path}</td><td><span class="st ${LOOP_ST[r.st][0]}">${LOOP_ST[r.st][1]}</span></td></tr>`).join('\n      ')
-const minorCount = E.filter((e) => e.minor).length
+const quietCount = E.filter((e) => e.quiet).length
 
 const page = `<!doctype html>
 <html lang="en">
@@ -434,7 +490,9 @@ ${TYPES.map((k) => `.e.t-${k} { stroke: rgb(var(--f-${k})) }`).join(' ')}
 .e.t-pic, .e.t-loop { opacity: .78 }
 .e.t-phys { opacity: .72 }
 .e.sp { opacity: .92 }
-.e.minor { opacity: .14 }
+.e.quiet { opacity: 0; pointer-events: none }
+.fan path { fill: none; stroke: rgb(var(--f-net)); stroke-width: 1.5; stroke-linecap: round; opacity: .5 }
+.fan circle { fill: rgb(var(--f-net)); opacity: .7 }
 .drifts path { fill: none; stroke: rgb(var(--c-text)); stroke-linecap: round; opacity: 0; animation: wave ${PERIOD}s ease-in-out infinite; pointer-events: none }
 .glow { fill: rgb(var(--f-pic)); opacity: 0; animation: glow ${PERIOD}s ease-in-out infinite; pointer-events: none }
 @keyframes wave { 0% { opacity: 0 } ${PEAK * 100}% { opacity: .42 } ${PEAK * 300}% { opacity: 0 } 100% { opacity: 0 } }
@@ -443,7 +501,9 @@ ${TYPES.map((k) => `.e.t-${k} { stroke: rgb(var(--f-${k})) }`).join(' ')}
 .el.always { opacity: .95 }
 ${TYPES.map((k) => `.el.t-${k} { fill: rgb(var(--f-${k})) }`).join(' ')}
 #map.focus .e { opacity: .06 }
-#map.focus .e.on { opacity: 1; stroke-width: calc(var(--w) + .8) }
+#map.focus .e.on { opacity: 1; stroke-width: calc(var(--w) + .8); pointer-events: auto }
+#map.focus .fan { opacity: 0 }
+.fan { transition: opacity .2s }
 #map.focus .drifts, #map.focus .glow, #map .t-pic.off ~ .nodes .glow { visibility: hidden }
 #map.focus .n { opacity: .32 }
 #map.focus .n.on { opacity: 1 }
@@ -489,7 +549,10 @@ section > p { color: rgb(var(--c-muted)); margin: 0; max-width: 84ch }
 .st.ph { color: rgb(var(--f-phys)) }
 .st.no { color: rgb(var(--c-muted)) }
 footer { color: rgb(var(--c-muted)); font: 11px/1.6 var(--mono); border-top: 1px solid rgb(var(--c-border)); padding-top: 12px; display: grid; gap: 4px }
-@media (prefers-reduced-motion: reduce) { .e, .el { transition: none } .drifts, .glow { display: none } }
+/* the wave of light : its own switch in the top bar (it follows reduced motion until used) */
+.drifts, .glow { display: none }
+:root[data-wave="on"] .drifts, :root[data-wave="on"] .glow { display: inline }
+@media (prefers-reduced-motion: reduce) { .e, .el, .fan { transition: none } }
 </style>
 </head>
 <body>
@@ -499,6 +562,7 @@ footer { color: rgb(var(--c-muted)); font: 11px/1.6 var(--mono); border-top: 1px
   <span class="label">drawn from the code</span>
   <span class="grow"></span>
   <a class="btn" href="${SITE}">← Site</a>
+  <button class="btn" id="wave" aria-pressed="false" title="A slow wave of light along the picture's path. Off by default when the system asks for less motion; remembered on this browser">flow ∿</button>
   <label class="label" for="theme">Theme <select id="theme" class="input" title="Theme : the app's own UI themes">${ORDER.map((t) => `<option value="${t}">${t}</option>`).join('')}</select></label>
 </div></header>
 
@@ -534,7 +598,7 @@ ${SVG}
 <section>
   <h2>Reading the map</h2>
   <p>${TEXT.intro}</p>
-  <p>The thick line is the spine, the path the picture really takes; the small labels are bookkeeping. Secondary links are drawn faint until you pick a block: all ${E.length} links are on the map, ${minorCount} of them secondary.</p>
+  <p>The thick line is the spine, the path the picture really takes; the small labels are bookkeeping. Secondary links, and the control plane's links to the outputs, appear when you pick a block: at rest the control plane's links to the outputs beside it are drawn as one stream. All ${E.length} links are on the map, ${quietCount} of them shown only on a pick.</p>
 </section>
 
 <section>
@@ -625,6 +689,19 @@ const pickT = document.getElementById('theme');
 const applyT = (t) => { document.documentElement.dataset.theme = t };
 try { const saved = localStorage.getItem('opsia-flow-theme'); if (saved && pickT.querySelector('option[value="' + saved + '"]')) { pickT.value = saved; applyT(saved) } } catch (e) {}
 pickT.addEventListener('change', () => { applyT(pickT.value); try { localStorage.setItem('opsia-flow-theme', pickT.value) } catch (e) {} });
+// The wave of light : follows the system's reduced-motion wish until the switch is used, then remembered.
+const waveB = document.getElementById('wave');
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+let waveSet = null;
+try { waveSet = localStorage.getItem('opsia-flow-wave') } catch (e) {}
+const applyW = (on) => { document.documentElement.dataset.wave = on ? 'on' : 'off'; waveB.setAttribute('aria-pressed', String(on)) };
+applyW(waveSet ? waveSet === 'on' : !calm.matches);
+calm.addEventListener('change', () => { if (!waveSet) applyW(!calm.matches) });
+waveB.addEventListener('click', () => {
+  const on = document.documentElement.dataset.wave !== 'on';
+  applyW(on); waveSet = on ? 'on' : 'off';
+  try { localStorage.setItem('opsia-flow-wave', waveSet) } catch (e) {}
+});
 </script>
 </body>
 </html>
