@@ -3918,8 +3918,8 @@ Bools/toggles are true at `≥ 0.5`. Triggers fire on the **rising edge**. **BPM
 the only raw value.** All indices in addresses are **1-based**.
 
 The **OSC** section of the Connect tab is in two halves : **↙ IN** (listen on/off,
-the port, the address to send to, the last message) and **↗ OUT** (the destination,
-**FEEDBACK** and **MARK**; the body rules' OSC goes there too), each with a light that
+the port, the address to send to, the multicast groups, the last message) and **↗ OUT**
+(**FEEDBACK** and **MARK**, then the destinations, each ticked for what it gets), each with a light that
 blinks with its traffic and its messages a second, also shown in the folded header.
 **monitor** opens the OSC monitor : every message coming in and going out, live (time,
 direction, address, values, and where an outgoing one went), filtered by direction and
@@ -4073,25 +4073,36 @@ TouchDesigner…), listed under ↗ out in the OSC section.
   - **B**: the Body rules' OSC.
 - **The masters.** The FEEDBACK and MARK buttons, and the Body page's OSC switch, stay
   the masters: a destination gets a kind only while its master is on.
-- **The same host:port twice** is sent to once (`= name`).
-- **Palinopsia's own input** is never sent to (`own input`, so no loops).
+- **The same host:port twice** is sent to once (`= name`; `localhost` and `127.0.0.1` are
+  the same place), with both rows' choices, the feedback under both rows' prefixes.
+- **Palinopsia's own input** is never sent to (`own input`): its port on this computer
+  (`127.x`, `localhost`, `0.0.0.0` or one of its own addresses) or a multicast group it
+  joined, on that port, while the input is listening. A port the input could not take
+  belongs to another program, so it can be sent to.
+- **Two Palinopsias feeding back to each other** are not stopped: each plays the other's
+  feedback, so a control you move can jump back to where it was a moment ago. **links**
+  marks such a sender `echo ?`. Give one side's F prefixes, turn F off on one side, or
+  mute that sender.
 - **The list is per computer** (it belongs to this network). The first destination is the
   old single one: an existing setup carries over as it was.
 
 **What reaches Palinopsia.** OSC travels over UDP to one machine. Palinopsia hears:
 - messages sent to it (its address, the IN port);
 - broadcasts on the local network (`x.x.x.255`, same port);
-- since v1.3.4, a **multicast group** you join under ↗ in. Type one or more groups
+- since v1.3.4, a **multicast group** you join under ↙ in. Type one or more groups
   (`239.0.0.1`, up to 8), and whatever any device sends to them on that port arrives
-  here, with nothing to change on the senders. Each group shows ✓ joined, or ✗ with the
-  reason.
+  here, with nothing to change on the senders. Each group is joined on every network
+  of this computer (the wired show network as well as the Wi-Fi), and shows ✓ joined
+  (its tooltip names the networks), or ✗ with the reason.
 
 A message sent to another machine never reaches it: add Palinopsia as a destination on
 the sender, broadcast, multicast, or forward it.
 
 **Muting a sender.** In **links**, **mute** on a sender keeps it listed, with its
 addresses, but never plays what it sends. Right-click mute to silence the whole machine
-(every program on that IP). Kept per computer.
+(every program on that IP): a program that reopens its socket comes back from a new
+port, which a mute by port does not cover. One click on **muted** hears it again,
+whichever way it was muted. Kept per computer.
 
 **links** (beside monitor) shows the connections:
 - **every sender** (host:port), with its msg/s and when it was last heard. Open one to see
@@ -4110,8 +4121,12 @@ The lists are kept only while links or the monitor is open.
 - **Aliases** are a controller's own addresses played onto any `/opsia` address, so they
   reach everything, effect and source inputs included. Each takes the argument number,
   the controller's range, the output range, a curve and invert. They are kept per
-  computer, and an alias plays alongside a learned mapping of the same address.
-- **What OSC Learn learned**, with its input range editable and a ✕ to forget it.
+  computer, and an alias plays alongside a learned mapping of the same address. A new
+  alias (**+ alias**, or **map…** in links) starts off, and plays once you pick its
+  target. An address under `/opsia` or `/composition`, or a target outside `/opsia/`, is
+  refused (the box flashes and shows what still plays).
+- **What OSC Learn learned**, with its input range editable (kept low to high; a flat
+  range is refused) and a ✕ to forget it.
 - **The built-in `/opsia` addresses**, read-only, found by typing.
 
 
@@ -4134,16 +4149,16 @@ sync over subsequent ticks; a full resend on (re)start.
 The composited **picture** is also streamed back as vision features (the inward half of
 the loop, so the image can play a sound brain): `/opsia/vision/{brightness | contrast |
 motion | edges | entropy | centroidX | centroidY | warmth | saturation | hue | depth |
-depthSpread | flowX | flowY | divergence | curl | coherence}`, each `f` `0..1`, on the
-same outbound target (see them all live in the Performance tab's **picture** section).
+depthSpread | flowX | flowY | divergence | curl | coherence}`, each `f` `0..1`, with the
+feedback, to each destination ticked F (see them all live in the Performance tab's **picture** section).
 
 **MARK** (the ↗ out half's second switch) draws the picture as sound : a scanline of the
 output read like an optical soundtrack, `/opsia/av/mark-signal` (32 floats) plus
-`/opsia/av/mark-level`, `mark-centroid` and `mark-flux`, to the same target.
+`/opsia/av/mark-level`, `mark-centroid` and `mark-flux`, to each destination ticked M.
 
 Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
-(value `1`) to the same OSC-out target, so an embodied gesture can play the sound side
+(value `1`) to each destination ticked B, so an embodied gesture can play the sound side
 in Pandore.
 
 ### OSC Learn : any controller, in its own addresses

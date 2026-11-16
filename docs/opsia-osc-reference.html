@@ -589,27 +589,37 @@
       </div>
       <div class="card">
         <h3>OSCQuery · WebSocket</h3>
-        <p>A live value-stream on the same port for web / no-UDP clients, every 100 ms while one is attached.
+        <p>A live value-stream on the same port for no-UDP clients on this computer, every 100 ms while one is attached.
+          A web page is answered only when it is served from this computer (<code>localhost</code> or <code>127.0.0.1</code>);
+          any other origin, a page opened from a file included, and any other host name are refused.
           With no <code>LISTEN</code> a client gets every path; <code>LISTEN</code> narrows it to the paths named,
           <code>IGNORE</code> drops one. Triggers, seeks, the audio sensors and <code>/opsia/audiolayer/play</code> are never streamed.</p>
         <p class="flow">→ {COMMAND:<span class="a">"LISTEN"</span>, DATA:"/opsia/…"}<br>← {FULL_PATH, VALUE:[v]}</p>
       </div>
       <div class="card">
         <h3>Outbound feedback</h3>
-        <p>A throttled diff-and-send loop (every 100 ms) pushes only <b>changed</b> controls back to a configured
-          host:port : the same <code>/opsia/…</code> addresses and values as OSCQuery advertises, indices as ints.
-          It follows what is loaded live. Triggers, seeks, the audio sensors and <code>/opsia/audiolayer/play</code> are never echoed. Pandore's UI tracks Opsia's.</p>
-        <p class="flow"><span class="a">Opsia</span> → UDP → host:port</p>
+        <p>A throttled diff-and-send loop (every 100 ms) pushes only <b>changed</b> controls to each <b>destination</b>
+          ticked <b>F</b> (the OSC section's ↗ out lists them; several at once, each its own host:port, optionally only
+          under some address prefixes) : the same <code>/opsia/…</code> addresses and values as OSCQuery advertises,
+          indices as ints, one batch per destination per tick. It follows what is loaded live. Triggers, seeks, the audio
+          sensors and <code>/opsia/audiolayer/play</code> are never echoed. Pandore's UI tracks Opsia's.
+          The same host:port twice is sent to once, and Palinopsia's own input (its port here, or a multicast group it
+          joined) never. Two Palinopsias sending their state to each other do echo : a moved control can jump back
+          (<b>links</b> marks such a sender <code>echo ?</code>).</p>
+        <p class="flow"><span class="a">Opsia</span> → UDP → each destination ticked F</p>
       </div>
       <div class="card">
         <h3>MARK · the picture as sound</h3>
         <p>A scanline of the output, drawn like an optical soundtrack : <code>/opsia/av/mark-signal</code>
-          (32 floats) with <code>mark-level · mark-centroid · mark-flux</code>, to the same host:port.</p>
+          (32 floats) with <code>mark-level · mark-centroid · mark-flux</code>, to each destination ticked <b>M</b>
+          (the Body rules' <code>/body/&lt;rule&gt;</code> go to each one ticked <b>B</b>).</p>
         <p class="flow"><span class="a">MARK</span> on, in the OSC section's ↗ out</p>
       </div>
     </div>
     <p class="blurb">The <b>OSC monitor</b> (the OSC section's <b>monitor</b> button) shows every message in and out,
-      live, with its address, values and destination.</p>
+      live, with its address, values and destination. <b>links</b> lists every sender (host:port) and every destination
+      with its rate; a sender can be muted (by its port, or right-click for its whole host). Under ↙ in, the input can
+      also join up to 8 <b>multicast</b> groups, on every network of the computer.</p>
     <p class="blurb">The same addresses are played by two other routes : the <b>dataflou</b> mesh (each of its
       destinations is an <code>/opsia/…</code> address, played once per change) and the <b>Agent (MCP)</b>'s
       <code>osc</code> tool (<code>/opsia/…</code> only; a trigger it sends fires every time). The agent's numbers go as
@@ -627,7 +637,10 @@
     <p class="blurb">One port, two doors. Every message arrives on the same OSC input port : <code>/opsia/…</code> goes to the
       map above, exactly as before and also while Learn is on; any other address is a controller's own, learned in
       MIDI Learn's mode and played through what it was learned on. A learned address never replaces or hides a
-      built-in one, and both may drive the same control : the last message wins.</p>
+      built-in one, and both may drive the same control : the last message wins. An <b>alias</b> (the OSC section's
+      <b>map</b>) plays a controller's address onto any <code>/opsia/…</code> address, with its argument, ranges, curve
+      and invert; it plays first, then a learned mapping of the same address. A new alias starts off, and plays once
+      its target is picked.</p>
     <div class="sync">
       <div class="card">
         <h3>Learn</h3>

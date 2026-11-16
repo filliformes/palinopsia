@@ -13,6 +13,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { fmtOscArg, oscPeerAddresses, oscPeers, watchOsc, type OscPeer } from '../oscMonitor'
 import { classifyOscAddress, type OscClass } from '../oscClassify'
+import { destsFor } from '../oscDests'
+
+// A sender that takes the feedback and sends this many /opsia values back is most
+// likely another Palinopsia feeding back here : the two echo each other.
+const ECHO_MIN = 24
+const sameHost = (h: string): string => (h === 'localhost' || h.startsWith('127.') ? '127.0.0.1' : h)
 
 function ago(t: number): string {
   const s = (performance.now() - t) / 1000
@@ -57,6 +63,7 @@ export function OscConnections({ onAlias }: { onAlias?: (address: string) => voi
   }, [dests])
   const ins = oscPeers('in')
   const outs = oscPeers('out')
+  const feedbackHosts = new Set(destsFor('feedback').map((d) => sameHost(d.host)))
 
   const peerRow = (p: OscPeer, dir: 'in' | 'out'): JSX.Element => {
     const name = dir === 'out' ? destName.get(p.key) : destHosts.get(p.key.split(':')[0])
@@ -64,6 +71,12 @@ export function OscConnections({ onAlias }: { onAlias?: (address: string) => voi
     const live = p.rate > 0
     const host = p.key.slice(0, p.key.lastIndexOf(':') > 0 ? p.key.lastIndexOf(':') : undefined)
     const isMuted = dir === 'in' && (muted.includes(p.key) || muted.includes(host))
+    let echo = false
+    if (dir === 'in' && !isMuted && feedbackHosts.has(sameHost(host))) {
+      let n = 0
+      for (const a of oscPeerAddresses('in', p.key).keys()) if (a.startsWith('/opsia/') && ++n >= ECHO_MIN) break
+      echo = n >= ECHO_MIN
+    }
     return (
       <div key={`${dir}|${p.key}`} className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-1">
@@ -76,19 +89,31 @@ export function OscConnections({ onAlias }: { onAlias?: (address: string) => voi
           <span className="min-w-0 truncate text-text">{p.key}</span>
           {name && <span className="shrink-0 text-muted">({dir === 'in' ? `host of ${name}` : name})</span>}
           <div className="flex-1" />
+          {echo && (
+            <span
+              className="shrink-0 text-danger"
+              title="This machine gets Palinopsia's feedback (F) and sends many /opsia values back : if it is another Palinopsia feeding back here, the two echo each other and a control you move can jump back. Turn F off on one side, give it prefixes, or mute this sender."
+            >
+              echo ?
+            </span>
+          )}
           <span className="shrink-0 tabular-nums text-muted">{p.rate}/s</span>
           <span className="w-10 shrink-0 text-right tabular-nums text-muted">{ago(p.lastAt)}</span>
           <span className={`shrink-0 text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}>▸</span>
         </button>
         {dir === 'in' && (
           <button
-            onClick={() => toggleMuted(muted.includes(host) ? host : p.key)}
+            onClick={() => {
+              // muted (by its port, its host or both) : one click hears it again
+              if (!isMuted) toggleMuted(p.key)
+              else for (const k of new Set([p.key, host])) if (muted.includes(k)) toggleMuted(k)
+            }}
             onContextMenu={(e) => { e.preventDefault(); toggleMuted(host) }}
             className={`shrink-0 rounded px-1 font-mono text-[9px] ${isMuted ? 'bg-danger/20 text-danger ring-1 ring-danger' : 'bg-panel2 text-muted hover:text-text'}`}
             title={
               isMuted
                 ? `Muted${muted.includes(host) ? ` (the whole host ${host})` : ''} : still shown here, never played. Click to hear it again.`
-                : `Mute this sender (${p.key}) : still shown here, never played. Right-click : mute the whole host ${host} (every program on that machine).`
+                : `Mute this sender (${p.key}) : still shown here, never played. A program that reopens comes back from a new port and plays again : right-click mutes the whole host ${host} (every program on that machine).`
             }
           >
             {isMuted ? 'muted' : 'mute'}

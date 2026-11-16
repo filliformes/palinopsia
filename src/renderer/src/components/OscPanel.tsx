@@ -44,7 +44,7 @@ function MulticastRow(): JSX.Element {
         title="Multicast groups to join (224.0.0.0 to 239.255.255.255, separated by commas) : whatever is sent to a group on this network, on the port above, reaches Palinopsia without being sent to it. Broadcasts (x.x.x.255) arrive without this."
       />
       {status?.joined.map((g) => (
-        <span key={g} className="shrink-0 text-accent" title={`Joined ${g} : its messages arrive here`}>
+        <span key={g} className="shrink-0 text-accent" title={`Joined ${g}${status.on?.[g]?.length ? ` on ${status.on[g].join(', ')}` : ''} : what is sent to it on those networks arrives here`}>
           ✓ {g}
         </span>
       ))}

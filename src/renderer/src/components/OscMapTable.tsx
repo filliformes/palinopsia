@@ -20,14 +20,19 @@ const num = (s: string, d: number): number => {
   return Number.isFinite(v) ? v : d
 }
 
-function NumBox({ value, onCommit, w = 38, title }: { value: number; onCommit: (v: number) => void; w?: number; title: string }): JSX.Element {
+// onCommit may refuse the value (false) : the box always shows the value kept
+function NumBox({ value, onCommit, w = 38, title }: { value: number; onCommit: (v: number) => boolean | void; w?: number; title: string }): JSX.Element {
   const [s, setS] = useState(String(value))
   useEffect(() => setS(String(value)), [value])
   return (
     <input
       value={s}
       onChange={(e) => setS(e.target.value)}
-      onBlur={() => onCommit(num(s, value))}
+      onBlur={() => {
+        // back to the kept value; a value taken (maybe clamped) arrives by its prop
+        onCommit(num(s, value))
+        setS(String(value))
+      }}
       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       className="input px-0.5 py-0 text-right text-[10px] tabular-nums"
       style={{ width: w }}
@@ -51,15 +56,33 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
   // "map…" from the connections view : a new alias for that address
   useEffect(() => {
     if (!prefill) return
-    const a = cleanAlias({ address: prefill, target: '/opsia/meta/1', inMin: 0, inMax: 1, outMin: 0, outMax: 1 })
+    // off until its target is picked : a live controller must not start playing a
+    // placeholder (Macro knob 1) the moment it is mapped
+    const a = cleanAlias({ address: prefill, target: '/opsia/meta/1', inMin: 0, inMax: 1, outMin: 0, outMax: 1, on: false })
     if (a && !aliases.some((x) => x.address === prefill)) setAliases([...aliases, a])
     setFilter(prefill)
     onPrefillUsed?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill])
 
-  const updAlias = (id: string, patch: Partial<OscAlias>): void => {
-    setAliases(aliases.map((a) => (a.id === id ? cleanAlias({ ...a, ...patch }) ?? a : a)))
+  // false when the edit is refused (an address under /opsia or /composition, a
+  // target outside /opsia/) : the box then shows what is kept
+  const updAlias = (id: string, patch: Partial<OscAlias>): boolean => {
+    const cur = aliases.find((a) => a.id === id)
+    if (!cur) return false
+    // picking where it plays starts it (a new alias waits, off, for this)
+    const next = cleanAlias({ ...cur, ...patch, ...(patch.target !== undefined && patch.target !== cur.target ? { on: true } : {}) })
+    if (!next) return false
+    setAliases(aliases.map((a) => (a.id === id ? next : a)))
+    return true
+  }
+  // a learned range : refused when empty or flat, kept low to high (a reversed one
+  // read as a switch, and a reload put it back the other way)
+  const setRange = (id: string, b: OscBinding, scope: MappingScope, lo: number, hi: number): boolean => {
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo === hi) return false
+    if (Math.min(lo, hi) === b.min && Math.max(lo, hi) === b.max) return false
+    setOscBinding(id, { ...b, min: Math.min(lo, hi), max: Math.max(lo, hi) }, scope)
+    return true
   }
   const learned: Array<{ id: string; b: OscBinding; scope: MappingScope }> = [
     ...Object.entries(sessionOscMap).map(([id, b]) => ({ id, b, scope: 'session' as const })),
@@ -105,7 +128,7 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
                   <button
                     onClick={() => updAlias(a.id, { on: !a.on })}
                     className={`shrink-0 rounded px-1 ${a.on ? 'bg-accent/20 text-accent' : 'bg-panel3 text-muted'}`}
-                    title={a.on ? 'On : click to stop it' : 'Off : click to play it'}
+                    title={a.on ? 'On : click to stop it' : 'Off : click to play it (a new alias starts once its target is picked)'}
                   >
                     ALIAS
                   </button>
@@ -131,7 +154,7 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
             ))}
           <button
             onClick={() => {
-              const a = cleanAlias({ address: '/1/fader1', target: '/opsia/meta/1' })
+              const a = cleanAlias({ address: '/1/fader1', target: '/opsia/meta/1', on: false })
               if (a) setAliases([...aliases, a])
             }}
             className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-text"
@@ -160,8 +183,8 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
               </span>
               {!b.bool && (
                 <>
-                  <NumBox value={b.min} onCommit={(v) => setOscBinding(id, { ...b, min: v }, scope)} title="The controller's lowest value (learned; edit to correct it)" />
-                  <NumBox value={b.max} onCommit={(v) => setOscBinding(id, { ...b, max: v }, scope)} title="The controller's highest value" />
+                  <NumBox value={b.min} onCommit={(v) => setRange(id, b, scope, v, b.max)} title="The controller's lowest value (learned; edit to correct it)" />
+                  <NumBox value={b.max} onCommit={(v) => setRange(id, b, scope, b.min, v)} title="The controller's highest value" />
                 </>
               )}
               <button onClick={() => setOscBinding(id, null, scope)} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Forget this mapping">
@@ -195,17 +218,24 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
   )
 }
 
-function AddrBox({ value, onCommit, title, list }: { value: string; onCommit: (v: string) => void; title: string; list?: string }): JSX.Element {
+function AddrBox({ value, onCommit, title, list }: { value: string; onCommit: (v: string) => boolean; title: string; list?: string }): JSX.Element {
   const [s, setS] = useState(value)
+  const [bad, setBad] = useState(false)
   useEffect(() => setS(value), [value])
   return (
     <input
       value={s}
       list={list}
       onChange={(e) => setS(e.target.value.trim())}
-      onBlur={() => (s === value ? undefined : onCommit(s))}
+      onBlur={() => {
+        if (s === value || onCommit(s)) return
+        // refused : back to the address that still plays, flashed red
+        setS(value)
+        setBad(true)
+        window.setTimeout(() => setBad(false), 700)
+      }}
       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      className="input min-w-0 flex-1 px-1 py-0 text-[10px]"
+      className={`input min-w-0 flex-1 px-1 py-0 text-[10px] ${bad ? 'ring-1 ring-danger' : ''}`}
       title={title}
     />
   )

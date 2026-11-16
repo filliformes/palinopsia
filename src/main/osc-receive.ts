@@ -21,11 +21,37 @@ export function isMulticastGroup(a: string): boolean {
   return !!m && m.slice(1).every((o) => Number(o) <= 255) && Number(m[1]) >= 224 && Number(m[1]) <= 239
 }
 
+export interface GroupJoins {
+  joined: string[] // joined on at least one interface
+  failed: Array<{ group: string; error: string }>
+  on: Record<string, string[]> // each joined group : the interfaces (IPv4) it was joined on
+}
+
+/** Join each group on EVERY interface given (left to itself, the OS joins one,
+ *  the one with the default route : a wired show network beside Wi-Fi never got
+ *  the group). With no interface, the OS's choice, as before. A group refused on
+ *  one interface still counts as joined where it worked; refused everywhere, it
+ *  is failed with the reason. */
+export function joinGroups(groups: string[], ifaces: string[], add: (group: string, iface?: string) => void): GroupJoins {
+  const res: GroupJoins = { joined: [], failed: [], on: {} }
+  for (const g of groups.slice(0, 8)) {
+    if (!isMulticastGroup(g)) { res.failed.push({ group: g, error: 'not a multicast address (224.0.0.0 to 239.255.255.255)' }); continue }
+    const ok: string[] = []
+    let err = ''
+    for (const ip of ifaces.length ? ifaces : [undefined]) {
+      try { add(g, ip); ok.push(ip ?? 'default') } catch (e) { err ||= `${ip ?? 'default'} : ${(e as Error).message}` }
+    }
+    if (ok.length) { res.joined.push(g); res.on[g] = ok } else res.failed.push({ group: g, error: err || 'refused' })
+  }
+  return res
+}
+
 export class OscReceiver {
   private udp: osc.UDPPort | null = null
-  // the multicast groups the socket joined, and the ones it could not
+  // the multicast groups the socket joined (and on which interfaces), and the ones it could not
   joined: string[] = []
   failed: Array<{ group: string; error: string }> = []
+  joinedOn: Record<string, string[]> = {}
   private onMessage: ((m: OscInMessage) => void) | null = null
 
   setOnMessage(cb: (m: OscInMessage) => void): void {
@@ -37,10 +63,11 @@ export class OscReceiver {
    * Resolves once the socket is ready; rejects on a bind failure (e.g. the
    * port is already taken). Closes any existing socket first.
    */
-  start(port: number, groups: string[] = []): Promise<void> {
+  start(port: number, groups: string[] = [], ifaces: string[] = []): Promise<void> {
     this.stop()
     this.joined = []
     this.failed = []
+    this.joinedOn = {}
     return new Promise((resolve, reject) => {
       const udp = new osc.UDPPort({ localAddress: '0.0.0.0', localPort: port, metadata: true })
       // Track the socket from the moment it's created, not only on 'ready', so a
@@ -52,10 +79,12 @@ export class OscReceiver {
         // Join the multicast groups asked for (the socket listens on every interface :
         // a group's messages on the local network now reach it too). One refused
         // group never stops the others, nor the listener.
-        const sock = (udp as unknown as { socket?: { addMembership(g: string): void } }).socket
-        for (const g of groups.slice(0, 8)) {
-          if (!isMulticastGroup(g)) { this.failed.push({ group: g, error: 'not a multicast address (224.0.0.0 to 239.255.255.255)' }); continue }
-          try { sock?.addMembership(g); this.joined.push(g) } catch (e) { this.failed.push({ group: g, error: (e as Error).message }) }
+        const sock = (udp as unknown as { socket?: { addMembership(g: string, iface?: string): void } }).socket
+        if (sock && groups.length) {
+          const r = joinGroups(groups, ifaces, (g, ip) => sock.addMembership(g, ip))
+          this.joined = r.joined
+          this.failed = r.failed
+          this.joinedOn = r.on
         }
         settled = true
         resolve()
