@@ -244,6 +244,29 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **dataflou : the one node keeps every wire** (found in the v1.3.4 audit, before release).
+  - **The update cut wires.** A wire saved by v1.3.3 into anything but the Macro knobs
+    (a layer, Feel, a scene, an action) stopped playing, and was erased from the bindings
+    file the next time any wire changed; the second node's wires and scene slots were
+    never read. Now the first run publishes every destination a saved wire plays
+    (`DfConfig.migrate`, one time), and `bindings-<universe>-session.json` and its scenes
+    file join the one node's (renamed `.v133`, never deleted).
+  - **A wire into what you stop publishing waits** instead of hanging on : kept and saved
+    (`DataflouNode.parked`), its stream stopped and the mesh told, listed in the
+    connections box with a **publish** button, and asked to stream at once when its
+    parameter is published again (it used to wait up to 15 s).
+  - **Unpublishing a source that something streamed** threw in the send pump twice a
+    second (30 s for another node's wire, forever for a wire inside Palinopsia), filling
+    the log and skipping the other streams. Its streams and last value now go with it.
+  - **The old `<name>-session` node is forgotten** : a node that still remembers it (by
+    HELLO, DIGEST or gossip) is sent a FLUSH, and it never shows in the network list.
+  - **What a C++ node cannot see** : a line under publish counts the published
+    parameters past the reference core's 128 entries and 32 per group (`dfCppHidden`,
+    played as its ParamStore declares a tree).
+  - **A group ticked one parameter at a time** (Background after wiring it, Tempo, World)
+    now unpublishes on the first click of its ✓; the World amount's group reads **World**.
+  - The README's list of destinations gains `feel/tonicity`, `feel/shutter`,
+    `feel/superimposition`, `world/amount`, and says `feel/drift` plays `/opsia/wander`.
 - **The Windows shortcuts' icon.** The desktop and Start menu shortcuts (and so the taskbar)
   showed a blank page instead of Palinopsia's icon : the installer wrote the app's long
   description into each shortcut, which Windows cut short while keeping its length, so

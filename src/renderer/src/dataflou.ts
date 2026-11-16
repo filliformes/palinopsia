@@ -30,7 +30,7 @@ const SIGNAL_BY_PATH = new Map<string, string>([
 
 const EMPTY: DfStatus = {
   running: false, error: null, sku: '', label: '', universe: '', address: '', tcpPort: 0, udpPort: 0,
-  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, published: 0, actions: 0, actionsDropped: 0,
+  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, cppHidden: 0, parked: [],
   visualizer: 0, visualizerAvailable: false
 }
 
@@ -452,6 +452,13 @@ export async function applyDataflou(): Promise<void> {
     sendWatches() // (the node may be new : its universe's list)
     listensSent = ''
     syncListens()
+    // the first run after the update from v1.3.3 : what the saved wires play is
+    // published too (its new tree follows through the publish list's effect)
+    if (cfg.migrate && status.running) {
+      const paths = publishableParked()
+      const now = useStore.getState().dataflou
+      useStore.getState().setDataflou({ migrate: false, publish: [...now.publish, ...paths.map((p) => `p:${p}`)] })
+    }
   } catch (e) {
     setStatus({ ...EMPTY, error: (e as Error).message })
   }
@@ -540,6 +547,18 @@ export function isDfPublished(path: string): boolean {
   const pub = new Set(useStore.getState().dataflou.publish)
   const action = path.startsWith('act/') ? dataflouActions().find((a) => a.path === path) : undefined
   return dfPublished(pub, dfGroupOf(path, action?.group), path)
+}
+
+/** The destinations whose saved wires wait (not published now) that can be
+ *  published : a fixed one, or an action the session has. */
+export function publishableParked(): string[] {
+  const acts = new Set(dataflouActions().map((a) => a.path))
+  return status.parked.filter((p) => !isDfPublished(p) && (DEST_BY_PATH.has(p) || acts.has(p)))
+}
+
+/** Publish the destinations whose wires wait, so they play again. */
+export async function publishParked(): Promise<void> {
+  await ensurePublished(publishableParked())
 }
 
 /** Publish these paths (one by one) if they are not yet, and wait for the node's

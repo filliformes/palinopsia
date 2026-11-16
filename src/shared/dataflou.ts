@@ -153,6 +153,11 @@ export interface DfStatus {
   published: number // the parameters on the mesh now (groups aside)
   actions: number // of which actions (Body rule list triggers)
   actionsDropped: number // published actions left out : the tree would pass one frame
+  // published parameters a node on the reference C++ core cannot see : it keeps
+  // 128 entries of a tree and 32 children per group, silently (see dfCppHidden)
+  cppHidden: number
+  // our destinations with saved wires that wait : not published now
+  parked: string[]
   visualizer: number // visualizer pages open on this node now
   visualizerAvailable: boolean // does this build carry the visualizer page ?
 }
@@ -168,6 +173,10 @@ export interface DfConfig {
   // layer, feel, scene, bg, randomize, output, bpm, audio, vision, body, mod),
   // or `act:<heading>` for a heading of the Body rule list's actions.
   publish: string[]
+  // Set by the update from v1.3.3 (one node, the Macro knobs only) : the first
+  // time the node runs, the destinations its saved wires play are published too,
+  // so they keep playing. The renderer's alone (main ignores it).
+  migrate?: boolean
 }
 
 export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', publish: ['g:meta'] }
@@ -354,7 +363,7 @@ const GROUP_LABELS: Record<string, string> = {
   meta: 'Macro knobs', layer: 'Layers', feel: 'Feel', scene: 'Scenes',
   bg: 'Background', randomize: 'Randomize', output: 'Output transform',
   audio: 'Audio in', vision: 'Picture', body: 'Body', mod: 'Modulators',
-  act: 'Actions (the Body rule list)'
+  act: 'Actions (the Body rule list)', world: 'World'
 }
 
 /** The fixed groups the dataflou section offers to publish, in tree order, with
@@ -374,6 +383,58 @@ export const DF_PUBLISH_GROUPS: Array<{ key: string; label: string; items: Array
   for (const s of DF_SOURCES) push(s.path, s.label, true)
   return out
 })()
+
+/** How many of a tree's parameters a node on the reference C++ core cannot see.
+ *  Its store keeps 128 entries (groups included, the root aside) and 32 children
+ *  per group, root included, and silently stops adding : an entry past a full
+ *  group still takes one of the 128, and whatever hangs under it is out of reach.
+ *  Played here exactly as its ParamStore declares a tree, entry by entry. */
+export function dfCppHidden(params: readonly DfParam[], cap = 128, children = 32): number {
+  type N = { name: string; kids: N[] }
+  const root: N = { name: '', kids: [] }
+  let used = 0
+  const alloc = (name: string): N | null => (used >= cap ? null : (used++, { name, kids: [] }))
+  const attach = (parent: N, n: N): void => {
+    if (parent.kids.length < children) parent.kids.push(n)
+  }
+  const segs = (path: string): string[] => path.split('/').filter(Boolean).map((x) => x.slice(0, 32))
+  const groupAt = (path: string[]): N => {
+    let cur = root
+    for (const seg of path) {
+      const had = cur.kids.find((k) => k.name === seg)
+      if (had) {
+        cur = had
+        continue
+      }
+      const n = alloc(seg)
+      if (!n) continue // (the store full : the walk stays where it is, as the core's)
+      attach(cur, n)
+      cur = n
+    }
+    return cur
+  }
+  const kinds = new Map<N, 'group' | 'param'>()
+  for (const p of params) {
+    const s = segs(p.path)
+    if (!s.length) continue
+    const parent = groupAt(s.slice(0, -1))
+    const name = s[s.length - 1]
+    if (parent.kids.some((k) => k.name === name)) continue
+    const n = alloc(name)
+    if (!n) continue
+    kinds.set(n, p.kind)
+    attach(parent, n)
+  }
+  let seen = 0
+  const walk = (n: N): void => {
+    for (const k of n.kids) {
+      if (kinds.get(k) === 'param') seen++
+      walk(k)
+    }
+  }
+  walk(root)
+  return params.filter((p) => p.kind === 'param').length - seen
+}
 
 function param(path: string, label: string, p: Partial<DfParam>): DfParam {
   return {
