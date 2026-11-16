@@ -881,6 +881,8 @@ export function readContinuous(id: string): number | null {
     const r = st.bodyControl.rules.find((x) => x.id === id.slice(5))
     return r ? (r.enabled ? 1 : 0) : null
   }
+  // (the World amount has a modulator target : answer what it plays)
+  if (id === 'field:worldAmount') return clamp01(liveModValues.get('world:amount') ?? st.worldAmount)
   const fk = FIELD_KEYS[id]
   if (fk) return clamp01(st[fk])
   if (id.startsWith('sonify:param:')) {
