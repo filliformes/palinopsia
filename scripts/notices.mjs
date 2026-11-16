@@ -43,13 +43,15 @@ function npmDependencies() {
     if (!key.startsWith('node_modules/')) continue
     const name = key.slice(key.lastIndexOf('node_modules/') + 'node_modules/'.length)
     if (v.dev && !BUNDLED_DEV.includes(name)) continue
-    // Optional packages are per-OS binaries (koffi's, esbuild's…) : only one OS
+    // Per-OS binaries (koffi's : optional, with an os / cpu field) : only one OS
     // installs each, so they are listed from the lockfile alone (no file text),
-    // and the generated file comes out the same on every OS.
+    // and the generated file comes out the same on every OS. Other optional
+    // packages (osc's serialport and its own dependencies) install everywhere and
+    // ship in the app : their license file is reproduced like any dependency's.
     const dir = path.join(ROOT, key)
     let license = v.license || ''
     let text = ''
-    if (v.optional) text = `(a per-OS binary package of a dependency above, under the same terms : ${license || 'see its package'})`
+    if (v.optional && (v.os || v.cpu)) text = `(a per-OS binary package of a dependency above, under the same terms : ${license || 'see its package'})`
     else if (fs.existsSync(dir)) {
       try {
         const pj = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
