@@ -15,6 +15,14 @@ let lastMs = 0
 let hot = -1
 let lastTick = -1
 
+/** A layer the flicker can show : it plays something, is not muted, and its
+ *  fader is up. The Feel panel counts the same layers to grey the dial, so it
+ *  never says "it needs two visible layers" while the engine strobes the only
+ *  picture against the empty slots (they sit at opacity 1). */
+export function superLayerOn(L: { mute: boolean; opacity: number; sourceA: { kind: string } } | null | undefined): boolean {
+  return !!L && !L.mute && L.opacity > 0.001 && L.sourceA.kind !== 'none'
+}
+
 /** Strobe the layer stack. `amount` 0 = off (deadzone); 1 = only the hot layer
  *  shows. `rateFps` = strobe rate (drawn frames/sec) on the own clock.
  *  `filmTick` = the Cameraless draw-tick serial (-1 when that stage isn't running) :
@@ -26,9 +34,16 @@ export function applyFlicker(
   amount: number,
   rateFps: number,
   nowMs: number,
-  filmTick = -1
+  filmTick = -1,
+  /** The composition's layers : only the ones superLayerOn passes take part. */
+  layers?: ReadonlyArray<Parameters<typeof superLayerOn>[0]>
 ): number {
-  if (amount < 0.02) {
+  // Which layers can show (the engine's opacity too : a layer faded to 0 this
+  // frame is not one). Under two there is nothing to flicker between : off.
+  const can = (i: number): boolean => (!layers || superLayerOn(layers[i])) && (comp.layers[i]?.opacity ?? 0) > 0.001
+  let count = 0
+  for (let i = 0; i < comp.layers.length; i++) if (can(i)) count++
+  if (amount < 0.02 || count < 2) {
     lastMs = nowMs
     hot = -1
     lastTick = -1
@@ -36,7 +51,8 @@ export function applyFlicker(
   }
   const dt = lastMs > 0 ? Math.min(0.2, (nowMs - lastMs) / 1000) : 0
   lastMs = nowMs
-  let reroll = hot < 0
+  // (the layer showing went away, muted or emptied : pick another now)
+  let reroll = hot < 0 || !can(hot)
   if (filmTick >= 0) {
     // Lock to the drawn frames.
     if (filmTick !== lastTick) reroll = true
@@ -55,10 +71,10 @@ export function applyFlicker(
   }
 
   if (reroll) {
-    // Eligible = layers currently carrying some opacity (visible, not muted-to-0).
+    // Eligible = the layers that can show (superLayerOn, fader up this frame).
     const elig: number[] = []
-    comp.layers.forEach((L, i) => {
-      if (L && L.opacity > 0.001) elig.push(i)
+    comp.layers.forEach((_L, i) => {
+      if (can(i)) elig.push(i)
     })
     if (elig.length > 1) {
       let pick = elig[Math.floor(Math.random() * elig.length)]
@@ -69,9 +85,10 @@ export function applyFlicker(
     }
   }
 
-  // Dim every non-hot layer toward black by `amount` (1 = hard cut to the hot one).
+  // Dim every other layer that can show toward black by `amount` (1 = hard cut
+  // to the hot one). The rest (empty, muted) are left alone.
   comp.layers.forEach((L, i) => {
-    if (L && i !== hot) L.opacity *= 1 - amount
+    if (L && i !== hot && can(i)) L.opacity *= 1 - amount
   })
   return hot
 }

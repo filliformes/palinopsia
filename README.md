@@ -861,7 +861,7 @@ Left → right:
   default 1 s : scene recalls, Randomize, Variation, the sequencer, sessions, New and
   Generate all morph over this, live). (**Proximity** and its `◑` moved to [Feel](#feel--whole-picture-dials-key-g) in v1.3.4.)
 - **`{ }`** (opens the [Source Editor](#source-editor--your-own-shaders-alte), also
-  `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector (the active World reads *· film off* when its film is not playing as it sets it, as after New) + its **amt** : the [World amount](#worlds--diegesis-key-w), a fader with Learn and its **M** · **❄ Freeze** :
+  `Alt+E`, `Cmd+Option+E` on a Mac) · **World** (opens the World editor, also key `W`) + the World selector (the active World reads *· film off* when its film is not playing as it sets it, as after New) + its amount : the [World amount](#worlds--diegesis-key-w), the fader right after the menu (no label of its own), with Learn and its **M** · **❄ Freeze** :
   hold the output on the current frame (the button lights while held; also key `H` or a
   learned pad). Messages (a refused effect drop, a saved recording) pass over the top of
   the picture; with a page over it they appear in the toolbar's empty middle, always in the
@@ -956,13 +956,14 @@ run fetch:depth` (see [Building from source](#getting-started)).
 Nine dials that bend the **whole picture at once**, on top of your layers and Finishing,
 in their own right-column tab : each a wide slider with its poles, a live readout and a
 one-line description. They write the engine each frame, never your sliders (they stack
-with modulators and each other), and each rests at a point that changes nothing. None of
-them blurs : blur is yours to set (Context), and each right side has its own character. **They
+with modulators and each other), and each rests at a point that changes nothing. Only
+Proximity's far side softens (optical distance); none of the others blurs : blur is yours to
+set (Context), and each right side has its own character. **They
 belong to the session** : Density, Proximity and its `◑`, Gesture ⇄ Texture, Coalesce,
 Tonicity, Wander and Interruption ⇄ Flow are saved with it and come back with it, are
 undoable, New sets them to rest, and a Generate sets them for the session it makes (an
-older session opens with them at rest). The two strobes (Shutter, Superimposition) start
-at 0 and are never set by Generate (a session does not keep them). **↺** puts every dial
+older session opens with them at rest). The two strobes (Shutter, Superimposition) are not
+saved with a session : they start at 0, and New, Open and Generate turn them off. **↺** puts every dial
 back to rest.
 
 **You can see what Feel is doing** : a dot on the **feel** tab while a dial is off rest
@@ -1454,7 +1455,7 @@ the composite live.
 - **The visualizer** reads the World on real generators, **your layers** included, driven
   by simulated audio or the **live sound** (the audio tab's input).
 - **The live code (JSON)** is folded until you open it (remembered).
-- **World amount** (the header, and the Transport's **amt** beside the World menu, each
+- **World amount** (the header, and the Transport's fader right after the World menu, each
   with its **M**; Learn; OSC `/opsia/world/amount`) : how much of this World is on. 1 :
   all of it. 0 : its push on the Context air and the film taken back off. It fades only
   the World's own change to those keys, frame by frame (`engine/worldAmount.ts`) : below
@@ -3722,7 +3723,7 @@ picture under the cut, so Outlines Only and Color Isolate did nothing).
 | Stage | Description |
 |---|---|
 | **Vibe Palette** | The always-on colour-**mastering** stage: an **opacity** dry/wet on top, auto-levels (temporally smoothed min/max), gamma tone placement, palette map, source mix-back, contrast, saturation, and split-tone. Decides the whole output's look; survives every global Randomize. Ships 56 palettes. |
-| **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Coalesce, Flow, Gesture⇄Texture, the sequencer's Breathe / Arc or a modulator add blur, haze, trails or depth on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, Coalesce`), and its **neutral** button puts those macros back to 0.5. |
+| **Context** | The always-on **depth** finalizer: temporal trails, a soft key light with volumetric bloom (place it on its pad, or **✎ draw** a path and **play** it : the light travels the drawing with the Metasurface's draw sequencer, direction, loop, time, jump and wiggle; **Vibe Color** lights it in the color the Vibe Palette is painting with), atmospheric haze, spatial blur (yours alone : it starts at 0, and New, Randomize, Variation, Generate and Worlds never set it; its ring-shaped blur and bloom are the default look, and `smoothing` gives the soft version), a depth vignette, a **void / edge-dissolve** (the frame's edges eaten toward black), and a **surface material** (project the composition onto one of 30 scanned materials; **evolution** keeps it from sitting still, as if a little wind moved the projector or the camera). Every parameter at zero is a clean passthrough. When Proximity, Interruption ⇄ Flow, Gesture ⇄ Texture, the World amount, the sequencer's Breathe / Arc or a modulator add blur, haze, trails, depth or the material on top of the sliders, a line under Context's header says what the picture really gets (e.g. `live blur 0.23 · haze 0.13 ← Proximity, World amount`), and its **rest** button puts those dials back to rest (Proximity to 0.5 with its `◑` off, the World amount to 1). |
 | **Finalizer** | The last always-on stage: a final grade (input black/white + gamma + per-channel R/G/B gain, and an **opacity** that fades the whole picture to black), sharpen, and physically-modelled grain over everything (on the dome, its film and digital grain is drawn after the mapping, in the master's pixels; its **crt** and **vhs** characters carry the same scanline **parasites** as the [Grain](#the-catalogue-65-effects) effect), plus an **output shaper** (clip the frame to any of ~21 silhouettes with a drop-shadow, filled by a colour or the Background; a clean edge at any resolution, or as soft as its **feather** asks; **post warp** measures the shape on the projector, after the Mapping warp, so a circle stays a perfect circle however the picture is keystoned to fit, where it used to come out an oval; **z tilt** and **z turn** lean the shape's own plane into depth, a disc seen at an angle, on top of the picture's warp), the **anaglyph 3D stage** (`stereo`: off / red-cyan / grayscale, with depth, convergence and invert : this is where the shaders described as "at home under anaglyph" get their glasses), the **Cameraless film hold** (a hand-made-film pass: draw-clock hold + boil / flutter, granulation and splice; **grab ▸** re-draws or re-freezes it on a trigger), and **film damage**, modelled on real prints and working with or without the hold : **dust** that changes every film frame (24 fps, Super 8 18; mostly tiny specks, rarely a big mottled clump, dark on the print or white sparkle from the negative, the odd fibre), **scratches** that run along the strip (they last, wander slowly, break up, dark / white / emulsion-coloured, sometimes in tramlines), the **film gauge** (35 mm / 16 mm / Super 8 scales it all) and **dirt on** (print / mixed / negative), plus **burst ▸** : a dirty stretch of film passes the gate (four to eight times the dust for about a second, even with dust at 0), to fire on a beat or an onset (bind M, MIDI or OSC). Sizes are in fractions of the frame, so a 1080p render and an 8K dome master look the same. All of it ships **off on a fresh or New session** and is switched on by the direct-film Worlds (Griffé · Peint · Pressé) or by hand, so a blank slate never opens with specks over the picture. The **output shape comes last**, after the film hold and the damage : the film weaves and gathers dust inside a fixed aperture, and the fill outside stays clean. Neutral at defaults. |
 
 In the **Finishing** view (key `F`) each stage is split into labeled sections : Vibe

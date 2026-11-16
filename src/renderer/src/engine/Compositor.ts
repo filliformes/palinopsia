@@ -3418,15 +3418,28 @@ export class Compositor {
       const own = Math.round(numf(ctx.inputs.pbrTexture, 0));
       const idx = own > 0 ? own : this.feelMaterial;
       const maps = idx > 0 ? this.pbrLib.get(idx) : this.pbrLib.neutralMaps();
-      // (Feel's Texture : the shader is told the material too)
-      if (own === 0 && idx > 0) this.masterRack.setUnitInput(ctx.id, 'pbrTexture', idx);
       this.masterRack.setUnitImage(ctx.id, 'pbrNormal', maps.normal);
       this.masterRack.setUnitImage(ctx.id, 'pbrHeight', maps.height);
       this.masterRack.setUnitImage(ctx.id, 'pbrAO', maps.ao);
-      // Texture "off" hard-zeroes the relief so the stage is a guaranteed
-      // passthrough whatever the sliders hold.
-      if (idx === 0) this.masterRack.setUnitInput(ctx.id, 'pbrAmount', 0);
+      // The surface's base, pushed every frame : the sync above only sends the
+      // keys the Context holds, and it rarely holds these (a new Context has
+      // none), so a value written over them (Feel's Texture, the off switch
+      // below) stuck in the shader after it let go : the material kept swaying
+      // with the evolution slider at 0, or a material picked later showed no
+      // relief at all. The shader is told the material (Feel's Texture lends
+      // paper when the session has none). Texture "off" hard-zeroes the relief so
+      // the stage is a guaranteed passthrough whatever the sliders hold, and so
+      // does a material only Feel lends (Texture raises it from 0 the same frame;
+      // the frame it lets go would else show the stored relief on paper).
+      this.masterRack.setUnitInput(ctx.id, 'pbrTexture', idx);
+      this.masterRack.setUnitInput(ctx.id, 'pbrAmount', own > 0 ? numf(ctx.inputs.pbrAmount, 0.5) : 0);
+      this.masterRack.setUnitInput(ctx.id, 'pbrEvolve', numf(ctx.inputs.pbrEvolve, 0));
     }
+    // Vibe's chord chroma, the same way : Tonicity writes it, and a Vibe Palette
+    // rarely holds the key (makeVibePalette has none), so it stuck where Tonicity
+    // left it.
+    const vibe = c.master.find((f) => f.shaderId === 'fx-vibe');
+    if (vibe) this.masterRack.setUnitInput(vibe.id, 'chroma', numf(vibe.inputs.chroma, 0.55));
   }
 
   /** Direct write to an FX unit's ISF input in any rack (modulation path). */

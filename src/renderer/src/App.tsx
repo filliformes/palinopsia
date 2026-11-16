@@ -1691,7 +1691,7 @@ export default function App(): JSX.Element {
           const fin = c.master.find((f) => f.shaderId === 'fx-finalizer')?.inputs
           const filmOn = fin && Math.round(Number(fin.filmHold) || 0) > 0
           const rateFps = filmOn ? Number(fin!.filmRate) || 8 : 8
-          flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now, comp!.filmTickSerial())
+          flickerHot = applyFlicker(comp!, st.superFlicker, rateFps, now, comp!.filmTickSerial(), c.layers)
         }
         // 2h. Frame-Weave : temporal interlace, show ONE layer per frame stepping
         //     through the lattice. Runs whenever enabled (independent of the scene
@@ -2748,7 +2748,7 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
     {
       id: 'feel',
       label: 'feel',
-      title: `Feel (G) : whole-picture dials over everything at once. They ride on top of your settings and save with the session.${feelOff ? ` Not at rest : ${feelOff}` : ' All at rest.'}`
+      title: `Feel (G) : whole-picture dials over everything at once. They ride on top of your settings and save with the session (not the two strobes, Shutter and Superimposition, which New and Open turn off).${feelOff ? ` Not at rest : ${feelOff}` : ' All at rest.'}`
     },
     { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, dataflou, Ableton Link, Resolume and the Agent, each a collapsible section' },
     {

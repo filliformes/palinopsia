@@ -758,7 +758,7 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       return { label: `RULE ${name} : ${v}${r ? '' : ' (gone)'}`, verb: w.verb(name), token: `Rule${camel(name).slice(0, 10)}${w.token}`, group: 'Body rules', title: w.title, gone: !r }
     }
     case 'feel': {
-      if (p[2] === 'reset') return { label: 'FEEL reset', verb: 'resets the Feel', token: 'FeelReset', group: 'Feel', title: 'All eight Feel macros back to neutral' }
+      if (p[2] === 'reset') return { label: 'FEEL reset', verb: 'resets the Feel', token: 'FeelReset', group: 'Feel', title: 'Every Feel dial back to rest (and Proximity’s ◑ off)' }
       const f = FEEL.find((x) => x.key === p[2])
       if (!f || (p[3] !== 'up' && p[3] !== 'down')) return null
       return { label: `FEEL ${f.label} ${p[3]}`, verb: `${p[3] === 'up' ? 'raises' : 'lowers'} ${f.label}`, token: camel(`${f.key} ${p[3]}`), group: 'Feel', title: `A tenth ${p[3]} on the ${f.label} dial` }

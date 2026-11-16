@@ -25,8 +25,8 @@ that CI builds into cross-platform releases.
     each layer's fader; a live line on each Finishing stage (Vibe, Context, Finalizer)
     with the values the picture really gets, the dials adding them and a **rest** button.
     Tonicity greys while the audio input is off, Superimposition under two visible layers.
-  - **The World amount is a performance fader.** Beside the World menu in the Transport
-    (**amt**, with Learn and its M) as well as in the World page; saved with the session
+  - **The World amount is a performance fader.** Right after the World menu in the Transport
+    (no label of its own, with Learn and its M) as well as in the World page; saved with the session
     and undoable (it was this computer's).
   - **A World says why it does little.** An amber line under *apply sets* : the audio
     input off (**turn audio on**), the layers its coupling moves that have no B source,
@@ -89,7 +89,7 @@ that CI builds into cross-platform releases.
   color, **flow** keeps its trails and stays sharp. None of them writes blur any more.
 - **Feel's labels say what the dials do.** "Interruption ⇄ Flow" (its interruption end is
   on the left), Shutter's ends read off and 24 fps (just past off is the choppiest, 2 fps),
-  Gesture ⇄ Texture reads crisp ⇄ smeared, the header says "whole-picture dials", one name
+  Gesture ⇄ Texture reads crisp ⇄ surface, the header says "whole-picture dials", one name
   for Coalesce everywhere, Monomedia's description matches what it sets, OSC Proximity reads
   far ⇄ close. **Drift is now Wander** (`/opsia/wander`; `/opsia/drift` and its MIDI
   binding still answer). The World page's subtitle says what a World is.
@@ -252,6 +252,7 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+<<<<<<< HEAD
 - **Audio channels and latency (before release).** A channel pick the device does not
   have (outputs 3+4 kept after the interface was unplugged) put both sides summed on the
   device's last channel, one speaker and up to twice as loud : it plays on 1+2 now, and
@@ -286,6 +287,29 @@ that CI builds into cross-platform releases.
     now unpublishes on the first click of its ✓; the World amount's group reads **World**.
   - The README's list of destinations gains `feel/tonicity`, `feel/shutter`,
     `feel/superimposition`, `world/amount`, and says `feel/drift` plays `/opsia/wander`.
+=======
+- **World and Feel, after the audit.**
+  - **Gesture ⇄ Texture let go cleanly.** Turned right and back, it left the material
+    swaying (its evolution) and, with a material of your own, the relief deeper than
+    its slider, until you touched them; letting go of it also flashed the stored relief
+    on paper for one frame. A material picked in Context on a session whose relief was
+    never touched now shows at the relief its slider reads (it showed none). Tonicity no
+    longer leaves the Vibe's chord chroma where it was when it stops.
+  - **Superimposition only flickers between layers that play something.** With one layer
+    playing and the others empty (a fresh session), it cut the only picture to black
+    most of the time while its row said it needed two layers. Empty and muted layers no
+    longer take part; under two, it does nothing, as its row says.
+  - **New and Open turn Shutter and Superimposition off.** A session never keeps them, so
+    one left on stop-motioned or flickered the next session. Feel's texts say so.
+  - **The Finishing live line** names the World amount only on a stage its World changes
+    (a World without film leaves the Finalizer alone), so its **rest** no longer resets
+    the World amount from the Finalizer's line.
+  - A controller learned to the World amount answers the value a modulator plays, not the
+    fader's; the Feel reset action's hover and the OSC descriptions (Gesture ⇄ Texture :
+    crisp ⇄ surface) match the app; the docs no longer call the Transport's World amount
+    fader "amt" and say Proximity's far side softens.
+
+>>>>>>> fix134-worldfeel
 - **The Windows shortcuts' icon.** The desktop and Start menu shortcuts (and so the taskbar)
   showed a blank page instead of Palinopsia's icon : the installer wrote the app's long
   description into each shortcut, which Windows cut short while keeping its length, so

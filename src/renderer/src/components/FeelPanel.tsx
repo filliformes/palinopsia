@@ -1,7 +1,8 @@
 // Feel : whole-picture dials over everything at once, in their own right-column
 // tab (G). Each rides on top of your settings (it writes the engine, never your
-// sliders) and saves with the session; each rests at a point that changes
-// nothing. Two groups : FIELD (space and matter, rest at 0.5) and TEMPERAMENT
+// sliders) and saves with the session, except the two strobes (Shutter,
+// Superimposition : New, Open and Generate turn them off); each rests at a point
+// that changes nothing. Two groups : FIELD (space and matter, rest at 0.5) and TEMPERAMENT
 // (time and color, rest at 0 except Interruption ⇄ Flow at 0.5). A dial that
 // cannot act now (Tonicity with the audio input off, Superimposition with one
 // visible layer) is greyed with the reason, and still moves.
@@ -11,6 +12,7 @@ import { useStore } from '../store'
 import { Blink } from './Blink'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { feelOffRest } from '../feelState'
+import { superLayerOn } from '../engine/flicker'
 
 function FeelRow({
   label,
@@ -110,7 +112,8 @@ export function FeelPanel(): JSX.Element {
   // what a dial needs to act : the audio input (Tonicity), two visible layers
   // (Superimposition)
   const audioOn = useStore((s) => s.audioEnabled)
-  const visible = useStore((s) => s.composition.layers.filter((L) => L && !L.mute && L.opacity > 0.001 && L.sourceA.kind !== 'none').length)
+  // (the engine's own count : engine/flicker.ts)
+  const visible = useStore((s) => s.composition.layers.filter(superLayerOn).length)
 
   // Every dial back to rest in one gesture (double-click resets one row).
   const resetAll = (): void => {
@@ -124,7 +127,7 @@ export function FeelPanel(): JSX.Element {
       <div className="flex items-center justify-between">
         <span
           className="font-mono text-[9px] uppercase tracking-wide text-muted"
-          title="Whole-picture dials : they bend everything at once, on top of your layers and Finishing (your sliders stay where they are). They save with the session; each rests at a point that changes nothing."
+          title="Whole-picture dials : they bend everything at once, on top of your layers and Finishing (your sliders stay where they are). They save with the session, except the two strobes (Shutter, Superimposition), which New, Open and Generate turn off. Each rests at a point that changes nothing."
         >
           Feel : whole-picture dials
         </span>

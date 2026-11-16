@@ -6645,6 +6645,10 @@ export const useStore = create<StoreState>((set, get) => ({
         name: 'Untitled',
         composition: built,
         ...FEEL_NEUTRAL, // the Feel macros start neutral (they are the session's)
+        // the strobes off : a session never keeps them, so one left on would
+        // stop-motion or flicker the next session
+        shutter: 0,
+        superFlicker: 0,
         worldAmount: 1,
         pins: [], // New is a clean slate : nothing persistent
         selection: { type: 'source', layer: 0, slot: 'A' },
@@ -6842,6 +6846,9 @@ export const useStore = create<StoreState>((set, get) => ({
       name: s.name,
       // the session's Feel macros (an older file : neutral)
       ...sanitizeFeel(s.feel),
+      // the strobes off (a session never keeps them : as New and Generate)
+      shutter: 0,
+      superFlicker: 0,
       // how much of its World is on (an older file : all of it)
       worldAmount: typeof s.worldAmount === 'number' && Number.isFinite(s.worldAmount) ? Math.max(0, Math.min(1, s.worldAmount)) : 1,
       theme: savedTheme ?? cur.theme,

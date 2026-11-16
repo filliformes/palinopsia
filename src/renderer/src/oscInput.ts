@@ -1823,7 +1823,7 @@ function enumerateLeaves(): Leaf[] {
   // Global field macros + Proximity (0.5 = deadzone).
   add('/opsia/density', 0, 1, st.density ?? 0.5, 'Density : sparse ⇄ dense (0.5 = rest)')
   add('/opsia/coupling', 0, 1, st.couplingOn ? 1 : 0, 'A/B coupling master switch (>= 0.5 : on)')
-  add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture : crisp ⇄ smeared (0.5 = rest)')
+  add('/opsia/gesture', 0, 1, st.gestureTexture ?? 0.5, 'Gesture ⇄ Texture : crisp ⇄ surface (0.5 = rest)')
   add('/opsia/coalesce', 0, 1, st.coalesce ?? 0.5, 'Coalesce : grain ⇄ mass (0.5 = rest)')
   add('/opsia/proximity', 0, 1, st.proximity ?? 0.5, 'Proximity : far ⇄ close (0.5 = rest)')
   add('/opsia/proximity/follow', 0, 1, st.proximityAudio ? 1 : 0, 'Proximity follows the sound, its ◑ (>= 0.5 : on)')

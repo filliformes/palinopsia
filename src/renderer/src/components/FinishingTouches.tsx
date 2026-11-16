@@ -22,7 +22,7 @@ import { PresetPicker } from './PresetPicker'
 import { useFlash } from './useFlash'
 import { ContextLightPad } from './ContextLightPad'
 import { VibePaletteStrip } from './VibePaletteStrip'
-import { WORLD_CONTEXT_KEYS, WORLD_FILM_KEYS } from '../worlds'
+import { WORLD_CONTEXT_KEYS, WORLD_FILM_KEYS, worldShiftOf, worldStageOf } from '../worlds'
 
 const AC: Record<string, string> = { 'fx-vibe': 'accent2', 'fx-context': 'accent', 'fx-finalizer': 'active' }
 
@@ -150,7 +150,12 @@ type LiveSt = ReturnType<typeof useStore.getState>
 /** Who adds on top of this stage now (the dials writing it, off rest). */
 function stageFrom(stage: Stage, st: LiveSt): string[] {
   const from: string[] = []
-  const world = st.worldAmount < 0.995 && !!st.composition.worldBase
+  // The World amount, only on a stage its World changed (a World without film
+  // leaves the Finalizer alone : its rest must not move the Context air).
+  const w = st.worlds.find((x) => x.id === st.world)
+  const shiftOn = (sid: 'fx-context' | 'fx-finalizer'): boolean =>
+    !!w && Object.entries(worldShiftOf(st.composition, w)).some(([k, v]) => Math.abs(v) > 1e-6 && worldStageOf(k) === sid)
+  const world = (sid: 'fx-context' | 'fx-finalizer'): boolean => st.worldAmount < 0.995 && !!st.composition.worldBase && shiftOn(sid)
   if (stage === 'vibe') {
     if (st.tonicity > 0.02 && st.audioEnabled) from.push('Tonicity')
     if (!NEUTRAL(st.coalesce)) from.push('Coalesce')
@@ -159,14 +164,14 @@ function stageFrom(stage: Stage, st: LiveSt): string[] {
     if (!NEUTRAL(st.proximity) || st.proximityAudio) from.push('Proximity')
     if (st.flow > 0.52) from.push('Interruption ⇄ Flow')
     if (st.gestureTexture > 0.52) from.push('Gesture ⇄ Texture')
-    if (world) from.push('World amount')
+    if (world('fx-context')) from.push('World amount')
     const seq = st.sequence
     if ((seq.breathe?.amount ?? 0) > 0.001 || seq.arc?.enabled) from.push('sequencer')
   } else {
     if (st.gestureTexture < 0.48) from.push('Gesture ⇄ Texture')
     if (!NEUTRAL(st.flow)) from.push('Interruption ⇄ Flow')
     if (st.drift > 0.02) from.push('Wander')
-    if (world) from.push('World amount')
+    if (world('fx-finalizer')) from.push('World amount')
   }
   return from
 }
