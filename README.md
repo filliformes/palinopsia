@@ -1497,19 +1497,23 @@ The **Connect** right-column tab (key `A`) holds the control panels
   - **Channels** : beside each device, a menu picks which of its channels : a
     **stereo pair** (1+2, 3+4…) or **one channel** (mono). For the **input**, the
     pair is what the analysis, the monitor, **learn noise** and the Filter voice's
-    line-in hear (a mono channel plays on both sides); it lists the channels the
+    line-in hear (a mono channel plays on both sides; the Filter, one voice, hears the
+    pair summed to mono); it lists the channels the
     device delivers once it is open (most drivers on Windows give one or two per
     device : an interface often shows its other inputs as devices of their own). For
     **Sonify's output** (Sonify and the Audio Layer) and the **monitor's output**, the
     stereo lands on the picked pair of a device with more channels (an interface's
     outputs 3+4), or is summed onto one channel; the menu reads how many channels
-    the device takes. While **Space** is on it places the channels itself and the
-    output's menu waits. The films' and audio players' own sound stays on 1+2. All
+    the device takes. A pick the device does not have (3+4 kept from an interface
+    that is unplugged) plays on 1+2, said in the menu. While **Space** is on it
+    places the channels itself and the output's menu waits. The films' and audio players' own sound stays on 1+2. All
     three are kept per computer, with the devices.
   - **The Filter voice's line-in** opens the input chosen here (by its id, else its
-    name, else the default input) on the same channels; it used to open the default
-    input whatever was chosen. With the Audio Layer as the input, it opens the
-    default input as before.
+    name, else the default input) on the same channels, while the Audio section
+    listens to that device (on, in **Local** or **Both**, where its menus show); it
+    used to open the default input whatever was chosen. With the analysis off, in
+    **OSC**, or with the Audio Layer as the input, it opens the default input on 1+2
+    as before.
   - **Latency** (under the devices) : the audio engine's **sample rate** (the device's
     own, or 44.1, 48, 88.2, 96 kHz : another than the device's is converted on the
     way) and the **buffer** asked of the device (auto : the lowest; or 128 to 4096

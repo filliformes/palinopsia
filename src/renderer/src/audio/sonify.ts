@@ -22,7 +22,7 @@ import type { AssembleSoundInfo } from '../engine/AssembleSource'
 import { SPACE_MAX_CH, pictureToDirection } from '@shared/spatial'
 import type { DomeConfig } from '@shared/dome'
 import { defaultEq, normalizeEq, type SoniEq } from './eqMath'
-import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, type ChPick } from './channelPick'
+import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, pickFits, type ChPick } from './channelPick'
 import { AUDIO_FORMAT_DEFAULT, contextOptions, formatKey, latencyOf, type AudioFormat, type LatencyInfo } from './audioFormat'
 import { SYNTH_DEPTH_PARAMS, SynthPlayer, defaultSynth, normalizeSynth, synthSound, type SynthCfg } from './synthPlay'
 import { SIGNAL_DEPTH_PARAMS, defaultSignalPatch, normalizeSignalPatch, signalHit, signalModOf, signalPlayerCfg, type SignalRow } from './signalPlay'
@@ -705,6 +705,8 @@ class SonifyEngine {
   private healAfterTake = false // a rebuild waits for the take holding the bus
   // the sample rate and buffer asked of the device (per computer)
   private fmt: AudioFormat = { ...AUDIO_FORMAT_DEFAULT }
+  private ctxFmt = '' // the format the open context was made with
+  private fmtAfterStart = false // a format change waits for the start under way
   private watchTimer = 0
   private lastClock = -1
   private tap: AudioWorkletNode | null = null
@@ -957,6 +959,7 @@ class SonifyEngine {
   private ensureCtx(): Promise<AudioContext> {
     if (this.ctxReady) return this.ctxReady
     this.ctxReady = (async (): Promise<AudioContext> => {
+      const made = formatKey(this.fmt)
       const ctx = new AudioContext(contextOptions(this.fmt))
       try {
         // the Synth's engine first : the soni processor builds it from the
@@ -982,6 +985,7 @@ class SonifyEngine {
       hush.offset.value = 0
       hush.connect(this.recDest)
       hush.start()
+      this.ctxFmt = made
       this.ctx = ctx
       if (this.cfg.sinkId) this.applySink(this.cfg.sinkId)
       for (const fn of this.ctxListeners) { try { fn(ctx) } catch (e) { console.warn('[sonify] context listener', e) } }
@@ -1159,6 +1163,10 @@ class SonifyEngine {
       this.stop(true)
     } finally {
       this.starting = false
+      if (this.fmtAfterStart) {
+        this.fmtAfterStart = false
+        this.applyFormat()
+      }
     }
   }
 
@@ -1441,7 +1449,21 @@ class SonifyEngine {
   setEngineFormat(f: AudioFormat): void {
     if (formatKey(f) === formatKey(this.fmt)) return
     this.fmt = { ...f }
-    if (!this.ctx) return
+    if (!this.ctx) {
+      // a context still opening, on the format before : once it is up, start
+      // over on this one (the change was dropped and the menu lied)
+      const opening = this.ctxReady
+      if (opening) void opening.then(() => { if (this.ctxReady === opening) this.applyFormat() }).catch(() => {})
+      return
+    }
+    this.applyFormat()
+  }
+
+  // The open context on another format than the one asked : a fresh context
+  // (after the take holding the bus; after a start under way)
+  private applyFormat(): void {
+    if (!this.ctx || formatKey(this.fmt) === this.ctxFmt) return
+    if (this.starting) { this.fmtAfterStart = true; return }
     if (this.bus > 0) { this.healAfterTake = true; return }
     void this.rebuild()
   }
@@ -1553,14 +1575,20 @@ class SonifyEngine {
       } else if (this.spaceRoute.on) {
         layout(Math.max(1, Math.min(this.spaceRoute.nch, dst.maxChannelCount, SPACE_MAX_CH)), true)
         node.connect(out, 1)
-      } else if (isDefaultPick(this.outPick)) {
+      } else if (isDefaultPick(this.outPick) || !pickFits(this.outPick, dst.maxChannelCount)) {
+        // 1+2 (also for a pick this device does not have : plain stereo, not its
+        // sides squeezed onto its last channel)
         layout(Math.min(2, dst.maxChannelCount), false)
         this.eqNode?.connect(out)
       } else {
         // the stereo onto the picked channels of the device (outputs 3+4 of an
         // interface), or summed onto one : the output gain stays stereo, the
-        // device takes all its channels
-        layout(Math.min(2, dst.maxChannelCount), false)
+        // device takes all its channels. Only the gain is set here : the device's
+        // own count is left as outputRoute wants it (a change of it restarts the
+        // device, and 2 then n restarted it twice on every start, mid-take too)
+        out.channelCount = Math.min(2, dst.maxChannelCount)
+        out.channelCountMode = 'explicit'
+        out.channelInterpretation = 'speakers'
         try { out.disconnect() } catch { /* not connected */ }
         const r = outputRoute(ctx, dst, this.outPick)
         out.connect(r.input)
@@ -1827,9 +1855,17 @@ class SonifyEngine {
         const raw = this.ctx.createMediaStreamSource(stream)
         const n = Math.max(1, Math.min(32, stream.getAudioTracks()[0]?.getSettings().channelCount ?? 2))
         const route = new InputPick(this.ctx, raw, n, this.lineDev.pick)
-        route.out.connect(this.node)
+        // the Filter plays one channel (the worklet reads input 0's first) : the
+        // pair summed to mono, so both its sides are heard ((L + R) / 2; a mono
+        // pick, the same channel on both, comes through as it is)
+        const mono = this.ctx.createGain()
+        mono.channelCount = 1
+        mono.channelCountMode = 'explicit'
+        mono.channelInterpretation = 'speakers'
+        route.out.connect(mono)
+        mono.connect(this.node)
         this.lineRoute = route
-        this.lineSrc = { disconnect: () => { try { raw.disconnect() } catch { /* gone */ } route.dispose(); if (this.lineRoute === route) this.lineRoute = null } }
+        this.lineSrc = { disconnect: () => { try { raw.disconnect(); mono.disconnect() } catch { /* gone */ } route.dispose(); if (this.lineRoute === route) this.lineRoute = null } }
       })
       .catch((e) => console.warn('[sonify] line-in unavailable, noise only', e))
   }

@@ -14,7 +14,7 @@
 // Design rule for the chapter: prefer DISCONTINUITY (transient/flux) over gain —
 // the salient signal dominates cross-modal perception.
 
-import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, stereoDestination, type ChPick } from '../audio/channelPick'
+import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, pickFits, stereoDestination, type ChPick } from '../audio/channelPick'
 import { AUDIO_FORMAT_DEFAULT, contextOptions, formatKey, latencyOf, type AudioFormat, type LatencyInfo } from '../audio/audioFormat'
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
@@ -690,7 +690,8 @@ class AudioBus {
     this.monitorNodes = []
     const dst = ctx.destination
     try {
-      if (isDefaultPick(this.monitorPick)) {
+      // (a pick this device does not have : plain stereo too)
+      if (isDefaultPick(this.monitorPick) || !pickFits(this.monitorPick, dst.maxChannelCount)) {
         stereoDestination(dst)
         g.connect(dst)
         return

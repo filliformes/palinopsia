@@ -241,8 +241,8 @@ clipAudio.setPlayheads((layer, slot) => {
 setMediaSink(useStore.getState().sonify.sinkId ?? '')
 useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
 // The channels picked in the audio tab (per computer) : the input it listens
-// to (the Filter's line-in opens the same device and channels), the main
-// output's and the monitor's.
+// to (the Filter's line-in opens the same device and channels while the tab
+// listens to that input), the main output's and the monitor's.
 {
   const push = (st: ReturnType<typeof useStore.getState>): void => {
     audioBus.setInChannels(st.audioInCh)
@@ -252,8 +252,10 @@ useStore.subscribe((st) => setMediaSink(st.sonify.sinkId ?? ''))
     // input takes it on its next open (reopened below)
     sonifyEngine.setEngineFormat(st.audioFormat)
     audioBus.setFormat(st.audioFormat)
-    const layer = st.audioDeviceId === LAYER_INPUT
-    sonifyEngine.setLineInput(layer ? '' : st.audioDeviceId ?? '', layer ? '' : st.audioDeviceLabel ?? '', layer ? CH_DEFAULT : st.audioInCh)
+    // the device and channels only while the tab listens to a device (its menus
+    // show then); else the default input on 1+2 (a hidden pick never applies)
+    const dev = st.audioEnabled && (st.audioSource === 'local' || st.audioSource === 'both') && st.audioDeviceId !== LAYER_INPUT
+    sonifyEngine.setLineInput(dev ? st.audioDeviceId ?? '' : '', dev ? st.audioDeviceLabel ?? '' : '', dev ? st.audioInCh : CH_DEFAULT)
   }
   push(useStore.getState())
   useStore.subscribe(push)
