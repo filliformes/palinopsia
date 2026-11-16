@@ -288,7 +288,7 @@ In **Sonify** (also in the cheat-sheet) :
 | Gesture | Action |
 |---|---|
 | `Shift`+drag a slider | Finer : a tenth of the speed, from where the drag starts |
-| Click a value | Type it : the Collage's films in, hp, lp, ring in and Ring cutoff, the Prism crossover (`4250`, `4.2k`, `off`, `-6`) |
+| Click a value | Type it : the Collage's films in, hp, lp, ring in and Ring cutoff, the Strates crossover (`4250`, `4.2k`, `off`, `-6`) |
 | Drag an output-EQ point | Frequency across, gain up and down (it moves once dragged past 3 px, so a click only selects it); the wheel over a point sets its Q, a double-click switches its band, `Delete` turns the selected band off. While the editor is open the app's one-key shortcuts wait; `Esc` closes it |
 | Drag a Space number | Up or down to change it; drag a voice's dot on the Room map to place it |
 

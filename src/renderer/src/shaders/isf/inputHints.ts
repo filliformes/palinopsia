@@ -635,7 +635,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     rate: 'Flutter speed : how often the wobble and dashes re-roll.',
     freeze: 'A wandering freeze line : one row smeared across a stripe of the frame. 0 = off.',
     distort: 'Per-line analog x-jitter over the whole frame (the tape never sits still).',
-    bleed: 'Tinted chroma bleed : the red channel dragged sideways, magenta at the edges and cyan in the middle, warbling with the scan.',
+    bleed: 'Tinted chroma bleed : the red channel trails to the right, tinted between magenta and cyan in bands that drift down the frame.',
     bleedRange: 'How far the chroma bleed reaches.'
   },
   'fx-triangle-flicker': {
@@ -1087,8 +1087,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     thresh: 'Motion floor : motion smaller than this is ignored, so still areas don’t creep.',
     moshGate: 'Holds the smear only on the MOVING parts (+) or only on the STILL parts (−). 0 = everywhere.',
     edgeRepel: 'Steers the smear along the picture’s own edges : + away from bright, − toward bright.',
-    resharp: 'Adds the live picture’s fine detail back on top, so the mosh stays crisp.',
-    bleed: 'Codec color bleed : the red and blue channels slide apart along the motion.',
+    resharp: 'Sharpens the moshed picture against a softened copy of itself, so the mosh stays crisp (only what is shown : the smear underneath keeps its softness).',
+    bleed: 'Codec color bleed : the color travels at half resolution on blocks twice the size and catches up slowly, so it lags and smears along the motion.',
     autoBloom: 'Blooms automatically on a scene cut (a sudden change of the whole picture).',
     cutSense: 'How big a change counts as a cut for the auto-bloom : lower = more sensitive.',
     sidechainFlow: 'MOTION TRANSFER : take the motion from the sidechain layer instead of this one, so another layer’s movement moshes this layer’s texture.',

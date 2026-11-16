@@ -1,5 +1,6 @@
 // The dense optical-flow pass : one fragment shader, written for Palinopsia from the
 // published method only.
+// third-party: The Datamosh node (the Lucas-Kanade pass : published methods only, no code)
 //
 // Method : Lucas-Kanade. The brightness constancy constraint I_x u + I_y v + I_t = 0
 // (Horn and Schunck) has two unknowns per texel; Lucas and Kanade assume the motion is

@@ -52,6 +52,12 @@
 //
 // Every rate is per 60 Hz frame and raised to the frames that passed, so the look is
 // the same at any frame rate and a rack at dt = 0 is a still picture.
+//
+// third-party: The Datamosh node (published methods only, no code)
+// third-party: transflow (ideas : the sticky and melt modes, the stochastic reseed; no code)
+// third-party: BENDR (ideas : the mosh gate, edge repel and re-sharp; no code)
+// third-party: ffglitch (ideas : vectors averaged, rotated and reversed, the bloom on a pulse; no code)
+// third-party: Datamosher-Pro (ideas : the triggerable glitch family; no code)
 
 import type { ConvNode, NodeContext } from './convNodes'
 import { glGeneration } from './glGeneration'
@@ -88,6 +94,10 @@ vec4 safe(vec4 c) {
   c = finite(c);
   return vec4(clamp(c.rgb, 0.0, 4096.0), clamp(c.a, 0.0, 1.0));
 }
+// what leaves the node (and what the history keeps) : no overshoot past white
+vec4 unit(vec4 c) { return clamp(finite(c), 0.0, 1.0); }
+// inside the frame (an edge counts as in)
+float inFrame(vec2 u) { return step(0.0, u.x) * step(u.x, 1.0) * step(0.0, u.y) * step(u.y, 1.0); }
 `
 
 // the flow source's luma (covered by its alpha) on the grid : 16 taps over the texel
@@ -314,7 +324,7 @@ void main() {
   // the vector is handed out over the frames, each block on its own beat
   float beat = fract(hash12(bq) + uTick * 0.61803399);
   vec2 src = uMode == 1 ? (px - floor(d * uRes + beat)) / uRes : vUV - d;
-  vec4 H = texture(uAcc, src);
+  vec4 H = mix(live, texture(uAcc, src), inFrame(src));
 
   // ── chroma : at half resolution, on the vector of a block twice the size ──
   if (uBleed > 0.0) {
@@ -324,11 +334,12 @@ void main() {
     vec2 site = floor(px * 0.5) * 2.0 + 1.0; // the corner 4 pixels share : their mean
     float cbeat = fract(hash12(cq + 71.3) + uTick * 0.61803399);
     vec2 cs = uMode == 1 ? (site - 2.0 * floor(dc * uRes * 0.5 + cbeat)) / uRes : site / uRes - dc;
-    vec3 Hc = texture(uAcc, cs).rgb;
+    vec3 Hc = mix(live.rgb, texture(uAcc, cs).rgb, inFrame(cs));
     float y = dot(H.rgb, LUMA);
     H.rgb = y + mix(H.rgb - y, Hc - dot(Hc, LUMA), uBleed);
   }
-  vec4 Hb = texture(uAccBlur, vUV - d);
+  vec2 sb = vUV - d;
+  vec4 Hb = mix(liveB, texture(uAccBlur, sb), inFrame(sb));
 
   // ── the bloom : no I-frame, the history held ──
   float decay = mix(uDecay, 1.0, env);
@@ -346,7 +357,7 @@ void main() {
   float man = 1.0 - over(clamp(m * uManifest, 0.0, 1.0));
   keepL *= man; keepH *= man;
   // reseed : some macroblocks snap back
-  float snap = hash13(vec3(bq, uTick)) < over(uReseed * 0.05) ? 1.0 : 0.0;
+  float snap = hash13(vec3(bq, uTick)) < over(uReseed * 0.3) ? 1.0 : 0.0;
   keepL *= 1.0 - snap; keepH *= 1.0 - snap;
   // an actant : nothing is corrected inside it
   if (uActant > 0.0) {
@@ -359,7 +370,7 @@ void main() {
   // (colour is corrected more slowly than luma)
   float cy = dot(corr.rgb, LUMA);
   corr.rgb = cy + (corr.rgb - cy) * (1.0 - 0.75 * uBleed * (1.0 - snap));
-  o = safe(H + corr);
+  o = unit(H + corr);
 }`
 
 // re-sharpen : the result against a slightly blurred copy of itself
@@ -370,7 +381,7 @@ uniform float uAmt;
 void main() {
   vec4 c = texture(uT, vUV);
   vec4 b = 0.25 * (texture(uT, vUV + uOff) + texture(uT, vUV - uOff) + texture(uT, vUV + vec2(uOff.x, -uOff.y)) + texture(uT, vUV + vec2(-uOff.x, uOff.y)));
-  o = safe(c + uAmt * (c - b));
+  o = unit(c + uAmt * (c - b));
 }`
 
 interface Tex { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
@@ -432,11 +443,16 @@ interface Full {
 
 const UNITS = 7
 
+/** The programs and the triangle, one set per context : a new node (Randomize, Generate)
+ *  draws with them at once instead of compiling fourteen programs. The generation
+ *  rebuilds them after a GPU reset. */
+interface SharedGL { gen: number; progs: Progs; vao: WebGLVertexArrayObject; quad: WebGLBuffer }
+const sharedGL = new WeakMap<WebGL2RenderingContext, SharedGL>()
+
 export class DatamoshNode implements ConvNode {
   private gen = -1
   private progs: Progs | null = null
   private vao: WebGLVertexArrayObject | null = null
-  private quad: WebGLBuffer | null = null
   private grid: Grid | null = null
   private full: Full | null = null
   private key = ''
@@ -523,18 +539,24 @@ export class DatamoshNode implements ConvNode {
     this.last = null
     this.key = ''
     gl.getExtension('EXT_color_buffer_float')
-    const progs = {} as Progs
-    for (const k of Object.keys(SHADERS) as (keyof typeof SHADERS)[]) progs[k] = compile(gl, SHADERS[k], k)
-    this.progs = progs
-    this.vao = gl.createVertexArray()!
-    gl.bindVertexArray(this.vao)
-    this.quad = gl.createBuffer()!
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quad)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
-    gl.enableVertexAttribArray(0)
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-    gl.bindVertexArray(null)
-    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+    let sh = sharedGL.get(gl)
+    if (!sh || sh.gen !== this.gen) {
+      const progs = {} as Progs
+      for (const k of Object.keys(SHADERS) as (keyof typeof SHADERS)[]) progs[k] = compile(gl, SHADERS[k], k)
+      const vao = gl.createVertexArray()!
+      gl.bindVertexArray(vao)
+      const quad = gl.createBuffer()!
+      gl.bindBuffer(gl.ARRAY_BUFFER, quad)
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+      gl.enableVertexAttribArray(0)
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
+      gl.bindVertexArray(null)
+      gl.bindBuffer(gl.ARRAY_BUFFER, null)
+      sh = { gen: this.gen, progs, vao, quad }
+      sharedGL.set(gl, sh)
+    }
+    this.progs = sh.progs
+    this.vao = sh.vao
   }
 
   /** Make `pr` the program, with `texs` on the units 0.. under the given uniform names. */
@@ -854,15 +876,8 @@ export class DatamoshNode implements ConvNode {
     const gl = this.gl
     if (this.gen !== glGeneration()) return
     this.freeTargets()
-    if (this.progs) for (const p of Object.values(this.progs)) gl.deleteProgram(p.p)
-    if (this.vao) {
-      gl.bindVertexArray(this.vao)
-      if (this.quad) gl.deleteBuffer(this.quad)
-      gl.bindVertexArray(null)
-      gl.deleteVertexArray(this.vao)
-    }
+    // (the programs, the triangle and its VAO are the context's : the next node uses them)
     this.progs = null
     this.vao = null
-    this.quad = null
   }
 }

@@ -280,6 +280,23 @@ that CI builds into cross-platform releases.
     Sine tag in every file using it (now tagged in all 66).
   - The Connect tab's hover, the shortcut sheet, the MIDI section's button and the
     README name the top bar's **Learn** button and the tab's sections in their order.
+- **The three rewrites, checked against what they replaced** (the v1.3.4 audit):
+  - **Datamosh** looks as it did in v1.3.3 again where the rewrite had drifted:
+    - a vector that reads from past the frame takes the live picture, so a pan no longer
+      drags the frame's edge pixels inward as streaks;
+    - **reseed** snaps blocks back at its old rate (it had become six times weaker);
+    - the picture stays within white : **re-sharpen** at 1 pushed edges to 1.75, which the
+      effects after it then worked on;
+    - the fourteen programs are compiled once and shared, so a Randomize or Generate that
+      brings Datamosh in no longer compiles them again.
+  - **Inspector** : Datamosh's block size stays lit in melt and fluid while the chroma bleed
+    (on by default) uses it. The re-sharpen and chroma bleed hints, and Tracking's bleed
+    hint, describe what the rewritten code does.
+  - **Sonify's reverb** at 176.4 and 192 kHz : its buffers are sized from the sample rate,
+    so the longest line and three of its inner allpasses keep their own lengths and the
+    predelay reaches 255 ms (it stopped near 170 ms). Unchanged up to 96 kHz.
+  - The README's shortcut table names the Strates crossover; the rewrites are tagged in the
+    code with their entries in the credits register.
 
 ## v1.3.3 — 2026-11-12
 
