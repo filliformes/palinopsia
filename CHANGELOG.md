@@ -265,6 +265,21 @@ that CI builds into cross-platform releases.
 
   The knobs are the same. VIDVOX's VHS Glitch (MIT) and staffantan's unity-vhsglitch
   remain credited as the effect's model.
+- **Credits that were missing or wrong (v1.3.4 audit).**
+  - The mac app now carries Electron's license and Chromium's notices
+    (`LICENSE.electron.txt`, `LICENSES.chromium.html` in its Resources) : electron-builder
+    deletes both on macOS.
+  - `licenses/npm-dependencies.txt` reproduces the license files of serialport and its
+    dependencies, which ship through the osc library; they were listed as per-OS
+    binaries without their text.
+  - node-addon-api, compiled into the four native addons, has its entry.
+  - The dataflou visualizer's entry names the commit it is built from (518c67f).
+  - `npm run check:notices` no longer fails on Vincent's own copyright lines, catches a
+    copyright line without "(c)" and an Apache-style license header, checks that a tag
+    names a real entry (not any phrase of the register), and requires the Hash without
+    Sine tag in every file using it (now tagged in all 66).
+  - The Connect tab's hover, the shortcut sheet, the MIDI section's button and the
+    README name the top bar's **Learn** button and the tab's sections in their order.
 
 ## v1.3.3 — 2026-11-12
 
