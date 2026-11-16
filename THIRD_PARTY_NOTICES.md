@@ -497,13 +497,10 @@ methods are free to build on; naming them is a matter of respect.
   modes and the stochastic reseed from Yohan Chalier's **transflow**
   (https://github.com/ychalier/transflow, GPL-3.0). Both remain credited for the ideas.
 - **ffglitch** (Ramiro Polla, https://ffglitch.org; ffglitch-core LGPL-2.1+ / GPL-2+,
-  ffglitch-scripts Unlicense) and **Datamosher-Pro** (Akash Bora,
-  https://github.com/Akascape/Datamosher-Pro, MIT). Behind the Datamosh node:
-  - motion vectors averaged, rotated and reversed;
-  - the bloom fired by hand or on a pulse;
-  - the triggerable glitch family.
-
-  No code was taken.
+  ffglitch-scripts Unlicense). Behind the Datamosh node : motion vectors averaged,
+  rotated and reversed; the bloom fired by hand or on a pulse. No code was taken.
+- **Datamosher-Pro** (Akash Bora, https://github.com/Akascape/Datamosher-Pro, MIT).
+  Behind the Datamosh node : the triggerable glitch family. No code was taken.
 - **Nuvotion** (Nuvotion Visuals' web VJ app): the XY pads over the Macro knobs.
 - **Tixl** (https://github.com/tixl3d/tixl, MIT) and **nw_wrld**
   (https://github.com/aagentah/nw_wrld, GPL-3.0): the light output and the installation

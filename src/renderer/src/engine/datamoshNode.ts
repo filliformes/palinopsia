@@ -54,7 +54,7 @@
 // the same at any frame rate and a rack at dt = 0 is a still picture.
 //
 // third-party: The Datamosh node (published methods only, no code)
-// third-party: transflow (ideas : the sticky and melt modes, the stochastic reseed; no code)
+// third-party: The Datamosh node (transflow's ideas : the sticky and melt modes, the stochastic reseed; no code)
 // third-party: BENDR (ideas : the mosh gate, edge repel and re-sharp; no code)
 // third-party: ffglitch (ideas : vectors averaged, rotated and reversed, the bloom on a pulse; no code)
 // third-party: Datamosher-Pro (ideas : the triggerable glitch family; no code)
