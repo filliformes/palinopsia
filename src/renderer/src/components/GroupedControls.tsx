@@ -614,7 +614,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     const d: Why = {}
     if (zero('actant')) put(d, ['actantTrig', 'actantRate', 'actantLife'], 'Actants are at 0.')
     if (zero('autoBloom')) put(d, ['cutSense'], 'Auto-bloom is at 0 : no cuts are listened for.')
-    if (isnt('mode', 1) && zero('reseed') && zero('actant')) put(d, ['block'], 'Only the sticky mode, reseed and actants use blocks.')
+    if (isnt('mode', 1) && zero('reseed') && zero('bleed')) put(d, ['block'], 'Only the sticky mode, reseed and chroma bleed use blocks.')
     return d
   },
   'node-ibfv': ({ zero, at }) => {
