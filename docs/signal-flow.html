@@ -84,9 +84,10 @@ select.input { appearance: none; -webkit-appearance: none; background-image: url
 .legend svg { width: 26px; height: 8px; overflow: visible }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start }
-/* the detail rail sits beside the map only where both fit with the map still large (about
-   1340 px of its 1720); narrower, it goes under the map, which then takes the whole width */
-@media (min-width: 1700px) { .stage { grid-template-columns: minmax(0, 1fr) 320px } }
+/* the detail rail sits beside the map from 1440 px (narrowing to 260 px on a mid-size
+   window, so the map keeps about 70 % of its 1720 or more); narrower, it goes under the map,
+   which then takes the whole width */
+@media (min-width: 1440px) { .stage { grid-template-columns: minmax(0, 1fr) clamp(260px, 18vw, 320px) } }
 figure { margin: 0; min-width: 0 }
 .scroller { overflow-x: auto; border: 1px solid rgb(var(--c-border)); border-radius: 2px; background: rgb(var(--c-bg)) }
 /* the map scales to its column (no horizontal scroll on a desktop); a phone keeps a floor
@@ -126,7 +127,7 @@ figcaption { color: rgb(var(--c-muted)); font-size: 12px; margin-top: 8px; max-w
 
 /* detail rail */
 aside { background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-border)); border-radius: 2px; padding: 12px 14px 14px; display: grid; gap: 10px; min-width: 0 }
-@media (min-width: 1700px) { aside { position: sticky; top: 12px } }
+@media (min-width: 1440px) { aside { position: sticky; top: 12px } }
 aside h3 { font-size: 15px; font-weight: 600; margin: 0 }
 aside p { margin: 0 }
 aside ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px }
