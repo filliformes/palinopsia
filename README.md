@@ -192,8 +192,9 @@ only verifies. The build copies them into the app and CI fetches them before eve
 (cached). Without them the app runs, and with Room on the Body page's header says what to fetch.
 
 NDI needs no build step : the sender calls the NDI runtime through an FFI (`koffi`).
-`npm run ndi:bundle` copies an installed official NDI runtime into `resources/ndi/` so
-the next build ships it (see [NDI](#ndi)).
+No build ever carries the NDI runtime : each user installs NDI on their own machine (see
+[NDI](#ndi)), and `npm run release-check` refuses a build beside a leftover copy in
+`resources/ndi`.
 
 The Syphon addon (`native/syphon/`, macOS) is built by `sh native/syphon/build.sh`
 (needs Xcode : it builds the Syphon framework from source, then the addon); CI does it
@@ -2300,9 +2301,8 @@ Output page; it stays on across restarts.
 - The status line shows whether a receiver is connected, the rate actually sent and the
   size; **ON AIR / PREVIEW** tally lights up when a receiver's switcher has you on
   program or preview; a warning appears when the rate falls behind.
-- **The NDI runtime** : Palinopsia uses its own bundled copy when the build has one, else
-  the machine's NDI (NDI Tools / Runtime / SDK), else the copy another creative app
-  carries (TouchDesigner, Resolume, vMix…). The section names the one in use. NDI is
+- **The NDI runtime** : Palinopsia uses the machine's NDI (NDI Tools / Runtime / SDK),
+  else the copy another creative app carries (TouchDesigner, Resolume, vMix…). The section names the one in use. NDI is
   tested on Windows; the macOS and Linux paths are written but untested.
 - **A computer with no NDI at all** : the section offers **install NDI runtime**. One click
   downloads NDI's official runtime installer (about 10 MB on Windows, 5 MB on macOS,
@@ -2310,8 +2310,10 @@ Output page; it stays on across restarts.
   valid signature, and opens it. You go through NDI's installer (and its licence);
   Palinopsia keeps looking meanwhile and goes live **by itself** as soon as the install
   finishes, no restart. On Linux (no installer exists) it points to the NDI SDK.
-- To ship the runtime inside a build instead, install the NDI SDK or NDI Tools and run
-  `npm run ndi:bundle` before building (see `resources/ndi/README.md`).
+- **Palinopsia never ships the NDI runtime.** Vizrt's library is proprietary, and Ableton
+  Link, which runs in the same process, is under the GPL from Ableton, who grants no
+  exception for it. So NDI is always the user's own install on their own machine (see
+  `THIRD_PARTY_NOTICES.md` and `LICENSE-EXCEPTIONS.md`).
 
 How it is fast enough : the GPU converts the frame to UYVY and reads it back
 asynchronously (a ring of six buffers; a capture is skipped rather than ever waiting on

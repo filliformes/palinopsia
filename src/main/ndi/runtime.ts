@@ -1,11 +1,12 @@
-// Where is an NDI runtime on this machine ? Candidates in priority order :
-//   1. the copy bundled with Palinopsia (resources/ndi, see its README : the
-//      NDI licence allows shipping the runtime inside an application's folder),
-//   2. the official runtime's own env vars (NDI_RUNTIME_DIR_V6 / V5 / V4),
-//   3. the standard NDI install folders (Runtime / Tools / SDK),
-//   4. copies other creative apps ship (Resolume, TouchDesigner, vMix,
+// Where is an NDI runtime on this machine ? Palinopsia never ships one (Ableton
+// Link runs in the same process, GPL from Ableton with no exception for a
+// proprietary library) : the user installs NDI on their own machine. Candidates
+// in priority order :
+//   1. the official runtime's own env vars (NDI_RUNTIME_DIR_V6 / V5 / V4),
+//   2. the standard NDI install folders (Runtime / Tools / SDK),
+//   3. copies other creative apps ship (Resolume, TouchDesigner, vMix,
 //      MadMapper…) : a venue machine almost always has one,
-//   5. (Linux) the bare soname, left to the dynamic loader.
+//   4. (Linux) the bare soname, left to the dynamic loader.
 // The sender (src/preload/ndi.ts) tries them in order until one loads AND
 // initializes.
 
@@ -15,7 +16,7 @@ import { execFileSync } from 'child_process'
 
 export interface NdiCandidate {
   path: string
-  origin: string // shown in the UI : "bundled", "NDI 6 Runtime", "Resolume Arena"…
+  origin: string // shown in the UI : "NDI 6 Runtime", "Resolume Arena"…
 }
 
 function libName(): string[] {
@@ -45,8 +46,7 @@ function machineEnv(): Record<string, string> {
   return env
 }
 
-/** `bundledDir` : resources/ndi (packaged) or <project>/resources/ndi/<os> (dev). */
-export function ndiCandidates(bundledDirs: string[]): NdiCandidate[] {
+export function ndiCandidates(): NdiCandidate[] {
   const names = libName()
   const out: NdiCandidate[] = []
   const seen = new Set<string>()
@@ -59,7 +59,6 @@ export function ndiCandidates(bundledDirs: string[]): NdiCandidate[] {
       }
     }
   }
-  for (const d of bundledDirs) add(d, 'bundled')
   const vars = ['NDI_RUNTIME_DIR_V6', 'NDI_RUNTIME_DIR_V5', 'NDI_RUNTIME_DIR_V4']
   const machine = vars.every((v) => process.env[v]) ? {} : machineEnv()
   for (const v of vars) {

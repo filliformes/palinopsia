@@ -20,6 +20,12 @@ resulting work. Corresponding Source for a non-source form of such a
 combination shall not include the source code for the parts of the NDI® SDK or
 runtime used, as well as that of the covered work.
 
+The NDI® runtime is never distributed with Palinopsia. This permission covers
+Palinopsia's own code only. Palinopsia also includes Ableton Link, which Ableton AG
+licenses under the GPL with no such permission, and Link runs in the same process as
+the NDI® runtime. So no build of Palinopsia carries the NDI® runtime: each user
+installs it on their own machine, from Vizrt.
+
 NDI® is a registered trademark of Vizrt NDI AB.
 
 ## What you make with Palinopsia is yours

@@ -338,10 +338,15 @@ These ship inside every build, in `resources/depth`. `npm run fetch:depth`
 (`scripts/fetch-depth.mjs`) fetches them pinned and hash-checked; they are not in the git
 repository.
 
-### The NDI® runtime (`resources/ndi`)
+### The NDI® runtime (never shipped)
 
-The NDI® runtime is not part of Palinopsia. When a build carries it, it is Vizrt's library
-under Vizrt's own license; see [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md). NDI® is a
+The NDI® runtime is not part of Palinopsia and is **never distributed with it**. It is
+Vizrt's proprietary library under Vizrt's own license. Palinopsia loads it in the same
+process as Ableton Link, which Ableton licenses under the GPL with no exception for a
+proprietary library, so no build may carry it. Each user installs NDI on their own
+machine (the NDI section's **install NDI runtime** opens NDI's own installer), and
+Palinopsia uses that install. The release check refuses a build while a copy sits in the
+old `resources/ndi` folder. See [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md). NDI® is a
 registered trademark of Vizrt NDI AB.
 
 ### Electron and Chromium

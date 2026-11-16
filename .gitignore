@@ -29,10 +29,10 @@ dist-tsc/
 # Your own shaders (the Source Editor), saved at the repo root when run from source.
 /Shaders/
 
-# The NDI runtime a build ships (see resources/ndi/README.md) : a licensed
-# binary put there per machine, never committed.
-/resources/ndi/*/*
-!/resources/ndi/*/.gitkeep
+# The NDI runtime is never shipped or committed (THIRD_PARTY_NOTICES.md) : a
+# leftover local copy from older checkouts stays out of git (and the release
+# check refuses a build while one is there).
+/resources/ndi/
 
 # Vincent's own prompt notes (kept locally, never published)
 Sonification Mode prompt.txt

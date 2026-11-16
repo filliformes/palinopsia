@@ -22,6 +22,19 @@ else {
 // Windows cuts near 260 characters while keeping the full length : every field after
 // it then shifts and the shortcut's icon breaks (a blank page on the desktop and the
 // taskbar, every install up to v1.3.3). Keep it to one short sentence.
+// The NDI runtime never ships with Palinopsia (Ableton Link, in the same process, is
+// GPL from Ableton, who grants no exception for a proprietary library) : no build is
+// made beside a leftover copy of it (the old resources/ndi folder).
+const ndiLeft = []
+const walkNdi = (d) => {
+  for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+    const p = path.join(d, f.name)
+    if (f.isDirectory()) walkNdi(p)
+    else if (f.name !== '.gitkeep') ndiLeft.push(path.relative(ROOT, p).split(path.sep).join('/'))
+  }
+}
+if (fs.existsSync(path.join(ROOT, 'resources/ndi'))) walkNdi(path.join(ROOT, 'resources/ndi'))
+if (ndiLeft.length) problems.push(`the NDI runtime must never ship with Palinopsia : remove ${ndiLeft.slice(0, 3).join(', ')}${ndiLeft.length > 3 ? ` and ${ndiLeft.length - 3} more` : ''} (resources/ndi)`)
 const description = String(JSON.parse(read('package.json') || '{}').description ?? '')
 if (description.length > 200) problems.push(`package.json's description is ${description.length} characters : keep it under 200 (a longer one breaks the Windows shortcuts' icon)`)
 if (problems.length) {

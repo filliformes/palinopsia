@@ -242,6 +242,13 @@ that CI builds into cross-platform releases.
 - **CI** : the build job, which runs every dependency's install script, is read-only and
   keeps no token in `.git/config`. Only the release job may write, and its release
   action is pinned to a commit.
+- **The NDI runtime never ships with Palinopsia** (Vincent's decision, 2026-11-15). It is
+  Vizrt's proprietary library, and Ableton Link, in the same process, is GPL from Ableton,
+  who grants no exception for it. The build no longer copies `resources/ndi`, the
+  `ndi:bundle` script and its folder are gone, the app no longer looks for a bundled copy
+  (only the machine's own NDI, and the one-click install), and `npm run release-check`
+  refuses a build beside a leftover copy. The register and `LICENSE-EXCEPTIONS.md` say
+  why.
 
 ### Fixed
 

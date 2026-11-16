@@ -109,14 +109,9 @@ extraResources:
       - ort-wasm-simd-threaded.asyncify.wasm
       - models/rtmo-s.onnx
       - licenses/*
-  # The NDI runtime, when one was put in resources/ndi/<os> before building
-  # (see resources/ndi/README.md). The NDI licence allows shipping it in the
-  # application's own folder; without it the app uses the machine's NDI.
-  - from: resources/ndi/${os}
-    to: ndi
-    filter:
-      - "**/*"
-      - "!.gitkeep"
+  # No NDI runtime, ever : Palinopsia never ships Vizrt's library (Ableton Link in
+  # the same process is GPL from Ableton, who grants no exception for it). The
+  # user installs NDI on their own machine (the app's one-click install).
 win:
   # Explicit .ico so the app icon is embedded in the exe. Without it, only a PNG
   # was present and electron-builder shipped the default Electron icon on Windows.
