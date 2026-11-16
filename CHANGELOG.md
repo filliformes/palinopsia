@@ -5,6 +5,22 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Changed
+
+- **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):
+  - the spine (sources, A/B mix, layer FX, stack, master FX and finalizers, presentation,
+    transform, keystone) is drawn large, ordinary blocks medium, bookkeeping (autosave,
+    OSCQuery, the Resolume mapper, the touch bus, the trigger catalog, the readbacks) small;
+    the sizes come from the graph itself (the longest chain of picture links);
+  - links are curves, as wide as what they carry (the picture widest, sound medium,
+    control fine), visible at rest; links on one side of a block meet at one point; the
+    long sound links run side by side under the picture path; the room loops sweep round
+    the map;
+  - a slow wave of light travels the spine (off under reduced motion);
+  - titles only on the map, in IBM Plex Sans; the subtitle moved to the detail panel;
+    softer bands with sentence-case captions; a two-sentence intro, the longer one moved
+    under the map ("Reading the map").
+
 ## v1.3.4 — 2026-11-15
 
 ### Added
