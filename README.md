@@ -333,7 +333,7 @@ controls, the Background's, the 16 Macro knobs), **presets** (each shader's, you
 layer, Mixer and Background ones), **master chains**, **Generate themes**, the **loops**
 (the Loop rack's recipes, onto the selected layer), the
 **pages** and tabs, and **commands** (Randomize, Vary, Panic flush, Black, Freeze, Record,
-MIDI Learn, Fulldome, New, Open, Undo, Redo). Results come in groups, each row saying
+Learn, Fulldome, New, Open, Undo, Redo). Results come in groups, each row saying
 where it will land; a row that can't apply is greyed and says why. The keyword tags
 work as in every picker (`reverb`, `paint`), and several words narrow it (`mosh l2`).
 With the field empty, your recent picks come first.

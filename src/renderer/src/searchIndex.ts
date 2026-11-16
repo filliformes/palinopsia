@@ -905,7 +905,7 @@ function commandItems(s: St, units: UnitInfo[]): SearchItem[] {
       const st = useStore.getState()
       st.setMacroBar(!st.macroBar)
     }),
-    cmd('learn', 'MIDI Learn', `L · ${s.midiLearnMode ? 'on : turn it off' : 'off : turn it on'}`, ['midi', 'map', 'controller'], () => {
+    cmd('learn', 'Learn', `MIDI and OSC · L · ${s.midiLearnMode ? 'on : turn it off' : 'off : turn it on'}`, ['midi', 'map', 'controller'], () => {
       const st = useStore.getState()
       st.setMidiLearnMode(!st.midiLearnMode)
     }),
