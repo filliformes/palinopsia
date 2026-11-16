@@ -92,10 +92,10 @@ function noise() { noiseSeed = (Math.imul(noiseSeed, 1103515245) + 12345) & 0x7f
 
 const RVB_LINES = 8
 const RVB_TICK = 16 // control rate : coefficients move every 16 samples
+// Buffer sizes : these are the smallest (they hold 96 kHz) ; each reverb sizes its own
+// from its sample rate (FDNReverb.sizes), powers of two so the reads wrap with a mask.
 const RVB_TANK_SIZE = 32768 // per line ; holds the longest line at 96 kHz plus modulation
-const RVB_TANK_MASK = RVB_TANK_SIZE - 1
 const RVB_PRE_SIZE = 32768 // 255 ms at 96 kHz is 24480 samples
-const RVB_PRE_MASK = RVB_PRE_SIZE - 1
 const RVB_AP_COUNT = 4
 const RVB_AP_SIZE = 2048
 
@@ -121,7 +121,6 @@ const RVB_LOOP_AP_RATIO = [
 const RVB_LOOP_AP_SIZE_MIN = 1 / 3
 const RVB_LOOP_AP_GAIN = 0.5
 const RVB_LOOP_AP_SIZE = 16384
-const RVB_LOOP_AP_MASK = RVB_LOOP_AP_SIZE - 1
 
 // Who feeds what : left input goes to the even lines, right input to the odd ones.
 const RVB_IN_SIGN = [1, 1, -1, 1, 1, -1, -1, -1]
@@ -145,6 +144,7 @@ class FDNReverb {
   constructor(sr) {
     this.sr = sr
     this.srScale = sr / 48000
+    this.sizes()
 
     // parameters : the host writes these fields
     this.mode = 0
@@ -169,28 +169,28 @@ class FDNReverb {
     this.wR = 0
 
     // predelay
-    this.preL = new Float32Array(RVB_PRE_SIZE)
-    this.preR = new Float32Array(RVB_PRE_SIZE)
+    this.preL = new Float32Array(this.preSize)
+    this.preR = new Float32Array(this.preSize)
     this.preW = 0
     this.preCur = 0 // delay in samples, slewed
     this.preTgt = 0
 
     // input diffuser : 4 Schroeder allpasses per channel
-    this.apL = new Float32Array(RVB_AP_COUNT * RVB_AP_SIZE)
-    this.apR = new Float32Array(RVB_AP_COUNT * RVB_AP_SIZE)
+    this.apL = new Float32Array(RVB_AP_COUNT * this.apSize)
+    this.apR = new Float32Array(RVB_AP_COUNT * this.apSize)
     this.apLenL = new Int32Array(RVB_AP_COUNT)
     this.apLenR = new Int32Array(RVB_AP_COUNT)
     this.apIdxL = new Int32Array(RVB_AP_COUNT)
     this.apIdxR = new Int32Array(RVB_AP_COUNT)
     for (let k = 0; k < RVB_AP_COUNT; k++) {
-      this.apLenL[k] = Math.min(RVB_AP_SIZE, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_L[k] * this.srScale)))
-      this.apLenR[k] = Math.min(RVB_AP_SIZE, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_R[k] * this.srScale)))
+      this.apLenL[k] = Math.min(this.apSize, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_L[k] * this.srScale)))
+      this.apLenR[k] = Math.min(this.apSize, FDNReverb.nextPrime(Math.round(RVB_AP_LEN_R[k] * this.srScale)))
     }
     this.apG = 0
     this.apGTgt = 0
 
     // tank
-    this.tank = new Float32Array(RVB_LINES * RVB_TANK_SIZE)
+    this.tank = new Float32Array(RVB_LINES * this.tankSize)
     this.tankW = 0
     this.lenTgt = new Float64Array(RVB_LINES) // prime length for the current size
     this.lenCur = new Float64Array(RVB_LINES) // gliding length
@@ -201,7 +201,7 @@ class FDNReverb {
     this.depthCur = 0
     // allpass inside each line : same glide as the line
     const nAp = RVB_LINES * RVB_LOOP_AP_COUNT // index : allpass * 8 + line
-    this.loopAp = new Float32Array(nAp * RVB_LOOP_AP_SIZE)
+    this.loopAp = new Float32Array(nAp * this.loopApSize)
     this.apLenTgt = new Float64Array(nAp)
     this.apLenCur = new Float64Array(nAp)
     this.apDel = new Float64Array(nAp)
@@ -253,6 +253,26 @@ class FDNReverb {
     this.reset()
   }
 
+  // Buffer sizes for this sample rate : at least the 96 kHz ones, bigger above (a fixed
+  // size clamped the longest line, three in-loop allpasses to one length and the
+  // predelay to 170 ms at 192 kHz).
+  sizes() {
+    const pow2 = (n) => { let p = 1; while (p < n) p *= 2; return p }
+    const s = this.srScale
+    let apMax = 0
+    for (let a = 0; a < RVB_LINES * RVB_LOOP_AP_COUNT; a++) apMax = Math.max(apMax, RVB_TANK_LEN[a % RVB_LINES] * RVB_LOOP_AP_RATIO[a])
+    // in-loop allpasses : the longest at size 1, room for the primes stepped past the lines
+    this.loopApSize = Math.max(RVB_LOOP_AP_SIZE, pow2(Math.ceil(apMax * s) + 512))
+    // tank lines : the longest at size 1, the modulation depth (40 at 48 kHz), the 4-point
+    // read and maxLen's 256 ; never smaller than the allpasses (their write index is the tank's)
+    this.tankSize = Math.max(RVB_TANK_SIZE, this.loopApSize, pow2(Math.ceil((RVB_TANK_LEN[RVB_LINES - 1] + 40) * s) + 512))
+    this.preSize = Math.max(RVB_PRE_SIZE, pow2(Math.ceil(0.255 * this.sr) + 8)) // 255 ms
+    this.apSize = Math.max(RVB_AP_SIZE, pow2(Math.ceil(Math.max(RVB_AP_LEN_L[RVB_AP_COUNT - 1], RVB_AP_LEN_R[RVB_AP_COUNT - 1]) * s) + 64))
+    this.tankMask = this.tankSize - 1
+    this.preMask = this.preSize - 1
+    this.loopApMask = this.loopApSize - 1
+  }
+
   // Smallest prime ≥ n.
   static nextPrime(n) {
     if (n < 2) return 2
@@ -274,7 +294,7 @@ class FDNReverb {
   recompute() {
     // size → line lengths : distinct primes, so mutually prime
     const scale = Math.pow(RVB_SIZE_MIN, 1 - clampf(this.size, 0, 1)) * this.srScale
-    const maxLen = RVB_TANK_SIZE - 256
+    const maxLen = this.tankSize - 256
     let prev = 16
     for (let i = 0; i < RVB_LINES; i++) {
       let len = FDNReverb.nextPrime(Math.max(prev + 1, Math.round(RVB_TANK_LEN[i] * scale)))
@@ -293,7 +313,7 @@ class FDNReverb {
           j = -1
         }
       }
-      this.apLenTgt[a] = Math.min(len, RVB_LOOP_AP_SIZE - 8)
+      this.apLenTgt[a] = Math.min(len, this.loopApSize - 8)
     }
     this.updateDecay()
   }
@@ -366,7 +386,7 @@ class FDNReverb {
       this.hpCTgt = this.onePole(clampf(this.locut_hz, 20, 2000))
     }
     const frozen = this.freeze ? 1 : 0
-    this.preTgt = Math.min(RVB_PRE_SIZE - 4, clampf(this.predelay_ms, 0, 255) * 0.001 * sr)
+    this.preTgt = Math.min(this.preSize - 4, clampf(this.predelay_ms, 0, 255) * 0.001 * sr)
     this.apGTgt = this.mode ? RVB_AP_GAIN_MODE1 : RVB_AP_GAIN_MAX * clampf(this.diffusion, 0, 1)
 
     // modulation depth : none when frozen, a fractional read would wear the tail down
@@ -468,10 +488,11 @@ class FDNReverb {
       this.preCur = pd
     }
     const pi = pd | 0, pf = pd - pi
-    const pa = (pw - pi) & RVB_PRE_MASK, pb = (pw - pi - 1) & RVB_PRE_MASK
+    const PM = this.preMask
+    const pa = (pw - pi) & PM, pb = (pw - pi - 1) & PM
     let xL = this.preL[pa] + (this.preL[pb] - this.preL[pa]) * pf
     let xR = this.preR[pa] + (this.preR[pb] - this.preR[pa]) * pf
-    this.preW = (pw + 1) & RVB_PRE_MASK
+    this.preW = (pw + 1) & PM
 
     // input gain : fades to 0 when frozen
     const inG = (this.inG += (this.inGTgt - this.inG) * ks)
@@ -480,9 +501,9 @@ class FDNReverb {
 
     // ── input diffusion : Schroeder allpasses in series ──
     const g = (this.apG += (this.apGTgt - this.apG) * ks)
-    const apL = this.apL, apR = this.apR
+    const apL = this.apL, apR = this.apR, AS = this.apSize
     for (let k = 0; k < RVB_AP_COUNT; k++) {
-      const base = k * RVB_AP_SIZE
+      const base = k * AS
       let idx = this.apIdxL[k]
       let dl = apL[base + idx]
       let v = xL - g * dl
@@ -505,19 +526,20 @@ class FDNReverb {
     const kHi = this.kHi, kMidHi = this.kMidHi, kLoMid = this.kLoMid
     const y = this.y
     const loopAp = this.loopAp, apDel = this.apDel, apDelInc = this.apDelInc, apAtt = this.apAtt
-    const aw = w & RVB_LOOP_AP_MASK
+    const TS = this.tankSize, TM = this.tankMask, LS = this.loopApSize, LM = this.loopApMask
+    const aw = w & LM
     let sumL = 0, sumR = 0
     for (let i = 0; i < RVB_LINES; i++) {
-      const base = i * RVB_TANK_SIZE
+      const base = i * TS
       // modulated length, read with a 4-point Lagrange interpolation
       const D = del[i]
       del[i] = D + delInc[i]
       const n = D | 0, f = D - n
       const r = w - n
-      const a0 = tank[base + ((r + 1) & RVB_TANK_MASK)]
-      const a1 = tank[base + (r & RVB_TANK_MASK)]
-      const a2 = tank[base + ((r - 1) & RVB_TANK_MASK)]
-      const a3 = tank[base + ((r - 2) & RVB_TANK_MASK)]
+      const a0 = tank[base + ((r + 1) & TM)]
+      const a1 = tank[base + (r & TM)]
+      const a2 = tank[base + ((r - 1) & TM)]
+      const a3 = tank[base + ((r - 2) & TM)]
       const fm1 = f - 1, fm2 = f - 2, fp1 = f + 1
       let o = a1 * fp1 * fm1 * fm2 * 0.5 - a2 * fp1 * f * fm2 * 0.5 + (a3 * fp1 * f * fm1 - a0 * f * fm1 * fm2) * 0.16666666666666666
 
@@ -528,9 +550,9 @@ class FDNReverb {
         const A = apDel[a]
         apDel[a] = A + apDelInc[a]
         const an = A | 0
-        const ab = a * RVB_LOOP_AP_SIZE
-        let ad = loopAp[ab + ((aw - an) & RVB_LOOP_AP_MASK)]
-        ad = (ad + (loopAp[ab + ((aw - an - 1) & RVB_LOOP_AP_MASK)] - ad) * (A - an)) * apAtt[a]
+        const ab = a * LS
+        let ad = loopAp[ab + ((aw - an) & LM)]
+        ad = (ad + (loopAp[ab + ((aw - an - 1) & LM)] - ad) * (A - an)) * apAtt[a]
         const av = o - RVB_LOOP_AP_GAIN * ad
         loopAp[ab + aw] = av
         o = ad + RVB_LOOP_AP_GAIN * av
@@ -557,14 +579,14 @@ class FDNReverb {
     const d4 = b4 + b6, d5 = b5 + b7, d6 = b4 - b6, d7 = b5 - b7
     const h = RVB_HADAMARD_NORM
     tank[w] = (d0 + d4) * h + xL * RVB_IN_SIGN[0]
-    tank[RVB_TANK_SIZE + w] = (d1 + d5) * h + xR * RVB_IN_SIGN[1]
-    tank[2 * RVB_TANK_SIZE + w] = (d2 + d6) * h + xL * RVB_IN_SIGN[2]
-    tank[3 * RVB_TANK_SIZE + w] = (d3 + d7) * h + xR * RVB_IN_SIGN[3]
-    tank[4 * RVB_TANK_SIZE + w] = (d0 - d4) * h + xL * RVB_IN_SIGN[4]
-    tank[5 * RVB_TANK_SIZE + w] = (d1 - d5) * h + xR * RVB_IN_SIGN[5]
-    tank[6 * RVB_TANK_SIZE + w] = (d2 - d6) * h + xL * RVB_IN_SIGN[6]
-    tank[7 * RVB_TANK_SIZE + w] = (d3 - d7) * h + xR * RVB_IN_SIGN[7]
-    this.tankW = (w + 1) & RVB_TANK_MASK
+    tank[TS + w] = (d1 + d5) * h + xR * RVB_IN_SIGN[1]
+    tank[2 * TS + w] = (d2 + d6) * h + xL * RVB_IN_SIGN[2]
+    tank[3 * TS + w] = (d3 + d7) * h + xR * RVB_IN_SIGN[3]
+    tank[4 * TS + w] = (d0 - d4) * h + xL * RVB_IN_SIGN[4]
+    tank[5 * TS + w] = (d1 - d5) * h + xR * RVB_IN_SIGN[5]
+    tank[6 * TS + w] = (d2 - d6) * h + xL * RVB_IN_SIGN[6]
+    tank[7 * TS + w] = (d3 - d7) * h + xR * RVB_IN_SIGN[7]
+    this.tankW = (w + 1) & TM
 
     // ── output : gain, low-cut (one-pole high-pass), width as mid/side ──
     const outG = (this.outG += (this.outGTgt - this.outG) * ks)
