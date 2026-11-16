@@ -140,6 +140,7 @@ const RVB_GLIDE_MAX = 0.5 // samples of length change per sample, at most
 const RVB_SLEW_S = 0.02 // time constant of the gains
 const RVB_TINY = 1e-25 // below this a filter state is set to zero (denormals)
 
+// third-party: The Sonify reverb (published methods only, no code)
 class FDNReverb {
   constructor(sr) {
     this.sr = sr
