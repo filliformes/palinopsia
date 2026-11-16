@@ -231,7 +231,7 @@ to interoperate with it.
 
 The dataflou section's **visualizer** button opens the dataflou project's own web
 visualizer, by **Alexandre Burton** (Artificiel). It is built from its repository (`web/`,
-commit 4561df8 of 2026-11-03) by `scripts/build-dataflou-visualizer.mjs`, without its
+commit 518c67f of 2026-11-11) by `scripts/build-dataflou-visualizer.mjs`, without its
 Atelier editor panel. Palinopsia serves it (`src/main/dataflou/visualizer.ts`), but it is
 not part of Palinopsia's own code and not under its license. It is included with its
 author's permission (2026-11-07), and all rights remain with its author.
