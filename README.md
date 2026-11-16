@@ -271,11 +271,11 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `V` | **Big preview** : fold the panels under the preview away, and back (the expand arrows at the end of the preview's right-hand capsule) |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
-| `L` | **MIDI Learn** on/off : from any tab or full-page view |
+| `L` | **Learn** (MIDI and OSC controllers) on/off : from any tab or full-page view |
 | `?` | Keyboard **cheat-sheet** : this table, in-app (Esc closes) |
 | `0` | **Panic flush** : clear every self-feeding buffer (feedback / trails / rings / accumulators) at once |
 | `.` | **Black** : the whole show (picture and sound) to black over the Morph time; again, back (the top bar's ■ Black) |
-| `Esc` | Close the cheat-sheet, then MIDI Learn; otherwise close the Source Editor / Resolume / Body / Sequence / World / Sonify / Lights / Output. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
+| `Esc` | Close the cheat-sheet, then Learn; otherwise close the Source Editor / Resolume / Body / Sequence / World / Sonify / Lights / Output. On a **fullscreen output** over the control window (not an installation), a tap of `Esc` closes the output itself; on any other output it hands focus back to the controls |
 | `Ctrl/Cmd+K` | **Search everything** : effects, sources, parameters, presets, master chains, Generate themes, pages and commands in one palette (again : close it; see [below](#search-everything-ctrlk)) |
 | `Ctrl/Cmd+Z` · `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y` | Undo · Redo (100 levels) |
 | `Ctrl/Cmd+S` | Save session (the shader instead, while the Source Editor is open) |
@@ -883,8 +883,8 @@ narrows it tucks the SESSION / GENERATE labels away, then tightens the session n
 the menus and the zoom readout, never dropping a button, on one line down to the
 1024 px minimum window. It carries the session controls, one group (the name, the
 session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Add a
-session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **MIDI Learn**
-button (key `L`), the **REC** pill (stop it here and a toast confirms the saved
+session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **Learn**
+button (MIDI Learn, which learns OSC controllers too : key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
 zoom, the theme selector, and, at the far right, **⚡ Flush**, the panic
 button (also key `0`) that drops every self-feeding buffer at once: per-layer
@@ -1583,7 +1583,7 @@ Parametric generator.
 
 ## MIDI
 
-Hardware control, Ableton-style. Press **MIDI Learn** in the top toolbar (or the
+Hardware control, Ableton-style. Press **Learn** in the top toolbar (or the
 `L` key, from any tab) : it turns blue and every learnable control grows a **blue
 overlay**. Click one (it pulses), then move a knob / hit a pad on your
 controller : bound (the overlay turns **green**). The mode stays armed so you can

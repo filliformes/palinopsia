@@ -50,7 +50,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
       ['H', 'Freeze / hold the output'],
       ['.', 'Black : the whole show (picture and sound) to black over the Morph time  ·  again : back'],
       ['L', 'Learn on / off : MIDI and OSC controllers'],
-      ['Esc', 'Close this sheet, then the top page (the Source Editor first) · exit MIDI Learn'],
+      ['Esc', 'Close this sheet, then the top page (the Source Editor first) · exit Learn'],
       ['Esc on the output', 'Close a fullscreen output over the controls, else back to them (an installation : hold Esc or O 1.5 s)'],
       ['Ctrl ⇧O', 'Leave an installation, from any window']
     ]

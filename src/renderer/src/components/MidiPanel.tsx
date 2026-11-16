@@ -202,8 +202,8 @@ export function MidiPanel(): JSX.Element {
           }
           title={
             learnMode
-              ? 'MIDI Learn ON : click a highlighted control, then move a MIDI control. Click to exit.'
-              : 'Enter MIDI Learn mode (same as the toolbar button)'
+              ? 'Learn ON : click a highlighted control, then move a MIDI control. Click to exit.'
+              : 'Enter Learn mode (same as the top bar\'s Learn button)'
           }
         >
           {learnMode ? 'LEARNING' : 'LEARN'}

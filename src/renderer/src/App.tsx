@@ -2748,7 +2748,7 @@ function RightViewTabs({ onNeed }: { onNeed: (w: number | ((prev: number) => num
       label: 'feel',
       title: `Feel (G) : whole-picture dials over everything at once. They ride on top of your settings and save with the session.${feelOff ? ` Not at rest : ${feelOff}` : ' All at rest.'}`
     },
-    { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, Resolume, dataflou and Ableton Link, each a collapsible section' },
+    { id: 'io', label: 'connect', title: 'Connect (A) : the audio bus, MIDI (controller input + learned bindings + output), OSC input/OSCQuery, dataflou, Ableton Link, Resolume and the Agent, each a collapsible section' },
     {
       id: 'perf',
       label: 'performance',
