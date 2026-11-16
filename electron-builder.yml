@@ -146,6 +146,14 @@ mac:
         - arm64
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   category: public.app-category.music
+  # Electron's MIT license and Chromium's notices : on Windows and Linux they stay
+  # beside the app, but on macOS electron-builder deletes both, so they travel
+  # inside the app's Resources here (with the rest of the notices).
+  extraResources:
+    - from: node_modules/electron/dist/LICENSE
+      to: LICENSE.electron.txt
+    - from: node_modules/electron/dist/LICENSES.chromium.html
+      to: LICENSES.chromium.html
   # An ad-hoc signature ("-") : Apple Silicon refuses to run unsigned code, and
   # electron-builder 26 no longer falls back to one by itself (26.15 skipped
   # signing entirely : "Palinopsia is damaged"). Not notarized : see the README.

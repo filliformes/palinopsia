@@ -342,7 +342,7 @@ registered trademark of Vizrt NDI AB.
 Palinopsia runs on **Electron** (https://www.electronjs.org, MIT, Copyright (c) Electron
 contributors and GitHub Inc.) and the **Chromium** browser engine it embeds. Every build
 carries their notices: `LICENSE.electron.txt` and `LICENSES.chromium.html`, beside the
-app.
+app on Windows and Linux, and in `Palinopsia.app/Contents/Resources` on macOS.
 
 ### npm packages
 
