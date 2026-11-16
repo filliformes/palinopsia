@@ -20,6 +20,7 @@ uniform float PH_rain;
 
 // @dome
 
+// third-party: Hash without Sine
 float h11(float x) { x = fract(x * 0.1031); x *= x + 33.33; x *= x + x; return fract(x); }
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 

@@ -44,6 +44,7 @@ const float R0 = 0.035;   // the crushed core round the impact (frame heights)
 const float RMAX = 2.1;   // past the farthest corner from any impact
 
 float hash12(vec2 p) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : whole-number inputs, kept small
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);

@@ -62,6 +62,7 @@ float flowN(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   vec4 q = vec4(i.xyxy) + vec4(0.0, 0.0, 1.0, 1.0);
+  // third-party: Hash without Sine
   vec3 a = fract(vec3(q.xyx) * 0.1031); a += dot(a, a.yzx + 33.33);
   vec3 b = fract(vec3(q.zyz) * 0.1031); b += dot(b, b.yzx + 33.33);
   vec3 c = fract(vec3(q.xwx) * 0.1031); c += dot(c, c.yzx + 33.33);

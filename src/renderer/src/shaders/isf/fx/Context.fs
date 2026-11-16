@@ -40,6 +40,7 @@
 uniform float DOME_FILL; // the horizon's radius on the disc under full-dome fill, else 0 (engine/domeSignal.ts)
 
 // Void / edge-dissolve noise (a ragged erosion boundary, not a clean vignette).
+// third-party: Hash without Sine
 float vHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float vNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);

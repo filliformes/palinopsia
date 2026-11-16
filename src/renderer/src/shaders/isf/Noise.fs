@@ -41,6 +41,7 @@ uniform float PH_noiseEvolve; // wrap 4096
 // Hoskins hashes, fed whole lattice coordinates (each under ~1e4 : the lattice
 // wraps at 4096 cells an octave, or at the seamless period).
 float h12(vec2 p) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);

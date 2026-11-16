@@ -49,6 +49,7 @@ const float R0 = 0.6; // the core's radius
 
 // Hash without Sine (THIRD_PARTY_NOTICES), on cells already wrapped at 256 (vnoise3).
 float hash13(vec3 p3) {
+  // third-party: Hash without Sine
   p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);

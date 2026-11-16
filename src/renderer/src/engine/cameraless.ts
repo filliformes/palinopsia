@@ -60,6 +60,7 @@ uniform float uAspect;     // width / height : rotate and mottle in square units
 // Sine-free hash (Hoskins) : the sin(dot(...)) kind aliases into banded rows on
 // large integer grids.
 float h1(vec2 p){
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);

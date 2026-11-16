@@ -9,10 +9,12 @@
 //   2. a font in src/renderer/src/fonts or docs/fonts is not listed in licenses/fonts.txt;
 //   3. a vendored or shipped third-party folder (native/*/sdk/*, resources/*) is not
 //      named in THIRD_PARTY_NOTICES.md;
-//   4. a `third-party: <name>` tag in the code names something THIRD_PARTY_NOTICES.md
-//      does not contain;
-//   5. a file carries a foreign copyright line, an SPDX id or a Shadertoy link but no
-//      `third-party:` tag (so it cannot be traced to its entry).
+//   4. a `third-party: <name>` tag in the code names no entry of THIRD_PARTY_NOTICES.md
+//      (a `### Name` heading, or a `- **Name**` item);
+//   5. a file carries a foreign copyright line (with or without "(c)"), an Apache-style
+//      "Licensed under the …" header, an SPDX id or a Shadertoy link but no
+//      `third-party:` tag (so it cannot be traced to its entry);
+//   6. a file uses Hash without Sine (its .1031 constant) without its tag.
 //
 // The rule it backs : code, shaders, algorithms ported line by line, binaries, models,
 // fonts, images, sounds and data taken from someone else get an entry in
@@ -120,9 +122,30 @@ for (const p of shipped) if (!NOTICES.includes(p)) problems.push(`${p} ships thi
 
 // ── 4 + 5. tags in the code ─────────────────────────────────────────────────
 const SCAN = ['src', 'tools', 'scripts', 'native']
-const EXT = /\.(ts|tsx|js|mjs|cjs|fs|vs|glsl|py|sh|cpp|cc|h|mm|c)$/
+const EXT = /\.(ts|tsx|js|mjs|cjs|fs|frag|isf|vs|glsl|py|sh|cpp|cc|h|hpp|mm|m|c|html|css)$/
 const SKIP = /(^|\/)(node_modules|build|out|sdk|\.syphon-src|\.syphon-build|frameworks)(\/|$)|tools\/shader-rig\/bundle\.js$|scripts\/notices\.mjs$/
-const FOREIGN = /shadertoy\.com\/view|SPDX-License-Identifier|copyright\s*(\(c\)|©)\s*(?!\d{4}\s*(vincent fillion|filliformes))/i
+// Someone else's work : a Shadertoy link, an SPDX id, an Apache-style "Licensed under
+// the …" header, or a copyright line ("Copyright (c) 2014 X", "Copyright © X",
+// "Copyright 2016 X") that is not Vincent's own.
+const OWN = /vincent fillion|filliformes|fillioning/i
+const COPYRIGHT_LINE = /copyright\s*(\(c\)|©|\d{4})/i
+const foreign = (src) =>
+  /shadertoy\.com\/view|SPDX-License-Identifier|licensed under the (apache|mit|bsd|gnu|mozilla)/i.test(src) ||
+  src.split('\n').some((l) => COPYRIGHT_LINE.test(l) && !OWN.test(l))
+// Hoskins' Hash without Sine (its .1031 constant) : every file using it carries the tag.
+const HOSKINS = /\.1031\b/
+// The entry names a tag may give : Part headings ("### Name (`file`)" : the name
+// before its parenthesis) and the bold names that open a list item ("- **Name**").
+const ENTRIES = new Set()
+for (const l of NOTICES.split(/\r?\n/)) {
+  const h = /^###\s+(.+?)\s*$/.exec(l)
+  if (h) {
+    ENTRIES.add(h[1].trim())
+    ENTRIES.add(h[1].replace(/\s*\(.*$/, '').trim())
+  }
+  const b = /^\s*-\s+\*\*(.+?)\*\*/.exec(l)
+  if (b) ENTRIES.add(b[1].replace(/®/g, '').trim())
+}
 function walk(d, acc) {
   for (const f of fs.readdirSync(d)) {
     const p = path.join(d, f)
@@ -139,8 +162,9 @@ for (const p of SCAN.flatMap((d) => walk(path.join(ROOT, d), []))) {
   // The entry name is the tag up to an optional note in parentheses.
   const found = [...src.matchAll(/third-party:\s*([^\n*(]+?)\s*(?:\(|\*\/|\n|$)/g)].map((m) => m[1].trim())
   tags += found.length
-  for (const t of found) if (!NOTICES.includes(t)) problems.push(`${rel(p)} : tag "third-party: ${t}" has no matching entry in THIRD_PARTY_NOTICES.md`)
-  if (!found.length && FOREIGN.test(src)) problems.push(`${rel(p)} carries a foreign copyright, an SPDX id or a Shadertoy link but no \`third-party:\` tag`)
+  for (const t of found) if (!ENTRIES.has(t)) problems.push(`${rel(p)} : tag "third-party: ${t}" names no entry of THIRD_PARTY_NOTICES.md (a ### heading or a "- **name**" item)`)
+  if (!found.length && foreign(src)) problems.push(`${rel(p)} carries a foreign copyright, a license header, an SPDX id or a Shadertoy link but no \`third-party:\` tag`)
+  if (HOSKINS.test(src) && !found.includes('Hash without Sine')) problems.push(`${rel(p)} uses Hash without Sine (the .1031 constant) without the tag \`third-party: Hash without Sine\``)
 }
 
 if (problems.length) {

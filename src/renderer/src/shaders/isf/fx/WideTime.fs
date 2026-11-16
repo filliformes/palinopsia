@@ -67,6 +67,7 @@ float layerDt() {
 // the input and left fogs and a 30 Hz flicker) nor has its long trails cut
 // short by a forced one-step-per-frame floor.
 float hash13(vec3 p3) {
+  // third-party: Hash without Sine
   p3 = fract(p3 * 0.1031); // precise hash : whole-number inputs, kept small
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);

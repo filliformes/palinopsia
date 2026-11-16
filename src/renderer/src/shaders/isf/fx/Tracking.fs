@@ -29,6 +29,7 @@ uniform float PH_roll; // wrap 16.666666666666668
 const float TAU = 6.28318530718;
 
 float hash(vec2 p) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : no rows, no lattice over hours
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);

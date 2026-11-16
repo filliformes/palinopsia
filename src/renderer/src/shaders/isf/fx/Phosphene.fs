@@ -21,6 +21,7 @@ const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
 // Hoskins hash, whole-number inputs (pixel, frame).
 float hash31(vec3 p) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(p * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);

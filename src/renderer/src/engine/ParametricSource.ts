@@ -45,6 +45,7 @@ const FS: Record<'raster' | 'wave' | 'bars' | 'show', string> = {
   // Raster : hard columns, each lit when its band beats its own threshold
   // (louder = more columns), plus scanning seams where the band is alive.
   raster: HEAD + `
+// third-party: Hash without Sine
 float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
 void main(){
   float cols = floor(mix(24.0, 96.0, uScale));

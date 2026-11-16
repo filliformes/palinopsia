@@ -32,6 +32,7 @@ uniform float PH_vary;
 uniform float PH_evolve; // wrap 100.5309649
 
 float hash13(vec3 p3) {
+  // third-party: Hash without Sine
   p3 = fract(p3 * 0.1031);
   p3 += dot(p3, p3.zyx + 31.32);
   return fract((p3.x + p3.y) * p3.z);

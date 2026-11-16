@@ -68,6 +68,7 @@ in vec2 vUV; out vec4 o;
 float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
 vec4 pm(vec4 c){ return vec4(c.rgb * c.a, c.a); }
 vec4 unpm(vec4 c){ return vec4(c.a > 1e-5 ? c.rgb / c.a : vec3(0.0), c.a); }
+// third-party: Hash without Sine
 float hash12(vec2 q){ vec3 p3 = fract(vec3(q.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 `
 

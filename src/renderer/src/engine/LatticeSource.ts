@@ -67,6 +67,7 @@ flat out vec2 vDir;           // the streak's direction, to hold the outline sti
 vec3 gSeed;
 
 vec3 hash33(vec3 p3) {
+  // third-party: Hash without Sine
   p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
   p3 += dot(p3, p3.yxz + 33.33);
   return fract((p3.xxy + p3.yxx) * p3.zyx);

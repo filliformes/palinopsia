@@ -63,6 +63,7 @@ void main(){ vUV = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`
 // GLSL shared by the first-half node shaders : the Hoskins hash (feed it
 // integer-spaced inputs, each under ~1e4) and straight-alpha helpers.
 const GLSL_HASH = `
+// third-party: Hash without Sine
 float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }`
 const GLSL_PM = `

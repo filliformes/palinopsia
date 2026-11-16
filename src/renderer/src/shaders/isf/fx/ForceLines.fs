@@ -26,6 +26,7 @@ uniform float PH_rate; // wrap 4096
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
 float hash11(float x) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(x) * 0.1031); // precise hash : no rows, no lattice over hours
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);

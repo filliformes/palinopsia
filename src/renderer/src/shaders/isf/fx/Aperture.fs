@@ -19,6 +19,7 @@
 // from where it is instead of jumping it.
 uniform float PH_rate;
 
+// third-party: Hash without Sine
 float hash1(float n) { n = fract(n * 0.1031); n *= n + 33.33; n *= n + n; return fract(n); }
 
 void main() {

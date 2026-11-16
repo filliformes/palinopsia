@@ -40,6 +40,7 @@ uniform float PH_timeGlitch; // wrap 4096
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
 float hash12(vec2 p) {
+  // third-party: Hash without Sine
   vec3 p3 = fract(vec3(p.xyx) * 0.1031); // precise hash : whole-number inputs, kept small
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
