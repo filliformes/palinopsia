@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { applyOscOutput } from '../oscInput'
-import { isPlausibleHost, isSelfDest, makeDest, type OscDest } from '../oscDests'
+import { destKey, isPlausibleHost, isSelfDest, makeDest, type OscDest } from '../oscDests'
 import { oscPeerRates } from '../oscMonitor'
 import { numberBoxCh, numberBoxChars } from './numberBox'
 
@@ -41,14 +41,16 @@ export function OscDestinations(): JSX.Element {
   }
   const add = (): void => {
     const last = dests[dests.length - 1]
-    setDests([...dests, makeDest({ name: `out ${dests.length + 1}`, host: last?.host ?? '127.0.0.1', port: (last?.port ?? 9000) + 1 })])
+    // the next port after the last row's (one below at the very top : 65536 is no port)
+    const lp = last?.port ?? 9000
+    setDests([...dests, makeDest({ name: `out ${dests.length + 1}`, host: last?.host ?? '127.0.0.1', port: lp >= 65535 ? lp - 1 : lp + 1 })])
     applyOscOutput()
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       {dests.map((d, i) => {
-        const dupOf = dests.findIndex((o, j) => j < i && o.host === d.host && o.port === d.port)
+        const dupOf = dests.findIndex((o, j) => j < i && destKey(o) === destKey(d))
         return (
           <DestRow
             key={d.id}

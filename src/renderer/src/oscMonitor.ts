@@ -64,7 +64,9 @@ function countPeer(dir: 'in' | 'out', key: string, n: number, t: number): void {
     if (m.size >= PEER_CAP) {
       let old: string | null = null, oldAt = Infinity
       for (const [k, v] of m) if (v.lastAt < oldAt) { oldAt = v.lastAt; old = k }
-      if (old) m.delete(old)
+      // its address list goes with it (a sender on a new port per message would
+      // otherwise grow them without end while links or the monitor is open)
+      if (old) { m.delete(old); byPeer[dir].delete(old) }
     }
     m.set(key, (p = { key, n: 0, lastAt: t, rate: 0, win: 0, winAt: t }))
   }
@@ -97,7 +99,10 @@ export function oscPeerRates(dir: 'in' | 'out'): Record<string, number> {
 const byPeer = { in: new Map<string, Map<string, { n: number; lastAt: number; args: OscArg[] }>>(), out: new Map<string, Map<string, { n: number; lastAt: number; args: OscArg[] }>>() }
 function recordPeer(dir: 'in' | 'out', key: string, address: string, args: OscArg[], t: number): void {
   let m = byPeer[dir].get(key)
-  if (!m) byPeer[dir].set(key, (m = new Map()))
+  if (!m) {
+    if (!peers[dir].has(key)) return // only the peers counted (at most PEER_CAP a way)
+    byPeer[dir].set(key, (m = new Map()))
+  }
   const a = m.get(address)
   if (a) { a.n++; a.lastAt = t; a.args = args }
   else if (m.size < 256) m.set(address, { n: 1, lastAt: t, args })

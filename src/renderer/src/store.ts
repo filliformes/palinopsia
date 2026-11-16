@@ -2462,8 +2462,8 @@ interface StoreState {
   // or a whole host), heard and shown but never played
   oscMulticast: string[]
   setOscMulticast: (groups: string[]) => void
-  oscMulticastStatus: { joined: string[]; failed: Array<{ group: string; error: string }> } | null
-  setOscMulticastStatus: (s: { joined: string[]; failed: Array<{ group: string; error: string }> } | null) => void
+  oscMulticastStatus: { joined: string[]; failed: Array<{ group: string; error: string }>; on?: Record<string, string[]> } | null
+  setOscMulticastStatus: (s: { joined: string[]; failed: Array<{ group: string; error: string }>; on?: Record<string, string[]> } | null) => void
   oscMuted: string[]
   toggleOscMuted: (key: string) => void
   // OSC aliases (oscAliases.ts) : controller addresses played onto /opsia ones

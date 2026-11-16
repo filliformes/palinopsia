@@ -91,23 +91,30 @@ export function saveOscDests(list: OscDest[]): void {
   }
 }
 
-const isLoopback = (h: string): boolean => h === 'localhost' || h.startsWith('127.')
+// 0.0.0.0 reaches this computer too (macOS, Linux)
+const isLoopback = (h: string): boolean => h === 'localhost' || h === '0.0.0.0' || h.startsWith('127.')
 
-/** Would this destination send into Palinopsia's own OSC input (a loop) ? */
+/** One place, whatever it is called : localhost and 127.0.0.1 are the same. */
+export const destKey = (d: Pick<OscDest, 'host' | 'port'>): string => `${d.host === 'localhost' ? '127.0.0.1' : d.host}:${d.port}`
+
+/** Would this destination send into Palinopsia's own OSC input (a loop) ? Only
+ *  while the input really holds the port (a failed bind leaves it to another
+ *  program, which may well be the receiver), and a multicast group the input
+ *  joined counts as this computer (its own sends come back to it). */
 export function isSelfDest(d: Pick<OscDest, 'host' | 'port'>): boolean {
   const st = useStore.getState()
-  if (!st.oscEnabled || d.port !== st.oscPort) return false
-  return isLoopback(d.host) || st.oscAddresses.includes(d.host)
+  if (!st.oscEnabled || !st.oscListening || d.port !== st.oscPort) return false
+  return isLoopback(d.host) || st.oscAddresses.includes(d.host) || !!st.oscMulticastStatus?.joined.includes(d.host)
 }
 
 let memo: { list: OscDest[]; masters: string; byKind: Map<OscDestKind, OscDest[]> } | null = null
 
 /** The destinations a kind of message goes to now : on, the kind ticked, its
- *  master on, never Palinopsia's own input, one per host:port (flags merged, the
- *  first one's prefixes). */
+ *  master on, never Palinopsia's own input, one per host:port (localhost and
+ *  127.0.0.1 are one; flags merged, both rows' prefixes). */
 export function destsFor(kind: OscDestKind): OscDest[] {
   const st = useStore.getState()
-  const masters = `${st.oscOutEnabled}|${st.markSignalEnabled}|${st.bodyControl.oscOut}|${st.oscEnabled}|${st.oscPort}|${st.oscAddresses.join(',')}`
+  const masters = `${st.oscOutEnabled}|${st.markSignalEnabled}|${st.bodyControl.oscOut}|${st.oscEnabled}|${st.oscListening}|${st.oscPort}|${st.oscAddresses.join(',')}|${st.oscMulticastStatus?.joined.join(',') ?? ''}`
   if (!memo || memo.list !== st.oscDests || memo.masters !== masters) {
     const byKind = new Map<OscDestKind, OscDest[]>()
     const master: Record<OscDestKind, boolean> = { feedback: st.oscOutEnabled, mark: st.markSignalEnabled, body: !!st.bodyControl.oscOut }
@@ -116,11 +123,16 @@ export function destsFor(kind: OscDestKind): OscDest[] {
       if (master[k]) {
         for (const d of st.oscDests) {
           if (!d.on || !d[k] || isSelfDest(d)) continue
-          const key = `${d.host}:${d.port}`
+          const key = destKey(d)
           const had = seen.get(key)
-          // the same place twice : one send; feedback to everything if either wants it
-          if (had) { if (k === 'feedback' && (!had.prefixes.length || !d.prefixes.length)) seen.set(key, { ...had, prefixes: [] }) }
-          else seen.set(key, d)
+          // the same place twice : one send; feedback to everything if either wants
+          // it, else under both rows' prefixes
+          if (had) {
+            if (k === 'feedback') {
+              const prefixes = !had.prefixes.length || !d.prefixes.length ? [] : [...new Set([...had.prefixes, ...d.prefixes])]
+              seen.set(key, { ...had, prefixes })
+            }
+          } else seen.set(key, d)
         }
       }
       byKind.set(k, [...seen.values()])

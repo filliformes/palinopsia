@@ -257,6 +257,35 @@ that CI builds into cross-platform releases.
 
   The knobs are the same. VIDVOX's VHS Glitch (MIT) and staffantan's unity-vhsglitch
   remain credited as the effect's model.
+- **OSC destinations, links and map (the v1.3.4 audit).**
+  - **No loop through a multicast group.** A destination on a group the input joined, on
+    the input's port, sent the feedback straight back in (a gliding Macro knob was pulled
+    back to an old value), and `0.0.0.0` did the same on macOS and Linux. Both now count
+    as `own input`. A port the input failed to take is no longer refused as `own input`:
+    it belongs to another program.
+  - **Multicast on every network.** A group was joined on the one network the system
+    picked (the Wi-Fi beside a wired show network) while showing ✓ joined. It is now
+    joined on each network, and its tooltip names them.
+  - **A new alias waits.** **map…** and **+ alias** made an alias that played onto Macro
+    knob 1 at once, so a streaming controller moved the knob before a target was picked.
+    A new alias starts off and plays once its target is chosen.
+  - **A learned range stays a range.** In map, a min at or above the max turned a fader
+    into an on/off switch (and a reload flipped it back): it is kept low to high, a flat
+    one refused, as in the MIDI section's list.
+  - **A refused alias edit shows.** An address under `/opsia` or a target outside
+    `/opsia/` stayed typed in its box while the old one kept playing : the box now goes
+    back to what plays, flashed red.
+  - **The same place twice.** Two rows on one host:port sent the feedback under the first
+    row's prefixes only (now both rows'), and `localhost` and `127.0.0.1` counted as two
+    places (sent twice, now once).
+  - **Mute.** One click on **muted** now hears a sender again when both it and its host
+    were muted (it took two), and the tooltip says a mute by port lapses when the program
+    reopens.
+  - **links** keeps the address lists of its 32 senders only (a sender on a new port per
+    message grew them without end while open), and marks a sender `echo ?` when it gets
+    the feedback and sends many `/opsia` values back (two Palinopsias echoing each other).
+  - **+ destination** after a row on port 65535 made a port 65536 row that sent nothing
+    and vanished at the next launch : it takes 65534.
 
 ## v1.3.3 — 2026-11-12
 

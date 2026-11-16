@@ -959,9 +959,10 @@ app.whenReady().then(async () => {
       // one, host it on port-1 instead so it can't overflow to an invalid 65536.
       const httpPort = p >= 65535 ? p - 1 : p + 1
       const groups = Array.isArray(multicast) ? multicast.filter((g): g is string => typeof g === 'string').slice(0, 8) : []
-      await oscReceiver.start(p, groups)
+      // each group joined on every interface (the show network, not only the OS's pick)
+      await oscReceiver.start(p, groups, addresses)
       await oscquery.start(httpPort, p)
-      return { ok: true, listening: true, port: p, addresses, multicast: { joined: oscReceiver.joined, failed: oscReceiver.failed } }
+      return { ok: true, listening: true, port: p, addresses, multicast: { joined: oscReceiver.joined, failed: oscReceiver.failed, on: oscReceiver.joinedOn } }
     } catch (e) {
       oscReceiver.stop()
       oscquery.stop()

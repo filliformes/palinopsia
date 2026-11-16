@@ -1462,7 +1462,7 @@ export interface OscListenResult {
   addresses: string[]
   error?: string
   // the multicast groups asked for : joined, or refused (with why)
-  multicast?: { joined: string[]; failed: Array<{ group: string; error: string }> }
+  multicast?: { joined: string[]; failed: Array<{ group: string; error: string }>; on?: Record<string, string[]> }
 }
 
 /** One leaf of the OSCQuery address tree the renderer publishes to main. */
