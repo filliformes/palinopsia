@@ -9,7 +9,7 @@
 // - src/shared/links.ts : SUPPORT_URL (the app's ☕ button in the top bar);
 // - .github/FUNDING.yml : GitHub's Sponsor button on the repository;
 // - README.md : a line under the introduction and one in Credits & license;
-// - docs/index.html : a link in the site's top bar and a line under the downloads.
+// - docs/index.html : a link in the site's top bar, a line under the downloads and the footer's Donate.
 // Run it again with another username to change it. scripts/release-check.mjs
 // fails a release build while any of these is missing.
 
@@ -50,6 +50,7 @@ fs.writeFileSync(
 block('README.md', 'support-top', `\n**Palinopsia is free and open source.** If it plays a part in your work, you can\n[buy its author a coffee ☕](${url}).\n`)
 block('README.md', 'support', `\nIf Palinopsia plays a part in your work : [buy me a coffee ☕](${url}).\n`)
 block('docs/index.html', 'support-nav', `<a class="link" href="${url}">☕ Support</a>`)
+block('docs/index.html', 'support-footer', `<a href="${url}">Donate</a> to keep it going and free.`)
 // Stripe's own button on the site when given (its script, from js.stripe.com, only
 // on the site, never in the app), the plain link beside it for a blocked script.
 const button = stripe
