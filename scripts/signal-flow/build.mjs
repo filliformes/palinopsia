@@ -301,10 +301,15 @@ select.input { appearance: none; -webkit-appearance: none; background-image: url
 .legend svg { width: 26px; height: 8px; overflow: visible }
 
 .stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start }
-@media (min-width: 1280px) { .stage { grid-template-columns: minmax(0, 1fr) 320px } }
+/* the detail rail sits beside the map only where both fit with the map still large (about
+   1340 px of its 1720); narrower, it goes under the map, which then takes the whole width */
+@media (min-width: 1700px) { .stage { grid-template-columns: minmax(0, 1fr) 320px } }
 figure { margin: 0; min-width: 0 }
 .scroller { overflow-x: auto; border: 1px solid rgb(var(--c-border)); border-radius: 2px; background: rgb(var(--c-bg)) }
-#map { display: block; width: 100%; min-width: 1180px; height: auto; font-family: var(--font-app) }
+/* the map scales to its column (no horizontal scroll on a desktop); a phone keeps a floor
+   and scrolls sideways */
+#map { display: block; width: 100%; height: auto; font-family: var(--font-app) }
+@media (max-width: 899px) { #map { min-width: 900px } }
 figcaption { color: rgb(var(--c-muted)); font-size: 12px; margin-top: 8px; max-width: 100ch }
 
 /* the map */
@@ -338,7 +343,7 @@ ${TYPES.map((k) => `.el.t-${k} { fill: rgb(var(--f-${k})) }`).join(' ')}
 
 /* detail rail */
 aside { background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-border)); border-radius: 2px; padding: 12px 14px 14px; display: grid; gap: 10px; min-width: 0 }
-@media (min-width: 1280px) { aside { position: sticky; top: 12px } }
+@media (min-width: 1700px) { aside { position: sticky; top: 12px } }
 aside h3 { font-size: 15px; font-weight: 600; margin: 0 }
 aside p { margin: 0 }
 aside ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px }
