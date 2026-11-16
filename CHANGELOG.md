@@ -5,6 +5,25 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Changed
+
+- **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):
+  - the spine (sources, A/B mix, layer FX, stack, master FX and finalizers, presentation,
+    transform, keystone) is drawn large, ordinary blocks medium, the touch bus, the trigger
+    catalog and the readbacks small; the sizes come from the graph itself (the longest
+    chain of picture links); the In and Out columns are one width each, on one grid;
+  - links are curves, as wide as what they carry (the picture widest, sound medium,
+    control fine); links on one side of a block meet at one point;
+  - calm at rest : secondary links and the control plane's links to the outputs appear
+    only when a block is picked; at rest those to the outputs beside it are one stream
+    that splits near them, those to the speakers and lights join a river of three lanes
+    under the picture path; no link crosses the spine or passes behind a block;
+  - a slow wave of light travels the spine, with its own **flow ∿** switch in the top bar
+    (off by default when the system asks for less motion; remembered);
+  - titles only on the map, in Work Sans; the subtitle moved to the detail panel; softer
+    bands with sentence-case captions; a two-sentence intro, the longer one moved under
+    the map ("Reading the map").
+
 ## v1.3.4 — 2026-11-15
 
 ### Added

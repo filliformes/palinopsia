@@ -13,7 +13,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { N, E, W, H, IX, OX, TEXT, AUDITED } from './graph.mjs'
+import { N, E, W, H, IX, OX, TEXT, BOOKKEEPING } from './graph.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
@@ -118,15 +118,87 @@ const FONT_CSS = FONT_FILES.map((f) => {
   return `@font-face { font-family: '${FAMILY[fam]}'; font-weight: ${wt}; font-style: normal; font-display: swap; src: url('fonts/${f}') format('woff2'); }`
 }).join('\n')
 
-// ── 4. Geometry ─────────────────────────────────────────────────────────────
+// ── 4. Sizes : three, by role ───────────────────────────────────────────────
+// The spine (the longest chain of picture links : sources, A/B mix, layer FX, stack,
+// master and finalizers, presentation, transform, keystone) is drawn large; bookkeeping
+// (graph.mjs BOOKKEEPING, and blocks whose every link is secondary) small, as labels;
+// everything else medium; inputs and outputs all take their column's width. The map's
+// titles are set in Work Sans, whatever the theme.
+const MAP_FONT = 'Work Sans'
+// Its advance widths (docs/fonts/worksans-500 and -600), in thousandths of an em,
+// measured once in Chromium, so each block fits its title. Change them with the font.
+const GLYPHS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~·→×↔…²←±’'
+const ADV = {
+  500: '328,281,422,656,625,875,625,234,359,359,578,609,266,516,266,453,625,406,594,594,625,578,609,578,625,609,297,297,609,609,609,563,953,672,656,688,719,641,609,719,734,297,578,672,594,875,734,750,625,750,672,641,625,703,656,969,625,594,625,359,453,359,578,531,500,563,625,563,625,578,406,547,625,281,281,578,313,953,625,594,625,625,406,531,422,625,531,859,547,531,531,375,266,375,563,234,1000,609,1000,891,375,1000,609,266',
+  600: '313,297,438,672,641,906,641,250,375,375,578,609,281,516,281,453,641,422,594,594,641,578,609,594,625,609,297,297,609,609,609,578,938,672,672,688,719,641,609,719,734,313,594,672,594,891,734,734,641,734,688,641,641,703,672,984,641,625,641,375,453,375,594,531,500,578,625,563,625,578,406,547,625,281,281,609,313,938,625,594,625,625,422,531,438,625,547,875,563,547,516,391,297,391,578,250,1000,609,1000,906,375,1000,609,281'
+}
+for (const k in ADV) ADV[k] = ADV[k].split(',').map(Number)
+const textW = (s, wt, px) => ([...s].reduce((a, c) => { const i = GLYPHS.indexOf(c); return a + (i < 0 ? 600 : ADV[wt][i]) }, 0) * px) / 1000
+const SZ = {
+  L: { h: 48, fs: 16, wt: 600, pl: 17, pr: 17, rx: 17 },
+  M: { h: 32, fs: 14.5, wt: 500, pl: 25, pr: 13, rx: 11 },
+  S: { h: 22, fs: 13, wt: 500, pl: 17, pr: 11, rx: 11 }
+}
+const picNext = (id) => E.filter((e) => e.a === id && e.t === 'pic' && N[e.b].kind === 'pic').map((e) => e.b)
+const picPrev = (id) => E.filter((e) => e.b === id && e.t === 'pic' && N[e.a].kind === 'pic').map((e) => e.a)
+const depth = (step) => { const m = new Map(); const f = (id) => { if (!m.has(id)) m.set(id, 1 + Math.max(0, ...step(id).map(f))); return m.get(id) }; return f }
+const after = depth(picNext), before = depth(picPrev)
+const PIC = Object.values(N).filter((n) => n.kind === 'pic').map((n) => n.id)
+const LONGEST = Math.max(...PIC.map(after))
+const SPINE = new Set(PIC.filter((id) => before(id) + after(id) - 1 === LONGEST))
+const SMALL = new Set(Object.keys(N).filter((id) => BOOKKEEPING.has(id) || E.filter((e) => e.a === id || e.b === id).every((e) => e.minor)))
+const fit = (n, z) => Math.round(textW(n.title, z.wt, z.fs) + z.pl + z.pr)
+const COLW = Object.fromEntries(['in', 'out'].map((k) => [k, Math.max(...Object.values(N).filter((n) => n.kind === k).map((n) => fit(n, SZ.M)))]))
+for (const n of Object.values(N)) {
+  n.size = SPINE.has(n.id) ? 'L' : SMALL.has(n.id) && !COLW[n.kind] ? 'S' : 'M'
+  const z = SZ[n.size]
+  n.w = COLW[n.kind] ?? fit(n, z)
+  n.h = z.h
+  n.x = n.kind === 'in' ? n.ax - n.w : n.kind === 'out' ? n.ax : Math.round(n.ax - n.w / 2)
+  n.y = n.ay - n.h / 2
+}
+// blocks must keep a little air between them
+const NL = Object.values(N)
+NL.forEach((a, i) => NL.slice(i + 1).forEach((b) => {
+  if (a.x < b.x + b.w + 6 && b.x < a.x + a.w + 6 && a.y < b.y + b.h + 4 && b.y < a.y + a.h + 4) console.warn(`signal-flow : ${a.id} and ${b.id} overlap`)
+}))
+
+// ── 5. Links : curves, weighted by what they carry ──────────────────────────
+const cx = (n) => n.x + n.w / 2, cy = (n) => n.y + n.h / 2, right = (n) => n.x + n.w, bottom = (n) => n.y + n.h
+// the two bands and the layer group, wrapped round their blocks
+const box = (ids, px, top, bot = top) => {
+  const ns = ids.map((id) => N[id])
+  const x0 = Math.min(...ns.map((n) => n.x)) - px, x1 = Math.max(...ns.map(right)) + px
+  const y0 = Math.min(...ns.map((n) => n.y)) - top, y1 = Math.max(...ns.map(bottom)) + bot
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+const byKind = (...k) => Object.values(N).filter((n) => k.includes(n.kind)).map((n) => n.id)
+const CB = box(byKind('ctl', 'bus'), 22, 22)
+const PB = box(byKind('pic'), 26, 52, 36)
+const LG = box(['p-srcA', 'p-srcB', 'p-rackA', 'p-rackB', 'p-mix', 'p-lrack', 'p-loop'], 14, 40, 44)
 const anchor = (n, side, k = 0.5) => ({ l: [n.x, n.y + n.h * k], r: [n.x + n.w, n.y + n.h * k], t: [n.x + n.w * k, n.y], b: [n.x + n.w * k, n.y + n.h] })[side]
 function planSides(e) {
+  if (e.sides) return [e.sides[0], e.sides[1]]
   const a = N[e.a], b = N[e.b]
   if (b.x >= a.x + a.w - 2) return ['r', 'l']
   if (b.x + b.w <= a.x + 2) return ['l', 'r']
   return b.y > a.y ? ['b', 't'] : ['t', 'b']
 }
-// Several links on one side of a block spread along it, ordered by where their other end is.
+for (const e of E) e.spine = e.t === 'pic' && SPINE.has(e.a) && SPINE.has(e.b)
+// The control plane's links to the outputs : to the outputs beside it they gather into one
+// stream that splits near them; to those below, they join the river under the picture path.
+const CTL = (n) => n.kind === 'ctl' || n.kind === 'bus'
+for (const e of E) {
+  if (e.path || !CTL(N[e.a]) || N[e.b].kind !== 'out') continue
+  e.path = cy(N[e.b]) < PB.y ? 'stream' : 'river'
+}
+// Quiet links are drawn only while one of their blocks is picked : the secondary ones and
+// the control plane's fan to the outputs (sound excepted), so the map is calm at rest.
+for (const e of E) e.quiet = e.minor || (CTL(N[e.a]) && N[e.b].kind === 'out' && e.t !== 'snd')
+const STREAM = [CB.x + CB.w, (Math.min(...E.filter((e) => e.path === 'stream').map((e) => cy(N[e.b]))) + Math.max(...E.filter((e) => e.path === 'stream').map((e) => cy(N[e.b])))) / 2]
+const streamTail = (b) => { const p3 = [b.x - 2, cy(b)], d = Math.max(40, (p3[0] - STREAM[0]) * 0.5); return [[STREAM[0] + d, STREAM[1]], [p3[0] - d, p3[1]], p3] }
+const RIVER = { 'o-sonify': 0, 'o-media': 1, 'o-lights': 2 }
+// Links on one side of a spine block spread along it, ordered by where their other end is.
 const sides = new Map()
 for (const e of E) {
   if (e.path) continue
@@ -136,10 +208,15 @@ for (const e of E) {
 function kpos(id, side, e) {
   const other = (x) => { const o = N[x.a === id ? x.b : x.a]; return 'lr'.includes(side) ? o.y + o.h / 2 : o.x + o.w / 2 }
   const lst = [...sides.get(id + '|' + side)].sort((p, q) => other(p) - other(q))
-  return lst.length === 1 ? 0.5 : 0.18 + (0.64 * lst.indexOf(e)) / (lst.length - 1)
+  // the spine's blocks take their links side by side; the others gather theirs at one point, like streams
+  if (lst.length === 1 || N[id].size !== 'L') return 0.5
+  return 0.22 + (0.56 * lst.indexOf(e)) / (lst.length - 1)
 }
+// a cubic from side to side, its handles as long as the way is far
 function bez(p0, p3, s0, s3) {
-  const d = Math.max(40, Math.abs('lr'.includes(s0) ? p3[0] - p0[0] : p3[1] - p0[1]) * 0.5)
+  const along = 'lr'.includes(s0) ? 0 : 1
+  const dp = Math.abs(p3[along] - p0[along]), ds = Math.abs(p3[1 - along] - p0[1 - along])
+  const d = Math.min(320, Math.max(26, dp * 0.5 + ds * 0.14))
   const ctrl = (p, s) => ({ r: [p[0] + d, p[1]], l: [p[0] - d, p[1]], b: [p[0], p[1] + d], t: [p[0], p[1] - d] })[s]
   return [p0, ctrl(p0, s0), ctrl(p3, s3), p3]
 }
@@ -147,103 +224,173 @@ function pt([[x0, y0], [x1, y1], [x2, y2], [x3, y3]], t) {
   const m = 1 - t
   return [m ** 3 * x0 + 3 * m * m * t * x1 + 3 * m * t * t * x2 + t ** 3 * x3, m ** 3 * y0 + 3 * m * m * t * y1 + 3 * m * t * t * y2 + t ** 3 * y3]
 }
-// Routes drawn round the map, for loops and long returns.
+const bezLen = (bz) => { let l = 0, p = bz[0]; for (let i = 1; i <= 32; i++) { const q = pt(bz, i / 32); l += Math.hypot(q[0] - p[0], q[1] - p[1]); p = q } return l }
+// A way through several points with every corner turned into a wide arc.
+function smooth(pts, r) {
+  let d = `M${f1(pts[0][0])},${f1(pts[0][1])}`
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [p, c, q] = [pts[i - 1], pts[i], pts[i + 1]]
+    const l1 = Math.hypot(c[0] - p[0], c[1] - p[1]), l2 = Math.hypot(q[0] - c[0], q[1] - c[1])
+    const k = Math.min(r, l1 / 2, l2 / 2), m = 0.552
+    const a = [c[0] + ((p[0] - c[0]) * k) / l1, c[1] + ((p[1] - c[1]) * k) / l1]
+    const b = [c[0] + ((q[0] - c[0]) * k) / l2, c[1] + ((q[1] - c[1]) * k) / l2]
+    d += ` L${f1(a[0])},${f1(a[1])} C${f1(a[0] + (c[0] - a[0]) * m)},${f1(a[1] + (c[1] - a[1]) * m)} ${f1(b[0] + (c[0] - b[0]) * m)},${f1(b[1] + (c[1] - b[1]) * m)} ${f1(b[0])},${f1(b[1])}`
+  }
+  const z = pts[pts.length - 1]
+  return d + ` L${f1(z[0])},${f1(z[1])}`
+}
+// Routes drawn round the map, for loops and long returns. Each gives its way and where its label sits.
 const CUSTOM = {
-  'read-vision': (a, b) => { // up the gap right of the bands, along the top of the control band, into the vision bus
-    const x0 = a.x + a.w * 0.8, y0 = a.y, yb = b.y + b.h * 0.35
-    return [`M${x0},${y0} L${x0},${y0 - 14} L1456,${y0 - 14} L1456,82 L760,82 L760,${yb} L${b.x + b.w + 4},${yb}`, [1110, 82]]
+  'read-vision': (a, b) => { // up between the finalizers and the film, along under the control plane, into the vision bus
+    const x0 = N['p-final'].x + N['p-final'].w + (N['p-film'].x - right(N['p-final'])) / 2, y = bottom(b) + 46
+    const from = x0 > a.x + 8 && x0 < right(a) - 8 ? [[x0, a.y]] : [[a.x, cy(a)], [x0, cy(a)]]
+    return [smooth([...from, [x0, y], [right(b) + 50, y], [right(b) + 50, cy(b) - 5], [right(b) + 2, cy(b) - 5]], 34), [(x0 + right(b)) / 2 + 40, y]]
   },
-  'depth-vision': (a, b) => {
-    const x0 = a.x, y0 = a.y + a.h / 2, yb = b.y + b.h * 0.8
-    return [`M${x0},${y0} C900,${y0} 760,1000 760,560 L760,${yb} L${b.x + b.w + 4},${yb}`, [800, 980]]
+  'depth-vision': (a, b) => { // up between the stack and the master FX
+    const x0 = right(N['p-stack']) + (N['p-master'].x - right(N['p-stack'])) / 2, y = bottom(b) + 56
+    return [smooth([[a.x + 16, a.y], [a.x + 16, a.y - 30], [x0, a.y - 44], [x0, y], [right(b) + 62, y], [right(b) + 62, cy(b) + 6], [right(b) + 2, cy(b) + 6]], 30), [x0 - 70, y]]
   },
-  'depth-nodes': (a, b) => {
-    const x0 = a.x, y0 = a.y + a.h * 0.7, x3 = b.x + b.w / 2, y3 = b.y + b.h
-    return [`M${x0},${y0} C${x0 - 160},${y0} ${x3},${y3 + 140} ${x3},${y3 + 4}`, [830, 905]]
+  'depth-nodes': (a, b) => { // back under the spine, into the layer FX from below
+    const x0 = a.x, y0 = cy(a) + 4, x3 = cx(b), y3 = bottom(b) + 2
+    return [`M${f1(x0)},${f1(y0)} C${f1(x0 - 190)},${f1(y0 + 10)} ${f1(x3)},${f1(y3 + 120)} ${f1(x3)},${f1(y3)}`, [x0 - 120, y0 + 20]]
   },
-  'self-loop': (a) => {
-    const { x, y, w, h } = a
-    return [`M${x + w * 0.75},${y + h} C${x + w * 0.75},${y + h + 46} ${x + w * 0.25},${y + h + 46} ${x + w * 0.25},${y + h + 4}`, [x + w / 2, y + h + 50]]
+  'self-loop': (a) => { // a small ring over the loop
+    const { x, y, w } = a
+    return [`M${f1(x + w * 0.3)},${y} C${f1(x + w * 0.2)},${y - 40} ${f1(x + w * 0.8)},${y - 40} ${f1(x + w * 0.7)},${y - 2}`, [x + w / 2, y - 34]]
   },
-  sidechain: (a, b) => {
-    const x0 = a.x + a.w * 0.5, y0 = a.y, x3 = b.x + b.w * 0.5, y3 = b.y + b.h
-    return [`M${x0},${y0} C${x0},${y0 - 40} ${x0 - 60},${y0 - 40} 640,${y0 - 40} L470,${y0 - 40} C380,${y0 - 40} 360,${y3 + 70} ${x3},${y3 + 4}`, [660, y0 - 40]]
+  sidechain: (a, b) => { // under the two lanes, back to source B
+    const x0 = a.x + a.w * 0.3, y = bottom(b) + 30, x3 = b.x + b.w * 0.7
+    return [smooth([[x0, bottom(a)], [x0, y], [x3, y], [x3, bottom(b) + 2]], 24), [(x0 + x3) / 2, y]]
   },
-  'osc-echo': (a, b) => { // top margin, right to left, into OSC in's left side
-    const x0 = a.x + a.w * 0.5, y0 = a.y, y3 = b.y + b.h * 0.3
-    return [`M${x0},${y0} L${x0},40 L12,40 L12,${y3} L${b.x - 4},${y3}`, [900, 40]]
+  'osc-echo': (a, b) => { // over the top, right to left, into OSC in from the left
+    const x0 = a.x + 30
+    return [smooth([[x0, a.y], [x0, 40], [44, 40], [44, cy(b)], [b.x - 2, cy(b)]], 60), [900, 40]]
   },
-  'df-echo': (a, b) => {
-    const x0 = a.x + a.w, y0 = a.y + a.h / 2, y3 = b.y + b.h / 2
-    return [`M${x0},${y0} L1704,${y0} L1704,54 L20,54 L20,${y3} L${b.x - 4},${y3}`, [900, 54]]
+  'df-echo': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, 24], [30, 24], [30, cy(b)], [b.x - 2, cy(b)]], 60), [900, 24]],
+  'mcp-snap': (a, b) => [smooth([[cx(a), bottom(a)], [cx(a), H - 20], [18, H - 20], [18, cy(b)], [b.x - 2, cy(b)]], 110), [700, H - 20]],
+  'sound-back': (a, b) => [smooth([[right(a), cy(a)], [W - 8, cy(a)], [W - 8, H - 34], [32, H - 34], [32, cy(b)], [b.x - 2, cy(b)]], 110), [900, H - 34]],
+  'camera-back': (a, b) => [smooth([[right(a), cy(a)], [W - 20, cy(a)], [W - 20, H - 48], [46, H - 48], [46, cy(b)], [b.x - 2, cy(b)]], 110), [900, H - 48]],
+  stream: (a, b) => { // to the stream's source at the control plane's edge, then out to the output
+    const p0 = [right(a), cy(a)], d = Math.max(40, (STREAM[0] - p0[0]) * 0.5), [c1, c2, p3] = streamTail(b)
+    const bz = [STREAM, c1, c2, p3]
+    return [`M${f1(p0[0])},${f1(p0[1])} C${f1(p0[0] + d)},${f1(p0[1])} ${f1(STREAM[0] - d)},${f1(STREAM[1])} ${f1(STREAM[0])},${f1(STREAM[1])} C${f1(c1[0])},${f1(c1[1])} ${f1(c2[0])},${f1(c2[1])} ${f1(p3[0])},${f1(p3[1])}`, pt(bz, 0.62)]
   },
-  'mcp-snap': (a, b) => {
-    const x0 = a.x + a.w * 0.5, y0 = a.y + a.h, y3 = b.y + b.h / 2
-    return [`M${x0},${y0} L${x0},1032 L16,1032 L16,${y3} L${b.x - 4},${y3}`, [700, 1032]]
+  river: (a, b) => { // the ways to the speakers and the lights, three lanes under the picture path, never across the spine
+    const k = RIVER[b.id] ?? 0, xr = IX + 8 + k * 6, yc = PB.y + PB.h + 14 + k * 7, x3 = b.x - 22 - k * 6
+    let head, lp
+    if (a.kind === 'in') { head = [[right(a) + 2, cy(a)], [xr, cy(a)], [xr, yc]]; lp = [560 + k * 230, yc] }
+    else if (a.kind === 'pic') { const x = cx(a) + (k - 1) * 8; head = [[x, bottom(a)], [x, yc]]; lp = [x + 110, yc] }
+    else { // from the control plane : down a free way beside the block, left under the band, down its left edge
+      const yg = CB.y + CB.h + 8 + k * 6
+      const free = (x) => !Object.values(N).some((n) => n !== a && x > n.x - 6 && x < right(n) + 6 && bottom(n) > cy(a) && n.y < yg)
+      const xs = [a.x - 14, right(a) + 14].find(free) ?? a.x - 14
+      head = [[xs < a.x ? a.x : right(a), cy(a)], [xs, cy(a)], [xs, yg], [xr, yg], [xr, yc]]
+      lp = [(xs + xr) / 2, yg]
+    }
+    return [smooth([...head, [x3, yc], [x3, cy(b)], [b.x - 2, cy(b)]], 40), lp]
   },
-  'sound-back': (a, b) => {
-    const x0 = a.x + a.w, y0 = a.y + a.h * 0.5, y3 = b.y + b.h / 2
-    return [`M${x0},${y0} L1708,${y0} L1708,1058 L8,1058 L8,${y3} L${b.x - 4},${y3}`, [900, 1058]]
+  over: (a, b, e) => { // across the control plane along its top edge, so it passes over the columns between
+    const k = E.filter((x) => x.path === 'over').indexOf(e), ys = CB.y + 6 + k * 4, fwd = cx(b) > cx(a)
+    const free = (x, y0, y1) => !Object.values(N).some((n) => x > n.x - 6 && x < right(n) + 6 && n.y < y1 && bottom(n) > y0)
+    const walk = (x, step, y0, y1) => { for (let i = 0; i < 40 && !free(x, y0, y1); i++) x += step; return x }
+    const x0 = walk(fwd ? right(a) + 14 : a.x - 14, fwd ? 4 : -4, ys, a.y), x3 = walk(fwd ? b.x - 18 : right(b) + 10, fwd ? -4 : 4, ys, b.y)
+    const p0 = fwd ? [right(a), cy(a)] : [a.x, cy(a)], p3 = fwd ? [b.x - 2, cy(b)] : [right(b) + 2, cy(b)]
+    return [smooth([p0, [x0, cy(a)], [x0, ys], [x3, ys], [x3, cy(b)], p3], 40), [(x0 + x3) / 2, ys + 2]]
   },
-  'camera-back': (a, b) => {
-    const x0 = a.x + a.w, y0 = a.y + a.h * 0.3, y3 = b.y + b.h * 0.3
-    return [`M${x0},${y0} L1714,${y0} L1714,1084 L3,1084 L3,${y3} L${b.x - 4},${y3}`, [900, 1084]]
+  up: (a, b) => { // from an input below, up beside the picture band, along under the control plane, up into the block
+    const xu = IX + 30, yg = CB.y + CB.h + 14, x3 = b.x - 22
+    return [smooth([[right(a) + 2, cy(a)], [xu, cy(a)], [xu, yg], [x3, yg], [x3, cy(b)], [b.x - 2, cy(b)]], 40), [x3 - 60, yg]]
+  },
+  'out-right': (a, b) => { // up the outside of the output column, into the block's right side
+    const x = OX + COLW.out + 12
+    return [smooth([[right(a), cy(a)], [x, cy(a)], [x, cy(b)], [right(b) + 2, cy(b)]], 20), [x, (cy(a) + cy(b)) / 2]]
+  },
+  mark: (a, b) => { // up beside the output column
+    const x = OX - 20
+    return [smooth([[right(a), cy(a)], [x, cy(a)], [x, cy(b)], [b.x - 2, cy(b)]], 30), [x - 40, (cy(a) + cy(b)) / 2]]
   }
 }
 
-// ── 5. The SVG ──────────────────────────────────────────────────────────────
+// ── 6. The SVG ──────────────────────────────────────────────────────────────
 const TYPES = ['net', 'ctl', 'pic', 'snd', 'loop', 'phys']
 const COLOR = Object.fromEntries(TYPES.map((k) => [k, `rgb(var(--f-${k}))`]))
-const DASH = { loop: '6 5', phys: '2 5' }
-const paths = [], labels = []
-E.forEach((e, i) => {
-  let d, lp
+// stroke width by what a link carries : the picture's spine widest, sound medium, control fine
+const WIDTH = { pic: 2.8, snd: 1.9, ctl: 1.2, net: 1.1, loop: 1.7, phys: 1.7 }
+const SPINE_W = 6
+const DASH = { loop: '7 6', phys: '0.1 6' }
+// light drifting along the picture's way : a soft wave of light leaves the sources every
+// PERIOD seconds and travels the spine at SPEED units a second, lighting each block and link
+// as it passes (off under prefers-reduced-motion)
+const SPEED = 90, PERIOD = 30, PEAK = 0.05
+const waveDelay = (s) => ((((s / SPEED - PEAK * PERIOD) % PERIOD) + PERIOD) % PERIOD - PERIOD).toFixed(2) + 's'
+const paths = [], labels = [], drifts = []
+const reach = new Map([...SPINE].filter((id) => before(id) === 1).map((id) => [id, 0]))
+E.map((e, i) => [e, i]).sort(([p], [q]) => (SPINE.has(p.a) ? before(p.a) : 99) - (SPINE.has(q.a) ? before(q.a) : 99)).forEach(([e, i]) => {
+  let d, lp, bz = null
   if (e.path) {
     if (!CUSTOM[e.path]) throw new Error(`edge ${e.a} → ${e.b} : unknown path ${e.path}`)
-    ;[d, lp] = CUSTOM[e.path](N[e.a], N[e.b])
+    ;[d, lp] = CUSTOM[e.path](N[e.a], N[e.b], e)
   } else {
     const p0 = anchor(N[e.a], e.sa, kpos(e.a, e.sa, e))
     const p3 = anchor(N[e.b], e.sb, kpos(e.b, e.sb, e))
-    const end = [p3[0] - (e.sb === 'l' ? 4 : e.sb === 'r' ? -4 : 0), p3[1] - (e.sb === 't' ? 4 : 0)]
-    const bz = bez(p0, end, e.sa, e.sb)
+    const g = e.spine ? -1 : 2 // the spine runs into its blocks; other links stop at their arrow
+    const end = [p3[0] + (e.sb === 'l' ? -g : e.sb === 'r' ? g : 0), p3[1] + (e.sb === 't' ? -g : e.sb === 'b' ? g : 0)]
+    bz = bez(p0, end, e.sa, e.sb)
     d = `M${f1(bz[0][0])},${f1(bz[0][1])} C${f1(bz[1][0])},${f1(bz[1][1])} ${f1(bz[2][0])},${f1(bz[2][1])} ${f1(bz[3][0])},${f1(bz[3][1])}`
     lp = pt(bz, e.lt)
   }
+  const w = e.spine ? SPINE_W : WIDTH[e.t]
   const dash = DASH[e.t] ? ` stroke-dasharray="${DASH[e.t]}"` : ''
-  paths.push(`<path class="e t-${e.t}${e.minor ? ' minor' : ''}" data-i="${i}" d="${d}" fill="none" stroke="${COLOR[e.t]}" stroke-width="${e.t === 'pic' ? 1.6 : 1.3}"${dash} marker-end="url(#m-${e.t})"><title>${esc(N[e.a].title)} → ${esc(N[e.b].title)}${e.label ? ' : ' + esc(e.label) : ''}</title></path>`)
-  if (e.label && lp) labels.push(`<text class="el${e.always ? ' always' : ''} t-${e.t}" data-i="${i}" x="${f1(lp[0])}" y="${f1(lp[1] - 4)}" text-anchor="middle">${esc(e.label)}</text>`)
+  const cls = `e t-${e.t}${e.spine ? ' sp' : ''}${e.quiet ? ' quiet' : ''}`
+  paths[i] = `<path class="${cls}" data-i="${i}" d="${d}" style="--w:${w}"${dash}${e.spine ? '' : ` marker-end="url(#m-${e.t})"`}><title>${esc(N[e.a].title)} → ${esc(N[e.b].title)}${e.label ? ' : ' + esc(e.label) : ''}</title></path>`
+  if (e.label && lp) labels.push([i, `<text class="el${e.always ? ' always' : ''} t-${e.t}" data-i="${i}" x="${f1(lp[0])}" y="${f1(lp[1] - 6)}" text-anchor="middle">${esc(e.label)}</text>`])
+  // the glint passes through each block of the spine and on to the picture's outputs
+  if (bz && e.t === 'pic' && SPINE.has(e.a) && (SPINE.has(e.b) || N[e.b].kind === 'out') && reach.has(e.a)) {
+    const start = reach.get(e.a) + N[e.a].w, len = bezLen(bz)
+    if (SPINE.has(e.b)) reach.set(e.b, Math.max(reach.get(e.b) ?? 0, start + len))
+    drifts.push(`<path d="${d}" style="stroke-width:${w};animation-delay:${waveDelay(start + len / 2)}"/>`)
+  }
 })
+// at rest, the control plane's fan to the outputs beside it is drawn as one stream
+const fanTo = [...new Set(E.filter((e) => e.path === 'stream').map((e) => e.b))]
+const fan = fanTo.map((id) => { const [c1, c2, p3] = streamTail(N[id]); return `<path d="M${f1(STREAM[0])},${f1(STREAM[1])} C${f1(c1[0])},${f1(c1[1])} ${f1(c2[0])},${f1(c2[1])} ${f1(p3[0])},${f1(p3[1])}" marker-end="url(#m-net)"/>` }).join('') + `<circle cx="${f1(STREAM[0])}" cy="${f1(STREAM[1])}" r="3.4"/>`
 const nodes = Object.values(N).map((n) => {
-  const tx = n.x + 12
-  const t = [`<text class="nt" x="${tx}" y="${n.y + 18}">${esc(n.title)}</text>`, ...n.sub.split('\n').map((l, j) => `<text class="ns" x="${tx}" y="${n.y + 33 + j * 13}">${esc(l)}</text>`)]
-  return `<g class="n k-${n.kind}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.title)}: ${esc(n.sub.replace(/\n/g, ' '))}"><rect class="nb" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="2"/><rect class="ks" x="${n.x + 1}" y="${n.y + 1}" width="3" height="${n.h - 2}"/>${t.join('')}</g>`
+  const z = SZ[n.size], my = n.y + n.h / 2, base = f1(my + z.fs * 0.35)
+  const body = n.size === 'L'
+    ? `<rect class="nt-tint" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${z.rx}"/>${reach.has(n.id) ? `<rect class="glow" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${z.rx}" style="animation-delay:${waveDelay(reach.get(n.id) + n.w / 2)}"/>` : ''}<text class="nt" x="${f1(n.x + n.w / 2)}" y="${base}" text-anchor="middle">${esc(n.title)}</text>`
+    : `<circle class="kd" cx="${n.x + (n.size === 'S' ? 8.5 : 13)}" cy="${my}" r="${n.size === 'S' ? 2.6 : 3.3}"/><text class="nt" x="${n.x + z.pl}" y="${base}">${esc(n.title)}</text>`
+  return `<g class="n s-${n.size} k-${n.kind}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.title)}: ${esc(n.sub)}"><rect class="nb" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${z.rx}"/>${body}</g>`
 })
-const markers = TYPES.map((k) => `<marker id="m-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L10,5 L0,9 z" fill="${COLOR[k]}"/></marker>`).join('')
-const bands = `<rect class="band" x="282" y="74" width="1162" height="476" rx="2"/>
-<text class="bl" x="294" y="68">Control plane · CPU, every frame, before the picture is drawn</text>
-<rect class="band" x="282" y="600" width="1162" height="414" rx="2"/>
-<text class="bl" x="294" y="594">Picture path · GPU, every frame</text>
-<rect class="grp" x="290" y="612" width="676" height="138" rx="2"/>
-<text class="gl" x="300" y="745">× 4 layers</text>
-<text class="bl" x="${IX}" y="80">In</text>
-<text class="bl" x="${OX}" y="80">Out</text>`
-const SVG = `<svg id="map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Palinopsia's signal flow: external inputs on the left feed the store, buses and modulators of the control plane; every frame the control plane overlays its values on the GPU picture path; the picture leaves on the right to projectors, streams, HIVE, recordings, Sonify and lights, and is read back into the vision bus and depth, closing feedback loops; dotted lines close only through the room, the network or an agent.">
+const MK = { pic: 10, snd: 9, ctl: 8, net: 8, loop: 8.5, phys: 8.5 }
+const markers = TYPES.map((k) => `<marker id="m-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${MK[k]}" markerHeight="${MK[k]}" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M1,1 L9.4,5 L1,9 Q3,5 1,1 z" fill="${COLOR[k]}"/></marker>`).join('')
+const rect = (c, b, rx) => `<rect class="${c}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rx}"/>`
+const bands = `${rect('band', CB, 28)}
+<text class="bl" x="${CB.x + 14}" y="${CB.y - 9}">Control plane · on the CPU, every frame, before the picture is drawn</text>
+${rect('band', PB, 28)}
+<text class="bl" x="${PB.x + 14}" y="${PB.y + PB.h - 12}">Picture path · on the GPU, every frame</text>
+${rect('grp', LG, 22)}
+<text class="gl" x="${LG.x + LG.w - 14}" y="${LG.y + LG.h - 10}" text-anchor="end">× 4 layers</text>
+<text class="bl" x="${IX}" y="${CB.y - 9}" text-anchor="end">In</text>
+<text class="bl" x="${OX}" y="${CB.y - 9}">Out</text>`
+const SVG = `<svg id="map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Palinopsia's signal flow: external inputs on the left feed the store, buses and modulators of the control plane; every frame the control plane overlays its values on the GPU picture path, drawn as a thick spine from the sources to the presentation; the picture leaves on the right to projectors, streams, HIVE, recordings, Sonify and lights, and is read back into the vision bus and depth, closing feedback loops; dotted lines close only through the room, the network or an agent.">
 <defs>${markers}</defs>
 ${bands}
+<g class="fan t-net" aria-hidden="true">${fan}</g>
 <g class="edges">${paths.join('')}</g>
+<g class="drifts t-pic" aria-hidden="true">${drifts.join('')}</g>
 <g class="nodes">${nodes.join('')}</g>
-<g class="labels">${labels.join('')}</g>
+<g class="labels">${labels.sort(([p], [q]) => p - q).map(([, s]) => s).join('')}</g>
 </svg>`
 const DATA = JSON.stringify({
-  nodes: Object.fromEntries(Object.values(N).map((n) => [n.id, { title: n.title, kind: n.kind, desc: n.desc, refs: n.refs }])),
+  nodes: Object.fromEntries(Object.values(N).map((n) => [n.id, { title: n.title, sub: n.sub, kind: n.kind, desc: n.desc, refs: n.refs }])),
   edges: E.map((e) => ({ a: e.a, b: e.b, t: e.t, label: e.label }))
 }).replace(/</g, '\\u003c')
 
-// ── 6. The page ─────────────────────────────────────────────────────────────
+// ── 7. The page ─────────────────────────────────────────────────────────────
 const LOOP_ST = { inside: ['in', 'inside'], room: ['ph', 'through the room'], network: ['ph', 'through the network'], agent: ['ph', 'through the agent'], 'not wired': ['no', 'not wired'] }
 const phases = TEXT.phases.map((p) => `<div class="phase" style="--strip: rgb(var(--f-${p.flow}))"><span class="label">${p.title}</span><ol>${p.items.map((li) => `<li>${li}</li>`).join('')}</ol></div>`).join('\n    ')
 const loops = TEXT.loops.map((r) => `<tr><td>${r.name}</td><td class="path">${r.path}</td><td><span class="st ${LOOP_ST[r.st][0]}">${LOOP_ST[r.st][1]}</span></td></tr>`).join('\n      ')
-const minorCount = E.filter((e) => e.minor).length
+const quietCount = E.filter((e) => e.quiet).length
 
 const page = `<!doctype html>
 <html lang="en">
@@ -298,7 +445,6 @@ select.input { appearance: none; -webkit-appearance: none; background-image: url
 .intro { display: grid; gap: 10px; max-width: 980px }
 .intro h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.005em; text-wrap: balance }
 .intro p { margin: 0; color: rgb(var(--c-muted)); max-width: 80ch }
-.intro .note { font: 11px/1.4 var(--mono); color: rgb(var(--c-muted)) }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
 .legend svg { width: 26px; height: 8px; overflow: visible }
 
@@ -308,38 +454,61 @@ select.input { appearance: none; -webkit-appearance: none; background-image: url
    which then takes the whole width */
 @media (min-width: 1440px) { .stage { grid-template-columns: minmax(0, 1fr) clamp(260px, 18vw, 320px) } }
 figure { margin: 0; min-width: 0 }
-.scroller { overflow-x: auto; border: 1px solid rgb(var(--c-border)); border-radius: 2px; background: rgb(var(--c-bg)) }
+.scroller { overflow-x: auto; border: 1px solid rgb(var(--c-border) / .6); border-radius: 14px; background: rgb(var(--c-bg)) }
 /* the map scales to its column (no horizontal scroll on a desktop); a phone keeps a floor
    and scrolls sideways */
 #map { display: block; width: 100%; height: auto; font-family: var(--font-app) }
-@media (max-width: 899px) { #map { min-width: 900px } }
+@media (max-width: 899px) { #map { min-width: 1000px } }
 figcaption { color: rgb(var(--c-muted)); font-size: 12px; margin-top: 8px; max-width: 100ch }
 
-/* the map */
-.band { fill: rgb(var(--c-panel) / .55); stroke: rgb(var(--c-border)); stroke-width: 1 }
-.grp { fill: none; stroke: rgb(var(--f-pic) / .5); stroke-dasharray: 2 4 }
-.gl { fill: rgb(var(--f-pic)); font: 500 10px var(--mono); letter-spacing: .06em; text-transform: uppercase }
-.bl { fill: rgb(var(--c-muted)); font: 500 10px var(--mono); letter-spacing: .06em; text-transform: uppercase }
+/* the map : soft bands, three sizes of block, links weighted by what they carry */
+#map { --map-font: '${MAP_FONT}', var(--font-app) }
+.band { fill: rgb(var(--c-panel) / .45); stroke: rgb(var(--c-border) / .5); stroke-width: 1 }
+.grp { fill: rgb(var(--f-pic) / .04); stroke: rgb(var(--f-pic) / .38); stroke-dasharray: 1 6; stroke-linecap: round; stroke-width: 1.4 }
+.gl { fill: rgb(var(--f-pic)); font: 500 13px var(--map-font) }
+.bl { fill: rgb(var(--c-muted)); font: 500 14px var(--map-font) }
 .n { cursor: pointer; outline: none }
-.n .nb { fill: rgb(var(--c-panel2)); stroke: rgb(var(--c-border)); stroke-width: 1 }
+.n .nb { fill: rgb(var(--c-panel2)); stroke: rgb(var(--c-border) / .75); stroke-width: 1 }
 .n:hover .nb { fill: rgb(var(--c-panel3)) }
-.n .nt { fill: rgb(var(--c-text)); font-weight: 600; font-size: 12px }
-.n .ns { fill: rgb(var(--c-muted)); font: 10px var(--mono) }
-.k-in .ks, .k-out .ks { fill: rgb(var(--f-net)) }
-.k-ctl .ks { fill: rgb(var(--f-ctl)) }
-.k-bus .ks { fill: rgb(var(--f-ctl) / .45) }
-.k-pic .ks { fill: rgb(var(--f-pic)) }
-.n:focus-visible .nb { stroke: rgb(var(--c-accent)); stroke-width: 1.6 }
-.e { transition: opacity .15s }
-.e.minor { opacity: .2 }
-.el { font: 10px var(--mono); paint-order: stroke; stroke: rgb(var(--c-bg)); stroke-width: 4px; stroke-linejoin: round; opacity: 0; transition: opacity .15s; pointer-events: none }
+.n .nt { fill: rgb(var(--c-text)); font: 500 14.5px var(--map-font) }
+.s-L .nb { fill: rgb(var(--c-bg)); stroke: rgb(var(--f-pic) / .75); stroke-width: 1.5 }
+.s-L .nt-tint { fill: rgb(var(--f-pic) / .16); pointer-events: none }
+.s-L:hover .nb { fill: rgb(var(--c-panel2)) }
+.s-L .nt { font: 600 16px var(--map-font) }
+.s-S .nb { fill: rgb(var(--c-bg) / .6); stroke: none }
+.s-S .nt { fill: rgb(var(--c-text) / .8); font: 500 13px var(--map-font) }
+.s-S:hover .nb { fill: rgb(var(--c-panel2)); stroke: rgb(var(--c-border)) }
+.kd { fill: rgb(var(--f-net)) }
+.k-ctl .kd { fill: rgb(var(--f-ctl)) }
+.k-bus .kd { fill: none; stroke: rgb(var(--f-ctl)); stroke-width: 1.5 }
+.k-pic .kd { fill: rgb(var(--f-pic)) }
+.n:focus-visible .nb { stroke: rgb(var(--c-accent)); stroke-width: 2 }
+.e { fill: none; stroke-width: var(--w); stroke-linecap: round; stroke-linejoin: round; opacity: .5; transition: opacity .2s }
+${TYPES.map((k) => `.e.t-${k} { stroke: rgb(var(--f-${k})) }`).join(' ')}
+.e.t-net { opacity: .42 }
+.e.t-snd { opacity: .62 }
+.e.t-pic, .e.t-loop { opacity: .78 }
+.e.t-phys { opacity: .72 }
+.e.sp { opacity: .92 }
+.e.quiet { opacity: 0; pointer-events: none }
+.fan path { fill: none; stroke: rgb(var(--f-net)); stroke-width: 1.5; stroke-linecap: round; opacity: .5 }
+.fan circle { fill: rgb(var(--f-net)); opacity: .7 }
+.drifts path { fill: none; stroke: rgb(var(--c-text)); stroke-linecap: round; opacity: 0; animation: wave ${PERIOD}s ease-in-out infinite; pointer-events: none }
+.glow { fill: rgb(var(--f-pic)); opacity: 0; animation: glow ${PERIOD}s ease-in-out infinite; pointer-events: none }
+@keyframes wave { 0% { opacity: 0 } ${PEAK * 100}% { opacity: .42 } ${PEAK * 300}% { opacity: 0 } 100% { opacity: 0 } }
+@keyframes glow { 0% { opacity: 0 } ${PEAK * 100}% { opacity: .3 } ${PEAK * 300}% { opacity: 0 } 100% { opacity: 0 } }
+.el { font: 400 12.5px var(--map-font); paint-order: stroke; stroke: rgb(var(--c-bg)); stroke-width: 4px; stroke-linejoin: round; opacity: 0; transition: opacity .2s; pointer-events: none }
 .el.always { opacity: .95 }
 ${TYPES.map((k) => `.el.t-${k} { fill: rgb(var(--f-${k})) }`).join(' ')}
-#map.focus .e { opacity: .07 }
-#map.focus .e.on { opacity: 1; stroke-width: 2.2 }
+#map.focus .e { opacity: .06 }
+#map.focus .e.on { opacity: 1; stroke-width: calc(var(--w) + .8); pointer-events: auto }
+#map.focus .fan { opacity: 0 }
+.fan { transition: opacity .2s }
+#map.focus .drifts, #map.focus .glow, #map .t-pic.off ~ .nodes .glow { visibility: hidden }
 #map.focus .n { opacity: .32 }
 #map.focus .n.on { opacity: 1 }
-#map.focus .n.sel .nb { stroke: rgb(var(--c-accent)); stroke-width: 1.6 }
+#map.focus .n.sel .nb { stroke: rgb(var(--c-accent)); stroke-width: 2 }
+#map.focus .s-S.sel .nb { fill: rgb(var(--c-panel2)) }
 #map.focus .el { opacity: 0 }
 #map.focus .el.on { opacity: 1 }
 #map .off { display: none }
@@ -348,6 +517,8 @@ ${TYPES.map((k) => `.el.t-${k} { fill: rgb(var(--f-${k})) }`).join(' ')}
 aside { background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-border)); border-radius: 2px; padding: 12px 14px 14px; display: grid; gap: 10px; min-width: 0 }
 @media (min-width: 1440px) { aside { position: sticky; top: 12px } }
 aside h3 { font-size: 15px; font-weight: 600; margin: 0 }
+aside .sub { font-size: 12px; color: rgb(var(--c-muted)); margin-top: -6px }
+aside .sub:empty { display: none }
 aside p { margin: 0 }
 aside ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px }
 aside li { font-size: 12px; color: rgb(var(--c-muted)); display: flex; gap: 8px; align-items: baseline }
@@ -378,7 +549,10 @@ section > p { color: rgb(var(--c-muted)); margin: 0; max-width: 84ch }
 .st.ph { color: rgb(var(--f-phys)) }
 .st.no { color: rgb(var(--c-muted)) }
 footer { color: rgb(var(--c-muted)); font: 11px/1.6 var(--mono); border-top: 1px solid rgb(var(--c-border)); padding-top: 12px; display: grid; gap: 4px }
-@media (prefers-reduced-motion: reduce) { .e, .el { transition: none } }
+/* the wave of light : its own switch in the top bar (it follows reduced motion until used) */
+.drifts, .glow { display: none }
+:root[data-wave="on"] .drifts, :root[data-wave="on"] .glow { display: inline }
+@media (prefers-reduced-motion: reduce) { .e, .el, .fan { transition: none } }
 </style>
 </head>
 <body>
@@ -388,18 +562,18 @@ footer { color: rgb(var(--c-muted)); font: 11px/1.6 var(--mono); border-top: 1px
   <span class="label">drawn from the code</span>
   <span class="grow"></span>
   <a class="btn" href="${SITE}">← Site</a>
+  <button class="btn" id="wave" aria-pressed="false" title="A slow wave of light along the picture's path. Off by default when the system asks for less motion; remembered on this browser">flow ∿</button>
   <label class="label" for="theme">Theme <select id="theme" class="input" title="Theme : the app's own UI themes">${ORDER.map((t) => `<option value="${t}">${t}</option>`).join('')}</select></label>
 </div></header>
 
 <main class="wrap">
 <div class="intro">
   <h2>How a signal moves through Palinopsia, and how it comes back</h2>
-  <p>${TEXT.intro}</p>
-  <p class="note">Secondary links are drawn faint until you pick a block: all ${E.length} links are on the map, ${minorCount} of them secondary.</p>
+  <p>${TEXT.lede}</p>
   <div class="legend" role="group" aria-label="Show or hide each kind of flow">
     <span class="label">Flows</span>
-${[['pic', 'picture', ''], ['ctl', 'control · modulation', ''], ['snd', 'sound', ''], ['net', 'in · out of the app', ''], ['loop', 'feedback inside', ' stroke-dasharray="6 5"'], ['phys', 'loops through the room', ' stroke-dasharray="2 5"']]
-  .map(([k, l, d]) => `    <button class="btn" data-t="${k}" aria-pressed="true"><svg aria-hidden="true"><line x1="0" y1="4" x2="26" y2="4" stroke="rgb(var(--f-${k}))" stroke-width="2"${d}/></svg>${l}</button>`).join('\n')}
+${[['pic', 'picture', 4, ''], ['ctl', 'control · modulation', 1.6, ''], ['snd', 'sound', 2.4, ''], ['net', 'in · out of the app', 1.6, ''], ['loop', 'feedback inside', 2, ' stroke-dasharray="5 4"'], ['phys', 'loops through the room', 2.4, ' stroke-dasharray="0.1 5"']]
+  .map(([k, l, w, d]) => `    <button class="btn" data-t="${k}" aria-pressed="true"><svg aria-hidden="true"><line x1="2" y1="4" x2="24" y2="4" stroke="rgb(var(--f-${k}))" stroke-width="${w}" stroke-linecap="round"${d}/></svg>${l}</button>`).join('\n')}
   </div>
 </div>
 
@@ -413,12 +587,19 @@ ${SVG}
   <aside id="detail" aria-live="polite">
     <span class="label" id="d-kind">How to read it</span>
     <h3 id="d-title">Pick a block</h3>
+    <p id="d-sub" class="sub"></p>
     <p id="d-desc">Hover, tap or tab to any block: its connections light up here and on the map, with what flows along each one. Tap the empty map to see everything again.</p>
     <div id="d-in"></div>
     <div id="d-out"></div>
     <div class="refs" id="d-refs"></div>
   </aside>
 </div>
+
+<section>
+  <h2>Reading the map</h2>
+  <p>${TEXT.intro}</p>
+  <p>The thick line is the spine, the path the picture really takes; the small labels are bookkeeping. Secondary links, and the control plane's links to the outputs, appear when you pick a block: at rest the control plane's links to the outputs beside it are drawn as one stream. All ${E.length} links are on the map, ${quietCount} of them shown only on a pick.</p>
+</section>
 
 <section>
   <h2>One frame, in order</h2>
@@ -477,6 +658,7 @@ function show(id) {
   });
   document.getElementById('d-kind').textContent = KIND[n.kind];
   document.getElementById('d-title').textContent = n.title;
+  document.getElementById('d-sub').textContent = n.sub;
   document.getElementById('d-desc').textContent = n.desc;
   document.getElementById('d-in').innerHTML = list('Receives', ins);
   document.getElementById('d-out').innerHTML = list('Sends', outs);
@@ -507,12 +689,25 @@ const pickT = document.getElementById('theme');
 const applyT = (t) => { document.documentElement.dataset.theme = t };
 try { const saved = localStorage.getItem('opsia-flow-theme'); if (saved && pickT.querySelector('option[value="' + saved + '"]')) { pickT.value = saved; applyT(saved) } } catch (e) {}
 pickT.addEventListener('change', () => { applyT(pickT.value); try { localStorage.setItem('opsia-flow-theme', pickT.value) } catch (e) {} });
+// The wave of light : follows the system's reduced-motion wish until the switch is used, then remembered.
+const waveB = document.getElementById('wave');
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+let waveSet = null;
+try { waveSet = localStorage.getItem('opsia-flow-wave') } catch (e) {}
+const applyW = (on) => { document.documentElement.dataset.wave = on ? 'on' : 'off'; waveB.setAttribute('aria-pressed', String(on)) };
+applyW(waveSet ? waveSet === 'on' : !calm.matches);
+calm.addEventListener('change', () => { if (!waveSet) applyW(!calm.matches) });
+waveB.addEventListener('click', () => {
+  const on = document.documentElement.dataset.wave !== 'on';
+  applyW(on); waveSet = on ? 'on' : 'off';
+  try { localStorage.setItem('opsia-flow-wave', waveSet) } catch (e) {}
+});
 </script>
 </body>
 </html>
 `
 
-// ── 7. Write (or check) ─────────────────────────────────────────────────────
+// ── 8. Write (or check) ─────────────────────────────────────────────────────
 const FAM_LICENSE = FONT_FILES.map((f) => {
   const fl = read('licenses/fonts.txt').replace(/\r\n/g, '\n')
   const i = fl.indexOf(`${f} :`)
