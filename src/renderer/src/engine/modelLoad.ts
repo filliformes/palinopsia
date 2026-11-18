@@ -1,7 +1,8 @@
 // The Model source's files : read once on their own thread (workers/modelWorker.ts),
 // kept by path, shared by every slot that shows the same file (A and B, the scenes,
-// the Inspector's line that says what was read). The two models used last stay in
-// memory, so a scene that comes back to one does not read it again.
+// the Inspector's line that says what was read). Every file a slot still shows stays
+// in memory (they ask for it each frame), and the last two no slot shows any more, so
+// a scene that comes back to one does not read it again.
 
 import ModelWorker from '../workers/modelWorker?worker&inline'
 import type { FromModelWorker, ToModelWorker } from '../workers/modelWorker'
@@ -13,12 +14,15 @@ export type ModelState =
   | { state: 'error'; message: string }
 
 const KEEP = 2
+// (a file not asked for this long is no longer on screen)
+const IDLE_MS = 5000
 
 class ModelLoader {
   private worker: Worker | null = null
   private entries = new Map<string, ModelState>()
   private pending = new Map<number, string>()
   private used: string[] = []
+  private asked = new Map<string, number>()
   private nextId = 1
   private listeners = new Set<() => void>()
   /** Bumped on every change : a cheap "has anything landed" for the engines. */
@@ -57,13 +61,19 @@ class ModelLoader {
     return w
   }
 
+  /** Forget the files no slot shows any more, beyond the last KEEP of them (run when
+   *  a file lands : never while a slot is drawing one, which would read it again). */
   private touch(path: string): void {
     this.used = [path, ...this.used.filter((p) => p !== path)]
-    for (const old of this.used.slice(KEEP)) {
-      const e = this.entries.get(old)
-      if (e?.state === 'ready') this.entries.delete(old)
+    const now = performance.now()
+    let idle = 0
+    for (const p of this.used) {
+      if (now - (this.asked.get(p) ?? 0) < IDLE_MS) continue
+      if (++idle <= KEEP) continue
+      if (this.entries.get(p)?.state === 'ready') this.entries.delete(p)
+      this.asked.delete(p)
     }
-    this.used = this.used.slice(0, KEEP)
+    this.used = this.used.filter((p) => this.entries.has(p))
   }
 
   private changed(): void {
@@ -73,11 +83,9 @@ class ModelLoader {
 
   /** The file's state, its reading started on the first ask. */
   get(path: string, files: readonly string[] = []): ModelState {
+    this.asked.set(path, performance.now())
     const e = this.entries.get(path)
-    if (e) {
-      if (e.state === 'ready' && this.used[0] !== path) this.touch(path)
-      return e
-    }
+    if (e) return e
     const st: ModelState = { state: 'loading' }
     this.entries.set(path, st)
     const id = this.nextId++
