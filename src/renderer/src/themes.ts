@@ -1673,6 +1673,95 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 0.8 }
   }),
 
+  // ── Objects : the Model source, a 3D object, over a picture or wearing one ──
+  mk({
+    id: 'chrome-idol', name: 'Chrome Idol', family: 'Objects',
+    blurb: 'A mirror object turning slowly over a painted ground, reflecting a studio that turns with the light.',
+    world: 'synthetic',
+    palette: [K, [0.16, 0.14, 0.13, 1], [0.85, 0.82, 0.78, 1]],
+    sources: ['gen-model'],
+    stack: [['swell', 'dye-field', 'membrane'], ['gen-model']],
+    presets: { 'gen-model': ['Chrome knot', 'Liquid capsule', 'Foil dodecahedron'] },
+    pickInputs: { 'gen-model': { groundOp: [0], depthOut: [1], spin: [0.08, 0.12, 0.18] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0, haze: 0.05, bloom: 0.12, depth: 0.2 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'wire-study', name: 'Wire Study', family: 'Objects',
+    blurb: 'Shapes drawn in fine light : their wireframes and their edges, turning and leaving a trace on the dark.',
+    world: 'parametric',
+    palette: [K, [0.1, 0.12, 0.16, 1], [0.8, 0.88, 0.95, 1]],
+    sources: ['gen-model'],
+    presets: { 'gen-model': ['Wire sphere', 'Blueprint'] },
+    pickInputs: { 'gen-model': { style: [1, 2], shape: [0, 1, 4, 12, 13, 14], groundOp: [0], lineWidth: [1, 1.4, 2] } },
+    layerFx: ['fx-light-trails', 'fx-grade'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0, feedback: 0.3, density: 0.45, drift: 0.1,
+    context: { trails: 0.2, haze: 0, bloom: 0.15, depth: 0 },
+    motion: { ...SLOW, rate: [0.01, 0.05], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'second-skin', name: 'Second Skin', family: 'Objects',
+    blurb: 'An object wearing the picture of the layer under it : wrapped round it, projected on it, reflected in it or read as its lit sphere.',
+    world: 'synthetic',
+    palette: [K, [0.25, 0.18, 0.3, 1], [0.9, 0.8, 0.7, 1]],
+    sources: ['gen-model'],
+    // the picture below, seen only on the object that wears it
+    stack: [['drift-field', 'dye-field', 'op-art', 'swell', 'membrane'], ['gen-model']],
+    muted: [0],
+    reads: { 'gen-model': 0 },
+    presets: { 'gen-model': ['Picture sphere'] },
+    pickInputs: { 'gen-model': { shape: [0, 1, 9, 14], skinMode: [0, 1, 2, 3], skin: [1], groundOp: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0, haze: 0, bloom: 0.1, depth: 0.2 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'glass-object', name: 'Glass Object', family: 'Objects',
+    blurb: 'A glass solid turning in front of a picture, bending it through its faces, the colors split at its edges.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.16, 0.2, 1], [0.8, 0.9, 0.95, 1]],
+    sources: ['gen-model'],
+    stack: [['op-art', 'drift-field', 'swell', 'dye-field'], ['gen-model']],
+    reads: { 'gen-model': 0 },
+    presets: { 'gen-model': ['Glass icosahedron'] },
+    pickInputs: { 'gen-model': { shape: [13, 12, 11, 0, 1], skin: [1], skinMode: [0], groundOp: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0, haze: 0, bloom: 0.15, depth: 0.15 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'point-cloud', name: 'Point Cloud', family: 'Objects',
+    blurb: 'Shapes made only of their points, lit beads tumbling slowly, their trails glowing behind them.',
+    world: 'musical',
+    palette: [K, [0.18, 0.12, 0.08, 1], [0.95, 0.75, 0.45, 1]],
+    sources: ['gen-model'],
+    presets: { 'gen-model': ['Points torus'] },
+    pickInputs: { 'gen-model': { shape: [0, 1, 9, 13, 14], segments: [64, 96, 128], pointSize: [2, 3, 4], groundOp: [0] } },
+    layerFx: ['fx-light-trails', 'fx-grade'],
+    blends: ['screen', 'add'], layers: [1, 2], useB: 0, feedback: 0.2, density: 0.45, drift: 0.1,
+    context: { trails: 0.15, haze: 0, bloom: 0.2, depth: 0 },
+    motion: { ...SLOW, rate: [0.01, 0.04], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'true-depth', name: 'True Depth', family: 'Objects',
+    blurb: 'An object whose real depth drives the depth effects : parallax that sways it in space, or a Pulfrich lag that makes it stand out.',
+    world: 'synthetic',
+    palette: [K, [0.14, 0.14, 0.15, 1], [0.82, 0.8, 0.76, 1]],
+    sources: ['gen-model'],
+    stack: [['gen-model']],
+    stackFx: [['node-parallax', 'node-pulfrich']],
+    presets: { 'gen-model': ['Deep knot', 'Clay capsule', 'Chrome knot', 'Red wax torus'], 'node-parallax': ['Big parallax'], 'node-pulfrich': ['Anaglyph depth'] },
+    pickInputs: { 'gen-model': { depthOut: [1], groundOp: [1] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0, haze: 0, bloom: 0.1, depth: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+
   // ── Dome : made for a fulldome. No vignette (it darkens the rim, where a dome
   // audience looks), nothing that frames the edges, slow motion overhead. ──
   mk({
@@ -1742,6 +1831,20 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade', 'fx-light-trails'],
     blends: ['screen', 'lighten'], layers: [1, 2], useB: 0.2, drift: 0.2, density: 0.4,
     context: { depth: 0, haze: 0.08 }
+  }),
+  mk({
+    id: 'dome-object', name: 'Object Overhead', family: 'Dome',
+    blurb: 'One object turning at the zenith, round and in the middle of the sky, a slow wash of color around it.',
+    world: 'sublimated',
+    palette: [K, [0.08, 0.1, 0.16, 1], [0.8, 0.82, 0.9, 1]],
+    sources: ['gen-model'],
+    stack: [['swell', 'dye-field', 'membrane'], ['gen-model']],
+    presets: { 'gen-model': ['Chrome knot', 'Foil dodecahedron', 'Soap bubble', 'Normals tumble'] },
+    pickInputs: { 'gen-model': { groundOp: [0], posX: [0], posY: [0], spin: [0.05, 0.08, 0.12] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.2, density: 0.4,
+    context: { depth: 0, haze: 0.05, bloom: 0.12 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
 
   // ── Film Wall : your own films (a Collage folder), cut, graded, damaged ──

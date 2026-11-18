@@ -464,7 +464,7 @@ async function collect(onProgress?: (done: number, total: number) => void): Prom
     await check()
     const gb = res.bytes / 1e9
     const size = gb >= 1 ? gb.toFixed(1) + ' GB' : Math.round(res.bytes / 1e6) + ' MB'
-    const skipped = res.refused ? ` · ${res.refused} skipped (not a film or a sound file)` : ''
+    const skipped = res.refused ? ` · ${res.refused} skipped (not a film, a sound or a model file)` : ''
     if (!res.ok) showToast(`Collected ${copied} of ${items.length} files, then : ${res.error}${skipped}`, 'warn', 8000)
     else showToast(`Collected ${copied} file${copied === 1 ? '' : 's'} (${size}) into "${name} media"${skipped} · save to keep the new paths`, res.refused ? 'warn' : 'ok', 7000)
     return res.ok && !res.refused

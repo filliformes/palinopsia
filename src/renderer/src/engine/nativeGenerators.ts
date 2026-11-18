@@ -24,6 +24,7 @@ import { SandPlateSource } from './SandPlateSource'
 import { FurSource } from './FurSource'
 import { ReliefSource } from './ReliefSource'
 import { PointCloudSource } from './PointCloudSource'
+import { ModelSource } from './ModelSource'
 import type { HandGestureLog } from '@shared/types'
 
 /** A pointer on the picture (the mouse on the preview, a pinching hand), for a
@@ -65,6 +66,12 @@ export interface NativeGenerator {
   status?(): string
   /** A remote event (OSC, an action) : a name and its numbers. */
   event?(name: string, args: number[]): void
+  /** Optional : the file the slot plays (the Model's model), and the files beside it
+   *  the session carries for it; every sync, the same values until they change. */
+  file?(path: string | null, files?: readonly string[]): void
+  /** Optional : a real depth map of what it drew (nearest white), for the depth
+   *  readers in place of the depth AI; null while it has none. */
+  depthTexture?(): WebGLTexture | null
   // No PANIC hook on purpose : a generator's state IS the picture (Compositor.panic);
   // each engine carries its own regrow / reseed event instead.
   dispose(): void
@@ -84,7 +91,8 @@ const REGISTRY: Record<string, Factory> = {
   'gen-sandplate': (gl, w, h) => new SandPlateSource(gl, w, h),
   'gen-fur': (gl, w, h) => new FurSource(gl, w, h),
   'gen-relief': (gl, w, h) => new ReliefSource(gl, w, h),
-  'gen-pointcloud': (gl, w, h) => new PointCloudSource(gl, w, h)
+  'gen-pointcloud': (gl, w, h) => new PointCloudSource(gl, w, h),
+  'gen-model': (gl, w, h) => new ModelSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)
@@ -108,7 +116,8 @@ export function syncNativeSlot(
   h: number,
   id: string | null,
   inputs: Record<string, number | number[]> | null,
-  ops?: readonly HandGestureLog[]
+  ops?: readonly HandGestureLog[],
+  file?: { path?: string; files?: readonly string[] }
 ): NativeSlot | null {
   const make = nativeGeneratorFactory(id)
   if (!make || !id) {
@@ -123,6 +132,7 @@ export function syncNativeSlot(
   if (inputs) {
     slot.src.update(inputs)
     slot.src.handOps?.(ops)
+    slot.src.file?.(file?.path ?? null, file?.files ?? [])
   }
   return slot
 }

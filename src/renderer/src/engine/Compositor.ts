@@ -1384,9 +1384,14 @@ export class ISFLayer {
   }
 
   /** Activate/swap/refresh/clear a registry engine (engine/nativeGenerators.ts). */
-  setNative(slot: 'A' | 'B', id: string | null, inputs: Record<string, number | number[]> | null, ops?: import('@shared/types').HandGestureLog[]): void {
-    const next = syncNativeSlot(slot === 'A' ? this.natA : this.natB, this.shared.gl, this.w, this.h, id, inputs, ops);
+  setNative(slot: 'A' | 'B', id: string | null, inputs: Record<string, number | number[]> | null, ops?: import('@shared/types').HandGestureLog[], src?: { modelPath?: string; modelFiles?: string[] } | null): void {
+    const next = syncNativeSlot(slot === 'A' ? this.natA : this.natB, this.shared.gl, this.w, this.h, id, inputs, ops, src ? { path: src.modelPath, files: src.modelFiles } : undefined);
     if (slot === 'A') this.natA = next; else this.natB = next;
+  }
+
+  /** A Model source's real depth (its TRUE DEPTH on and drawn), A before B. */
+  modelDepth(): WebGLTexture | null {
+    return this.natA?.src.depthTexture?.() ?? this.natB?.src.depthTexture?.() ?? null;
   }
 
   /** The slot's registry engine (pointerInput.ts : a source that takes the pointer). */
@@ -2914,6 +2919,26 @@ export class Compositor {
     return { data: out, w: gw, h: gh };
   }
 
+  /** The real depth of the topmost seen layer that plays a Model with TRUE DEPTH on
+   *  (a muted, invisible or un-soloed layer gives none). The depth readers take it in
+   *  place of the depth AI's map. Its last frame, for a reader on a layer below it. */
+  modelDepthTex(): WebGLTexture | null {
+    const soloing = this.layers.some((l) => l.solo);
+    for (let i = this.layers.length - 1; i >= 0; i--) {
+      const L = this.layers[i];
+      if (!((soloing ? L.solo : !L.mute) && L.opacity > 0.001)) continue;
+      const t = L.modelDepth();
+      if (t) return t;
+    }
+    return null;
+  }
+
+  /** A Model gives the depth readers its real depth now (App.tsx then leaves the
+   *  depth AI idle : its map would not be read). */
+  hasModelDepth(): boolean {
+    return this.modelDepthTex() !== null;
+  }
+
   /** Ensure a shared depth map exists (cleared to neutral until one is computed).
    *  The native node-parallax reads depth via nodeCtx.depth, not through here. */
   private bindDepth(): void {
@@ -3252,7 +3277,7 @@ export class Compositor {
         ? { text: l.sourceA.text ?? 'OPSIA', inputs: l.sourceA.inputs, sidechain: l.sourceA.sidechain ?? null }
         : null);
       L.setParam('A', isParamA ? { inputs: l.sourceA.inputs } : null);
-      L.setNative('A', natA, natA ? l.sourceA.inputs : null, l.sourceA.handOps);
+      L.setNative('A', natA, natA ? l.sourceA.inputs : null, l.sourceA.handOps, l.sourceA);
       L.setSilhouette('A', l.sourceA.kind === 'generator' && l.sourceA.shaderId === 'gen-silhouette' ? { inputs: l.sourceA.inputs } : null);
       L.setCollage('A', isCollA ? { pool: l.sourceA.collagePool ?? [], edls: l.sourceA.collageEdls ?? [], inputs: l.sourceA.inputs, folder: l.sourceA.collageFolder } : null);
       L.setAudio('A', l.sourceA.kind === 'audio' && l.sourceA.mediaId ? { url: l.sourceA.mediaId, path: l.sourceA.mediaPath ?? '', inputs: l.sourceA.inputs } : null, i);
@@ -3275,7 +3300,7 @@ export class Compositor {
         ? { text: l.sourceB.text ?? 'OPSIA', inputs: l.sourceB.inputs, sidechain: l.sourceB.sidechain ?? null }
         : null);
       L.setParam('B', isParamB && l.sourceB ? { inputs: l.sourceB.inputs } : null);
-      L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null, l.sourceB?.handOps);
+      L.setNative('B', natB, natB && l.sourceB ? l.sourceB.inputs : null, l.sourceB?.handOps, l.sourceB);
       L.setSilhouette('B', !!l.sourceB && l.sourceB.kind === 'generator' && l.sourceB.shaderId === 'gen-silhouette' ? { inputs: l.sourceB.inputs } : null);
       L.setCollage('B', isCollB && l.sourceB ? { pool: l.sourceB.collagePool ?? [], edls: l.sourceB.collageEdls ?? [], inputs: l.sourceB.inputs, folder: l.sourceB.collageFolder } : null);
       L.setAudio('B', l.sourceB?.kind === 'audio' && l.sourceB.mediaId ? { url: l.sourceB.mediaId, path: l.sourceB.mediaPath ?? '', inputs: l.sourceB.inputs } : null, i);
@@ -3334,7 +3359,7 @@ export class Compositor {
       this.bgParam = null;
     }
     const bgNatId = bg && nativeGeneratorFactory(bgId) ? bgId : null;
-    this.bgNat = syncNativeSlot(this.bgNat, this.shared.gl, this.w, this.h, bgNatId, bgNatId && bg ? bg.source.inputs : null, bg?.source.handOps);
+    this.bgNat = syncNativeSlot(this.bgNat, this.shared.gl, this.w, this.h, bgNatId, bgNatId && bg ? bg.source.inputs : null, bg?.source.handOps, bg ? { path: bg.source.modelPath, files: bg.source.modelFiles } : undefined);
     // 'gen-text' is native (kept out of loadIsf) but has no background handler :
     // TextSource.render needs a sidechain texture the background path never wires,
     // so it can't satisfy the one-arg bgNativeSource contract. The curated picker
@@ -3761,7 +3786,9 @@ export class Compositor {
     // the wall clock. Reverse runs time forward for decays (|dt|).
     const nodeCtx: NodeApplyCtx = {
       dt: dtSec,
-      depth: this.depthLive ? this.depthTex : null, // null with Depth off : nodes use their fallback
+      // A Model's real depth wins over the depth engine's map (the topmost one seen);
+      // null with neither : nodes use their fallback.
+      depth: this.modelDepthTex() ?? (this.depthLive ? this.depthTex : null),
       audioTex: this.audioTexGL,
       frame: this.frameNo,
       bpm: this.bpm,

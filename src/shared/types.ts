@@ -163,6 +163,13 @@ export interface SourceSlot extends ShaderInstance {
   // Collage `feed: assemblages` : one small edit per piece, copied out of the
   // Assemble bank so the session does not depend on machine-local storage.
   collageEdls?: import('./collage').CollageEdl[]
+  // For the native Model generator (shaderId 'gen-model') : the model file on disk
+  // (glb, gltf, obj, stl, ply), its name, and the files beside it that it reads (a
+  // .gltf's buffers and images, an OBJ's MTL and color map), so the session's media
+  // list collects and relinks them with it. Its `shape` input on "file" shows it.
+  modelPath?: string
+  modelName?: string
+  modelFiles?: string[]
   // What was done by hand on the picture (Marbling : drops, combs, swirls made
   // with the mouse on the preview), one entry per gesture with its events and
   // their steps, so the session (and each scene) reopens the same picture. The

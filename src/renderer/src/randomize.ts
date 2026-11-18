@@ -200,6 +200,9 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-sandplate': /^(sand|plate)$/,
   // Fur : a coat's colors go together (its presets).
   'gen-fur': /^(tip|root|skin|markColor)$/,
+  // Model : the line and ground colors, the depth it hands on and hiding the far lines
+  // are staging (its presets); its own color rolls.
+  'gen-model': /^(lineColor|ground|depthOut|hidden)$/,
   // Relief : its colors and ground go together (its presets).
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
   // Point Cloud : the points carry the picture's colors on the house ground.

@@ -74,6 +74,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('sweep', 'period', 'sync', 'direction', 'position', 'restart', 'width', 'trail'),
     g('light', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest', 'wet')
   ],
+  'gen-model': [
+    // (three columns of 17, 15 and 17 : a fourth wrapped under them at the Inspector's width)
+    g('shape and motion', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio'),
+    g('look', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick'),
+    g('finish, light and skin', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut')
+  ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
     g('hand and wind', 'brush', 'hold', 'heal', 'groom', 'wind', 'gust', 'spring', 'audio', 'audioPart', 'lightAngle', 'lightHeight'),
@@ -509,6 +515,31 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (isnt('direction', 3)) put(d, ['position'], 'The plane sweeps by itself : by hand only.')
     if (is('direction', 3)) put(d, ['period', 'sync', 'restart'], 'By hand : the plane stands where you put it.')
     if (isnt('sync', 0)) put(d, ['period'], 'The sweep runs on the tempo.')
+    return d
+  },
+  // Model : what each look and material reads; a file's colors need a file.
+  'gen-model': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('shape', 1, 14)) put(d, ['thickness'], 'Only the torus and the knot have a tube.')
+    if (is('shape', 15)) put(d, ['segments'], 'A model file is drawn as it is made.')
+    if (isnt('shape', 15)) put(d, ['fileColor'], 'Shape is not on file : a built-in shape has no colors of its own.')
+    if (isnt('material', 8)) put(d, ['matcap'], 'Only the matcap material reads a lit sphere.')
+    if (isnt('material', 1, 2, 3, 4)) put(d, ['film'], 'The oil film is on plastic, metal, brushed metal and chrome.')
+    if (zero('film') && isnt('material', 6)) put(d, ['filmThick'], 'No film : oil film is at 0 and the material is not soap film.')
+    if (is('material', 0, 8, 9, 10)) put(d, ['flow'], 'This material reflects nothing to flow.')
+    if (zero('flow')) put(d, ['flowSpeed'], 'Flowing is at 0.')
+    if (isnt('material', 7)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
+    if (is('material', 8, 9, 10)) put(d, ['gloss', 'light', 'ambient', 'lightHeight'], 'This material is not lit by the lamp.')
+    if (is('material', 9, 10)) put(d, ['lightAngle'], 'This material is not lit by the lamp.')
+    if (zero('spin')) put(d, ['spinAxis'], 'Spin is at 0.')
+    if (zero('wobble') && zero('audio')) put(d, ['wobbleSize', 'wobbleSpeed'], 'Wobble and audio are at 0 : nothing bends.')
+    if (zero('skin')) put(d, ['skinMode', 'tile', 'scroll'], 'Picture is at 0 : it wears no skin.')
+    else if (isnt('skinMode', 0)) put(d, ['tile', 'scroll'], 'Only the wrapped skin repeats and scrolls.')
+    if (is('style', 0, 3)) put(d, ['lineColor', 'lineWidth', 'edgeAngle', 'hidden'], 'This look draws no lines.')
+    else if (is('style', 1)) put(d, ['edgeAngle'], 'The wireframe draws every triangle.')
+    if (is('style', 4)) put(d, ['hidden'], 'Solid + edges always hides what is behind.')
+    if (isnt('style', 3)) put(d, ['pointSize'], 'Only the points look has points.')
+    if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0 : no ground.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

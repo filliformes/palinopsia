@@ -880,6 +880,38 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
     vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Objects : chains for a Model source, most of them reading its true depth ──
+  {
+    name: 'Object in Depth', group: 'Objects',
+    fx: [
+      { shaderId: 'node-parallax', inputs: { amount: 0.55, angle: 0, sway: 0.5, swayRate: 0.6, dof: 0.25, dofShape: 0, focus: 0.75, fog: 0.2, invert: 0, wet: 1.0 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.2, chroma: 0, parasites: 0.1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0.04 }
+  },
+  {
+    name: 'Pulfrich Object', group: 'Objects',
+    fx: [
+      { shaderId: 'node-pulfrich', inputs: { mode: 0, source: 1, delay: 6, curve: 1.0, zero: 0.3, separation: 0.55, desat: 0.3, swap: 0, mix: 1.0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Shallow Focus', group: 'Objects',
+    fx: [
+      { shaderId: 'node-lumablur', inputs: { control: 1, blackWidth: 22, whiteWidth: 0, gamma: 1.0, focus: 0.85, invert: 0, quality: 1, mix: 1.0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 1, lift: 0.02, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.98, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Object Trails', group: 'Objects',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.95, drift: 0, angle: 1.5708, knee: 0 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.12, saturation: 1.05, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Glitch : time broken, the pane broken, the picture keyed ──
   {
     name: 'Glitched Memory', group: 'Glitch',

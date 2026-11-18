@@ -23,6 +23,7 @@ import { showToast } from './Toast'
 import { placeAssemblage } from '../assemble/place'
 import { playableVideoUrl } from './videoImport'
 import { collageFromFolder, droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
+import { loadModelInto } from './ModelStrip'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { CapturePicker } from './CapturePicker'
 import { DevicePicker } from './DevicePicker'
@@ -1072,7 +1073,8 @@ function SourceRow({
     useStore.getState().setSourceAudio(scope.layer, scope.kind === 'sourceA' ? 'A' : 'B', `opsia-media://local/${encodeURIComponent(path)}`, file.name, path)
   }
   // Files dragged in from the desktop : a film (imported, converted if it
-  // must be), a sound (Import audio), or a folder (a Collage of its films).
+  // must be), a sound (Import audio), a 3D model (a Model source), or a folder
+  // (a Collage of its films).
   const [dropOver, setDropOver] = useState(false)
   async function onDropFiles(e: DragEvent): Promise<void> {
     const items = droppedPaths(e)
@@ -1091,11 +1093,18 @@ function SourceRow({
       useStore.getState().setSourceAudio(layer, slotName, `opsia-media://local/${encodeURIComponent(path)}`, name, path)
       return
     }
+    if (kind === 'model') {
+      // a 3D model : the slot becomes a Model of it (once it is read)
+      const cur = useStore.getState().composition.layers[layer]?.[slotName === 'A' ? 'sourceA' : 'sourceB']
+      if (cur?.shaderId !== 'gen-model') useStore.getState().setSourceShader(layer, slotName, 'gen-model')
+      await loadModelInto({ kind: 'layer', layer, slot: slotName }, path, name)
+      return
+    }
     if ((await window.api.pathKind(path)) === 'dir') {
       await collageFromFolder(layer, slotName, path)
       return
     }
-    showToast(`${name} : a layer slot takes a film, a sound file or a folder (a Collage of its films)`, 'warn', 5000)
+    showToast(`${name} : a layer slot takes a film, a sound file, a 3D model (glb, gltf, obj, stl, ply) or a folder (a Collage of its films)`, 'warn', 5000)
   }
   const isAudio = sourceKind === 'audio'
   const isVideo = sourceKind === 'video'

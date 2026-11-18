@@ -1,7 +1,7 @@
 // Files dragged in from the desktop : what a drop holds (paths on disk), what
 // kind each is, and a drag handler pair for a drop target that lights while a
-// file drag is over it. A layer's A / B row takes a film, a sound or a folder
-// (a Collage of it); an Audio Layer slot takes a sound (or a film's
+// file drag is over it. A layer's A / B row takes a film, a sound, a 3D model (a
+// Model source of it) or a folder (a Collage of it); an Audio Layer slot takes a sound (or a film's
 // soundtrack); a session file opens wherever it lands.
 
 import type { DragEvent } from 'react'
@@ -11,13 +11,15 @@ import { showToast } from './Toast'
 export const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp)$/i
 export const AUDIO_EXT = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
 export const SESSION_EXT = /\.json$/i
+export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply)$/i
 
-export type DropKind = 'video' | 'audio' | 'session' | 'other'
+export type DropKind = 'video' | 'audio' | 'session' | 'model' | 'other'
 
 export function dropKind(path: string): DropKind {
   if (VIDEO_EXT.test(path)) return 'video'
   if (AUDIO_EXT.test(path)) return 'audio'
   if (SESSION_EXT.test(path)) return 'session'
+  if (MODEL_EXT.test(path)) return 'model'
   return 'other'
 }
 

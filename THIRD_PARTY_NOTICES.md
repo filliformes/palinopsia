@@ -593,6 +593,30 @@ methods are free to build on; naming them is a matter of respect.
     The rules are written for Palinopsia in TypeScript; no HIVE code is included.
 - **Corpus-based selection**: Diemo Schwarz's CataRT model (Assemble's matching), and VIVO
   and Dimopoulos & Winkler's per-pixel warmness (Assemble's analysis).
+- **The Model source** (`engine/ModelSource.ts`, `modelMesh.ts`, `modelParse.ts`,
+  `workers/modelWorker.ts`). Its readers and meshes are Palinopsia's own code, written
+  from these published formats and methods; no library and no code was taken:
+  - **glTF 2.0 specification**: The Khronos Group, *glTF 2.0 Specification*
+    (https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html), also published as
+    ISO/IEC 12113:2022. The GLB container, accessors (sparse and normalized included),
+    node transforms and the base color of the metallic-roughness material.
+  - **OBJ and MTL formats**: the text formats Wavefront Technologies introduced for its
+    Advanced Visualizer, as publicly documented (for example
+    https://paulbourke.net/dataformats/obj/ and https://paulbourke.net/dataformats/mtl/).
+  - **STL format**: the stereolithography format of 3D Systems (1987), in its binary and
+    text forms, as publicly documented.
+  - **PLY format**: Greg Turk's polygon file format (Stanford University, 1994), as
+    documented at https://paulbourke.net/dataformats/ply/.
+  - **The Lit Sphere**: P.-P. J. Sloan, W. Martin, A. Gooch and B. Gooch, "The Lit Sphere:
+    A Model for Capturing NPR Shading from Art", *Proceedings of Graphics Interface 2001*.
+    The matcap material (a picture of a lit ball read by the surface's normal, the skin
+    layer usable as one). The five built-in lit spheres are drawn in code.
+  - **Platonic solid coordinates**: public geometry (the regular solids' vertices from
+    the golden ratio), and the (2, 3) torus knot's public parametrization.
+  - **The built-in shape list**: the classic set offered by the shape generators of
+    patching environments (Cycling '74's jit.gl.gridshape in Max among them): sphere,
+    torus, cylinder, open cylinder, cube, open cube, plane, circle, cone, capsule. The
+    names in the app are plain shape names.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the

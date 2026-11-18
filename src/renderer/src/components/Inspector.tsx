@@ -16,6 +16,7 @@ import { inputsForShader, defaultInputs } from '../shaders/isf/inputs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { CollageStrip } from './CollageStrip'
+import { ModelStrip, type ModelTarget } from './ModelStrip'
 import { SilhouetteFxStrip, SilhouetteStrip } from './SilhouetteStrip'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { floatModTargets, hasModulationOn, useFxMenuItems } from './fxMenu'
@@ -213,6 +214,8 @@ export function Inspector(): JSX.Element {
     pool: import('@shared/collage').CollageClip[]
     edls: import('@shared/collage').CollageEdl[]
   } | null = null
+  // A Model : its file, what was read, its skin layer.
+  let modelCfg: { target: ModelTarget; slot: SourceSlot; setSide: ((r: SidechainRef | null) => void) | null; hostLayer: number } | null = null
   // An Import Audio slot : its transport (the video's, in audio mode) under its look.
   let audioCfg: { layer: number; slot: 'A' | 'B'; state: SourceSlot } | null = null
   // The FX the header is showing, if any : right-clicking its title offers the
@@ -288,6 +291,9 @@ export function Inspector(): JSX.Element {
         }
       }
       if (slot.kind === 'audio') audioCfg = { layer: li, slot: sl, state: slot }
+      if (slot.shaderId === 'gen-model') {
+        modelCfg = { target: { kind: 'layer', layer: li, slot: sl }, slot, setSide: (r) => setSourceSidechain(li, sl, r), hostLayer: li }
+      }
       if (slot.shaderId === 'gen-text') {
         textCfg = {
           text: slot.text ?? 'OPSIA',
@@ -316,6 +322,8 @@ export function Inspector(): JSX.Element {
       context = 'background'
       onChange = (n, v) => setBackgroundInput(n, v)
       modTargetFor = (input) => ({ kind: 'bgSource', input })
+      // (the slab reads no other layer : no skin there)
+      if (bg.source.shaderId === 'gen-model') modelCfg = { target: { kind: 'background' }, slot: bg.source, setSide: null, hostLayer: -1 }
       if (bg.source.shaderId === 'gen-collage') {
         collageCfg = {
           target: { kind: 'background' },
@@ -735,6 +743,18 @@ export function Inspector(): JSX.Element {
           folder={collageCfg.folder}
           pool={collageCfg.pool}
           edls={collageCfg.edls}
+        />
+      )}
+      {modelCfg && (
+        <ModelStrip
+          target={modelCfg.target}
+          path={modelCfg.slot.modelPath}
+          name={modelCfg.slot.modelName}
+          files={modelCfg.slot.modelFiles}
+          side={modelCfg.slot.sidechain ?? null}
+          setSide={modelCfg.setSide}
+          hostLayer={modelCfg.hostLayer}
+          onFile={Math.round(Number(modelCfg.slot.inputs.shape ?? 14)) === 15}
         />
       )}
       {textCfg && (

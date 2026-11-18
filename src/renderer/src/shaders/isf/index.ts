@@ -2308,6 +2308,84 @@ export const GENERATORS: IsfShader[] = [
       mirror: [0, 0], fold: [6, 6], relief: [0.35, 0.8], gloss: [0.4, 0.9], grain: [0, 0.4], dents: [0, 0.4], bevel: [0.1, 0.5], shadow: [0.4, 0.8], edge: [0, 0], film: [0, 0],
       filmThick: [0.1, 0.6], colorPick: [1, 6], groundOp: [1, 1], side: [0, 0], sideUse: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.3, 0.7], orbit: [-0.2, 0.2], follow: [0, 0]
     }
+  },
+  {
+    // Native (engine/ModelSource.ts, meshes engine/modelMesh.ts, files engine/modelParse.ts
+    // read in workers/modelWorker.ts) : a 3D object, built in or from a file, lit in the
+    // materials Relief and Inflate share. The file rides on the slot (modelPath).
+    id: 'gen-model',
+    name: 'Model',
+    category: 'Generator',
+    native: true,
+    dice: true, // (a built-in shape needs no file)
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Model : a 3D object turning in front of a camera. SHAPE picks one of fifteen built in (sphere, torus, cylinders, cubes, plane, disc, cone, capsule, the five regular solids, a knot) or the FILE opened in the Inspector or dropped on the layer (glTF / GLB, OBJ, STL, PLY). LOOK draws it solid, as a wireframe, as its edges (creases, open borders and its outline), as points, or solid with its edges. MATERIAL : clay, plastic, metal, brushed metal, chrome, glass, soap film, foil, a lit sphere (MATCAP), flat color, or its normals. TURN, TILT, ROLL set it, SPIN turns it, DISTANCE and FIELD OF VIEW frame it, X and Y move it. WOBBLE bends its surface, AUDIO swells it with the bass and roughens it with the mids. PICTURE puts the layer picked as SKIN on it : wrapped round it, projected on it from the front, reflected in it, or as its lit sphere. The ground lets the layers below show through (its opacity). TRUE DEPTH hands its real depth to Parallax, Pulfrich and Luma Blur in place of the depth AI.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], LABELS: ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'disc', 'cone', 'capsule', 'tetrahedron', 'octahedron', 'dodecahedron', 'icosahedron', 'knot', 'file'], DEFAULT: 14, LABEL: 'shape' },
+        { NAME: 'segments', TYPE: 'float', MIN: 3, MAX: 128, DEFAULT: 48, LABEL: 'segments' },
+        { NAME: 'thickness', TYPE: 'float', MIN: 0.05, MAX: 0.9, DEFAULT: 0.35, LABEL: 'tube' },
+        { NAME: 'style', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['solid', 'wireframe', 'edges', 'points', 'solid + edges'], DEFAULT: 0, LABEL: 'look' },
+        { NAME: 'material', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], LABELS: ['clay', 'plastic', 'metal', 'brushed metal', 'chrome', 'glass', 'soap film', 'foil', 'matcap', 'flat', 'normals'], DEFAULT: 4, LABEL: 'material' },
+        { NAME: 'matcap', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['pearl', 'red wax', 'jade', 'bronze', 'toon'], DEFAULT: 0, LABEL: 'matcap' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.78, 0.74, 0.7, 1], LABEL: 'color' },
+        { NAME: 'fileColor', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'file colors' },
+        { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'gloss' },
+        { NAME: 'cavity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'cavity' },
+        { NAME: 'facets', TYPE: 'bool', DEFAULT: false, LABEL: 'facets' },
+        { NAME: 'film', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'oil film' },
+        { NAME: 'filmThick', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'film thickness' },
+        { NAME: 'flow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'flowing' },
+        { NAME: 'flowSpeed', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.3, LABEL: 'flow speed' },
+        { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'foil rainbow' },
+        { NAME: 'flakes', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil flakes' },
+        { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'foil glints' },
+        { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'tilt' },
+        { NAME: 'roll', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'roll' },
+        { NAME: 'spin', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.15, LABEL: 'spin' },
+        { NAME: 'spinAxis', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['upright', 'across', 'toward you', 'tumble'], DEFAULT: 0, LABEL: 'spins' },
+        { NAME: 'distance', TYPE: 'float', MIN: 1.2, MAX: 12, DEFAULT: 4, LABEL: 'distance' },
+        { NAME: 'lens', TYPE: 'float', MIN: 10, MAX: 110, DEFAULT: 35, LABEL: 'field of view' },
+        { NAME: 'posX', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'x' },
+        { NAME: 'posY', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'y' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.1, MAX: 3, DEFAULT: 1, LABEL: 'size' },
+        { NAME: 'wobble', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'wobble' },
+        { NAME: 'wobbleSize', TYPE: 'float', MIN: 0.3, MAX: 6, DEFAULT: 1.5, LABEL: 'wobble size' },
+        { NAME: 'wobbleSpeed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'wobble speed' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'audio' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'light height' },
+        { NAME: 'light', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'light' },
+        { NAME: 'ambient', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'ambient' },
+        { NAME: 'skin', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'picture' },
+        { NAME: 'skinMode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['wrapped', 'projected', 'reflected', 'as matcap'], DEFAULT: 0, LABEL: 'picture as' },
+        { NAME: 'tile', TYPE: 'float', MIN: 0.25, MAX: 8, DEFAULT: 1, LABEL: 'repeat' },
+        { NAME: 'scroll', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'scroll' },
+        { NAME: 'lineColor', TYPE: 'color', DEFAULT: [0.92, 0.94, 0.95, 1], LABEL: 'line color' },
+        { NAME: 'lineWidth', TYPE: 'float', MIN: 0.5, MAX: 6, DEFAULT: 1.2, LABEL: 'line width' },
+        { NAME: 'edgeAngle', TYPE: 'float', MIN: 5, MAX: 90, DEFAULT: 30, LABEL: 'crease angle' },
+        { NAME: 'hidden', TYPE: 'bool', DEFAULT: false, LABEL: 'hide far lines' },
+        { NAME: 'pointSize', TYPE: 'float', MIN: 0.5, MAX: 12, DEFAULT: 2.5, LABEL: 'point size' },
+        { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'fog' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0.02, 0.02, 0.025, 1], LABEL: 'ground' },
+        { NAME: 'groundOp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'ground opacity' },
+        { NAME: 'depthOut', TYPE: 'bool', DEFAULT: true, LABEL: 'true depth' }
+      ]
+    })}*/`,
+    // The file and the picture are choices made with them in mind, the ground, the
+    // depth and the line width are staging : never dealt. The dice turn the shape among
+    // the built-in ones only (never to "file"), and the colors roll through the presets.
+    curated: {
+      shape: [0, 14], segments: [24, 72], thickness: [0.2, 0.55], style: [0, 4], material: [0, 10], matcap: [0, 4], fileColor: [1, 1],
+      gloss: [0.3, 0.8], cavity: [0.1, 0.6], film: [0, 0.4], filmThick: [0.2, 0.7], flow: [0, 0.6], flowSpeed: [-0.4, 0.4],
+      rainbow: [0.4, 0.9], flakes: [0.3, 0.7], glint: [0.2, 0.7], turn: [-1, 1], tilt: [-0.3, 0.4], roll: [-0.2, 0.2],
+      spin: [-0.35, 0.35], spinAxis: [0, 3], distance: [3.2, 5.5], lens: [25, 50], posX: [0, 0], posY: [0, 0], scale: [0.8, 1.2],
+      wobble: [0, 0.4], wobbleSize: [0.8, 2.5], wobbleSpeed: [0.1, 0.5], audio: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75],
+      light: [0.8, 1.3], ambient: [0.1, 0.35], skin: [0, 0], skinMode: [0, 0], tile: [1, 1], scroll: [0, 0],
+      lineWidth: [1.2, 1.2], edgeAngle: [20, 45], pointSize: [1.5, 4], fog: [0, 0.5], groundOp: [0, 0]
+    }
   }
 ]
 
