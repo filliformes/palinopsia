@@ -23,7 +23,7 @@ export const DEPTH_MISSING_MESSAGE = 'Depth AI is not in this copy of the app : 
 
 type DepthMap = { data: Float32Array; w: number; h: number }
 
-class DepthEngine {
+export class DepthEngine {
   private worker: Worker | null = null
   private busy = false
   private lastRun = 0
@@ -133,15 +133,17 @@ class DepthEngine {
   }
 
   /** Feed a frame at inputSize(). Starts the engine on first use, then runs one
-   *  inference at a time, at most every minIntervalMs. */
-  update(rgba: Uint8Array, w: number, h: number, nowMs: number): void {
+   *  inference at a time, at most every minIntervalMs. True when this frame went
+   *  to the model (the Point Cloud's own engine serves several clouds by turns). */
+  update(rgba: Uint8Array, w: number, h: number, nowMs: number): boolean {
     this.start()
-    if (this.status !== 'ready' || this.busy || !this.worker) return
-    if (nowMs - this.lastRun < this.minIntervalMs) return
+    if (this.status !== 'ready' || this.busy || !this.worker) return false
+    if (nowMs - this.lastRun < this.minIntervalMs) return false
     this.lastRun = nowMs
     this.busy = true
     const copy = rgba.slice(0, w * h * 4)
     this.worker.postMessage({ t: 'frame', rgba: copy, w, h }, [copy.buffer])
+    return true
   }
 
   /** The newest depth map since the last call, or null if nothing new. */

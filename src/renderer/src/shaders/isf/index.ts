@@ -534,6 +534,50 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { amount: [0.1, 0.6], angle: [0, 6.2832], sway: [0, 0.6], swayRate: [0.4, 2], dof: [0, 0.5], focus: [0.3, 0.7], fog: [0, 0.5], wet: [0.6, 1] }
   },
   {
+    // Native (engine/depthScanNode.ts) : a plane sweeping through the depth, and
+    // the depth slice. Reads the shared depth map, brightness while it is off.
+    id: 'node-depthscan',
+    name: 'Depth Scan',
+    category: 'FX',
+    native: true,
+    source: `/*{
+      "DESCRIPTION": "Depth Scan : a plane sweeps through the picture's depth and lights what it crosses : brighter (BRIGHTEN), toward the GLOW color (TINT), swollen over its own edge (ENLARGE), with a crisp contour where the plane meets the picture (LINE) and a fading wake (TRAIL). It runs near to far, far to near, back and forth or BY HAND, once a PERIOD or on the beat (SYNC); REST dims what it is not crossing. SLICE keeps only a band of depth (SLICE AT, SLICE WIDTH, SOFTNESS) and makes the rest transparent (the layers below show through), dimmed, black, or a white-on-black MATTE for the Matte node; SCAN IN SLICE runs the plane inside the band. With the depth engine on AI, the depth model reads the very picture entering the effect (not the whole frame, which holds the effect's own result); with depth off, or DEPTH FROM set so, the picture's brightness stands in (bright = near), or its darkness. Best on the Master FX or on a layer whose picture has depth.",
+      "CATEGORIES": ["FX", "Optical", "Depth"],
+      "INPUTS": [
+        { "NAME": "mode", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["scan", "slice", "scan in slice"], "DEFAULT": 0, "LABEL": "mode" },
+        { "NAME": "reads", "TYPE": "long", "VALUES": [0, 1, 2], "LABELS": ["depth", "brightness", "darkness"], "DEFAULT": 0, "LABEL": "depth from" },
+        { "NAME": "flip", "TYPE": "bool", "DEFAULT": false, "LABEL": "flip depth", "COMPACT": true },
+        { "NAME": "period", "TYPE": "float", "MIN": 0.25, "MAX": 30.0, "DEFAULT": 4.0, "LABEL": "period (s)" },
+        { "NAME": "sync", "TYPE": "long", "VALUES": [0, 1, 2, 3, 4, 5], "LABELS": ["free", "beat", "2 beats", "bar", "2 bars", "4 bars"], "DEFAULT": 0, "LABEL": "sync" },
+        { "NAME": "direction", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["near to far", "far to near", "back and forth", "by hand"], "DEFAULT": 0, "LABEL": "direction" },
+        { "NAME": "position", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "by hand at" },
+        { "NAME": "restart", "TYPE": "event", "LABEL": "restart ▸" },
+        { "NAME": "width", "TYPE": "float", "MIN": 0.005, "MAX": 0.6, "DEFAULT": 0.08, "LABEL": "width" },
+        { "NAME": "trail", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "trail" },
+        { "NAME": "brighten", "TYPE": "float", "MIN": 0.0, "MAX": 3.0, "DEFAULT": 1.0, "LABEL": "brighten" },
+        { "NAME": "tint", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.35, "LABEL": "tint" },
+        { "NAME": "glow", "TYPE": "color", "DEFAULT": [0.93, 0.88, 0.78, 1.0], "LABEL": "glow color" },
+        { "NAME": "line", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.5, "LABEL": "line" },
+        { "NAME": "enlarge", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "enlarge" },
+        { "NAME": "rest", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.2, "LABEL": "dim the rest" },
+        { "NAME": "sliceAt", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.6, "LABEL": "slice at" },
+        { "NAME": "sliceWidth", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "slice width" },
+        { "NAME": "softness", "TYPE": "float", "MIN": 0.0, "MAX": 0.5, "DEFAULT": 0.05, "LABEL": "softness" },
+        { "NAME": "outside", "TYPE": "long", "VALUES": [0, 1, 2, 3], "LABELS": ["transparent", "dimmed", "black", "matte"], "DEFAULT": 0, "LABEL": "outside" },
+        { "NAME": "dim", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.15, "LABEL": "dimmed to" },
+        { "NAME": "invert", "TYPE": "bool", "DEFAULT": false, "LABEL": "keep outside", "COMPACT": true },
+        { "NAME": "wet", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 1.0, "LABEL": "mix" }
+      ]
+    }*/`,
+    // The dice keeps to the scan (a blind slice can empty the layer) and to a
+    // light hand on the rest.
+    curated: {
+      mode: [0, 0], reads: [0, 0], period: [2, 10], sync: [0, 0], direction: [0, 2], position: [0.5, 0.5], width: [0.04, 0.16], trail: [0, 0.6],
+      brighten: [0.5, 1.6], tint: [0.1, 0.6], line: [0.2, 0.8], enlarge: [0, 0.5], rest: [0, 0.3],
+      sliceAt: [0.4, 0.8], sliceWidth: [0.2, 0.5], softness: [0.02, 0.1], outside: [0, 0], dim: [0.1, 0.3], wet: [0.7, 1]
+    }
+  },
+  {
     id: 'node-eternalism',
     name: 'Eternalism',
     category: 'FX',
@@ -2120,6 +2164,65 @@ export const GENERATORS: IsfShader[] = [
       flow: [-3.1416, 3.1416], lie: [0.45, 0.85], whorl: [0.05, 0.5], scale: [0.6, 3], drift: [0, 0.2], brush: [0.4, 0.4], hold: [0.8, 0.8], heal: [15, 15],
       wind: [0.05, 0.3], gust: [0, 0], spring: [0.3, 0.7], audio: [0, 0], audioPart: [0.5, 0.5], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75],
       marks: [0, 0], markScale: [3, 10], shine: [0.3, 0.7], gloss: [0.25, 0.7], side: [0, 0], sideUse: [0, 0], ground: [1, 1]
+    }
+  },
+  {
+    // Native (engine/PointCloudSource.ts) : a picture lifted into space as points,
+    // raised by its depth or brightness, orbited, splashed, blown and parted.
+    id: 'gen-pointcloud',
+    name: 'Point Cloud',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Point Cloud : a picture lifted into space. The layer picked as SIDECHAIN (or a picture of its own : a globe, dunes, rings on water) becomes up to 640,000 points, each with the color of the picture where it sits, raised toward you by the picture\'s depth (the depth model reading that picture, with depth: AI on) or by its brightness, and seen through an orbiting camera (TURN, TILT, DISTANCE, SWAY, SPIN). Every point keeps its place as the picture changes : STIPPLE thins the dark parts out, SETTLE smooths the relief. SPLASH throws the points out on the sound\'s hits or the beat and GATHERS them back; WIND blows them away past a line across the picture, where they form again; drag on the preview (or pinch, or the Room\'s people) and they part round the hand. SCAN sweeps a plane through the depth that lights the points it crosses.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'own', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['globe', 'dunes', 'rings'], DEFAULT: 0, LABEL: 'own picture' },
+        { NAME: 'raise', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['depth', 'brightness', 'darkness'], DEFAULT: 0, LABEL: 'raised by' },
+        { NAME: 'depth', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'depth' },
+        { NAME: 'settle', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'settle (s)' },
+        { NAME: 'stipple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'stipple' },
+        { NAME: 'gain', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'brightness' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'ground' },
+        { NAME: 'density', TYPE: 'float', MIN: 0.02, MAX: 1, DEFAULT: 0.5, LABEL: 'points' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.1, MAX: 4, DEFAULT: 1, LABEL: 'size' },
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['square', 'round', 'soft'], DEFAULT: 1, LABEL: 'shape' },
+        { NAME: 'jitter', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'jitter' },
+        { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'fog' },
+        { NAME: 'scan', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'scan' },
+        { NAME: 'scanPeriod', TYPE: 'float', MIN: 1, MAX: 30, DEFAULT: 8, LABEL: 'scan period (s)' },
+        { NAME: 'scanSync', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['free', 'beat', '2 beats', 'bar', '2 bars', '4 bars'], DEFAULT: 0, LABEL: 'scan sync' },
+        { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'tilt' },
+        { NAME: 'distance', TYPE: 'float', MIN: 0.3, MAX: 4, DEFAULT: 1.1, LABEL: 'distance' },
+        { NAME: 'lens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'lens' },
+        { NAME: 'sway', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'sway' },
+        { NAME: 'swayRate', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'sway rate' },
+        { NAME: 'spin', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'spin' },
+        { NAME: 'part', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'hand parts' },
+        { NAME: 'partSize', TYPE: 'float', MIN: 0.02, MAX: 0.6, DEFAULT: 0.15, LABEL: 'hand size' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'room people' },
+        { NAME: 'splash', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'splash' },
+        { NAME: 'splashOn', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['hits', 'beat', '2 beats', 'bar', '2 bars', 'trigger only'], DEFAULT: 0, LABEL: 'splash on' },
+        { NAME: 'throw', TYPE: 'float', MIN: 0.02, MAX: 1.5, DEFAULT: 0.35, LABEL: 'how far' },
+        { NAME: 'gather', TYPE: 'float', MIN: 0.3, MAX: 8, DEFAULT: 2, LABEL: 'gather (s)' },
+        { NAME: 'burst', TYPE: 'event', LABEL: 'splash ▸' },
+        { NAME: 'wind', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'wind' },
+        { NAME: 'windAt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.3, LABEL: 'line at' },
+        { NAME: 'windAngle', TYPE: 'float', MIN: -3.1416, MAX: 3.1416, DEFAULT: 0, LABEL: 'line angle' },
+        { NAME: 'windSpeed', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'gusts' }
+      ]
+    })}*/`,
+    // The camera stays near the front for the dice (a turned cloud reads as noise
+    // without the picture it stood for); the hand, the people and the sync are staging.
+    curated: {
+      own: [0, 2], raise: [0, 1], depth: [0.3, 0.8], settle: [0.2, 0.6], stipple: [0.1, 0.5], gain: [0.9, 1.3],
+      density: [0.4, 0.8], size: [0.7, 1.4], shape: [0, 2], jitter: [0.3, 0.9], fog: [0.1, 0.5], scan: [0, 0.5], scanPeriod: [4, 12], scanSync: [0, 0],
+      turn: [-0.15, 0.15], tilt: [-0.2, 0.3], distance: [0.9, 1.4], lens: [0.3, 0.7], sway: [0.2, 0.6], swayRate: [0.15, 0.5], spin: [0, 0],
+      part: [0.6, 0.6], partSize: [0.15, 0.15], people: [0, 0], splash: [0.2, 0.6], splashOn: [0, 0], throw: [0.2, 0.5], gather: [1.2, 3],
+      wind: [0, 0], windAt: [0.3, 0.3], windAngle: [0, 0], windSpeed: [0.3, 0.3]
     }
   },
   {

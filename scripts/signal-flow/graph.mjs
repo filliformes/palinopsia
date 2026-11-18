@@ -99,6 +99,7 @@ node("p-present", 1372, 596, "Presentation", "fade · freeze · Black · flash l
 node("p-out", 1380, 762, "Transform · dome", "flat or dome", "pic", "The output transform (flat output) or the dome master, never both. NDI, Spout / Syphon, the projector stream and DXV recording take the picture here, before the keystone.", "Compositor OutXformStage, DomeStage · captureKick")
 node("p-warp", 1380, 830, "Keystone", "the operator canvas", "pic", "The operator canvas, drawn with the keystone (or as a plain copy). HIVE, encoder recordings, MARK and the agent's snapshot read it.", "Compositor warpProg · App.tsx loop")
 node("p-depth", 1050, 712, "Depth AI", "every 85 ms · late", "pic", "Depth Anything V2 estimates the depth of the presented picture in a worker. Every native node (Parallax, the master rack's too) reads it on later frames; the vision bus reads its mean and spread.", "engine/depthEstimate.ts · App.tsx loop depthEngine.update / take · nodeCtx.depth")
+node("p-pdepth", 640, 770, "Picture depth", "one layer's picture · every 85 ms · late", "pic", "A second copy of the depth model, for the pieces that need the depth of their OWN picture rather than of the presented one, which holds their result: the Point Cloud (the layer it lifts) and Depth Scan (the picture entering it). Running only while the depth menu is on AI and one of them asks; several take turns, and each map is smoothed into the next.", "engine/pictureDepth.ts PictureDepthReader · PointCloudSource · depthScanNode")
 node("p-read", 1190, 690, "Readbacks", "vision 32² · Sonify 96² · lights · after presentation", "pic", "Small asynchronous reads of the presented picture (before transform and keystone), one or two frames late: for the vision bus, Sonify and the lights. Sonify and the lights can also tap single layers.", "Compositor visionSample, readSonifyGrids, kickLights, depthFrame")
 
 // ── Outputs ────────────────────────────────────────────────
@@ -248,6 +249,9 @@ edge("o-sonify", "o-rec", "snd", "record bus")
 edge("p-read", "c-vbus", "loop", "the picture, read back ~30 Hz", true, "read-vision")
 edge("p-depth", "c-vbus", "loop", "depth mean · spread", false, "depth-vision")
 edge("p-depth", "p-lrack", "loop", "depth → nodes, later frames", true, "depth-nodes")
+edge("p-mix", "p-pdepth", "pic", "a layer's picture", false, null, 0.5, "bt")
+edge("p-pdepth", "p-srcB", "loop", "Point Cloud's relief", false, "picture-depth")
+edge("p-pdepth", "p-lrack", "loop", "Depth Scan")
 edge("p-loop", "p-loop", "loop", "returns", true, "self-loop")
 edge("p-loop", "p-srcB", "loop", "layers read each other", true, "sidechain")
 edge("o-osc", "in-osc", "phys", "a controller that echoes what it receives", true, "osc-echo")
@@ -259,6 +263,9 @@ edge("o-screen", "in-body", "phys", "the body camera sees the projection", true,
 // Secondary links : faint until a block is picked. Every link into dataflou out and the
 // Resolume mapper is secondary too.
 export const MINOR = new Set([
+  "p-mix>p-pdepth",
+  "p-pdepth>p-srcB",
+  "p-pdepth>p-lrack",
   "c-abus>o-lights",
   "c-abus>p-srcA",
   "c-alayer>c-mods",
@@ -370,6 +377,11 @@ export const TEXT = {
     {
       "name": "Depth",
       "path": "presented picture → Depth AI (every 85 ms) → depth map → Parallax and every native node, and the vision bus",
+      "st": "inside"
+    },
+    {
+      "name": "The depth of one picture",
+      "path": "a layer's picture → Picture depth (a second model, every 85 ms) → the Point Cloud that lifts it, the Depth Scan it enters",
       "st": "inside"
     },
     {

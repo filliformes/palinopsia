@@ -23,6 +23,7 @@ import { MarbleSource } from './MarbleSource'
 import { SandPlateSource } from './SandPlateSource'
 import { FurSource } from './FurSource'
 import { ReliefSource } from './ReliefSource'
+import { PointCloudSource } from './PointCloudSource'
 import type { HandGestureLog } from '@shared/types'
 
 /** A pointer on the picture (the mouse on the preview, a pinching hand), for a
@@ -82,7 +83,8 @@ const REGISTRY: Record<string, Factory> = {
   'gen-marble': (gl, w, h) => new MarbleSource(gl, w, h),
   'gen-sandplate': (gl, w, h) => new SandPlateSource(gl, w, h),
   'gen-fur': (gl, w, h) => new FurSource(gl, w, h),
-  'gen-relief': (gl, w, h) => new ReliefSource(gl, w, h)
+  'gen-relief': (gl, w, h) => new ReliefSource(gl, w, h),
+  'gen-pointcloud': (gl, w, h) => new PointCloudSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)

@@ -262,6 +262,10 @@ const CUSTOM = {
     const x0 = a.x + a.w * 0.3, y = bottom(b) + 30, x3 = b.x + b.w * 0.7
     return [smooth([[x0, bottom(a)], [x0, y], [x3, y], [x3, bottom(b) + 2]], 24), [(x0 + x3) / 2, y]]
   },
+  'picture-depth': (a, b) => { // up from under the picture band, under the two lanes, into a source from below
+    const x0 = a.x + a.w * 0.25, y = bottom(b) + 18, x3 = b.x + b.w * 0.5
+    return [smooth([[x0, a.y - 1], [x0, y], [x3, y], [x3, bottom(b) + 2]], 22), [(x0 + x3) / 2 + 30, y]]
+  },
   'osc-echo': (a, b) => { // over the top, right to left, into OSC in from the left
     const x0 = a.x + 30
     return [smooth([[x0, a.y], [x0, 40], [44, 40], [44, cy(b)], [b.x - 2, cy(b)]], 60), [900, 40]]

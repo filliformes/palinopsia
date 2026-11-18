@@ -445,6 +445,22 @@ methods are free to build on; naming them is a matter of respect.
   moving bands a little apart, so their edges split into color. Used in the flowing metal
   of `reliefShade.ts`; Palinopsia's bands are its own, driven by the real surface's
   reflection.
+- **Gather 聚 Lite** by DAO ("be of DAO", https://gather.be-of-dao.com), a free browser
+  instrument that turns pictures into a cloud of sand raised by a depth model. Its own code
+  carries no license, so only its ideas were taken:
+  - the picture as a depth-raised point cloud seen through an orbiting, swaying camera;
+  - the points thrown out on a hit and gathered back home on an eased arc;
+  - the grains past a drift line living short cycles, blown away and formed again, with a
+    ragged edge;
+  - the pointer's wake pushing the grains aside;
+  - the SCAN plane sweeping through the depth and lighting what it crosses.
+
+  They are behind the Point Cloud (`engine/PointCloudSource.ts`) and Depth Scan
+  (`engine/depthScanNode.ts`), both written for Palinopsia. No code was taken.
+- **Hex Composer** (https://hexcomposer.com; a closed, paid program, and its documentation
+  repository plmn95/hxc-docs has no license): its POINTCLOUD module, which draws a picture
+  as a 3D field of points with brightness or another picture as the depth, in square, round
+  or soft points. Behind the Point Cloud. Idea only, no code taken.
 - **Aural Mirror** by Remo DeVico
   (https://www.remodevicocomposer.eu/experimental-tools/aural-mirror/), an instrument that
   turns a painting into sound and musical structure. Four machines read the same picture

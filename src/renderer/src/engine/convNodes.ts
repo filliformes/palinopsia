@@ -21,6 +21,7 @@ import { RippleNode } from './rippleNode'
 import { DatamoshNode } from './datamoshNode'
 import { MorphogenNode } from './morphogenNode'
 import { CurrentNode } from './currentNode'
+import { DepthScanNode } from './depthScanNode'
 import { F_DOWNSAMPLE, F_FLOW, F_BLUR } from './pictureFlow'
 import { domeFill } from './domeSignal'
 // The dome's disc helpers, shared with the ISF shaders' "// @dome" (Feedback).
@@ -4756,9 +4757,10 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-ripple') return new RippleNode(gl)
   if (shaderId === 'node-reaction') return new MorphogenNode(gl)
   if (shaderId === 'node-fluid') return new CurrentNode(gl)
+  if (shaderId === 'node-depthscan') return new DepthScanNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-reaction', 'node-fluid', 'node-drape', 'node-touch', 'node-ripple', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette']
+export const NATIVE_NODE_IDS = ['node-reaction', 'node-fluid', 'node-drape', 'node-touch', 'node-ripple', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette', 'node-depthscan']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

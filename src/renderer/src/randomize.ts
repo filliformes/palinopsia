@@ -202,6 +202,10 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-fur': /^(tip|root|skin|markColor)$/,
   // Relief : its colors and ground go together (its presets).
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
+  // Point Cloud : the points carry the picture's colors on the house ground.
+  'gen-pointcloud': /^ground$/,
+  // Depth Scan : the plane's glow stays its preset's (a dark glow reads as a hole).
+  'node-depthscan': /^glow$/,
   // Noise : matte, never plasma. Focus is a blur (by hand only), the map, the
   // key, the seamless repeat and the tempo lock are uses, not looks, and the
   // tint stays the preset's.
@@ -356,7 +360,9 @@ const SELF_NODE_IDS = [
   'node-pulfrich', 'node-corrode', 'node-decimate', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile',
   // Sidechain recipes safe to draw blind (Remap and Matte can scramble or hide the
   // whole picture with an arbitrary sidechain, so they stay hand-placed).
-  'node-lumablur', 'node-gooey', 'node-lookup'
+  'node-lumablur', 'node-gooey', 'node-lookup',
+  // Depth Scan reads brightness without the depth engine, so it always draws
+  'node-depthscan'
 ]
 const SELF_NODES = NATIVE_NODES.filter((n) => SELF_NODE_IDS.includes(n.id))
 /** The effects a blind rack is dealt from (the convolution nodes join the layer rack). */

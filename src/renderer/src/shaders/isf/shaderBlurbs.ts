@@ -186,6 +186,8 @@ export const SHADER_BLURBS: Record<string, string> = {
     'Lets every part of the picture live at a different moment. It keeps a short history and then decides, pixel by pixel, how far back to look, driven by a sweep, by the image’s own brightness, or by another layer. One frame ends up containing many different presents.',
   'node-sediment':
     'A long memory: the brightest traces of everything that has passed sink slowly back toward black over seconds or minutes. It also stores occasional snapshots that can be brought back to the surface. Built for durational work, where the picture should carry where it has been.',
+  'node-depthscan':
+    'A plane sweeps through the depth of the picture and lights what it crosses, with a crisp contour where it meets the picture and a wake behind it; or only a band of depth is kept and the rest falls away, a depth matte. On the beat, by hand or on its own. With the depth engine on AI it reads the depth of the picture it is given; with depth off, its brightness.',
   'node-parallax':
     'Gives a flat image real depth: near things shift more than far things as the camera gently sways, with focus falling off and distance sinking into haze. It needs the depth engine switched on (the Performance tab, at the head of its picture section) to know what is near and what is far. With depth off it passes the picture through untouched.',
   'node-eternalism':

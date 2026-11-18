@@ -268,13 +268,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'gen-relief'
+            slot.shaderId === 'gen-pointcloud'
+              ? "The layer the cloud lifts into points, by SIDECHAIN : each point takes its color, and its depth (with depth: AI on, the model reads this layer itself, not the whole frame) or its brightness raises them. None = the cloud's own picture."
+              : slot.shaderId === 'gen-relief'
               ? 'A layer Relief reads, by SIDECHAIN : its colors in the strokes, reflected in the metal, or bent through the relief as through glass. Its moving things or its outlines can also draw the strokes (draws itself).'
               : slot.shaderId === 'gen-fur'
               ? 'A layer the coat reads, by SIDECHAIN : its colors on the hairs, or the hair growing only where it is bright, so letters or a silhouette come out furry.'
@@ -387,7 +389,7 @@ export function Inspector(): JSX.Element {
   // A piece that reads the shared depth map (Parallax, Pulfrich keyed on depth,
   // Luma Blur's depth focus) : what it does while the depth engine is off. The
   // note itself shows only while depth is off (DepthOffNote reads the store).
-  const depthNote = selection?.type === 'fx' && shaderId ? depthOffText(shaderId, values, modulated) : null
+  const depthNote = (selection?.type === 'fx' || selection?.type === 'source') && shaderId ? depthOffText(shaderId, values, modulated) : null
   const fxOpaBound = useBound(fxOpaTarget ? modTargetKey(fxOpaTarget) : null)
   // One shared assign-context value : the header's FX-opacity pill and the body's
   // parameter pills both toggle the same side panel (`assign`).
