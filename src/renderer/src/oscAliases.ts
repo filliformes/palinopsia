@@ -1,5 +1,6 @@
 // OSC aliases (the map table) : a controller's own address played onto an /opsia
-// address, scaled. Per computer. The router (oscInput.ts route) asks aliasesFor()
+// address, scaled. Per computer, or saved with the session (sessionOscAliases).
+// The router (oscInput.ts route) asks aliasesFor()
 // before OSC Learn, and an alias plays alongside a learned mapping of the same
 // address. An alias never starts with /opsia or /composition and always targets
 // /opsia, so it can never call itself.
@@ -48,15 +49,20 @@ export function saveOscAliases(list: OscAlias[]): void {
   }
 }
 
-let index: { list: OscAlias[]; by: Map<string, OscAlias[]> } | null = null
+let index: { list: OscAlias[]; session: OscAlias[]; by: Map<string, OscAlias[]> } | null = null
 
-/** The aliases on this address (on ones only). */
+/** The aliases on this address (on ones only) : the session's own, then this
+ *  computer's on the values the session's leave free (a session alias on an address
+ *  and value takes the place of the computer's there, as session mappings do). */
 export function aliasesFor(address: string): OscAlias[] | undefined {
-  const list = useStore.getState().oscAliases
-  if (!index || index.list !== list) {
+  const st = useStore.getState()
+  const list = st.oscAliases, session = st.sessionOscAliases
+  if (!index || index.list !== list || index.session !== session) {
     const by = new Map<string, OscAlias[]>()
-    for (const a of list) if (a.on) by.set(a.address, [...(by.get(a.address) ?? []), a])
-    index = { list, by }
+    const taken = new Set<string>()
+    for (const a of session) if (a.on) { by.set(a.address, [...(by.get(a.address) ?? []), a]); taken.add(`${a.address}|${a.arg}`) }
+    for (const a of list) if (a.on && !taken.has(`${a.address}|${a.arg}`)) by.set(a.address, [...(by.get(a.address) ?? []), a])
+    index = { list, session, by }
   }
   return index.by.get(address)
 }

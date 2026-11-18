@@ -8,7 +8,7 @@
 // file's `mappings`). The Macro knobs' CCs are neither : they stay on the knob
 // itself, in the composition (so the session and its scenes), as before.
 
-import type { MidiBinding, OscBinding, SessionMappings } from '@shared/types'
+import type { MidiBinding, OscAlias, OscBinding, SessionMappings } from '@shared/types'
 
 export function sanitizeMidiBinding(b: unknown): MidiBinding | null {
   const m = b as Partial<MidiBinding> | null
@@ -56,11 +56,12 @@ export const sanitizeOscMap = (raw: unknown): Record<string, OscBinding> => sani
 
 /** A session file's mappings, or nothing (both maps empty : the field is left
  *  out, so a session without any is the same file as before). */
-export function sessionMappingsOut(midi: Record<string, MidiBinding>, osc: Record<string, OscBinding>): SessionMappings | null {
+export function sessionMappingsOut(midi: Record<string, MidiBinding>, osc: Record<string, OscBinding>, aliases: OscAlias[] = []): SessionMappings | null {
   const hasMidi = Object.keys(midi).length > 0
   const hasOsc = Object.keys(osc).length > 0
-  if (!hasMidi && !hasOsc) return null
-  return { ...(hasMidi ? { midi } : {}), ...(hasOsc ? { osc } : {}) }
+  const hasAliases = aliases.length > 0
+  if (!hasMidi && !hasOsc && !hasAliases) return null
+  return { ...(hasMidi ? { midi } : {}), ...(hasOsc ? { osc } : {}), ...(hasAliases ? { aliases } : {}) }
 }
 
 export function sameMidiInput(a: MidiBinding, b: MidiBinding): boolean {

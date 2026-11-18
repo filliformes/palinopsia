@@ -18,6 +18,7 @@
 //   /opsia/layer{n}/source/{A|B}                       s shaderId | name | "none"
 //   /opsia/layer{n}/source/{A|B}/{input}              f 0..1 → range
 //   /opsia/layer{n}/source/{A|B}/fx/{i}/{input}       f 0..1 → range
+//   /opsia/layer{n}/source/{A|B}/preset               i n (1-based) | s name : recall one of the source's presets
 //   /opsia/layer{n}/source/{A|B}/drop                  f x f y [f size] : Marbling, a drop at (x, y) (0..1, y up; size × the drop size, default 1)
 //   /opsia/layer{n}/fx/{i}/{input}                    f 0..1 → range
 //   /opsia/layer{n}/video[/{A|B}]/play|loop|grain     >= 0.5 (slotless form: first video slot)
@@ -41,6 +42,7 @@
 //   /opsia/bg/randomize                                 trigger (the Background's own dice)
 //   /opsia/bg/source                                    s shaderId | name | "none"
 //   /opsia/bg/source/{input}                           f 0..1 → range (color/point2D: N args)
+//   /opsia/bg/source/preset                            i n (1-based) | s name : recall one of its presets
 //   /opsia/bg/source/drop                              f x f y [f size] : Marbling on the Background, a drop at (x, y)
 //   /opsia/bg/fx/{i}/{input}                           f 0..1 → range
 //   /opsia/density|proximity                            f 0..1 (field macros)
@@ -122,6 +124,7 @@ import { colorOf, hsvaOf, PART_INDEX, PART_OF_WORD, PART_WORD, withPart } from '
 import type { ColorChannel } from '@shared/types'
 import { modTargetKey, useStore } from './store'
 import { sendOsc, sendOscBatch, type OscArg } from './oscMonitor'
+import { PRESETS_BY_ID, type ShaderPreset } from './shaders/isf/presets'
 import { destsFor } from './oscDests'
 import { aliasesFor, aliasValue } from './oscAliases'
 import type { RandomizeScope } from './randomize'
@@ -222,6 +225,23 @@ function sourceInputs(li: number, slot: 'A' | 'B'): Record<string, number | numb
   const l = useStore.getState().composition.layers[li]
   return (slot === 'A' ? l?.sourceA : l?.sourceB)?.inputs
 }
+
+/** One of a source's presets : by its 1-based number (rounded, so a scaled value
+ *  lands on one) or by its name. */
+function presetOf(shaderId: string, args: OscArg[]): ShaderPreset | null {
+  const list = PRESETS_BY_ID[shaderId]
+  if (!list?.length) return null
+  const a0 = args[0]
+  if (typeof a0?.value === 'string') {
+    const n = String(a0.value).trim().toLowerCase()
+    return list.find((p) => p.name.toLowerCase() === n) ?? null
+  }
+  const v = typeof a0?.value === 'number' ? a0.value : NaN
+  if (!Number.isFinite(v)) return null
+  return list[Math.max(1, Math.min(list.length, Math.round(v))) - 1]
+}
+/** The preset each slot last recalled over OSC (so a repeat does not re-apply it). */
+const lastPreset = new Map<string, string>()
 
 function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
   const l = useStore.getState().composition.layers[li]
@@ -389,6 +409,16 @@ function route(address: string, args: Args, host = ''): void {
         const input = segs[5]
         const sid = sourceShaderId(li, slot)
         if (!sid) return
+        // one of the source's presets, by its number or its name (only on a change :
+        // a controller that repeats its switches' state does not re-apply it)
+        if (input === 'preset' && segs[6] === undefined) {
+          const p = presetOf(sid, args)
+          if (p && lastPreset.get(`L${li}${slot}`) !== `${sid}|${p.name}`) {
+            lastPreset.set(`L${li}${slot}`, `${sid}|${p.name}`)
+            for (const [k, v] of Object.entries(p.values)) st.setSourceInput(li, slot, k, v)
+          }
+          return
+        }
         // Marbling : a drop at a place (two numbers or more; one number is the plain trigger)
         if (input === 'drop' && args.length >= 2 && sourceEvent({ layer: li, slot }, 'drop', oscNums(args))) return
         const v = resolveOrPart(sid, input, segs[6], sourceInputs(li, slot)?.[input], args)
@@ -572,6 +602,14 @@ function route(address: string, args: Args, host = ''): void {
         }
         const sid = st.composition.background?.source?.shaderId
         if (!sid) return
+        if (segs[3] === 'preset' && segs[4] === undefined) {
+          const p = presetOf(sid, args)
+          if (p && lastPreset.get('bg') !== `${sid}|${p.name}`) {
+            lastPreset.set('bg', `${sid}|${p.name}`)
+            for (const [k, v] of Object.entries(p.values)) st.setBackgroundInput(k, v)
+          }
+          return
+        }
         if (segs[3] === 'drop' && args.length >= 2 && sourceEvent('bg', 'drop', oscNums(args))) return
         const v = resolveOrPart(sid, segs[3], segs[4], st.composition.background?.source?.inputs[segs[3]], args)
         if (v !== null) st.setBackgroundInput(segs[3], v)

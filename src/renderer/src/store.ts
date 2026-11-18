@@ -42,7 +42,7 @@ import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSe
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
 import { DF_DEFAULT_CONFIG, cleanPublish, type DfConfig } from '@shared/dataflou'
 import { loadOscDests, makeDest, saveOscDests, type OscDest } from './oscDests'
-import { loadOscAliases, saveOscAliases } from './oscAliases'
+import { cleanAlias, loadOscAliases, saveOscAliases } from './oscAliases'
 import { LOOP_BLENDS, LOOP_SYNCS, type LoopBlend } from '@shared/types'
 import { LOOP_DELAY_MAX_MS } from './engine/loopDelay'
 import { isLayerRackKind, LAYER_RACK_PROP, layerRackOf } from './layerRack'
@@ -801,8 +801,9 @@ function loadMidiMap(): Record<string, MidiBinding> {
 }
 
 // The session's own mappings, from a session file (none in an older file).
-function sessionMapsFrom(m: SessionMappings | undefined): { sessionMidiMap: Record<string, MidiBinding>; sessionOscMap: Record<string, OscBinding> } {
-  return { sessionMidiMap: sanitizeMidiMap(m?.midi), sessionOscMap: sanitizeOscMap(m?.osc) }
+function sessionMapsFrom(m: SessionMappings | undefined): { sessionMidiMap: Record<string, MidiBinding>; sessionOscMap: Record<string, OscBinding>; sessionOscAliases: OscAlias[] } {
+  const aliases = Array.isArray(m?.aliases) ? m!.aliases.map(cleanAlias).filter((a): a is OscAlias => !!a).slice(0, 256) : []
+  return { sessionMidiMap: sanitizeMidiMap(m?.midi), sessionOscMap: sanitizeOscMap(m?.osc), sessionOscAliases: aliases }
 }
 
 // The MIDI (or OSC) mappings of Body rules that are not there any more (a rule
@@ -2478,6 +2479,10 @@ interface StoreState {
   // OSC aliases (oscAliases.ts) : controller addresses played onto /opsia ones
   oscAliases: OscAlias[]
   setOscAliases: (list: OscAlias[]) => void
+  /** The session's own aliases (saved with it; on an address and value they take
+   *  the place of this computer's). */
+  sessionOscAliases: OscAlias[]
+  setSessionOscAliases: (list: OscAlias[]) => void
 
   // User shader presets : app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
@@ -6244,6 +6249,8 @@ export const useStore = create<StoreState>((set, get) => ({
       return { oscMuted }
     }),
   oscAliases: loadOscAliases(),
+  sessionOscAliases: [],
+  setSessionOscAliases: (list) => set({ sessionOscAliases: list.map(cleanAlias).filter((a): a is OscAlias => !!a).slice(0, 256) }),
   setOscAliases: (list) =>
     set(() => {
       const oscAliases = list.slice(0, 256)
@@ -6722,6 +6729,7 @@ export const useStore = create<StoreState>((set, get) => ({
         // no mappings of its own (this computer's keep playing)
         sessionMidiMap: {},
         sessionOscMap: {},
+        sessionOscAliases: [],
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -7075,7 +7083,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       // its own MIDI / OSC mappings, only when it has some (a session without
       // any is written as before, byte for byte)
-      ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap)),
+      ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap, s.sessionOscAliases)),
       ui: { theme: s.theme }
     }
   }

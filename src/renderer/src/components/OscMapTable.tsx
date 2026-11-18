@@ -44,6 +44,15 @@ function NumBox({ value, onCommit, w = 38, title }: { value: number; onCommit: (
 export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | null; onPrefillUsed?: () => void }): JSX.Element {
   const aliases = useStore((s) => s.oscAliases)
   const setAliases = useStore((s) => s.setOscAliases)
+  const sessionAliases = useStore((s) => s.sessionOscAliases)
+  const setSessionAliases = useStore((s) => s.setSessionOscAliases)
+  // each list by where it lives : this computer, or the session (saved with it)
+  const listOf = (scope: MappingScope): OscAlias[] => (scope === 'session' ? sessionAliases : aliases)
+  const setListOf = (scope: MappingScope, l: OscAlias[]): void => (scope === 'session' ? setSessionAliases(l) : setAliases(l))
+  const aliasRows: Array<{ a: OscAlias; scope: MappingScope }> = [
+    ...sessionAliases.map((a) => ({ a, scope: 'session' as const })),
+    ...aliases.map((a) => ({ a, scope: 'computer' as const }))
+  ]
   const oscMap = useStore((s) => s.oscMap)
   const sessionOscMap = useStore((s) => s.sessionOscMap)
   const setOscBinding = useStore((s) => s.setOscBinding)
@@ -67,14 +76,21 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
 
   // false when the edit is refused (an address under /opsia or /composition, a
   // target outside /opsia/) : the box then shows what is kept
-  const updAlias = (id: string, patch: Partial<OscAlias>): boolean => {
-    const cur = aliases.find((a) => a.id === id)
+  const updAlias = (id: string, patch: Partial<OscAlias>, scope: MappingScope = 'computer'): boolean => {
+    const list = listOf(scope)
+    const cur = list.find((a) => a.id === id)
     if (!cur) return false
     // picking where it plays starts it (a new alias waits, off, for this)
     const next = cleanAlias({ ...cur, ...patch, ...(patch.target !== undefined && patch.target !== cur.target ? { on: true } : {}) })
     if (!next) return false
-    setAliases(aliases.map((a) => (a.id === id ? next : a)))
+    setListOf(scope, list.map((a) => (a.id === id ? next : a)))
     return true
+  }
+  // an alias moved between this computer and the session
+  const moveAlias = (a: OscAlias, from: MappingScope): void => {
+    const to: MappingScope = from === 'session' ? 'computer' : 'session'
+    setListOf(from, listOf(from).filter((x) => x.id !== a.id))
+    setListOf(to, [...listOf(to), a])
   }
   // a learned range : refused when empty or flat, kept low to high (a reversed one
   // read as a switch, and a reload put it back the other way)
@@ -108,7 +124,7 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
           className="input min-w-[120px] flex-1 px-1 py-0.5 text-[10px]"
         />
         <button onClick={() => setShow({ ...show, aliases: !show.aliases })} className={chip(show.aliases)} title="Controller addresses mapped onto /opsia ones">
-          aliases {aliases.length}
+          aliases {aliasRows.length}
         </button>
         <button onClick={() => setShow({ ...show, learned: !show.learned })} className={chip(show.learned)} title="What OSC Learn learned">
           learned {learned.length}
@@ -120,48 +136,67 @@ export function OscMapTable({ prefill, onPrefillUsed }: { prefill?: string | nul
 
       {show.aliases && (
         <div className="flex min-w-0 flex-col gap-1">
-          {aliases
-            .filter((a) => hit(a.address, a.target))
-            .map((a) => (
-              <div key={a.id} className="flex min-w-0 flex-col gap-0.5 border-l-2 border-accent/40 pl-1">
+          {aliasRows
+            .filter(({ a }) => hit(a.address, a.target))
+            .map(({ a, scope }) => (
+              <div key={`${scope}|${a.id}`} className="flex min-w-0 flex-col gap-0.5 border-l-2 border-accent/40 pl-1">
                 <div className="flex min-w-0 items-center gap-1 font-mono text-[9px]">
                   <button
-                    onClick={() => updAlias(a.id, { on: !a.on })}
+                    onClick={() => updAlias(a.id, { on: !a.on }, scope)}
                     className={`shrink-0 rounded px-1 ${a.on ? 'bg-accent/20 text-accent' : 'bg-panel3 text-muted'}`}
                     title={a.on ? 'On : click to stop it' : 'Off : click to play it (a new alias starts once its target is picked)'}
                   >
                     ALIAS
                   </button>
-                  <AddrBox value={a.address} onCommit={(v) => updAlias(a.id, { address: v })} title="The controller's address (not /opsia)" />
+                  <AddrBox value={a.address} onCommit={(v) => updAlias(a.id, { address: v }, scope)} title="The controller's address (not /opsia)" />
                   <span className="shrink-0 text-muted">→</span>
-                  <AddrBox value={a.target} list="opsia-osc-leaves" onCommit={(v) => updAlias(a.id, { target: v })} title="The /opsia address it plays (type to search)" />
-                  <button onClick={() => setAliases(aliases.filter((x) => x.id !== a.id))} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Remove this alias">
+                  <AddrBox value={a.target} list="opsia-osc-leaves" onCommit={(v) => updAlias(a.id, { target: v }, scope)} title="The /opsia address it plays (type to search)" />
+                  <button
+                    onClick={() => moveAlias(a, scope)}
+                    className={`shrink-0 rounded px-1 ${scope === 'session' ? 'bg-accent2/15 text-accent2' : 'bg-panel3 text-muted'}`}
+                    title={scope === 'session' ? 'Saved with this session (on its address and value it takes the place of this computer\'s) : click to keep it on this computer instead' : 'Kept on this computer, for every session : click to save it with this session instead'}
+                  >
+                    {scope === 'session' ? 'SESSION' : 'PC'}
+                  </button>
+                  <button onClick={() => setListOf(scope, listOf(scope).filter((x) => x.id !== a.id))} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Remove this alias">
                     ✕
                   </button>
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-1 font-mono text-[9px] text-muted">
-                  arg <NumBox value={a.arg} w={30} onCommit={(v) => updAlias(a.id, { arg: v })} title="Which argument of the message (0 = the first)" />
-                  in <NumBox value={a.inMin} onCommit={(v) => updAlias(a.id, { inMin: v })} title="The controller's lowest value" />
-                  <NumBox value={a.inMax} onCommit={(v) => updAlias(a.id, { inMax: v })} title="The controller's highest value" />
-                  out <NumBox value={a.outMin} onCommit={(v) => updAlias(a.id, { outMin: v })} title="The value it sends at its lowest (0..1 for most controls)" />
-                  <NumBox value={a.outMax} onCommit={(v) => updAlias(a.id, { outMax: v })} title="The value it sends at its highest" />
-                  curve <NumBox value={a.curve} w={30} onCommit={(v) => updAlias(a.id, { curve: v })} title="1 linear · under 1 rises fast then slows · over 1 starts slow" />
-                  <button onClick={() => updAlias(a.id, { invert: !a.invert })} className={`rounded px-1 ${a.invert ? 'bg-accent/20 text-accent' : 'bg-panel3 text-muted'}`} title="Turn it the other way">
+                  arg <NumBox value={a.arg} w={30} onCommit={(v) => updAlias(a.id, { arg: v }, scope)} title="Which argument of the message (0 = the first)" />
+                  in <NumBox value={a.inMin} onCommit={(v) => updAlias(a.id, { inMin: v }, scope)} title="The controller's lowest value" />
+                  <NumBox value={a.inMax} onCommit={(v) => updAlias(a.id, { inMax: v }, scope)} title="The controller's highest value" />
+                  out <NumBox value={a.outMin} onCommit={(v) => updAlias(a.id, { outMin: v }, scope)} title="The value it sends at its lowest (0..1 for most controls)" />
+                  <NumBox value={a.outMax} onCommit={(v) => updAlias(a.id, { outMax: v }, scope)} title="The value it sends at its highest" />
+                  curve <NumBox value={a.curve} w={30} onCommit={(v) => updAlias(a.id, { curve: v }, scope)} title="1 linear · under 1 rises fast then slows · over 1 starts slow" />
+                  <button onClick={() => updAlias(a.id, { invert: !a.invert }, scope)} className={`rounded px-1 ${a.invert ? 'bg-accent/20 text-accent' : 'bg-panel3 text-muted'}`} title="Turn it the other way">
                     inv
                   </button>
                 </div>
               </div>
             ))}
-          <button
-            onClick={() => {
-              const a = cleanAlias({ address: '/1/fader1', target: '/opsia/meta/1', on: false })
-              if (a) setAliases([...aliases, a])
-            }}
-            className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-text"
-            title="Map a controller's address onto a Palinopsia address (or use map… in the connections view)"
-          >
-            + alias
-          </button>
+          <div className="flex gap-1">
+            <button
+              onClick={() => {
+                const a = cleanAlias({ address: '/1/fader1', target: '/opsia/meta/1', on: false })
+                if (a) setAliases([...aliases, a])
+              }}
+              className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-text"
+              title="Map a controller's address onto a Palinopsia address, on this computer for every session (or use map… in the connections view)"
+            >
+              + alias
+            </button>
+            <button
+              onClick={() => {
+                const a = cleanAlias({ address: '/1/fader1', target: '/opsia/meta/1', on: false })
+                if (a) setSessionAliases([...sessionAliases, a])
+              }}
+              className="self-start rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-text"
+              title="An alias saved with this session : it travels with the file, and on its address and value takes the place of this computer's"
+            >
+              + in session
+            </button>
+          </div>
         </div>
       )}
 

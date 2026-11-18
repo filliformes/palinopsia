@@ -4023,6 +4023,7 @@ another protocol and is not shown.
 | `…/vary` | trigger | **Vary** this layer : a variant at its own amount (its Vary button) |
 | `…/source/{A\|B}` | s | Set source shader (id / name; `none` empties the slot, `loop 2` plays layer 2's picture (the Loop source), a name it does not know leaves it as it is) |
 | `…/source/{A\|B}/{input}` | f · color · point2D | A source shader input |
+| `…/source/{A\|B}/preset` | i · s | Recall one of the source's presets : its number (1 = the first; a scaled value is rounded) or its name. Only on a change (a controller repeating its switches does not re-apply it) |
 | `…/source/{A\|B}/drop` | f f [f] | **Marbling** : a drop at (x, y), 0..1 of the frame (y up), its size × the drop size (default 1). Live, not logged. One number is the plain `drop ▸` trigger |
 | `…/source/{A\|B}/fx/{i}/{input}` | f · color · point2D | A Source-FX unit input |
 | `…/fx/{i}/{input}` | f · color · point2D | A Layer-FX unit input |
@@ -4066,6 +4067,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `bg/blend` | bool → **group** (≥ 0.5) else **blend in** |
 | `bg/randomize` | trigger : the Background's own dice |
 | `bg/source` · `bg/source/{input}` · `bg/fx/{i}/{input}` | Background source (a ground's id or name, or `none`; anything else is ignored) / its inputs / FX inputs |
+| `bg/source/preset` | Recall one of the Background source's presets, by number or name |
 | `bg/source/drop` | **Marbling** on the Background : `f x f y [f size]`, a drop at a place |
 
 **Coupling master switch** : `/opsia/coupling` (≥ 0.5 : every layer's A/B coupling on; below : paused).
@@ -4195,10 +4197,13 @@ The lists are kept only while links or the monitor is open.
 **map** is every address Palinopsia answers to, in one table with a filter:
 - **Aliases** are a controller's own addresses played onto any `/opsia` address, so they
   reach everything, effect and source inputs included. Each takes the argument number,
-  the controller's range, the output range, a curve and invert. They are kept per
-  computer, and an alias plays alongside a learned mapping of the same address. A new
-  alias (**+ alias**, or **map…** in links) starts off, and plays once you pick its
-  target. An address under `/opsia` or `/composition`, or a target outside `/opsia/`, is
+  the controller's range, the output range, a curve and invert. They are kept on this
+  computer (**PC**) or saved with the session (**SESSION** : **+ in session**, or click a
+  row's **PC** to move it into the session and back); on an address and argument, the
+  session's alias takes the place of the computer's, so a session made for one
+  controller carries its whole mapping. An alias plays alongside a learned mapping of
+  the same address. A new alias (**+ alias**, **+ in session**, or **map…** in links)
+  starts off, and plays once you pick its target. An address under `/opsia` or `/composition`, or a target outside `/opsia/`, is
   refused (the box flashes and shows what still plays).
 - **What OSC Learn learned**, with its input range editable (kept low to high; a flat
   range is refused) and a ✕ to forget it.

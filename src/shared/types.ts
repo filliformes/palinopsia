@@ -1090,6 +1090,9 @@ export type MappingScope = 'computer' | 'session'
 export interface SessionMappings {
   midi?: Record<string, MidiBinding>
   osc?: Record<string, OscBinding>
+  /** The session's own OSC aliases (the map table's, saved with the session) : on
+   *  an address and value they take the place of this computer's. */
+  aliases?: OscAlias[]
 }
 
 export interface MetaKnobState {

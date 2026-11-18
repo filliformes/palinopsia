@@ -7,6 +7,19 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The OCTOCOSME session** (`docs/sessions/octocosme-one-controller.opsia.json`, explained
+  in `docs/sessions/OCTOCOSME.md`) : one OCTOCOSME controller plays four Grid Mesh shapes,
+  the patch's mesh layout, a master rack standing in for its Resolume stage, and the
+  controller's whole mapping saved in the session (48 aliases, from the patch's DataScale
+  ranges). Checked by playing the controller's messages to the app.
+- **Presets over OSC** : `/opsia/layer{n}/source/{A|B}/preset` and `/opsia/bg/source/preset`
+  recall a source's preset by number or name (only on a change).
+- **OSC aliases saved with the session** : the map table's aliases can live on this computer
+  (**PC**) or in the session (**SESSION**, **+ in session**, one click to move one); on an
+  address and argument the session's takes the place of the computer's, as session
+  mappings do. The session file's `mappings.aliases`.
+- **Grid Mesh looks keep the shape's place** : the OCTOCOSME presets no longer carry x and y.
+
 - **Grid Mesh, a new 3D source** (`engine/GridMeshSource.ts`, `engine/gridMesh.ts`), beside
   Model, made to play the OCTOCOSME visuals:
   - a shape built as a grid of vertices (ten shapes, grid x × y), deformed by a still noise
