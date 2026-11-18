@@ -7,6 +7,30 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The Model and Grid Mesh in hand** (`pointerInput.ts`, `engine/heldObject.ts`) : a
+  drag on the preview turns the object under the cursor in any direction (a trackball
+  round the screen's axes), the wheel over it changes its **distance** (12 % a notch,
+  trackpad deltas in proportion, clamped to the slider's range, on the base value so a
+  modulator keeps swinging round it).
+  - The hold is a hidden `orient` input (a unit quaternion) saved with the slot : the
+    outermost turn, in the camera's axes, so spin, turn, tilt and roll all run inside it
+    and none of them is rewritten (Euler angles would jump through the gimbal and fight a
+    modulator). Absent it is no turn, bit for bit : the eight OCTOCOSME presets render
+    identically before and after (0 differing pixels each). Presets and the reset (↺)
+    put it back at rest; your own presets save it.
+  - Hit test : each engine fills a coarse cover of the frame (128 cells across) from its
+    last frame's own projection, at most every 120 ms and only while a pointer is over the
+    preview (the Model reads at most 150K triangles of a dense file), so the wheel and the
+    drag act only on the object actually under the cursor, through the keystone, the
+    output transform and the dome.
+  - On the object the hand comes before everything (a Master FX Slick or Drape, a
+    selected effect); two overlapping objects : the selected one, else the top. A click
+    that never moves goes on release to whatever takes the click without the object.
+  - One undo step per drag (written live while it moves, one edit on release, so a pause
+    mid-drag never splits it) and per run of wheel notches. Body pinches turn it live.
+  - With an object on the picture the wheel never scrolls the page from the preview;
+    Ctrl + wheel stays the UI zoom. Cursor : grab / grabbing; the corner hint names it.
+  - Measured on the RTX 4070 test copy : 60 fps still, during a drag and on the 4096 dome.
 - **Grid Mesh, a general source** (it was built for the OCTOCOSME show) :
   - **joined to the instrument** : **skin** (the layer picked as its sidechain, **wrapped**
     by the grid's s, t, which the noise multiplies too so the picture tears with the

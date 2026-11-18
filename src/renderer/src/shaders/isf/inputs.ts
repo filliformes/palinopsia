@@ -7,6 +7,7 @@
 
 import { SHADER_BY_ID } from './index'
 import { INPUT_HINTS } from './inputHints'
+import { HELD_AT_REST } from '../../engine/heldObject'
 
 export interface IsfInputDesc {
   name: string
@@ -147,5 +148,7 @@ export function defaultInputs(shaderId: string): Record<string, number | number[
     else if (d.type === 'point2D') out[d.name] = Array.isArray(d.min) ? [...d.min] : [0.5, 0.5]
     else out[d.name] = typeof d.min === 'number' ? d.min : 0
   }
+  // (a 3D object's hidden hold, back at rest : engine/heldObject.ts)
+  for (const [k, v] of Object.entries(HELD_AT_REST[shaderId] ?? {})) out[k] = [...v]
   return out
 }

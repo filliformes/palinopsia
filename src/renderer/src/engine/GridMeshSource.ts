@@ -39,6 +39,7 @@ import { domeFill } from './domeSignal'
 import {
   PLANES, buildGridShape, deformGrid, gridNormals, noiseField, primitives, transformGrid, type Primitives
 } from './gridMesh'
+import { HitCover, isNoTurn, quatIn, quatMat4 } from './heldObject'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -348,6 +349,14 @@ export class GridMeshSource implements NativeGenerator {
   private nSeg = 0
   private nPt = 0
   private stat = ''
+  // where each vertex fell on screen last frame (clip space, and its w), kept for the
+  // hand (pointerInput.ts) : what the mesh covers
+  private hx = new Float32Array(0)
+  private hy = new Float32Array(0)
+  private hw = new Float32Array(0)
+  private hn = 0
+  private hPtR = 0
+  private cover = new HitCover()
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     const g = (this.g = new EngineGL(gl, 'gridmesh'))
@@ -544,7 +553,11 @@ export class GridMeshSource implements NativeGenerator {
     const S = m4(); S[0] = S[5] = S[10] = size
     const dist = Math.max(0.1, num(I, 'distance', 22)) * (fill ? 1.5 : 1)
     const T = m4(); T[12] = num(I, 'posX', 0); T[13] = num(I, 'posY', 0); T[14] = -dist
-    const R = mul4(mul4(rotX(num(I, 'tilt', 0) * D), rotY(num(I, 'turn', 0) * D)), rotZ(num(I, 'roll', 0) * D))
+    const R0 = mul4(mul4(rotX(num(I, 'tilt', 0) * D), rotY(num(I, 'turn', 0) * D)), rotZ(num(I, 'roll', 0) * D))
+    // how the hand holds it (dragged on the preview) : the outermost turn, in the
+    // camera's own axes, round its center (the lights stay where they are)
+    const held = quatIn(I['orient'])
+    const R = isNoTurn(held) ? R0 : mul4(quatMat4(held), R0)
     const MV = mul4(T, mul4(R, S))
     const asp = fill ? 1 : this.w / Math.max(1, this.h)
     const fov = Math.max(1, Math.min(170, num(I, 'lens', 15))) * D
@@ -562,7 +575,10 @@ export class GridMeshSource implements NativeGenerator {
     const prim = this.prim
     const polyF = Math.round(num(I, 'polyFront', POLY_FILL)), polyB = Math.round(num(I, 'polyBack', POLY_FILL))
     const n = nx * ny
-    const sx = new Float32Array(n), sy = new Float32Array(n)
+    if (this.hx.length < n) { this.hx = new Float32Array(n); this.hy = new Float32Array(n); this.hw = new Float32Array(n) }
+    const sx = this.hx, sy = this.hy, sws = this.hw
+    this.hn = n
+    this.hPtR = (Math.max(1, num(I, 'pointSize', 4)) / 1080) * 0.5
     let reach2 = 0 // the mesh's reach from its center, squared (for its depth's range)
     for (let k = 0; k < n; k++) {
       const o = k * PLANES, x = grid[o], y = grid[o + 1], z = grid[o + 2]
@@ -570,6 +586,7 @@ export class GridMeshSource implements NativeGenerator {
       if (r2 > reach2) reach2 = r2
       const sw = MVP[3] * x + MVP[7] * y + MVP[11] * z + MVP[15]
       const iw = Math.abs(sw) > 1e-6 ? 1 / sw : 0
+      sws[k] = sw
       sx[k] = (MVP[0] * x + MVP[4] * y + MVP[8] * z + MVP[12]) * iw
       sy[k] = (MVP[1] * x + MVP[5] * y + MVP[9] * z + MVP[13]) * iw
     }
@@ -734,6 +751,29 @@ export class GridMeshSource implements NativeGenerator {
     g.bind(0, this.pic!.tex)
     g.draw(targetFbo, this.w, this.h)
     g.done(4)
+  }
+
+  /** Is the frame point (u, v : 0..1, v up) on the mesh as it drew its last frame
+   *  (pointerInput.ts : the hand grabs what is under it, the wheel zooms it). Every
+   *  triangle its draw mode makes counts (whether drawn filled, as lines or points :
+   *  a wireframe is held by its whole shape), and its lines and points. */
+  hitTest(u: number, v: number): boolean {
+    const prim = this.prim
+    if (!prim || !this.hn) return false
+    if (this.cover.stale()) {
+      const c = this.cover, x = this.hx, y = this.hy, w = this.hw
+      c.begin(this.w / Math.max(1, this.h))
+      const ok = (k: number): boolean => k < this.hn && w[k] > 1e-3
+      const T = prim.tris
+      for (let t = 0; t + 2 < T.length; t += 3) {
+        const a = T[t], b = T[t + 1], d = T[t + 2]
+        if (ok(a) && ok(b) && ok(d)) c.tri(x[a], y[a], x[b], y[b], x[d], y[d])
+      }
+      const S = prim.segs
+      for (let t = 0; t + 1 < S.length; t += 2) if (ok(S[t]) && ok(S[t + 1])) c.seg(x[S[t]], y[S[t]], x[S[t + 1]], y[S[t + 1]])
+      for (const k of prim.pts) if (ok(k)) c.dot(x[k], y[k], this.hPtR)
+    }
+    return this.cover.hit(u, v)
   }
 
   dispose(): void {

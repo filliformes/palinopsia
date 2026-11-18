@@ -66,6 +66,10 @@ export interface NativeGenerator {
   pointerHint?(): string
   /** A short line on its state (drops, points) for the hint. */
   status?(): string
+  /** Optional : a 3D object the hand can hold (the Model, Grid Mesh) : is the frame
+   *  point (u, v : 0..1, v up) on it as it drew its last frame. pointerInput.ts then
+   *  turns it by a drag (its hidden `orient` input) and zooms it by the wheel. */
+  hitTest?(u: number, v: number): boolean
   /** A remote event (OSC, an action) : a name and its numbers. */
   event?(name: string, args: number[]): void
   /** Optional : the file the slot plays (the Model's model), and the files beside it

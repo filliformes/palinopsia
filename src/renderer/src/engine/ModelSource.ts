@@ -62,6 +62,7 @@ import { buildShape, prepareMesh, SHAPE_FILE, SHAPES, type MeshData } from './mo
 import { modelLoader } from './modelLoad'
 import { Onset } from './touchInput'
 import { soniBar, soniBeats } from '../audio/soniClock'
+import { HitCover, isNoTurn, quatIn, quatMat4 } from './heldObject'
 
 // ── Shared GLSL : the noise the wobble and the soap film read ───────────────────
 const NOISE = `
@@ -848,6 +849,12 @@ export class ModelSource implements NativeGenerator {
   private ptDepthShP_: Prog | null = null
   private dustP_: Prog | null = null
   private dustLineP_: Prog | null = null
+  // what it covers, for the hand (pointerInput.ts) : the last frame's projection
+  private cover = new HitCover()
+  private seen: { mvp: Float32Array; off: [number, number]; ptR: number } | null = null
+  private cpx = new Float32Array(0)
+  private cpy = new Float32Array(0)
+  private cok = new Uint8Array(0)
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     const g = (this.g = new EngineGL(gl, 'model'))
@@ -1255,7 +1262,11 @@ export class ModelSource implements NativeGenerator {
     const scale = Math.max(0.05, num(I, 'scale', 1)) * (1 + 0.3 * this.bass)
     const wob = Math.max(0, num(I, 'wobble', 0)) + this.mids * 0.6
     this.wobT = (this.wobT + dt * Math.max(0, num(I, 'wobbleSpeed', 0.3)) * 1.2) % 64
-    const M = mul4(mul4(mul4(rotX(num(I, 'tilt', 0.1) * Math.PI + this.ax), rotY(num(I, 'turn', 0) * Math.PI + this.ay)), rotZ(num(I, 'roll', 0) * Math.PI + this.az)), (() => { const s = m4(); s[0] = s[5] = s[10] = scale; return s })())
+    const M0 = mul4(mul4(mul4(rotX(num(I, 'tilt', 0.1) * Math.PI + this.ax), rotY(num(I, 'turn', 0) * Math.PI + this.ay)), rotZ(num(I, 'roll', 0) * Math.PI + this.az)), (() => { const s = m4(); s[0] = s[5] = s[10] = scale; return s })())
+    // how the hand holds it (dragged on the preview) : the outermost turn, in the
+    // camera's own axes, so its spin, turn, tilt and roll all happen in the hand
+    const held = quatIn(I['orient'])
+    const M = isNoTurn(held) ? M0 : mul4(quatMat4(held), M0)
     // under full-dome fill it stands back, framed in the middle, clear of the rim
     const dist = Math.max(0.5, num(I, 'distance', 4)) * (fill ? 1.7 : 1)
     const V = m4(); V[14] = -dist
@@ -1271,6 +1282,7 @@ export class ModelSource implements NativeGenerator {
     P[0] = f / asp; P[5] = f; P[10] = (far + near) / (near - far); P[11] = -1; P[14] = (2 * far * near) / (near - far)
     const NM = new Float32Array([MV[0] / scale, MV[1] / scale, MV[2] / scale, MV[4] / scale, MV[5] / scale, MV[6] / scale, MV[8] / scale, MV[9] / scale, MV[10] / scale])
     const off: [number, number] = [num(I, 'posX', 0), num(I, 'posY', 0)]
+    this.seen = { mvp: mul4(P, MV), off, ptR: (Math.max(0.3, num(I, 'pointSize', 2.5)) / 1080) * 0.5 }
     // the depth of the shape's own reach : its front white, its back black
     const near0 = dist - reach, far0 = dist + reach
 
@@ -1453,6 +1465,47 @@ export class ModelSource implements NativeGenerator {
     g.bind(0, this.pic!.tex)
     g.draw(targetFbo, this.w, this.h)
     g.done(sh ? 8 : 4)
+  }
+
+  /** Is the frame point (u, v : 0..1, v up) on the object as it drew its last frame
+   *  (pointerInput.ts : the hand grabs what is under it, the wheel zooms it). The
+   *  cover is filled from the mesh's own vertices through that frame's projection,
+   *  at most every 120 ms, a dense mesh read one triangle in a few (its triangles
+   *  are far smaller than a cell). Its wobble and flying shards are left out. */
+  hitTest(u: number, v: number): boolean {
+    const gp = this.gpu, s = this.seen
+    if (!gp || !s) return false
+    if (this.cover.stale()) this.fillCover(gp, s)
+    return this.cover.hit(u, v)
+  }
+
+  private fillCover(gp: GpuMesh, s: { mvp: Float32Array; off: [number, number]; ptR: number }): void {
+    const c = this.cover
+    c.begin(this.w / Math.max(1, this.h))
+    const pos = gp.mesh.pos, n = pos.length / 3, m = s.mvp
+    if (this.cpx.length < n) { this.cpx = new Float32Array(n); this.cpy = new Float32Array(n); this.cok = new Uint8Array(n) }
+    const px = this.cpx, py = this.cpy, ok = this.cok
+    for (let k = 0; k < n; k++) {
+      const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]
+      const w = m[3] * x + m[7] * y + m[11] * z + m[15]
+      if (w < 1e-3) { ok[k] = 0; continue }
+      ok[k] = 1
+      px[k] = (m[0] * x + m[4] * y + m[8] * z + m[12]) / w + s.off[0]
+      py[k] = (m[1] * x + m[5] * y + m[9] * z + m[13]) / w + s.off[1]
+    }
+    const idx = gp.mesh.idx
+    const BUDGET = 150000
+    if (idx && idx.length) {
+      const nT = idx.length / 3
+      const step = Math.max(1, Math.ceil(nT / BUDGET))
+      for (let t = 0; t < nT; t += step) {
+        const a = idx[t * 3], b = idx[t * 3 + 1], d = idx[t * 3 + 2]
+        if (ok[a] && ok[b] && ok[d]) c.tri(px[a], py[a], px[b], py[b], px[d], py[d])
+      }
+    } else {
+      const step = Math.max(1, Math.ceil(n / BUDGET))
+      for (let k = 0; k < n; k += step) if (ok[k]) c.dot(px[k], py[k], s.ptR)
+    }
   }
 
   dispose(): void {

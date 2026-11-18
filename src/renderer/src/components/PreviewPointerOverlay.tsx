@@ -14,7 +14,7 @@ export default function PreviewPointerOverlay({ canvasRef }: { canvasRef: React.
     setStatus(hintStatus())
     const id = window.setInterval(() => setStatus(hintStatus()), 300)
     return () => window.clearInterval(id)
-  }, [v.hint])
+  }, [v.hint, v.where]) // (two objects share one hint : the place tells them apart)
   const cv = canvasRef.current
   const dots = cv
     ? v.cursors.map((c) => ({ c, p: frameToCanvasPx(cv, c.u, c.v) })).filter((d): d is { c: typeof d.c; p: [number, number] } => !!d.p)
