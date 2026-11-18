@@ -17,6 +17,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { effectiveZoom } from './uiZoom'
 import { ownerWindow } from './ownerWindow'
+import { is3D, THREE_D_TITLE } from '../shaders/isf/threeD'
 
 export interface SearchOption {
   value: string
@@ -99,7 +100,7 @@ export function SearchSelect({
   const query = q.trim().toLowerCase()
   const groups = useMemo(() => {
     const scored = options
-      .map((o, i) => ({ o, i, s: searchScore(o, query) }))
+      .map((o, i) => ({ o, i, s: searchScore(is3D(o.value) ? { ...o, keywords: [...(o.keywords ?? []), '3d'] } : o, query) }))
       .filter((x): x is { o: SearchOption; i: number; s: number } => x.s !== null)
     const byGroup = new Map<string, { o: SearchOption; i: number; s: number }[]>()
     for (const x of scored) {
@@ -265,6 +266,16 @@ export function SearchSelect({
                     >
                       {o.prefix}
                       {o.label}
+                      {/* the 3D pieces (threeD.ts) : a fixed blue in every theme */}
+                      {is3D(o.value) && (
+                        <span
+                          title={THREE_D_TITLE}
+                          className="ml-1.5 rounded-sm px-[3px] align-[1px] font-mono text-[8.5px] font-semibold leading-none"
+                          style={{ color: 'rgb(56 182 255)', background: 'rgb(56 182 255 / 0.14)', boxShadow: 'inset 0 0 0 1px rgb(56 182 255 / 0.45)' }}
+                        >
+                          3D
+                        </span>
+                      )}
                     </button>
                   )
                 })}
