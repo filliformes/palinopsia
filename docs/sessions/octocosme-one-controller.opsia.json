@@ -1,0 +1,4099 @@
+{
+ "version": 1,
+ "name": "OCTOCOSME · one controller",
+ "composition": {
+  "layers": [
+   {
+    "id": "676ac5f5-554c-4b1b-85c8-dded21e9c48a",
+    "sourceA": {
+     "kind": "generator",
+     "shaderId": "gen-gridmesh",
+     "inputs": {
+      "shape": 9,
+      "dimX": 40,
+      "dimY": 40,
+      "drawMode": 0,
+      "polyFront": 0,
+      "polyBack": 0,
+      "lineWidth": 1,
+      "pointSize": 12.7,
+      "noiseBasis": 6,
+      "noiseBlend": 0,
+      "noiseScale": 0.87,
+      "noiseSize": 1,
+      "noiseGrid": 20,
+      "noiseX": 0,
+      "noiseY": 0,
+      "noiseZ": 0,
+      "noiseFlip": 0,
+      "noiseStill": 1,
+      "noiseColor": 1,
+      "autoNormals": 1,
+      "spinAxes": 0,
+      "spinSpeed": 10,
+      "shapeRotX": 0,
+      "shapeRotY": 0,
+      "shapeRotZ": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "scaleZ": 1,
+      "size": 1,
+      "tilt": 0,
+      "turn": 0,
+      "roll": 0,
+      "distance": 22,
+      "lens": 10,
+      "color": [
+       0.431,
+       0,
+       0.788,
+       1
+      ],
+      "lighting": 1,
+      "diffuseModel": 0,
+      "specularModel": 0,
+      "specularColor": [
+       0.239,
+       0,
+       0.38,
+       1
+      ],
+      "shininess": 2.55,
+      "emission": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "ambientColor": [
+       0,
+       0,
+       0,
+       1
+      ],
+      "roughness": 0,
+      "darkness": 0,
+      "toonDiffSize": 0,
+      "toonDiffSmooth": 0,
+      "toonSpecSize": 0,
+      "toonSpecSmooth": 0,
+      "light1Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light1Az": 81.2,
+      "light1El": 0,
+      "light2Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light2Az": 0,
+      "light2El": -16,
+      "ambient": 0.2,
+      "blendOn": 1,
+      "blendSrc": 6,
+      "blendDst": 5,
+      "depthTest": 1,
+      "level": 1,
+      "posX": -2.5
+     }
+    },
+    "sourceB": {
+     "kind": "generator",
+     "shaderId": "organic",
+     "inputs": {
+      "mode": 0,
+      "rate": 1.048558852490789,
+      "scale": 3.1183381549069704,
+      "detail": 0.7438535874030439,
+      "flow": 0.3926636737343683,
+      "swirl": 0.2236802467195995,
+      "depth": 0.5180875847295079,
+      "embers": 0.3678699146107228,
+      "vary": 0.050985798548253414,
+      "contrast": 1.363100494431233
+     }
+    },
+    "sourceAFx": [
+     {
+      "id": "0931c0db-e586-447e-b559-13f8ffe2ee67",
+      "shaderId": "node-melt",
+      "enabled": true,
+      "inputs": {
+       "amount": 0.49447856225348236,
+       "width": 0.15240327514710428,
+       "dir": -0.12029930620512064,
+       "gate": 0.3218784782548445,
+       "mix": 0.8684140482984788
+      },
+      "sidechain": {
+       "kind": "layer",
+       "layer": 0
+      }
+     }
+    ],
+    "sourceBFx": [
+     {
+      "id": "db4f8913-3602-4760-89b4-0a469973d9bf",
+      "shaderId": "node-lookup",
+      "enabled": true,
+      "inputs": {
+       "index": 0,
+       "axis": 0,
+       "position": 0.6897630004784878,
+       "band": 0.1382985424528774,
+       "offset": 0.3109296259409443,
+       "cycles": 0.7804138468166901,
+       "gamma": 1.1982127879815136,
+       "mirror": 1,
+       "mix": 0.7812710025158915
+      }
+     }
+    ],
+    "fx": [
+     {
+      "id": "b0295e64-6df1-4b1d-a337-245db9bbd1f2",
+      "shaderId": "node-reponse",
+      "enabled": true,
+      "inputs": {
+       "length": 9.504150473212675,
+       "decay": 0.31098017885958434,
+       "attack": 0.11015498042720183,
+       "gain": 0.7843261275006206,
+       "reverse": 0,
+       "stride": 1.3123566550156078,
+       "mix": 0.5731518231226771
+      },
+      "sidechain": {
+       "kind": "layer",
+       "layer": 1
+      }
+     }
+    ],
+    "loopFx": [
+     {
+      "id": "9e1faa20-4d10-44d9-afb2-7c6fdb89a5bc",
+      "shaderId": "fx-transform",
+      "enabled": true,
+      "inputs": {
+       "zoom": 1.008,
+       "wrap": 0
+      }
+     }
+    ],
+    "blend": "normal",
+    "opacity": 1,
+    "mute": false,
+    "solo": false,
+    "feedback": true,
+    "feedbackAmount": 0.75,
+    "sourceMix": 0.4705915529299755,
+    "sourceBlend": "wrap",
+    "harmony": 0,
+    "speed": 1,
+    "coupling": {
+     "mode": "lean",
+     "amount": 0.5,
+     "tightness": 0.7,
+     "feature": "flux"
+    },
+    "mask": {
+     "mode": 0,
+     "invert": false,
+     "soft": 0.1,
+     "lumaLo": 0.2,
+     "lumaHi": 1,
+     "angle": 0,
+     "pos": 0.5,
+     "cx": 0.5,
+     "cy": 0.5,
+     "size": 0.4,
+     "aspect": 1,
+     "round": 1
+    },
+    "loopDelay": 0,
+    "loopSync": 0,
+    "loopBlend": "multiply"
+   },
+   {
+    "id": "586bcae8-307c-4b84-b738-beeb5b6cd470",
+    "sourceA": {
+     "kind": "generator",
+     "shaderId": "gen-gridmesh",
+     "inputs": {
+      "shape": 8,
+      "dimX": 60,
+      "dimY": 20,
+      "drawMode": 4,
+      "polyFront": 0,
+      "polyBack": 0,
+      "lineWidth": 10,
+      "pointSize": 1,
+      "noiseBasis": 1,
+      "noiseBlend": 0,
+      "noiseScale": 0.069,
+      "noiseSize": 1,
+      "noiseGrid": 20,
+      "noiseX": 0,
+      "noiseY": 0,
+      "noiseZ": 0,
+      "noiseFlip": 0,
+      "noiseStill": 1,
+      "noiseColor": 1,
+      "autoNormals": 1,
+      "spinAxes": 0,
+      "spinSpeed": 10,
+      "shapeRotX": 0,
+      "shapeRotY": 0,
+      "shapeRotZ": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "scaleZ": 1,
+      "size": 1,
+      "tilt": 0,
+      "turn": 0,
+      "roll": 0,
+      "distance": 22,
+      "lens": 10,
+      "color": [
+       0,
+       1,
+       0.275,
+       1
+      ],
+      "lighting": 1,
+      "diffuseModel": 3,
+      "specularModel": 1,
+      "specularColor": [
+       0.663,
+       1,
+       0.263,
+       1
+      ],
+      "shininess": 1.027,
+      "emission": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "ambientColor": [
+       0,
+       0,
+       0,
+       1
+      ],
+      "roughness": 0,
+      "darkness": 0,
+      "toonDiffSize": 0,
+      "toonDiffSmooth": 0,
+      "toonSpecSize": 0,
+      "toonSpecSmooth": 0,
+      "light1Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light1Az": 81.2,
+      "light1El": 0,
+      "light2Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light2Az": 0,
+      "light2El": -16,
+      "ambient": 0.2,
+      "blendOn": 1,
+      "blendSrc": 6,
+      "blendDst": 5,
+      "depthTest": 1,
+      "level": 1,
+      "posX": -0.85
+     }
+    },
+    "sourceB": null,
+    "sourceAFx": [],
+    "sourceBFx": [],
+    "fx": [],
+    "loopFx": [],
+    "blend": "difference",
+    "opacity": 1,
+    "mute": false,
+    "solo": false,
+    "feedback": false,
+    "feedbackAmount": 0.6,
+    "sourceMix": 0.5,
+    "sourceBlend": "normal",
+    "harmony": 0,
+    "speed": 1,
+    "coupling": {
+     "mode": "lean",
+     "amount": 0.5,
+     "tightness": 0.7,
+     "feature": "flux"
+    },
+    "mask": {
+     "mode": 0,
+     "invert": false,
+     "soft": 0.1,
+     "lumaLo": 0.2,
+     "lumaHi": 1,
+     "angle": 0,
+     "pos": 0.5,
+     "cx": 0.5,
+     "cy": 0.5,
+     "size": 0.4,
+     "aspect": 1,
+     "round": 1
+    }
+   },
+   {
+    "id": "f996ebdf-12ea-4f9b-a9d0-78d0b372ba05",
+    "sourceA": {
+     "kind": "generator",
+     "shaderId": "gen-gridmesh",
+     "inputs": {
+      "shape": 6,
+      "dimX": 50,
+      "dimY": 50,
+      "drawMode": 4,
+      "polyFront": 0,
+      "polyBack": 0,
+      "lineWidth": 1.1,
+      "pointSize": 14,
+      "noiseBasis": 9,
+      "noiseBlend": 0,
+      "noiseScale": 3.709,
+      "noiseSize": 1,
+      "noiseGrid": 20,
+      "noiseX": 0,
+      "noiseY": 0,
+      "noiseZ": 0,
+      "noiseFlip": 0,
+      "noiseStill": 1,
+      "noiseColor": 1,
+      "autoNormals": 1,
+      "spinAxes": 0,
+      "spinSpeed": 10,
+      "shapeRotX": 0,
+      "shapeRotY": 0,
+      "shapeRotZ": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "scaleZ": 1,
+      "size": 1,
+      "tilt": 0,
+      "turn": 0,
+      "roll": 0,
+      "distance": 22,
+      "lens": 10,
+      "color": [
+       0.436,
+       0.365,
+       0.015,
+       1
+      ],
+      "lighting": 1,
+      "diffuseModel": 2,
+      "specularModel": 2,
+      "specularColor": [
+       0.444,
+       0.562,
+       1,
+       1
+      ],
+      "shininess": 1.1,
+      "emission": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "ambientColor": [
+       0,
+       0,
+       0,
+       1
+      ],
+      "roughness": 0,
+      "darkness": 0,
+      "toonDiffSize": 0.11,
+      "toonDiffSmooth": 0.274,
+      "toonSpecSize": 0.015,
+      "toonSpecSmooth": 0.007,
+      "light1Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light1Az": 81.2,
+      "light1El": 0,
+      "light2Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light2Az": 0,
+      "light2El": -16,
+      "ambient": 0.2,
+      "blendOn": 1,
+      "blendSrc": 6,
+      "blendDst": 7,
+      "depthTest": 1,
+      "level": 1,
+      "posX": 0.85
+     }
+    },
+    "sourceB": null,
+    "sourceAFx": [],
+    "sourceBFx": [],
+    "fx": [],
+    "loopFx": [],
+    "blend": "difference",
+    "opacity": 1,
+    "mute": false,
+    "solo": false,
+    "feedback": false,
+    "feedbackAmount": 0.6,
+    "sourceMix": 0.5,
+    "sourceBlend": "normal",
+    "harmony": 0,
+    "speed": 1,
+    "coupling": {
+     "mode": "lean",
+     "amount": 0.5,
+     "tightness": 0.7,
+     "feature": "flux"
+    },
+    "mask": {
+     "mode": 0,
+     "invert": false,
+     "soft": 0.1,
+     "lumaLo": 0.2,
+     "lumaHi": 1,
+     "angle": 0,
+     "pos": 0.5,
+     "cx": 0.5,
+     "cy": 0.5,
+     "size": 0.4,
+     "aspect": 1,
+     "round": 1
+    }
+   },
+   {
+    "id": "0139b178-2392-49f0-8d27-355f818cba20",
+    "sourceA": {
+     "kind": "generator",
+     "shaderId": "gen-gridmesh",
+     "inputs": {
+      "shape": 4,
+      "dimX": 10,
+      "dimY": 20,
+      "drawMode": 7,
+      "polyFront": 1,
+      "polyBack": 0,
+      "lineWidth": 2,
+      "pointSize": 52,
+      "noiseBasis": 5,
+      "noiseBlend": 0,
+      "noiseScale": 0.896,
+      "noiseSize": 1,
+      "noiseGrid": 20,
+      "noiseX": 0,
+      "noiseY": 0,
+      "noiseZ": 0,
+      "noiseFlip": 0,
+      "noiseStill": 1,
+      "noiseColor": 1,
+      "autoNormals": 1,
+      "spinAxes": 0,
+      "spinSpeed": 10,
+      "shapeRotX": 0,
+      "shapeRotY": 0,
+      "shapeRotZ": 0,
+      "scaleX": 1,
+      "scaleY": 1,
+      "scaleZ": 1,
+      "size": 1,
+      "tilt": 0,
+      "turn": 0,
+      "roll": 0,
+      "distance": 22,
+      "lens": 10,
+      "color": [
+       0.935,
+       0.784,
+       0.824,
+       1
+      ],
+      "lighting": 1,
+      "diffuseModel": 1,
+      "specularModel": 0,
+      "specularColor": [
+       0,
+       0.074,
+       0.942,
+       1
+      ],
+      "shininess": 0.2,
+      "emission": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "ambientColor": [
+       0,
+       0,
+       0,
+       1
+      ],
+      "roughness": 0,
+      "darkness": 0,
+      "toonDiffSize": 0.98,
+      "toonDiffSmooth": 4.17,
+      "toonSpecSize": 0,
+      "toonSpecSmooth": 0,
+      "light1Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light1Az": 81.2,
+      "light1El": 0,
+      "light2Color": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "light2Az": 0,
+      "light2El": -16,
+      "ambient": 0.2,
+      "blendOn": 1,
+      "blendSrc": 3,
+      "blendDst": 5,
+      "depthTest": 1,
+      "level": 1,
+      "posX": 2.5
+     }
+    },
+    "sourceB": null,
+    "sourceAFx": [],
+    "sourceBFx": [],
+    "fx": [],
+    "loopFx": [],
+    "blend": "difference",
+    "opacity": 1,
+    "mute": false,
+    "solo": false,
+    "feedback": false,
+    "feedbackAmount": 0.6,
+    "sourceMix": 0.5,
+    "sourceBlend": "normal",
+    "harmony": 0,
+    "speed": 1,
+    "coupling": {
+     "mode": "lean",
+     "amount": 0.5,
+     "tightness": 0.7,
+     "feature": "flux"
+    },
+    "mask": {
+     "mode": 0,
+     "invert": false,
+     "soft": 0.1,
+     "lumaLo": 0.2,
+     "lumaHi": 1,
+     "angle": 0,
+     "pos": 0.5,
+     "cx": 0.5,
+     "cy": 0.5,
+     "size": 0.4,
+     "aspect": 1,
+     "round": 1
+    }
+   }
+  ],
+  "background": {
+   "source": {
+    "kind": "generator",
+    "shaderId": "solid-color",
+    "inputs": {
+     "gradient": 0,
+     "color": [
+      0.353875064132914,
+      0.6731710192113403,
+      0.5416632610818757,
+      1
+     ]
+    }
+   },
+   "fx": [],
+   "opacity": 1,
+   "speed": 0.25,
+   "depth": 0
+  },
+  "master": [
+   {
+    "id": "769d3fdb-b477-4bb2-a9e1-51feddab1edc",
+    "shaderId": "fx-colorizer",
+    "enabled": true,
+    "inputs": {
+     "low": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "mid": [
+      0.85,
+      0.08,
+      0.75,
+      1
+     ],
+     "high": [
+      1,
+      0.35,
+      0.45,
+      1
+     ],
+     "mixSrc": 0
+    }
+   },
+   {
+    "id": "ba8f2546-e83f-4af0-b48b-090b6cd53160",
+    "shaderId": "fx-grade",
+    "enabled": true,
+    "inputs": {
+     "saturation": 1,
+     "brightness": 0,
+     "contrast": 1
+    }
+   },
+   {
+    "id": "2eeaff32-7823-4f75-a129-2ee8ca47934b",
+    "shaderId": "fx-light-trails",
+    "enabled": true,
+    "inputs": {
+     "decay": 0.8
+    }
+   },
+   {
+    "id": "fab91e19-5d1b-4165-8782-b1270983625f",
+    "shaderId": "fx-chroma-shift",
+    "enabled": true,
+    "inputs": {
+     "amount": 0
+    }
+   },
+   {
+    "id": "542123a6-b05e-4933-8748-7ca762958bbc",
+    "shaderId": "fx-posterize",
+    "enabled": true,
+    "inputs": {
+     "levels": 32
+    }
+   },
+   {
+    "id": "52dfc31b-a160-4c11-a82c-644ef45a273d",
+    "shaderId": "fx-pixelate",
+    "enabled": true,
+    "inputs": {
+     "cells": 400
+    }
+   },
+   {
+    "id": "7343ba23-700d-4cf5-94b9-2da79cd4cd4f",
+    "shaderId": "fx-distort",
+    "enabled": true,
+    "inputs": {
+     "mode": 9,
+     "amount": 0
+    }
+   },
+   {
+    "id": "ff546a9b-e334-452b-8aa4-fe18fd3d07ba",
+    "shaderId": "fx-displace",
+    "enabled": true,
+    "inputs": {
+     "amount": 0
+    }
+   },
+   {
+    "id": "536db2e0-92a2-4d29-b2df-26bf4c2eb21b",
+    "shaderId": "fx-grain",
+    "enabled": true,
+    "inputs": {
+     "amount": 0
+    }
+   },
+   {
+    "id": "84824c39-e5b6-4c39-a047-65555415f397",
+    "shaderId": "fx-hue-rotate",
+    "enabled": true,
+    "inputs": {
+     "shift": 0
+    }
+   },
+   {
+    "id": "781e19bd-41f5-4738-afc2-c575a33fb841",
+    "shaderId": "fx-vibe",
+    "enabled": true,
+    "locked": true,
+    "inputs": {
+     "stops": 2,
+     "blend": 1,
+     "dither": 0,
+     "mixSrc": 0.5,
+     "autoLevel": 0,
+     "saturation": 1,
+     "contrast": 1,
+     "gamma": 1,
+     "sharpen": 0,
+     "splitTone": 0,
+     "colorA": [
+      0,
+      0,
+      0,
+      1
+     ],
+     "colorB": [
+      1,
+      1,
+      1,
+      1
+     ]
+    }
+   },
+   {
+    "id": "11707698-92a9-408f-8731-783feb67892d",
+    "shaderId": "fx-context",
+    "enabled": true,
+    "locked": true,
+    "inputs": {
+     "trails": 0.22,
+     "blur": 0,
+     "bloom": 0.18,
+     "depth": 0.28,
+     "haze": 0.16,
+     "atmosphere": [
+      0.5,
+      0.58,
+      0.72,
+      1
+     ],
+     "lightGlow": 0,
+     "lightSize": 0.5,
+     "lightColor": [
+      1,
+      0.92,
+      0.8,
+      1
+     ],
+     "light": [
+      0.5,
+      0.55
+     ]
+    }
+   },
+   {
+    "id": "31f1ff56-62f2-4a4e-8a09-baaa3b6f60e3",
+    "shaderId": "fx-finalizer",
+    "enabled": true,
+    "locked": true,
+    "inputs": {
+     "black": 0,
+     "white": 1,
+     "gamma": 1,
+     "rGain": 1,
+     "gGain": 1,
+     "bGain": 1,
+     "alpha": 1,
+     "sharpen": 0,
+     "character": 1,
+     "grain": 0.06,
+     "grainSize": 1.5,
+     "chroma": 0,
+     "parasites": 0.1,
+     "filmGauge": 1
+    }
+   }
+  ],
+  "bpm": 120,
+  "modulators": [
+   {
+    "type": "lfo",
+    "enabled": false,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "lfo",
+    "enabled": false,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "lfo",
+    "enabled": false,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "adsr",
+    "enabled": true,
+    "sync": "bpm",
+    "rateHz": 0.32324011902312266,
+    "divisionIdx": 6,
+    "dotted": false,
+    "triplet": false,
+    "curve": "sigmoid",
+    "shape": "sawtooth",
+    "ramp": {
+     "rampMs": 3239.7695220864057,
+     "curvePct": 16.961756735912388,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 1168.0341082479547,
+     "decayMs": 621.9701509327439,
+     "sustainMs": 6291.236505552268,
+     "releaseMs": 2275.3560785849245,
+     "sustainLevel": 0.46238568709051436,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "random"
+    },
+    "random": {
+     "distribution": 0.7890244076909019
+    },
+    "sh": {
+     "probability": 0.9419326837572507,
+     "smooth": false,
+     "distribution": 0.24207030636772736
+    },
+    "slew": {
+     "riseMs": 1780.1437646837203,
+     "fallMs": 258.7657022045383,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.868148969401589
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 14,
+     "pulses": 7,
+     "decay": 0.4643247943325153
+    },
+    "turing": {
+     "length": 7,
+     "mutate": 0.17084649392025916
+    },
+    "cellular": {
+     "rule": 30,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.75,
+      0.15,
+      1,
+      0.55,
+      0.35,
+      0.15,
+      1,
+      0.55,
+      0.75,
+      0.75,
+      1,
+      0.55,
+      0.75,
+      0.55,
+      0.35,
+      0.55
+     ],
+     "on": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "1:2",
+      "always",
+      "always",
+      "!first",
+      "always",
+      "always",
+      "always",
+      "always",
+      "2:4",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0.4,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "lfo",
+    "enabled": false,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "lfo",
+    "enabled": false,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "euclid",
+    "enabled": true,
+    "sync": "free",
+    "rateHz": 0.1262698657120412,
+    "divisionIdx": 5,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "rndSmooth",
+    "ramp": {
+     "rampMs": 9344.364523488768,
+     "curvePct": -50.977688543839946,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 3265.938724952398,
+     "decayMs": 1265.6052820200962,
+     "sustainMs": 4985.368671079906,
+     "releaseMs": 598.0938639851968,
+     "sustainLevel": 0.4995819934562928,
+     "loop": true
+    },
+    "arp": {
+     "steps": 3,
+     "mode": "down"
+    },
+    "random": {
+     "distribution": 0.7309186940400763
+    },
+    "sh": {
+     "probability": 0.7634821633069375,
+     "smooth": false,
+     "distribution": 0.414332916914008
+    },
+    "slew": {
+     "riseMs": 1861.8597080377924,
+     "fallMs": 113.80920814469985,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.939539815396465
+    },
+    "audio": {
+     "feature": "level",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 12,
+     "pulses": 3,
+     "decay": 0.5182824855171388
+    },
+    "turing": {
+     "length": 12,
+     "mutate": 0.2374728733941519
+    },
+    "cellular": {
+     "rule": 150,
+     "cells": 22
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.75,
+      0.35,
+      0.75,
+      0.55,
+      0.15,
+      1,
+      0.55,
+      1,
+      0.75,
+      1,
+      0.75,
+      0.55,
+      0.75,
+      1,
+      0.55,
+      1
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "p50",
+      "always",
+      "2:4",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    }
+   },
+   {
+    "type": "audio",
+    "enabled": true,
+    "sync": "free",
+    "rateHz": 0.2,
+    "divisionIdx": 7,
+    "dotted": false,
+    "triplet": false,
+    "curve": "linear",
+    "shape": "sine",
+    "ramp": {
+     "rampMs": 4000,
+     "curvePct": 0,
+     "mode": "loop"
+    },
+    "adsr": {
+     "attackMs": 500,
+     "decayMs": 1000,
+     "sustainMs": 2000,
+     "releaseMs": 1000,
+     "sustainLevel": 0.7,
+     "loop": true
+    },
+    "arp": {
+     "steps": 8,
+     "mode": "up"
+    },
+    "random": {
+     "distribution": 0.5
+    },
+    "sh": {
+     "probability": 1,
+     "smooth": false,
+     "distribution": 0.5
+    },
+    "slew": {
+     "riseMs": 200,
+     "fallMs": 400,
+     "randomTarget": true
+    },
+    "chaos": {
+     "r": 3.8
+    },
+    "audio": {
+     "feature": "flux",
+     "band": 0,
+     "smooth": 0.2
+    },
+    "vision": {
+     "feature": "brightness",
+     "smooth": 0.3
+    },
+    "body": {
+     "feature": "handRightHeight",
+     "smooth": 0.3
+    },
+    "organic": {
+     "variation": 0.5
+    },
+    "physics": {
+     "motion": "bounce",
+     "damping": 0.5
+    },
+    "motion": {
+     "shape": "oscillation"
+    },
+    "homeostat": {
+     "feature": "edges",
+     "setpoint": 0.5,
+     "gain": 0.4,
+     "adapt": 0.3
+    },
+    "euclid": {
+     "steps": 16,
+     "pulses": 5,
+     "decay": 0.35
+    },
+    "turing": {
+     "length": 8,
+     "mutate": 0.15
+    },
+    "cellular": {
+     "rule": 90,
+     "cells": 24
+    },
+    "steps": {
+     "length": 8,
+     "values": [
+      0.125,
+      0.25,
+      0.375,
+      0.5,
+      0.625,
+      0.75,
+      0.875,
+      1,
+      1,
+      0.875,
+      0.75,
+      0.625,
+      0.5,
+      0.375,
+      0.25,
+      0.125
+     ],
+     "on": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+     ],
+     "cond": [
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always",
+      "always"
+     ],
+     "swing": 50,
+     "glide": 0,
+     "rest": "hold"
+    },
+    "controller": {
+     "smooth": 0.3,
+     "attackMs": 20,
+     "releaseMs": 600,
+     "velocity": true
+    },
+    "fromWorld": true,
+    "worldRows": [
+     "2087dd13-ab09-47e3-bb56-3de5875b047a"
+    ]
+   }
+  ],
+  "modMatrix": [
+   {
+    "id": "32832edc-51f3-4389-9be4-1e0d13cbe873",
+    "mod": 3,
+    "target": {
+     "kind": "fx",
+     "scope": {
+      "kind": "layer",
+      "layer": 0
+     },
+     "instId": "b0295e64-6df1-4b1d-a337-245db9bbd1f2",
+     "input": "attack"
+    },
+    "depth": 0.5721763397432177,
+    "mode": "replace"
+   },
+   {
+    "id": "7f5ea705-de09-4407-9dcd-242d5ac89386",
+    "mod": 3,
+    "target": {
+     "kind": "source",
+     "layer": 0,
+     "slot": "B",
+     "input": "detail"
+    },
+    "depth": 0.6888474991481647,
+    "mode": "replace"
+   },
+   {
+    "id": "644990ea-0e8e-420f-aa5c-21451d820739",
+    "mod": 6,
+    "target": {
+     "kind": "fx",
+     "scope": {
+      "kind": "layer",
+      "layer": 0
+     },
+     "instId": "b0295e64-6df1-4b1d-a337-245db9bbd1f2",
+     "input": "length"
+    },
+    "depth": -0.728361454761079,
+    "mode": "replace"
+   },
+   {
+    "id": "2087dd13-ab09-47e3-bb56-3de5875b047a",
+    "mod": 7,
+    "target": {
+     "kind": "fx",
+     "scope": {
+      "kind": "master"
+     },
+     "instId": "11707698-92a9-408f-8731-783feb67892d",
+     "input": "haze"
+    },
+    "depth": 0.4
+   }
+  ],
+  "metaKnobs": [
+   {
+    "name": "Knob 1",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 2",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 3",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 4",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 5",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 6",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 7",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 8",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 9",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 10",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 11",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 12",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 13",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 14",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 15",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   },
+   {
+    "name": "Knob 16",
+    "value": 0,
+    "smoothMs": 10,
+    "curve": "linear",
+    "midiCc": null,
+    "destinations": []
+   }
+  ],
+  "worldBase": {
+   "trails": 0,
+   "bloom": 0.1,
+   "depth": 0.12,
+   "haze": 0
+  },
+  "worldShift": {
+   "trails": 0.22,
+   "bloom": 0.07999999999999999,
+   "depth": 0.16000000000000003,
+   "haze": 0.16
+  }
+ },
+ "scenes": [],
+ "feel": {
+  "density": 0.5,
+  "gestureTexture": 0.5,
+  "coalesce": 0.5,
+  "tonicity": 0,
+  "drift": 0,
+  "flow": 0.5,
+  "proximity": 0.5,
+  "proximityAudio": false
+ },
+ "world": {
+  "id": "synthetic",
+  "name": "Synthetic",
+  "builtin": true,
+  "blurb": "Abstract concordance : audio leans the A/B texture (default).",
+  "coupling": {
+   "mode": "lean",
+   "amount": 0.5,
+   "tightness": 0.7,
+   "feature": "flux"
+  },
+  "context": {
+   "trails": 0.22,
+   "bloom": 0.18,
+   "depth": 0.28,
+   "haze": 0.16
+  },
+  "autoMod": {
+   "feature": "flux",
+   "target": "haze",
+   "depth": 0.4
+  }
+ },
+ "sequence": {
+  "enabled": false,
+  "running": false,
+  "dwell": 8,
+  "dwellJitter": 0.2,
+  "transition": "morph",
+  "crossfadeMs": 1200,
+  "mode": "weighted",
+  "noRepeat": 2,
+  "variation": 0.15,
+  "breathe": {
+   "amount": 0,
+   "periodSec": 30
+  },
+  "arc": {
+   "enabled": false,
+   "lengthSec": 120
+  },
+  "burial": {
+   "enabled": false,
+   "lengthSec": 180,
+   "depth": 0.7
+  },
+  "longTake": {
+   "enabled": false,
+   "lengthSec": 240,
+   "depth": 0.5
+  },
+  "frameWeave": {
+   "enabled": false,
+   "rate": 24,
+   "cells": [
+    0,
+    1,
+    2,
+    3
+   ]
+  },
+  "cadenceEvery": 0,
+  "ruptureChance": 0,
+  "monomediaChance": 0,
+  "monomediaStyle": "black",
+  "audioAdvance": "off"
+ },
+ "sonify": {
+  "on": false,
+  "master": 0.8,
+  "sinkId": "",
+  "root": 0,
+  "rootOct": 3,
+  "scale": "minor",
+  "spectra": {
+   "on": true,
+   "tap": 0,
+   "gain": 0.5,
+   "pan": 0,
+   "sweepOn": true,
+   "sweepHz": 0.25,
+   "sync": false,
+   "x": 0.5,
+   "path": 0,
+   "pace": 0,
+   "gamma": 1.8,
+   "breath": 0,
+   "loOct": 2,
+   "hiOct": 7,
+   "quantize": true
+  },
+  "orbit": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.5,
+   "pan": 0,
+   "note": 45,
+   "freq": 110,
+   "quantize": true,
+   "ratio": 1,
+   "cx": 0.5,
+   "cy": 0.5,
+   "rx": 0.25,
+   "ry": 0.25,
+   "drive": 1,
+   "smooth": 0.5
+  },
+  "flow": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.6,
+   "pan": 0,
+   "sense": 0.4,
+   "density": 0.5,
+   "dur": 0.09,
+   "noise": 0.15,
+   "colour": 0.6,
+   "loOct": 3,
+   "hiOct": 6,
+   "quantize": true
+  },
+  "events": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.6,
+   "pan": 0,
+   "mode": "blend",
+   "sense": 0.5,
+   "density": 0.4,
+   "decay": 0.35,
+   "highs": 0.6,
+   "wave": 1,
+   "loOct": 3,
+   "hiOct": 6,
+   "quantize": true
+  },
+  "raster": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.4,
+   "pan": 0,
+   "note": 45,
+   "freq": 110,
+   "quantize": true,
+   "rx": 0.35,
+   "ry": 0.35,
+   "rw": 0.3,
+   "rh": 0.3,
+   "smooth": 0,
+   "tone": 0.6
+  },
+  "sstv": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.4,
+   "pan": 0,
+   "lineHz": 12,
+   "sync": false,
+   "dev": 1,
+   "syncLev": 0.5
+  },
+  "filter": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.6,
+   "pan": 0,
+   "q": 0.5,
+   "noise": 0.5,
+   "lineIn": false,
+   "loop": 0,
+   "sweepOn": false,
+   "sweepHz": 0.25,
+   "x": 0.5,
+   "gamma": 1.6,
+   "path": 0,
+   "pace": 0,
+   "loOct": 1,
+   "hiOct": 8,
+   "quantize": false
+  },
+  "signal": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.6,
+   "pan": 0,
+   "wave": 0,
+   "decay": 0.3,
+   "tone": 0.6,
+   "fm": 0.4,
+   "heads": 2,
+   "rate": 8,
+   "sync": false,
+   "steps": 16,
+   "spread": 0.5,
+   "thresh": 0.5,
+   "density": 0.35,
+   "path": 0,
+   "loOct": 4,
+   "hiOct": 8,
+   "snap": 1,
+   "play": "heads",
+   "pmode": "height",
+   "tie": false,
+   "sens": 0.5,
+   "picture": 0.8,
+   "patch": [
+    {
+     "src": "speed",
+     "depth": 0.6
+    },
+    {
+     "src": "size",
+     "depth": 0.3
+    },
+    {
+     "src": "brightness",
+     "depth": 0.4
+    },
+    {
+     "src": "texture",
+     "depth": 0.3
+    },
+    {
+     "src": "none",
+     "depth": 0
+    },
+    {
+     "src": "speed",
+     "depth": 0.5
+    },
+    {
+     "src": "x",
+     "depth": 0.8
+    },
+    {
+     "src": "none",
+     "depth": 0
+    }
+   ]
+  },
+  "chord": {
+   "on": false,
+   "tap": 0,
+   "gain": 0.6,
+   "pan": 0,
+   "voices": 7,
+   "loOct": 2,
+   "hiOct": 6,
+   "gamma": 1.6,
+   "spread": 0.6,
+   "attack": 0.4,
+   "release": 0.8,
+   "tone": 0.3,
+   "waves": 0,
+   "wavesRate": 0.4,
+   "wavesSync": 0,
+   "noise": 0,
+   "air": 0.4
+  },
+  "collage": {
+   "on": false,
+   "gain": 0.7,
+   "pan": 0,
+   "reso": 0.5,
+   "ring": 0.5,
+   "bright": 0.5,
+   "width": 1,
+   "inGain": 0,
+   "hp": 20,
+   "lp": 20000,
+   "hpSlope": 24,
+   "lpSlope": 24,
+   "ringIn": 0,
+   "comp": 0,
+   "loOct": 2,
+   "hiOct": 6,
+   "bank": 0,
+   "bankSend": false,
+   "decay": 0.5,
+   "choke": false,
+   "cutoff": 1,
+   "peak": 0,
+   "slope": 0,
+   "tone": 0,
+   "tilt": 0,
+   "waves": 0,
+   "wavesRate": 0.5,
+   "wavesSync": 0,
+   "noise": 0,
+   "noiseRate": 0.5,
+   "noiseSync": 0,
+   "detune": 0,
+   "voicing": 0
+  },
+  "assemblage": {
+   "on": false,
+   "gain": 0.7,
+   "pan": 0,
+   "reso": 0.3,
+   "ring": 0.5,
+   "bright": 0.5,
+   "width": 0.8,
+   "inGain": 0,
+   "hp": 20,
+   "lp": 20000,
+   "hpSlope": 24,
+   "lpSlope": 24,
+   "ringIn": 0,
+   "comp": 0,
+   "loOct": 2,
+   "hiOct": 6,
+   "bank": 0,
+   "bankSend": false,
+   "decay": 0.5,
+   "choke": false,
+   "cutoff": 1,
+   "peak": 0,
+   "slope": 0,
+   "tone": 0,
+   "tilt": 0,
+   "waves": 0,
+   "wavesRate": 0.5,
+   "wavesSync": 0,
+   "noise": 0,
+   "noiseRate": 0.5,
+   "noiseSync": 0,
+   "detune": 0,
+   "voicing": 0,
+   "accent": 0.4,
+   "tape": true
+  },
+  "fx": {
+   "send": 0.05,
+   "dlyMix": 0.35,
+   "dlyTime": 0.3,
+   "dlyFb": 0.35,
+   "dlyTone": 0.5,
+   "dlyMode": 1,
+   "rvMode": 0,
+   "rvMix": 0.6,
+   "rvSize": 0.6,
+   "rvDecay": 0.6,
+   "rvDamp": 0.3,
+   "rvPre": 20,
+   "rvMod": 6,
+   "rvModRate": 0.5,
+   "rvWidth": 1,
+   "rvLocut": 220,
+   "rvFreeze": false,
+   "rvDiff": 0.85,
+   "rvLowDamp": 0.5,
+   "rvCross": 0.3,
+   "rvLowMult": 1,
+   "rvHighMult": 1
+  },
+  "mixFilter": [
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5,
+   0.5
+  ],
+  "taps": [
+   {
+    "kind": "master",
+    "layer": 0
+   },
+   {
+    "kind": "layer",
+    "layer": 0
+   }
+  ],
+  "eq": {
+   "on": false,
+   "inGain": 0,
+   "outGain": 0,
+   "glue": {
+    "on": false,
+    "amount": 0.4,
+    "voice": "clean"
+   },
+   "bands": [
+    {
+     "on": false,
+     "freq": 30,
+     "gain": 0,
+     "q": 0.71,
+     "slope": 24
+    },
+    {
+     "on": false,
+     "freq": 100,
+     "gain": 0,
+     "q": 0.71,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 60,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 120,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 250,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 500,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 1000,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 2000,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 4000,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 8000,
+     "gain": 0,
+     "q": 1,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 8000,
+     "gain": 0,
+     "q": 0.71,
+     "slope": 12
+    },
+    {
+     "on": false,
+     "freq": 18000,
+     "gain": 0,
+     "q": 0.71,
+     "slope": 24
+    }
+   ]
+  }
+ },
+ "soniSeq": {
+  "on": false,
+  "stepMs": 1000,
+  "len": 8,
+  "cur": 0,
+  "mode": "forward",
+  "bounceDecay": 60,
+  "bias": 0,
+  "edge": "wrap",
+  "steps": [
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   },
+   {
+    "voices": [
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ],
+    "preset": ""
+   }
+  ]
+ },
+ "sonifyOn": false,
+ "soniSeqOn": false,
+ "soniKeySeq": {
+  "on": false,
+  "mode": "circle",
+  "rate": "free",
+  "freeMs": 5000,
+  "freeVary": 0,
+  "chance": 1,
+  "glide": 1,
+  "returnHome": false,
+  "poolRoots": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true
+  ],
+  "poolScales": [
+   "major",
+   "minor",
+   "dorian",
+   "phrygian",
+   "lydian"
+  ],
+  "euclid": false,
+  "ePulses": 3,
+  "eSteps": 8,
+  "eRot": 0,
+  "steps": [
+   {
+    "root": 9,
+    "scale": "minor",
+    "oct": 3
+   },
+   {
+    "root": 2,
+    "scale": "minor",
+    "oct": 3
+   },
+   {
+    "root": 5,
+    "scale": "major",
+    "oct": 3
+   },
+   {
+    "root": 4,
+    "scale": "minor",
+    "oct": 3
+   },
+   {
+    "root": 0,
+    "scale": "major",
+    "oct": 3
+   },
+   {
+    "root": 5,
+    "scale": "lydian",
+    "oct": 3
+   },
+   {
+    "root": 7,
+    "scale": "major",
+    "oct": 3
+   },
+   {
+    "root": 9,
+    "scale": "dorian",
+    "oct": 3
+   }
+  ],
+  "len": 4,
+  "order": "forward",
+  "bias": 0,
+  "circBias": 0,
+  "circLeap": 1,
+  "circRel": 0.25,
+  "affSmooth": 50,
+  "affNoRepeat": true,
+  "affTour": false,
+  "pivKind": "modes",
+  "pivDir": "random",
+  "picSource": "color",
+  "picHold": 8,
+  "picRange": 1,
+  "picKeys": "pool",
+  "picSteps": [
+   {
+    "root": 5,
+    "scale": "lydian",
+    "oct": 3
+   },
+   {
+    "root": 0,
+    "scale": "major",
+    "oct": 3
+   },
+   {
+    "root": 7,
+    "scale": "mixolydian",
+    "oct": 3
+   },
+   {
+    "root": 2,
+    "scale": "dorian",
+    "oct": 3
+   },
+   {
+    "root": 9,
+    "scale": "minor",
+    "oct": 3
+   },
+   {
+    "root": 4,
+    "scale": "phrygian",
+    "oct": 3
+   },
+   {
+    "root": 11,
+    "scale": "locrian",
+    "oct": 3
+   },
+   {
+    "root": 10,
+    "scale": "major",
+    "oct": 3
+   }
+  ],
+  "picLen": 4
+ },
+ "soniKeySeqOn": false,
+ "seqLanes": {
+  "arm": {
+   "scenes": true,
+   "keys": true,
+   "rules": true,
+   "lights": true
+  }
+ },
+ "ruleSeqOn": false,
+ "globalSpeed": 1,
+ "morphMs": 1000,
+ "surface": {
+  "path": [],
+  "timeMs": 8000,
+  "way": "forward",
+  "jump": 0,
+  "wiggle": 0,
+  "closed": false
+ },
+ "resolume": {
+  "enabled": false,
+  "host": "127.0.0.1",
+  "port": 7000,
+  "rateHz": 30,
+  "session": null,
+  "inputs": [
+   {
+    "id": "u2xqjiy7",
+    "source": "mod:1",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "vutbeppa",
+    "source": "mod:2",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "wcz6oytl",
+    "source": "mod:3",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "cdj8llmd",
+    "source": "mod:4",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "dohi3bmp",
+    "source": "mod:5",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "a05m6dsa",
+    "source": "mod:6",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "wjhexwr6",
+    "source": "mod:7",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "zpav1wzs",
+    "source": "mod:8",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "c1eadyds",
+    "source": "vision:brightness",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "rf6m27cd",
+    "source": "vision:motion",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "kjyz1htl",
+    "source": "vision:contrast",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "3lxsuh8q",
+    "source": "vision:edges",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "ielt0nb0",
+    "source": "vision:warmth",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "q8mdd5nu",
+    "source": "vision:hue",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "d92lhepr",
+    "source": "audio:level",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "yh762kvf",
+    "source": "audio:transient",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "z3fywp01",
+    "source": "audio:centroid",
+    "smooth": 0.15,
+    "gain": 1
+   },
+   {
+    "id": "55pzidx5",
+    "source": "audio:noisiness",
+    "smooth": 0.15,
+    "gain": 1
+   }
+  ],
+  "outputs": [],
+  "cells": [],
+  "folded": [],
+  "sceneColumns": false,
+  "columnOffset": 0,
+  "snapshots": [
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  "locked": false
+ },
+ "dome": {
+  "enabled": false,
+  "res": 4096,
+  "aperture": 210,
+  "mode": "fisheye",
+  "spin": 0,
+  "rotate": 0,
+  "flipX": false,
+  "feather": 0,
+  "grid": false,
+  "turns": 2,
+  "mirrorSeams": true,
+  "top": 90,
+  "bottom": -15,
+  "cap": "fade",
+  "azimuth": 0,
+  "elevation": 25,
+  "width": 100,
+  "roll": 0,
+  "surround": 0.25,
+  "fit": "fill",
+  "scale": 1,
+  "offsetX": 0,
+  "offsetY": 0,
+  "sim": {
+   "tilt": 0,
+   "fov": 100,
+   "back": 0,
+   "template": 0.19,
+   "sweet": false,
+   "sweetW": 90,
+   "sweetLo": 10,
+   "sweetHi": 55,
+   "view": "inside"
+  }
+ },
+ "outXform": {
+  "offsetX": 0,
+  "offsetY": 0,
+  "scale": 1,
+  "rotate": 0,
+  "spin": 0,
+  "feather": 0,
+  "flipX": false,
+  "flipY": false,
+  "edge": "black"
+ },
+ "lights": {
+  "looks": {},
+  "scenes": [],
+  "master": {
+   "brightness": 1,
+   "speed": 1,
+   "blackSec": 2,
+   "fadeSec": 1.5,
+   "gain": 1,
+   "saturation": 1,
+   "contrast": 1
+  }
+ },
+ "spaceVoices": {
+  "spectra": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 60,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "orbit": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 60,
+   "hspan": 0.15,
+   "vspan": 0.15,
+   "spin": 0
+  },
+  "flow": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 90,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "events": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 90,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "raster": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 60,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "sstv": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 120,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "filter": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 60,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "chord": {
+   "follow": false,
+   "az": 0,
+   "el": 90,
+   "width": 120,
+   "hspan": 0.3,
+   "vspan": 0.3,
+   "spin": 0
+  },
+  "collage": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 120,
+   "hspan": 0.25,
+   "vspan": 0.2,
+   "spin": 0
+  },
+  "signal": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 90,
+   "hspan": 0.08,
+   "vspan": 0.08,
+   "spin": 0
+  },
+  "assemblage": {
+   "follow": true,
+   "az": 0,
+   "el": 30,
+   "width": 120,
+   "hspan": 0.2,
+   "vspan": 0.15,
+   "spin": 0
+  }
+ },
+ "audioLayer": {
+  "A": null,
+  "B": null,
+  "mix": 0.5,
+  "volume": 1,
+  "mute": false
+ },
+ "mappings": {
+  "aliases": [
+   {
+    "id": "vnt39z11",
+    "on": true,
+    "address": "/A/strips/switches",
+    "arg": 2,
+    "inMin": 0,
+    "inMax": 7,
+    "outMin": 1,
+    "outMax": 8,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/preset"
+   },
+   {
+    "id": "4xopm1l4",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 6,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/spinAxes"
+   },
+   {
+    "id": "bgsi2knr",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 6,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5277777777777778,
+    "outMax": 0.7777777777777778,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/spinSpeed"
+   },
+   {
+    "id": "mj0mxwqm",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 10,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.125,
+    "outMax": 0.625,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/noiseBlend"
+   },
+   {
+    "id": "w8olra15",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 2,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.75,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/turn"
+   },
+   {
+    "id": "ojxoshkl",
+    "on": true,
+    "address": "/B/strips/pots",
+    "arg": 2,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.5,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/source/A/level"
+   },
+   {
+    "id": "48o3pj0d",
+    "on": true,
+    "address": "/B/strips/switches",
+    "arg": 2,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": true,
+    "target": "/opsia/layer1/mute"
+   },
+   {
+    "id": "31qin6ab",
+    "on": true,
+    "address": "/audio1/peak",
+    "arg": 0,
+    "inMin": 0.002,
+    "inMax": 0.02,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/opacity"
+   },
+   {
+    "id": "7jphcoo7",
+    "on": true,
+    "address": "/A/strips/switches",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 7,
+    "outMin": 1,
+    "outMax": 8,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/preset"
+   },
+   {
+    "id": "blb718wr",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 7,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/spinAxes"
+   },
+   {
+    "id": "21qubvvp",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 7,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5277777777777778,
+    "outMax": 0.7777777777777778,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/spinSpeed"
+   },
+   {
+    "id": "xfogs2ea",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 11,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.125,
+    "outMax": 0.625,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/noiseBlend"
+   },
+   {
+    "id": "1mkksiv7",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.75,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/turn"
+   },
+   {
+    "id": "9gslyu9z",
+    "on": true,
+    "address": "/B/strips/pots",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.5,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/source/A/level"
+   },
+   {
+    "id": "d6jk4dhf",
+    "on": true,
+    "address": "/B/strips/switches",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": true,
+    "target": "/opsia/layer2/mute"
+   },
+   {
+    "id": "g04gy9xf",
+    "on": true,
+    "address": "/audio2/peak",
+    "arg": 0,
+    "inMin": 0.002,
+    "inMax": 0.02,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/opacity"
+   },
+   {
+    "id": "i4mg4j35",
+    "on": true,
+    "address": "/A/strips/switches",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 7,
+    "outMin": 1,
+    "outMax": 8,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/preset"
+   },
+   {
+    "id": "0bgwdeon",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 8,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/spinAxes"
+   },
+   {
+    "id": "opfrj2su",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 8,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5277777777777778,
+    "outMax": 0.7777777777777778,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/spinSpeed"
+   },
+   {
+    "id": "9v05byrz",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 12,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.125,
+    "outMax": 0.625,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/noiseBlend"
+   },
+   {
+    "id": "1bojzrti",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.75,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/turn"
+   },
+   {
+    "id": "pauxobd1",
+    "on": true,
+    "address": "/B/strips/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.5,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/source/A/level"
+   },
+   {
+    "id": "5odvmtv7",
+    "on": true,
+    "address": "/B/strips/switches",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": true,
+    "target": "/opsia/layer3/mute"
+   },
+   {
+    "id": "7v4ygb8n",
+    "on": true,
+    "address": "/audio3/peak",
+    "arg": 0,
+    "inMin": 0.002,
+    "inMax": 0.02,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/opacity"
+   },
+   {
+    "id": "lurwmnnq",
+    "on": true,
+    "address": "/A/strips/switches",
+    "arg": 5,
+    "inMin": 0,
+    "inMax": 7,
+    "outMin": 1,
+    "outMax": 8,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/preset"
+   },
+   {
+    "id": "fxu6kwxm",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 9,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/spinAxes"
+   },
+   {
+    "id": "oy0xwkim",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 9,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5277777777777778,
+    "outMax": 0.7777777777777778,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/spinSpeed"
+   },
+   {
+    "id": "7r702ltf",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 13,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.125,
+    "outMax": 0.625,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/noiseBlend"
+   },
+   {
+    "id": "ozvgoy7g",
+    "on": true,
+    "address": "/A/strips/pots",
+    "arg": 5,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.75,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/turn"
+   },
+   {
+    "id": "9yb3n31a",
+    "on": true,
+    "address": "/B/strips/pots",
+    "arg": 5,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.5,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/source/A/level"
+   },
+   {
+    "id": "z938e2h0",
+    "on": true,
+    "address": "/B/strips/switches",
+    "arg": 5,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": true,
+    "target": "/opsia/layer4/mute"
+   },
+   {
+    "id": "62ba8c04",
+    "on": true,
+    "address": "/audio4/peak",
+    "arg": 0,
+    "inMin": 0.002,
+    "inMax": 0.02,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/opacity"
+   },
+   {
+    "id": "2nr3z4hv",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 6,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.85,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/1/bias"
+   },
+   {
+    "id": "xilgerca",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 6,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.85,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/3/decay"
+   },
+   {
+    "id": "nv4wyjvp",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 6,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.2,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/2/saturation"
+   },
+   {
+    "id": "9k2f87tz",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.4,
+    "outMax": 0.6,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/2/brightness"
+   },
+   {
+    "id": "w5tblh9f",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 3,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.25,
+    "outMax": 0.3,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/2/contrast"
+   },
+   {
+    "id": "gp3smucx",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.2,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/7/amount"
+   },
+   {
+    "id": "pt26qrfo",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 5,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.4,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/4/amount"
+   },
+   {
+    "id": "wt54s7vt",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 7,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 1,
+    "outMax": 0.1,
+    "curve": 0.6,
+    "invert": false,
+    "target": "/opsia/master/fx/5/levels"
+   },
+   {
+    "id": "n1rgw48f",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 7,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 1,
+    "outMax": 0.08,
+    "curve": 0.6,
+    "invert": false,
+    "target": "/opsia/master/fx/6/cells"
+   },
+   {
+    "id": "3vhnpc5b",
+    "on": true,
+    "address": "/A/global/pots",
+    "arg": 7,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 0.4,
+    "curve": 10,
+    "invert": false,
+    "target": "/opsia/master/fx/9/amount"
+   },
+   {
+    "id": "h9bkeswp",
+    "on": true,
+    "address": "/B/global/pots",
+    "arg": 2,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0,
+    "outMax": 1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/10/shift"
+   },
+   {
+    "id": "9vyyfxz1",
+    "on": true,
+    "address": "/touch/bend",
+    "arg": 0,
+    "inMin": -1,
+    "inMax": 1,
+    "outMin": 0.15,
+    "outMax": 0.35,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/master/fx/8/amount"
+   },
+   {
+    "id": "vsm4de4w",
+    "on": true,
+    "address": "/B/global/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer1/speed"
+   },
+   {
+    "id": "23yszp3j",
+    "on": true,
+    "address": "/B/global/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer2/speed"
+   },
+   {
+    "id": "tvzvsc3p",
+    "on": true,
+    "address": "/B/global/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer3/speed"
+   },
+   {
+    "id": "146u5k0l",
+    "on": true,
+    "address": "/B/global/pots",
+    "arg": 4,
+    "inMin": 0,
+    "inMax": 1,
+    "outMin": 0.5,
+    "outMax": 0.1,
+    "curve": 1,
+    "invert": false,
+    "target": "/opsia/layer4/speed"
+   }
+  ]
+ },
+ "ui": {
+  "theme": "studio"
+ }
+}

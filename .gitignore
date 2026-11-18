@@ -9,6 +9,8 @@ dist-tsc/
 
 # Personal sessions saved at the repo root during testing
 *.opsia.json
+# …except the sessions shipped as examples (docs/sessions : OCTOCOSME)
+!docs/sessions/*.opsia.json
 
 # Portable builds dropped at the repo root after a build
 /Palinopsia*.exe
