@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { inputsForShader } from '../shaders/isf/inputs'
+import { HELD_AT_REST } from '../engine/heldObject'
 import { PRESETS_BY_ID, type ShaderPreset } from '../shaders/isf/presets'
 import { useStore } from '../store'
 import { ConfirmModal, PromptModal } from './PromptModal'
@@ -93,6 +94,8 @@ export function PresetPicker({
       if (cur !== undefined) out[d.name] = cur
       else if (d.def !== undefined) out[d.name] = d.def
     }
+    // a 3D object's hold (how it was turned by hand) is part of what you save
+    for (const [k, v] of Object.entries(HELD_AT_REST[shaderId] ?? {})) out[k] = values[k] ?? [...v]
     return out
   }
 

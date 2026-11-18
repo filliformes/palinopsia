@@ -20,6 +20,16 @@
 //   the undo history and the session file.
 // - Nothing changes for a session with no source that takes the pointer : the
 //   cursor stays the arrow and a click does what it always did (nothing).
+// - A 3D OBJECT (the Model, Grid Mesh : an engine with hitTest) is held like one in
+//   any 3D app : a drag on it turns it in any direction (round the screen's axes,
+//   engine/heldObject.ts), the wheel over it brings it nearer or sends it away (its
+//   distance, a camera dolly). It is found by what it actually covers, so with
+//   several on screen the one under the cursor answers. On the object it comes
+//   BEFORE everything above (a whole-picture taker on the Master FX, the selected
+//   unit) : the hand takes what it is on. Off the object nothing changes. When two
+//   objects overlap, the one selected in the Inspector answers, else the top one.
+//   A click that never moves (under the dead zone) goes, on release, to whatever
+//   takes the click there without the object (as before the objects took the hand).
 
 import { useStore, withFxInputs } from './store'
 import { commitNow, runSilently, writeLive } from './undo'
@@ -28,8 +38,11 @@ import { SHADER_BY_ID } from './shaders/isf'
 import type { Compositor } from './engine/Compositor'
 import type { NativeGenerator } from './engine/nativeGenerators'
 import { displayToFrame, frameToDisplay } from './engine/pointerMap'
-import type { FxInstance, FxScope, HandGestureLog } from '@shared/types'
+import type { CompositionState, FxInstance, FxScope, HandGestureLog } from '@shared/types'
 import { layerRackOf } from './layerRack'
+import { dragTurn, quatIn, type Quat } from './engine/heldObject'
+import { domeFill } from './engine/domeSignal'
+import { inputsForShader } from './shaders/isf/inputs'
 
 type SrcTarget = { layer: number; slot: 'A' | 'B' } | 'bg'
 type FxTarget = { fx: FxScope; instId: string }
@@ -50,6 +63,25 @@ const MOUSE_DEAD = 4
 let getComp: () => Compositor | null = () => null
 const active = new Map<number, Active>()
 let trimWarned = false
+
+/** A 3D object held by a pointer (the mouse, a hand) : turned while it drags. */
+interface Grab {
+  t: SrcTarget
+  eng: NativeGenerator
+  shaderId: string
+  live: boolean // a hand : live, never an undo step
+  moved: boolean
+  x0: number // where it went down (frame uv)
+  y0: number
+  lu: number // where it was last
+  lv: number
+  q0: Quat // the hold when it went down (the mouse : one undo step from it)
+  q: Quat
+  shift?: boolean
+  alt?: boolean
+}
+const grabs = new Map<number, Grab>()
+const holding = (pid: number): boolean => active.has(pid) || grabs.has(pid)
 
 export function setPointerHost(f: () => Compositor | null): void {
   getComp = f
@@ -226,6 +258,173 @@ function findTarget(): { t: Target; eng: Taker; shaderId: string } | null {
   return null
 }
 
+// ── The 3D objects the hand can hold (the Model, Grid Mesh) ─────────────
+
+type Held = { t: SrcTarget; eng: NativeGenerator; shaderId: string }
+const HELD_HINT = 'drag : turn it any way · wheel : nearer or farther'
+
+function slotOf(c: CompositionState, t: SrcTarget) {
+  return t === 'bg' ? c.background?.source : t.slot === 'A' ? c.layers[t.layer]?.sourceA : c.layers[t.layer]?.sourceB ?? undefined
+}
+
+/** The slot's engine when it is a holdable object. */
+function heldEngine(comp: Compositor, t: SrcTarget): Held | null {
+  const src = slotOf(useStore.getState().composition, t)
+  if (!src || src.kind !== 'generator' || !src.shaderId) return null
+  const eng = comp.pointerEngine(t)
+  return eng && typeof eng.hitTest === 'function' ? { t, eng, shaderId: src.shaderId } : null
+}
+
+/** Every holdable object that shows now, top first (the slots in the order the
+ *  pointer looks through them : top layer down, the source that shows most first,
+ *  the Background last). */
+function shownObjects(comp: Compositor): Held[] {
+  const st = useStore.getState()
+  const out: Held[] = []
+  const layers = st.composition.layers
+  const anySolo = layers.some((l) => l.solo)
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const l = layers[i]
+    if ((anySolo ? !l.solo : l.mute) || !(l.opacity > 0)) continue
+    const mix = l.sourceB ? l.sourceMix : 0
+    const order: Array<'A' | 'B'> = mix > 0.5 ? ['B', 'A'] : ['A', 'B']
+    for (const slot of order) {
+      if (slot === 'A' && mix >= 1 && l.sourceB) continue
+      if (slot === 'B' && (!l.sourceB || mix <= 0)) continue
+      const h = heldEngine(comp, { layer: i, slot })
+      if (h) out.push(h)
+    }
+  }
+  const bg = st.composition.background
+  if (bg && bg.opacity > 0) {
+    const h = heldEngine(comp, 'bg')
+    if (h) out.push(h)
+  }
+  return out
+}
+
+const sameSlot = (a: SrcTarget, b: SrcTarget): boolean =>
+  a === 'bg' || b === 'bg' ? a === b : a.layer === b.layer && a.slot === b.slot
+
+/** The object under the frame point : the selected one when it is under it, else
+ *  the top one. Null over empty picture. */
+function objectAt(u: number, v: number): Held | null {
+  const comp = getComp()
+  if (!comp) return null
+  const shown = shownObjects(comp)
+  if (!shown.length) return null
+  const sel = useStore.getState().selection
+  const st: SrcTarget | null = sel?.type === 'source' ? { layer: sel.layer, slot: sel.slot } : sel?.type === 'background' ? 'bg' : null
+  if (st) {
+    const h = shown.find((x) => sameSlot(x.t, st))
+    if (h && h.eng.hitTest!(u, v)) return h
+  }
+  for (const h of shown) if (h.eng.hitTest!(u, v)) return h
+  return null
+}
+
+/** One slot's inputs changed, in a composition (the hold written live). */
+function withSlotInputs(c: CompositionState, t: SrcTarget, inputs: Record<string, number | number[]>): CompositionState {
+  if (t === 'bg') {
+    const bg = c.background
+    return bg ? { ...c, background: { ...bg, source: { ...bg.source, inputs: { ...bg.source.inputs, ...inputs } } } } : c
+  }
+  const layers = c.layers.map((l, i) => {
+    if (i !== t.layer) return l
+    if (t.slot === 'A') return { ...l, sourceA: { ...l.sourceA, inputs: { ...l.sourceA.inputs, ...inputs } } }
+    return l.sourceB ? { ...l, sourceB: { ...l.sourceB, inputs: { ...l.sourceB.inputs, ...inputs } } } : l
+  })
+  return { ...c, layers }
+}
+
+/** An edit of one input : the store's own action (an undo step, as a slider). */
+function setSlotInput(t: SrcTarget, name: string, value: number | number[]): void {
+  const st = useStore.getState()
+  if (t === 'bg') st.setBackgroundInput(name, value)
+  else st.setSourceInput(t.layer, t.slot, name, value)
+}
+
+/** The frame's width over its height as the objects are drawn (square under the
+ *  dome's fill, which keeps their view square). */
+const viewAspect = (): number => (domeFill() > 0 ? 1 : frameAspect())
+
+function grabDown(pid: number, h: Held, u: number, v: number, mods: { shift?: boolean; alt?: boolean }, live: boolean): void {
+  // a mouse drag is its own undo step : whatever was settling closes first
+  if (!live) commitNow()
+  const q = quatIn(slotOf(useStore.getState().composition, h.t)?.inputs.orient)
+  grabs.set(pid, { ...h, live, moved: false, x0: u, y0: v, lu: u, lv: v, q0: q, q, shift: mods.shift, alt: mods.alt })
+}
+
+function grabMove(pid: number, u: number, v: number, dead: number, aspect: number): void {
+  const g = grabs.get(pid)
+  if (!g) return
+  if (!g.moved) {
+    if (Math.hypot((u - g.x0) * aspect, v - g.y0) < dead) return
+    g.moved = true
+  }
+  // the slot changed under the hand (another source, a scene) : it lets go there
+  const comp = getComp()
+  if (!comp || comp.pointerEngine(g.t) !== g.eng) { grabs.delete(pid); return }
+  const q = dragTurn(g.q, (u - g.lu) * viewAspect(), v - g.lv)
+  g.lu = u
+  g.lv = v
+  if (q === g.q) return
+  g.q = q
+  // live while it moves (never a step per move, never split by a pause); the
+  // mouse's whole turn becomes one step when it lets go
+  writeLive((c) => withSlotInputs(c, g.t, { orient: q }))
+}
+
+function grabUp(pid: number, phase: 'up' | 'cancel'): void {
+  const g = grabs.get(pid)
+  if (!g) return
+  grabs.delete(pid)
+  if (g.moved) {
+    if (g.live) return
+    // one undo step, from the hold it had to the hold it has
+    writeLive((c) => withSlotInputs(c, g.t, { orient: g.q0 }))
+    setSlotInput(g.t, 'orient', g.q)
+    commitNow()
+    return
+  }
+  // a click that never moved : to whatever takes the click there without the
+  // object, as if the object were not holdable
+  if (phase !== 'up') return
+  const f = findTarget()
+  if (!f) return
+  f.eng.pointer!({ phase: 'down', pid, u: g.x0, v: g.y0, shift: g.shift, alt: g.alt, commit: !g.live && !isFx(f.t) ? commitFor(f.t, f.shaderId) : undefined })
+  const comp = getComp()
+  if (comp && takerOf(comp, f.t) === f.eng) f.eng.pointer!({ phase: 'up', pid, u: g.x0, v: g.y0 })
+}
+
+// The wheel : a burst of notches is one undo step (a pause past the undo's quiet
+// window, or another object, starts the next).
+const ZOOM_PER_100PX = Math.log(1.12) // one notch (100 px) : 12 % nearer or farther
+let wheelAt = 0
+let wheelKey = ''
+
+function zoomObject(h: Held, e: WheelEvent): void {
+  const d = inputsForShader(h.shaderId).find((x) => x.name === 'distance')
+  if (!d) return
+  const lo = typeof d.min === 'number' ? d.min : 0.1
+  const hi = typeof d.max === 'number' ? d.max : 100
+  const inp = slotOf(useStore.getState().composition, h.t)?.inputs
+  const dist = inp?.distance
+  const cur = typeof dist === 'number' && Number.isFinite(dist) ? dist : typeof d.def === 'number' ? d.def : lo
+  // pixels (a mouse, a trackpad's small steps), lines or pages
+  const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1)
+  if (!dy) return
+  // the base (what the slider holds) : a modulator on it keeps swinging round it
+  const next = Math.max(lo, Math.min(hi, cur * Math.exp((dy / 100) * ZOOM_PER_100PX)))
+  if (next === cur) return
+  const key = h.t === 'bg' ? 'bg' : `${h.t.layer}:${h.t.slot}`
+  const now = performance.now()
+  if (now - wheelAt > 300 || key !== wheelKey) commitNow()
+  wheelAt = now
+  wheelKey = key
+  setSlotInput(h.t, 'distance', Math.round(next * 1000) / 1000)
+}
+
 const fxWhere = (s: FxScope): string =>
   s.kind === 'master' ? 'Master FX' : s.kind === 'background' ? 'Background FX' : `L${s.layer + 1} ${s.kind === 'layer' ? 'FX' : s.kind === 'loop' ? 'loop' : s.kind === 'sourceA' ? 'A fx' : 'B fx'}`
 const where = (t: Target, shaderId: string): string =>
@@ -249,6 +448,9 @@ function commitFor(t: SrcTarget, shaderId: string): (e: HandGestureLog) => void 
 /** A pointer goes down at the frame's (u, v) (v up). `log` : the mouse. */
 function down(pid: number, u: number, v: number, mods: { shift?: boolean; alt?: boolean }, log: boolean): boolean {
   release(pid, 'cancel')
+  // a 3D object under it : the hand takes it
+  const h = objectAt(u, v)
+  if (h) { grabDown(pid, h, u, v, mods, !log); return true }
   const f = findTarget()
   if (!f) return false
   active.set(pid, { ...f, moved: false, x0: u, y0: v })
@@ -257,6 +459,7 @@ function down(pid: number, u: number, v: number, mods: { shift?: boolean; alt?: 
 }
 
 function move(pid: number, u: number, v: number, dead: number, aspect: number): void {
+  if (grabs.has(pid)) { grabMove(pid, u, v, dead, aspect); return }
   const a = active.get(pid)
   if (!a) return
   if (!a.moved) {
@@ -270,6 +473,7 @@ function move(pid: number, u: number, v: number, dead: number, aspect: number): 
 }
 
 function release(pid: number, phase: 'up' | 'cancel'): void {
+  if (grabs.has(pid)) { grabUp(pid, phase); return }
   const a = active.get(pid)
   if (!a) return
   active.delete(pid)
@@ -315,11 +519,13 @@ export function frameToCanvasPx(canvas: HTMLCanvasElement, u: number, v: number)
 export function attachPreviewPointer(canvas: HTMLCanvasElement): () => void {
   let downAt: [number, number] | null = null
   const hover = (e: PointerEvent): void => {
-    if (active.has(MOUSE_PID)) return
-    const f = toFrame(canvas, e.clientX, e.clientY) ? findTarget() : null
-    canvas.style.cursor = f ? 'crosshair' : ''
+    if (holding(MOUSE_PID)) return
+    const p = toFrame(canvas, e.clientX, e.clientY)
+    const o = p ? objectAt(p[0], p[1]) : null
+    const f = o ?? (p ? findTarget() : null)
+    canvas.style.cursor = o ? 'grab' : f ? 'crosshair' : ''
     hintEngine = f?.eng ?? null
-    const hint = f ? f.eng.pointerHint?.() ?? 'click : play on the picture' : null
+    const hint = o ? HELD_HINT : f ? f.eng.pointerHint?.() ?? 'click : play on the picture' : null
     const w = f ? where(f.t, f.shaderId) : null
     if (hint !== view.hint || w !== view.where) setView({ hint, where: w })
   }
@@ -329,13 +535,23 @@ export function attachPreviewPointer(canvas: HTMLCanvasElement): () => void {
     if (!p) return
     if (!down(MOUSE_PID, p[0], p[1], { shift: e.shiftKey, alt: e.altKey }, true)) return
     e.preventDefault()
+    if (grabs.has(MOUSE_PID)) canvas.style.cursor = 'grabbing'
     downAt = [e.clientX, e.clientY]
     try { canvas.setPointerCapture(e.pointerId) } catch { /* gone */ }
   }
   const onMove = (e: PointerEvent): void => {
-    if (!active.has(MOUSE_PID)) { hover(e); return }
+    if (!holding(MOUSE_PID)) { hover(e); return }
     if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < MOUSE_DEAD) return
     downAt = null
+    const g = grabs.get(MOUSE_PID)
+    if (g) {
+      // the hand turns it from where the mouse is now (the coalesced points in
+      // between add nothing to a turn that follows the path)
+      g.moved = true
+      const p = toFrame(canvas, e.clientX, e.clientY)
+      if (p) grabMove(MOUSE_PID, p[0], p[1], 0, 1)
+      return
+    }
     const a = active.get(MOUSE_PID)
     if (a) a.moved = true
     // every point the mouse passed through since the last event, for smooth strokes
@@ -346,18 +562,25 @@ export function attachPreviewPointer(canvas: HTMLCanvasElement): () => void {
     }
   }
   const onUp = (e: PointerEvent): void => {
-    if (!active.has(MOUSE_PID)) return
+    if (!holding(MOUSE_PID)) return
+    // a turn ends where the mouse lets go (the browser may fold the last moves
+    // into the release)
+    const g = grabs.get(MOUSE_PID)
+    if (g?.moved) {
+      const p = toFrame(canvas, e.clientX, e.clientY)
+      if (p) grabMove(MOUSE_PID, p[0], p[1], 0, 1)
+    }
     release(MOUSE_PID, 'up')
     downAt = null
     try { canvas.releasePointerCapture(e.pointerId) } catch { /* gone */ }
     hover(e)
   }
   const onLost = (): void => {
-    if (active.has(MOUSE_PID)) release(MOUSE_PID, 'up')
+    if (holding(MOUSE_PID)) release(MOUSE_PID, 'up')
     downAt = null
   }
   const onLeave = (): void => {
-    if (active.has(MOUSE_PID)) return
+    if (holding(MOUSE_PID)) return
     canvas.style.cursor = ''
     hintEngine = null
     if (view.hint || view.where) setView({ hint: null, where: null })
@@ -367,7 +590,22 @@ export function attachPreviewPointer(canvas: HTMLCanvasElement): () => void {
   canvas.addEventListener('pointerup', onUp)
   canvas.addEventListener('pointercancel', onLost)
   canvas.addEventListener('lostpointercapture', onLost)
+  // The wheel over an object : nearer or farther. With an object anywhere on the
+  // picture the wheel never scrolls the page from the preview (over empty picture
+  // it does nothing); with none it scrolls as it always did. Ctrl + wheel stays
+  // the UI's zoom (App.tsx).
+  const onWheel = (e: WheelEvent): void => {
+    if (e.ctrlKey || e.metaKey) return
+    const comp = getComp()
+    if (!comp || !shownObjects(comp).length) return
+    e.preventDefault()
+    if (holding(MOUSE_PID)) return
+    const p = toFrame(canvas, e.clientX, e.clientY)
+    const o = p ? objectAt(p[0], p[1]) : null
+    if (o) zoomObject(o, e)
+  }
   canvas.addEventListener('pointerleave', onLeave)
+  canvas.addEventListener('wheel', onWheel, { passive: false })
   return () => {
     onLost()
     canvas.removeEventListener('pointerdown', onDown)
@@ -376,6 +614,7 @@ export function attachPreviewPointer(canvas: HTMLCanvasElement): () => void {
     canvas.removeEventListener('pointercancel', onLost)
     canvas.removeEventListener('lostpointercapture', onLost)
     canvas.removeEventListener('pointerleave', onLeave)
+    canvas.removeEventListener('wheel', onWheel)
     canvas.style.cursor = ''
   }
 }

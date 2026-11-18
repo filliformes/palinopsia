@@ -6,6 +6,8 @@
 //
 // Bools follow the store's numeric convention (0/1). Angles are radians.
 
+import { HELD_AT_REST } from '../../engine/heldObject'
+
 export interface ShaderPreset {
   name: string
   values: Record<string, number | number[]>
@@ -2385,3 +2387,8 @@ export const PRESETS_BY_ID: Record<string, ShaderPreset[]> = {
     { name: 'Failing panel', values: { rate: 8, chance: 0.5, bands: 10, jitter: 0.6, blackout: 0.35 } }
   ]
 }
+
+// The 3D objects the hand holds (engine/heldObject.ts) : every preset sets the hold
+// back to rest too, so a preset shows its look whatever the object was turned to.
+for (const [id, rest] of Object.entries(HELD_AT_REST))
+  for (const p of PRESETS_BY_ID[id] ?? []) for (const [k, v] of Object.entries(rest)) if (!(k in p.values)) p.values[k] = [...v]
