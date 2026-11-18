@@ -7,6 +7,42 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Grid Mesh, a general source** (it was built for the OCTOCOSME show) :
+  - **joined to the instrument** : **skin** (the layer picked as its sidechain, **wrapped**
+    by the grid's s, t, which the noise multiplies too so the picture tears with the
+    shape, **skin tile**, **skin scroll**, or **from the front**); **audio** (the sound's
+    level adds up to 2 to the deform, 40 ms rise, 300 ms fall) and **hits** (each onset,
+    `touchInput.Onset`, moves the noise field along); **true depth** (`depthOut`, off by
+    default : the same primitives into a half-size depth picture, nearest white over the
+    mesh's own reach, handed to the depth readers like the Model's,
+    `Compositor.modelDepthTex`, the depth menu's note); under the dome's fill a square view
+    and the camera 1.5x back (the stretch rule);
+  - **blend as** : normal, add, screen, lighten (MAX), exclusion (crossings cancel), or
+    **factors** (the raw GL factors, kept for the experts and the OCTOCOSME looks; the
+    default, so a session saved before keeps its look);
+  - app copy without names : diffuse **matte / rough matte / toon / dark rim**, shine
+    **soft / sharp / toon / satin / glaze** (the models' names in the hints and the
+    register), factor menus spelled out (source / dest), labels that no longer collide
+    (**deform**, **noise gain**, **blend pieces**); keywords without product names;
+  - the engine's fallbacks match the Inspector's defaults (a fresh slot drew deform 0,
+    noise scale 1 and 2 px points while the panel showed 1.5, 0.9 and 4); the CPU side keeps
+    its arrays between frames;
+  - **the dice** : the camera, the place, the lights, the raw factors, the level, the
+    skin, the sound and the depth are no longer dealt (they drew black 19 times in 24);
+    the light and glow colors skip the dice (`randomize.ts`);
+  - fourteen general presets after the eight OCTOCOSME ones (which keep numbers 1 to 8 for
+    OSC recall), every input set; Inspector columns rebalanced (three, with the new
+    inputs) and grey-outs (`DIMS` : what each draw mode makes, the noise without a deform,
+    each lighting model's own knobs, the factors, the skin without a layer); the
+    **Mesh** master chains (Neon Stage, Scribble Glow, Shard Afterimage, Mesh Print, Mesh in
+    Depth); Generate themes **Mesh Scribbles**, **Shard Garden**, **Torn Skin**,
+    **Sounding Mesh** (Objects; their motion never moves the noise field's place, each
+    move costs a new field : 6 ms for the fractal noises).
+Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise and true
+  depth on, every draw mode holds 60 fps at 1080p and on the 4096 dome (2048²), the
+  source's own render 3 to 6 ms; dome gate PASS (dome 60 fps, 59.7 updates/s). The
+  OCTOCOSME looks and four-mesh stage match the build before byte for byte.
+
 - **The OCTOCOSME session** (`docs/sessions/octocosme-one-controller.opsia.json`, explained
   in `docs/sessions/OCTOCOSME.md`) : one OCTOCOSME controller plays four Grid Mesh shapes,
   the patch's mesh layout, a master rack standing in for its Resolume stage, and the

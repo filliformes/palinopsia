@@ -82,7 +82,7 @@ Generate theme. The older shots stay in `docs/images/`.)*
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
-- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (180 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
+- [Sessions, scenes & themes](#sessions-scenes--themes) : session media (relink · collect) · a session added as scenes · Generate (184 themes, and Init) · [Persistent](#persistent--what-stays-put) controls, layers, effects, sources and modulators · Set in every scene
 - [Metasurface](#metasurface--the-continuous-scene-space) · [Randomize & Vary](#randomize--vary) · [Undo](#undo)
 
 **The vocabulary**
@@ -238,7 +238,7 @@ first-ever launch pays this once; it persists on disk afterwards.
 4. **Save a scene**: get something you like, click `+` in the Scene bank, then
    press `1`–`9` to recall it live (recalls morph over MORPH).
 5. **Go fullscreen**: press **`O`**, pick a display, hit fullscreen. Or try
-   **Generate** in the toolbar : 180 themed recipes that build a coherent
+   **Generate** in the toolbar : 184 themed recipes that build a coherent
    session (visuals + World + palette + macro biases + motion) in one click. Its
    first entry, **Init**, is the opposite : a blank session to start from (empty
    layers, no effects, eight plain modulators ready to bind).
