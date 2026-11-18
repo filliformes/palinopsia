@@ -34,6 +34,7 @@ const SELF_CONTAINED = new Set([
   'node-drape', // whatever enters, printed on the cloth
   'node-touch', // whatever enters, pushed by the hand
   'node-ripple', // whatever enters, seen through water
+  'node-slick', // whatever enters, covered by the oil
   'node-reaction', // Morphogen : this rack's picture steers it, a sidechain only takes over
   'node-fluid', // Current : likewise
   'node-depthscan', // the shared depth map, else this rack's own brightness

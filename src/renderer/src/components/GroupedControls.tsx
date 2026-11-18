@@ -65,9 +65,9 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
   'gen-terrain': [
-    // (three columns of 15, 16 and 15)
-    g('land and steps', 'own', 'raise', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor'),
-    g('color, light, air, water', 'palette', 'colorMix', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple'),
+    // (three columns of 17, 16 and 15)
+    g('land, steps, colors', 'own', 'raise', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor', 'palette', 'colorMix'),
+    g('light, air, water', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'),
     g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
   ],
   'gen-pointcloud': [
@@ -81,9 +81,9 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest', 'wet')
   ],
   'gen-model': [
-    // (three columns of 20, 21 and 22 : a fourth wrapped under them at the Inspector's width)
-    g('shape, motion, ground', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio', 'ground', 'groundOp', 'depthOut'),
-    g('look and finish', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'fog'),
+    // (three columns of 21, 24 and 22)
+    g('shape, motion, ground', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio', 'ground', 'groundOp', 'fog', 'depthOut'),
+    g('look and finish', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'crude', 'crudeDrips', 'crudeSheen'),
     g('light, skin, shatter', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'breakOn', 'shatter', 'broken', 'throw', 'scatter', 'shardSpin', 'gather', 'gravity', 'drift', 'crumble', 'dust', 'dustAt', 'dustSize', 'shatterNow')
   ],
   // Grid Mesh : what it is and how it is drawn and moves · what deforms it (the noise,
@@ -199,6 +199,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('touch', 'mode', 'size', 'strength', 'follow', 'soft', 'mix'),
     g('motion and look', 'fade', 'spring', 'speed', 'width', 'shade', 'split', 'clear'),
     g('fired by', 'fire', 'fireAt', 'audio', 'people', 'wander', 'press', 'point')
+  ],
+  // Slick : where the oil comes from · how it spreads and goes · how it looks
+  'node-slick': [
+    g('spills', 'seep', 'size', 'beat', 'audio', 'spill', 'spillAt', 'press', 'point'),
+    g('spread', 'tide', 'tideFrom', 'coverage', 'spread', 'fingers', 'current', 'motion', 'drips', 'recede', 'clean'),
+    g('look', 'thickness', 'opacity', 'sheen', 'gloss', 'relief', 'color', 'lightAngle', 'lightHeight', 'stain', 'mix')
   ],
   // Ripple : the water · what stirs it · how it looks
   'node-ripple': [
@@ -494,6 +500,12 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (isnt('fireAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : fire at the point, or press it.')
     return d
   },
+  'node-slick': ({ zero, isnt }) => {
+    const d: Why = {}
+    if (isnt('spillAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : spill at the point, or pour at it.')
+    if (zero('tide')) put(d, ['tideFrom'], 'Tide is at 0 : no tide comes in.')
+    return d
+  },
   'node-ripple': ({ zero, isnt }) => {
     const d: Why = {}
     if (isnt('stoneAt', 1) && zero('press')) put(d, ['point'], 'Nothing uses the point : drop the stone at the point, or press it.')
@@ -519,7 +531,8 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
     if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')
     if (zero('contours')) put(d, ['lineWidth', 'lineColor'], 'Contour lines is at 0.')
-    if (zero('water')) put(d, ['waterColor', 'mirror', 'ripple'], 'Water level is at 0 : no lake.')
+    if (zero('water')) put(d, ['waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'], 'Water level is at 0 : no lake.')
+    else if (zero('slick')) put(d, ['slickSpread'], 'Oil on the water is at 0 : the lake is clean.')
     if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
     if (zero('handAmount')) put(d, ['hand', 'handSize', 'heal', 'people'], 'Hand strength is at 0 : the hand leaves no mark.')
     return d
@@ -571,6 +584,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('shatter') && isnt('breakOn', 0)) put(d, ['breakOn'], 'Shatter is at 0 : only the trigger and broken break it.')
     if (zero('throw')) put(d, ['scatter'], 'Throw is at 0 : the shards turn in place.')
     if (zero('dust')) put(d, ['dustAt', 'dustSize'], 'Dust is at 0 : no shard turns to dust.')
+    if (zero('crude')) put(d, ['crudeDrips', 'crudeSheen'], 'Crude coat is at 0 : no oil on it.')
     return d
   },
   // Grid Mesh (engine/GridMeshSource.ts) : what each draw mode makes (lines, points,

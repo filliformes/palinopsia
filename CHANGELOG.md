@@ -35,6 +35,36 @@ that CI builds into cross-platform releases.
     ground; no multisampling;
   - eight presets, OCTOCOSME 1 to 8 : the patch's mesh bank, value for value; the methods
     and papers in THIRD_PARTY_NOTICES Part 6 and the bibliography.
+- **Slick : crude oil over the picture** (`node-slick`, `engine/slickNode.ts`, any rack) :
+  whatever plays is slowly covered by a spreading black crude slick, the petrol rainbow
+  only at its thin edges. A 32-bit thickness field (200 to 320 rows by the picture's
+  height, square on the dome's disc) on a fixed 60 Hz step : a viscous spread whose flux
+  grows with the square of the depth and stops below a resting depth (thin-film
+  lubrication form), mobility varied by a warped noise for fingers and lobes, carried by
+  a curl-noise current and the picture's optical flow (`PictureFlow`), thick oil dripping
+  down in streaks (outward on the dome), a sheen film that runs out ahead of the crude, a
+  stain, and a third channel holding the share coverage and the tide brought so it can ebb
+  while spills stay. Spills from a click / hold / drag on the preview, a Body pinch,
+  `/opsia/touch` (and `/hold`), the `spill` trigger, the beat (1 beat to 4 bars, the shared
+  clock), sound onsets and a seep; **tide** from an edge (or all round), **coverage** 0..1
+  (calibrated : 0.3 ≈ 24 %, 0.5 ≈ 53 % of the field crude), **recede**, **clean**. Look in
+  the oil-appearance order (silvery sheen, marbled rainbow from `FILM_GLSL`, metallic,
+  brown patches, continuous crude lit wet with the shared studio `roomAt`, the picture as
+  relief). 13 presets, the **Slick** chain group (5), themes **Contamination** and **Black
+  Tide**; Inspector groups and grey-outs; kept out of the dice (it takes the pointer).
+  Measured on the RTX 4070 laptop : 60 fps, p95 17.1 ms at 1080p and on the 4096 dome
+  (2048² comp, 320² field), defaults and every knob at its heaviest.
+- **Model : a crude coat** (`crude`, `crudeDrips`, `crudeSheen` on `gen-model`) : over any
+  material, a lumpy coat of crude whose depth thins at grazing edges into the petrol
+  rainbow over the material beneath, with drips sliding down in streaks along the world's
+  down in the model's frame. 0 by default (every existing preset backfilled with 0, looks
+  unchanged); presets Crude knot, Half drowned, Dripping crude, The file in crude; theme
+  **Crude Idol** (Objects).
+- **Terrain : oil on the water** (`slick`, `slickSpread` on `gen-terrain`) : a black slick
+  spreading over the lake toward its coverage at its own pace, calm (it damps the
+  ripples) with the sky and the sun's glint in it, the petrol rainbow at its edges,
+  gathering and lapping at the shores, a dark wet line on the beach above. Presets Oil on
+  the lake, Black coast (existing presets backfilled with 0).
 
 - **Model : fragments and dust (shatter)** : the Model breaks into its triangles and
   comes back together (`engine/ModelSource.ts`). **break on** by hand, on the sound's

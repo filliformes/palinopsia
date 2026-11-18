@@ -116,9 +116,17 @@ Simonyan, K., & Zisserman, A. (2015). Very deep convolutional networks for large
 
 ## 3. Fluids, flow and advection
 
+Bonn Agreement. (n.d.). *Bonn Agreement aerial operations handbook* (the Bonn Agreement Oil Appearance Code). Bonn Agreement Secretariat. https://www.bonnagreement.org
+
+↳ The order the Slick effect, the Model's crude coat and the Terrain's oil on the water draw their oil in, from the thin edge in : sheen, rainbow, metallic, the true color in patches, continuous.
+
 Bridson, R., Hourihan, J., & Nordenstam, M. (2007). Curl-noise for procedural fluid flow. *ACM Transactions on Graphics, 26*(3), Article 46. https://doi.org/10.1145/1276377.1276435
 
 ↳ The divergence-free velocity field that advects the Organic generator (fire, water, nature) and the curl-noise base field of the Sillage node.
+
+Fay, J. A. (1969). The spread of oil slicks on a calm sea. In D. P. Hoult (Ed.), *Oil on the sea* (pp. 53–63). Plenum Press.
+
+↳ The Slick effect's crude settling into a slick as it spreads and thins, a thin film running out ahead of it.
 
 Fedkiw, R., Stam, J., & Jensen, H. W. (2001). Visual simulation of smoke. In *Proceedings of the 28th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '01)* (pp. 15–22). ACM. https://doi.org/10.1145/383259.383260
 
@@ -131,6 +139,10 @@ Harris, M. J. (2004). Fast fluid dynamics simulation on the GPU. In R. Fernando 
 Lu, S., Jaffer, A., Jin, X., Zhao, H., & Mao, X. (2012). Mathematical marbling. *IEEE Computer Graphics and Applications, 32*(6), 26–35. https://doi.org/10.1109/MCG.2011.51
 
 ↳ The Marbling generator (`engine/marbleModel.ts`): the closed-form drop, tine line and vortex, each a map of the whole water that keeps every drop's area (the tine's falloff a `sech` instead of the paper's exponential).
+
+Oron, A., Davis, S. H., & Bankoff, S. G. (1997). Long-scale evolution of thin liquid films. *Reviews of Modern Physics, 69*(3), 931–980. https://doi.org/10.1103/RevModPhys.69.931
+
+↳ The Slick effect (`engine/slickNode.ts`): the crude spreads with a flux that grows with its depth (squared there, the paper's lubrication form has the cube), so thick oil runs and a thin film holds still.
 
 Stam, J. (1999). Stable fluids. In *Proceedings of the 26th Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '99)* (pp. 121–128). ACM Press/Addison-Wesley. https://doi.org/10.1145/311535.311548
 
@@ -760,6 +772,8 @@ Entries above whose details could not all be confirmed against a primary source:
 - Turk (1994): the date is the one the format's description is usually cited with; the hosted copy is a later transcription.
 - Perlin (2001): the course these notes belong to (Real-Time Shading, SIGGRAPH 2001) and their page numbers come from later citations; the notes themselves were not checked.
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
+- Fay (1969): the page range (53–63) in *Oil on the Sea* comes from secondary citations, not checked against the book.
+- Bonn Agreement (n.d.): the handbook is revised from time to time; the edition, and the part and annex holding the Oil Appearance Code, were not checked. The thickness bands it gives (sheen up to about 0.3 µm, rainbow to about 5 µm, metallic to about 50 µm, then the true color) are cited from memory, to check against the current handbook.
 - Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).
 - Waghorne et al. (2023): the full author list was not checked (only the first author and the title, against the arXiv preprint).

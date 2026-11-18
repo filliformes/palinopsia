@@ -1086,6 +1086,38 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.05 }
   },
+  // ── Slick : crude oil over the picture ──
+  {
+    name: 'Black Tide', group: 'Slick',
+    fx: [
+      { shaderId: 'node-slick', inputs: {seep: 0, size: 0.45, beat: 0, audio: 0, spillAt: 2, press: 0, point: [0.5, 0.5], tide: 0.6, tideFrom: 0, coverage: 0, spread: 0.45, fingers: 0.7, current: 0.2, motion: 0, drips: 0.1, recede: 0, thickness: 0.6, opacity: 1, sheen: 0.7, gloss: 0.75, relief: 0.4, color: [0.035, 0.026, 0.02, 1], lightAngle: 2.36, lightHeight: 0.5, stain: 0.3, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: -0.01, contrast: 1.06, saturation: 0.85, lift: 0.0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Contamination', group: 'Slick',
+    fx: [{ shaderId: 'node-slick', inputs: {seep: 0.35, size: 0.45, beat: 0, audio: 0, spillAt: 2, press: 0, point: [0.5, 0.5], tide: 0, tideFrom: 0, coverage: 0, spread: 0.4, fingers: 0.55, current: 0.2, motion: 0, drips: 0.3, recede: 0, thickness: 0.6, opacity: 1, sheen: 0.7, gloss: 0.75, relief: 0.4, color: [0.035, 0.026, 0.02, 1], lightAngle: 2.36, lightHeight: 0.5, stain: 0.3, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Petrol Sheen', group: 'Slick',
+    fx: [{ shaderId: 'node-slick', inputs: {seep: 0.6, size: 0.3, beat: 0, audio: 0, spillAt: 2, press: 0, point: [0.5, 0.5], tide: 0, tideFrom: 0, coverage: 0, spread: 0.55, fingers: 0.55, current: 0.35, motion: 0, drips: 0, recede: 0, thickness: 0.05, opacity: 1, sheen: 1, gloss: 0.5, relief: 0.4, color: [0.035, 0.026, 0.02, 1], lightAngle: 2.36, lightHeight: 0.5, stain: 0, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0.04 }
+  },
+  {
+    name: 'Spills on the Kick', group: 'Slick',
+    fx: [{ shaderId: 'node-slick', inputs: {seep: 0, size: 0.35, beat: 0, audio: 0.9, spillAt: 2, press: 0, point: [0.5, 0.5], tide: 0, tideFrom: 0, coverage: 0, spread: 0.45, fingers: 0.55, current: 0.2, motion: 0, drips: 0.3, recede: 0, thickness: 0.6, opacity: 1, sheen: 0.7, gloss: 0.75, relief: 0.4, color: [0.035, 0.026, 0.02, 1], lightAngle: 2.36, lightHeight: 0.5, stain: 0.3, mix: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.96, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Oil and Recovery', group: 'Slick',
+    fx: [
+      { shaderId: 'node-slick', inputs: {seep: 0.45, size: 0.45, beat: 0, audio: 0, spillAt: 2, press: 0, point: [0.5, 0.5], tide: 0, tideFrom: 0, coverage: 0, spread: 0.45, fingers: 0.55, current: 0.2, motion: 0, drips: 0.3, recede: 0.35, thickness: 0.6, opacity: 1, sheen: 0.7, gloss: 0.75, relief: 0.4, color: [0.035, 0.026, 0.02, 1], lightAngle: 2.36, lightHeight: 0.5, stain: 0.6, mix: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.04, saturation: 0.9, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
   // ── Relief : volume and film over the whole picture ──
   {
     name: 'Chrome Everything', group: 'Relief',

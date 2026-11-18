@@ -749,6 +749,54 @@ export const THEMES: Theme[] = [
     blends: ['screen', 'lighten'], useB: 0.3, feedback: 0, layers: [1, 1], drift: 0.3, coalesce: 0.5, bgOpacity: 0.6
   }),
   mk({
+    id: 'contamination', name: 'Contamination', family: 'Living Surfaces',
+    blurb: 'Something living, a growth, a coat, a sky, slowly covered by crude oil : it spills, spreads and smothers it, black and wet, a petrol rainbow at its edges. Click the preview to spill more.',
+    world: 'sublimated',
+    palette: [K, [0.12, 0.1, 0.07, 1], [0.86, 0.82, 0.72, 1]],
+    sources: ['gen-veins', 'colony', 'gen-fur', 'cloud-study', 'gen-nca', 'organic'],
+    stackFx: [['node-slick']],
+    presets: { 'node-slick': ['Spill', 'Coated forest', 'Tide coming in', 'Running down', 'Recovery', 'Brown crude'] },
+    pickInputs: { 'node-slick': { press: [0], motion: [0], audio: [0] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, drift: 0.2, density: 0.5,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0 },
+    // (the slow motion may ride the coverage : the picture goes under and comes back)
+    motion: { ...SLOW, skip: '^(mix|opacity|size|thickness|lightHeight)$' }
+  }),
+  mk({
+    id: 'black-tide', name: 'Black Tide', family: 'Cinematic / Atmospheric',
+    blurb: 'A coast under a low sun, a black slick spreading on the water and lapping at the shore; or a sky the oil creeps in on from an edge.',
+    world: 'sublimated',
+    palette: [K, [0.1, 0.11, 0.13, 1], [0.78, 0.8, 0.82, 1]],
+    sources: ['gen-terrain', 'cloud-study', 'swell'],
+    stack: [['gen-terrain', 'cloud-study', 'swell']],
+    stackFx: [['node-slick']],
+    presets: { 'gen-terrain': ['Oil on the lake', 'Black coast'], 'node-slick': ['Tide coming in', 'Black tide all round', 'Rainbow sheen only', 'Spill'] },
+    pickInputs: { 'gen-terrain': { people: [0], fly: [0, 0.04, 0.08] }, 'node-slick': { press: [0], audio: [0], seep: [0, 0.2], tide: [0.3, 0.45, 0.6] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, drift: 0.15, density: 0.45,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0 },
+    motion: { ...SLOW, skip: '^(mix|opacity|size|coverage|thickness|water|height|lens|tilt|camHeight|distance)$' }
+  }),
+  mk({
+    id: 'crude-idol', name: 'Crude Idol', family: 'Objects',
+    blurb: 'An object turning slowly, coated in crude : black and wet, the petrol rainbow where the coat thins, oil running down it.',
+    world: 'parametric',
+    palette: [K, [0.14, 0.12, 0.1, 1], [0.9, 0.86, 0.8, 1]],
+    sources: ['gen-model'],
+    stack: [['swell', 'dye-field', 'membrane', 'cloud-study'], ['gen-model']],
+    presets: { 'gen-model': ['Crude knot', 'Half drowned', 'Dripping crude'] },
+    pickInputs: { 'gen-model': { groundOp: [0], depthOut: [1], spin: [0.05, 0.08, 0.12], crude: [0.6, 0.8, 1] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.15, density: 0.5,
+    vibe: { mixSrc: 1 },
+    // (no depth haze : its far side would wash the crude pale)
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
     id: 'pond', name: 'Pond', family: 'Living Surfaces',
     blurb: 'The picture under water : rain rings it, what moves in it stirs it, a hand trails through it.',
     world: 'sublimated',
