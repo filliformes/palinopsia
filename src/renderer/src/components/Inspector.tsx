@@ -271,13 +271,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud' || slot.shaderId === 'gen-terrain') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'gen-pointcloud'
+            slot.shaderId === 'gen-terrain'
+              ? "The layer raised into the land, by SIDECHAIN : its brightness, darkness or depth (with depth: AI on, the model reads this layer itself, not the whole frame) is the height, and its colors color the land as far as PICTURE TO RAMP says. None = the land of its own."
+              : slot.shaderId === 'gen-pointcloud'
               ? "The layer the cloud lifts into points, by SIDECHAIN : each point takes its color, and its depth (with depth: AI on, the model reads this layer itself, not the whole frame) or its brightness raises them. None = the cloud's own picture."
               : slot.shaderId === 'gen-relief'
               ? 'A layer Relief reads, by SIDECHAIN : its colors in the strokes, reflected in the metal, or bent through the relief as through glass. Its moving things or its outlines can also draw the strokes (draws itself).'
@@ -874,7 +876,7 @@ export function Inspector(): JSX.Element {
                     values={values}
                     onChange={onChange}
                     modTargetFor={modTargetFor}
-                    dim={shaderId === 'gen-text' ? mergeDims(textDim(values), groupDim(shaderId, values, modulated)) : groupDim(shaderId, values, modulated)}
+                    dim={shaderId === 'gen-text' ? mergeDims(textDim(values), groupDim(shaderId, values, modulated)) : groupDim(shaderId, values, modulated, { side: !!sideCfg?.ref })}
                   />
                 ) : (
                   <AutoControls
@@ -882,7 +884,7 @@ export function Inspector(): JSX.Element {
                     values={values}
                     onChange={onChange}
                     modTargetFor={modTargetFor}
-                    dim={shaderId === 'gen-text' ? textDim(values) : groupDim(shaderId, values, modulated)}
+                    dim={shaderId === 'gen-text' ? textDim(values) : groupDim(shaderId, values, modulated, { side: !!sideCfg?.ref })}
                     layout="wrap"
                   />
                 )}

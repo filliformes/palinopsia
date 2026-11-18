@@ -80,6 +80,8 @@ export function depthOffText(
     return 'depth is off : depth focus reads brightness instead'
   if (shaderId === 'node-depthscan' && (modulated.has('reads') || pick('reads', 0) === 0))
     return 'depth is off : the scan reads brightness instead'
+  if (shaderId === 'gen-terrain' && (modulated.has('raise') || pick('raise', 1) === 0))
+    return 'depth is off : the land is raised by brightness instead'
   if (shaderId === 'gen-pointcloud' && (modulated.has('raise') || pick('raise', 0) === 0))
     return 'depth is off : the points are raised by brightness instead'
   return null

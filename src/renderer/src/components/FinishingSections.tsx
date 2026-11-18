@@ -48,7 +48,7 @@ export interface FinishingSection {
   /** Rows that do nothing right now : name → why (grayed, reason in the tooltip). */
   dim?: (v: Values, ctx: DimCtx) => Record<string, string>
   /** A short state read-out for sections without a switch. */
-  summary?: (v: Values) => string
+  summary?: (v: Values, ctx?: DimCtx) => string
 }
 
 // (exported : every sectioned panel colors its sections from the same set)
@@ -248,11 +248,14 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       color: C.amber,
       inputs: ['lightGlow', 'lightOrder', 'lightSize', 'lightColor'],
       labels: { lightGlow: 'glow', lightSize: 'size', lightColor: 'color' },
-      summary: (v) => {
+      // (the surface material is lit by this light, its place and its color, glow or
+      // not : the header says so instead of "off" while one is drawn)
+      summary: (v, ctx) => {
         const g = num(v, 'lightGlow', 0.1)
-        if (g <= 0.001) return 'off'
+        const surf = !!ctx && pbrOn(v, ctx) && num(v, 'pbrAmount', 0.5) > 0.001
+        if (g <= 0.001) return surf ? 'no glow · lights the surface' : 'off'
         const post = typeof v.lightOrder === 'number' ? v.lightOrder >= 0.5 : true
-        return `glow ${Math.round(g * 100)}% · ${post ? 'post' : 'pre'}`
+        return `glow ${Math.round(g * 100)}% · ${post ? 'post' : 'pre'}${surf ? ' · lights the surface' : ''}`
       },
       // The light color also lights the surface material's rim and sheen.
       dim: (v, ctx): Record<string, string> => {
@@ -271,7 +274,7 @@ export const FINISHING_SECTIONS: Record<string, FinishingSection[]> = {
       switchInput: 'pbrTexture',
       offValue: 0,
       inputs: ['pbrAmount', 'pbrLight', 'pbrScale', 'pbrDepth', 'pbrEvolve'],
-      labels: { pbrScale: 'texture scale' },
+      labels: { pbrScale: 'texture scale', pbrLight: 'raking light' },
       dim: (v, ctx): Record<string, string> => {
         if (live(v, ctx, 'pbrAmount', 0.5)) return {}
         const why = 'Relief is 0 : the surface material is not drawn.'
@@ -540,7 +543,7 @@ function Section({
           sw ? (
             <EnumSwitch inp={sw} value={values[sw.name]} onChange={onChange} modTargetFor={modTargetFor} />
           ) : s.summary ? (
-            <span className="truncate font-mono text-[9px] text-muted">{s.summary(values)}</span>
+            <span className="truncate font-mono text-[9px] text-muted">{s.summary(values, { bgEmpty, dome, driven })}</span>
           ) : null
         }
       />

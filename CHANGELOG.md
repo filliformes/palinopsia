@@ -36,6 +36,44 @@ that CI builds into cross-platform releases.
   - eight presets, OCTOCOSME 1 to 8 : the patch's mesh bank, value for value; the methods
     and papers in THIRD_PARTY_NOTICES Part 6 and the bibliography.
 
+- **Model : fragments and dust (shatter)** : the Model breaks into its triangles and
+  comes back together (`engine/ModelSource.ts`). **break on** by hand, on the sound's
+  onsets (`touchInput.Onset`), or on the beat every 1 / 2 beats, 1 / 2 bars (the shared
+  `soniClock` count, so Link's bars); the **shatter ▸** event (MIDI / OSC / Body rules);
+  **broken** held by hand (modulatable, for slow dissolves). Each shard flies out along
+  its face normal (**throw**, **scatter**), turns round its center (**shard spin**,
+  tumbling while out), falls or rises (**gravity**, the world's down in the model's
+  frame), drifts (**drift**), gathers back over **gather** s; **crumble** staggers them;
+  past **dust at** a **dust** share shrinks into grains (**dust size**). Done in the vertex
+  shader : the triangles and vertices are read back from data textures by `gl_VertexID`
+  (RGBA32UI corners, RGBA32F place + normal + uv, RGBA8 colors; 2048 a row) and drawn
+  without vertex data, 3 a triangle, so no per-corner copy of the mesh; the lines draw
+  each edge twice, once per face it borders (`modelMesh.buildEdges` now lists the faces,
+  `MeshData.edgeFaces`), the second fading in as the faces part; the points look's beads
+  each fly on their own; dust is one instanced grain a triangle. The clip planes open to
+  take the flying shards, the depth range stays the object's, and the true depth is drawn
+  from the shards. While nothing is broken the mesh draws by its old path, unchanged.
+  Five presets (Breathing glass, Beat shatter, Dust on the bar, Shards on the kick, Slow
+  dissolve), the Generate theme **Fragments** (family Objects, light trails on the
+  object); the Model's other themes never sweep **broken** or **break on**. Inspector :
+  three columns (20 / 21 / 22). The idea credited in the register's Part 6 ("Exploding
+  objects").
+- **Terrain** (`gen-terrain`, `engine/TerrainSource.ts`) : a picture raised into a lit,
+  solid landscape seen across. The sidechain layer (or a land of its own : rolling hills,
+  ridges, dunes, a crater, islands) raised by its brightness, darkness or depth (the
+  picture-depth model, as the Point Cloud), with smooth / peaks / rock, terraces with
+  sharpness and contour lines, a ramp by height (earth, snow peaks, topo map, night,
+  desert, lava, paper) mixed with the picture's colors, a sun with soft cast shadows,
+  ambient and shadow color, haze toward the horizon, a sky that can be transparent, a
+  mirroring lake at a level, and a camera (tilt from grazing to straight down, turn,
+  height with ground following, distance, lens, spin, sway) that flies over an endless
+  field (mirrored, repeated, or one island). The hand presses, raises or spreads the
+  land and it heals. A per-pixel height-field march over a max pyramid rebuilt every
+  frame (Tevs, Ihrke and Seidel 2008), far land read from coarser mips, lost rays
+  finished by a coarse walk : 2-4 ms at 1080p, 5-9 ms at the 2048² dome composition on
+  the RTX 4070 laptop, 60 fps both; fulldome gate run. 14 presets, the Landscape master
+  chains (4), themes Raised Land, Endless Land, Survey Map. Credits : ReactDrops (the
+  idea), Terrain raymarching and Maximum mipmaps (the methods) in the register's Part 6.
 - **A frequency band on the audio modulator** : an **HZ** row under SMOOTH, a slider with
   two ends on a logarithmic track (0 to 20000 Hz, the two shown beside it; double-click :
   the whole range, the old behavior), reads every feature only between the two
@@ -133,6 +171,13 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **A model file opens in plastic** : a file loaded on a built-in shape starts in the plastic
+  material (chrome, the default, reflected the studio and hid the file's own colors and a
+  layer worn as skin); a file swapped for another keeps the material chosen.
+- **Context : the light that lights the surface material says so** : with a surface
+  material drawn and the glow at 0, the light section reads *no glow · lights the surface*
+  (it read *off* while the material's sheen and rim kept the light's place and color), and
+  **raking** is now **raking light**, its hint saying the glow is only the halo.
 - **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):
   - the spine (sources, A/B mix, layer FX, stack, master FX and finalizers, presentation,
     transform, keystone) is drawn large, ordinary blocks medium, the touch bus, the trigger

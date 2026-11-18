@@ -64,6 +64,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
+  'gen-terrain': [
+    // (three columns of 15, 16 and 15)
+    g('land and steps', 'own', 'raise', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor'),
+    g('color, light, air, water', 'palette', 'colorMix', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple'),
+    g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
+  ],
   'gen-pointcloud': [
     g('picture and points', 'own', 'raise', 'depth', 'settle', 'stipple', 'gain', 'ground', 'density', 'size', 'shape', 'jitter', 'fog'),
     g('camera and scan', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin', 'scan', 'scanPeriod', 'scanSync'),
@@ -75,10 +81,10 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest', 'wet')
   ],
   'gen-model': [
-    // (three columns of 17, 15 and 17 : a fourth wrapped under them at the Inspector's width)
-    g('shape and motion', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio'),
-    g('look', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick'),
-    g('finish, light and skin', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut')
+    // (three columns of 20, 21 and 22 : a fourth wrapped under them at the Inspector's width)
+    g('shape, motion, ground', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio', 'ground', 'groundOp', 'depthOut'),
+    g('look and finish', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'fog'),
+    g('light, skin, shatter', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'breakOn', 'shatter', 'broken', 'throw', 'scatter', 'shardSpin', 'gather', 'gravity', 'drift', 'crumble', 'dust', 'dustAt', 'dustSize', 'shatterNow')
   ],
   'gen-gridmesh': [
     g('shape and draw', 'shape', 'dimX', 'dimY', 'drawMode', 'polyFront', 'polyBack', 'lineWidth', 'pointSize', 'spinAxes', 'spinSpeed', 'shapeRotX', 'shapeRotY', 'shapeRotZ', 'scaleX', 'scaleY', 'scaleZ', 'size', 'tilt', 'turn', 'roll', 'posX', 'posY', 'distance', 'lens'),
@@ -501,6 +507,20 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (isnt('material', 5)) put(d, ['dispersion', 'rim'], 'Only the glass splits color and has a rim.')
     return d
   },
+  // Terrain : its own land or a picture (the sidechain), what each one reads.
+  'gen-terrain': ({ zero, side }) => {
+    const d: Why = {}
+    if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
+    if (side && zero('rough')) put(d, ['evolve'], 'A layer is picked as the sidechain and rock is at 0 : nothing of its own evolves.')
+    else put(d, ['raise', 'settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
+    if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
+    if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')
+    if (zero('contours')) put(d, ['lineWidth', 'lineColor'], 'Contour lines is at 0.')
+    if (zero('water')) put(d, ['waterColor', 'mirror', 'ripple'], 'Water level is at 0 : no lake.')
+    if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
+    if (zero('handAmount')) put(d, ['hand', 'handSize', 'heal', 'people'], 'Hand strength is at 0 : the hand leaves no mark.')
+    return d
+  },
   'gen-pointcloud': ({ zero, is }) => {
     const d: Why = {}
     if (zero('depth')) put(d, ['settle'], 'Depth is at 0 : the picture lies flat.')
@@ -545,6 +565,9 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('style', 4)) put(d, ['hidden'], 'Solid + edges always hides what is behind.')
     if (isnt('style', 3)) put(d, ['pointSize'], 'Only the points look has points.')
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0 : no ground.')
+    if (zero('shatter') && isnt('breakOn', 0)) put(d, ['breakOn'], 'Shatter is at 0 : only the trigger and broken break it.')
+    if (zero('throw')) put(d, ['scatter'], 'Throw is at 0 : the shards turn in place.')
+    if (zero('dust')) put(d, ['dustAt', 'dustSize'], 'Dust is at 0 : no shard turns to dust.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

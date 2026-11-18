@@ -26,6 +26,7 @@ import { ReliefSource } from './ReliefSource'
 import { PointCloudSource } from './PointCloudSource'
 import { ModelSource } from './ModelSource'
 import { GridMeshSource } from './GridMeshSource'
+import { TerrainSource } from './TerrainSource'
 import type { HandGestureLog } from '@shared/types'
 
 /** A pointer on the picture (the mouse on the preview, a pinching hand), for a
@@ -93,6 +94,7 @@ const REGISTRY: Record<string, Factory> = {
   'gen-fur': (gl, w, h) => new FurSource(gl, w, h),
   'gen-relief': (gl, w, h) => new ReliefSource(gl, w, h),
   'gen-pointcloud': (gl, w, h) => new PointCloudSource(gl, w, h),
+  'gen-terrain': (gl, w, h) => new TerrainSource(gl, w, h),
   'gen-model': (gl, w, h) => new ModelSource(gl, w, h),
   'gen-gridmesh': (gl, w, h) => new GridMeshSource(gl, w, h)
 }

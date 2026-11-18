@@ -290,6 +290,18 @@ Sloan, P.-P. J., Martin, W., Gooch, A., & Gooch, B. (2001). The lit sphere: A mo
 
 ↳ The Model source's matcap material (`engine/ModelSource.ts`): a lit ball's picture read at each point by the surface's normal.
 
+Quílez, I. (n.d.). *Terrain raymarching*. iquilezles.org. https://iquilezles.org/articles/terrainmarching/
+
+↳ The Terrain source (`engine/TerrainSource.ts`): a height field marched from the camera, pixel by pixel.
+
+Quílez, I. (n.d.). *Soft shadows in raymarched SDFs*. iquilezles.org. https://iquilezles.org/articles/rmshadows/
+
+↳ The Terrain's shadows, softened by how closely the ray toward the sun passes the land.
+
+Tevs, A., Ihrke, I., & Seidel, H.-P. (2008). Maximum mipmaps for fast, accurate, and scalable dynamic height field rendering. In *Proceedings of the 2008 Symposium on Interactive 3D Graphics and Games (I3D '08)*. ACM.
+
+↳ The Terrain's march : a pyramid of the highest point under each cell, rebuilt every frame, lets a ray skip whole empty cells.
+
 ## 9. Image processing and computer vision
 
 Bayer, B. E. (1973). An optimum method for two-level rendition of continuous-tone pictures. In *IEEE International Conference on Communications, Conference Record* (Vol. 1, pp. 26-11–26-15). IEEE.

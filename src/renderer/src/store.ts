@@ -3649,6 +3649,11 @@ export const useStore = create<StoreState>((set, get) => ({
           ...cur,
           inputs: { ...cur.inputs, shape: file ? FILE : shape === FILE ? 14 : (shape ?? 14) }
         }
+        // A file arriving on a built-in shape starts in plastic : its own colors show
+        // (chrome, the default, reflects the studio instead) and a layer worn as its
+        // skin reads plainly. A file swapped for another keeps the material chosen.
+        const PLASTIC = 1
+        if (file && shape !== FILE) next.inputs = { ...next.inputs, material: PLASTIC }
         if (file) {
           next.modelPath = file.path
           next.modelName = file.name

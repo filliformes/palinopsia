@@ -2226,6 +2226,78 @@ export const GENERATORS: IsfShader[] = [
     }
   },
   {
+    // Native (engine/TerrainSource.ts) : a picture raised into a lit, solid landscape
+    // seen across, terraced, shadowed, hazed, flown over.
+    id: 'gen-terrain',
+    name: 'Terrain',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Terrain : a picture raised into a solid landscape and seen across. The layer picked as SIDECHAIN (or a land of its own : rolling hills, ridges, dunes, a crater, islands) becomes the height of the land, raised by its brightness, its darkness or its depth (the depth model reading that picture, with depth: AI on). SMOOTH rounds it, PEAKS draws summits up out of a mass, ROCK breaks it into ridges; TERRACES cut it into steps with CONTOUR lines on them, the topographic look; its colors come from the picture, a ramp by height (earth, snow peaks, topo map, night, desert, lava, paper) or both. A sun casts shadows across it, the haze thickens toward the horizon, a lake can fill it to a level and mirror the hills. The camera looks from grazing to straight down, turns, rises, and FLIES forward over an endless field (the picture mirrored, repeated, or one island on a plain). Drag on the preview (or pinch, or the Room\'s people) : the land is pressed down, raised or spread apart under the hand, and heals back.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'own', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['rolling hills', 'ridges', 'dunes', 'crater', 'islands'], DEFAULT: 1, LABEL: 'own land' },
+        { NAME: 'raise', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['depth', 'brightness', 'darkness'], DEFAULT: 1, LABEL: 'raised by' },
+        { NAME: 'height', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'height' },
+        { NAME: 'smooth', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'smooth' },
+        { NAME: 'peaks', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'peaks' },
+        { NAME: 'rough', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'rock' },
+        { NAME: 'settle', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'settle (s)' },
+        { NAME: 'scale', TYPE: 'float', MIN: 0.3, MAX: 3, DEFAULT: 1, LABEL: 'land scale' },
+        { NAME: 'evolve', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.1, LABEL: 'evolve' },
+        { NAME: 'terraces', TYPE: 'float', MIN: 0, MAX: 40, DEFAULT: 12, LABEL: 'terraces' },
+        { NAME: 'sharp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'sharpness' },
+        { NAME: 'contours', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'contour lines' },
+        { NAME: 'lineWidth', TYPE: 'float', MIN: 0.5, MAX: 4, DEFAULT: 1.2, LABEL: 'line width' },
+        { NAME: 'lineColor', TYPE: 'color', DEFAULT: [0.24, 0.15, 0.09, 1], LABEL: 'line color' },
+        { NAME: 'palette', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6], LABELS: ['earth', 'snow peaks', 'topo map', 'night', 'desert', 'lava', 'paper'], DEFAULT: 0, LABEL: 'ramp' },
+        { NAME: 'colorMix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'picture to ramp' },
+        { NAME: 'sunAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'sun angle' },
+        { NAME: 'sunHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'sun height' },
+        { NAME: 'shadows', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.8, LABEL: 'shadows' },
+        { NAME: 'ambient', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ambient' },
+        { NAME: 'sunColor', TYPE: 'color', DEFAULT: [1, 0.93, 0.8, 1], LABEL: 'sun color' },
+        { NAME: 'shadowColor', TYPE: 'color', DEFAULT: [0.32, 0.38, 0.55, 1], LABEL: 'shadow color' },
+        { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'haze' },
+        { NAME: 'haze', TYPE: 'color', DEFAULT: [0.74, 0.78, 0.84, 1], LABEL: 'horizon' },
+        { NAME: 'sky', TYPE: 'color', DEFAULT: [0.32, 0.45, 0.66, 1], LABEL: 'sky' },
+        { NAME: 'skyOp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'sky opacity' },
+        { NAME: 'water', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'water level' },
+        { NAME: 'waterColor', TYPE: 'color', DEFAULT: [0.06, 0.18, 0.22, 1], LABEL: 'water color' },
+        { NAME: 'mirror', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'reflection' },
+        { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripples' },
+        { NAME: 'tilt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'tilt' },
+        { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
+        { NAME: 'camHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'camera height' },
+        { NAME: 'distance', TYPE: 'float', MIN: 0.3, MAX: 3, DEFAULT: 1.2, LABEL: 'distance' },
+        { NAME: 'lens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'lens' },
+        { NAME: 'fly', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'fly' },
+        { NAME: 'spin', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'spin' },
+        { NAME: 'sway', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'sway' },
+        { NAME: 'swayRate', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'sway rate' },
+        { NAME: 'edges', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['mirrored', 'repeated', 'island'], DEFAULT: 0, LABEL: 'beyond the edge' },
+        { NAME: 'hand', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['presses', 'raises', 'spreads'], DEFAULT: 0, LABEL: 'the hand' },
+        { NAME: 'handAmount', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'hand strength' },
+        { NAME: 'handSize', TYPE: 'float', MIN: 0.02, MAX: 0.6, DEFAULT: 0.12, LABEL: 'hand size' },
+        { NAME: 'heal', TYPE: 'float', MIN: 0.2, MAX: 60, DEFAULT: 6, LABEL: 'heal (s)' },
+        { NAME: 'people', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'room people' },
+        { NAME: 'restore', TYPE: 'event', LABEL: 'restore ▸' }
+      ]
+    })}*/`,
+    // The camera stays above the land for the dice (a buried or upside-down view reads as
+    // noise); the hand, the people, the flight and the edge of the field are staging.
+    curated: {
+      own: [0, 4], raise: [1, 1], height: [0.35, 0.75], smooth: [0.15, 0.5], peaks: [0, 0.4], rough: [0, 0.4], settle: [0.2, 0.6], scale: [0.7, 1.6], evolve: [0, 0.2],
+      terraces: [0, 24], sharp: [0.5, 1], contours: [0, 0.8], lineWidth: [0.8, 1.8], palette: [0, 6], colorMix: [0.3, 1],
+      sunAngle: [0, 6.2832], sunHeight: [0.12, 0.6], shadows: [0.5, 1], ambient: [0.2, 0.45], fog: [0.15, 0.5], skyOp: [1, 1],
+      water: [0, 0], mirror: [0.4, 0.8], ripple: [0.1, 0.5],
+      tilt: [0.12, 0.55], turn: [-0.25, 0.25], camHeight: [0.05, 0.35], distance: [0.9, 1.6], lens: [0.35, 0.65], fly: [0, 0], spin: [0, 0],
+      sway: [0.15, 0.5], swayRate: [0.15, 0.5], edges: [0, 0], hand: [0, 0], handAmount: [0.6, 0.6], handSize: [0.12, 0.12], heal: [6, 6], people: [0, 0]
+    }
+  },
+  {
     // Native (engine/ReliefSource.ts, materials engine/reliefShade.ts) : strokes with real
     // height in clay, metal, plastic, ink and soap film, relit every frame.
     id: 'gen-relief',
@@ -2320,7 +2392,7 @@ export const GENERATORS: IsfShader[] = [
     dice: true, // (a built-in shape needs no file)
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Model : a 3D object turning in front of a camera. SHAPE picks one of fifteen built in (sphere, torus, cylinders, cubes, plane, disc, cone, capsule, the five regular solids, a knot) or the FILE opened in the Inspector or dropped on the layer (glTF / GLB, OBJ, STL, PLY). LOOK draws it solid, as a wireframe, as its edges (creases, open borders and its outline), as points, or solid with its edges. MATERIAL : clay, plastic, metal, brushed metal, chrome, glass, soap film, foil, a lit sphere (MATCAP), flat color, or its normals. TURN, TILT, ROLL set it, SPIN turns it, DISTANCE and FIELD OF VIEW frame it, X and Y move it. WOBBLE bends its surface, AUDIO swells it with the bass and roughens it with the mids. PICTURE puts the layer picked as SKIN on it : wrapped round it, projected on it from the front, reflected in it, or as its lit sphere. The ground lets the layers below show through (its opacity). TRUE DEPTH hands its real depth to Parallax, Pulfrich and Luma Blur in place of the depth AI.',
+        'Model : a 3D object turning in front of a camera. SHAPE picks one of fifteen built in (sphere, torus, cylinders, cubes, plane, disc, cone, capsule, the five regular solids, a knot) or the FILE opened in the Inspector or dropped on the layer (glTF / GLB, OBJ, STL, PLY). LOOK draws it solid, as a wireframe, as its edges (creases, open borders and its outline), as points, or solid with its edges. MATERIAL : clay, plastic, metal, brushed metal, chrome, glass, soap film, foil, a lit sphere (MATCAP), flat color, or its normals. TURN, TILT, ROLL set it, SPIN turns it, DISTANCE and FIELD OF VIEW frame it, X and Y move it. WOBBLE bends its surface, AUDIO swells it with the bass and roughens it with the mids. PICTURE puts the layer picked as SKIN on it : wrapped round it, projected on it from the front, reflected in it, or as its lit sphere. The ground lets the layers below show through (its opacity). TRUE DEPTH hands its real depth to Parallax, Pulfrich and Luma Blur in place of the depth AI. SHATTER breaks it into its triangles and gathers them back : on the ONSETS of the sound, on the BEAT (1 beat to 2 bars), on the SHATTER trigger, or held by hand (BROKEN, to modulate for slow dissolves). THROW, SCATTER, SHARD SPIN, GATHER, GRAVITY and DRIFT shape the flight, CRUMBLE lets the shards go one after another, DUST shrinks a share of them into points past DUST AT.',
       CATEGORIES: ['Generator', 'Geometry'],
       INPUTS: [
         { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], LABELS: ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'disc', 'cone', 'capsule', 'tetrahedron', 'octahedron', 'dodecahedron', 'icosahedron', 'knot', 'file'], DEFAULT: 14, LABEL: 'shape' },
@@ -2371,7 +2443,21 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'fog' },
         { NAME: 'ground', TYPE: 'color', DEFAULT: [0.02, 0.02, 0.025, 1], LABEL: 'ground' },
         { NAME: 'groundOp', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'ground opacity' },
-        { NAME: 'depthOut', TYPE: 'bool', DEFAULT: true, LABEL: 'true depth' }
+        { NAME: 'depthOut', TYPE: 'bool', DEFAULT: true, LABEL: 'true depth' },
+        { NAME: 'breakOn', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['by hand', 'onsets', 'beat', '2 beats', 'bar', '2 bars'], DEFAULT: 0, LABEL: 'break on' },
+        { NAME: 'shatter', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'shatter' },
+        { NAME: 'broken', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'broken' },
+        { NAME: 'throw', TYPE: 'float', MIN: 0, MAX: 3, DEFAULT: 0.8, LABEL: 'throw' },
+        { NAME: 'scatter', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'scatter' },
+        { NAME: 'shardSpin', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'shard spin' },
+        { NAME: 'gather', TYPE: 'float', MIN: 0.2, MAX: 8, DEFAULT: 1.5, LABEL: 'gather (s)' },
+        { NAME: 'gravity', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.2, LABEL: 'gravity' },
+        { NAME: 'drift', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'drift' },
+        { NAME: 'crumble', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'crumble' },
+        { NAME: 'dust', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'dust' },
+        { NAME: 'dustAt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'dust at' },
+        { NAME: 'dustSize', TYPE: 'float', MIN: 0.5, MAX: 6, DEFAULT: 1.5, LABEL: 'dust size' },
+        { NAME: 'shatterNow', TYPE: 'event', LABEL: 'shatter ▸' }
       ]
     })}*/`,
     // The file and the picture are choices made with them in mind, the ground, the
@@ -2384,7 +2470,9 @@ export const GENERATORS: IsfShader[] = [
       spin: [-0.35, 0.35], spinAxis: [0, 3], distance: [3.2, 5.5], lens: [25, 50], posX: [0, 0], posY: [0, 0], scale: [0.8, 1.2],
       wobble: [0, 0.4], wobbleSize: [0.8, 2.5], wobbleSpeed: [0.1, 0.5], audio: [0, 0], lightAngle: [0, 6.2832], lightHeight: [0.35, 0.75],
       light: [0.8, 1.3], ambient: [0.1, 0.35], skin: [0, 0], skinMode: [0, 0], tile: [1, 1], scroll: [0, 0],
-      lineWidth: [1.2, 1.2], edgeAngle: [20, 45], pointSize: [1.5, 4], fog: [0, 0.5], groundOp: [0, 0]
+      lineWidth: [1.2, 1.2], edgeAngle: [20, 45], pointSize: [1.5, 4], fog: [0, 0.5], groundOp: [0, 0],
+      breakOn: [0, 0], shatter: [0.4, 0.9], broken: [0, 0], throw: [0.3, 1.5], scatter: [0.1, 0.6], shardSpin: [0.1, 0.8],
+      gather: [0.8, 3], gravity: [-0.3, 0.6], drift: [0, 0.5], crumble: [0, 0.8], dust: [0, 0.6], dustAt: [0.3, 0.8], dustSize: [1, 2.5]
     }
   },
   {
