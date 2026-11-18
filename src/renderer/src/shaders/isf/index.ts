@@ -2386,6 +2386,93 @@ export const GENERATORS: IsfShader[] = [
       light: [0.8, 1.3], ambient: [0.1, 0.35], skin: [0, 0], skinMode: [0, 0], tile: [1, 1], scroll: [0, 0],
       lineWidth: [1.2, 1.2], edgeAngle: [20, 45], pointSize: [1.5, 4], fog: [0, 0.5], groundOp: [0, 0]
     }
+  },
+  {
+    // Native (engine/GridMeshSource.ts, the grid and its noise engine/gridMesh.ts) : a
+    // shape made as a grid of vertices, deformed by a still noise field it turns
+    // through, drawn in a classic draw mode read in the grid's own order. Made to play
+    // the OCTOCOSME visuals (their shards, scribbles and slivers).
+    id: 'gen-gridmesh',
+    name: 'Grid Mesh',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Grid Mesh : a shape made as a GRID of vertices (X × Y), deformed by a still NOISE field it turns through, and drawn in one of twelve DRAW MODES. The surface modes (tri grid, quad grid) follow the grid; the others read its vertices one after another and join them as that mode joins any list : a line strip scribbles across the shape, a fan or a polygon throws long slivers from its first point, quads and quad strips cut it into shards. The noise is a field on its own small grid, brought to 0..1 and scaled by SIZE, multiplied into the shape on that grid (vertices repeat or drop : the steps) and crossfaded back by BLEND (past 1, beyond the noisy shape). The shape spins inside the still field, so the deformation changes as it turns. FRONT and BACK draw each side filled, as lines or as points. Two lights, with the diffuse (Lambert, Oren-Nayar, toon, Minnaert) and specular (Blinn, Phong, toon, Ward, Cook-Torrance) models; the BLEND FACTORS set how its own triangles pile up over a transparent ground. Made to play the OCTOCOSME visuals.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], LABELS: ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'circle', 'cone', 'capsule'], DEFAULT: 9, LABEL: 'shape' },
+        { NAME: 'dimX', TYPE: 'float', MIN: 2, MAX: 128, DEFAULT: 40, LABEL: 'grid x' },
+        { NAME: 'dimY', TYPE: 'float', MIN: 2, MAX: 128, DEFAULT: 40, LABEL: 'grid y' },
+        { NAME: 'drawMode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], LABELS: ['tri grid', 'quad grid', 'points', 'lines', 'line strip', 'line loop', 'triangles', 'tri fan', 'tri strip', 'quads', 'quad strip', 'polygon'], DEFAULT: 0, LABEL: 'draw mode' },
+        { NAME: 'polyFront', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['filled', 'lines', 'points'], DEFAULT: 0, LABEL: 'front' },
+        { NAME: 'polyBack', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['filled', 'lines', 'points'], DEFAULT: 0, LABEL: 'back' },
+        { NAME: 'lineWidth', TYPE: 'float', MIN: 1, MAX: 12, DEFAULT: 1, LABEL: 'line width' },
+        { NAME: 'pointSize', TYPE: 'float', MIN: 1, MAX: 100, DEFAULT: 4, LABEL: 'point size' },
+        { NAME: 'noiseBasis', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], LABELS: ['saw', 'distance', 'sine', 'cell', 'checker', 'distorted', 'gradient', 'simplex', 'voronoi', 'value (cubic)', 'value (convolution)', 'sparse convolution', 'fractal mono', 'fractal hetero', 'multifractal', 'hybrid multifractal', 'ridged multifractal', 'turbulence'], DEFAULT: 6, LABEL: 'noise' },
+        { NAME: 'noiseBlend', TYPE: 'float', MIN: -2, MAX: 6, DEFAULT: 1.5, LABEL: 'blend' },
+        { NAME: 'noiseScale', TYPE: 'float', MIN: 0.01, MAX: 10, DEFAULT: 0.9, LABEL: 'noise scale' },
+        { NAME: 'noiseSize', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 1, LABEL: 'size' },
+        { NAME: 'noiseGrid', TYPE: 'float', MIN: 2, MAX: 64, DEFAULT: 20, LABEL: 'noise grid' },
+        { NAME: 'noiseX', TYPE: 'float', MIN: -10, MAX: 10, DEFAULT: 0, LABEL: 'noise x' },
+        { NAME: 'noiseY', TYPE: 'float', MIN: -10, MAX: 10, DEFAULT: 0, LABEL: 'noise y' },
+        { NAME: 'noiseZ', TYPE: 'float', MIN: -10, MAX: 10, DEFAULT: 0, LABEL: 'noise z' },
+        { NAME: 'noiseFlip', TYPE: 'bool', DEFAULT: false, LABEL: 'mirror noise' },
+        { NAME: 'noiseStill', TYPE: 'bool', DEFAULT: true, LABEL: 'turns in the noise' },
+        { NAME: 'noiseColor', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'noise in color' },
+        { NAME: 'autoNormals', TYPE: 'bool', DEFAULT: true, LABEL: 'normals from shape' },
+        { NAME: 'spinAxes', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7], LABELS: ['still', 'y', 'z', 'x + y', 'all ×2', 'all', 'x + z', 'y + z'], DEFAULT: 5, LABEL: 'spin axes' },
+        { NAME: 'spinSpeed', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 10, LABEL: 'spin speed' },
+        { NAME: 'shapeRotX', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'shape x°' },
+        { NAME: 'shapeRotY', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'shape y°' },
+        { NAME: 'shapeRotZ', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'shape z°' },
+        { NAME: 'scaleX', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 1, LABEL: 'stretch x' },
+        { NAME: 'scaleY', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 1, LABEL: 'stretch y' },
+        { NAME: 'scaleZ', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 1, LABEL: 'stretch z' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.05, MAX: 6, DEFAULT: 1, LABEL: 'size' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'tilt°' },
+        { NAME: 'turn', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'turn°' },
+        { NAME: 'roll', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 0, LABEL: 'roll°' },
+        { NAME: 'posX', TYPE: 'float', MIN: -8, MAX: 8, DEFAULT: 0, LABEL: 'x' },
+        { NAME: 'posY', TYPE: 'float', MIN: -8, MAX: 8, DEFAULT: 0, LABEL: 'y' },
+        { NAME: 'distance', TYPE: 'float', MIN: 1, MAX: 60, DEFAULT: 22, LABEL: 'distance' },
+        { NAME: 'lens', TYPE: 'float', MIN: 2, MAX: 120, DEFAULT: 15, LABEL: 'field of view' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [1, 1, 1, 1], LABEL: 'color' },
+        { NAME: 'lighting', TYPE: 'bool', DEFAULT: true, LABEL: 'lit' },
+        { NAME: 'diffuseModel', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['Lambert', 'Oren-Nayar', 'toon', 'Minnaert'], DEFAULT: 0, LABEL: 'diffuse' },
+        { NAME: 'specularModel', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['Blinn', 'Phong', 'toon', 'Ward', 'Cook-Torrance'], DEFAULT: 0, LABEL: 'specular' },
+        { NAME: 'specularColor', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'specular color' },
+        { NAME: 'shininess', TYPE: 'float', MIN: 0, MAX: 64, DEFAULT: 2, LABEL: 'shininess' },
+        { NAME: 'emission', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'emission' },
+        { NAME: 'ambientColor', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'ambient color' },
+        { NAME: 'roughness', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'roughness' },
+        { NAME: 'darkness', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.5, LABEL: 'darkness' },
+        { NAME: 'toonDiffSize', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'toon size' },
+        { NAME: 'toonDiffSmooth', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.05, LABEL: 'toon softness' },
+        { NAME: 'toonSpecSize', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'toon shine size' },
+        { NAME: 'toonSpecSmooth', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.05, LABEL: 'toon shine softness' },
+        { NAME: 'light1Color', TYPE: 'color', DEFAULT: [1, 1, 1, 1], LABEL: 'light 1' },
+        { NAME: 'light1Az', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: 30, LABEL: 'light 1 around' },
+        { NAME: 'light1El', TYPE: 'float', MIN: -90, MAX: 90, DEFAULT: 30, LABEL: 'light 1 height' },
+        { NAME: 'light2Color', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'light 2' },
+        { NAME: 'light2Az', TYPE: 'float', MIN: -180, MAX: 180, DEFAULT: -60, LABEL: 'light 2 around' },
+        { NAME: 'light2El', TYPE: 'float', MIN: -90, MAX: 90, DEFAULT: 10, LABEL: 'light 2 height' },
+        { NAME: 'ambient', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'ambient' },
+        { NAME: 'blendOn', TYPE: 'bool', DEFAULT: true, LABEL: 'blend' },
+        { NAME: 'blendSrc', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], LABELS: ['zero', 'one', 'dst color', 'src color', 'one − dst color', 'one − src color', 'src alpha', 'one − src alpha', 'dst alpha', 'one − dst alpha', 'src alpha saturate'], DEFAULT: 6, LABEL: 'blend source' },
+        { NAME: 'blendDst', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], LABELS: ['zero', 'one', 'dst color', 'src color', 'one − dst color', 'one − src color', 'src alpha', 'one − src alpha', 'dst alpha', 'one − dst alpha', 'src alpha saturate'], DEFAULT: 7, LABEL: 'blend dest' },
+        { NAME: 'depthTest', TYPE: 'bool', DEFAULT: true, LABEL: 'depth test' },
+        { NAME: 'level', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'level' }
+      ]
+    })}*/`,
+    // The dice play the shape, its grid, the draw mode and the noise; the camera, the
+    // lights and the blend factors are staging : never dealt.
+    curated: {
+      shape: [0, 9], dimX: [6, 60], dimY: [6, 60], drawMode: [0, 11], polyFront: [0, 2], polyBack: [0, 2], lineWidth: [1, 4], pointSize: [2, 30],
+      noiseBasis: [0, 17], noiseBlend: [0, 4], noiseScale: [0.05, 4], noiseSize: [1, 1], noiseGrid: [20, 20],
+      spinAxes: [1, 7], spinSpeed: [-30, 30], shininess: [1, 8], diffuseModel: [0, 3], specularModel: [0, 2]
+    }
   }
 ]
 

@@ -7,6 +7,22 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Grid Mesh, a new 3D source** (`engine/GridMeshSource.ts`, `engine/gridMesh.ts`), beside
+  Model, made to play the OCTOCOSME visuals:
+  - a shape built as a grid of vertices (ten shapes, grid x × y), deformed by a still noise
+    field it turns through: eighteen noises written from their published methods, the
+    field on its own 20 × 20 grid, multiplied into every value of the shape (the shape
+    resampled to it and back by the nearest cell : the steps) and crossfaded back (past 1,
+    beyond);
+  - twelve draw modes read in the grid's own order (line strip, fan, quads, polygon… : the
+    scribbles, slivers and shards), filled / lines / points per side, square points and
+    wide lines in pixels;
+  - two lights with Lambert, Oren-Nayar, toon and Minnaert diffuse and Blinn, Phong, toon,
+    Ward and Cook-Torrance specular models; the classic blend factors over a transparent
+    ground; no multisampling;
+  - eight presets, OCTOCOSME 1 to 8 : the patch's mesh bank, value for value; the methods
+    and papers in THIRD_PARTY_NOTICES Part 6 and the bibliography.
+
 - **A frequency band on the audio modulator** : an **HZ** row under SMOOTH, a slider with
   two ends on a logarithmic track (0 to 20000 Hz, the two shown beside it; double-click :
   the whole range, the old behavior), reads every feature only between the two

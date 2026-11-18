@@ -80,6 +80,11 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('look', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick'),
     g('finish, light and skin', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut')
   ],
+  'gen-gridmesh': [
+    g('shape and draw', 'shape', 'dimX', 'dimY', 'drawMode', 'polyFront', 'polyBack', 'lineWidth', 'pointSize', 'spinAxes', 'spinSpeed', 'shapeRotX', 'shapeRotY', 'shapeRotZ', 'scaleX', 'scaleY', 'scaleZ', 'size', 'tilt', 'turn', 'roll', 'posX', 'posY', 'distance', 'lens'),
+    g('noise', 'noiseBasis', 'noiseBlend', 'noiseScale', 'noiseSize', 'noiseGrid', 'noiseX', 'noiseY', 'noiseZ', 'noiseFlip', 'noiseStill', 'noiseColor', 'autoNormals'),
+    g('light and blend', 'color', 'lighting', 'diffuseModel', 'specularModel', 'specularColor', 'shininess', 'emission', 'ambientColor', 'roughness', 'darkness', 'toonDiffSize', 'toonDiffSmooth', 'toonSpecSize', 'toonSpecSmooth', 'light1Color', 'light1Az', 'light1El', 'light2Color', 'light2Az', 'light2El', 'ambient', 'blendOn', 'blendSrc', 'blendDst', 'depthTest', 'level')
+  ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
     g('hand and wind', 'brush', 'hold', 'heal', 'groom', 'wind', 'gust', 'spring', 'audio', 'audioPart', 'lightAngle', 'lightHeight'),

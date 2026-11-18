@@ -28,7 +28,7 @@ This is the reading list behind Palinopsia: the scientific papers, books, theses
 
 Ebert, D. S., Musgrave, F. K., Peachey, D., Perlin, K., & Worley, S. (2003). *Texturing and modeling: A procedural approach* (3rd ed.). Morgan Kaufmann.
 
-↳ Fractal (fbm) and ridged noise across the Organic family: Erosion's carved channels, Mycelium's hyphae, the grain of Colony and Ground.
+↳ Fractal (fbm) and ridged noise across the Organic family: Erosion's carved channels, Mycelium's hyphae, the grain of Colony and Ground. Grid Mesh's value noises (Peachey) and its fractal sums (Musgrave : fBm, heterogeneous terrain, multifractal, hybrid and ridged multifractal).
 
 Hoskins, D. (2014). *Hash without sine* [Computer software, MIT License]. Shadertoy. https://www.shadertoy.com/view/4djSRW
 
@@ -38,9 +38,21 @@ Montfort, N., Baudoin, P., Bell, J., Bogost, I., Douglass, J., Marino, M. C., Ma
 
 ↳ The Ten Print generator (the one-line maze and its arc variant).
 
+Lewis, J. P. (1989). Algorithms for solid noise synthesis. *ACM SIGGRAPH Computer Graphics, 23*(3), 263–270.
+
+↳ The sparse convolution noise of Grid Mesh (`engine/gridMesh.ts`).
+
 Perlin, K. (1985). An image synthesizer. *ACM SIGGRAPH Computer Graphics, 19*(3), 287–296. https://doi.org/10.1145/325165.325247
 
 ↳ Gradient and value noise under most generators, and the noise-driven placement of film dust in the Finalizer film damage (`engine/filmDamage.ts`).
+
+Perlin, K. (2001). Noise hardware. In *Real-time shading* (SIGGRAPH 2001 course notes). ACM SIGGRAPH.
+
+↳ The simplex noise of Grid Mesh (`engine/gridMesh.ts`).
+
+Perlin, K. (2002). Improving noise. *ACM Transactions on Graphics, 21*(3), 681–682. https://doi.org/10.1145/566654.566636
+
+↳ The quintic fade of Grid Mesh's gradient noise.
 
 Quilez, I. (n.d.). *2D distance functions*. https://iquilezles.org/articles/distfunctions2d/
 
@@ -56,7 +68,29 @@ Quilez, I. (2017). *Gradient noise derivatives*. https://iquilezles.org/articles
 
 Worley, S. (1996). A cellular texture basis function. In *Proceedings of the 23rd Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '96)* (pp. 291–294). ACM. https://doi.org/10.1145/237170.237267
 
-↳ The Worley F1/F2 cells of the Organic toolkit: pores, grains, plates and areolae.
+↳ The Worley F1/F2 cells of the Organic toolkit: pores, grains, plates and areolae; Grid Mesh's cell and Voronoi noises.
+
+### Lighting models (Grid Mesh)
+
+Beckmann, P., & Spizzichino, A. (1963). *The scattering of electromagnetic waves from rough surfaces*. Pergamon Press.
+
+Blinn, J. F. (1977). Models of light reflection for computer synthesized pictures. *ACM SIGGRAPH Computer Graphics, 11*(2), 192–198.
+
+Cook, R. L., & Torrance, K. E. (1982). A reflectance model for computer graphics. *ACM Transactions on Graphics, 1*(1), 7–24. https://doi.org/10.1145/357290.357293
+
+Lambert, J. H. (1760). *Photometria, sive de mensura et gradibus luminis, colorum et umbrae*. Augsburg: Eberhard Klett.
+
+Minnaert, M. (1941). The reciprocity principle in lunar photometry. *The Astrophysical Journal, 93*, 403–410.
+
+Oren, M., & Nayar, S. K. (1994). Generalization of Lambert's reflectance model. In *Proceedings of the 21st Annual Conference on Computer Graphics and Interactive Techniques (SIGGRAPH '94)* (pp. 239–246). ACM.
+
+Phong, B. T. (1975). Illumination for computer generated pictures. *Communications of the ACM, 18*(6), 311–317. https://doi.org/10.1145/360825.360839
+
+Schlick, C. (1994). An inexpensive BRDF model for physically-based rendering. *Computer Graphics Forum, 13*(3), 233–246.
+
+Ward, G. J. (1992). Measuring and modeling anisotropic reflection. *ACM SIGGRAPH Computer Graphics, 26*(2), 265–272.
+
+↳ The diffuse (Lambert, Oren-Nayar, Minnaert) and specular (Phong, Blinn, Ward, Cook-Torrance with Schlick's Fresnel and Beckmann's distribution) models of Grid Mesh's two lights (`engine/GridMeshSource.ts`).
 
 ## 2. Texture synthesis and neural cellular automata
 
@@ -712,6 +746,7 @@ Entries above whose details could not all be confirmed against a primary source:
 - Sloan, Martin, Gooch and Gooch (2001): the page range and DOI in the Graphics Interface 2001 proceedings were not checked.
 - The Khronos Group (2021): the date given is that of the 2.0.1 revision of the specification as hosted; the first 2.0 release was 2017.
 - Turk (1994): the date is the one the format's description is usually cited with; the hosted copy is a later transcription.
+- Perlin (2001): the course these notes belong to (Real-Time Shading, SIGGRAPH 2001) and their page numbers come from later citations; the notes themselves were not checked.
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
 - Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).

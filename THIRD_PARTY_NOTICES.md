@@ -617,6 +617,42 @@ methods are free to build on; naming them is a matter of respect.
     patching environments (Cycling '74's jit.gl.gridshape in Max among them): sphere,
     torus, cylinder, open cylinder, cube, open cube, plane, circle, cone, capsule. The
     names in the app are plain shape names.
+- **The Grid Mesh source** (`engine/GridMeshSource.ts`, `engine/gridMesh.ts`), written
+  for Palinopsia to play the OCTOCOSME visuals. No code was taken:
+  - **The idea**: Vincent Fillion's own OCTOCOSME visuals, a Max patch built on Cycling
+    '74's Jitter objects (jit.gl.gridshape, jit.bfg, jit.normalize, jit.expr, jit.xfade,
+    jit.gl.mesh, jit.gl.material). Grid Mesh rebuilds the chain that patch wires (a grid
+    shape turned inside a still noise field, the noise multiplied in on its own grid and
+    crossfaded back, the classic draw modes read in the grid's order) from what the patch
+    does, not from Jitter's code, which is closed. Cycling '74 has no part in it; the
+    names in the app are plain names (Grid Mesh, draw modes, noise names).
+  - **Grid Mesh noise methods** (`gridMesh.ts`), each written from its published method:
+    gradient noise, K. Perlin, "An Image Synthesizer", *SIGGRAPH '85* (Computer Graphics
+    19(3), 287–296), with the quintic fade of K. Perlin, "Improving Noise", *ACM
+    Transactions on Graphics* 21(3), 681–682 (SIGGRAPH 2002); simplex noise, K. Perlin,
+    "Noise Hardware", SIGGRAPH 2001 course notes (Real-Time Shading); cellular and
+    Voronoi noise, S. Worley, "A Cellular Texture Basis Function", *SIGGRAPH '96*,
+    291–294; sparse convolution noise, J. P. Lewis, "Algorithms for Solid Noise
+    Synthesis", *SIGGRAPH '89* (Computer Graphics 23(3), 263–270); value noise (cubic
+    and convolution, after D. Peachey) and the fractal sums (fBm, heterogeneous terrain,
+    multifractal, hybrid and ridged multifractal, after F. K. Musgrave) and turbulence,
+    from D. S. Ebert, F. K. Musgrave, D. Peachey, K. Perlin and S. Worley, *Texturing and
+    Modeling: A Procedural Approach*, 3rd ed., Morgan Kaufmann, 2003. The permutation is
+    a seeded shuffle of our own (no published table is reproduced).
+  - **Grid Mesh lighting models** (`GridMeshSource.ts`): Lambert's cosine law (J. H.
+    Lambert, *Photometria*, 1760); B. T. Phong, "Illumination for Computer Generated
+    Pictures", *Communications of the ACM* 18(6), 311–317 (1975); J. F. Blinn, "Models
+    of Light Reflection for Computer Synthesized Pictures", *SIGGRAPH '77* (Computer
+    Graphics 11(2), 192–198); M. Oren and S. K. Nayar, "Generalization of Lambert's
+    Reflectance Model", *SIGGRAPH '94*, 239–246; M. Minnaert, "The Reciprocity Principle
+    in Lunar Photometry", *The Astrophysical Journal* 93, 403–410 (1941); G. J. Ward,
+    "Measuring and Modeling Anisotropic Reflection", *SIGGRAPH '92* (Computer Graphics
+    26(2), 265–272); R. L. Cook and K. E. Torrance, "A Reflectance Model for Computer
+    Graphics", *ACM Transactions on Graphics* 1(1), 7–24 (1982), with C. Schlick's
+    Fresnel approximation ("An Inexpensive BRDF Model for Physically-based Rendering",
+    *Computer Graphics Forum* 13(3), 233–246, 1994) and the Beckmann distribution (P.
+    Beckmann and A. Spizzichino, *The Scattering of Electromagnetic Waves from Rough
+    Surfaces*, Pergamon, 1963). The toon steps are plain thresholds.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the
