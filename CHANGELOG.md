@@ -104,6 +104,13 @@ that CI builds into cross-platform releases.
 
 ### Changed
 
+- **A model file opens in plastic** : a file loaded on a built-in shape starts in the plastic
+  material (chrome, the default, reflected the studio and hid the file's own colors and a
+  layer worn as skin); a file swapped for another keeps the material chosen.
+- **Context : the light that lights the surface material says so** : with a surface
+  material drawn and the glow at 0, the light section reads *no glow · lights the surface*
+  (it read *off* while the material's sheen and rim kept the light's place and color), and
+  **raking** is now **raking light**, its hint saying the glow is only the halo.
 - **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):
   - the spine (sources, A/B mix, layer FX, stack, master FX and finalizers, presentation,
     transform, keystone) is drawn large, ordinary blocks medium, the touch bus, the trigger
