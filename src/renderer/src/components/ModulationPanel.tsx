@@ -22,7 +22,7 @@ import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { auLabel } from '@shared/auMod'
-import { AUDIO_BANDS, AUDIO_FEATURES } from '../engine/audioIn'
+import { AUDIO_BANDS, AUDIO_FEATURES, AUDIO_HZ_MAX } from '../engine/audioIn'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
@@ -642,14 +642,20 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
                 </option>
               ))}
             </select>
+            {/* which of the six bands, on the same row (the card holds one row less
+                than band + HZ + FROM would take) */}
+            {a.feature === 'band' && (
+              <BoundedNumberInput value={a.band + 1} min={1} max={AUDIO_BANDS} integer
+                onChange={(v) => update(index, { audio: { ...a, band: Math.round(v) - 1 } })}
+                className="input w-7 shrink-0 px-1 py-0.5 text-right text-[10px]"
+                title={`Which of the ${AUDIO_BANDS} bands (1 : the lows … ${AUDIO_BANDS} : the highs)`} />
+            )}
           </Row>
-          {a.feature === 'band' && (
-            <NumRow label="BAND" value={a.band + 1} min={1} max={AUDIO_BANDS} integer
-              onChange={(v) => update(index, { audio: { ...a, band: Math.round(v) - 1 } })} />
-          )}
           <SliderRow label="SMOOTH" value={a.smooth} min={0} max={0.99}
             title="One-pole smoothing : 0 snaps to the signal, →1 glides"
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
+          <HzRow lo={a.lo ?? 0} hi={a.hi ?? AUDIO_HZ_MAX} clip={!!a.src}
+            onChange={(lo, hi) => update(index, { audio: { ...a, lo, hi } })} />
           <ClipFromRow value={a.src} onChange={(src) => update(index, { audio: { ...a, src } })} />
         </>
       )
@@ -1636,6 +1642,27 @@ function Row({
       </span>
       {children}
     </div>
+  )
+}
+
+// The audio modulator's frequency band : it listens only between LO and HI (Hz).
+// 0 to 20000 is the whole sound. Read on the live spectrum (the audio input, or
+// the Audio Layer when the audio tab listens to it); a clip's sound carries
+// features only, so the band waits while FROM is a clip.
+const HZ_HELP =
+  'The frequency band it listens to, in Hz : every feature (level, flux, transient, centroid, band, pitch, noisiness) is read only between these two. ' +
+  '0 to 20000 is the whole sound. A kick : 40 to 120; a voice : 200 to 3000; hats : 6000 to 16000. Centroid reads where the energy sits inside the band.'
+function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boolean; onChange: (lo: number, hi: number) => void }): JSX.Element {
+  const title = clip ? `${HZ_HELP} Not while it listens to a clip (FROM) : a clip's sound has no spectrum to cut.` : HZ_HELP
+  const box = 'input min-w-0 flex-1 px-1 py-0.5 text-right text-[10px]'
+  return (
+    <Row label="HZ" title={title}>
+      <BoundedNumberInput value={Math.round(lo)} min={0} max={AUDIO_HZ_MAX} integer disabled={clip}
+        onChange={(v) => onChange(Math.min(v, hi), hi)} className={box} title={`From (Hz). ${title}`} />
+      <span className="shrink-0 font-mono text-[9px] text-muted">to</span>
+      <BoundedNumberInput value={Math.round(hi)} min={0} max={AUDIO_HZ_MAX} integer disabled={clip}
+        onChange={(v) => onChange(lo, Math.max(v, lo))} className={box} title={`To (Hz). ${title}`} />
+    </Row>
   )
 }
 

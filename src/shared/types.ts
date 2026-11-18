@@ -792,7 +792,9 @@ export interface ModulatorConfig {
   sh: { probability: number; smooth: boolean; distribution: number }
   slew: { riseMs: number; fallMs: number; randomTarget: boolean }
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
-  audio: { feature: AudioFeature; band: number; smooth: number; src?: ClipAudioSrc } // follows the audio bus, or a slot's clip
+  // follows the audio bus, or a slot's clip; lo / hi (Hz) : only that part of the
+  // live spectrum (absent, or 0 to 20000 : the whole sound, as before)
+  audio: { feature: AudioFeature; band: number; smooth: number; src?: ClipAudioSrc; lo?: number; hi?: number }
   organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour

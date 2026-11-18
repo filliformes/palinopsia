@@ -1153,6 +1153,17 @@ One type follows the **live performer** instead of the picture:
   flatness) : bind a sound's noise to a layer's tint saturation and the *sound
   colours the picture* (the other direction of the same crossmodal table).
 
+**The audio modulator's frequency band.** An `audio` card's **HZ** row, under SMOOTH,
+sets the band it listens to, from 0 to 20000 Hz (0 to 20000 : the whole sound, as
+before). Every feature is then read only between the two : **level** the band's
+loudness, **flux** and **transient** the hits inside it, **centroid** where its energy
+sits from the low edge (0) to the high edge (1), **noisiness** how noisy the band is,
+**band** one of the six bands cut to it, **pitch** the input's pitch held while it falls
+inside. A kick : 40 to 120; a voice : 200 to 3000; the hats : 6000 to 16000. It reads
+the live spectrum (the audio input, or the Audio Layer when the audio tab listens to
+it); while the card listens to a clip (FROM), whose sound carries features only, the
+band waits.
+
 **The body modulator's clutch.** A `body` card can take a second body feature, its
 **CLUTCH** (any feature, the same menu) : it then follows its own feature only while the
 clutch reads above a threshold (**ABOVE**, 0.5 to start; **BELOW** follows while it
@@ -3392,7 +3403,10 @@ a MIDI pad or a key. The global Vary and each layer's Vary are also OSC triggers
 100 levels, gesture-grouped (a slider drag is one step). The history snapshots
 the **whole session surface** : composition, scene bank, sequence, worlds, and
 session name, so an accidental **New** or **Generate** really is one `Ctrl+Z`
-away, scenes and all. The auto-sequencer's own advances are excluded so they
+away, scenes and all. The **Lights** too : the looks, cues, masters and group faders, and
+the rig (a fixture added, moved, patched or deleted, the outputs), which is this
+computer's but undoes like any edit. The lights' on / off switch is not a step : an undo
+never turns the lights off or on, as it never touches Black. The auto-sequencer's own advances are excluded so they
 don't flood your history.
 
 ---

@@ -7,6 +7,17 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **A frequency band on the audio modulator** : an **HZ** row under SMOOTH (0 to 20000
+  Hz; the whole range is the old behavior) reads every feature only between the two
+  frequencies, on the live spectrum (`audioIn.ts` `featureInRange` : level as the band's
+  RMS, flux and its transient with their own memory per modulator, centroid inside the
+  band, noisiness, the six bands cut to it, the pitch held while inside). Waits while the
+  card listens to a clip (no spectrum there). The band number moved onto the FEAT row so
+  the card still fits.
+- **Lights in undo, the rig too** : adding, moving, patching or deleting a fixture and the
+  outputs are undo steps (`undo.ts` `lightRig`, saved on this computer as any rig edit);
+  the lights' on / off switch stays out, like Black.
+
 - **The Space line** : while Space drives Sonify's output (speakers or objects), a small line
   beside the Sonify meter and under Sonify's output in the Connect tab's Audio section says
   the mode and the channels in use (`objects 1-26`, *Space : speakers, 8 channels*). It

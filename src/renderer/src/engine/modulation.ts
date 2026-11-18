@@ -20,7 +20,7 @@ import type { ColorChannel, CompositionState, ControlInputConfig, LfoShape, ModC
 import { BLEND_MODES, FX_OPACITY_INPUT } from '@shared/types'
 import { colorOf, fitPart, hsvaOf, PART_INDEX, rgbaOf } from './colorParts'
 import { controlKey } from '../modKey'
-import { audioBus } from './audioIn'
+import { AUDIO_HZ_MAX, audioBus, hzFiltered, hzRangeState, type HzRangeState } from './audioIn'
 import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
@@ -279,6 +279,7 @@ interface SlotState {
   arpDir: 1 | -1
   arpLastAdvanceAt: number
   audioValue: number // one-pole smoothed audio feature (audio type)
+  audioRange: HzRangeState // its frequency band's own memory (flux, transient, pitch)
   clipRead: ClipReadState // a clip's playhead as last read (audio type, from a clip)
   visionValue: number // one-pole smoothed picture feature (vision type)
   bodyValue: number // one-pole smoothed body feature (body type)
@@ -381,6 +382,7 @@ function makeSlot(now: number): SlotState {
     arpDir: 1,
     arpLastAdvanceAt: now,
     audioValue: 0,
+    audioRange: hzRangeState(),
     clipRead: newClipReadState(),
     visionValue: 0,
     bodyValue: 0,
@@ -1076,9 +1078,12 @@ export class ModEngine {
           // clock. One-pole smoothing tames it toward the value.
           const a = cfg.audio
           if (a) {
+            // (a frequency band reads the live spectrum : a clip's sound has none)
             const raw = a.src
               ? clipAudio.feature(a.src, a.feature, a.band, s.clipRead, performance.now())
-              : audioBus.feature(a.feature, a.band)
+              : hzFiltered(a.lo, a.hi)
+                ? audioBus.featureInRange(a.feature, a.band, a.lo ?? 0, a.hi ?? AUDIO_HZ_MAX, s.audioRange, performance.now())
+                : audioBus.feature(a.feature, a.band)
             const sm = Math.max(0, Math.min(0.99, a.smooth ?? 0))
             // dt-normalized one-pole : retain `sm` per 60fps frame, then scale by
             // the real dt so the follower's speed doesn't ride the frame rate
