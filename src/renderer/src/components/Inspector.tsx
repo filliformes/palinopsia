@@ -271,13 +271,15 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud' || slot.shaderId === 'gen-terrain') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud' || slot.shaderId === 'gen-terrain' || slot.shaderId === 'gen-gridmesh') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
           hostLayer: li,
           hint:
-            slot.shaderId === 'gen-terrain'
+            slot.shaderId === 'gen-gridmesh'
+              ? 'The layer the mesh wears as its SKIN : wrapped by its grid (the noise tears it with the shape) or projected from the front. Raise SKIN to see it. None = its own color.'
+              : slot.shaderId === 'gen-terrain'
               ? "The layer raised into the land, by SIDECHAIN : its brightness, darkness or depth (with depth: AI on, the model reads this layer itself, not the whole frame) is the height, and its colors color the land as far as PICTURE TO RAMP says. None = the land of its own."
               : slot.shaderId === 'gen-pointcloud'
               ? "The layer the cloud lifts into points, by SIDECHAIN : each point takes its color, and its depth (with depth: AI on, the model reads this layer itself, not the whole frame) or its brightness raises them. None = the cloud's own picture."

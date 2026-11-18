@@ -939,6 +939,49 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Mesh : chains for a Grid Mesh (its lines, shards and points on black) ──
+  {
+    name: 'Neon Stage', group: 'Mesh',
+    fx: [
+      { shaderId: 'fx-colorizer', inputs: { gain: 1.15, bias: 0, fold: 0, mixSrc: 0, low: [0, 0, 0, 1], mid: [0.75, 0.12, 0.6, 1], high: [1, 0.72, 0.8, 1], invert: 0 } },
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.9, drift: 0, angle: 1.5708, knee: 0.1 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.005, angle: 0 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { contrast: 1.04, saturation: 1.05, gamma: 1, autoLevel: 0 }
+  },
+  {
+    name: 'Scribble Glow', group: 'Mesh',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.95, drift: 0, angle: 1.5708, knee: 0 } },
+      { shaderId: 'fx-difference-bloom', inputs: { gain: 2.5, spread: 0.01, keep: 0.6, tint: [0.85, 0.9, 1, 1], hold: 0.1, soft: 0.3 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 1.05, lift: 0, gamma: 1 } }
+    ],
+    vibe: { contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0 }
+  },
+  {
+    name: 'Shard Afterimage', group: 'Mesh',
+    fx: [
+      { shaderId: 'node-afterimage', inputs: { decay: 0.55, amount: 0.55, chroma: 0.7, dwell: 0.2, mix: 0.9 } },
+      { shaderId: 'fx-rgb-shift', inputs: { offset: 0.006, scale: 0.01, angle: 0, wobble: 0.15, wobRate: 0.3183 } }
+    ],
+    vibe: { contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0 }
+  },
+  {
+    name: 'Mesh Print', group: 'Mesh',
+    fx: [
+      { shaderId: 'fx-halftone', inputs: { mode: 0, cell: 6, angle: 0.785, shape: 0, gain: 0.1, soft: 0.25, grit: 0.25, misreg: 0.2, ink: [0.08, 0.08, 0.12, 1], ink2: [0.86, 0.24, 0.2, 1], paper: [0.95, 0.93, 0.88, 1], amount: 1 } }
+    ],
+    vibe: { contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0 }
+  },
+  {
+    name: 'Mesh in Depth', group: 'Mesh',
+    fx: [
+      { shaderId: 'node-parallax', inputs: { amount: 0.5, angle: 0, sway: 0.5, swayRate: 0.5, dof: 0.3, dofShape: 0, focus: 0.75, fog: 0.25, invert: 0, wet: 1.0 } },
+      { shaderId: 'fx-chroma-shift', inputs: { amount: 0.004, angle: 0 } }
+    ],
+    vibe: { contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0 }
+  },
   // ── Glitch : time broken, the pane broken, the picture keyed ──
   {
     name: 'Glitched Memory', group: 'Glitch',

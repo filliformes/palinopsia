@@ -51,12 +51,15 @@ export function DepthMenu(): JSX.Element {
   )
 }
 
-/** A seen layer plays a Model with TRUE DEPTH on : its real depth goes to the depth
- *  readers whatever the depth engine is set to (Compositor.modelDepthTex). */
+/** A seen layer plays a Model (or a Grid Mesh) with TRUE DEPTH on : its real depth
+ *  goes to the depth readers whatever the depth engine is set to
+ *  (Compositor.modelDepthTex). The Model's is on by default, the Grid Mesh's off. */
 export function modelGivesDepth(c: CompositionState): boolean {
   const solo = c.layers.some((l) => l.solo)
   return c.layers.some((l) => (solo ? l.solo : !l.mute) && l.opacity > 0.001 &&
-    [l.sourceA, l.sourceB].some((s) => s?.kind === 'generator' && s.shaderId === 'gen-model' && Number(s.inputs.depthOut ?? 1) > 0.5))
+    [l.sourceA, l.sourceB].some((s) => s?.kind === 'generator' &&
+      ((s.shaderId === 'gen-model' && Number(s.inputs.depthOut ?? 1) > 0.5) ||
+       (s.shaderId === 'gen-gridmesh' && Number(s.inputs.depthOut ?? 0) > 0.5))))
 }
 
 /** What a depth reader does while the engine is off, or null when it reads no

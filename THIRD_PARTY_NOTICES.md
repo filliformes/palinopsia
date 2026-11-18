@@ -675,7 +675,9 @@ methods are free to build on; naming them is a matter of respect.
     Fresnel approximation ("An Inexpensive BRDF Model for Physically-based Rendering",
     *Computer Graphics Forum* 13(3), 233–246, 1994) and the Beckmann distribution (P.
     Beckmann and A. Spizzichino, *The Scattering of Electromagnetic Waves from Rough
-    Surfaces*, Pergamon, 1963). The toon steps are plain thresholds.
+    Surfaces*, Pergamon, 1963). The toon steps are plain thresholds. In the app's menus the
+    models go by what they look like (diffuse : matte, rough matte, toon, dark rim; shine :
+    soft, sharp, toon, satin, glaze); the models' names stay in the hints and here.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the

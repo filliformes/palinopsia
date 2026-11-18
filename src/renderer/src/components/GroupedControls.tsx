@@ -86,10 +86,13 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('look and finish', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'fog'),
     g('light, skin, shatter', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'breakOn', 'shatter', 'broken', 'throw', 'scatter', 'shardSpin', 'gather', 'gravity', 'drift', 'crumble', 'dust', 'dustAt', 'dustSize', 'shatterNow')
   ],
+  // Grid Mesh : what it is and how it is drawn and moves · what deforms it (the noise,
+  // the sound) and what it wears and how its pieces pile up · its material and lights,
+  // then what it hands on (three columns of 24, 22 and 24).
   'gen-gridmesh': [
-    g('shape and draw', 'shape', 'dimX', 'dimY', 'drawMode', 'polyFront', 'polyBack', 'lineWidth', 'pointSize', 'spinAxes', 'spinSpeed', 'shapeRotX', 'shapeRotY', 'shapeRotZ', 'scaleX', 'scaleY', 'scaleZ', 'size', 'tilt', 'turn', 'roll', 'posX', 'posY', 'distance', 'lens'),
-    g('noise', 'noiseBasis', 'noiseBlend', 'noiseScale', 'noiseSize', 'noiseGrid', 'noiseX', 'noiseY', 'noiseZ', 'noiseFlip', 'noiseStill', 'noiseColor', 'autoNormals'),
-    g('light and blend', 'color', 'lighting', 'diffuseModel', 'specularModel', 'specularColor', 'shininess', 'emission', 'ambientColor', 'roughness', 'darkness', 'toonDiffSize', 'toonDiffSmooth', 'toonSpecSize', 'toonSpecSmooth', 'light1Color', 'light1Az', 'light1El', 'light2Color', 'light2Az', 'light2El', 'ambient', 'blendOn', 'blendSrc', 'blendDst', 'depthTest', 'level')
+    g('shape, draw, place', 'shape', 'dimX', 'dimY', 'drawMode', 'polyFront', 'polyBack', 'lineWidth', 'pointSize', 'spinAxes', 'spinSpeed', 'shapeRotX', 'shapeRotY', 'shapeRotZ', 'scaleX', 'scaleY', 'scaleZ', 'size', 'tilt', 'turn', 'roll', 'posX', 'posY', 'distance', 'lens'),
+    g('noise, sound, skin, blend', 'noiseBlend', 'noiseBasis', 'noiseScale', 'noiseSize', 'noiseGrid', 'noiseX', 'noiseY', 'noiseZ', 'noiseFlip', 'noiseStill', 'noiseColor', 'autoNormals', 'audio', 'hits', 'skin', 'skinMode', 'tile', 'scroll', 'blendOn', 'blendMode', 'blendSrc', 'blendDst'),
+    g('material, light, out', 'color', 'lighting', 'diffuseModel', 'roughness', 'darkness', 'toonDiffSize', 'toonDiffSmooth', 'specularModel', 'specularColor', 'shininess', 'toonSpecSize', 'toonSpecSmooth', 'emission', 'ambientColor', 'ambient', 'light1Color', 'light1Az', 'light1El', 'light2Color', 'light2Az', 'light2El', 'depthTest', 'depthOut', 'level')
   ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
@@ -568,6 +571,38 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (zero('shatter') && isnt('breakOn', 0)) put(d, ['breakOn'], 'Shatter is at 0 : only the trigger and broken break it.')
     if (zero('throw')) put(d, ['scatter'], 'Throw is at 0 : the shards turn in place.')
     if (zero('dust')) put(d, ['dustAt', 'dustSize'], 'Dust is at 0 : no shard turns to dust.')
+    return d
+  },
+  // Grid Mesh (engine/GridMeshSource.ts) : what each draw mode makes (lines, points,
+  // triangles to fill or not), the noise only with a deformation, the lighting's
+  // own knobs per model, the factors only for BLEND AS factors, the skin only with a
+  // layer to wear.
+  'gen-gridmesh': ({ zero, is, isnt, side }) => {
+    const d: Why = {}
+    // tri grid, quad grid, triangles, the fans, strips, quads and polygon make triangles;
+    // points makes points; lines, line strip and line loop make lines
+    const triModes = isnt('drawMode', 2, 3, 4, 5)
+    if (is('drawMode', 2, 3, 4, 5)) put(d, ['polyFront', 'polyBack'], 'This draw mode makes no triangles : nothing to fill.')
+    if (triModes && isnt('polyFront', 1) && isnt('polyBack', 1)) put(d, ['lineWidth'], 'No lines : the draw mode makes triangles, and front and back are not on lines.')
+    if (is('drawMode', 2)) put(d, ['lineWidth'], 'Points makes no lines.')
+    if (is('drawMode', 3, 4, 5)) put(d, ['pointSize'], 'This draw mode makes lines, no points.')
+    else if (triModes && isnt('polyFront', 2) && isnt('polyBack', 2)) put(d, ['pointSize'], 'No points : the draw mode makes triangles, and front and back are not on points.')
+    if (is('spinAxes', 0)) put(d, ['spinSpeed'], 'Spin axes is on still.')
+    if (zero('noiseBlend') && zero('audio'))
+      put(d, ['noiseBasis', 'noiseScale', 'noiseSize', 'noiseGrid', 'noiseX', 'noiseY', 'noiseZ', 'noiseFlip', 'noiseStill', 'noiseColor', 'hits'], 'Deform and audio are at 0 : the shape is plain, no noise in it.')
+    if (!side) put(d, ['skin', 'skinMode', 'tile', 'scroll'], 'No layer is picked as its skin (the sidechain menu above).')
+    else if (zero('skin')) put(d, ['skinMode', 'tile', 'scroll'], 'Skin is at 0 : it wears its own color.')
+    else if (isnt('skinMode', 0)) put(d, ['tile', 'scroll'], 'Only the wrapped skin repeats and scrolls.')
+    if (zero('blendOn')) put(d, ['blendMode', 'blendSrc', 'blendDst'], 'Blend pieces is off : each piece covers what is under it.')
+    else if (isnt('blendMode', 0)) put(d, ['blendSrc', 'blendDst'], 'Blend as is not on factors : the plain blend sets them.')
+    if (zero('lighting')) {
+      put(d, ['diffuseModel', 'roughness', 'darkness', 'toonDiffSize', 'toonDiffSmooth', 'specularModel', 'specularColor', 'shininess', 'toonSpecSize', 'toonSpecSmooth', 'emission', 'ambientColor', 'ambient', 'light1Color', 'light1Az', 'light1El', 'light2Color', 'light2Az', 'light2El'], 'Lit is off : its color, unlit.')
+    } else {
+      if (isnt('diffuseModel', 1)) put(d, ['roughness'], 'Only the rough matte has a roughness.')
+      if (isnt('diffuseModel', 3)) put(d, ['darkness'], 'Only the dark rim darkens its edges.')
+      if (isnt('diffuseModel', 2)) put(d, ['toonDiffSize', 'toonDiffSmooth'], 'Diffuse is not on toon.')
+      if (isnt('specularModel', 2)) put(d, ['toonSpecSize', 'toonSpecSmooth'], 'Shine is not on toon.')
+    }
     return d
   },
   'gen-fur': ({ zero, is }) => {

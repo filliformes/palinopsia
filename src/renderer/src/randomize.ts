@@ -203,6 +203,9 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   // Model : the line and ground colors, the depth it hands on and hiding the far lines
   // are staging (its presets); its own color rolls.
   'gen-model': /^(lineColor|ground|depthOut|hidden)$/,
+  // Grid Mesh : the lights, the glow and the ambient tint are staging (its presets); its
+  // own color and its highlights roll.
+  'gen-gridmesh': /^(light1Color|light2Color|emission|ambientColor)$/,
   // Relief : its colors and ground go together (its presets).
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
   // Point Cloud : the points carry the picture's colors on the house ground.

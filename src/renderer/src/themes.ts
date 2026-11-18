@@ -228,6 +228,14 @@ const DEF = {
 }
 const mk = (t: ThemeIn): Theme => ({ ...DEF, ...t })
 
+// What the Grid Mesh themes' motion never binds : what re-cuts or re-deals the whole
+// mesh in one frame when it moves (its shape, its grid, its draw mode, its noise's
+// kind and grid, the menus and switches), the noise field's place and size (each move
+// works the whole field out again : 6 ms a frame for the fractal ones, measured 11-18),
+// the camera and place it is framed by, and the sound, the skin and the depth a theme
+// sets on purpose. It breathes by DEFORM, its spin, its own turn, stretch and size.
+const GRID_MESH_STILL = '^(shape|dimX|dimY|drawMode|polyFront|polyBack|noiseBasis|noiseGrid|noiseScale|noiseSize|noiseX|noiseY|noiseZ|noiseFlip|noiseStill|autoNormals|spinAxes|skin|skinMode|tile|blendOn|blendMode|blendSrc|blendDst|depthTest|depthOut|lighting|diffuseModel|specularModel|audio|hits|lens|distance|posX|posY|level|bloom|lift|haze)$'
+
 export const THEMES: Theme[] = [
   // ── Analog Video Synthesis ────────────────────────────────────────────
   mk({
@@ -1778,6 +1786,69 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     context: { trails: 0, haze: 0, bloom: 0.1, depth: 0 },
     motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+
+  // ── Objects, the Grid Mesh : a shape on its grid, torn by its noise, scribbled,
+  // shattered, worn or played by the sound ──
+  mk({
+    id: 'mesh-scribbles', name: 'Mesh Scribbles', family: 'Objects',
+    blurb: 'A shape read row by row as lines : rings, ribbons and wires turning through a still noise that tears them, leaving light behind.',
+    world: 'parametric',
+    palette: [K, [0.12, 0.1, 0.16, 1], [0.9, 0.82, 0.7, 1]],
+    sources: ['gen-gridmesh'],
+    presets: { 'gen-gridmesh': ['Ribbon scribble', 'Cone rings', 'Wire cage'] },
+    // (every Grid Mesh it deals draws lines : a cage of its triangles or its rows as strips)
+    pickInputs: { 'gen-gridmesh': { drawMode: [0, 4, 5], polyFront: [1], polyBack: [1], lineWidth: [1.2, 1.8, 2.4], noiseColor: [0, 0.2] } },
+    stackFx: [['fx-light-trails']],
+    layerFx: ['fx-grade', 'fx-chroma-shift'],
+    blends: ['screen', 'lighten'], layers: [1, 2], useB: 0, feedback: 0, density: 0.45, drift: 0.1,
+    context: { trails: 0.15, haze: 0, bloom: 0.15, depth: 0 },
+    motion: { ...SLOW, rate: [0.01, 0.05], skip: GRID_MESH_STILL }
+  }),
+  mk({
+    id: 'shard-garden', name: 'Shard Garden', family: 'Objects',
+    blurb: 'Shapes cut into shards, slivers and steps by their noise, breathing in and out of pieces over a slow painted ground.',
+    world: 'synthetic',
+    palette: [K, [0.16, 0.12, 0.2, 1], [0.88, 0.84, 0.92, 1]],
+    sources: ['gen-gridmesh'],
+    stack: [['swell', 'dye-field', 'membrane', 'drift-field'], ['gen-gridmesh']],
+    presets: { 'gen-gridmesh': ['Shard burst', 'Glass slivers', 'Stepped capsule', 'Noise blossom', 'Deep shards'] },
+    pickInputs: { 'gen-gridmesh': { size: [1.1, 1.3, 1.5] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0.05, haze: 0, bloom: 0.12, depth: 0.15 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: GRID_MESH_STILL }
+  }),
+  mk({
+    id: 'torn-skin', name: 'Torn Skin', family: 'Objects',
+    blurb: 'A shape wearing the picture of the layer under it, laid on by its grid, so the picture tears and smears as the noise tears the shape.',
+    world: 'synthetic',
+    palette: [K, [0.22, 0.16, 0.26, 1], [0.9, 0.82, 0.74, 1]],
+    sources: ['gen-gridmesh'],
+    // the picture below, seen only on the mesh that wears it
+    stack: [['drift-field', 'dye-field', 'op-art', 'swell'], ['gen-gridmesh']],
+    muted: [0],
+    reads: { 'gen-gridmesh': 0 },
+    presets: { 'gen-gridmesh': ['Worn skin'] },
+    pickInputs: { 'gen-gridmesh': { shape: [0, 1, 6, 9], skin: [1], skinMode: [0, 0, 1], noiseBlend: [0.8, 1.2, 1.8], size: [1.2, 1.5], ambient: [0.5] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0, haze: 0, bloom: 0.1, depth: 0.15 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: GRID_MESH_STILL }
+  }),
+  mk({
+    id: 'sounding-mesh', name: 'Sounding Mesh', family: 'Objects',
+    blurb: 'A shape the sound plays : the loud parts tear it open, each hit throws its noise somewhere new, the quiet lets it close.',
+    world: 'musical',
+    palette: [K, [0.1, 0.14, 0.2, 1], [0.8, 0.92, 1, 1]],
+    sources: ['gen-gridmesh'],
+    presets: { 'gen-gridmesh': ['Sound blossom'] },
+    pickInputs: { 'gen-gridmesh': { shape: [0, 1, 9], drawMode: [0, 1, 9, 10], audio: [0.6, 0.8, 1], hits: [0.3, 0.5, 0.8] } },
+    stackFx: [['fx-light-trails', 'node-afterimage']],
+    layerFx: ['fx-grade'],
+    blends: ['screen', 'add'], layers: [1, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0.1, haze: 0, bloom: 0.15, depth: 0 },
+    motion: { ...SLOW, rate: [0.01, 0.04], skip: GRID_MESH_STILL }
   }),
 
   // ── Dome : made for a fulldome. No vignette (it darkens the rim, where a dome

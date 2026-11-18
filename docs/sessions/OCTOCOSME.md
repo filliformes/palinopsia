@@ -61,7 +61,9 @@ changed there, and saving the session keeps the change.
 
 - **Peak into the noise** : in the patch the voice's level also adds to its noise blend
   (`peakRemap` → `Shape02NoiseBlend`). An alias drives one value, so here modB alone sets
-  the blend. A modulator (audio from the voice, or an OSC controller modulator) could add it.
+  the blend. A modulator (audio from the voice, or an OSC controller modulator) could add it;
+  or, with the voices' sound on Palinopsia's audio input, Grid Mesh's own **audio** knob (it
+  adds the sound's level to the deform). The session leaves it at 0.
 - **Pitch and interval** : the patch's `hauteur` and `intervalle` scale a master rotation
   (`MeshRotaMaster`) whose exact effect was not traced; pitch turns the mesh here, interval
   is not mapped.
