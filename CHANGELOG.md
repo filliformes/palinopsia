@@ -7,6 +7,28 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Model : fragments and dust (shatter)** : the Model breaks into its triangles and
+  comes back together (`engine/ModelSource.ts`). **break on** by hand, on the sound's
+  onsets (`touchInput.Onset`), or on the beat every 1 / 2 beats, 1 / 2 bars (the shared
+  `soniClock` count, so Link's bars); the **shatter ▸** event (MIDI / OSC / Body rules);
+  **broken** held by hand (modulatable, for slow dissolves). Each shard flies out along
+  its face normal (**throw**, **scatter**), turns round its center (**shard spin**,
+  tumbling while out), falls or rises (**gravity**, the world's down in the model's
+  frame), drifts (**drift**), gathers back over **gather** s; **crumble** staggers them;
+  past **dust at** a **dust** share shrinks into grains (**dust size**). Done in the vertex
+  shader : the triangles and vertices are read back from data textures by `gl_VertexID`
+  (RGBA32UI corners, RGBA32F place + normal + uv, RGBA8 colors; 2048 a row) and drawn
+  without vertex data, 3 a triangle, so no per-corner copy of the mesh; the lines draw
+  each edge twice, once per face it borders (`modelMesh.buildEdges` now lists the faces,
+  `MeshData.edgeFaces`), the second fading in as the faces part; the points look's beads
+  each fly on their own; dust is one instanced grain a triangle. The clip planes open to
+  take the flying shards, the depth range stays the object's, and the true depth is drawn
+  from the shards. While nothing is broken the mesh draws by its old path, unchanged.
+  Five presets (Breathing glass, Beat shatter, Dust on the bar, Shards on the kick, Slow
+  dissolve), the Generate theme **Fragments** (family Objects, light trails on the
+  object); the Model's other themes never sweep **broken** or **break on**. Inspector :
+  three columns (20 / 21 / 22). The idea credited in the register's Part 6 ("Exploding
+  objects").
 - **A frequency band on the audio modulator** : an **HZ** row under SMOOTH, a slider with
   two ends on a logarithmic track (0 to 20000 Hz, the two shown beside it; double-click :
   the whole range, the old behavior), reads every feature only between the two

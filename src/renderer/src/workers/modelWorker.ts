@@ -92,6 +92,7 @@ g.onmessage = (e: MessageEvent<ToModelWorker>): void => {
       const tr: Transferable[] = [mesh.pos.buffer, mesh.nrm.buffer, mesh.uv.buffer, mesh.col.buffer]
       if (mesh.idx) tr.push(mesh.idx.buffer)
       if (mesh.edges) tr.push(mesh.edges.buffer)
+      if (mesh.edgeFaces) tr.push(mesh.edgeFaces.buffer)
       if (mesh.texture) tr.push(mesh.texture)
       // (each buffer once : a duplicate in the list refuses the whole message)
       g.postMessage({ t: 'done', id: m.id, mesh, read }, [...new Set(tr)])

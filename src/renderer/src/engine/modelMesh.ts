@@ -45,6 +45,10 @@ export interface MeshData {
   /** 12 floats an edge : its two ends, then the normals of the two faces that meet
    *  there (the second all 0 on an open boundary). Null above MAX_EDGE_TRIS. */
   edges: Float32Array | null
+  /** 2 a edge : the two faces (triangles) that meet there, the second 0xffffffff on an
+   *  open boundary (the shards each take their own copy of a shared edge). Null with
+   *  the edges. */
+  edgeFaces: Uint32Array | null
   /** The file's base color texture, if any. */
   texture: ImageBitmap | null
   info: MeshInfo
@@ -503,8 +507,9 @@ function autoNormals(m: { pos: Float32Array; uv: Float32Array | null; col: Uint8
 }
 
 /** The edges : one per pair of welded points two faces share, with both faces'
- *  normals (the line looks keep a crease, a silhouette or an open boundary). */
-export function buildEdges(pos: Float32Array, idx: Uint32Array): Float32Array {
+ *  normals (the line looks keep a crease, a silhouette or an open boundary), and
+ *  which two faces they are (the shards). */
+export function buildEdges(pos: Float32Array, idx: Uint32Array): { edges: Float32Array; faces: Uint32Array } {
   const W = weld(pos)
   const { fn } = faceNormals(pos, idx)
   const t = idx.length / 3
@@ -525,7 +530,10 @@ export function buildEdges(pos: Float32Array, idx: Uint32Array): Float32Array {
   }
   const n = ea.n
   const out = new Float32Array(n * 12)
+  const faces = new Uint32Array(n * 2)
   for (let e = 0; e < n; e++) {
+    faces[e * 2] = f0.a[e]
+    faces[e * 2 + 1] = f1.a[e]
     const a = W.first[ea.a[e]] * 3, b = W.first[eb.a[e]] * 3, fa = f0.a[e] * 3, fb = f1.a[e]
     const o = e * 12
     out[o] = pos[a]; out[o + 1] = pos[a + 1]; out[o + 2] = pos[a + 2]
@@ -533,7 +541,7 @@ export function buildEdges(pos: Float32Array, idx: Uint32Array): Float32Array {
     out[o + 6] = fn[fa]; out[o + 7] = fn[fa + 1]; out[o + 8] = fn[fa + 2]
     if (fb !== NONE) { out[o + 9] = fn[fb * 3]; out[o + 10] = fn[fb * 3 + 1]; out[o + 11] = fn[fb * 3 + 2] }
   }
-  return out
+  return { edges: out, faces }
 }
 
 /** A raw mesh made ready to draw : checked against the caps, centred and fitted to
@@ -645,11 +653,11 @@ export function prepareMesh(raw: RawMesh, withEdges = true): MeshData {
   let hasTex = false
   if (raw.texture) for (let i = 3; i < col.length; i += 4) if (col[i] > 127) { hasTex = true; break }
   const tris = idx ? idx.length / 3 : 0
-  const edges = withEdges && idx && tris <= MAX_EDGE_TRIS ? buildEdges(pos, idx) : null
+  const ed = withEdges && idx && tris <= MAX_EDGE_TRIS ? buildEdges(pos, idx) : null
   if (idx && tris > MAX_EDGE_TRIS) notes.push('too dense for wireframe and edges : those looks draw it solid')
   return {
-    pos, nrm: nrm!, uv, col, idx, edges,
+    pos, nrm: nrm!, uv, col, idx, edges: ed ? ed.edges : null, edgeFaces: ed ? ed.faces : null,
     texture: hasTex ? raw.texture ?? null : null,
-    info: { tris, verts: vcount, points: !idx, hasUV, hasColor, hasTex, hasEdges: !!edges, format: raw.format, notes }
+    info: { tris, verts: vcount, points: !idx, hasUV, hasColor, hasTex, hasEdges: !!ed, format: raw.format, notes }
   }
 }

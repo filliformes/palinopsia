@@ -617,6 +617,13 @@ methods are free to build on; naming them is a matter of respect.
     patching environments (Cycling '74's jit.gl.gridshape in Max among them): sphere,
     torus, cylinder, open cylinder, cube, open cube, plane, circle, cone, capsule. The
     names in the app are plain shape names.
+  - **Exploding objects**: moving each triangle of a mesh out along its own face normal in
+    a shader, a long-standing real-time graphics technique, shown for example in Joey de
+    Vries' *LearnOpenGL*, chapter "Geometry Shader", section "Exploding objects"
+    (https://learnopengl.com/Advanced-OpenGL/Geometry-Shader). Behind the Model's
+    shatter (fragments and dust); Palinopsia's is its own, in the vertex shader (the
+    triangles read back from data textures), with its scatter, spin, gravity, drift,
+    crumble and dust. Idea only, no code taken.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the

@@ -860,7 +860,21 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     fog: "Fades the far side of it toward the ground.",
     ground: "The color around it.",
     groundOp: "How much the ground covers : at 0 the layers below show all around the object.",
-    depthOut: "Its real depth (near to far) goes to Parallax, Pulfrich and Luma Blur's depth focus in place of the depth AI, wherever they sit (the topmost Model seen wins). Off : they read the depth engine as before."
+    depthOut: "Its real depth (near to far) goes to Parallax, Pulfrich and Luma Blur's depth focus in place of the depth AI, wherever they sit (the topmost Model seen wins). Off : they read the depth engine as before. The shards' depth moves with them.",
+    breakOn: "What breaks it into its triangles : by hand (BROKEN, and the SHATTER trigger : a MIDI note, an OSC message or a Body rule can fire it), the sound's onsets, or the beat every 1 or 2 beats, 1 or 2 bars (the shared beat clock : Ableton Link's bars while it is on).",
+    shatter: "How hard a hit breaks it : the onsets and the beat throw the shards this far out of their whole flight (a loud onset a little more). The trigger always throws at least half way.",
+    broken: "Holds it broken by hand, 0 (whole) to 1 (every shard out) : modulate it for slow dissolves, the shards leaving and coming home as it moves. The hits add to it.",
+    throw: "How far the shards fly, in the object's size : most a little, a few far.",
+    scatter: "How far each shard strays from its own face's direction : 0 flies straight out, 1 everywhere.",
+    shardSpin: "How much each shard turns round its own center as it flies, and tumbles while it is out.",
+    gather: "How long a hit takes, in seconds : out at once, hanging a quarter of it, then gathered back home.",
+    gravity: "Makes the shards fall the further they are broken (down on the screen, however the object turns); below 0 they rise.",
+    drift: "A slow air the shards (and the dust) drift on while they are out.",
+    crumble: "The shards leave one after another instead of all at once, and come back in the same order : at 1, a slow BROKEN crumbles it piece by piece.",
+    dust: "The share of the shards that turn to dust : past DUST AT they shrink into a point that hangs and drifts, then grow back as they gather.",
+    dustAt: "How broken a shard must be before it turns to dust : low, it is dust almost as soon as it leaves.",
+    dustSize: "How big a grain of dust is, in pixels at 1080 rows.",
+    shatterNow: "Breaks it now, gathered back over GATHER seconds. A MIDI note, an OSC message or a Body rule can fire it."
   },
   'gen-fur': {
     length: 'How long the hairs are, in frame heights.',

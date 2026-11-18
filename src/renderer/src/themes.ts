@@ -1686,7 +1686,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     context: { trails: 0, haze: 0.05, bloom: 0.12, depth: 0.2 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
   mk({
     id: 'wire-study', name: 'Wire Study', family: 'Objects',
@@ -1699,7 +1699,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-light-trails', 'fx-grade'],
     blends: ['screen', 'lighten'], layers: [1, 2], useB: 0, feedback: 0.3, density: 0.45, drift: 0.1,
     context: { trails: 0.2, haze: 0, bloom: 0.15, depth: 0 },
-    motion: { ...SLOW, rate: [0.01, 0.05], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.01, 0.05], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
   mk({
     id: 'second-skin', name: 'Second Skin', family: 'Objects',
@@ -1716,7 +1716,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     context: { trails: 0, haze: 0, bloom: 0.1, depth: 0.2 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
   mk({
     id: 'glass-object', name: 'Glass Object', family: 'Objects',
@@ -1731,7 +1731,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     context: { trails: 0, haze: 0, bloom: 0.15, depth: 0.15 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
   mk({
     id: 'point-cloud', name: 'Point Cloud', family: 'Objects',
@@ -1744,7 +1744,22 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-light-trails', 'fx-grade'],
     blends: ['screen', 'add'], layers: [1, 2], useB: 0, feedback: 0.2, density: 0.45, drift: 0.1,
     context: { trails: 0.15, haze: 0, bloom: 0.2, depth: 0 },
-    motion: { ...SLOW, rate: [0.01, 0.04], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.01, 0.04], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+  }),
+  mk({
+    id: 'fragments', name: 'Fragments', family: 'Objects',
+    blurb: 'An object breaking into its triangles on the beat and on the sound, the shards flung out, some of them turned to dust, then gathered back.',
+    world: 'musical',
+    palette: [K, [0.14, 0.12, 0.12, 1], [0.9, 0.86, 0.8, 1]],
+    sources: ['gen-model'],
+    stack: [['swell', 'dye-field', 'membrane', 'drift-field'], ['gen-model']],
+    presets: { 'gen-model': ['Beat shatter', 'Dust on the bar', 'Shards on the kick', 'Breathing glass'] },
+    pickInputs: { 'gen-model': { groundOp: [0], depthOut: [1], posX: [0], posY: [0], spin: [0.06, 0.1, 0.15] } },
+    stackFx: [[], ['fx-light-trails']],
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    context: { trails: 0.1, haze: 0, bloom: 0.15, depth: 0.15 },
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|shatter|dust|dustAt|posX|posY|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
   mk({
     id: 'true-depth', name: 'True Depth', family: 'Objects',
@@ -1759,7 +1774,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     context: { trails: 0, haze: 0, bloom: 0.1, depth: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.03], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
 
   // ── Dome : made for a fulldome. No vignette (it darkens the rim, where a dome
@@ -1844,7 +1859,7 @@ export const THEMES: Theme[] = [
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, drift: 0.2, density: 0.4,
     context: { depth: 0, haze: 0.05, bloom: 0.12 },
-    motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(shape|style|material|matcap|segments|thickness|spinAxis|skinMode|skin|depthOut|hidden|facets|broken|breakOn|groundOp|ground|lineColor|fileColor|tile|lens|audio|bloom|lift|haze)$' }
   }),
 
   // ── Film Wall : your own films (a Collage folder), cut, graded, damaged ──

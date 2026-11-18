@@ -75,10 +75,10 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest', 'wet')
   ],
   'gen-model': [
-    // (three columns of 17, 15 and 17 : a fourth wrapped under them at the Inspector's width)
-    g('shape and motion', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio'),
-    g('look', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick'),
-    g('finish, light and skin', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut')
+    // (three columns of 20, 21 and 22 : a fourth wrapped under them at the Inspector's width)
+    g('shape, motion, ground', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio', 'ground', 'groundOp', 'depthOut'),
+    g('look and finish', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'fog'),
+    g('light, skin, shatter', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'breakOn', 'shatter', 'broken', 'throw', 'scatter', 'shardSpin', 'gather', 'gravity', 'drift', 'crumble', 'dust', 'dustAt', 'dustSize', 'shatterNow')
   ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
@@ -540,6 +540,9 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('style', 4)) put(d, ['hidden'], 'Solid + edges always hides what is behind.')
     if (isnt('style', 3)) put(d, ['pointSize'], 'Only the points look has points.')
     if (zero('groundOp')) put(d, ['ground'], 'Ground opacity is at 0 : no ground.')
+    if (zero('shatter') && isnt('breakOn', 0)) put(d, ['breakOn'], 'Shatter is at 0 : only the trigger and broken break it.')
+    if (zero('throw')) put(d, ['scatter'], 'Throw is at 0 : the shards turn in place.')
+    if (zero('dust')) put(d, ['dustAt', 'dustSize'], 'Dust is at 0 : no shard turns to dust.')
     return d
   },
   'gen-fur': ({ zero, is }) => {

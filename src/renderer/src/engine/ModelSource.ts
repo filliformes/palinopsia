@@ -27,12 +27,24 @@
 //   picture; it is never re-projected to true dome directions).
 // - Its depth : drawn again, smaller, into its own target, nearest white, the back of
 //   its bounding sphere black (engine/Compositor.ts hands it to the depth readers).
+// - SHATTER (fragments and dust) : on the sound's onsets, the beat (the shared beat
+//   clock, so Ableton Link's bars), the trigger, or held by hand (BROKEN), every
+//   triangle flies out as a shard of its own along its face, scattered, turned round
+//   its center, falling or rising and drifting, then gathers back to its place; past
+//   DUST AT a share of them shrink into points that hang and drift. All of it in the
+//   vertex shader from the triangle's corners, pulled from data textures by
+//   gl_VertexID (no copy of the mesh per corner); the lines follow the faces they
+//   border, the points look's beads each fly on their own, and the true depth is
+//   drawn from the moving shards. While nothing is broken the mesh draws by its
+//   usual path, untouched.
 //
 // The lit sphere (matcap) after Sloan, Martin, Gooch and Gooch, "The Lit Sphere"
 // (Graphics Interface 2001) : a picture of a lit ball, read by the surface's normal.
 // third-party: The Lit Sphere (matcap)
+// third-party: Exploding objects (the idea : each triangle moved along its own face
+// normal in a shader; this one is written for Palinopsia, no code taken)
 
-import { EngineGL, SlotClock, num, col, type Prog, type Target } from './organicGL'
+import { EngineGL, SlotClock, Edge, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator } from './nativeGenerators'
 import { domeFill } from './domeSignal'
 import { audioBus } from './audioIn'
@@ -40,6 +52,8 @@ import { acquireMsaa, msaaBuffer, releaseMsaa } from './sharedMsaa'
 import { RELIEF_SHADE } from './reliefShade'
 import { buildShape, prepareMesh, SHAPE_FILE, SHAPES, type MeshData } from './modelMesh'
 import { modelLoader } from './modelLoad'
+import { Onset } from './touchInput'
+import { soniBar, soniBeats } from '../audio/soniClock'
 
 // ── Shared GLSL : the noise the wobble and the soap film read ───────────────────
 const NOISE = `
@@ -379,6 +393,304 @@ in float vD;
 out vec4 o;
 void main() { if (dot(vQ, vQ) > 1.0) discard; o = vec4(vD, vD, vD, 1.0); }`
 
+// ── SHATTER : the shards ───────────────────────────────────────────────────────
+// Every triangle a shard of its own (in the points look : every bead a grain),
+// thrown out along its face, scattered, turned round its own center, falling or
+// rising, drifting on a slow air, then gathered back to its place. Past DUST AT the
+// dusting share of them shrink into a point. All from the shard's number and its
+// rest place : nothing is simulated, so nothing drifts away for good, and at uShE 0
+// every shard is home.
+const SHARD = `
+uniform float uShE, uShThrow, uShScat, uShSpin, uShCrumble, uShGrav, uShDrift, uShDust, uShDustAt, uShT, uShTumble;
+uniform vec3 uShDown;
+// third-party: Hash without Sine
+vec4 h43(vec3 p) {
+  vec4 p4 = fract(vec4(p.xyzx) * vec4(0.1031, 0.1030, 0.0973, 0.1099));
+  p4 += dot(p4, p4.wzxy + 33.33);
+  return fract((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+// a turn of t radians round the unit axis a
+mat3 turn3(vec3 a, float t) {
+  float c = cos(t), s = sin(t), C = 1.0 - c;
+  return mat3(c + a.x * a.x * C, a.y * a.x * C + a.z * s, a.z * a.x * C - a.y * s,
+              a.x * a.y * C - a.z * s, c + a.y * a.y * C, a.z * a.y * C + a.x * s,
+              a.x * a.z * C + a.y * s, a.y * a.z * C - a.x * s, c + a.z * a.z * C);
+}
+// Where shard id (its rest center c, its face's normal n) is : moved by off, turned
+// by R round c, shrunk by k; dust : how far it has turned to dust (0..1).
+void shard(int id, vec3 c, vec3 n, out vec3 off, out mat3 R, out float k, out float dust) {
+  off = vec3(0.0); R = mat3(1.0); k = 1.0; dust = 0.0;
+  vec3 key = vec3(float(id & 1023), float(id >> 10), 0.0);
+  vec4 r = h43(key + vec3(0.0, 0.0, 3.7)), r2 = h43(key.yxz + vec3(0.0, 0.0, 11.3)), r3 = h43(key + vec3(0.0, 0.0, 23.9));
+  // CRUMBLE : the shards leave one after another (and come back in the same order)
+  float e = clamp(uShE * (1.0 + uShCrumble) - uShCrumble * r.w, 0.0, 1.0);
+  if (e <= 0.0) return;
+  // out along its face, a little away from the middle too (a flat sheet bursts), scattered
+  vec3 d = n + normalize(c + vec3(1e-5, 0.0, 0.0)) * 0.45 + (r2.xyz - 0.5) * 2.4 * uShScat;
+  d = dot(d, d) > 1e-10 ? normalize(d) : vec3(0.0, 0.0, 1.0);
+  // most a little, a few far
+  float fly = uShThrow * (0.35 + 0.8 * r.x + 1.4 * pow(r.y, 6.0));
+  off = d * fly * e;
+  // GRAVITY : falls (or rises) the further it is broken
+  off += uShDown * (uShGrav * e * e * (0.6 + 0.8 * r3.z) * 1.2);
+  // DRIFT : a slow air of its own, waves crossing at odd angles (uShT : a phase that
+  // wraps at 2 pi, read only at whole multiples so the wrap never shows)
+  if (uShDrift > 0.0) {
+    vec3 q = c * 2.0 + r3.xyz * 6.2832;
+    off += vec3(sin(q.y * 2.1 + uShT), sin(q.z * 1.7 + q.x * 1.3 + 2.0 * uShT), sin(q.x * 2.3 - uShT)) * (uShDrift * e * 0.7);
+  }
+  // SHARD SPIN : a turn round an axis of its own, more the further broken, and a slow
+  // tumble while it is out (uShTumble eases to a stop : a long hold hangs still)
+  float ang = e * uShSpin * ((1.2 + 3.6 * r.z) + uShTumble * (0.4 + 0.9 * r3.y)) * (r3.w < 0.5 ? -1.0 : 1.0);
+  vec3 ax = r2.zxy - 0.5;
+  R = turn3(dot(ax, ax) > 1e-6 ? normalize(ax) : vec3(0.0, 1.0, 0.0), ang);
+  // DUST : past DUST AT, the dusting share of the shards shrinks into a point
+  if (uShDust > 0.0 && r3.x < uShDust) {
+    dust = smoothstep(uShDustAt, min(1.0, uShDustAt + 0.3) + 1e-3, e);
+    k = 1.0 - dust;
+  }
+}`
+
+// The mesh read back in the vertex shader : its triangles (three corners a texel) and
+// its vertices (two texels each : place + u, normal + v), 2048 texels a row.
+const PULL = `
+precision highp usampler2D;
+precision highp sampler2D;
+uniform usampler2D uIdx;
+uniform sampler2D uVtx;
+ivec2 at(int i) { return ivec2(i & 2047, i >> 11); }
+vec3 vpos(int v) { return texelFetch(uVtx, at(v * 2), 0).xyz; }
+// a triangle's center and its face's normal (the same in all three corners, so the
+// shard stays whole)
+void faceOf(uvec4 t, out vec3 c, out vec3 fn) {
+  vec3 p0 = vpos(int(t.x)), p1 = vpos(int(t.y)), p2 = vpos(int(t.z));
+  c = (p0 + p1 + p2) / 3.0;
+  fn = cross(p1 - p0, p2 - p0);
+  fn = dot(fn, fn) > 1e-30 ? normalize(fn) : vec3(0.0, 0.0, 1.0);
+}`
+
+// the solid, every triangle its own shard (drawn without vertex data : 3 a triangle)
+const SOLID_SHARD_VS = `${VS_HEAD}
+${SHARD}
+${PULL}
+uniform sampler2D uVcol;
+out vec3 vPos;
+out vec3 vN;
+out vec3 vObjN;
+out vec3 vObjP;
+out vec2 vUV;
+out vec4 vC;
+out float vD;
+void main() {
+  int f = gl_VertexID / 3, k = gl_VertexID - f * 3;
+  uvec4 t = texelFetch(uIdx, at(f), 0);
+  int me = int(k == 0 ? t.x : k == 1 ? t.y : t.z);
+  vec4 A = texelFetch(uVtx, at(me * 2), 0), B = texelFetch(uVtx, at(me * 2 + 1), 0);
+  vec3 c, fn, off;
+  mat3 R;
+  float sk, dust;
+  faceOf(t, c, fn);
+  shard(f, c, fn, off, R, sk, dust);
+  vec3 q = A.xyz, n = B.xyz;
+  deform(q, n);
+  q = c + off + R * ((q - c) * sk);
+  n = R * n;
+  vec4 e = uMV * vec4(q, 1.0);
+  vPos = e.xyz;
+  vN = uNM * n;
+  vObjN = n;
+  vObjP = A.xyz;
+  vUV = vec2(A.w, B.w);
+  vC = texelFetch(uVcol, at(me), 0);
+  vD = depth01(e.z);
+  gl_Position = uP * e;
+  gl_Position.xy += uOff * gl_Position.w;
+}`
+
+// the lines : each edge twice, once with each face it borders (the second shows only
+// once the two have come apart, so a whole mesh never draws it doubled)
+const LINE_SHARD_VS = `${VS_HEAD}
+${SHARD}
+${PULL}
+layout(location = 0) in vec3 p;
+layout(location = 1) in vec3 aB;
+layout(location = 2) in vec3 aF0;
+layout(location = 3) in vec3 aF1;
+layout(location = 4) in uvec2 aFace;
+uniform vec2 uRes;
+uniform float uWidth, uAll, uCrease;
+out float vX;
+out float vD;
+out float vA;
+vec3 moved(vec3 q, vec3 c, vec3 off, mat3 R, float k) { return c + off + R * ((q - c) * k); }
+void main() {
+  vX = 0.0;
+  vD = 0.0;
+  vA = 0.0;
+  bool second = (gl_InstanceID & 1) == 1;
+  if (second && aFace.y == 0xffffffffu) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  int f = int(second ? aFace.y : aFace.x);
+  vec3 a = p, b = aB;
+  vec3 nA = normalize(aF0 + aF1 + 1e-6), nB = nA;
+  deform(a, nA);
+  deform(b, nB);
+  vec3 c, fn, off;
+  mat3 R;
+  float sk, dust;
+  faceOf(texelFetch(uIdx, at(f), 0), c, fn);
+  shard(f, c, fn, off, R, sk, dust);
+  vec3 a1 = moved(a, c, off, R, sk), b1 = moved(b, c, off, R, sk);
+  float fade = 1.0;
+  if (second) {
+    int f0 = int(aFace.x);
+    vec3 c0, fn0, off0;
+    mat3 R0;
+    float sk0, dust0;
+    faceOf(texelFetch(uIdx, at(f0), 0), c0, fn0);
+    shard(f0, c0, fn0, off0, R0, sk0, dust0);
+    vec3 m = (a + b) * 0.5;
+    vec4 pa = uP * (uMV * vec4(moved(m, c0, off0, R0, sk0), 1.0)), pb = uP * (uMV * vec4(moved(m, c, off, R, sk), 1.0));
+    vec2 sep = (pb.xy / max(pb.w, 1e-3) - pa.xy / max(pa.w, 1e-3)) * 0.5 * uRes;
+    fade = clamp(length(sep) - 0.5, 0.0, 1.0);
+    if (fade <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  }
+  vec4 ea = uMV * vec4(a1, 1.0), eb = uMV * vec4(b1, 1.0);
+  bool boundary = dot(aF1, aF1) < 1e-8;
+  vec3 mid = (ea.xyz + eb.xyz) * 0.5;
+  float s0 = dot(uNM * aF0, -mid), s1 = dot(uNM * aF1, -mid);
+  bool show = uAll > 0.5 || boundary || dot(aF0, aF1) < uCrease || s0 * s1 < 0.0;
+  vec4 ca = uP * ea, cb = uP * eb;
+  ca.xy += uOff * ca.w;
+  cb.xy += uOff * cb.w;
+  if (!show || ca.w < 1e-3 || cb.w < 1e-3) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  vec2 sa = (ca.xy / ca.w * 0.5 + 0.5) * uRes, sb = (cb.xy / cb.w * 0.5 + 0.5) * uRes;
+  vec2 d = sb - sa;
+  float l = length(d);
+  d = l > 1e-3 ? d / l : vec2(1.0, 0.0);
+  vec2 nrm = vec2(-d.y, d.x);
+  float hw = uWidth * 0.5 + 1.0;
+  int k = gl_VertexID;
+  bool atB = k >= 2;
+  float side = (k == 0 || k == 2) ? -1.0 : 1.0;
+  vec4 cc = atB ? cb : ca;
+  vec2 s = (atB ? sb + d * hw * 0.5 : sa - d * hw * 0.5) + nrm * side * hw;
+  vX = side * hw;
+  vD = depth01(atB ? eb.z : ea.z);
+  vA = fade * sk;
+  gl_Position = vec4((s / uRes * 2.0 - 1.0) * cc.w, cc.z, cc.w);
+}`
+
+const LINE_SHARD_FS = `#version 300 es
+precision highp float;
+uniform vec3 uLineC, uGround;
+uniform float uWidth, uFog, uGroundA;
+in float vX;
+in float vD;
+in float vA;
+out vec4 o;
+void main() {
+  float cov = clamp(uWidth * 0.5 + 0.5 - abs(vX), 0.0, 1.0) * vA;
+  if (cov <= 0.0) discard;
+  float f = uFog * pow(1.0 - vD, 1.4);
+  vec3 c = mix(uLineC, uGround, f);
+  float a = cov * mix(1.0, uGroundA, f);
+  o = vec4(c * a, a);
+}`
+
+// the dust : one point a shard, where the shard has shrunk to, fading in as it goes
+const DUST_VS = `${VS_HEAD}
+${SHARD}
+${PULL}
+uniform sampler2D uVcol;
+uniform vec2 uRes;
+uniform float uDustPx, uDist;
+out vec2 vQ;
+out vec3 vPos;
+out vec3 vObjN;
+out vec3 vObjP;
+out vec2 vUV;
+out vec4 vC;
+out float vD;
+out float vR;
+out float vA;
+void main() {
+  int f = gl_InstanceID;
+  uvec4 t = texelFetch(uIdx, at(f), 0);
+  vec3 c, fn, off;
+  mat3 R;
+  float sk, dust;
+  faceOf(t, c, fn);
+  shard(f, c, fn, off, R, sk, dust);
+  vQ = vec2(0.0);
+  vR = 1.0;
+  vA = dust;
+  vPos = vec3(0.0);
+  vObjN = fn;
+  vObjP = c;
+  vUV = vec2(0.0);
+  vC = vec4(1.0);
+  vD = 0.0;
+  if (dust < 0.01) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  vec4 e = uMV * vec4(c + off, 1.0);
+  int k = gl_VertexID;
+  vec2 corner = vec2((k == 1 || k == 3) ? 1.0 : -1.0, k >= 2 ? 1.0 : -1.0);
+  vec4 cp = uP * e;
+  cp.xy += uOff * cp.w;
+  float r = max(0.6, uDustPx * 0.5 * uDist / max(0.05, -e.z));
+  vR = r;
+  vQ = corner * (r + 1.0) / r;
+  vPos = e.xyz;
+  vObjN = R * fn;
+  int v0 = int(t.x);
+  vUV = vec2(texelFetch(uVtx, at(v0 * 2), 0).w, texelFetch(uVtx, at(v0 * 2 + 1), 0).w);
+  vC = texelFetch(uVcol, at(v0), 0);
+  vD = depth01(e.z);
+  if (cp.w < 1e-3) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  cp.xy += corner * (r + 1.0) / uRes * 2.0 * cp.w;
+  gl_Position = cp;
+}`
+
+// (the dust in the line looks : points of the line color)
+const DUST_LINE_FS = `#version 300 es
+precision highp float;
+uniform vec3 uLineC, uGround;
+uniform float uFog, uGroundA;
+in vec2 vQ;
+in float vD;
+in float vR;
+in float vA;
+out vec4 o;
+void main() {
+  float cov = clamp((1.0 - length(vQ)) * vR + 0.5, 0.0, 1.0) * vA;
+  if (cov <= 0.0) discard;
+  float f = uFog * pow(1.0 - vD, 1.4);
+  vec3 c = mix(uLineC, uGround, f);
+  float a = cov * mix(1.0, uGroundA, f);
+  o = vec4(c * a, a);
+}`
+
+/** `src` with `a` swapped for `b`, which must be there (a shard variant of a program). */
+function swap(src: string, a: string, b: string): string {
+  if (!src.includes(a)) throw new Error('ModelSource : a shard variant lost its anchor')
+  return src.replace(a, b)
+}
+// the points look : every bead a grain of its own, shrinking to dust
+const POINT_SHARD_VS = swap(swap(swap(POINT_VS, 'uniform float uSize, uDist;', `uniform float uSize, uDist, uDustPx;
+${SHARD}`), `  deform(q, n);
+  vec4 e = uMV * vec4(q, 1.0);`, `  deform(q, n);
+  vec3 sOff;
+  mat3 sR;
+  float sK, sDust;
+  shard(gl_InstanceID, p, dot(aN, aN) > 1e-8 ? aN : normalize(p + vec3(1e-5, 0.0, 0.0)), sOff, sR, sK, sDust);
+  q += sOff;
+  vec4 e = uMV * vec4(q, 1.0);`), 'float r = max(0.75, uSize * 0.5 * uDist / max(0.05, -e.z));', 'float r = mix(max(0.75, uSize * 0.5 * uDist / max(0.05, -e.z)), max(0.6, uDustPx * 0.5 * uDist / max(0.05, -e.z)), sDust);')
+// the solid looks' dust : lit beads, faded in
+// (a grain lit dark by a mirror material would vanish : it keeps at least most of its
+// own color, so the dust reads as fine bright specks)
+const DUST_FS = swap(swap(POINT_FS, 'in float vR;', `in float vR;
+in float vA;`), 'o = c * cov;', `c.rgb = max(c.rgb, alb * c.a * 0.85);
+  o = c * (cov * vA);`)
+
 // (the picture : the resolved model, straight alpha again)
 const SHOW_FS = `#version 300 es
 precision highp float;
@@ -417,9 +729,33 @@ interface GpuMesh {
   nVert: number
   nEdge: number
   tex: WebGLTexture | null
+  /** the edges' buffer (the shards' line copies read it too) */
+  bE: WebGLBuffer | null
+  /** what the shards read, made the first time something breaks (null : not yet;
+   *  ok false : too big for the data textures, it never breaks) */
+  sh: Shards | null
+}
+
+/** The mesh as the shards read it : its triangles and vertices in data textures, and
+ *  the lines' vertex array with the two faces of each edge. */
+interface Shards {
+  ok: boolean
+  idx: WebGLTexture | null
+  vtx: WebGLTexture | null
+  vcol: WebGLTexture | null
+  edVao: WebGLVertexArrayObject | null
+  bFace: WebGLBuffer | null
 }
 
 const STYLE_SOLID = 0, STYLE_WIRE = 1, STYLE_EDGES = 2, STYLE_POINTS = 3, STYLE_SOLID_EDGES = 4
+
+/** BREAK ON : by hand (BROKEN and the trigger only), the sound's onsets, then the beat
+ *  every 1 or 2 beats, 1 or 2 bars (0 : not a beat rate). */
+const BREAK_BEATS = [0, 0, 1, 2, -1, -2] // (negative : bars, Link's bar while it is on)
+const MAX_HITS = 4
+const PULL_W = 2048 // texels a row of the shards' data textures
+interface Hit { age: number; s: number; gather: number }
+const smoother = (t: number): number => { t = Math.max(0, Math.min(1, t)); return t * t * t * (t * (t * 6 - 15) + 10) }
 
 export class ModelSource implements NativeGenerator {
   private g: EngineGL
@@ -447,6 +783,24 @@ export class ModelSource implements NativeGenerator {
   private bass = 0
   private mids = 0
   private lastShapeBuild = 0
+  // SHATTER : the hits under way, the beat they last fell on, how long it has been
+  // broken (its tumble), the drift's clock
+  private hits: Hit[] = []
+  private onset = new Onset()
+  private trig = new Edge()
+  private lastBeat = NaN
+  private lastOn = -1
+  private brokenFor = 0
+  private shT = Math.random() * Math.PI * 2
+  /** how broken it is this frame (a test hook reads it) */
+  shatterNow = 0
+  private solidShP_: Prog | null = null
+  private depthShP_: Prog | null = null
+  private lineShP_: Prog | null = null
+  private pointShP_: Prog | null = null
+  private ptDepthShP_: Prog | null = null
+  private dustP_: Prog | null = null
+  private dustLineP_: Prog | null = null
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     const g = (this.g = new EngineGL(gl, 'model'))
@@ -460,13 +814,137 @@ export class ModelSource implements NativeGenerator {
   private get lineP(): Prog { return (this.lineP_ ??= this.g.prog(LINE_FS, LINE_VS)) }
   private get pointP(): Prog { return (this.pointP_ ??= this.g.prog(POINT_FS, POINT_VS)) }
   private get ptDepthP(): Prog { return (this.ptDepthP_ ??= this.g.prog(POINT_DEPTH_FS, POINT_VS)) }
+  // (the shards' programs only once something breaks)
+  private get solidShP(): Prog { return (this.solidShP_ ??= this.g.prog(SOLID_FS, SOLID_SHARD_VS)) }
+  private get depthShP(): Prog { return (this.depthShP_ ??= this.g.prog(DEPTH_FS, SOLID_SHARD_VS)) }
+  private get lineShP(): Prog { return (this.lineShP_ ??= this.g.prog(LINE_SHARD_FS, LINE_SHARD_VS)) }
+  private get pointShP(): Prog { return (this.pointShP_ ??= this.g.prog(POINT_FS, POINT_SHARD_VS)) }
+  private get ptDepthShP(): Prog { return (this.ptDepthShP_ ??= this.g.prog(POINT_DEPTH_FS, POINT_SHARD_VS)) }
+  private get dustP(): Prog { return (this.dustP_ ??= this.g.prog(DUST_FS, DUST_VS)) }
+  private get dustLineP(): Prog { return (this.dustLineP_ ??= this.g.prog(DUST_LINE_FS, DUST_VS)) }
 
   update(inputs: Record<string, number | number[]>): void {
     this.inputs = { ...inputs }
+    if (this.trig.fired(num(inputs, 'shatterNow', 0))) this.fire(1, true)
   }
 
   setInput(name: string, value: number | number[]): void {
     this.inputs[name] = value
+    if (name === 'shatterNow' && typeof value === 'number' && this.trig.fired(value)) this.fire(1, true)
+  }
+
+  /** A remote event : SHATTER (or its trigger's own name) breaks it now. */
+  event(name: string): void {
+    if (name === 'shatter' || name === 'shatterNow') this.fire(1, true)
+  }
+
+  /** A hit : every shard thrown out, gathered back over GATHER seconds. */
+  private fire(strength: number, byHand = false): void {
+    const I = this.inputs
+    const amt = Math.max(0, Math.min(1, num(I, 'shatter', 0.7)))
+    // the trigger always breaks it (at least half way), the sound and the beat by SHATTER
+    const s = Math.min(1, byHand ? Math.max(strength * amt, 0.5) : strength * amt)
+    if (s <= 0.001) return
+    if (this.hits.length >= MAX_HITS) this.hits.shift()
+    this.hits.push({ age: 0, s, gather: Math.max(0.2, Math.min(8, num(I, 'gather', 1.5))) })
+  }
+
+  /** How broken it is this frame, 0..1 : BROKEN, or the hits under way (thrown out
+   *  quickly, hanging a quarter of GATHER, then eased home), whichever is more. */
+  private shatterStep(dt: number): number {
+    const I = this.inputs
+    const on = Math.max(0, Math.min(BREAK_BEATS.length - 1, Math.round(num(I, 'breakOn', 0))))
+    const amt = Math.max(0, Math.min(1, num(I, 'shatter', 0.7)))
+    const hit = this.onset.hit() // (read every frame : its edge must not go stale)
+    if (on !== this.lastOn) { this.lastOn = on; this.lastBeat = NaN }
+    if (amt > 0.001) {
+      if (on === 1 && hit > 0) this.fire(hit)
+      else if (BREAK_BEATS[on] !== 0) {
+        // on the shared beat clock (Ableton Link's while it is on) : every linked app's beats
+        const b = BREAK_BEATS[on]
+        const per = b > 0 ? b : -b * soniBar()
+        const n = Math.floor(soniBeats() / per + 1e-6)
+        if (Number.isFinite(n)) {
+          if (Number.isFinite(this.lastBeat) && n !== this.lastBeat) this.fire(1)
+          this.lastBeat = n
+        }
+      }
+    }
+    let e = Math.max(0, Math.min(1, num(I, 'broken', 0)))
+    for (const h of this.hits) {
+      h.age += dt
+      const out = 1 - Math.exp(-h.age / 0.06)
+      const home = smoother((h.age - h.gather * 0.25) / (h.gather * 0.75))
+      e = Math.max(e, h.s * out * (1 - home))
+    }
+    this.hits = this.hits.filter((h) => h.age < h.gather + 0.05)
+    // its tumble : the time it has been broken, easing to a stop past a few seconds
+    this.brokenFor = e > 1e-4 ? this.brokenFor + dt : 0
+    this.shT = (this.shT + dt * 0.6) % (Math.PI * 2)
+    return e
+  }
+
+  /** The data textures and the lines' vertex array the shards read, made once a mesh. */
+  private ensureShards(gp: GpuMesh): boolean {
+    if (gp.sh) return gp.sh.ok
+    const gl = this.g.gl
+    const m = gp.mesh
+    const sh: Shards = { ok: false, idx: null, vtx: null, vcol: null, edVao: null, bFace: null }
+    gp.sh = sh
+    if (!m.idx) return false
+    const nV = m.pos.length / 3, nT = m.idx.length / 3
+    const rowsV = Math.ceil((nV * 2) / PULL_W), rowsC = Math.ceil(nV / PULL_W), rowsT = Math.ceil(nT / PULL_W)
+    if (Math.max(rowsV, rowsT) > (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number)) return false
+    const vd = new Float32Array(rowsV * PULL_W * 4)
+    for (let v = 0; v < nV; v++) {
+      const o = v * 8
+      vd[o] = m.pos[v * 3]; vd[o + 1] = m.pos[v * 3 + 1]; vd[o + 2] = m.pos[v * 3 + 2]; vd[o + 3] = m.uv[v * 2]
+      vd[o + 4] = m.nrm[v * 3]; vd[o + 5] = m.nrm[v * 3 + 1]; vd[o + 6] = m.nrm[v * 3 + 2]; vd[o + 7] = m.uv[v * 2 + 1]
+    }
+    const cd = new Uint8Array(rowsC * PULL_W * 4)
+    cd.set(m.col.subarray(0, nV * 4))
+    const id = new Uint32Array(rowsT * PULL_W * 4)
+    for (let t = 0; t < nT; t++) { id[t * 4] = m.idx[t * 3]; id[t * 4 + 1] = m.idx[t * 3 + 1]; id[t * 4 + 2] = m.idx[t * 3 + 2] }
+    const tex = (rows: number, ifmt: number, fmt: number, type: number, data: ArrayBufferView): WebGLTexture => {
+      const t = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
+      gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, PULL_W, rows, 0, fmt, type, data)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.bindTexture(gl.TEXTURE_2D, null)
+      return t
+    }
+    sh.vtx = tex(rowsV, gl.RGBA32F, gl.RGBA, gl.FLOAT, vd)
+    sh.vcol = tex(rowsC, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, cd)
+    sh.idx = tex(rowsT, gl.RGBA32UI, gl.RGBA_INTEGER, gl.UNSIGNED_INT, id)
+    // the lines : every edge twice (its attributes step every second instance), with
+    // the two faces it borders
+    if (gp.bE && m.edgeFaces && gp.nEdge) {
+      const vao = gl.createVertexArray()!
+      gl.bindVertexArray(vao)
+      gl.bindBuffer(gl.ARRAY_BUFFER, gp.bE)
+      for (let k = 0; k < 4; k++) {
+        gl.enableVertexAttribArray(k)
+        gl.vertexAttribPointer(k, 3, gl.FLOAT, false, 48, k * 12)
+        gl.vertexAttribDivisor(k, 2)
+      }
+      const bF = gl.createBuffer()!
+      gl.bindBuffer(gl.ARRAY_BUFFER, bF)
+      gl.bufferData(gl.ARRAY_BUFFER, m.edgeFaces, gl.STATIC_DRAW)
+      gl.enableVertexAttribArray(4)
+      gl.vertexAttribIPointer(4, 2, gl.UNSIGNED_INT, 0, 0)
+      gl.vertexAttribDivisor(4, 2)
+      gl.bindVertexArray(null)
+      gl.bindBuffer(gl.ARRAY_BUFFER, null)
+      sh.edVao = vao
+      sh.bFace = bF
+    }
+    sh.ok = true
+    return true
   }
 
   feed(_audio: WebGLTexture | null, side: WebGLTexture | null): void {
@@ -547,10 +1025,11 @@ export class ModelSource implements NativeGenerator {
     inst(0, bPos, 3, gl.FLOAT, false); inst(1, bN, 3, gl.FLOAT, false); inst(2, bUV, 2, gl.FLOAT, false); inst(3, bC, 4, gl.UNSIGNED_BYTE, true)
     // the edges : one quad each, from its two ends and its two faces
     let edVao: WebGLVertexArrayObject | null = null
+    let bE: WebGLBuffer | null = null
     if (mesh.edges && mesh.edges.length) {
       edVao = gl.createVertexArray()!
       gl.bindVertexArray(edVao)
-      const bE = buf(gl.ARRAY_BUFFER, mesh.edges)
+      bE = buf(gl.ARRAY_BUFFER, mesh.edges)
       bufs.push(bE)
       for (let k = 0; k < 4; k++) {
         gl.enableVertexAttribArray(k)
@@ -580,7 +1059,7 @@ export class ModelSource implements NativeGenerator {
       gl.bindTexture(gl.TEXTURE_2D, null)
     }
     this.gpu = {
-      key, mesh, vao, ptVao, edVao, bufs, tex,
+      key, mesh, vao, ptVao, edVao, bufs, tex, bE, sh: null,
       nIdx: mesh.idx ? mesh.idx.length : 0, nVert: mesh.pos.length / 3, nEdge: mesh.edges ? mesh.edges.length / 12 : 0
     }
   }
@@ -592,11 +1071,16 @@ export class ModelSource implements NativeGenerator {
     // (deleted with its own vertex array bound : never the default one's binding)
     gl.bindVertexArray(gp.vao)
     for (const b of gp.bufs) gl.deleteBuffer(b)
+    if (gp.sh?.bFace) gl.deleteBuffer(gp.sh.bFace)
     gl.bindVertexArray(null)
     gl.deleteVertexArray(gp.vao)
     gl.deleteVertexArray(gp.ptVao)
     if (gp.edVao) gl.deleteVertexArray(gp.edVao)
     if (gp.tex) gl.deleteTexture(gp.tex)
+    if (gp.sh) {
+      if (gp.sh.edVao) gl.deleteVertexArray(gp.sh.edVao)
+      for (const t of [gp.sh.idx, gp.sh.vtx, gp.sh.vcol]) if (t) gl.deleteTexture(t)
+    }
     this.gpu = null
   }
 
@@ -689,6 +1173,17 @@ export class ModelSource implements NativeGenerator {
     const wantDepth = num(I, 'depthOut', 1) > 0.5
     this.ensureTargets(wantDepth)
 
+    // ── SHATTER : how broken; the shards' path only while anything is (else the mesh
+    // draws as it always has) ──
+    const shE = this.shatterStep(dt)
+    this.shatterNow = shE
+    const sh = shE > 1e-4 && (!gp.nIdx || this.ensureShards(gp))
+    const shThrow = Math.max(0, num(I, 'throw', 0.8))
+    const shGrav = Math.max(-1, Math.min(1, num(I, 'gravity', 0.2)))
+    const shDrift = Math.max(0, Math.min(1, num(I, 'drift', 0.2)))
+    const shCrumble = Math.max(0, Math.min(1, num(I, 'crumble', 0.3)))
+    const shDust = Math.max(0, Math.min(1, num(I, 'dust', 0)))
+
     // ── the sound : the bass swells it, the mids roughen it ──
     const amt = Math.max(0, Math.min(1, num(I, 'audio', 0)))
     let bassT = 0, midsT = 0
@@ -719,7 +1214,10 @@ export class ModelSource implements NativeGenerator {
     const V = m4(); V[14] = -dist
     const MV = mul4(V, M)
     const reach = scale * (1 + wob * 0.6)
-    const near = Math.max(0.02, dist - reach * 1.2), far = dist + reach * 1.2
+    // (the shards fly past the object's own reach : the clip planes open to take them,
+    // its depth's range stays the object's)
+    const shReach = sh ? scale * Math.min(1, shE * (1 + shCrumble)) * (shThrow * 2.6 + Math.abs(shGrav) * 1.8 + shDrift * 1.4 + 0.2) : 0
+    const near = Math.max(0.02, dist - (reach + shReach) * 1.2), far = dist + (reach + shReach) * 1.2
     const fov = (Math.max(5, Math.min(150, num(I, 'lens', 35))) * Math.PI) / 180
     const f = 1 / Math.tan(fov / 2)
     const P = new Float32Array(16)
@@ -735,6 +1233,24 @@ export class ModelSource implements NativeGenerator {
       gl.uniformMatrix3fv(p.u('uNM'), false, NM)
       return p.f2('uOff', off[0], off[1]).f1('uWob', wob).f1('uWobS', Math.max(0.1, num(I, 'wobbleSize', 1.5))).f1('uWobT', this.wobT)
         .f1('uNear0', near0).f1('uFar0', far0)
+    }
+    const px = this.h / 1080
+    // the shards : in use (and its uniforms set) when anything is broken, else the usual program
+    const shardU = (p: Prog): Prog =>
+      p.f1('uShE', shE).f1('uShThrow', shThrow).f1('uShScat', Math.max(0, Math.min(1, num(I, 'scatter', 0.35))))
+        .f1('uShSpin', Math.max(0, Math.min(1, num(I, 'shardSpin', 0.4)))).f1('uShCrumble', shCrumble)
+        .f1('uShGrav', shGrav).f1('uShDrift', shDrift).f1('uShDust', shDust)
+        .f1('uShDustAt', Math.max(0, Math.min(1, num(I, 'dustAt', 0.6)))).f1('uShT', this.shT)
+        .f1('uShTumble', 4 * (1 - Math.exp(-this.brokenFor / 4)))
+        // the world's down in the model's own frame (the rows of its turn)
+        .f3('uShDown', -NM[1], -NM[4], -NM[7])
+        .f1('uDustPx', Math.max(0.3, num(I, 'dustSize', 1.5)) * px)
+        .i1('uIdx', 5).i1('uVtx', 6).i1('uVcol', 7)
+    const pick = (normal: Prog, shard: () => Prog): Prog => (sh ? shardU(shard().use()) : normal.use())
+    if (sh && gp.sh?.ok) {
+      g.bind(5, gp.sh.idx)
+      g.bind(6, gp.sh.vtx)
+      g.bind(7, gp.sh.vcol)
     }
     // the light and the looks
     const la = num(I, 'lightAngle', 2.36)
@@ -791,6 +1307,12 @@ export class ModelSource implements NativeGenerator {
     const glass = Math.round(num(I, 'material', 4)) === 5
     const hidden = num(I, 'hidden', 0) > 0.5
     const drawSolid = (_p: Prog): void => {
+      if (sh) {
+        // the shards : three corners a triangle, everything read from the data textures
+        gl.bindVertexArray(g.pointVao)
+        gl.drawArrays(gl.TRIANGLES, 0, gp.nIdx)
+        return
+      }
       gl.bindVertexArray(gp.vao)
       gl.drawElements(gl.TRIANGLES, gp.nIdx, gl.UNSIGNED_INT, 0)
     }
@@ -798,7 +1320,7 @@ export class ModelSource implements NativeGenerator {
       // glass shows only its front (its back would double it); the rest both sides
       if (glass) { gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK) }
       if (style === STYLE_SOLID_EDGES) { gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1) }
-      drawSolid(shade(common(this.solidP.use())))
+      drawSolid(shade(common(pick(this.solidP, () => this.solidShP))))
       gl.disable(gl.CULL_FACE)
       gl.disable(gl.POLYGON_OFFSET_FILL)
     } else if (style !== STYLE_POINTS && hidden) {
@@ -806,11 +1328,10 @@ export class ModelSource implements NativeGenerator {
       gl.colorMask(false, false, false, false)
       gl.enable(gl.POLYGON_OFFSET_FILL)
       gl.polygonOffset(1, 1)
-      drawSolid(common(this.depthP.use()))
+      drawSolid(common(pick(this.depthP, () => this.depthShP)))
       gl.disable(gl.POLYGON_OFFSET_FILL)
       gl.colorMask(true, true, true, true)
     }
-    const px = this.h / 1080
     if (style === STYLE_WIRE || style === STYLE_EDGES || style === STYLE_SOLID_EDGES) {
       const [lr, lg, lb] = col(I, 'lineColor', [0.92, 0.94, 0.95])
       const wpx = Math.max(1, Math.max(0.3, num(I, 'lineWidth', 1.2)) * px)
@@ -818,16 +1339,35 @@ export class ModelSource implements NativeGenerator {
       const see = style !== STYLE_SOLID_EDGES && !hidden
       if (see) gl.disable(gl.DEPTH_TEST)
       gl.depthMask(false)
-      common(this.lineP.use()).f2('uRes', this.w, this.h).f1('uWidth', wpx).f1('uAll', style === STYLE_WIRE ? 1 : 0).f1('uCrease', crease)
+      const shLines = sh && !!gp.sh?.edVao
+      common(shLines ? shardU(this.lineShP.use()) : this.lineP.use()).f2('uRes', this.w, this.h).f1('uWidth', wpx).f1('uAll', style === STYLE_WIRE ? 1 : 0).f1('uCrease', crease)
         .f3('uLineC', lr, lg, lb).f3('uGround', gr, gg, gb).f1('uGroundA', ga).f1('uFog', Math.max(0, Math.min(1, num(I, 'fog', 0))))
-      gl.bindVertexArray(gp.edVao)
-      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nEdge)
+      if (shLines) {
+        gl.bindVertexArray(gp.sh!.edVao)
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nEdge * 2)
+      } else {
+        gl.bindVertexArray(gp.edVao)
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nEdge)
+      }
       gl.depthMask(true)
       gl.enable(gl.DEPTH_TEST)
     } else if (style === STYLE_POINTS) {
-      shade(common(this.pointP.use())).f1('uSize', Math.max(0.3, num(I, 'pointSize', 2.5)) * px).f1('uDist', dist)
+      shade(common(pick(this.pointP, () => this.pointShP))).f1('uSize', Math.max(0.3, num(I, 'pointSize', 2.5)) * px).f1('uDist', dist)
       gl.bindVertexArray(gp.ptVao)
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nVert)
+    }
+    // DUST : the shards shrunk to points, one a triangle (the points look's beads shrink
+    // on their own)
+    if (sh && gp.nIdx && shDust > 0 && style !== STYLE_POINTS && shE * (1 + shCrumble) > Math.max(0, Math.min(1, num(I, 'dustAt', 0.6)))) {
+      gl.depthMask(false)
+      const [lr, lg, lb] = col(I, 'lineColor', [0.92, 0.94, 0.95])
+      const dp = style === STYLE_SOLID || style === STYLE_SOLID_EDGES
+        ? shade(common(shardU(this.dustP.use())))
+        : common(shardU(this.dustLineP.use())).f3('uLineC', lr, lg, lb).f3('uGround', gr, gg, gb).f1('uGroundA', ga).f1('uFog', Math.max(0, Math.min(1, num(I, 'fog', 0))))
+      dp.f2('uRes', this.w, this.h).f1('uDist', dist)
+      gl.bindVertexArray(g.pointVao)
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nIdx / 3)
+      gl.depthMask(true)
     }
     gl.disable(gl.BLEND)
 
@@ -840,9 +1380,9 @@ export class ModelSource implements NativeGenerator {
       gl.clearColor(0, 0, 0, 1)
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
       gl.depthFunc(gl.LESS)
-      if (gp.nIdx) drawSolid(common(this.depthP.use()))
+      if (gp.nIdx) drawSolid(common(pick(this.depthP, () => this.depthShP)))
       else {
-        common(this.ptDepthP.use()).f2('uRes', d.w, d.h).f1('uSize', Math.max(0.3, num(I, 'pointSize', 2.5)) * (d.h / 1080)).f1('uDist', dist)
+        common(pick(this.ptDepthP, () => this.ptDepthShP)).f2('uRes', d.w, d.h).f1('uSize', Math.max(0.3, num(I, 'pointSize', 2.5)) * (d.h / 1080)).f1('uDist', dist)
         gl.bindVertexArray(gp.ptVao)
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, gp.nVert)
       }
@@ -861,7 +1401,7 @@ export class ModelSource implements NativeGenerator {
     this.showP.use().i1('uPic', 0)
     g.bind(0, this.pic!.tex)
     g.draw(targetFbo, this.w, this.h)
-    g.done(4)
+    g.done(sh ? 8 : 4)
   }
 
   dispose(): void {
