@@ -17,6 +17,7 @@ import { sonifyEngine } from './audio/sonify'
 import { cancelMorph } from './morph'
 import { showToast } from './components/Toast'
 import { tempoEdited } from './tempoEvents'
+import { persistRig } from './lights/lightStore'
 
 const CAPACITY = 100
 const QUIET_MS = 300
@@ -62,8 +63,13 @@ interface Snapshot {
   seqLanes: FullState['seqLanes']
   // The lights of the session : each light's look, the cues, the masters, the
   // group faders (New and Open replace them; "to all", a show, a deleted cue are
-  // steps). The rig is this computer's and is not in it.
+  // steps).
   lightsSession: FullState['lightsSession']
+  // The rig : the fixtures (added, moved, patched, deleted) and the outputs. It is
+  // this computer's (saved with it, not with the session), but an edit to it is a
+  // step all the same. Its on / off switch is not : like Black, an undo never
+  // turns the lights off or on (see sameRig, apply).
+  lightRig: FullState['lightRig']
 }
 
 function snap(): Snapshot {
@@ -94,7 +100,8 @@ function snap(): Snapshot {
     pins: s.pins,
     ruleSeq: s.ruleSeq,
     seqLanes: s.seqLanes,
-    lightsSession: s.lightsSession
+    lightsSession: s.lightsSession,
+    lightRig: s.lightRig
   }
 }
 
@@ -137,8 +144,19 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.pins !== b.pins ||
     a.ruleSeq !== b.ruleSeq ||
     a.seqLanes !== b.seqLanes ||
-    a.lightsSession !== b.lightsSession
+    a.lightsSession !== b.lightsSession ||
+    !sameRig(a.lightRig, b.lightRig)
   )
+}
+
+// The rig field by field, its on / off switch left out (not a step).
+function sameRig(a: FullState['lightRig'], b: FullState['lightRig']): boolean {
+  if (a === b) return true
+  const x = a as unknown as Record<string, unknown>
+  const y = b as unknown as Record<string, unknown>
+  for (const k in x) if (k !== 'on' && x[k] !== y[k]) return false
+  for (const k in y) if (k !== 'on' && !(k in x)) return false
+  return true
 }
 
 /** The live inputs open after an undo : an undo never opens one by itself. A
@@ -190,6 +208,20 @@ function apply(s: Snapshot): void {
     seqLanes: s.seqLanes,
     lightsSession: s.lightsSession
   })
+  // The rig as it was (saved on this computer like any rig edit), the lights left
+  // on or off as they are now; a fixture no longer there is no longer picked.
+  {
+    const cur = useStore.getState()
+    if (!sameRig(s.lightRig, cur.lightRig)) {
+      const lightRig = persistRig({ ...s.lightRig, on: cur.lightRig.on })
+      const ids = new Set(lightRig.fixtures.map((f) => f.id))
+      useStore.setState({
+        lightRig,
+        lightSel: cur.lightSel && ids.has(cur.lightSel) ? cur.lightSel : null,
+        lightPicked: cur.lightPicked.filter((id) => ids.has(id))
+      })
+    }
+  }
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
   // Sonify goes through setSonify so the sound engine (and its localStorage)
@@ -367,7 +399,7 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   if (a.sequence !== b.sequence) return 'sequencer'
   if (a.ruleSeq !== b.ruleSeq) return 'rule timeline'
   if (a.seqLanes !== b.seqLanes) return 'Seq transport'
-  if (a.lightsSession !== b.lightsSession) return 'lights'
+  if (a.lightsSession !== b.lightsSession || !sameRig(a.lightRig, b.lightRig)) return 'lights'
   if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
   if (a.sonify !== b.sonify) return 'sonify'
   if (a.audioLayer !== b.audioLayer) return 'audio layer'
