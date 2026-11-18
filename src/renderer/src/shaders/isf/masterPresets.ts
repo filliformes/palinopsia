@@ -1073,6 +1073,71 @@ export const MASTER_PRESETS: MasterPreset[] = [
     ],
     vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.9, gamma: 1, autoLevel: 0, splitTone: 0.12 }
   },
+  // ── Depth : a plane through the depth (Depth Scan), slices, and chains for a
+  // Point Cloud (they keep its colors : mixSrc 1). ──
+  {
+    name: 'Depth Sweep', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 0, flip: 0, period: 4, sync: 0, direction: 0, position: 0.5, width: 0.08, trail: 0.3, brighten: 1, tint: 0.35, glow: [0.93, 0.88, 0.78, 1], line: 0.5, enlarge: 0.3, rest: 0.2, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Sonar', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 0, flip: 0, period: 3, sync: 0, direction: 1, position: 0.5, width: 0.04, trail: 0.7, brighten: 1.6, tint: 0.8, glow: [0.55, 0.95, 0.85, 1], line: 0.9, enlarge: 0.3, rest: 0.85, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.04, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
+  {
+    name: 'Plane on the Bar', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 0, flip: 0, period: 4, sync: 3, direction: 2, position: 0.5, width: 0.1, trail: 0.3, brighten: 1, tint: 0.35, glow: [0.93, 0.88, 0.78, 1], line: 0.5, enlarge: 0.3, rest: 0.4, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Depth Contours', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 0, flip: 0, period: 7, sync: 0, direction: 2, position: 0.5, width: 0.03, trail: 0, brighten: 0, tint: 0, glow: [0.93, 0.88, 0.78, 1], line: 1, enlarge: 0, rest: 0.15, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.04, saturation: 0.9, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.06 }
+  },
+  {
+    name: 'Only the Near', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 1, reads: 0, flip: 0, period: 4, sync: 0, direction: 0, position: 0.5, width: 0.08, trail: 0.3, brighten: 1, tint: 0.35, glow: [0.93, 0.88, 0.78, 1], line: 0.5, enlarge: 0.3, rest: 0.2, sliceAt: 0.78, sliceWidth: 0.44, softness: 0.07, outside: 1, dim: 0.08, invert: 0, wet: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.1, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Ember Front', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 0, flip: 0, period: 4, sync: 0, direction: 0, position: 0.5, width: 0.06, trail: 0.8, brighten: 1.4, tint: 0.7, glow: [1, 0.55, 0.2, 1], line: 0.5, enlarge: 0.6, rest: 0.5, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.05, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1.02, gamma: 1, autoLevel: 0, splitTone: 0.1 }
+  },
+  {
+    name: 'Night Points', group: 'Depth',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.14, saturation: 1.02, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Points Under a Scan', group: 'Depth',
+    fx: [
+      { shaderId: 'node-depthscan', inputs: {mode: 0, reads: 1, flip: 0, period: 6, sync: 0, direction: 0, position: 0.5, width: 0.1, trail: 0.5, brighten: 1.2, tint: 0.25, glow: [0.93, 0.88, 0.78, 1], line: 0, enlarge: 0.5, rest: 0.1, sliceAt: 0.6, sliceWidth: 0.3, softness: 0.05, outside: 0, dim: 0.15, invert: 0, wet: 1} },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 1, lift: 0, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   {
     name: 'Hard Memory', group: 'Frame Store',
     fx: [

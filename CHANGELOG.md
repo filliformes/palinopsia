@@ -5,6 +5,41 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Point Cloud, a new source** (`gen-pointcloud`, `engine/PointCloudSource.ts`; Vincent's
+  pick of 11-08 : "the picture as a point cloud"). The layer picked as its sidechain (or a
+  picture of its own : a globe, dunes, rings on water) lifted into up to 640,000 points,
+  each with the picture's color, raised by the picture's depth or its brightness, seen
+  through an orbiting camera (turn, tilt, distance, lens, sway, spin).
+  - Every point has a home in the picture dealt once from its index, so a moving picture
+    recolors and re-raises the points without re-dealing them : no shimmer. `stipple` thins
+    the dark parts by a fixed threshold per point; `settle` glides the relief.
+  - Motion, all from the home each frame (nothing simulated, nothing drifts) : a splash on
+    the sound's hits, the beat or `splash ▸`, gathered back on an eased arc; a wind past a
+    line where the points leave and form again; the points parting round the hand (the
+    mouse on the preview, a pinch, the Room's people); a scan plane through the depth.
+  - Depth : with the depth engine on AI, a second copy of the model reads the picture the
+    cloud lifts (`engine/pictureDepth.ts`), not the finished frame, which holds the cloud
+    itself. Depth off : brightness, and the Inspector says so.
+  - Depth-tested instanced quads in the shared multisampled buffer, alpha to coverage for
+    round and soft points. Dome : stretched, the view kept square, the camera standing back.
+  - Measured on the RTX 4070 laptop : 640,000 points at 60 fps at 1080p (p95 18.6 ms;
+    20.3 ms with both depth models running).
+  - 14 presets, 3 Generate themes (Lifted Picture, Sand on the Beat, Wearing Away), 2 Master
+    FX chains (Night Points, Points Under a Scan).
+- **Depth Scan, a new effect** (`node-depthscan`, `engine/depthScanNode.ts`; Vincent's pick
+  of 11-08 : "a plane sweeping through depth", and the depth slice). A plane sweeps through
+  the picture's depth (near to far, far to near, back and forth, by hand; a period or the
+  beat) and lights what it crosses : brighten, tint toward a glow color, enlarge, a
+  pixel-true contour line, a trail, the rest dimmed. Slice keeps a band of depth and makes
+  the rest transparent, dimmed, black or a white matte; scan in slice runs the plane inside
+  it. Its depth is the model reading the picture entering it (depth: AI), else brightness or
+  darkness. Any rack. 12 presets, the Generate theme Depth Sweep, 6 Master FX chains (group
+  Depth). Measured : 60 fps at 1080p, on its own and with a Point Cloud.
+- **Credits** : Gather 聚 Lite (DAO) and Hex Composer, for the ideas behind both, in
+  THIRD_PARTY_NOTICES.md Part 6. No code taken.
+
 ### Changed
 
 - **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):

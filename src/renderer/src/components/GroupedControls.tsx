@@ -64,6 +64,16 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
+  'gen-pointcloud': [
+    g('picture and points', 'own', 'raise', 'depth', 'settle', 'stipple', 'gain', 'ground', 'density', 'size', 'shape', 'jitter', 'fog'),
+    g('camera and scan', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin', 'scan', 'scanPeriod', 'scanSync'),
+    g('splash, wind, hand', 'splash', 'splashOn', 'throw', 'gather', 'burst', 'wind', 'windAt', 'windAngle', 'windSpeed', 'part', 'partSize', 'people')
+  ],
+  'node-depthscan': [
+    g('depth and slice', 'mode', 'reads', 'flip', 'sliceAt', 'sliceWidth', 'softness', 'outside', 'dim', 'invert'),
+    g('sweep', 'period', 'sync', 'direction', 'position', 'restart', 'width', 'trail'),
+    g('light', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest', 'wet')
+  ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),
     g('hand and wind', 'brush', 'hold', 'heal', 'groom', 'wind', 'gust', 'spring', 'audio', 'audioPart', 'lightAngle', 'lightHeight'),
@@ -478,6 +488,27 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('material', 0)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'Clay has no reflection to flow.')
     if (isnt('material', 6)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
     if (isnt('material', 5)) put(d, ['dispersion', 'rim'], 'Only the glass splits color and has a rim.')
+    return d
+  },
+  'gen-pointcloud': ({ zero, is }) => {
+    const d: Why = {}
+    if (zero('depth')) put(d, ['settle'], 'Depth is at 0 : the picture lies flat.')
+    if (zero('scan')) put(d, ['scanPeriod', 'scanSync'], 'Scan is at 0.')
+    if (!is('scanSync', 0)) put(d, ['scanPeriod'], 'The scan sweeps on the tempo.')
+    if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
+    if (zero('part') && zero('people')) put(d, ['partSize'], 'Hand parts and room people are at 0.')
+    if (zero('splash')) put(d, ['splashOn'], 'Splash is at 0 : only the trigger throws.')
+    if (zero('wind')) put(d, ['windAt', 'windAngle', 'windSpeed'], 'Wind is at 0.')
+    return d
+  },
+  'node-depthscan': ({ is, isnt }) => {
+    const d: Why = {}
+    if (is('mode', 1)) put(d, ['period', 'sync', 'direction', 'position', 'restart', 'width', 'trail', 'brighten', 'tint', 'glow', 'line', 'enlarge', 'rest'], 'Slice only : no plane sweeps.')
+    if (is('mode', 0)) put(d, ['sliceAt', 'sliceWidth', 'softness', 'outside', 'dim', 'invert'], 'Scan only : nothing is sliced.')
+    if (isnt('outside', 1)) put(d, ['dim'], 'Only the dimmed outside has a level.')
+    if (isnt('direction', 3)) put(d, ['position'], 'The plane sweeps by itself : by hand only.')
+    if (is('direction', 3)) put(d, ['period', 'sync', 'restart'], 'By hand : the plane stands where you put it.')
+    if (isnt('sync', 0)) put(d, ['period'], 'The sweep runs on the tempo.')
     return d
   },
   'gen-fur': ({ zero, is }) => {
