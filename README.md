@@ -2894,6 +2894,18 @@ dome piece at home, check a SpatGRIS scene before the venue, then switch to the 
 When the output has fewer channels than the setup, the page says so and offers
 headphones in one click.
 
+**The Space line.** While Space is on, a small line beside the Sonify meter (in the
+Sonify bar) and under Sonify's output in the Connect tab's Audio section says where the
+sound goes : `objects 1-26` in the bar, *Space : objects, channels 1 to 26* or
+*Space : speakers, 8 channels* in the Audio section. It turns **amber** when the output
+has fewer channels than Space needs (the rest are dropped : only the voices on the
+output's first channels are heard, often Spectra and Orbit alone), with the reason in
+its tooltip (and under it in the Audio section). Its **stereo** button sets the output
+back to stereo in one click (Space's other settings are kept for next time); in the bar,
+a click on the line opens the Space view. The Sonify meter reads the stereo mix
+**before** Space, so it shows every voice moving even when some of them are dropped :
+its tooltip says so while Space is on.
+
 **Collage pieces** (0 to 30) : the Collage voice's pieces as sources of their own, each
 sounding where it is in the picture (on the dome, through the mapping) instead of the
 voice as one pair. Past the count, a piece joins the group of pieces nearest to it, so

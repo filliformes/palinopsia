@@ -21,6 +21,7 @@ import { modTargetKey, useStore } from '../store'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { SonifyKeySequencer } from './SonifyKeySequencer'
 import { AudioOutputSelect } from './AudioOutputSelect'
+import { SpaceOutLine } from './SpaceOutLine'
 import { SpacePanel } from './SpacePanel'
 import { SPACE_FIELD_RANGE, SPACE_VOICE_LABEL, parseSpaceModParam } from '@shared/spatial'
 
@@ -747,6 +748,7 @@ export function SonifyPage({
   const now = (): SoniConfig => useStore.getState().sonify
   const patch = (p: Partial<SoniConfig>): void => set({ ...now(), ...p })
   const [view, setView] = useState<'voices' | 'mixer' | 'seq' | 'space'>('voices')
+  const spaceOn = useStore((s) => s.space.mode !== 'stereo')
   // The voice/mixer column is drag-resizable (persisted), like the Sequence page.
   const [voiceW, setVoiceW] = useState(() => {
     const v = Number(localStorage.getItem('opsia.soniVoiceW'))
@@ -1247,7 +1249,7 @@ export function SonifyPage({
           />
         </span>
         <span className="w-7 shrink-0 text-right font-mono text-[9px] text-muted">{cfg.master.toFixed(2)}</span>
-        <div className="flex shrink-0 items-center gap-1" title="Output level after the master and the limiter, per channel (L above, R below) : the bar is the average (RMS) level, the tick the peak, on a dB scale from -54 to 0 (lines at -36, -18, -6 dB). Yellow above -9 dB, orange while the limiter works (it holds the peak under -1 dB).">
+        <div className="flex shrink-0 items-center gap-1" title={`Output level after the master and the limiter, per channel (L above, R below) : the bar is the average (RMS) level, the tick the peak, on a dB scale from -54 to 0 (lines at -36, -18, -6 dB). Yellow above -9 dB, orange while the limiter works (it holds the peak under -1 dB).${spaceOn ? ' Space is on : this is the stereo mix before Space. The output carries what Space makes of it (the line beside says on which channels).' : ''}`}>
           <div ref={meterRef} className="relative flex h-[9px] w-[72px] flex-col justify-between overflow-hidden rounded-sm bg-panel3">
             {[0, 1].map((c) => (
               <div key={c} className="relative h-[4px] w-full">
@@ -1261,6 +1263,8 @@ export function SonifyPage({
           </div>
           <span data-m="db" className="w-6 text-right font-mono text-[9px] tabular-nums text-muted">-∞</span>
         </div>
+        {/* Space on : where the sound really goes (the meter reads the mix before it) */}
+        <SpaceOutLine variant="bar" onOpen={() => setView('space')} />
         {/* Quantizer */}
         <span className="font-mono text-[9px] uppercase text-muted">key</span>
         <select

@@ -5,6 +5,18 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **The Space line** : while Space drives Sonify's output (speakers or objects), a small line
+  beside the Sonify meter and under Sonify's output in the Connect tab's Audio section says
+  the mode and the channels in use (`objects 1-26`, *Space : speakers, 8 channels*). It
+  turns amber when the output has fewer channels than Space needs (the reason in its
+  tooltip, and under it in the Audio section), and its **stereo** button goes back to the
+  stereo mix in one click. The Sonify meter's tooltip says it reads the mix before Space.
+  (Space left in objects mode on a stereo output played only the first voices, without the
+  FX return, while the meter showed every voice moving; the only warning was on the Space
+  view.)
+
 ### Changed
 
 - **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):

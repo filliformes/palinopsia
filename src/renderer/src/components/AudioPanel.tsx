@@ -12,6 +12,7 @@ import { layerSounds } from '../audio/audioLayer'
 import { EqCard, GlueCard } from './SonifyEq'
 import { useStore } from '../store'
 import { AudioOutputSelect } from './AudioOutputSelect'
+import { SpaceOutLine } from './SpaceOutLine'
 import { ChannelSelect, useOutputChannels } from '../audio/channelPick'
 import { sonifyEngine } from '../audio/sonify'
 import { AUDIO_BUFFERS, AUDIO_RATES, bufferLabel, rateLabel, type LatencyInfo } from '../audio/audioFormat'
@@ -220,6 +221,8 @@ export function AudioPanel(): JSX.Element {
                 : `Which of the output's channels Sonify and the Audio Layer play on : a stereo pair, or one channel (the two sides summed). The device takes ${outN} channel${outN === 1 ? '' : 's'}. The films' and audio players' own sound stays on 1+2.`}
             />
           </div>
+          {/* Space on : the mode, its channels, amber when some are dropped */}
+          <SpaceOutLine variant="row" />
         </div>
         {enabled && <Meters />}
       </div>
