@@ -38,6 +38,8 @@
 //   act:key:<next|fifthup|fifthdown|up|down>
 //   act:au:<play|A|B|mute>
 //   act:out:<shot|turn|spin|flipx|flipy|reset>
+//   act:fav:<n>   open favorite session n (0-based, Open ▾'s order), without
+//                 asking : unsaved work is kept as a recovery copy
 
 import type { FxInstance, FxScope, LayerState, SourceSlot } from '@shared/types'
 import { BLEND_MODES, LOOP_BLENDS } from '@shared/types'
@@ -59,6 +61,8 @@ import { outputCanvas } from './engine/outputCanvas'
 import { runSilently } from './undo'
 import { showToast } from './components/Toast'
 import { isLayerRackKind, LAYER_RACK_SHORT, layerRackOf, type LayerRackKind } from './layerRack'
+import { favoriteSessions } from './favoriteSessions'
+import { fireOpenSessionPath } from './commands'
 
 type St = ReturnType<typeof useStore.getState>
 const get = (): St => useStore.getState()
@@ -469,6 +473,20 @@ const RULE_WORDS: Record<RuleVerb, { verb: (name: string) => string; token: stri
   toggle: { verb: (n) => `turns “${n}” on or off`, token: 'Tog', title: 'Turns the Body rule on, or off when it is on' }
 }
 
+// A favorite opens as a learned pad's Open : never a dialog mid-show. A second
+// fire while one is opening is skipped.
+let openingFav = false
+async function openFavorite(n: number): Promise<void> {
+  const f = favoriteSessions.list()[n]
+  if (!f || openingFav) return
+  openingFav = true
+  try {
+    await fireOpenSessionPath(f.path, false)
+  } finally {
+    openingFav = false
+  }
+}
+
 // ── The executor ────────────────────────────────────────────────────────────
 
 /** Fire an `act:` id. Unknown or gone : nothing. */
@@ -625,6 +643,11 @@ export function fireAction(id: string): void {
         case 'flipy': st.setOutXform({ flipY: !x.flipY }); return
         case 'reset': st.resetOutXform(); return
       }
+      return
+    }
+    case 'fav': {
+      const n = Number(p[2])
+      if (Number.isInteger(n) && n >= 0) void openFavorite(n)
       return
     }
   }
@@ -799,6 +822,15 @@ export function actionInfo(id: string, st: St = get()): ActionInfo | null {
       }[p[2] as 'shot' | 'turn' | 'spin' | 'flipx' | 'flipy' | 'reset']
       return w ? { label: w[0], verb: w[1], token: w[2], group: 'Output', title: `${w[3]}. Under the fulldome the output transform waits (the dome has its own)` } : null
     }
+    case 'fav': {
+      const n = Number(p[2])
+      if (!Number.isInteger(n) || n < 0) return null
+      const f = favoriteSessions.list()[n]
+      return {
+        label: `FAVORITE ${n + 1}${f ? ` · ${f.name}` : ' (gone)'}`, verb: `opens favorite ${n + 1}`, token: `Fav${n + 1}`, group: 'Session',
+        title: 'Opens this favorite session (Open ▾, in its order) without asking : unsaved work is kept as a recovery copy', gone: !f
+      }
+    }
   }
   return null
 }
@@ -811,7 +843,7 @@ export function actionLabel(id: string): string {
 /** Every `act:` id worth offering now, in the picker's order : the layers, the
  *  Background's opacity, the triggers of what is loaded, the effects, the
  *  scenes, the Worlds, Generate, the Meta knobs, the modulators, the Body
- *  rules, the Feel, tempo and sound, the output. */
+ *  rules, the Feel, tempo and sound, the output, the favorite sessions. */
 export function actionIds(st: St = get()): string[] {
   const out: string[] = []
   st.composition.layers.forEach((_, i) => { for (const v of LAYER_VERBS) out.push(`act:layer:${i}:${v}`) })
@@ -849,5 +881,6 @@ export function actionIds(st: St = get()): string[] {
   out.push('act:key:next', 'act:key:fifthup', 'act:key:fifthdown', 'act:key:up', 'act:key:down')
   out.push('act:au:play', 'act:au:A', 'act:au:B', 'act:au:mute')
   out.push('act:out:shot', 'act:out:turn', 'act:out:spin', 'act:out:flipx', 'act:out:flipy', 'act:out:reset')
+  favoriteSessions.list().forEach((_, n) => out.push(`act:fav:${n}`))
   return out
 }

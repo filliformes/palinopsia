@@ -112,6 +112,16 @@ export function registerOpenSession(fn: (() => void) | null): void {
 export function fireOpenSession(): void {
   openSessionFn?.()
 }
+// A session file by its path, the way Open ▾'s recent and favorite entries open
+// it. `interactive` false (a learned pad's favorite) : never a dialog, a
+// recovery copy of unsaved work instead.
+let openSessionPathFn: ((path: string, interactive: boolean) => Promise<void>) | null = null
+export function registerOpenSessionPath(fn: ((path: string, interactive: boolean) => Promise<void>) | null): void {
+  openSessionPathFn = fn
+}
+export function fireOpenSessionPath(path: string, interactive = true): Promise<void> {
+  return openSessionPathFn ? openSessionPathFn(path, interactive) : Promise.resolve()
+}
 
 // The big preview (V) folds the panels under it away : App registers how to
 // bring them back, so a search pick (Ctrl/Cmd+K) can reach a control there.

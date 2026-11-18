@@ -34,7 +34,7 @@ import { setPointerHost, attachPreviewPointer } from './pointerInput'
 import PreviewPointerOverlay from './components/PreviewPointerOverlay'
 import { sonifyEngine } from './audio/sonify'
 import { spaceEngine } from './audio/space'
-import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession, registerShowPanels } from './commands'
+import { fireSelectedRandomize, registerPanic, firePanic, fireFreeze, isFrozen, registerRecordToggle, registerNewSession, registerOpenSession, registerOpenSessionPath, registerShowPanels } from './commands'
 import { Toaster, showToast, usePictureToastDock } from './components/Toast'
 import { PictureCapsule } from './components/PictureCapsule'
 import { glassEnabled, setGlassEnabled, useGlass, useSliderLens, type GlassShape } from './glass'
@@ -115,7 +115,8 @@ import { addSessionAsScenes, registerScenesAsker } from './sessionScenes'
 import { leaveSession, markClean, markDirty, registerSessionAsker, type LeaveChoice } from './sessionGuard'
 import { recentSessions } from './recentSessions'
 import { baseName, droppedPaths, isFileDrag, openDroppedSession, setSessionDropOpener } from './components/fileDrop'
-import { ContextMenu as RecentMenu, MenuHost } from './components/ContextMenu'
+import { ContextMenu as RecentMenu, MenuHost, type MenuItem } from './components/ContextMenu'
+import { favoriteSessions, MAX_FAVORITES } from './favoriteSessions'
 import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
 import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
@@ -2135,10 +2136,12 @@ export default function App(): JSX.Element {
     }
   }
 
-  // Open a session by its path (a recent one, a file dropped on the window) :
-  // asked about the one being left, like Open. A file that is gone (or not a
-  // session) leaves the recent list.
-  async function openSessionPath(path: string): Promise<void> {
+  // Open a session by its path (a recent one, a favorite, a file dropped on the
+  // window) : asked about the one being left, like Open. A file that is gone (or
+  // not a session) leaves the recent list (a favorite stays, flagged : it was
+  // starred on purpose). `interactive` false = a learned pad opening a favorite :
+  // never a dialog mid-show (unsaved changes go to a recovery copy).
+  async function openSessionPath(path: string, interactive = true): Promise<void> {
     const label = baseName(path)
     let session: unknown = null
     try { session = await window.api.sessionLoad(path) } catch { session = null }
@@ -2147,7 +2150,7 @@ export default function App(): JSX.Element {
       recentSessions.remove(path)
       return
     }
-    if (!(await leaveSession(`opening ${label}`))) return
+    if (!(await leaveSession(`opening ${label}`, interactive))) return
     try {
       useStore.getState().loadSession(session as Parameters<ReturnType<typeof useStore.getState>['loadSession']>[0])
       useStore.getState().setSessionPath(path)
@@ -2200,7 +2203,9 @@ export default function App(): JSX.Element {
   useEffect(() => {
     registerNewSession(() => void doNewSession(false))
     registerOpenSession(() => void openSession())
-    return () => { registerNewSession(null); registerOpenSession(null) }
+    // a favorite by its place (act:fav:<n>) opens the way a recent one does
+    registerOpenSessionPath((p, interactive) => openPathRef.current(p, interactive))
+    return () => { registerNewSession(null); registerOpenSession(null); registerOpenSessionPath(null) }
   }, [])
 
   // One-shot blue flash on the Save button (dataFLOU's confirmation gesture) —
@@ -2968,19 +2973,96 @@ function PreviewSizer({
   )
 }
 
-/** Open ▾ : the sessions opened or saved lately (× takes one off the list). */
+/** Open ▾ : your favorite sessions (starred, in the order you starred them),
+ *  then the sessions opened or saved lately (× takes one off its list, ☆ stars
+ *  a recent one). A favorite whose file is gone stays, flagged. */
 function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const sessionPath = useStore((s) => s.sessionPath)
+  // the lists change while the menu is open (a star) : draw it again
+  const [, redraw] = useState(0)
+  useEffect(() => {
+    if (!menu) return
+    const bump = (): void => redraw((n) => n + 1)
+    const a = favoriteSessions.subscribe(bump)
+    const b = recentSessions.subscribe(bump)
+    return () => { a(); b() }
+  }, [menu])
+  // which favorites' files are gone, looked at each time the menu opens
+  const [missing, setMissing] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!menu) return
+    const paths = favoriteSessions.list().map((f) => f.path)
+    if (!paths.length) return
+    let live = true
+    window.api.mediaCheck(paths).then(
+      (kinds) => { if (live) setMissing(new Set(paths.filter((p) => kinds[p] !== 'file'))) },
+      () => { /* unknown : nothing flagged */ }
+    )
+    return () => { live = false }
+  }, [menu])
   // another session's pictures as scenes of this one (the session stays)
   const addAsScenes = {
     label: 'Add a session as scenes…',
     title: 'Pick a session file : what it opens on becomes a scene here (its own scenes too, if you want them). This session stays open.',
     onClick: () => { setMenu(null); void addSessionAsScenes() }
   }
+  const media = { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }
   const list = menu ? recentSessions.list() : []
+  const favs = menu ? favoriteSessions.list() : []
   // the same name twice : the folder tells them apart
-  const label = (p: string, name: string): string =>
-    list.filter((r) => r.name === name).length > 1 ? `${name}  (${baseName(p.replace(/[\\/][^\\/]*$/, ''))})` : name
+  const label = (all: Array<{ name: string }>, p: string, name: string): string =>
+    all.filter((r) => r.name === name).length > 1 ? `${name}  (${baseName(p.replace(/[\\/][^\\/]*$/, ''))})` : name
+  const star = (path: string): void => {
+    if (!favoriteSessions.toggle(path)) showToast(`The favorites are full (${MAX_FAVORITES}) : take one off first`, 'warn')
+  }
+  const isFav = favoriteSessions.has(sessionPath)
+  const full = favs.length >= MAX_FAVORITES
+  const favItems: MenuItem[] = [
+    { label: 'Favorites', heading: true, title: 'Sessions you starred, in the order you starred them. A pad, a key or a body rule opens one by its place (FAVORITE 1, 2…)' },
+    ...favs.map((f, i) => {
+      const gone = missing.has(f.path)
+      return {
+        label: label(favs, f.path, f.name),
+        hint: gone ? 'file missing' : undefined,
+        title: gone
+          ? `${f.path} is not there now (moved, renamed or on a drive not plugged in) : × takes it off the favorites`
+          : `${f.path} · FAVORITE ${i + 1} as a trigger`,
+        onClick: () => { setMenu(null); onOpen(f.path) },
+        onDelete: () => favoriteSessions.remove(f.path),
+        deleteTitle: `Take ${f.name} off the favorites (the file stays)`
+      }
+    }),
+    sessionPath
+      ? {
+          label: isFav ? '★ Take this session off favorites' : '☆ Add this session to favorites',
+          disabled: !isFav && full,
+          title: !isFav && full ? `The favorites are full (${MAX_FAVORITES}) : take one off first` : sessionPath,
+          keepOpen: true,
+          onClick: () => star(sessionPath)
+        }
+      : { label: '☆ Add this session to favorites', disabled: true, title: 'Save the session first : a favorite is a session file' }
+  ]
+  const recentItems: MenuItem[] = list.length
+    ? [
+        { label: 'Recent', heading: true },
+        ...list.map((r) => {
+          const starred = favoriteSessions.has(r.path)
+          return {
+            label: label(list, r.path, r.name),
+            title: r.path,
+            onClick: () => { setMenu(null); onOpen(r.path) },
+            onStar: () => star(r.path),
+            starred,
+            starTitle: starred ? `Take ${r.name} off the favorites` : `Add ${r.name} to the favorites`,
+            onDelete: () => { recentSessions.remove(r.path); setMenu({ ...menu! }) },
+            deleteTitle: `Take ${r.name} off the list (the file stays)`
+          }
+        }),
+        { label: '', divider: true },
+        { label: 'Clear the recent list', onClick: () => { recentSessions.clear(); setMenu(null) } }
+      ]
+    : [{ label: 'Recent', heading: true }, { label: 'No recent sessions yet', disabled: true }, { label: '', divider: true }]
   return (
     <>
       <button
@@ -2989,8 +3071,8 @@ function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Eleme
           const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
           setMenu((m) => (m ? null : { x: r.left, y: r.bottom + 2 }))
         }}
-        title="Recent sessions"
-        aria-label="Recent sessions"
+        title="Favorite and recent sessions"
+        aria-label="Favorite and recent sessions"
       >
         ▾
       </button>
@@ -2998,23 +3080,7 @@ function RecentButton({ onOpen }: { onOpen: (path: string) => void }): JSX.Eleme
         <RecentMenu
           x={menu.x}
           y={menu.y}
-          header={<span className="font-mono text-[10px] text-muted">Recent sessions</span>}
-          items={
-            list.length
-              ? [
-                  ...list.map((r) => ({
-                    label: label(r.path, r.name),
-                    onClick: () => { setMenu(null); onOpen(r.path) },
-                    onDelete: () => { recentSessions.remove(r.path); setMenu({ ...menu }) },
-                    deleteTitle: `Take ${r.name} off the list (the file stays)`
-                  })),
-                  { label: '', divider: true },
-                  { label: 'Clear the list', onClick: () => { recentSessions.clear(); setMenu(null) } },
-                  addAsScenes,
-                  { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }
-                ]
-              : [{ label: 'No recent sessions yet', disabled: true }, { label: '', divider: true }, addAsScenes, { label: 'Session media…', onClick: () => { setMenu(null); openSessionMedia() } }]
-          }
+          items={[...favItems, { label: '', divider: true }, ...recentItems, addAsScenes, media]}
           onClose={() => setMenu(null)}
         />
       )}

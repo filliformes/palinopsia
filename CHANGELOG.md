@@ -16,6 +16,22 @@ that CI builds into cross-platform releases.
   (Space left in objects mode on a stereo output played only the first voices, without the
   FX return, while the meter showed every voice moving; the only warning was on the Space
   view.)
+- **Favorite sessions** in the top bar's **Open ▾** (`favoriteSessions.ts`) : a
+  **Favorites** section above **Recent**, for the sessions you want to recall quickly.
+  - **☆ Add this session to favorites** stars the session on screen (greyed until it has
+    been saved : a favorite is a session file); a **☆** on each recent entry stars it
+    too (**★** takes it off).
+  - Click a favorite to open it, the way a recent one opens (asked about unsaved changes
+    first); **×** takes it off the list, the file stays.
+  - In the order you starred them, up to 24, machine-local like the recent list
+    (`opsia.favoriteSessions`).
+  - A favorite whose file is gone stays on the list, flagged **file missing** (it comes
+    back when the file does, a drive plugged in again), until you take it off. The recent
+    list still drops such a file.
+  - Each favorite is a trigger : **FAVORITE n** (`act:fav:<n>`, in the **Session**
+    group) opens it from a MIDI pad, an OSC Learn, a key, a Body rule or the dataflou
+    mesh, without asking (unsaved work is kept as a recovery copy, like a pad's New).
+  - The search (Ctrl/Cmd+K) finds them : **Open <name>**.
 
 ### Changed
 

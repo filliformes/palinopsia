@@ -61,6 +61,15 @@ export interface MenuItem {
   keepOpen?: boolean
   /** Hover text. */
   title?: string
+  /** A section's small heading inside the list (not clickable). */
+  heading?: boolean
+  /** A short note after the label, in the warning color (a favorite whose
+   *  file is gone). */
+  hint?: string
+  /** Optional ☆ / ★ before the × : star the row (the menu stays open). */
+  onStar?: () => void
+  starred?: boolean
+  starTitle?: string
 }
 
 // The room a menu keeps from the window's edges, and from the button it opens
@@ -198,6 +207,10 @@ export function ContextMenu({
       {items.map((item, i) =>
         item.divider ? (
           <div key={i} className="my-1 border-t border-border" />
+        ) : item.heading ? (
+          <div key={i} className="px-3 pb-0.5 pt-1 font-mono text-[9px] uppercase tracking-wide text-muted" title={item.title}>
+            {item.label}
+          </div>
         ) : (
           <div key={i} className="flex items-center">
             <button
@@ -214,7 +227,21 @@ export function ContextMenu({
               }`}
             >
               {item.label}
+              {item.hint && <span className="ml-2 text-[10px] text-danger/80">{item.hint}</span>}
             </button>
+            {item.onStar && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  item.onStar?.()
+                }}
+                className={`px-1 text-[11px] ${item.starred ? 'text-accent2' : 'text-muted hover:text-accent2'}`}
+                title={item.starTitle ?? (item.starred ? 'Take off the favorites' : 'Add to the favorites')}
+                aria-pressed={!!item.starred}
+              >
+                {item.starred ? '★' : '☆'}
+              </button>
+            )}
             {item.onDelete && (
               <button
                 onClick={(e) => {

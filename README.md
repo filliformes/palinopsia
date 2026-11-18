@@ -883,7 +883,8 @@ The **top bar** stays on one line in a window narrower than the screen : as it
 narrows it tucks the SESSION / GENERATE labels away, then tightens the session name,
 the menus and the zoom readout, never dropping a button, on one line down to the
 1024 px minimum window. It carries the session controls, one group (the name, the
-session list and **Load**, then **New**, **Open ▾** (the recent sessions, **Add a
+session list and **Load**, then **New**, **Open ▾** (your **Favorites** : the sessions
+you starred, in the order you starred them, then the **Recent** sessions, **Add a
 session as scenes…**, **Session media…**), **Save** and **Save As**), the Generate menu and its button, the **Learn**
 button (MIDI Learn, which learns OSC controllers too : key `L`), the **REC** pill (stop it here and a toast confirms the saved
 file), the **AGENT** light while the [Agent (MCP)](#agent-mcp) is on, undo / redo, UI
@@ -1816,7 +1817,9 @@ effect, a World, a family...; **nothing** first, for an OSC-only rule) :
   sequencers, undo / redo.
 - **Output** : a **screenshot** (into the Recorded folder, no dialog), the output
   transform **turned 90°**, **spinning** or not, **flipped** X or Y, reset.
-- **Session** : New, Load, Open.
+- **Session** : New, Load, Open, and **FAVORITE n** (`act:fav:<n>`) : favorite session n
+  of **Open ▾**, opened without asking (unsaved work kept as a recovery copy). The
+  number is its place in the list : take one off and those under it move up.
 
 An action leaves whatever is **persistent** alone (a pinned layer, opacity, blend,
 source, Macro knob or modulator : it says so); a trigger or a retrigger still plays, as a hand on
@@ -3083,9 +3086,22 @@ sit in four columns : **films** (what plays), **pieces** (how the frame is cut),
 
 Sessions are `.opsia.json` files: **New / Open / Save / Save As** in the toolbar,
 beside the session list and **Load** (one group), plus **Ctrl/Cmd+S** (overwrites the
-current file, Save-As the first time). **Open ▾** lists the sessions opened or saved
-lately (the newest ten, on this computer; × takes one off the list, a file that is gone
-leaves it), and a session file **dropped on the window** opens too. Theme,
+current file, Save-As the first time). **Open ▾** lists your **Favorites** first, then
+the sessions opened or saved lately (**Recent** : the newest ten, on this computer; ×
+takes one off the list, a file that is gone leaves it), and a session file **dropped on
+the window** opens too.
+
+**Favorites.** The sessions you want back in one click, on this computer, in the order
+you starred them (up to 24). **☆ Add this session to favorites** (in Open ▾) stars the
+session on screen, once it has been saved; the **☆** beside a recent session stars it
+(**★** : it is one, click to take it off). Click a favorite to open it, asked about
+unsaved changes as Open is; **×** takes it off the list (the file stays). A favorite
+whose file has moved, been renamed or sits on a drive not plugged in stays on the list,
+flagged **file missing**, until you take it off. Each one is also a trigger,
+**FAVORITE n** in the shared trigger vocabulary (`act:fav:<n>`, its place in the list),
+for a MIDI pad, an OSC control, a key or a Body rule : it opens without a dialog,
+keeping unsaved work as a recovery copy. The search (Ctrl/Cmd+K) finds them as **Open
+<name>**. Theme,
 worlds, scenes and the sequencer all travel inside the session file, and so do the
 [output transform](#output-transform), each source's framing (its mirror included) and,
 when you ask for it, the [projector warp](#output--mapping-key-o).
