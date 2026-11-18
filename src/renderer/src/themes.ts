@@ -204,6 +204,9 @@ export function motionFor(t: Theme): MotionRecipe {
 
 // ── Palette atoms (matte, near-black grounds + disciplined accents) ─────
 const K: Rgba = [0.02, 0.02, 0.025, 1] // the near-black base almost every theme opens on
+// Terrain's motion : never the choices (its own land, what raises it, the ramp, the edge of
+// the field), the flight, the water (a lake appearing from 0) or the hand.
+const SKIP_TERRAIN = '^(own|raise|edges|palette|hand|handAmount|handSize|heal|people|restore|fly|spin|settle|evolve|scale|water|skyOp|camHeight|bloom|lift|haze)$'
 const INK: Rgba = [0.015, 0.015, 0.02, 1]
 const PAPER: Rgba = [0.9, 0.88, 0.83, 1]
 const WHITE: Rgba = [0.95, 0.95, 0.95, 1]
@@ -2279,6 +2282,61 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
     motion: { ...SLOW, rate: [0.005, 0.02], skip: '^(own|raise|density|shape|jitter|ground|splashOn|scanSync|part|partSize|people|burst|windAngle|bloom|lift|haze)$' }
+  }),
+  // ── A picture raised into a landscape (Terrain) ──
+  mk({
+    id: 'raised-land', name: 'Raised Land', family: 'Space',
+    blurb: 'A picture below, unseen, raised into a landscape : its bright parts stand as mountains, terraced and lit by a low sun, the camera drifting over them. Drag on the preview : the land gives under your hand.',
+    world: 'parametric',
+    palette: [K, [0.3, 0.28, 0.24, 1], [0.9, 0.86, 0.78, 1]],
+    sources: ['gen-terrain'],
+    // the picture, muted : seen only as the land it becomes
+    stack: [['scan', 'erosion', 'gen-marble', 'cloud-study'], ['gen-terrain']],
+    muted: [0],
+    reads: { 'gen-terrain': 0 },
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-terrain': ['Figure as mountains', 'Flying over the picture', 'Topo map', 'Terraced hillside'] },
+    pickInputs: { 'gen-terrain': { people: [0], raise: [1], fly: [0, 0.12, 0.25] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
+  }),
+  mk({
+    id: 'endless-land', name: 'Endless Land', family: 'Cinematic / Atmospheric',
+    blurb: 'Flying low over a land that never ends : ridges, snow, dunes, islands or lava, a sun low in the haze.',
+    world: 'synthetic',
+    palette: [K, [0.32, 0.3, 0.28, 1], [0.86, 0.84, 0.8, 1]],
+    sources: ['gen-terrain'],
+    stack: [['gen-terrain']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-terrain': ['Ridges', 'Snow peaks', 'Desert dunes', 'Islands', 'Lava fields', 'Night valley', 'Moon crater'] },
+    pickInputs: { 'gen-terrain': { people: [0], fly: [0.1, 0.18, 0.28] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
+  }),
+  mk({
+    id: 'survey-map', name: 'Survey Map', family: 'Minimal / Structural',
+    blurb: 'A land seen from above as a survey map or a model cut from card : flat steps, a contour line on each, the shadows of a low lamp.',
+    world: 'parametric',
+    palette: [K, [0.5, 0.46, 0.4, 1], [0.94, 0.92, 0.88, 1]],
+    sources: ['gen-terrain'],
+    stack: [['gen-terrain']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-terrain': ['Topo map', 'Paper model', 'Terraced hillside'] },
+    pickInputs: { 'gen-terrain': { people: [0], fly: [0], tilt: [0.55, 0.75, 0.9] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
   }),
   mk({
     id: 'depth-sweep', name: 'Depth Sweep', family: 'Space',

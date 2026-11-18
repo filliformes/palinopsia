@@ -207,6 +207,9 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
   // Point Cloud : the points carry the picture's colors on the house ground.
   'gen-pointcloud': /^ground$/,
+  // Terrain : the sun, the sky, the haze, the water and the lines are a weather chosen
+  // together (its presets); a rolled sky over a rolled sun reads as a broken monitor.
+  'gen-terrain': /^(sunColor|shadowColor|haze|sky|lineColor|waterColor)$/,
   // Depth Scan : the plane's glow stays its preset's (a dark glow reads as a hole).
   'node-depthscan': /^glow$/,
   // Noise : matte, never plasma. Focus is a blur (by hand only), the map, the
@@ -802,7 +805,8 @@ type Blend = (typeof MIX_BLENDS)[number]
 // (median above 0.3) ...
 const LIT_GROUND = new Set<string>([
   'gen-marble', 'gen-physarum', 'dye-field', 'gen-veins', 'scan', 'ground', 'solid-color',
-  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane', 'noise'
+  'gen-fur', 'mycelium', 'rgb-osc', 'gen-fluid', 'membrane', 'noise',
+  'gen-terrain' // (its land under a sky : median 0.37 over eight dice, 11-18)
 ])
 // ... and these a mid one (0.15 to 0.3).
 const MID_GROUND = new Set<string>([
