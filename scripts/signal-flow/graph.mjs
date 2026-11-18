@@ -82,7 +82,7 @@ node("c-seq", 1040, 150, "Scene sequencer", "dwell · onsets · chaos", "ctl", "
 node("c-time", 1110, 262, "Time", "freeze · flicker · Black", "ctl", "Freeze, flicker, frame-weave, the relay envelopes and Black, applied last before render. Black also fades Sonify and the films' sound.", "App.tsx loop: setFreeze … setBlack, scaleLayerSound · black.ts")
 
 // ── Picture path (GPU) ─────────────────────────────────────
-node("p-srcA", 311, 535, "Source A", "ISF · film · live", "pic", "The layer's first source: an ISF generator, a native engine, a film, a live input, Collage, Assemble (its live cuts follow the vision bus), Text, the Silhouette (the body camera's mask), another layer (Loop source)…", "Compositor ISFLayer.renderSource · assemble/liveMatch.ts syncLiveMatchers")
+node("p-srcA", 311, 535, "Source A", "ISF · film · live", "pic", "The layer's first source: an ISF generator, a native engine, a film, a live input, Collage, Assemble (its live cuts follow the vision bus), Text, the Silhouette (the body camera's mask), a Model (a 3D object, built in or from a file, whose real depth can stand in for the depth map), another layer (Loop source)…", "Compositor ISFLayer.renderSource · assemble/liveMatch.ts syncLiveMatchers")
 node("p-srcB", 311, 597, "Source B", "optional", "pic", "The layer's second source, mixed with A.", "Compositor.render (renderSource B)")
 node("p-rackA", 446, 535, "Source FX A", "its own rack", "pic", "Effects on source A alone (ISF effects and native nodes such as Datamosh, Melt, Transfert).", "Compositor.render (rackA.apply)")
 node("p-rackB", 446, 597, "Source FX B", "its own rack", "pic", "Effects on source B alone.", "Compositor.render (rackB.apply)")
@@ -98,7 +98,7 @@ node("p-film", 1252, 584, "Film", "hold · damage · output shape", "pic", "The 
 node("p-present", 1372, 596, "Presentation", "fade · freeze · Black · flash limit", "pic", "Scene crossfade, freeze, the Black fade and the flash-safety limiter on everything before it. The readbacks take the picture here.", "Compositor.render (crossfade, freeze, Black, StrobeLimiter, lastPresent)")
 node("p-out", 1380, 762, "Transform · dome", "flat or dome", "pic", "The output transform (flat output) or the dome master, never both. NDI, Spout / Syphon, the projector stream and DXV recording take the picture here, before the keystone.", "Compositor OutXformStage, DomeStage · captureKick")
 node("p-warp", 1380, 830, "Keystone", "the operator canvas", "pic", "The operator canvas, drawn with the keystone (or as a plain copy). HIVE, encoder recordings, MARK and the agent's snapshot read it.", "Compositor warpProg · App.tsx loop")
-node("p-depth", 1050, 712, "Depth AI", "every 85 ms · late", "pic", "Depth Anything V2 estimates the depth of the presented picture in a worker. Every native node (Parallax, the master rack's too) reads it on later frames; the vision bus reads its mean and spread.", "engine/depthEstimate.ts · App.tsx loop depthEngine.update / take · nodeCtx.depth")
+node("p-depth", 1050, 712, "Depth AI", "every 85 ms · late", "pic", "Depth Anything V2 estimates the depth of the presented picture in a worker. Every native node (Parallax, the master rack's too) reads it on later frames; the vision bus reads its mean and spread. While a seen layer plays a Model with true depth on, the nodes read that Model's real depth instead (drawn with it, the same frame) and the AI rests.", "engine/depthEstimate.ts · App.tsx loop depthEngine.update / take · nodeCtx.depth · Compositor.modelDepthTex")
 node("p-read", 1190, 690, "Readbacks", "vision 32² · Sonify 96² · lights · after presentation", "pic", "Small asynchronous reads of the presented picture (before transform and keystone), one or two frames late: for the vision bus, Sonify and the lights. Sonify and the lights can also tap single layers.", "Compositor visionSample, readSonifyGrids, kickLights, depthFrame")
 
 // ── Outputs ────────────────────────────────────────────────
@@ -369,7 +369,7 @@ export const TEXT = {
     },
     {
       "name": "Depth",
-      "path": "presented picture → Depth AI (every 85 ms) → depth map → Parallax and every native node, and the vision bus",
+      "path": "presented picture → Depth AI (every 85 ms) → depth map → Parallax and every native node, and the vision bus (a Model's true depth, when one gives it, goes straight to the nodes instead : no loop)",
       "st": "inside"
     },
     {

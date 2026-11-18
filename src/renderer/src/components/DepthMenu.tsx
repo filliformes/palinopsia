@@ -4,6 +4,7 @@
 // it is off. The setting belongs to the computer, not the session (the store
 // keeps it in localStorage : opsia.depthMode, opsia.depthRes).
 
+import type { CompositionState } from '@shared/types'
 import { useStore } from '../store'
 import { DEPTH_RES_STEPS } from '../engine/depthEstimate'
 
@@ -50,6 +51,14 @@ export function DepthMenu(): JSX.Element {
   )
 }
 
+/** A seen layer plays a Model with TRUE DEPTH on : its real depth goes to the depth
+ *  readers whatever the depth engine is set to (Compositor.modelDepthTex). */
+export function modelGivesDepth(c: CompositionState): boolean {
+  const solo = c.layers.some((l) => l.solo)
+  return c.layers.some((l) => (solo ? l.solo : !l.mute) && l.opacity > 0.001 &&
+    [l.sourceA, l.sourceB].some((s) => s?.kind === 'generator' && s.shaderId === 'gen-model' && Number(s.inputs.depthOut ?? 1) > 0.5))
+}
+
 /** What a depth reader does while the engine is off, or null when it reads no
  *  depth at all (Pulfrich keyed on luminance, Luma Blur on brightness). A
  *  modulated choice counts as depth : it can land there. True to the nodes
@@ -78,8 +87,10 @@ export function depthOffText(
  *  chrome, to sit in a row that is already there (Luma Blur's control picker). */
 export function DepthOffNote({ text, inline = false }: { text: string; inline?: boolean }): JSX.Element | null {
   const off = useStore((s) => s.depthMode === 'off')
+  // (a Model with TRUE DEPTH on feeds the readers itself : nothing to say)
+  const model = useStore((s) => modelGivesDepth(s.composition))
   const setDepthMode = useStore((s) => s.setDepthMode)
-  if (!off) return null
+  if (!off || model) return null
   const body = (
     <>
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted/50" />

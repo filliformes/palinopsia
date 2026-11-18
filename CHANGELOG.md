@@ -5,6 +5,34 @@ that CI builds into cross-platform releases.
 
 ## Unreleased
 
+### Added
+
+- **Model, a new source** (`gen-model`) : a 3D object on any layer, the first piece in
+  real 3D (`engine/ModelSource.ts`, `modelMesh.ts`, `modelParse.ts`, `modelLoad.ts`,
+  `workers/modelWorker.ts`, `components/ModelStrip.tsx`):
+  - fifteen built-in shapes made in code (sphere, torus, cylinder, open cylinder, cube,
+    open cube, plane, disc, cone, capsule, the five regular solids, a trefoil knot), with
+    segments and a tube;
+  - model files : glTF 2.0 (`.glb`, `.gltf` with embedded or neighboring buffers and
+    images, base color texture), OBJ (+ MTL colors, first color map), STL (binary, text),
+    PLY (text, binary, vertex colors, point clouds); our own readers on a worker, no new
+    dependency; centered and fitted, normals made where missing (40° crease), up to 2M
+    triangles; Draco / meshopt refused with the reason. Opened from the Inspector's
+    **model** row or dropped on a layer; the path rides on the slot (`modelPath`,
+    `modelFiles`) so Session media lists, relinks and collects it;
+  - looks : solid, wireframe, edges (creases, borders, silhouette), points, solid +
+    edges, lines and points drawn as pixel-true quads;
+  - materials : Relief's clay, plastic, metal, brushed metal, chrome, soap film, foil
+    (+ flowing, oil film), plus glass, five lit spheres (matcap), flat, normals; cavity,
+    facets;
+  - another layer as its skin : wrapped, projected, reflected, as matcap;
+  - **true depth** : its real depth feeds Parallax, Pulfrich and Luma Blur's depth focus
+    in place of the depth AI (`Compositor.modelDepthTex`), which rests meanwhile;
+  - the dome : the view kept square, the object standing back in the middle;
+  - 18 presets, the **Objects** master chains (4), Generate themes Chrome Idol, Wire
+    Study, Second Skin, Glass Object, Point Cloud, True Depth (family **Objects**) and
+    Object Overhead (**Dome**).
+
 ### Changed
 
 - **Signal flow map, redrawn as a flow** (`docs/signal-flow.html`):
@@ -26,6 +54,12 @@ that CI builds into cross-platform releases.
 
 ### Fixed
 
+- **opsia-media:// had lost its privileges since 2026-09-15** : `main/index.ts`
+  registered it and opsia-asset:// in two `registerSchemesAsPrivileged` calls, and
+  Electron takes one (the second replaced the first), so fetch refused the scheme and
+  its streaming / CORS privileges were not in force. One call now (`media.ts`
+  `MEDIA_SCHEME_PRIVILEGES`, `assets.ts` `ASSET_SCHEME_PRIVILEGES`); the scheme also
+  serves model files and the buffers and images they name.
 - **Macro knob CCs follow scene changes** : a CC learned on a Macro knob is kept through a
   scene recall (and a Generate, a World, the dice). Each scene stored its own copy of the
   knobs, so a scene saved before the Learn came back without the CC and the controller
