@@ -15,6 +15,7 @@ import {
   screen,
   globalShortcut,
   powerSaveBlocker,
+  protocol,
   systemPreferences
 } from 'electron'
 import { dirname, join } from 'path'
@@ -27,8 +28,8 @@ import { OscReceiver, localIPv4s, type OscInMessage } from './osc-receive'
 import * as sessionIO from './session'
 import * as autosave from './autosave'
 import { OscQueryServer, type OscQueryNode } from './oscquery'
-import { registerMediaScheme, handleMediaProtocol } from './media'
-import { registerAssetScheme, handleAssetProtocol } from './assets'
+import { MEDIA_SCHEME_PRIVILEGES, handleMediaProtocol } from './media'
+import { ASSET_SCHEME_PRIVILEGES, handleAssetProtocol } from './assets'
 import { killAllConverts, registerVideoConvert, warmVideoFolder } from './videoConvert'
 import { registerAssemble } from './assemble'
 import { registerCollage } from './collage'
@@ -53,10 +54,10 @@ import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
 import { autostartStatus, removeAutostartNow, setAutostart, WATCHDOG_ARG } from './autostart'
 
-// Must run before app ready : makes opsia-media:// a privileged streaming scheme.
-registerMediaScheme()
-// Same : opsia-asset:// serves the bundled MediaPipe wasm + models (offline).
-registerAssetScheme()
+// Must run before app ready, ONCE (Electron takes one call : a second replaced the
+// first) : opsia-media:// a privileged streaming, fetch-capable scheme (films, sounds,
+// the Model's files), opsia-asset:// the bundled MediaPipe / depth / pose files (offline).
+protocol.registerSchemesAsPrivileged([MEDIA_SCHEME_PRIVILEGES, ASSET_SCHEME_PRIVILEGES])
 // Ask Chromium to enable the platform HEVC decoder + encoder (HIVE live-in and
 // HIVE output both use WebCodecs HEVC). Electron 36+ documents app.commandLine
 // as lowercasing what it is given, and feature names are case-sensitive :

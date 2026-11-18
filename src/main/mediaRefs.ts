@@ -13,7 +13,9 @@ export type PathKind = 'file' | 'dir' | 'none'
 
 /** The files a session plays : films and sounds (what the app imports). A
  *  relink only proposes these, and a collect only copies these. */
-const MEDIA_FILE = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp|wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
+// (films, sounds, and the Model's files : the model and the buffers, images and
+// material files it names beside it)
+const MEDIA_FILE = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp|wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf|glb|gltf|bin|obj|mtl|stl|ply|png|jpg|jpeg|webp)$/i
 
 async function kindOf(p: string): Promise<PathKind> {
   try {
@@ -167,8 +169,8 @@ const isInside = (root: string, p: string): boolean => {
 
 /** Copy each source to its destination, no file overwritten : a name already
  *  taken by a different file gets " (2)", " (3)"… Same size and date, or same
- *  size and the same bytes : the copy is already there. Only films and sounds
- *  are copied, and only into the session's own "<name> media" folder. Progress
+ *  size and the same bytes : the copy is already there. Only films, sounds and
+ *  models (with their files) are copied, and only into the session's own "<name> media" folder. Progress
  *  goes back as 'media:collectProgress'. */
 async function collect(
   sender: WebContents,

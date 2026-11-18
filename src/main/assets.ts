@@ -21,7 +21,7 @@
 // anything else ("local") resources/mediapipe. Read-only, extension-allowlisted,
 // traversal-guarded.
 
-import { app, protocol } from 'electron'
+import { app, protocol, type CustomScheme } from 'electron'
 import { createReadStream, statSync } from 'fs'
 import { join, normalize, sep } from 'path'
 import { Readable } from 'stream'
@@ -72,12 +72,12 @@ function poseBase(): string {
     : join(app.getAppPath(), 'resources', 'pose')
 }
 
-/** Must run BEFORE app ready : privileged + secure + fetch-capable so MediaPipe's
- *  internal fetch / wasm instantiation works from the packaged file:// renderer. */
-export function registerAssetScheme(): void {
-  protocol.registerSchemesAsPrivileged([
-    { scheme: ASSET_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }
-  ])
+/** Privileged + secure + fetch-capable so MediaPipe's internal fetch / wasm
+ *  instantiation works from the packaged file:// renderer. Registered with
+ *  opsia-media's in one call, before app ready (main/index.ts). */
+export const ASSET_SCHEME_PRIVILEGES: CustomScheme = {
+  scheme: ASSET_SCHEME,
+  privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true }
 }
 
 /** Must run AFTER app ready : serve the requested file from the mediapipe base. */

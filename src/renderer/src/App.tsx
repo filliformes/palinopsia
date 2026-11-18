@@ -1889,7 +1889,8 @@ export default function App(): JSX.Element {
           // inference size (the depth menu's detail, the picture's own aspect).
           // The readback is asynchronous (see gridReadback.ts), so this hands the
           // estimator a frame from one or two frames back and the EMA absorbs it.
-          if (now - lastDepthSample > 85) {
+          // (a Model giving its real depth : the readers take that, the AI rests)
+          if (now - lastDepthSample > 85 && !comp!.hasModelDepth()) {
             lastDepthSample = now
             perfMeter.begin('depth')
             depthEngine.res = st.depthRes

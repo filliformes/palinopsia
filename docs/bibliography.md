@@ -252,6 +252,10 @@ Shimojo, S., & Shams, L. (2001). Sensory modalities are not separate modalities:
 
 ↳ The same audio bus rule (`engine/audioIn.ts`): the more discontinuous signal dominates cross-modal perception.
 
+Sloan, P.-P. J., Martin, W., Gooch, A., & Gooch, B. (2001). The lit sphere: A model for capturing NPR shading from art. In *Proceedings of Graphics Interface 2001*. Canadian Human-Computer Communications Society.
+
+↳ The Model source's matcap material (`engine/ModelSource.ts`): a lit ball's picture read at each point by the surface's normal.
+
 ## 9. Image processing and computer vision
 
 Bayer, B. E. (1973). An optimum method for two-level rendition of continuous-tone pictures. In *IEEE International Conference on Communications, Conference Record* (Vol. 1, pp. 26-11–26-15). IEEE.
@@ -668,6 +672,14 @@ International Telecommunication Union. (2015). *Parameter values for the HDTV st
 
 ↳ The video-range UYVY conversion of the frame-capture stage (`engine/frameCapture.ts`).
 
+The Khronos Group. (2021). *glTF 2.0 specification* [Standard]. https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+
+↳ The Model source's glTF / GLB reader (`engine/modelParse.ts`).
+
+Turk, G. (1994). *The PLY polygon file format* [File format description]. Stanford University. https://paulbourke.net/dataformats/ply/
+
+↳ The Model source's PLY reader (meshes and point clouds).
+
 *ISF: Interactive Shader Format specification* (Version 2.0). (n.d.). GitHub. https://github.com/mrRay/ISF_Spec
 
 ↳ The shader format of the whole engine (JSON header plus GLSL, inputs, passes, persistent buffers), and of the shaders you write in the Source Editor.
@@ -697,6 +709,9 @@ Entries above whose details could not all be confirmed against a primary source:
 - Tessendorf (2001): the notes circulate in several revisions (copyright 1999–2001, hosted copy revised later); the SIGGRAPH course number is not confirmed.
 - Yeo and Berger (2006): the page range in the ICMC 2006 proceedings is not confirmed.
 - Verplank, Mathews and Shaw (2000): pages 368–371 come from secondary citations; no stable URL for the paper was found.
+- Sloan, Martin, Gooch and Gooch (2001): the page range and DOI in the Graphics Interface 2001 proceedings were not checked.
+- The Khronos Group (2021): the date given is that of the 2.0.1 revision of the specification as hosted; the first 2.0 release was 2017.
+- Turk (1994): the date is the one the format's description is usually cited with; the hosted copy is a later transcription.
 - Mitsuhashi (1982): volume, issue and pages confirmed by secondary sources only; no DOI or stable URL checked.
 - Harris (2004): the page range (637–665) of chapter 38 in *GPU Gems* comes from secondary citations; NVIDIA's online edition (the URL above) carries no page numbers.
 - Mikkelsen (2022): the paper's own header prints "Vol. 11, No. 2" while the journal's official BibTeX gives issue 3 (used above, and matching the URL).

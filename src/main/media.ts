@@ -7,7 +7,7 @@
 // the transport's constant seeking stays smooth (no loading the whole clip into
 // memory). The renderer resolves a picked file's path via webUtils.getPathForFile.
 
-import { protocol } from 'electron'
+import { protocol, type CustomScheme } from 'electron'
 import { createReadStream, statSync } from 'fs'
 import { isAbsolute } from 'path'
 import { Readable } from 'stream'
@@ -35,14 +35,28 @@ const MIME: Record<string, string> = {
   aif: 'audio/aiff',
   aiff: 'audio/aiff',
   wma: 'audio/x-ms-wma',
-  caf: 'audio/x-caf'
+  caf: 'audio/x-caf',
+  // the Model source's files (workers/modelWorker.ts reads them with fetch) : the
+  // model, and what a model names beside it (glTF buffers and images, an OBJ's MTL)
+  glb: 'model/gltf-binary',
+  gltf: 'model/gltf+json',
+  bin: 'application/octet-stream',
+  obj: 'model/obj',
+  mtl: 'model/mtl',
+  stl: 'model/stl',
+  ply: 'application/octet-stream',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp'
 }
 const extOf = (path: string): string => path.split('.').pop()?.toLowerCase() ?? ''
 const mimeFor = (path: string): string => MIME[extOf(path)] ?? 'video/mp4'
 // Only these extensions may be streamed. The scheme addresses clips by absolute
 // path, so without this any renderer request could read an arbitrary file
-// (~/.ssh/id_rsa, .env, …); restricting to known video and sound containers
-// keeps the blast radius to media files, which is all this scheme serves.
+// (~/.ssh/id_rsa, .env, …); restricting to known video and sound containers, 3D
+// models and the images and buffers they name keeps the blast radius to media
+// files, which is all this scheme serves.
 const ALLOWED_EXT = new Set(Object.keys(MIME))
 // CORS : the Collage, Assemble and the Sonify Collage voice load their films with
 // crossOrigin='anonymous' (a WebGL upload or an audio graph needs an untainted
@@ -58,12 +72,14 @@ const CORS = {
 const reply = (body: BodyInit | null, status: number, headers: Record<string, string> = {}): Response =>
   new Response(body, { status, headers: { ...CORS, ...headers } })
 
-/** Must run BEFORE app ready : registers the scheme as a privileged, streaming,
- *  standard scheme so <video> can seek it via range requests. */
-export function registerMediaScheme(): void {
-  protocol.registerSchemesAsPrivileged([
-    { scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }
-  ])
+/** The scheme's privileges : standard, streaming (so <video> can seek it via range
+ *  requests), fetch-capable (the Model source's reader fetches its files). Registered
+ *  in ONE call with opsia-asset's (main/index.ts) : Electron takes that call once, and a
+ *  second one replaced the first, which left this scheme with none of them (fetch
+ *  refused it : "URL scheme opsia-media is not supported"). */
+export const MEDIA_SCHEME_PRIVILEGES: CustomScheme = {
+  scheme: MEDIA_SCHEME,
+  privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true }
 }
 
 /** Must run AFTER app ready : serves files with 200 / 206 (range) responses. */

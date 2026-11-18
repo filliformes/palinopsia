@@ -1722,6 +1722,12 @@ interface StoreState {
   // The same two, for a Collage sitting on the Background slab.
   setBgCollagePool: (folder: string, pool: import('@shared/collage').CollageClip[]) => void
   setBgCollageEdls: (edls: import('@shared/collage').CollageEdl[]) => void
+  // Native Model source (gen-model) : its file, its name and the files beside it that
+  // it reads (null : back to the built-in shape). A file shows at once (shape on file).
+  setSourceModel: (
+    target: { kind: 'layer'; layer: number; slot: 'A' | 'B' } | { kind: 'background' },
+    file: { path: string; name: string; files: string[] } | null
+  ) => void
 
   // ── Background slab : the ground under the four layers ───────────────
   setBackgroundSource: (shaderId: string | null) => void
@@ -3627,6 +3633,39 @@ export const useStore = create<StoreState>((set, get) => ({
           const next = { ...c2!, collageEdls: edls }
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
+      }
+    }),
+  setSourceModel: (target, file) =>
+    set((s) => {
+      const FILE = 15 // the shape menu's last entry (modelMesh.ts SHAPE_FILE)
+      const withFile = (cur: SourceSlot): SourceSlot => {
+        const shape = cur.inputs.shape
+        const next: SourceSlot = {
+          ...cur,
+          inputs: { ...cur.inputs, shape: file ? FILE : shape === FILE ? 14 : (shape ?? 14) }
+        }
+        if (file) {
+          next.modelPath = file.path
+          next.modelName = file.name
+          next.modelFiles = file.files
+        } else {
+          delete next.modelPath
+          delete next.modelName
+          delete next.modelFiles
+        }
+        return next
+      }
+      if (target.kind === 'background') {
+        const bg = s.composition.background
+        if (!bg || bg.source.shaderId !== 'gen-model') return s
+        return { composition: { ...s.composition, background: { ...bg, source: withFile(bg.source) } } }
+      }
+      const cur = target.slot === 'A' ? s.composition.layers[target.layer]?.sourceA : s.composition.layers[target.layer]?.sourceB
+      if (!cur || cur.shaderId !== 'gen-model') return s
+      return {
+        composition: updateLayer2(s.composition, target.layer, (l) =>
+          target.slot === 'A' ? { ...l, sourceA: withFile(l.sourceA) } : { ...l, sourceB: withFile(l.sourceB!) }
+        )
       }
     }),
   setBgCollagePool: (folder, pool) =>
