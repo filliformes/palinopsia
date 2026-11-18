@@ -22,6 +22,13 @@
 // it PRESSES the land down, RAISES it, or SPREADS it apart, and the marks heal back
 // over HEAL seconds (a field of its own, kept in the land's coordinates).
 //
+// An OIL SLICK on the water : a black sheen spreading over the lake between the land,
+// its edges in the petrol rainbow (the thin-film colors Thin Film and the Slick effect
+// share), gathering along the shores and lapping at them, a dark wet line on the beach
+// above. Its coverage grows toward OIL ON THE WATER at SLICK SPREAD's pace; it calms the
+// ripples where it is thick (oil damps them) and drifts slowly with the water.
+// third-party: Oil appearance code (the order from the thin edge in : rainbow, then black)
+//
 // Dome (full-dome fill) : stretched like any picture, the view kept square so the
 // land keeps its proportions. Never re-projected to true directions.
 //
@@ -37,6 +44,7 @@ import type { NativeGenerator, SourcePointer } from './nativeGenerators'
 import { domeFill } from './domeSignal'
 import { TouchPoints } from './touchInput'
 import { PictureDepthReader, pictureDepth } from './pictureDepth'
+import { FILM_GLSL } from './reliefShade'
 
 const LMAX = 5 // max pyramid levels above the field (cells of 2..32 texels)
 const MAX_HANDS = 8
@@ -514,6 +522,27 @@ uniform vec3 uSun, uSunCol, uShadowCol, uHaze, uSkyCol, uLineCol, uWaterCol;
 uniform float uSkyOp, uAmb, uShadows, uFog, uFar, uMix, uLines, uLineW, uWater, uMirror, uRipple, uRipPh;
 uniform int uPal, uHasPic, uDebug;
 uniform float uLineN;
+uniform float uSlick, uSlickT;
+${FILM_GLSL}
+// the slick's own noise (on the land's coordinates, so it stays on the water as you fly)
+// third-party: Hash without Sine
+float skHash(vec2 p) { p = mod(p, 512.0); vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float skNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(skHash(i), skHash(i + vec2(1.0, 0.0)), f.x), mix(skHash(i + vec2(0.0, 1.0)), skHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float skFbm(vec2 p) { return 0.55 * skNoise(p) + 0.3 * skNoise(p * 2.1 + 7.3) + 0.15 * skNoise(p * 4.3 + 2.9); }
+// how thick the oil is at this place of the water (G : field texels), 0 or less : none
+float slickAt(vec2 G, float depth) {
+  vec2 sp = G / uFieldRes.y;
+  float sn = skFbm(sp * 3.2 + vec2(uSlickT * 0.7, -uSlickT * 0.45));
+  // it gathers along the shores, and laps at them
+  float shore = 1.0 - smoothstep(0.0, 0.07, depth);
+  float lap = 0.5 + 0.5 * sin(depth * 160.0 - uRipPh * 1.4 + sn * 6.0);
+  // (its coverage : 0.5 covers about half the water, 1 all of it)
+  return sn - mix(0.86, 0.12, uSlick) + shore * (0.12 + 0.1 * lap) * uSlick;
+}
 
 vec3 sky(vec3 rd) {
   float up = clamp(rd.y, 0.0, 1.0);
@@ -688,9 +717,41 @@ void main() {
       c += uSunCol * pow(max(dot(rr, uSun), 0.0), 220.0) * 2.0 * uMirror;
       // a thin line of foam where it meets the shore
       c = mix(c, vec3(0.85, 0.88, 0.9) * (0.5 + 0.5 * max(uSun.y, 0.0)), (1.0 - smoothstep(0.0, 0.012, depth)) * 0.5);
+      // the oil slick : the rainbow at its thin edge, black and calm where it is thick
+      if (uSlick > 0.0) {
+        float th = slickAt(Gw, depth);
+        float edgeS = smoothstep(0.0, 0.04, th);
+        float thickS = smoothstep(0.07, 0.19, th);
+        if (edgeS > 0.0) {
+          // (marbled, so the orders run in streaks rather than rings round the patches)
+          float marb = skNoise(Gw / uFieldRes.y * 22.0 + vec2(uSlickT * 1.3, 0.0));
+          vec3 film = filmColor(100.0 + 6500.0 * max(th, 0.0) * (0.5 + marb), max(-rd.y, 0.1), 1.45);
+          vec3 sheen = c * (0.45 + 0.9 * film) + film * film * 0.18;
+          vec3 nO = normalize(mix(nw, vec3(0.0, 1.0, 0.0), 0.8));
+          vec3 rO = reflect(rd, nO);
+          rO.y = abs(rO.y);
+          float frO = 0.04 + 0.96 * pow(1.0 - max(dot(-rd, nO), 0.0), 5.0);
+          vec3 oil = vec3(0.02, 0.014, 0.008) + mix(sky(rO), refl, uMirror) * frO * 0.7
+                   + uSunCol * pow(max(dot(rO, uSun), 0.0), 600.0) * 2.5;
+          oil *= mix(vec3(1.0), 0.5 + 1.0 * filmColor(500.0 + 300.0 * th, max(-rd.y, 0.1), 1.5), 0.25);
+          c = mix(c, sheen, edgeS * (1.0 - thickS));
+          c = mix(c, oil, thickS);
+        }
+      }
       tt = tw;
     } else {
-      c = shadeLand(ro + rd * t, lodAt(t), fwL);
+      vec3 pl = ro + rd * t;
+      c = shadeLand(pl, lodAt(t), fwL);
+      // the slick's dark wet line on the beach, just above the water
+      if (uSlick > 0.0 && uWater > 0.0005) {
+        float above = (pl.y - uHt * uWater) / max(uHt, 1e-3);
+        if (above < 0.03) {
+          vec2 sp = toG(pl.xz) / uFieldRes.y;
+          float sn = skFbm(sp * 3.2 + vec2(uSlickT * 0.7, -uSlickT * 0.45));
+          float st = (1.0 - smoothstep(0.0, 0.006 + 0.014 * uSlick, above)) * smoothstep(0.3, 0.55, sn + uSlick * 0.45);
+          c = mix(c, c * 0.15 + vec3(0.012, 0.01, 0.007), st * min(1.0, uSlick * 1.6));
+        }
+      }
     }
     // the haze toward the horizon, and the far edge of the field fading into the sky
     float f = 1.0 - exp(-tt * uFog * uFog * 1.4);
@@ -747,6 +808,8 @@ export class TerrainSource implements NativeGenerator {
   private swayB = Math.random() * TAU
   private evoPh = Math.random() * 50
   private ripPh = 0
+  private slickNow = 0
+  private slickT = Math.random() * 100
   // the flight, in field texels (wrapped by the field's own period)
   private offX = 0
   private offY = 0
@@ -956,6 +1019,11 @@ export class TerrainSource implements NativeGenerator {
     this.swayB = (this.swayB + swayRate * 0.43 * dt) % TAU
     this.evoPh = (this.evoPh + clamp(num(I, 'evolve', 0.1), 0, 1) * 0.08 * dt) % 4096
     this.ripPh = (this.ripPh + dt * 1.6) % (TAU * 100)
+    // the slick spreads toward its coverage at its own pace, and drifts with the water
+    const slickTo = clamp(num(I, 'slick', 0), 0, 1)
+    const slickSp = clamp(num(I, 'slickSpread', 0.3), 0, 1)
+    this.slickNow += (slickTo - this.slickNow) * (1 - Math.exp(-dt * (0.03 + 0.6 * slickSp * slickSp)))
+    this.slickT = (this.slickT + dt * (0.008 + 0.05 * slickSp)) % 1000
 
     // ── the camera ──
     const ht = clamp(num(I, 'height', 0.5), 0, 1) * 0.6
@@ -1153,6 +1221,7 @@ export class TerrainSource implements NativeGenerator {
       .f1('uMirror', clamp(num(I, 'mirror', 0.6), 0, 1))
       .f1('uRipple', clamp(num(I, 'ripple', 0.3), 0, 1))
       .f1('uRipPh', this.ripPh)
+      .f1('uSlick', this.slickNow > 0.002 ? this.slickNow : 0).f1('uSlickT', this.slickT)
       .i1('uPal', Math.round(clamp(num(I, 'palette', 0), 0, 6)))
       .i1('uHasPic', this.side ? 1 : 0)
       .i1('uDebug', this.debug)

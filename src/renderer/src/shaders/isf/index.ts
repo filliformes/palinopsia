@@ -1137,6 +1137,51 @@ export const NATIVE_NODES: IsfShader[] = [
     curated: { rain: [0.1, 0.5], dropSize: [0.2, 0.6], audio: [0, 0], motion: [0, 0.5], people: [0, 0], wander: [0, 0.5], stoneAt: [0, 2], follow: [0.6, 1], press: [0, 0], speed: [0.25, 0.6], calm: [0.2, 0.55], edges: [0, 1], refract: [0.35, 0.75], split: [0, 0.35], shade: [0.2, 0.5], lightAngle: [0, 6.2832], deep: [0, 0.3], mix: [1, 1] }
   },
   {
+    // Native (engine/slickNode.ts) : a crude oil thickness field spreading over the
+    // picture; spills, the beat, the sound, a tide and coverage bring it, it drips and recedes.
+    id: 'node-slick',
+    name: 'Slick',
+    category: 'FX',
+    native: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Slick : crude oil spreading over the picture. Whatever plays is slowly covered by a black, heavy, viscous slick, with the petrol rainbow only at its thin edges. The oil SPILLS where you click on the preview (hold : it pours, drag : a trail; or pinch with the Body page\'s pinch = click), on the BEAT, on the sound\'s HITS, on the SPILL trigger (at the center, the point or anywhere), and SEEPS up by itself now and then. It SPREADS as a thick film : thick oil runs, a thin film hardly moves and its edge comes to rest; FINGERS lets lobes run ahead at the front, a slow CURRENT and the picture\'s own MOTION carry it, DRIPS lets thick oil run down in streaks. TIDE brings one big slick in from the edge you choose, as far as it says; COVERAGE draws the slick over that share of the picture, to ride a piece from clean to coated (lowered, what it brought ebbs away; spills stay). RECEDE evaporates it, the thin film first, leaving a STAIN; CLEAN wipes it. The look follows the thickness : a silvery sheen at the very edge, the rainbow (SHEEN), a dark metallic film, brown patches, then the crude itself (its COLOR), near-black and wet, its GLOSS lit from the light you set, the picture under it only as RELIEF. THICKNESS : how much of the slick reads as crude rather than sheen; OPACITY : how much the crude hides. On the dome the oil lies on the dome itself, round all the way down, and drips run outward to the rim.',
+      CATEGORIES: ['FX', 'Organic', 'Live'],
+      INPUTS: [
+        { NAME: 'inputImage', TYPE: 'image' },
+        { NAME: 'seep', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'seeps by itself' },
+        { NAME: 'size', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.45, LABEL: 'spill size' },
+        { NAME: 'beat', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['off', '1 beat', '2 beats', '1 bar', '2 bars', '4 bars'], DEFAULT: 0, LABEL: 'spill on the beat' },
+        { NAME: 'audio', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sound hits' },
+        { NAME: 'spill', TYPE: 'event', LABEL: 'spill' },
+        { NAME: 'spillAt', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['center', 'the point', 'anywhere'], DEFAULT: 2, LABEL: 'spill at' },
+        { NAME: 'press', TYPE: 'bool', DEFAULT: false, LABEL: 'pour at the point', COMPACT: true },
+        { NAME: 'point', TYPE: 'point2D', MIN: [0, 0], MAX: [1, 1], DEFAULT: [0.5, 0.5], LABEL: 'point' },
+        { NAME: 'tide', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'tide' },
+        { NAME: 'tideFrom', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['bottom', 'top', 'left', 'right', 'all round'], DEFAULT: 0, LABEL: 'tide from' },
+        { NAME: 'coverage', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'coverage' },
+        { NAME: 'spread', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'spread' },
+        { NAME: 'fingers', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.55, LABEL: 'fingers' },
+        { NAME: 'current', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.2, LABEL: 'current' },
+        { NAME: 'motion', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'its own motion' },
+        { NAME: 'drips', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'drips' },
+        { NAME: 'recede', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'recede' },
+        { NAME: 'clean', TYPE: 'event', LABEL: 'clean' },
+        { NAME: 'thickness', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'thickness' },
+        { NAME: 'opacity', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'opacity' },
+        { NAME: 'sheen', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'sheen' },
+        { NAME: 'gloss', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.75, LABEL: 'gloss' },
+        { NAME: 'relief', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'picture as relief' },
+        { NAME: 'color', TYPE: 'color', DEFAULT: [0.035, 0.026, 0.02, 1], LABEL: 'crude color' },
+        { NAME: 'lightAngle', TYPE: 'float', MIN: 0, MAX: 6.2832, DEFAULT: 2.36, LABEL: 'light angle' },
+        { NAME: 'lightHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'light height' },
+        { NAME: 'stain', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'stain' },
+        { NAME: 'mix', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 1, LABEL: 'mix' }
+      ]
+    })}*/`,
+    curated: { seep: [0.2, 0.5], size: [0.3, 0.6], beat: [0, 0], audio: [0, 0], spillAt: [0, 2], press: [0, 0], tide: [0, 0], tideFrom: [0, 4], coverage: [0, 0], spread: [0.25, 0.6], fingers: [0.35, 0.8], current: [0.1, 0.4], motion: [0, 0.3], drips: [0, 0.5], recede: [0.2, 0.5], thickness: [0.4, 0.8], opacity: [0.85, 1], sheen: [0.5, 0.9], gloss: [0.55, 0.9], relief: [0.3, 0.7], lightAngle: [0, 6.2832], lightHeight: [0.3, 0.7], stain: [0.15, 0.45], mix: [1, 1] }
+  },
+  {
     // Native (engine/inflateNode.ts) : a jump flood turns the layer's shape into a height,
     // lit with Relief's materials.
     id: 'node-inflate',
@@ -2235,7 +2280,7 @@ export const GENERATORS: IsfShader[] = [
     dice: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Terrain : a picture raised into a solid landscape and seen across. The layer picked as SIDECHAIN (or a land of its own : rolling hills, ridges, dunes, a crater, islands) becomes the height of the land, raised by its brightness, its darkness or its depth (the depth model reading that picture, with depth: AI on). SMOOTH rounds it, PEAKS draws summits up out of a mass, ROCK breaks it into ridges; TERRACES cut it into steps with CONTOUR lines on them, the topographic look; its colors come from the picture, a ramp by height (earth, snow peaks, topo map, night, desert, lava, paper) or both. A sun casts shadows across it, the haze thickens toward the horizon, a lake can fill it to a level and mirror the hills. The camera looks from grazing to straight down, turns, rises, and FLIES forward over an endless field (the picture mirrored, repeated, or one island on a plain). Drag on the preview (or pinch, or the Room\'s people) : the land is pressed down, raised or spread apart under the hand, and heals back.',
+        'Terrain : a picture raised into a solid landscape and seen across. The layer picked as SIDECHAIN (or a land of its own : rolling hills, ridges, dunes, a crater, islands) becomes the height of the land, raised by its brightness, its darkness or its depth (the depth model reading that picture, with depth: AI on). SMOOTH rounds it, PEAKS draws summits up out of a mass, ROCK breaks it into ridges; TERRACES cut it into steps with CONTOUR lines on them, the topographic look; its colors come from the picture, a ramp by height (earth, snow peaks, topo map, night, desert, lava, paper) or both. A sun casts shadows across it, the haze thickens toward the horizon, a lake can fill it to a level and mirror the hills, and OIL ON THE WATER spreads a black slick over the lake, the petrol rainbow at its edges, lapping at the shores. The camera looks from grazing to straight down, turns, rises, and FLIES forward over an endless field (the picture mirrored, repeated, or one island on a plain). Drag on the preview (or pinch, or the Room\'s people) : the land is pressed down, raised or spread apart under the hand, and heals back.',
       CATEGORIES: ['Generator', 'Geometry'],
       INPUTS: [
         { NAME: 'own', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['rolling hills', 'ridges', 'dunes', 'crater', 'islands'], DEFAULT: 1, LABEL: 'own land' },
@@ -2268,6 +2313,8 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'waterColor', TYPE: 'color', DEFAULT: [0.06, 0.18, 0.22, 1], LABEL: 'water color' },
         { NAME: 'mirror', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'reflection' },
         { NAME: 'ripple', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'ripples' },
+        { NAME: 'slick', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'oil on the water' },
+        { NAME: 'slickSpread', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'slick spread' },
         { NAME: 'tilt', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.25, LABEL: 'tilt' },
         { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
         { NAME: 'camHeight', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.15, LABEL: 'camera height' },
@@ -2392,7 +2439,7 @@ export const GENERATORS: IsfShader[] = [
     dice: true, // (a built-in shape needs no file)
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Model : a 3D object turning in front of a camera. SHAPE picks one of fifteen built in (sphere, torus, cylinders, cubes, plane, disc, cone, capsule, the five regular solids, a knot) or the FILE opened in the Inspector or dropped on the layer (glTF / GLB, OBJ, STL, PLY). LOOK draws it solid, as a wireframe, as its edges (creases, open borders and its outline), as points, or solid with its edges. MATERIAL : clay, plastic, metal, brushed metal, chrome, glass, soap film, foil, a lit sphere (MATCAP), flat color, or its normals. TURN, TILT, ROLL set it, SPIN turns it, DISTANCE and FIELD OF VIEW frame it, X and Y move it. WOBBLE bends its surface, AUDIO swells it with the bass and roughens it with the mids. PICTURE puts the layer picked as SKIN on it : wrapped round it, projected on it from the front, reflected in it, or as its lit sphere. The ground lets the layers below show through (its opacity). TRUE DEPTH hands its real depth to Parallax, Pulfrich and Luma Blur in place of the depth AI. SHATTER breaks it into its triangles and gathers them back : on the ONSETS of the sound, on the BEAT (1 beat to 2 bars), on the SHATTER trigger, or held by hand (BROKEN, to modulate for slow dissolves). THROW, SCATTER, SHARD SPIN, GATHER, GRAVITY and DRIFT shape the flight, CRUMBLE lets the shards go one after another, DUST shrinks a share of them into points past DUST AT.',
+        'Model : a 3D object turning in front of a camera. SHAPE picks one of fifteen built in (sphere, torus, cylinders, cubes, plane, disc, cone, capsule, the five regular solids, a knot) or the FILE opened in the Inspector or dropped on the layer (glTF / GLB, OBJ, STL, PLY). LOOK draws it solid, as a wireframe, as its edges (creases, open borders and its outline), as points, or solid with its edges. MATERIAL : clay, plastic, metal, brushed metal, chrome, glass, soap film, foil, a lit sphere (MATCAP), flat color, or its normals. TURN, TILT, ROLL set it, SPIN turns it, DISTANCE and FIELD OF VIEW frame it, X and Y move it. WOBBLE bends its surface, AUDIO swells it with the bass and roughens it with the mids. PICTURE puts the layer picked as SKIN on it : wrapped round it, projected on it from the front, reflected in it, or as its lit sphere. The ground lets the layers below show through (its opacity). TRUE DEPTH hands its real depth to Parallax, Pulfrich and Luma Blur in place of the depth AI. SHATTER breaks it into its triangles and gathers them back : on the ONSETS of the sound, on the BEAT (1 beat to 2 bars), on the SHATTER trigger, or held by hand (BROKEN, to modulate for slow dissolves). THROW, SCATTER, SHARD SPIN, GATHER, GRAVITY and DRIFT shape the flight, CRUMBLE lets the shards go one after another, DUST shrinks a share of them into points past DUST AT. CRUDE COAT covers it in crude oil over whatever it is made of : black and wet where thick, the material beneath under the petrol rainbow where the coat thins (its lumps, its edges), CRUDE DRIPS running down it.',
       CATEGORIES: ['Generator', 'Geometry'],
       INPUTS: [
         { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], LABELS: ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'disc', 'cone', 'capsule', 'tetrahedron', 'octahedron', 'dodecahedron', 'icosahedron', 'knot', 'file'], DEFAULT: 14, LABEL: 'shape' },
@@ -2413,6 +2460,9 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'rainbow', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'foil rainbow' },
         { NAME: 'flakes', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'foil flakes' },
         { NAME: 'glint', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'foil glints' },
+        { NAME: 'crude', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'crude coat' },
+        { NAME: 'crudeDrips', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.4, LABEL: 'crude drips' },
+        { NAME: 'crudeSheen', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.7, LABEL: 'crude sheen' },
         { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
         { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.1, LABEL: 'tilt' },
         { NAME: 'roll', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'roll' },
