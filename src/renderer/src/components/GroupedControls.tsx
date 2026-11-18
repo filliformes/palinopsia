@@ -65,10 +65,10 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
   'gen-model': [
-    g('shape and camera', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale'),
-    g('look', 'style', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'film', 'filmThick', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint'),
-    g('light and skin', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut'),
-    g('wobble and lines', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio', 'facets', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize')
+    // (three columns of 17, 15 and 17 : a fourth wrapped under them at the Inspector's width)
+    g('shape and motion', 'shape', 'segments', 'thickness', 'turn', 'tilt', 'roll', 'spin', 'spinAxis', 'distance', 'lens', 'posX', 'posY', 'scale', 'wobble', 'wobbleSize', 'wobbleSpeed', 'audio'),
+    g('look', 'style', 'lineColor', 'lineWidth', 'edgeAngle', 'hidden', 'pointSize', 'material', 'matcap', 'color', 'fileColor', 'gloss', 'cavity', 'facets', 'film', 'filmThick'),
+    g('finish, light and skin', 'flow', 'flowSpeed', 'rainbow', 'flakes', 'glint', 'lightAngle', 'lightHeight', 'light', 'ambient', 'skin', 'skinMode', 'tile', 'scroll', 'fog', 'ground', 'groundOp', 'depthOut')
   ],
   'gen-fur': [
     g('coat', 'length', 'density', 'thickness', 'clump', 'curl', 'wild', 'flow', 'lie', 'whorl', 'scale', 'drift', 'repart'),

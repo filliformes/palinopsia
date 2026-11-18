@@ -2263,7 +2263,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'lineColor', TYPE: 'color', DEFAULT: [0.92, 0.94, 0.95, 1], LABEL: 'line color' },
         { NAME: 'lineWidth', TYPE: 'float', MIN: 0.5, MAX: 6, DEFAULT: 1.2, LABEL: 'line width' },
         { NAME: 'edgeAngle', TYPE: 'float', MIN: 5, MAX: 90, DEFAULT: 30, LABEL: 'crease angle' },
-        { NAME: 'hidden', TYPE: 'bool', DEFAULT: false, LABEL: 'hide what is behind' },
+        { NAME: 'hidden', TYPE: 'bool', DEFAULT: false, LABEL: 'hide far lines' },
         { NAME: 'pointSize', TYPE: 'float', MIN: 0.5, MAX: 12, DEFAULT: 2.5, LABEL: 'point size' },
         { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'fog' },
         { NAME: 'ground', TYPE: 'color', DEFAULT: [0.02, 0.02, 0.025, 1], LABEL: 'ground' },
