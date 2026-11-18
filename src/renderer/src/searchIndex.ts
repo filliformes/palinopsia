@@ -54,6 +54,7 @@ import { generateFromTheme } from './components/TopBarMenus'
 import {
   fireFreeze,
   fireOpenSession,
+  fireOpenSessionPath,
   firePanic,
   fireRecordToggle,
   fireSelectedRandomize,
@@ -61,6 +62,7 @@ import {
   fireVariation
 } from './commands'
 import { leaveSession, markClean } from './sessionGuard'
+import { favoriteSessions } from './favoriteSessions'
 import { redo, undo } from './undo'
 import { SIGNAL_FLOW_URL } from '@shared/links'
 
@@ -922,6 +924,10 @@ function commandItems(s: St, units: UnitInfo[]): SearchItem[] {
       showToast('New session')
     }),
     cmd('open', 'Open session…', 'a session file', ['load', 'file', 'session'], fireOpenSession),
+    // the favorite sessions (Open ▾), by name : asks to save changes first
+    ...favoriteSessions.list().map((f, i) =>
+      cmd(`fav:${f.path}`, `Open ${f.name}`, `favorite ${i + 1} · ${f.path}`, ['favorite', 'session', 'open', 'load'], () => fireOpenSessionPath(f.path))
+    ),
     cmd('undo', 'Undo', 'Ctrl Z', ['back'], () => undo()),
     cmd('redo', 'Redo', 'Ctrl ⇧Z · Ctrl Y', ['again'], () => redo())
   ]
