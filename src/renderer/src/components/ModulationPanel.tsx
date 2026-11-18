@@ -1652,16 +1652,72 @@ function Row({
 const HZ_HELP =
   'The frequency band it listens to, in Hz : every feature (level, flux, transient, centroid, band, pitch, noisiness) is read only between these two. ' +
   '0 to 20000 is the whole sound. A kick : 40 to 120; a voice : 200 to 3000; hats : 6000 to 16000. Centroid reads where the energy sits inside the band.'
+// The track is logarithmic, 20 Hz to 20 kHz (each octave the same length : a linear
+// track gave the lows, where kicks and voices live, a few pixels); its far left is 0.
+const HZ_LO = 20
+const hzToPos = (hz: number): number => (hz <= HZ_LO ? 0 : Math.log(hz / HZ_LO) / Math.log(AUDIO_HZ_MAX / HZ_LO))
+const posToHz = (p: number): number => (p <= 0.002 ? 0 : Math.round(HZ_LO * Math.pow(AUDIO_HZ_MAX / HZ_LO, Math.min(1, p))))
+// 40 · 160 · 2.5k · 16k : short enough to sit beside the track
+const hzLabel = (hz: number): string =>
+  hz < 1000 ? String(Math.round(hz)) : hz < 10000 ? `${(hz / 1000).toFixed(1).replace(/\.0$/, '')}k` : `${Math.round(hz / 1000)}k`
+
 function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boolean; onChange: (lo: number, hi: number) => void }): JSX.Element {
   const title = clip ? `${HZ_HELP} Not while it listens to a clip (FROM) : a clip's sound has no spectrum to cut.` : HZ_HELP
-  const box = 'input min-w-0 flex-1 px-1 py-0.5 text-right text-[10px]'
+  const track = useRef<HTMLDivElement>(null)
+  const drag = useRef<'lo' | 'hi' | null>(null)
+  const pLo = hzToPos(lo), pHi = hzToPos(hi)
+  // the pointer's place on the track, 0..1 (the rect, not the device pixels : the UI
+  // zoom is CSS zoom)
+  const at = (clientX: number): number => {
+    const r = track.current?.getBoundingClientRect()
+    return r && r.width > 0 ? Math.max(0, Math.min(1, (clientX - r.left) / r.width)) : 0
+  }
+  const move = (which: 'lo' | 'hi', p: number): void => {
+    const hz = posToHz(p)
+    if (which === 'lo') onChange(Math.min(hz, hi), hi)
+    else onChange(lo, Math.max(hz, lo))
+  }
+  const key = (which: 'lo' | 'hi') => (e: React.KeyboardEvent): void => {
+    const step = e.shiftKey ? 0.1 : 0.02
+    const p = which === 'lo' ? pLo : pHi
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); move(which, Math.max(0, p - step)) }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); move(which, Math.min(1, p + step)) }
+  }
+  const thumb = 'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent outline-none focus-visible:ring-1 focus-visible:ring-accent'
   return (
     <Row label="HZ" title={title}>
-      <BoundedNumberInput value={Math.round(lo)} min={0} max={AUDIO_HZ_MAX} integer disabled={clip}
-        onChange={(v) => onChange(Math.min(v, hi), hi)} className={box} title={`From (Hz). ${title}`} />
-      <span className="shrink-0 font-mono text-[9px] text-muted">to</span>
-      <BoundedNumberInput value={Math.round(hi)} min={0} max={AUDIO_HZ_MAX} integer disabled={clip}
-        onChange={(v) => onChange(lo, Math.max(v, lo))} className={box} title={`To (Hz). ${title}`} />
+      {/* the thumbs travel on an inner track inset by half a thumb, so neither end
+          spills over the readout */}
+      <div
+        className={`h-3.5 min-w-0 flex-1 touch-none select-none px-[5px] ${clip ? 'pointer-events-none opacity-40' : 'cursor-pointer'}`}
+        title={`${title} Drag either end; double-click : the whole sound (0 to 20000).`}
+        onPointerDown={(e) => {
+          if (clip || e.button !== 0) return
+          const p = at(e.clientX)
+          // the nearer thumb (between them, the nearer one; on one spot, the side moved toward)
+          const which = Math.abs(p - pLo) < Math.abs(p - pHi) || (pLo === pHi && p < pLo) ? 'lo' : 'hi'
+          drag.current = which
+          e.currentTarget.setPointerCapture(e.pointerId)
+          move(which, p)
+        }}
+        onPointerMove={(e) => { if (drag.current) move(drag.current, at(e.clientX)) }}
+        onPointerUp={() => { drag.current = null }}
+        onPointerCancel={() => { drag.current = null }}
+        onDoubleClick={() => { if (!clip) onChange(0, AUDIO_HZ_MAX) }}
+      >
+        <div ref={track} className="relative h-full w-full">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border" />
+        <div className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-accent/70" style={{ left: `${pLo * 100}%`, width: `${Math.max(0, pHi - pLo) * 100}%` }} />
+        <div role="slider" tabIndex={clip ? -1 : 0} aria-label="Lowest frequency" aria-valuemin={0} aria-valuemax={AUDIO_HZ_MAX} aria-valuenow={Math.round(lo)}
+          className={thumb} style={{ left: `${pLo * 100}%` }} onKeyDown={key('lo')} />
+        <div role="slider" tabIndex={clip ? -1 : 0} aria-label="Highest frequency" aria-valuemin={0} aria-valuemax={AUDIO_HZ_MAX} aria-valuenow={Math.round(hi)}
+          className={thumb} style={{ left: `${pHi * 100}%` }} onKeyDown={key('hi')} />
+        </div>
+      </div>
+      <span className={`ml-0.5 w-[50px] shrink-0 whitespace-nowrap text-right font-mono text-[9px] tabular-nums ${clip ? 'text-muted/50' : 'text-text'}`}
+        title={`${Math.round(lo)} to ${Math.round(hi)} Hz`}>
+        {hzLabel(lo)}–{hzLabel(hi)}
+      </span>
     </Row>
   )
 }

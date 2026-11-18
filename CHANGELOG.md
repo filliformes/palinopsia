@@ -7,8 +7,9 @@ that CI builds into cross-platform releases.
 
 ### Added
 
-- **A frequency band on the audio modulator** : an **HZ** row under SMOOTH (0 to 20000
-  Hz; the whole range is the old behavior) reads every feature only between the two
+- **A frequency band on the audio modulator** : an **HZ** row under SMOOTH, a slider with
+  two ends on a logarithmic track (0 to 20000 Hz, the two shown beside it; double-click :
+  the whole range, the old behavior), reads every feature only between the two
   frequencies, on the live spectrum (`audioIn.ts` `featureInRange` : level as the band's
   RMS, flux and its transient with their own memory per modulator, centroid inside the
   band, noisiness, the six bands cut to it, the pitch held while inside). Waits while the

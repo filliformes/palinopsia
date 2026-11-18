@@ -1154,8 +1154,11 @@ One type follows the **live performer** instead of the picture:
   colours the picture* (the other direction of the same crossmodal table).
 
 **The audio modulator's frequency band.** An `audio` card's **HZ** row, under SMOOTH,
-sets the band it listens to, from 0 to 20000 Hz (0 to 20000 : the whole sound, as
-before). Every feature is then read only between the two : **level** the band's
+is a slider with two ends : drag the low end and the high end to set the band it listens
+to, from 0 to 20000 Hz, the two frequencies shown beside it (`40–160`, `6k–16k`). The
+track is logarithmic (each octave as long as the next, so the lows get room), arrow keys
+move a focused end (Shift : faster), and a double-click gives the whole sound back (0 to
+20000, as before). Every feature is then read only between the two : **level** the band's
 loudness, **flux** and **transient** the hits inside it, **centroid** where its energy
 sits from the low edge (0) to the high edge (1), **noisiness** how noisy the band is,
 **band** one of the six bands cut to it, **pitch** the input's pitch held while it falls
