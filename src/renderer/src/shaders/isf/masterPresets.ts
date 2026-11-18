@@ -880,6 +880,33 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
     vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  // ── Landscape : chains for a Terrain (a land seen across, a map from above) ──
+  {
+    name: 'Survey Print', group: 'Landscape',
+    fx: [{ shaderId: 'fx-riso', inputs: {inks: 2, ink1: [0.55, 0.32, 0.18, 1], ink2: [0.1, 0.4, 0.55, 1], ink3: [1, 0.91, 0, 1], screen: 0, cell: 3, contrast: 1.1, misreg: 0.25, drift: 0.1, seed: 7, starve: 0.25, paper: [0.95, 0.93, 0.88, 1], tooth: 0.3, amount: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Aerial Film', group: 'Landscape',
+    fx: [
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.08, saturation: 0.92, lift: 0.02, gamma: 1 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.3, chroma: 0, parasites: 0.15 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.12 }
+  },
+  {
+    name: 'Night Flight', group: 'Landscape',
+    fx: [
+      { shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.2, mixSrc: 0, colorA: [0.02, 0.04, 0.02, 1], colorB: [0.15, 0.6, 0.25, 1], colorC: [0.75, 0.95, 0.7, 1] } },
+      { shaderId: 'fx-scanlines', inputs: { count: 500, darkness: 0.25, roll: 0.02 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Engraved Map', group: 'Landscape',
+    fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
   // ── Objects : chains for a Model source, most of them reading its true depth ──
   {
     name: 'Object in Depth', group: 'Objects',

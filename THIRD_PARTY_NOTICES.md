@@ -461,6 +461,22 @@ methods are free to build on; naming them is a matter of respect.
   repository plmn95/hxc-docs has no license): its POINTCLOUD module, which draws a picture
   as a 3D field of points with brightness or another picture as the depth, in square, round
   or soft points. Behind the Point Cloud. Idea only, no code taken.
+- **ReactDrops** (https://reactdrops.dev; its components are source-available under the
+  ReactDrops Component License 1.0, which allows them in finished sites and apps but not
+  their redistribution, and is not an open-source license): its Topographic Terrain, a
+  picture raised into a lit, terraced landscape seen across. Behind the Terrain source
+  (`engine/TerrainSource.ts`), written for Palinopsia from the idea alone. No code was
+  taken.
+- **Terrain raymarching**: Íñigo Quílez's articles "Terrain Raymarching"
+  (https://iquilezles.org/articles/terrainmarching/) and "Soft Shadows in Raymarched SDFs"
+  (https://iquilezles.org/articles/rmshadows/): marching a height field from the camera,
+  and a shadow softened by how closely the ray toward the sun passes the land. Used in the
+  Terrain source; written from the published method, no code taken.
+- **Maximum mipmaps**: A. Tevs, I. Ihrke and H.-P. Seidel, "Maximum Mipmaps for Fast,
+  Accurate, and Scalable Dynamic Height Field Rendering", *Proceedings of the 2008 Symposium
+  on Interactive 3D Graphics and Games (I3D '08)*, ACM. A pyramid of the highest point
+  under each cell lets a ray skip whole empty cells of a height field. The Terrain's march
+  walks one, rebuilt every frame; written from the paper's method, no code taken.
 - **Aural Mirror** by Remo DeVico
   (https://www.remodevicocomposer.eu/experimental-tools/aural-mirror/), an instrument that
   turns a painting into sound and musical structure. Four machines read the same picture

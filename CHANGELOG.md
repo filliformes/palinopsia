@@ -29,6 +29,22 @@ that CI builds into cross-platform releases.
   object); the Model's other themes never sweep **broken** or **break on**. Inspector :
   three columns (20 / 21 / 22). The idea credited in the register's Part 6 ("Exploding
   objects").
+- **Terrain** (`gen-terrain`, `engine/TerrainSource.ts`) : a picture raised into a lit,
+  solid landscape seen across. The sidechain layer (or a land of its own : rolling hills,
+  ridges, dunes, a crater, islands) raised by its brightness, darkness or depth (the
+  picture-depth model, as the Point Cloud), with smooth / peaks / rock, terraces with
+  sharpness and contour lines, a ramp by height (earth, snow peaks, topo map, night,
+  desert, lava, paper) mixed with the picture's colors, a sun with soft cast shadows,
+  ambient and shadow color, haze toward the horizon, a sky that can be transparent, a
+  mirroring lake at a level, and a camera (tilt from grazing to straight down, turn,
+  height with ground following, distance, lens, spin, sway) that flies over an endless
+  field (mirrored, repeated, or one island). The hand presses, raises or spreads the
+  land and it heals. A per-pixel height-field march over a max pyramid rebuilt every
+  frame (Tevs, Ihrke and Seidel 2008), far land read from coarser mips, lost rays
+  finished by a coarse walk : 2-4 ms at 1080p, 5-9 ms at the 2048² dome composition on
+  the RTX 4070 laptop, 60 fps both; fulldome gate run. 14 presets, the Landscape master
+  chains (4), themes Raised Land, Endless Land, Survey Map. Credits : ReactDrops (the
+  idea), Terrain raymarching and Maximum mipmaps (the methods) in the register's Part 6.
 - **A frequency band on the audio modulator** : an **HZ** row under SMOOTH, a slider with
   two ends on a logarithmic track (0 to 20000 Hz, the two shown beside it; double-click :
   the whole range, the old behavior), reads every feature only between the two

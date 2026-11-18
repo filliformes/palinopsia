@@ -64,6 +64,12 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('brush and color', 'brush', 'mode', 'size', 'convex', 'chaos', 'rough', 'fuse', 'ribs', 'dash', 'broken', 'mirror', 'fold', 'colorPick', 'color1', 'color2', 'color3', 'color4', 'color5'),
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
+  'gen-terrain': [
+    // (three columns of 15, 16 and 15)
+    g('land and steps', 'own', 'raise', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor'),
+    g('color, light, air, water', 'palette', 'colorMix', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple'),
+    g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
+  ],
   'gen-pointcloud': [
     g('picture and points', 'own', 'raise', 'depth', 'settle', 'stipple', 'gain', 'ground', 'density', 'size', 'shape', 'jitter', 'fog'),
     g('camera and scan', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin', 'scan', 'scanPeriod', 'scanSync'),
@@ -494,6 +500,20 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (is('material', 0)) put(d, ['flow', 'flowSpeed', 'bands', 'split', 'ripple'], 'Clay has no reflection to flow.')
     if (isnt('material', 6)) put(d, ['rainbow', 'flakes', 'glint'], 'Only the foil has a rainbow, flakes and glints.')
     if (isnt('material', 5)) put(d, ['dispersion', 'rim'], 'Only the glass splits color and has a rim.')
+    return d
+  },
+  // Terrain : its own land or a picture (the sidechain), what each one reads.
+  'gen-terrain': ({ zero, side }) => {
+    const d: Why = {}
+    if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
+    if (side && zero('rough')) put(d, ['evolve'], 'A layer is picked as the sidechain and rock is at 0 : nothing of its own evolves.')
+    else put(d, ['raise', 'settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
+    if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
+    if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')
+    if (zero('contours')) put(d, ['lineWidth', 'lineColor'], 'Contour lines is at 0.')
+    if (zero('water')) put(d, ['waterColor', 'mirror', 'ripple'], 'Water level is at 0 : no lake.')
+    if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
+    if (zero('handAmount')) put(d, ['hand', 'handSize', 'heal', 'people'], 'Hand strength is at 0 : the hand leaves no mark.')
     return d
   },
   'gen-pointcloud': ({ zero, is }) => {
