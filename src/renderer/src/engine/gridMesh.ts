@@ -14,8 +14,11 @@
 //      the plain shape : 0 the shape, 1 the noisy one, past 1 beyond it.
 //
 // The repeats and drops of steps 3 and 4 are what make the steps and shards; drawing
-// the grid as a line strip, a fan, quads or one polygon (in the grid's order, not as
-// its surface) makes the scribbles and the long slivers.
+// each ROW of the grid as a line strip, a fan, quads or one polygon (not as its
+// surface) makes the rings, scribbles and long slivers. The round shapes have their
+// axis along z (toward the camera) and the cube is a square tube whose rows walk its
+// outline, as the classic grid shapes are made (checked against the OCTOCOSME patch's
+// own output, its mesh bank's slots 1 to 4 at rest).
 //
 // Written for Palinopsia : the idea of this chain comes from the OCTOCOSME visuals
 // (Vincent's own Max patch), built there on Jitter's gridshape, bfg and mesh objects;
@@ -65,47 +68,43 @@ export function buildGridShape(shape: number, dimX: number, dimY: number): Float
       switch (name) {
         case 'sphere': {
           const ph = v * Math.PI, sp = Math.sin(ph), cp = Math.cos(ph)
-          put(k, sp * ct, cp, sp * st, u, v, sp * ct, cp, sp * st)
+          put(k, sp * ct, sp * st, cp, u, v, sp * ct, sp * st, cp)
           break
         }
         case 'torus': {
           const R = 1, r = 0.5, ph = v * TAU, cp = Math.cos(ph), sp = Math.sin(ph)
-          put(k, (R + r * cp) * ct, r * sp, (R + r * cp) * st, u, v, cp * ct, sp, cp * st)
+          put(k, (R + r * cp) * ct, (R + r * cp) * st, r * sp, u, v, cp * ct, cp * st, sp)
           break
         }
-        case 'cylinder':
-        case 'cone': {
+        case 'cylinder': {
           // the first and last rows close the ends (one centre point each), the rows
           // between run down the side
-          const cone = name === 'cone'
-          if (j === 0) { put(k, 0, 1, 0, u, v, 0, 1, 0); break }
-          if (j === ny - 1) { put(k, 0, -1, 0, u, v, 0, -1, 0); break }
+          if (j === 0) { put(k, 0, 0, 1, u, v, 0, 0, 1); break }
+          if (j === ny - 1) { put(k, 0, 0, -1, u, v, 0, 0, -1); break }
           const w = ny > 3 ? (j - 1) / (ny - 3) : 0.5
-          const y = 1 - 2 * w
-          const r = cone ? w : 1
-          put(k, r * ct, y, r * st, u, v, ct, cone ? 0.5 : 0, st)
+          put(k, ct, st, 1 - 2 * w, u, v, ct, st, 0)
           break
         }
+        case 'cone':
+          // open : from its point (the first row) to its rim (the last)
+          put(k, v * ct, v * st, 1 - 2 * v, u, v, ct, st, 0.5)
+          break
         case 'open cylinder':
-          put(k, ct, 1 - 2 * v, st, u, v, ct, 0, st)
+          put(k, ct, st, 1 - 2 * v, u, v, ct, st, 0)
           break
-        case 'cube': {
-          // the sphere's grid pushed out onto the cube (each direction to the face it meets)
-          const ph = v * Math.PI, sp = Math.sin(ph)
-          const dx = sp * ct, dy = Math.cos(ph), dz = sp * st
-          const m = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) || 1
-          const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz)
-          const nX = ax >= ay && ax >= az ? Math.sign(dx) : 0
-          const nY = !nX && ay >= az ? Math.sign(dy) : 0
-          const nZ = !nX && !nY ? Math.sign(dz) : 0
-          put(k, dx / m, dy / m, dz / m, u, v, nX, nY, nZ)
-          break
-        }
+        case 'cube':
         case 'open cube': {
-          // a square tube : the angle walks round the square's perimeter
-          const m = Math.max(Math.abs(ct), Math.abs(st)) || 1
-          const x = ct / m, z = st / m
-          put(k, x, 1 - 2 * v, z, u, v, Math.abs(x) >= Math.abs(z) ? Math.sign(x) : 0, 0, Math.abs(z) > Math.abs(x) ? Math.sign(z) : 0)
+          // a square tube along z, each row walking the square's perimeter from its
+          // top-left corner, down first (counter-clockwise as seen from the front, so a
+          // fan of a row faces the camera); the cube closes its two ends (first and
+          // last rows : one centre point each)
+          const closed = name === 'cube'
+          if (closed && j === 0) { put(k, 0, 0, 1, u, v, 0, 0, 1); break }
+          if (closed && j === ny - 1) { put(k, 0, 0, -1, u, v, 0, 0, -1); break }
+          const w = closed ? (ny > 3 ? (j - 1) / (ny - 3) : 0.5) : v
+          const t = (u % 1) * 4, side = Math.min(3, Math.floor(t)), f = t - side
+          const [x, y, nX, nY] = side === 0 ? [-1, 1 - 2 * f, -1, 0] : side === 1 ? [-1 + 2 * f, -1, 0, -1] : side === 2 ? [1, -1 + 2 * f, 1, 0] : [1 - 2 * f, 1, 0, 1]
+          put(k, x, y, 1 - 2 * w, u, v, nX, nY, 0)
           break
         }
         case 'plane':
@@ -116,8 +115,8 @@ export function buildGridShape(shape: number, dimX: number, dimY: number): Float
           break
         case 'capsule': {
           const ph = v * Math.PI, sp = Math.sin(ph), cp = Math.cos(ph)
-          const y = cp + (cp >= 0 ? 0.5 : -0.5)
-          put(k, sp * ct, y, sp * st, u, v, sp * ct, cp, sp * st)
+          const z = cp + (cp >= 0 ? 0.5 : -0.5)
+          put(k, sp * ct, sp * st, z, u, v, sp * ct, sp * st, cp)
           break
         }
       }
@@ -460,48 +459,52 @@ export interface Primitives {
 
 /** Cut the grid (nx × ny, row order) into what the draw mode makes. The surface modes
  *  (tri grid, quad grid) follow the grid's rows and columns; every other mode reads
- *  the vertices one after another in row order, as a flat list, and joins them as
- *  that mode joins any list : that is where the shards and scribbles come from. */
+ *  each ROW of vertices as its own list and joins it as that mode joins any list (a
+ *  line strip draws each row as one line, a fan opens from each row's first vertex) :
+ *  that is where the rings, scribbles, slivers and shards come from. */
 export function primitives(mode: number, nx: number, ny: number): Primitives {
-  const n = nx * ny
   const tris: number[] = [], segs: number[] = [], pts: number[] = []
-  switch (DRAW_MODES[mode] ?? 'tri grid') {
-    case 'tri grid':
-    case 'quad grid':
-      for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
-        const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1
-        tris.push(a, c, b, b, c, d)
-      }
-      break
-    case 'points':
-      for (let k = 0; k < n; k++) pts.push(k)
-      break
-    case 'lines':
-      for (let k = 0; k + 1 < n; k += 2) segs.push(k, k + 1)
-      break
-    case 'line strip':
-      for (let k = 0; k + 1 < n; k++) segs.push(k, k + 1)
-      break
-    case 'line loop':
-      for (let k = 0; k + 1 < n; k++) segs.push(k, k + 1)
-      if (n > 2) segs.push(n - 1, 0)
-      break
-    case 'triangles':
-      for (let k = 0; k + 2 < n; k += 3) tris.push(k, k + 1, k + 2)
-      break
-    case 'tri fan':
-    case 'polygon':
-      for (let k = 1; k + 1 < n; k++) tris.push(0, k, k + 1)
-      break
-    case 'tri strip':
-      for (let k = 0; k + 2 < n; k++) (k & 1 ? tris.push(k + 1, k, k + 2) : tris.push(k, k + 1, k + 2))
-      break
-    case 'quads':
-      for (let k = 0; k + 3 < n; k += 4) tris.push(k, k + 1, k + 2, k, k + 2, k + 3)
-      break
-    case 'quad strip':
-      for (let k = 0; k + 3 < n; k += 2) tris.push(k, k + 1, k + 3, k, k + 3, k + 2)
-      break
+  const name = DRAW_MODES[mode] ?? 'tri grid'
+  if (name === 'tri grid' || name === 'quad grid') {
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1
+      tris.push(a, c, b, b, c, d)
+    }
+    return { tris, segs, pts }
+  }
+  for (let j = 0; j < ny; j++) {
+    const o = j * nx, n = nx
+    switch (name) {
+      case 'points':
+        for (let k = 0; k < n; k++) pts.push(o + k)
+        break
+      case 'lines':
+        for (let k = 0; k + 1 < n; k += 2) segs.push(o + k, o + k + 1)
+        break
+      case 'line strip':
+        for (let k = 0; k + 1 < n; k++) segs.push(o + k, o + k + 1)
+        break
+      case 'line loop':
+        for (let k = 0; k + 1 < n; k++) segs.push(o + k, o + k + 1)
+        if (n > 2) segs.push(o + n - 1, o)
+        break
+      case 'triangles':
+        for (let k = 0; k + 2 < n; k += 3) tris.push(o + k, o + k + 1, o + k + 2)
+        break
+      case 'tri fan':
+      case 'polygon':
+        for (let k = 1; k + 1 < n; k++) tris.push(o, o + k, o + k + 1)
+        break
+      case 'tri strip':
+        for (let k = 0; k + 2 < n; k++) (k & 1 ? tris.push(o + k + 1, o + k, o + k + 2) : tris.push(o + k, o + k + 1, o + k + 2))
+        break
+      case 'quads':
+        for (let k = 0; k + 3 < n; k += 4) tris.push(o + k, o + k + 1, o + k + 2, o + k, o + k + 2, o + k + 3)
+        break
+      case 'quad strip':
+        for (let k = 0; k + 3 < n; k += 2) tris.push(o + k, o + k + 1, o + k + 3, o + k, o + k + 3, o + k + 2)
+        break
+    }
   }
   return { tris, segs, pts }
 }

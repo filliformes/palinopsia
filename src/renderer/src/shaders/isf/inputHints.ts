@@ -815,7 +815,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     shape: "The shape, made as a grid of vertices : its rows and columns are GRID X and GRID Y.",
     dimX: "How many vertices round the grid (its columns). Few makes it faceted; with a draw mode that reads the grid as a list, the order of the vertices changes the whole drawing.",
     dimY: "How many vertices along the grid (its rows).",
-    drawMode: "How the vertices are joined. TRI GRID and QUAD GRID draw the surface. The others read the vertices one after another and join them as that mode joins any list : a line strip scribbles across, a fan or a polygon throws slivers from the first vertex, quads and quad strips cut shards.",
+    drawMode: "How the vertices are joined. TRI GRID and QUAD GRID draw the surface. The others read each row of the grid as a list and join it as that mode joins any list : a line strip draws each row as a line (rings on a cone, stripes on a plane), a fan or a polygon throws slivers from each row's first vertex, quads and quad strips cut shards; once the noise tears the shape, the rows tear with it.",
     polyFront: "Each triangle facing you : filled, as its three lines, or as its three points.",
     polyBack: "Each triangle facing away : filled, as lines, or as points.",
     lineWidth: "How wide the lines are, in pixels at 1080 rows.",
