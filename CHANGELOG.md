@@ -237,6 +237,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Changed
 
+- **A blue 3D mark in the source and effect menus** (`shaders/isf/threeD.ts`, drawn by
+  `SearchSelect`) : after Model, Grid Mesh, Point Cloud and Terrain, and after the effects
+  that read the depth map (Parallax, Depth Scan, Luma Blur, Pulfrich); typing `3d` in a
+  menu finds them.
 - **A model file opens in plastic** : a file loaded on a built-in shape starts in the plastic
   material (chrome, the default, reflected the studio and hid the file's own colors and a
   layer worn as skin); a file swapped for another keeps the material chosen.
