@@ -477,6 +477,26 @@ methods are free to build on; naming them is a matter of respect.
   on Interactive 3D Graphics and Games (I3D '08)*, ACM. A pyramid of the highest point
   under each cell lets a ray skip whole empty cells of a height field. The Terrain's march
   walks one, rebuilt every frame; written from the paper's method, no code taken.
+- **Thin-film lubrication equation**: A. Oron, S. H. Davis and S. G. Bankoff, "Long-scale
+  evolution of thin liquid films", *Reviews of Modern Physics* 69(3), 931–980 (1997),
+  https://doi.org/10.1103/RevModPhys.69.931. In the long-wave (lubrication) approximation a
+  thin viscous film's flux grows with a power of its own thickness (the cube, for a film
+  on a no-slip floor) times the slope of what drives it, so a thick film runs and a thin one
+  hardly moves. The Slick effect (`engine/slickNode.ts`) spreads its crude with a flux that
+  grows with the square of the depth (a softer form chosen for the look and the cost),
+  written from the published form, no code taken.
+- **Oil slick spreading**: J. A. Fay, "The spread of oil slicks on a calm sea", in D. P.
+  Hoult (ed.), *Oil on the Sea*, Plenum Press, New York, 1969. A slick spreads under
+  gravity and, once thin, under surface tension, held back first by inertia and then by
+  viscosity, thinning as it grows. Behind the Slick effect's settling crude and the thin
+  film that runs out ahead of it; idea only, no code taken.
+- **Oil appearance code**: the Bonn Agreement Oil Appearance Code (BAOAC), in the *Bonn
+  Agreement Aerial Operations Handbook* (Bonn Agreement, https://www.bonnagreement.org),
+  the scale aerial surveys use to read an oil slick's thickness from its look : a silvery
+  sheen, then the rainbow, a metallic film, the oil's true color in patches, then
+  continuous. The Slick effect, the Model's crude coat (`engine/ModelSource.ts`) and the
+  Terrain's oil on the water (`engine/TerrainSource.ts`) draw their oil in that order, from
+  the thin edge in; idea only.
 - **Aural Mirror** by Remo DeVico
   (https://www.remodevicocomposer.eu/experimental-tools/aural-mirror/), an instrument that
   turns a painting into sound and musical structure. Four machines read the same picture

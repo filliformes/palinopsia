@@ -18,6 +18,7 @@ import { InflateNode } from './inflateNode'
 import { DrapeNode } from './drapeNode'
 import { TouchNode } from './touchNode'
 import { RippleNode } from './rippleNode'
+import { SlickNode } from './slickNode'
 import { DatamoshNode } from './datamoshNode'
 import { MorphogenNode } from './morphogenNode'
 import { CurrentNode } from './currentNode'
@@ -4755,12 +4756,13 @@ export function makeConvNode(gl: WebGL2RenderingContext, shaderId: string): Conv
   if (shaderId === 'node-drape') return new DrapeNode(gl)
   if (shaderId === 'node-touch') return new TouchNode(gl)
   if (shaderId === 'node-ripple') return new RippleNode(gl)
+  if (shaderId === 'node-slick') return new SlickNode(gl)
   if (shaderId === 'node-reaction') return new MorphogenNode(gl)
   if (shaderId === 'node-fluid') return new CurrentNode(gl)
   if (shaderId === 'node-depthscan') return new DepthScanNode(gl)
   return null
 }
 
-export const NATIVE_NODE_IDS = ['node-reaction', 'node-fluid', 'node-drape', 'node-touch', 'node-ripple', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette', 'node-depthscan']
+export const NATIVE_NODE_IDS = ['node-reaction', 'node-fluid', 'node-drape', 'node-touch', 'node-ripple', 'node-slick', 'node-inflate', 'node-transfert', 'node-convolve', 'node-mosaique', 'node-reponse', 'node-feedback', 'node-datamosh', 'node-codecmosh', 'node-scanner', 'node-autocutter', 'node-chronoscan', 'node-sediment', 'node-parallax', 'node-eternalism', 'node-afterimage', 'node-pulfrich', 'node-corrode', 'node-decimate', 'node-fieldstore', 'node-melt', 'node-faultline', 'node-ibfv', 'node-toile', 'node-remap', 'node-lumablur', 'node-gooey', 'node-matte', 'node-lookup', 'node-silhouette', 'node-depthscan']
 export const isNativeNode = (id: string | null | undefined): boolean =>
   !!id && NATIVE_NODE_IDS.includes(id)

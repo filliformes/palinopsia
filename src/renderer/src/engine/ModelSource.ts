@@ -27,6 +27,14 @@
 //   picture; it is never re-projected to true dome directions).
 // - Its depth : drawn again, smaller, into its own target, nearest white, the back of
 //   its bounding sphere black (engine/Compositor.ts hands it to the depth readers).
+// - CRUDE COAT : over any material, the object coated in crude oil. The coat's depth on
+//   the surface is a slow lumpy noise of the model's own place, raised by COAT; where it
+//   is thick it is near-black with a deep wet shine (the shared gloss plastic), where it
+//   thins (lumps, and its edges turning away from the camera) the material beneath
+//   shows under the petrol rainbow (the thin-film colors), and DRIPS run down it in
+//   streaks : columns across the world's down (in the model's own frame, so down stays
+//   down on the screen however it turns) whose oil slides down slowly.
+//   third-party: Oil appearance code (the order from the thin edge in : rainbow, then crude)
 // - SHATTER (fragments and dust) : on the sound's onsets, the beat (the shared beat
 //   clock, so Ableton Link's bars), the trigger, or held by hand (BROKEN), every
 //   triangle flies out as a shard of its own along its face, scattered, turned round
@@ -126,6 +134,8 @@ uniform vec2 uRes, uAspect;
 uniform vec3 uColor, uGround, uL;
 uniform float uGroundA, uMat, uMatcap, uFileColor, uHasFile, uHasTex, uGloss, uCav, uFacets, uFilm, uFilmNm, uLight, uAmb, uAz;
 uniform float uSkin, uSkinMode, uHasSide, uTile, uScroll, uFog, uT, uFpx;
+uniform float uCrude, uCrDrip, uCrSheen;
+uniform vec3 uCrDown, uCrCol;
 ${NOISE}
 ${RELIEF_SHADE}
 // The frame whose depth axis looks back along the view ray : the shading written for a
@@ -227,6 +237,43 @@ vec4 shadeAll(vec3 Nf, vec3 Lf, vec3 alb, vec2 uvS, vec2 uvM, vec3 objN, vec3 ob
   if (pic && uSkinMode > 2.5) c = mix(c, picC, uSkin);
   // cavity : the creases (where the normals close in) get less light; the ridges a little more
   if (uCav > 0.0) c *= 1.0 - uCav * 0.85 * clamp(-curv * 0.35, 0.0, 1.0) + uCav * 0.12 * clamp(curv * 0.1, 0.0, 1.0);
+  // crude coat : black wet oil over whatever it is, the rainbow where it thins, drips
+  // running down it
+  if (uCrude > 0.0) {
+    vec3 dn = normalize(uCrDown + vec3(0.0, 1e-5, 0.0));
+    float along = dot(objP, dn);
+    vec3 acr = objP - dn * along;
+    float lump = vn3(objP * 2.6 + 11.0) + 0.5 * vn3(objP * 6.1 + 3.0) - 0.75;
+    float drip = 0.0;
+    if (uCrDrip > 0.0) {
+      // the streaks : columns across the down, the oil in them sliding down slowly
+      float colm = smoothstep(0.52, 0.78, vn3(acr * 7.5 + 2.0));
+      float run = smoothstep(0.35, 0.75, vn3(acr * 7.5 + dn * (along * 1.6 + uT * 0.14) + 5.0));
+      drip = colm * (0.45 + 0.55 * run) * uCrDrip;
+    }
+    float k = uCrude * 1.35 - 0.35 + lump * 0.4 + drip * 0.7;
+    // (thinner where the surface turns away from the camera : the rainbow at its edges)
+    float kv = k * mix(0.3, 1.0, smoothstep(0.0, 0.65, Nf.z));
+    float cover = smoothstep(0.0, 0.05, kv);
+    float thick = smoothstep(0.16, 0.5, kv);
+    // (the slope of the coat, taken outside the branch : a derivative inside one is undefined)
+    vec2 dk = vec2(dFdx(k), dFdy(k));
+    if (cover > 0.0) {
+      // its own lumps and runs catch the light
+      vec3 Nc = normalize(Nf - vec3(dk, 0.0) * 22.0 * thick);
+      vec3 crude = shadeSurface(3.0, uCrCol, Nc, Lf, uAz, 1.65, vec3(0.0), 0.0, 0.0, 0.0, P);
+      vec3 Hc = normalize(Lf + vec3(0.0, 0.0, 1.0));
+      // a sharp wet highlight, a broad sheen, and the wet rim where it turns away
+      crude += vec3(1.0, 0.98, 0.95) * (pow(max(0.0, dot(Nc, Hc)), 380.0) * 0.9 + pow(max(0.0, dot(Nc, Hc)), 28.0) * 0.12);
+      crude += roomAt(reflect(vec3(0.0, 0.0, -1.0), Nc), uAz, P, Nc.z, 0.05) * pow(1.0 - max(Nc.z, 0.0), 3.0) * 0.35;
+      vec3 film = filmColor(110.0 + 2400.0 * kv, max(Nc.z, 0.05), 1.45);
+      vec3 thin = c * (0.35 + 0.9 * film) + film * film * 0.14;
+      crude *= mix(vec3(1.0), 0.45 + 1.1 * filmColor(520.0 + 380.0 * lump, max(Nc.z, 0.05), 1.5), 0.3 * uCrSheen);
+      vec3 coated = mix(mix(c, thin, uCrSheen), crude, thick);
+      c = mix(c, coated, cover);
+      a = mix(a, 1.0, thick);
+    }
+  }
   // fog : the far side fades toward the ground
   float f = uFog * pow(1.0 - d01, 1.4);
   return vec4(mix(c * a, uGround * uGroundA, f), mix(a, uGroundA, f));
@@ -1281,6 +1328,10 @@ export class ModelSource implements NativeGenerator {
         .f1('uBands', 3).f1('uSplit', 0.5).f1('uRipple', 0.3)
         .f1('uFoilSat', Math.max(0, Math.min(1, num(I, 'rainbow', 0.7)))).f1('uFoilScale', 40 + 260 * Math.max(0, Math.min(1, num(I, 'flakes', 0.5))))
         .f1('uFoilGlint', Math.max(0, Math.min(1, num(I, 'glint', 0.4))))
+        // the crude coat (the world's down in the model's own frame, as the shards read it)
+        .f1('uCrude', Math.max(0, Math.min(1, num(I, 'crude', 0)))).f1('uCrDrip', Math.max(0, Math.min(1, num(I, 'crudeDrips', 0.4))))
+        .f1('uCrSheen', Math.max(0, Math.min(1, num(I, 'crudeSheen', 0.7))))
+        .f3('uCrDown', -NM[1], -NM[4], -NM[7]).f3('uCrCol', 0.035, 0.026, 0.02)
         .i1('uTex', 2).i1('uSide', 3)
       return p
     }
