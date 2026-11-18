@@ -8,9 +8,11 @@
 //   the depth engine's) : Parallax, Depth Scan, Luma Blur (depth focus) and
 //   Pulfrich (keyed on the depth map).
 //
-// Shaders that only look 3D on a flat picture (Oil Cloud, Lattice, Relief…) take
-// no part in depth, so they stay unmarked. A new 3D source or depth reader is
-// added here.
+// - 2.5D (a lighter mark) : sources that LOOK 3D on a flat picture but hand no
+//   depth to anything : Oil Cloud (a ray-marched cloud), Lattice (its tunnel,
+//   sphere, torus and galaxy forms) and Relief (a height map relit).
+// A new 3D source or depth reader is added to THREE_D_IDS, a new look-only one to
+// TWO_HALF_D_IDS.
 
 export const THREE_D_IDS: ReadonlySet<string> = new Set([
   'gen-model',
@@ -23,6 +25,13 @@ export const THREE_D_IDS: ReadonlySet<string> = new Set([
   'node-pulfrich'
 ])
 
+export const TWO_HALF_D_IDS: ReadonlySet<string> = new Set(['oil-cloud', 'gen-lattice', 'gen-relief'])
+
 export const is3D = (id: string | null | undefined): boolean => !!id && THREE_D_IDS.has(id)
 
+/** '3D', '2.5D' or null : the mark a menu row carries. */
+export const depthMark = (id: string | null | undefined): '3D' | '2.5D' | null =>
+  !id ? null : THREE_D_IDS.has(id) ? '3D' : TWO_HALF_D_IDS.has(id) ? '2.5D' : null
+
 export const THREE_D_TITLE = '3D : draws a real 3D scene or reads the depth of one'
+export const TWO_HALF_D_TITLE = '2.5D : looks 3D on a flat picture, gives no depth to anything'

@@ -3637,7 +3637,9 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
   at once, the loaded parameters too.
 - **A blue 3D mark** follows the sources that draw a real 3D scene (Model, Grid Mesh,
   Point Cloud, Terrain) and the effects that read the depth map (Parallax, Depth Scan,
-  Luma Blur, Pulfrich) in the source and effect menus; `3d` in a menu's search lists them.
+  Luma Blur, Pulfrich) in the source and effect menus, a lighter dashed **2.5D** mark the
+  sources that look 3D on a flat picture but give no depth (Oil Cloud, Lattice, Relief);
+  `3d` or `2.5d` in a menu's search lists them.
 - **Every effect, source and modulator names itself on hover** : a plain-English
   sentence or two on the item's name in the Inspector, saying what it does.
 - **Native nodes**: the three **sidechain** nodes (Transfert, Convolution, Mosaïque) are

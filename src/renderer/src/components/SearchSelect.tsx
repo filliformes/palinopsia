@@ -17,7 +17,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { effectiveZoom } from './uiZoom'
 import { ownerWindow } from './ownerWindow'
-import { is3D, THREE_D_TITLE } from '../shaders/isf/threeD'
+import { depthMark, THREE_D_TITLE, TWO_HALF_D_TITLE } from '../shaders/isf/threeD'
 
 export interface SearchOption {
   value: string
@@ -67,6 +67,35 @@ export function searchScore(opt: Pick<SearchOption, 'label' | 'group' | 'keyword
   return i === q.length ? 4 : null
 }
 
+/** The search also finds a marked piece by its mark ("3d", "2.5d"). */
+function markWord(o: SearchOption): SearchOption {
+  const m = depthMark(o.value)
+  return m ? { ...o, keywords: [...(o.keywords ?? []), m.toLowerCase()] } : o
+}
+
+/** The small blue 3D / 2.5D mark after a 3D piece's name (threeD.ts) : a fixed
+ *  blue in every theme, the 2.5D one lighter (no fill, a dashed edge). */
+function DepthMark({ id }: { id: string }): JSX.Element | null {
+  const m = depthMark(id)
+  if (!m) return null
+  const full = m === '3D'
+  return (
+    <span
+      title={full ? THREE_D_TITLE : TWO_HALF_D_TITLE}
+      className="ml-1.5 rounded-sm px-[3px] align-[1px] font-mono text-[8.5px] font-semibold leading-none"
+      style={{
+        color: full ? 'rgb(56 182 255)' : 'rgb(56 182 255 / 0.85)',
+        background: full ? 'rgb(56 182 255 / 0.14)' : 'transparent',
+        boxShadow: full ? 'inset 0 0 0 1px rgb(56 182 255 / 0.45)' : undefined,
+        outline: full ? undefined : '1px dashed rgb(56 182 255 / 0.5)',
+        outlineOffset: full ? undefined : '-1px'
+      }}
+    >
+      {m}
+    </span>
+  )
+}
+
 export function SearchSelect({
   value,
   options,
@@ -100,7 +129,7 @@ export function SearchSelect({
   const query = q.trim().toLowerCase()
   const groups = useMemo(() => {
     const scored = options
-      .map((o, i) => ({ o, i, s: searchScore(is3D(o.value) ? { ...o, keywords: [...(o.keywords ?? []), '3d'] } : o, query) }))
+      .map((o, i) => ({ o, i, s: searchScore(markWord(o), query) }))
       .filter((x): x is { o: SearchOption; i: number; s: number } => x.s !== null)
     const byGroup = new Map<string, { o: SearchOption; i: number; s: number }[]>()
     for (const x of scored) {
@@ -266,16 +295,7 @@ export function SearchSelect({
                     >
                       {o.prefix}
                       {o.label}
-                      {/* the 3D pieces (threeD.ts) : a fixed blue in every theme */}
-                      {is3D(o.value) && (
-                        <span
-                          title={THREE_D_TITLE}
-                          className="ml-1.5 rounded-sm px-[3px] align-[1px] font-mono text-[8.5px] font-semibold leading-none"
-                          style={{ color: 'rgb(56 182 255)', background: 'rgb(56 182 255 / 0.14)', boxShadow: 'inset 0 0 0 1px rgb(56 182 255 / 0.45)' }}
-                        >
-                          3D
-                        </span>
-                      )}
+                      <DepthMark id={o.value} />
                     </button>
                   )
                 })}
