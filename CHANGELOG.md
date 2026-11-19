@@ -299,6 +299,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
   land once a frame (a timer when the window draws none); pads and triggers stay
   immediate, and a fader still waiting lands before a pad fires. Measured : 4,200 CC
   messages a second, 60 fps, frames under 21 ms.
+- **The source menus no longer cost a fifth of every frame** (`shaders/isf/index.ts`) :
+  each render sorted every generator into its section with a regex over its whole shader
+  source, in all nine source menus; the categories are now read once and each list sorted
+  once. Profiled with eight faders moving : the CPU idle share rose from 8 % to 60 %.
 - **opsia-media:// had lost its privileges since 2026-09-15** : `main/index.ts`
   registered it and opsia-asset:// in two `registerSchemesAsPrivileged` calls, and
   Electron takes one (the second replaced the first), so fetch refused the scheme and

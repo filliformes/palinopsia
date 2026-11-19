@@ -3091,38 +3091,47 @@ export const GENERATORS_ALPHA: IsfShader[] = [...GENERATORS].sort((a, b) =>
   a.name.localeCompare(b.name)
 )
 
+// A shader's CATEGORIES, read once : the pickers sort every generator into its
+// section on each render, and a regex over the whole shader source (54 of them,
+// in 9 menus, 60 times a second while MIDI faders move) cost about a fifth of the
+// frame (profiled 11-19). The sources never change after load.
+const CATS = new WeakMap<IsfShader, string>()
+function categoriesOf(sh: IsfShader): string {
+  let c = CATS.get(sh)
+  if (c === undefined) {
+    c = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)?.[1] ?? ''
+    CATS.set(sh, c)
+  }
+  return c
+}
+
 /** Generators tagged "Organic" in their ISF CATEGORIES : their own section in
  *  the source picker (living matter : reaction, growth, water, fire, ground). */
 export function isOrganicSource(sh: IsfShader): boolean {
-  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
-  return !!m && /"Organic"/.test(m[1])
+  return categoriesOf(sh).includes('"Organic"')
 }
 
 /** Generators tagged "Analog" : the analog video-synthesis lineage (oscillators,
  *  ramps, scan processing, beating line fields), their own section in the picker. */
 export function isAnalogSource(sh: IsfShader): boolean {
-  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
-  return !!m && /"Analog"/.test(m[1])
+  return categoriesOf(sh).includes('"Analog"')
 }
 
 /** Generators tagged "Live" : sources that read the room (the Body camera's
  *  silhouette), listed with the camera and capture entries. */
 export function isLiveSource(sh: IsfShader): boolean {
-  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
-  return !!m && /"Live"/.test(m[1])
+  return categoriesOf(sh).includes('"Live"')
 }
 
 /** Generators tagged "Painterly" : painted matter (Oil Cloud, Cloud Study). */
 export function isPaintedSource(sh: IsfShader): boolean {
-  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
-  return !!m && /"Painterly"/.test(m[1])
+  return categoriesOf(sh).includes('"Painterly"')
 }
 
 /** Generators tagged "Geometry" (and not analog video) : lines, grids, dots,
  *  patterns and shapes. */
 export function isGeometrySource(sh: IsfShader): boolean {
-  const m = sh.source.match(/"CATEGORIES"\s*:\s*\[([^\]]*)\]/)
-  return !!m && /"Geometry"/.test(m[1])
+  return categoriesOf(sh).includes('"Geometry"')
 }
 
 export type SourceSection = 'live' | 'organic' | 'painted' | 'analog' | 'geometry' | 'generators'
@@ -3150,11 +3159,17 @@ export function sourceIcon(id: string): string | undefined {
 
 /** Generators in picker order : living matter, painted matter, analog video,
  *  geometry, then every other generator, alphabetical within each section. */
+// (sorted once per list : the pickers ask on every render, and the lists are fixed)
+const ORDERED = new WeakMap<IsfShader[], IsfShader[]>()
 export function inPickerOrder(list: IsfShader[]): IsfShader[] {
+  const hit = ORDERED.get(list)
+  if (hit) return hit
   const rank: Record<SourceSection, number> = { live: -1, organic: 0, painted: 1, analog: 2, geometry: 3, generators: 4 }
-  return [...list].sort(
+  const out = [...list].sort(
     (a, b) => rank[sourceSection(a)] - rank[sourceSection(b)] || a.name.localeCompare(b.name)
   )
+  ORDERED.set(list, out)
+  return out
 }
 
 // A shader's display group = its first CATEGORIES tag that isn't the top-level
