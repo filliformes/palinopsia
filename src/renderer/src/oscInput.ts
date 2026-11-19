@@ -240,8 +240,19 @@ function presetOf(shaderId: string, args: OscArg[]): ShaderPreset | null {
   if (!Number.isFinite(v)) return null
   return list[Math.max(1, Math.min(list.length, Math.round(v))) - 1]
 }
-/** The preset each slot last recalled over OSC (so a repeat does not re-apply it). */
-const lastPreset = new Map<string, string>()
+/** True when every value of the preset is already what the slot holds : a controller
+ *  repeating its switch state does not re-apply it, but the same preset sent after a
+ *  hand edit, a shader swap or a session load does. */
+function presetAlreadyOn(values: Record<string, unknown>, inputs: Record<string, unknown> | undefined): boolean {
+  if (!inputs) return false
+  for (const [k, v] of Object.entries(values)) {
+    const cur = inputs[k]
+    if (cur === v) continue
+    if (typeof v === 'object' && v !== null && JSON.stringify(cur) === JSON.stringify(v)) continue
+    return false
+  }
+  return true
+}
 
 function sourceShaderId(li: number, slot: 'A' | 'B'): string | null {
   const l = useStore.getState().composition.layers[li]
@@ -413,8 +424,9 @@ function route(address: string, args: Args, host = ''): void {
         // a controller that repeats its switches' state does not re-apply it)
         if (input === 'preset' && segs[6] === undefined) {
           const p = presetOf(sid, args)
-          if (p && lastPreset.get(`L${li}${slot}`) !== `${sid}|${p.name}`) {
-            lastPreset.set(`L${li}${slot}`, `${sid}|${p.name}`)
+          const l = st.composition.layers[li]
+          const cur = (slot === 'A' ? l?.sourceA : l?.sourceB)?.inputs
+          if (p && !presetAlreadyOn(p.values, cur)) {
             for (const [k, v] of Object.entries(p.values)) st.setSourceInput(li, slot, k, v)
           }
           return
@@ -612,8 +624,7 @@ function route(address: string, args: Args, host = ''): void {
         if (!sid) return
         if (segs[3] === 'preset' && segs[4] === undefined) {
           const p = presetOf(sid, args)
-          if (p && lastPreset.get('bg') !== `${sid}|${p.name}`) {
-            lastPreset.set('bg', `${sid}|${p.name}`)
+          if (p && !presetAlreadyOn(p.values, st.composition.background?.source?.inputs)) {
             for (const [k, v] of Object.entries(p.values)) st.setBackgroundInput(k, v)
           }
           return

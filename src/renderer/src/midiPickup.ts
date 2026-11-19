@@ -55,10 +55,17 @@ export function pickupPass(input: string, id: string, t: number, cur: number | n
 }
 
 /** The target `id` was just written (by MIDI) : what it holds now is what the
- *  engaged controls left there. */
-export function pickupWritten(id: string, cur: number | null): void {
+ *  control that wrote it (`input`) left there. The other engaged controls on the
+ *  same target see the change at their next message and let go, as they would
+ *  for a scene or the mouse. */
+export function pickupWritten(id: string, cur: number | null, input?: string): void {
   const byIn = picks.get(id)
   if (!byIn || cur == null) return
+  if (input != null) {
+    const p = byIn.get(input)
+    if (p?.engaged) p.left = cur
+    return
+  }
   for (const p of byIn.values()) if (p.engaged) p.left = cur
 }
 

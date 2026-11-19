@@ -121,7 +121,7 @@ import { favoriteSessions, MAX_FAVORITES } from './favoriteSessions'
 import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
 import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
-import { initMidi, fireTrigger, midi, pickupHints } from './midi'
+import { initMidi, fireTrigger, midi, pickupHints, dropContinuous } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
@@ -800,6 +800,7 @@ export default function App(): JSX.Element {
           const s = await window.api.sessionLoad(k.sessionPath)
           if (s) {
             const st = useStore.getState()
+            dropContinuous() // (a fader queued for the old session must not land in this one)
             st.loadSession(s)
             st.setSessionPath(k.sessionPath)
             // The installation plays its sound as it was saved : Sonify and its
@@ -2129,6 +2130,7 @@ export default function App(): JSX.Element {
       // that slips past validation must not throw here and leave a half-applied
       // state.
       try {
+        dropContinuous() // (a fader queued for the old session must not land in this one)
         useStore.getState().loadSession(res.session)
         useStore.getState().setSessionPath(res.path) // Save now overwrites this file
         markClean()
@@ -2156,6 +2158,7 @@ export default function App(): JSX.Element {
     }
     if (!(await leaveSession(`opening ${label}`, interactive))) return
     try {
+      dropContinuous() // (a fader queued for the old session must not land in this one)
       useStore.getState().loadSession(session as Parameters<ReturnType<typeof useStore.getState>['loadSession']>[0])
       useStore.getState().setSessionPath(path)
       markClean()
@@ -2600,6 +2603,7 @@ export default function App(): JSX.Element {
             void (async () => {
               try {
                 const session = await window.api.autosaveLoad(entry.path)
+                dropContinuous() // (a fader queued for the old session must not land in this one)
                 useStore.getState().loadSession(session)
                 // Re-link the file it came from, so Save goes back there (it
                 // used to restore with no file, and the next switch wrote it

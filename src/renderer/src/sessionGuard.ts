@@ -34,7 +34,11 @@ export function setTempoShared(fn: () => boolean): void {
 }
 // The same while the BPM follows a MIDI clock (./midi.ts registers it).
 let tempoFollowed: () => boolean = () => false
-export function setTempoFollowed(fn: () => boolean): void {
+let tempoClean: (() => void) | null = null
+/** `fn` : the tempo is followed from outside now (not a change to save); `clean` :
+ *  called when the session is marked clean (the follower starts afresh). */
+export function setTempoFollowed(fn: () => boolean, clean?: () => void): void {
+  tempoClean = clean ?? null
   tempoFollowed = fn
 }
 
@@ -86,6 +90,7 @@ if (typeof window !== 'undefined') watchUserInput(window)
  *  fresh New / Generate not worth asking about. Changes the engine makes while
  *  it settles over the next 1.5 s are absorbed unless you touched something. */
 export function markClean(): void {
+  tempoClean?.()
   baseline = prints()
   const at = performance.now()
   if (settleTimer) clearTimeout(settleTimer)

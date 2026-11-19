@@ -45,8 +45,6 @@ export class ClockFollower {
   running = false
   /** a pulse arrived after the Start (before it, the beat holds at 0) */
   private counting = false
-  /** what was last written to the app's BPM (NaN : nothing yet) */
-  written = NaN
   private writtenAt = -1e9
 
   /** A clock pulse at `t` (ms, performance.now()'s clock). */
@@ -141,7 +139,6 @@ export class ClockFollower {
     if (Number.isFinite(cur) && Math.abs(this.bpm - cur) < Math.max(0.12, 3 * this.bpmErr)) return null
     if (v === cur) return null
     this.writtenAt = now
-    this.written = v
     return v
   }
 
@@ -192,7 +189,6 @@ export class ClockFollower {
     this.running = false
     this.counting = false
     this.pulses = 0
-    this.written = NaN
     this.writtenAt = -1e9
   }
 }

@@ -44,7 +44,7 @@ import { fxArrayFor, useStore } from './store'
 import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum, linkShared } from './link'
 import { ClockFollower } from './midiClockIn'
-import { pickupInputKey, pickupPass, pickupRecheck, pickupTrackedIds, pickupTracks, pickupWaiting, pickupWritten } from './midiPickup'
+import { pickupForget, pickupInputKey, pickupPass, pickupRecheck, pickupTrackedIds, pickupTracks, pickupWaiting, pickupWritten } from './midiPickup'
 import { setTempoFollowed } from './sessionGuard'
 import { modEngine } from './engine/modulation'
 import { sonifyParamOf, withSonifyParam, type SoniConfig } from './audio/sonify'
@@ -160,6 +160,9 @@ function chainOn(scope: FxScope): boolean | null {
 /** Execute a discrete trigger action by id. The one place each action lives, so
  *  MIDI, the keyboard and gestures can never drift apart. */
 export function fireTrigger(id: string): void {
+  // a fader still waiting for its frame lands first (a scene recalled from the
+  // keyboard, OSC or a gesture is not overwritten by it a frame later)
+  flushContinuous()
   const st = useStore.getState()
   switch (id) {
     case 'fire:vary': fireVariation(); return
@@ -790,7 +793,7 @@ class MidiManager {
     const cur = st.composition.bpm
     const bpm = this.clock.bpmToWrite(now, cur)
     // the BPM box's range; no undo step and no Save changes? (as Link's tempo)
-    if (bpm != null) writeLinkTempo(Math.max(20, Math.min(800, bpm)))
+    if (bpm != null) { writeLinkTempo(Math.max(20, Math.min(800, bpm))); this.clockSetTempo = true }
   }
 
   private clockTransport(s0: number, data: Uint8Array, src: string, st: ReturnType<typeof useStore.getState>): void {
@@ -853,6 +856,14 @@ class MidiManager {
   clockInFollowing(): boolean {
     const now = performance.now()
     return useStore.getState().midiClockIn && !this.clockWhy && this.clock.alive(now) && this.clock.bpm > 0
+  }
+
+  /** A MIDI clock has set the tempo since the session was last saved or opened
+   *  (and the clock in is still on) : its tempo is not a change to save, even
+   *  after the clock stopped (a drum machine that sends clock only while playing). */
+  clockSetTempo = false
+  clockTempoSinceClean(): boolean {
+    return useStore.getState().midiClockIn && (this.clockSetTempo || this.clockInFollowing())
   }
 
   /** What the MIDI panel shows of the clock IN. */
@@ -993,7 +1004,7 @@ class MidiManager {
             const id = `meta:${i}`
             if (cc.pickup && !pickupPass(input, id, t, knobTargetValue(i))) continue
             setKnobTarget(i, t, knobs[i].smoothMs)
-            if (cc.pickup) pickupWritten(id, knobTargetValue(i))
+            if (cc.pickup) pickupWritten(id, knobTargetValue(i), input)
           }
         }
       }
@@ -1008,7 +1019,7 @@ class MidiManager {
           ccHandled = true
           // pickup : nothing until the control reaches the value it drives
           if (b.pickup && !controlKeyOf(id) && !pickupPass(input, id, t, readContinuous(id, true))) continue
-          queueContinuous(id, t)
+          queueContinuous(id, t, input)
         }
       }
       // A CC used as a continuous control never also fires a trigger bound to
@@ -1048,12 +1059,12 @@ class MidiManager {
 // land together once a frame (one React render for every fader moved), whatever
 // the controller sends. A timer stands in when the window draws no frames
 // (minimized : the output still plays). Pads and triggers stay immediate.
-const ccPending = new Map<string, number>()
+const ccPending = new Map<string, { t: number; input?: string }>()
 let ccRaf = 0
 let ccTimer: ReturnType<typeof setTimeout> | null = null
 
-function queueContinuous(id: string, t: number): void {
-  ccPending.set(id, t)
+function queueContinuous(id: string, t: number, input?: string): void {
+  ccPending.set(id, { t, input })
   if (ccRaf || ccTimer) return
   ccRaf = requestAnimationFrame(flushContinuous)
   ccTimer = setTimeout(flushContinuous, 34)
@@ -1068,12 +1079,25 @@ export function flushContinuous(): void {
   if (!ccPending.size) return
   const p = [...ccPending]
   ccPending.clear()
-  for (const [id, t] of p) {
+  for (const [id, { t, input }] of p) {
     applyContinuous(id, t)
     // what a pickup control left there : a value found different at its next
-    // message was moved by something else (a scene, undo, the mouse)
-    if (pickupTracks(id)) pickupWritten(id, readContinuous(id, true))
+    // message was moved by something else (a scene, undo, the mouse, another
+    // control on the same target)
+    if (pickupTracks(id)) pickupWritten(id, readContinuous(id, true), input)
   }
+}
+
+/** Drop the faders waiting for their frame (a session is being loaded : a value
+ *  queued for the old one must not land in the new one), and forget what the
+ *  catch controls had caught. */
+export function dropContinuous(): void {
+  if (ccRaf) cancelAnimationFrame(ccRaf)
+  if (ccTimer) clearTimeout(ccTimer)
+  ccRaf = 0
+  ccTimer = null
+  ccPending.clear()
+  pickupForget()
 }
 
 /** The targets a MIDI input plays : the session's mappings on it when it has
@@ -1265,7 +1289,16 @@ export function readContinuous(id: string, base = false): number | null {
     case 'surface:x': return clamp01(st.surface.x)
     case 'surface:y': return clamp01(st.surface.y)
     case 'sonify:master': return clamp01(st.sonify.master)
+    // the Lights faders (so catch holds on them too)
+    case 'lights:master': return clamp01(st.lightsSession.master.brightness)
+    case 'lights:speed': return clamp01(st.lightsSession.master.speed / 4)
+    case 'lights:gain': return clamp01((st.lightsSession.master.gain ?? 1) / 2)
+    case 'lights:sat': return clamp01((st.lightsSession.master.saturation ?? 1) / 2)
+    case 'lights:contrast': return clamp01((st.lightsSession.master.contrast ?? 1) / 2)
+    case 'lights:fade': return clamp01(st.lightsSession.master.fadeSec / 20)
+    case 'lights:blacksec': return clamp01(st.lightsSession.master.blackSec / 20)
   }
+  if (id.startsWith('lights:group:')) return clamp01(st.lightsSession.groups?.[id.slice(13)] ?? 1)
   return null
 }
 
@@ -1273,7 +1306,7 @@ export const midi = new MidiManager()
 
 // While the BPM follows a MIDI clock, the tempo is the clock's, not the piece's :
 // the Save changes? question leaves it out (as with Ableton Link).
-setTempoFollowed(() => midi.clockInFollowing())
+setTempoFollowed(() => midi.clockTempoSinceClean(), () => { midi.clockSetTempo = midi.clockInFollowing() })
 
 /** A channel message as the MIDI panel shows it ('CC 21 ch1 = 64', 'bend ch1 = 8192'). */
 function describeChannelMsg(b0: number, b1: number, b2: number, len: number): string {
