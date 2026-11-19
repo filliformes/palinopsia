@@ -11,7 +11,14 @@
 //   knob directly (store.midiLearn = index); the first CC wins.
 // - PLAY : CCs drive Meta knobs through the smoother (same feel as a mouse
 //   drag) and the transport's continuous controls; notes / button-CCs fire
-//   scenes, Vary, Randomize and the Sonify toggle on the press edge only.
+//   scenes, Vary, Randomize and the Sonify toggle on the press edge only. The
+//   pitch bend (14-bit, its middle 0.5), channel and poly aftertouch play
+//   continuous targets as faders (v1.3.5). Each fader mapping jumps (as
+//   always) or picks up (midiPickup.ts : waits to reach the value, then follows).
+// - CLOCK IN : with "follow clock" on, the clock on the input (24 a beat) sets
+//   the BPM and its Start / Continue / Stop play the Seq transport
+//   (midiClockIn.ts; Ableton Link with peers wins). Realtime messages are
+//   one byte : they never reached here before v1.3.5.
 //
 // Meta-knob CC bindings live in the session (composition.metaKnobs[i].midiCc);
 // everything else is in store.midiMap, keyed by the target ids below : this
@@ -30,18 +37,22 @@ import {
 } from './commands'
 import { knobTargetValue, setKnobTarget, shuffleMetaValues } from './metaSmooth'
 import { liveModValues, metaLiveValues, sonifyModValues } from './engine/modulation'
-import { sameMidiInput } from './mappingModel'
+import { describeMidi, isFaderKind, sameMidiInput } from './mappingModel'
 import { randomSonify } from './audio/autoSonify'
-import { undo, redo } from './undo'
+import { undo, redo, writeLinkTempo } from './undo'
 import { fxArrayFor, useStore } from './store'
 import { tempoEdited } from './tempoEvents'
-import { linkBeats, linkPlay, linkQuantum } from './link'
+import { linkBeats, linkPlay, linkQuantum, linkShared } from './link'
+import { ClockFollower } from './midiClockIn'
+import { pickupInputKey, pickupPass, pickupRecheck, pickupTrackedIds, pickupTracks, pickupWaiting, pickupWritten } from './midiPickup'
+import { setTempoFollowed } from './sessionGuard'
+import { modEngine } from './engine/modulation'
 import { sonifyParamOf, withSonifyParam, type SoniConfig } from './audio/sonify'
 import { SYNTH_PARAM_LABEL } from './audio/synthPlay'
 import { SIGNAL_PARAM_LABEL } from './audio/signalPlay'
 import { SONIFY_MOD_DESCS } from './engine/modulation'
 import { actionLabel, fireAction } from './actions'
-import { seqTransportToggle } from './engine/ruleSeq'
+import { seqTransportPlay, seqTransportPlaying, seqTransportStop, seqTransportToggle } from './engine/ruleSeq'
 
 const SONI_VOICE_KEYS = ['spectra', 'orbit', 'flow', 'events', 'raster', 'sstv', 'filter', 'chord', 'collage', 'signal', 'assemblage', 'synth'] as const
 // Field-macro CC targets → their store setters. These "feel" dials aren't
@@ -419,9 +430,15 @@ export function midiTargetLabel(id: string): string {
   }
 }
 
-/** 'CC21 ch1' / 'NOTE 36 ch10' — one shape everywhere a binding is shown. */
+/** 'CC21 ch1' / 'NOTE 36 ch10' / 'bend ch1' / 'AT ch1' : one shape everywhere a binding is shown. */
 export function describeBinding(b: MidiBinding): string {
-  return `${b.kind === 'cc' ? 'CC' : 'NOTE '}${b.number} ch${b.channel + 1}`
+  return describeMidi(b)
+}
+
+/** The pitch bend's 14 bits as 0..1, its middle (8192) at exactly 0.5. */
+export function bendNorm(lsb: number, msb: number): number {
+  const v = ((msb & 0x7f) << 7) | (lsb & 0x7f)
+  return v <= 8192 ? v / 16384 : 0.5 + (v - 8192) / 16382
 }
 
 // Morph slider's power curve (Transport.tsx) : CC value → ms over 0..30s.
@@ -437,8 +454,26 @@ class MidiManager {
   // Diagnostics : the last raw message seen + the count of inputs currently
   // wired. The MIDI panel shows these so a plugged-in-but-silent controller is
   // instantly visible (message arriving vs not; input actually attached).
-  lastMsg = ''
+  // The last message is kept as its bytes and written out only when the panel
+  // reads it (150 ms) : a fader, the bend or aftertouch streaming hundreds a
+  // second build no string each. The clock's pulses and active sensing never
+  // land here (24 a beat : they have their own line, clockStatus).
+  private last = new Uint8Array(3)
+  private lastLen = 0
+  private lastNote = '' // a rare system message, written out (Start, SysEx …)
+  get lastMsg(): string {
+    if (this.lastNote) return this.lastNote
+    if (!this.lastLen) return ''
+    return describeChannelMsg(this.last[0], this.last[1], this.last[2], this.lastLen)
+  }
   wiredCount = 0
+  // ── MIDI clock IN (follow MIDI clock, midiClockIn.ts) ─────────────────
+  private clock = new ClockFollower()
+  // the port the clock comes from (the first heard : a second clock on another
+  // port is left alone while the first one runs)
+  private clockSrc = ''
+  // why the clock is not followed now ('' : it is)
+  private clockWhy: '' | 'link' | 'own' = ''
   // MIDI clock scheduler state (output side).
   private clockTimer: number | null = null
   private nextPulse = 0
@@ -682,25 +717,188 @@ class MidiManager {
     this.listeners.forEach((l) => l(devs))
   }
 
+  // ── System messages : the clock IN, its transport, the rest ────────────
+  private onSystem(e: MIDIMessageEvent, data: Uint8Array): void {
+    const s0 = data[0]
+    const st = useStore.getState()
+    const src = (e.target as MIDIInput | null)?.name ?? ''
+    // the clock and its transport (Song Position, Start, Continue, Stop)
+    const transport = s0 === 0xf8 || s0 === 0xfa || s0 === 0xfb || s0 === 0xfc || s0 === 0xf2
+    // MIDI thru : the clock and transport go through too (Opsia as a router),
+    // never back to their own port, and not while Palinopsia's own clock goes
+    // to that output (one clock per output : two would run the device at twice
+    // the tempo). SysEx stays home (this app never asks for SysEx access).
+    if (st.midiThru && s0 !== 0xf0 && s0 !== 0xf7 && s0 !== 0xfe) {
+      const out = this.output()
+      if (out && src !== out.name && !(transport && this.clockTimer != null)) {
+        try { out.send(data) } catch { /* port gone */ }
+      }
+    }
+    if (s0 === 0xf8) {
+      this.clockPulse(e, src, st)
+      return
+    }
+    if (s0 === 0xfe) return // active sensing : three a second, nothing to show
+    this.lastNote =
+      s0 === 0xf0 ? `SysEx ${data.length} bytes (ignored)`
+      : s0 === 0xfa ? 'clock Start'
+      : s0 === 0xfb ? 'clock Continue'
+      : s0 === 0xfc ? 'clock Stop'
+      : s0 === 0xf2 ? `song position ${(data[1] ?? 0) | ((data[2] ?? 0) << 7)}`
+      : s0 === 0xf1 ? 'time code'
+      : s0 === 0xf3 ? `song select ${data[1] ?? 0}`
+      : s0 === 0xff ? 'reset'
+      : '0x' + s0.toString(16)
+    if (transport) this.clockTransport(s0, data, src, st)
+  }
+
+  /** Why the clock IN is not followed now ('' : it is). Ableton Link with
+   *  other apps linked wins : their tempo is the session's. And a clock coming
+   *  back on the port Palinopsia's own clock goes out to is its own clock,
+   *  looped (a device echoing it, a loopback port) : following it would feed
+   *  the tempo back into itself. */
+  private clockIgnored(src: string): '' | 'link' | 'own' {
+    if (linkShared()) return 'link'
+    if (this.clockTimer != null) {
+      const out = this.output()
+      if (out && (out.name ?? out.id) === src) return 'own'
+    }
+    return ''
+  }
+
+  /** A pulse from the port the clock is followed on (else ignored). */
+  private clockFrom(src: string, now: number): boolean {
+    if (this.clockSrc === src) return true
+    // a second clock while the first runs : left alone
+    if (this.clockSrc && this.clock.alive(now)) return false
+    this.clock.reset()
+    this.clockSrc = src
+    return true
+  }
+
+  private clockPulse(e: MIDIMessageEvent, src: string, st: ReturnType<typeof useStore.getState>): void {
+    if (!st.midiClockIn) return
+    const now = performance.now()
+    if (!this.clockFrom(src, now)) return
+    // the time the message came in (the browser's stamp, on performance.now()'s
+    // clock : a busy main thread does not shift it); else now
+    const ts = e.timeStamp
+    const t = ts > 0 && ts <= now + 50 ? ts : now
+    this.clock.pulse(t)
+    this.clockWhy = this.clockIgnored(src)
+    if (this.clockWhy) return
+    const cur = st.composition.bpm
+    const bpm = this.clock.bpmToWrite(now, cur)
+    // the BPM box's range; no undo step and no Save changes? (as Link's tempo)
+    if (bpm != null) writeLinkTempo(Math.max(20, Math.min(800, bpm)))
+  }
+
+  private clockTransport(s0: number, data: Uint8Array, src: string, st: ReturnType<typeof useStore.getState>): void {
+    if (!st.midiClockIn) return
+    const now = performance.now()
+    if (!this.clockFrom(src, now)) return
+    this.clockWhy = this.clockIgnored(src)
+    if (this.clockWhy) return
+    if (s0 === 0xf2) {
+      this.clock.songPosition((data[1] ?? 0) | ((data[2] ?? 0) << 7))
+      return
+    }
+    // The Seq transport, as its play and stop (the fire:transport pad's) : Start
+    // plays from the top (bar 1 on the first pulse), Continue goes on, Stop stops
+    // every lane. With Ableton Link's start / stop sync (Link alone), the play
+    // reaches Link as any play here does.
+    if (s0 === 0xfa) {
+      this.clock.start()
+      // BPM-synced steps cards start their run on the downbeat (as Link's play)
+      if (linkBeats(now) == null) modEngine.restartRunsAt(0)
+      if (seqTransportPlaying()) seqTransportStop()
+      seqTransportPlay()
+      this.followerTransport('start')
+    } else if (s0 === 0xfb) {
+      this.clock.resume()
+      if (!seqTransportPlaying()) seqTransportPlay()
+      this.followerTransport('continue')
+    } else if (s0 === 0xfc) {
+      this.clock.stop()
+      seqTransportStop()
+      this.followerTransport('stop')
+    }
+  }
+
+  /** The device Palinopsia's own clock drives follows the transport heard
+   *  (a drum machine → Palinopsia → the Move) : Start re-aligns it on the
+   *  downbeat, Continue and Stop pass on. Not with Ableton Link : its bars
+   *  start and stop it (startClock). */
+  private followerTransport(what: 'start' | 'continue' | 'stop'): void {
+    if (this.clockTimer == null || linkBeats(performance.now(), false) != null) return
+    const o = this.output()
+    if (!o) return
+    if (what === 'start') {
+      this.resyncClock()
+      return
+    }
+    try { o.send([what === 'stop' ? 0xfc : 0xfb]) } catch { /* port gone */ }
+    this.following = what !== 'stop'
+  }
+
+  /** The beat the followed clock is on (from its Start), for the modulators
+   *  and the sequencers to lock to while Ableton Link is off; null while it is
+   *  not followed or not started. */
+  clockBeats(now: number): number | null {
+    if (!useStore.getState().midiClockIn || this.clockWhy || !this.clock.alive(now)) return null
+    return this.clock.beats(now)
+  }
+
+  /** The BPM follows a MIDI clock now. */
+  clockInFollowing(): boolean {
+    const now = performance.now()
+    return useStore.getState().midiClockIn && !this.clockWhy && this.clock.alive(now) && this.clock.bpm > 0
+  }
+
+  /** What the MIDI panel shows of the clock IN. */
+  clockStatus(): { on: boolean; heard: boolean; bpm: number; why: '' | 'link' | 'own'; playing: boolean; src: string } {
+    const now = performance.now()
+    const heard = this.clock.alive(now)
+    return {
+      on: useStore.getState().midiClockIn,
+      heard,
+      bpm: heard ? this.clock.bpm : 0,
+      why: heard ? this.clockWhy : '',
+      playing: heard && this.clock.running,
+      src: this.clockSrc
+    }
+  }
+
+  /** Forget the clock heard (follow turned off or on again). */
+  resetClockIn(): void {
+    this.clock.reset()
+    this.clockSrc = ''
+    this.clockWhy = ''
+  }
+
   private onMessage(e: MIDIMessageEvent): void {
     const data = e.data
-    if (!data || data.length < 2) return
+    if (!data || data.length < 1) return
+    // System messages (0xF0 and up) : the clock and its transport, SysEx, the
+    // rest. One byte for most : they never reached here before (v1.3.5).
+    if (data[0] >= 0xf0) {
+      this.onSystem(e, data)
+      return
+    }
+    if (data.length < 2) return // a lone data byte (the browser undoes running status)
     const status = data[0] & 0xf0
     const channel = data[0] & 0x0f
     const number = data[1]
     const value = data[2] ?? 0
 
     // Activity readout : record EVERY message (even ones we don't route, like
-    // pitch-bend) so the panel shows a controller is alive. Set before any return.
-    const kind =
-      status === 0x90 ? (value > 0 ? 'NOTE' : 'note-off')
-      : status === 0x80 ? 'note-off'
-      : status === 0xb0 ? 'CC'
-      : status === 0xe0 ? 'pitch-bend'
-      : status === 0xd0 ? 'aftertouch'
-      : status === 0xc0 ? 'prog-change'
-      : '0x' + status.toString(16)
-    this.lastMsg = `${kind} ${number} ch${channel + 1}${status === 0xb0 || status === 0x90 ? ' = ' + value : ''}`
+    // a program change) so the panel shows a controller is alive. Set before any
+    // return; written out only when the panel reads it.
+    this.last[0] = data[0]
+    this.last[1] = number
+    this.last[2] = value
+    this.lastLen = data.length
+    this.lastNote = ''
 
     // MIDI thru : forward this message to the output (Opsia as a router in the
     // middle), so e.g. a Launch Control XL reaches the Move through Opsia. Guard
@@ -711,11 +909,17 @@ class MidiManager {
       if (out && srcName !== out.name) { try { out.send(data) } catch { /* port gone */ } }
     }
 
-    // A binding candidate from any CC or Note-On. CC value 0 still counts
-    // (a knob turned fully down must keep driving its target).
+    // A binding candidate from any CC or Note-On, and (as faders) the pitch
+    // bend, the channel pressure and a key's pressure. CC value 0 still counts
+    // (a knob turned fully down must keep driving its target). `t` : the value
+    // a fader plays, 0..1.
     let binding: MidiBinding | null = null
+    let t = 0
     if (status === 0x90 && value > 0) binding = { kind: 'note', channel, number }
-    else if (status === 0xb0) binding = { kind: 'cc', channel, number }
+    else if (status === 0xb0) { binding = { kind: 'cc', channel, number }; t = value / 127 }
+    else if (status === 0xe0) { binding = { kind: 'bend', channel, number: 0 }; t = bendNorm(number, value) }
+    else if (status === 0xd0) { binding = { kind: 'pressure', channel, number: 0 }; t = number / 127 }
+    else if (status === 0xa0) { binding = { kind: 'polypressure', channel, number }; t = value / 127 }
     // A note's release, for a modulator input playing it as an envelope (its
     // attack came with the note on)
     // (always, Learn or not : a release lost while learning would hold the envelope open)
@@ -730,10 +934,14 @@ class MidiManager {
 
     const st = useStore.getState()
 
+    // A fader or knob learned now starts as this computer's default : pickup
+    // or jump (absent : jump, as before).
+    const pick = st.midiPickupDefault
+
     // Legacy per-knob learn (the CC button on a Meta knob) wins first.
     if (st.midiLearn !== null && binding.kind === 'cc') {
       const idx = st.midiLearn
-      st.updateMetaKnob(idx, { midiCc: { channel, number } })
+      st.updateMetaKnob(idx, { midiCc: { channel, number, ...(pick ? { pickup: true } : {}) } })
       st.setMidiLearn(null)
       return
     }
@@ -744,14 +952,20 @@ class MidiManager {
     // Macro knob's CC stays on the knob itself, as it always did.
     if (st.midiLearnMode && st.midiLearnTarget) {
       const target = st.midiLearnTarget
-      // Continuous targets are CC-only — ignore pad hits so the user can
-      // keep trying with a knob/fader. (A modulator input takes a pad too : it
-      // plays the note as an envelope.)
-      if (isContinuousTarget(target) && binding.kind !== 'cc' && !controlKeyOf(target)) return
-      if (target.startsWith('meta:')) {
-        st.updateMetaKnob(Number(target.slice(5)), { midiCc: { channel, number } })
+      const mod = !!controlKeyOf(target)
+      const cont = isContinuousTarget(target)
+      const fader = isFaderKind(binding.kind)
+      // Continuous targets take faders only (a CC, the bend, pressure) : ignore
+      // pad hits so the user can keep trying with a knob/fader. (A modulator
+      // input takes a pad too : it plays the note as an envelope.)
+      if (cont && !fader && !mod) return
+      // ... and a press target takes a pad or a button (a note, a CC) : the bend
+      // or aftertouch of a key just hit never binds over it
+      if (!cont && !mod && binding.kind !== 'cc' && binding.kind !== 'note') return
+      if (target.startsWith('meta:') && binding.kind === 'cc') {
+        st.updateMetaKnob(Number(target.slice(5)), { midiCc: { channel, number, ...(pick ? { pickup: true } : {}) } })
       } else {
-        st.setMidiBinding(target, binding, st.learnScope)
+        st.setMidiBinding(target, cont && fader && pick && !mod ? { ...binding, pickup: true } : binding, st.learnScope)
       }
       st.setMidiLearnTarget(null)
       return
@@ -765,27 +979,41 @@ class MidiManager {
     // applied — no early return per hit. Meta knobs go through the smoother.
     // The targets : the session's mappings on this input when it has any (a
     // piece's own setup wins for the inputs it uses), else this computer's.
-    const ids = midiTargetsFor(binding)
-    if (binding.kind === 'cc') {
-      const t = value / 127
+    const found = midiMatches(binding)
+    const ids = found.map(([id]) => id)
+    if (binding.kind !== 'note') {
       let ccHandled = false
-      const knobs = st.composition.metaKnobs
-      for (let i = 0; i < knobs.length; i++) {
-        const cc = knobs[i].midiCc
-        if (cc && cc.channel === channel && cc.number === number) {
-          setKnobTarget(i, t, knobs[i].smoothMs)
-          ccHandled = true
+      const input = pickupInputKey(binding.kind, channel, binding.number)
+      if (binding.kind === 'cc') {
+        const knobs = st.composition.metaKnobs
+        for (let i = 0; i < knobs.length; i++) {
+          const cc = knobs[i].midiCc
+          if (cc && cc.channel === channel && cc.number === number) {
+            ccHandled = true
+            const id = `meta:${i}`
+            if (cc.pickup && !pickupPass(input, id, t, knobTargetValue(i))) continue
+            setKnobTarget(i, t, knobs[i].smoothMs)
+            if (cc.pickup) pickupWritten(id, knobTargetValue(i))
+          }
         }
       }
-      for (const id of ids) {
+      for (const [id, b] of found) {
         // A Body rule's box on a knob or a latching button : on from 64, off below
         // (the release of a momentary button turns it off again)
-        if (id.startsWith('rule:')) { st.setBodyRuleActive(id.slice(5), value >= 64, 'midi'); ccHandled = true; continue }
-        if (isContinuousTarget(id)) { queueContinuous(id, t); ccHandled = true }
+        if (id.startsWith('rule:')) {
+          if (binding.kind === 'cc') { st.setBodyRuleActive(id.slice(5), value >= 64, 'midi'); ccHandled = true }
+          continue
+        }
+        if (isContinuousTarget(id)) {
+          ccHandled = true
+          // pickup : nothing until the control reaches the value it drives
+          if (b.pickup && !controlKeyOf(id) && !pickupPass(input, id, t, readContinuous(id, true))) continue
+          queueContinuous(id, t)
+        }
       }
       // A CC used as a continuous control never also fires a trigger bound to
-      // the same number.
-      if (ccHandled) return
+      // the same number. (The bend and pressure fire nothing.)
+      if (ccHandled || binding.kind !== 'cc') return
     }
 
     // Triggers fire on the press edge only : a CC button's release (value 0)
@@ -840,21 +1068,47 @@ export function flushContinuous(): void {
   if (!ccPending.size) return
   const p = [...ccPending]
   ccPending.clear()
-  for (const [id, t] of p) applyContinuous(id, t)
+  for (const [id, t] of p) {
+    applyContinuous(id, t)
+    // what a pickup control left there : a value found different at its next
+    // message was moved by something else (a scene, undo, the mouse)
+    if (pickupTracks(id)) pickupWritten(id, readContinuous(id, true))
+  }
 }
 
 /** The targets a MIDI input plays : the session's mappings on it when it has
  *  any (they silence this computer's on THAT input only), else this
  *  computer's. (A Macro knob's CC, on the knob, is not in either map.) */
 export function midiTargetsFor(b: MidiBinding): string[] {
+  return midiMatches(b).map(([id]) => id)
+}
+
+/** The same, with each mapping (its pickup choice). */
+function midiMatches(b: MidiBinding): Array<[string, MidiBinding]> {
   const st = useStore.getState()
-  const pick = (map: Record<string, MidiBinding>): string[] => {
-    const out: string[] = []
-    for (const id in map) if (sameMidiInput(map[id], b)) out.push(id)
+  const pick = (map: Record<string, MidiBinding>): Array<[string, MidiBinding]> => {
+    const out: Array<[string, MidiBinding]> = []
+    for (const id in map) if (sameMidiInput(map[id], b)) out.push([id, map[id]])
     return out
   }
   const own = pick(st.sessionMidiMap)
   return own.length ? own : pick(st.midiMap)
+}
+
+/** The pickup controls still waiting to reach their value, keyed
+ *  `<input>><target id>` (the MIDI panel's hint) : where the control is and
+ *  where the value is, 0..1. A target moved since (a scene) shows at once. */
+export function pickupHints(): Map<string, { at: number; value: number }> {
+  const out = new Map<string, { at: number; value: number }>()
+  const seen = new Set<string>()
+  for (const w of pickupWaiting()) seen.add(w.id)
+  // (engaged controls whose value moved meanwhile : waiting now)
+  for (const id of pickupTrackedIds()) if (!seen.has(id)) pickupRecheck(id, readContinuous(id, true))
+  for (const w of pickupWaiting()) {
+    const v = readContinuous(w.id, true)
+    if (v != null) out.set(`${w.input}>${w.id}`, { at: w.at, value: v })
+  }
+  return out
 }
 
 /** A computer mapping a session mapping silences (the same input). */
@@ -945,19 +1199,23 @@ const FIELD_KEYS: Record<string, 'density' | 'gestureTexture' | 'coalesce' | 'to
   'field:shutter': 'shutter', 'field:superFlicker': 'superFlicker', 'field:worldAmount': 'worldAmount'
 }
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : Number.isFinite(v) ? v : 0)
+const NO_LIVE: ReadonlyMap<string, number> = new Map()
 
 /** Where a continuous target is now, 0..1 (the inverse of applyContinuous) :
  *  the value playing (a modulator's, a Macro knob gliding to its target), so
  *  what a learned control answers follows modulators, scenes and Generate.
- *  A Body rule's box reads 1 on, 0 off. Null for anything without a value. */
-export function readContinuous(id: string): number | null {
+ *  A Body rule's box reads 1 on, 0 off. Null for anything without a value.
+ *  `base` : the value set, without what modulators play over it (MIDI pickup
+ *  waits for that one). */
+export function readContinuous(id: string, base = false): number | null {
   // (a modulator's input is the hand itself : nothing to answer)
   if (controlKeyOf(id)) return null
   const st = useStore.getState()
+  const liveMods = base ? NO_LIVE : liveModValues
   if (id.startsWith('meta:')) {
     const i = Number(id.slice(5))
     if (!st.composition.metaKnobs[i]) return null
-    return clamp01(metaLiveValues.get(i) ?? knobTargetValue(i))
+    return clamp01((base ? undefined : metaLiveValues.get(i)) ?? knobTargetValue(i))
   }
   if (id.startsWith('rule:')) {
     const r = st.bodyControl.rules.find((x) => x.id === id.slice(5))
@@ -969,12 +1227,12 @@ export function readContinuous(id: string): number | null {
     return on === null ? null : on ? 1 : 0
   }
   // (the World amount has a modulator target : answer what it plays)
-  if (id === 'field:worldAmount') return clamp01(liveModValues.get('world:amount') ?? st.worldAmount)
+  if (id === 'field:worldAmount') return clamp01(liveMods.get('world:amount') ?? st.worldAmount)
   const fk = FIELD_KEYS[id]
   if (fk) return clamp01(st[fk])
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13), d = SONIFY_MOD_DESCS[p]
-    const v = d ? sonifyModValues.get(p) ?? sonifyParamOf(st.sonify, p) : undefined
+    const v = d ? (base ? undefined : sonifyModValues.get(p)) ?? sonifyParamOf(st.sonify, p) : undefined
     return d && typeof v === 'number' && d.max > d.min ? clamp01((v - d.min) / (d.max - d.min)) : null
   }
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
@@ -982,7 +1240,7 @@ export function readContinuous(id: string): number | null {
     const i = Number(lm[1])
     const l = st.composition.layers[i]
     if (!l) return null
-    const live = liveModValues.get(`lay:${i}:${lm[2]}`)
+    const live = liveMods.get(`lay:${i}:${lm[2]}`)
     if (lm[2] === 'mix') return clamp01(live ?? l.sourceMix)
     if (lm[2] === 'harmony') return clamp01(((live ?? l.harmony ?? 0) + 1) / 2)
     return clamp01(live ?? l.opacity)
@@ -994,16 +1252,16 @@ export function readContinuous(id: string): number | null {
     case 'transport:prox': return clamp01(st.proximity)
     case 'transport:varyAmount': return clamp01((st.varyAmt - 0.01) / 0.99)
     case 'transport:randAmount': return clamp01((st.randIntensity - 0.02) / 0.98)
-    case 'audiolayer:volume': return clamp01((liveModValues.get('au:volume') ?? st.audioLayer.volume) / 2)
-    case 'audiolayer:mix': return clamp01(liveModValues.get('au:mix') ?? st.audioLayer.mix)
+    case 'audiolayer:volume': return clamp01((liveMods.get('au:volume') ?? st.audioLayer.volume) / 2)
+    case 'audiolayer:mix': return clamp01(liveMods.get('au:mix') ?? st.audioLayer.mix)
     // a chain's switch answers as a Body rule's box does : 1 on, 0 off
     case 'master:chain': {
       const on = chainOn({ kind: 'master' })
       return on === null ? null : on ? 1 : 0
     }
-    case 'bg:opacity': return clamp01(liveModValues.get('bg:opacity') ?? st.composition.background?.opacity ?? 0)
-    case 'bg:speed': return clamp01((liveModValues.get('bg:speed') ?? st.composition.background?.speed ?? 0) / BG_SPEED_MAX)
-    case 'bg:depth': return clamp01(liveModValues.get('bg:depth') ?? st.composition.background?.depth ?? 0)
+    case 'bg:opacity': return clamp01(liveMods.get('bg:opacity') ?? st.composition.background?.opacity ?? 0)
+    case 'bg:speed': return clamp01((liveMods.get('bg:speed') ?? st.composition.background?.speed ?? 0) / BG_SPEED_MAX)
+    case 'bg:depth': return clamp01(liveMods.get('bg:depth') ?? st.composition.background?.depth ?? 0)
     case 'surface:x': return clamp01(st.surface.x)
     case 'surface:y': return clamp01(st.surface.y)
     case 'sonify:master': return clamp01(st.sonify.master)
@@ -1012,6 +1270,26 @@ export function readContinuous(id: string): number | null {
 }
 
 export const midi = new MidiManager()
+
+// While the BPM follows a MIDI clock, the tempo is the clock's, not the piece's :
+// the Save changes? question leaves it out (as with Ableton Link).
+setTempoFollowed(() => midi.clockInFollowing())
+
+/** A channel message as the MIDI panel shows it ('CC 21 ch1 = 64', 'bend ch1 = 8192'). */
+function describeChannelMsg(b0: number, b1: number, b2: number, len: number): string {
+  const status = b0 & 0xf0
+  const ch = `ch${(b0 & 0x0f) + 1}`
+  switch (status) {
+    case 0x90: return b2 > 0 ? `NOTE ${b1} ${ch} = ${b2}` : `note-off ${b1} ${ch}`
+    case 0x80: return `note-off ${b1} ${ch}`
+    case 0xb0: return `CC ${b1} ${ch} = ${b2}`
+    case 0xe0: return `bend ${ch} = ${((b2 & 0x7f) << 7) | (b1 & 0x7f)}`
+    case 0xd0: return `AT ${ch} = ${b1}`
+    case 0xa0: return `AT ${b1} ${ch} = ${b2}`
+    case 0xc0: return `prog-change ${b1} ${ch}`
+    default: return `0x${status.toString(16)} ${len > 1 ? b1 : ''} ${ch}`
+  }
+}
 
 let started = false
 

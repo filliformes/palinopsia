@@ -77,7 +77,7 @@ Generate theme. The older shots stay in `docs/images/`.)*
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline · light cues) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
-- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn + clock/transport out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
+- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn (bend, aftertouch, pickup) + clock in and out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · installation · Flash safety
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
@@ -1672,7 +1672,7 @@ Learnable targets:
   World amount, the **Vary** amount and the **Randomize** amount (**AMT**), each over its
   slider's range (these two stay this computer's). Proximity (in Feel since v1.3.4) keeps
   its binding.
-- **Continuous (CC)** : each of the **4 layer opacities**, their **A/B mix** and
+- **Continuous (CC, the pitch bend, aftertouch)** : each of the **4 layer opacities**, their **A/B mix** and
   their A/B **hue** harmony (in the Mixer), the **Background**'s opacity, speed and
   shadow, the **Audio Layer**'s volume and A/B mix, the **8 Feel dials**, the
   **Metasurface XY**, the **Sonify master**, and
@@ -1699,6 +1699,45 @@ Learnable targets:
   turns the rule on or off, a knob or a latching button sets it (on from 64). The
   binding follows the rule, not its place in the list, and goes with it when it is
   deleted.
+
+**The pitch bend and aftertouch play faders too.** A keyboard's **pitch bend** (all 14
+bits : its middle is exactly half way), its **channel pressure** (aftertouch) and a key's
+own pressure (**poly aftertouch**) learn onto any continuous control as a fader would :
+arm the control, move the wheel or press into a key. They show as `bend ch1`, `AT ch1`
+and `AT 60 ch1`. A press target (a fire, a scene) never takes them : the aftertouch of the
+key you just hit does not bind over the note.
+
+**Jump or pickup.** After a scene recall, a session load, undo, a morph or the mouse, a
+fader's physical position no longer matches the value it drives. Each fader or knob
+mapping (CC, bend, aftertouch, and the Macro knobs' own CCs) has a choice in the ledger
+below : **jump** (the default, as always : the first touch snaps the value to the fader)
+or **pickup** (soft takeover : the fader does nothing until it reaches the value, passes
+it or comes within a step and a half of it, then follows; while it waits, its row says
+which way to move it and where to). Whatever moved the value meanwhile (a scene, undo, the
+mouse, OSC, another fader) makes it wait again; a modulator playing over the value does
+not (pickup reaches for the value set, not the one played). The **new : jump | pickup**
+switch says what a mapping learned from now on starts as (this computer's). Notes and
+pads have no pickup.
+
+**Follow MIDI clock.** With **follow clock** on (the MIDI section, this computer's), the
+BPM follows the **MIDI clock** on the input : 24 pulses a beat from a drum machine, a
+sequencer or a DAW. The tempo is a line through the last four beats of pulses, so a
+millisecond or two of jitter on each pulse averages away (within a few hundredths of a
+BPM), a tempo change settles within about a beat, and the BPM is written a few times a
+second (to a tenth, a whole number when the clock is on one), never 24 times a beat; it
+is no undo step and never asks "Save changes?". **Start** plays the Seq page's
+transport from the top, **Continue** goes on (from the Song Position the sender gives),
+**Stop** stops every lane; with [Ableton Link](#ableton-link) off, the modulators synced
+to the BPM and the sequencers lock onto the sender's bar, as they do onto Link's. The
+panel shows the tempo read and **CLK** lights beside the BPM (filled while it plays).
+Precedence : with Ableton Link enabled and **other apps linked**, Link wins : the clock
+reads "ignored (Link)". A clock coming back on the port this app's own clock goes out to
+is its own clock looped back (a device echoing it, a loopback port) : ignored too, so the
+tempo can never feed itself. With the clock out on as well, Opsia is a clock converter :
+the device downstream gets Opsia's own clock at the followed tempo, re-aligned on each
+Start, stopped and continued with the sender; **thru** then forwards everything but the
+clock (one clock per output : two would run the device twice as fast). With the clock out
+off, thru forwards the incoming clock and transport as they come.
 
 **Where a mapping lives : this computer or this session.** While Learn is on, a
 **computer | session** switch beside the **Learn** button (and in the MIDI section) says
@@ -1742,7 +1781,8 @@ running while the session is stopped (the device keeps the tempo), Start goes ou
 play's bar (a play heard a moment late sends the pulses it missed with it, so the bars
 still land) and Stop goes out at once with Link's stop. The clock pill's dot is hollow
 while the device waits for a play, and turning the clock on plays every linked app. A **thru / merge**
-pass forwards the learned input to that output (with a loop guard), so one USB
+pass forwards the learned input to that output (with a loop guard; the clock and transport
+too, unless Opsia's own clock goes there), so one USB
 cable both plays Opsia and drives the gear downstream. Built to sync an **Ableton
 Move** over USB-C: Opsia is the visual sibling, the Move keeps the beat.
 

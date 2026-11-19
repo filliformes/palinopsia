@@ -21,6 +21,7 @@ import { tempoEdited } from '../tempoEvents'
 import { LinkBadge } from './LinkSection'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MidiClockBadge } from './MidiPanel'
 import { ToastDock } from './Toast'
 import { TBTN, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { Blink } from './Blink'
@@ -284,6 +285,7 @@ export function Transport(): JSX.Element {
           />
         </div>
         <LinkBadge />
+        <MidiClockBadge />
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}

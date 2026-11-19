@@ -120,7 +120,7 @@ import { favoriteSessions, MAX_FAVORITES } from './favoriteSessions'
 import { MediaBanner, SessionMediaDialog, openSessionMedia } from './components/SessionMedia'
 import { sessionMedia } from './sessionMedia'
 import type { AutosaveEntry } from '@shared/types'
-import { initMidi, fireTrigger, midi } from './midi'
+import { initMidi, fireTrigger, midi, pickupHints } from './midi'
 import { FX_SHADERS, GENERATORS, NATIVE_NODES, SHADER_BY_ID, shaderSourceById } from './shaders/isf'
 import { inputsForShader } from './shaders/isf/inputs'
 import { MASTER_PRESETS } from './shaders/isf/masterPresets'
@@ -1325,7 +1325,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels } })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1588,7 +1588,9 @@ export default function App(): JSX.Element {
         perfMeter.begin('audio'); audioBus.tick(now); perfMeter.end('audio')
         perfMeter.begin('modulation')
         tickLink(now)
-        const linkNow = linkBeats(now)
+        // (a MIDI clock followed, Link off : its beat, so the modulators synced
+        // to the BPM lock onto the sender's bar as they do onto Link's)
+        const linkNow = linkBeats(now) ?? midi.clockBeats(now)
         const modValues = modEngine.tick(now, c.modulators, c.bpm, linkNow)
         applyModulation(comp!, c, modValues, inputsForShader, st.modBypass)
         perfMeter.end('modulation')
@@ -1659,7 +1661,7 @@ export default function App(): JSX.Element {
         // With Ableton Link, on the beat as it sounds : the latency lead is the
         // picture's (a projector's delay), the sound does not wait for it.
         {
-          const beats = soniClockTick(now, c.bpm, linkBeats(now, false), linkQuantum())
+          const beats = soniClockTick(now, c.bpm, linkBeats(now, false) ?? midi.clockBeats(now), linkQuantum())
           tickSonifySeq(now, beats)
           tickKeySeq(now, beats)
           // and the Seq page's Body rule timeline, on the same bars

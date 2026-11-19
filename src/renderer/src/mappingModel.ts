@@ -10,12 +10,19 @@
 
 import type { MidiBinding, OscAlias, OscBinding, SessionMappings } from '@shared/types'
 
+const MIDI_KINDS = ['cc', 'note', 'bend', 'pressure', 'polypressure'] as const
+
 export function sanitizeMidiBinding(b: unknown): MidiBinding | null {
   const m = b as Partial<MidiBinding> | null
-  if (!m || (m.kind !== 'cc' && m.kind !== 'note')) return null
+  if (!m || !(MIDI_KINDS as readonly string[]).includes(m.kind as string)) return null
   if (!Number.isInteger(m.channel) || !Number.isInteger(m.number)) return null
-  return { kind: m.kind, channel: Math.max(0, Math.min(15, m.channel!)), number: Math.max(0, Math.min(127, m.number!)) }
+  // (the bend and the channel pressure have no number : 0)
+  const number = m.kind === 'bend' || m.kind === 'pressure' ? 0 : Math.max(0, Math.min(127, m.number!))
+  return { kind: m.kind!, channel: Math.max(0, Math.min(15, m.channel!)), number, ...(m.pickup && m.kind !== 'note' ? { pickup: true } : {}) }
 }
+
+/** A binding that plays a value (a fader, a knob, the bend, pressure), not a press. */
+export const isFaderKind = (k: MidiBinding['kind']): boolean => k !== 'note'
 
 export function sanitizeOscBinding(b: unknown): OscBinding | null {
   const o = b as Partial<OscBinding> | null
@@ -83,11 +90,23 @@ export function silencedBySession(b: MidiBinding | OscBinding, midi: Record<stri
   return false
 }
 
-/** 'CC21 ch1' / 'NOTE 36 ch10' / '/1/fader3' (+ which value when it is not the
- *  first) : one shape everywhere a binding is shown. */
+/** 'CC21 ch1' / 'NOTE 36 ch10' / 'bend ch1' / 'AT ch1' / 'AT 60 ch1' /
+ *  '/1/fader3' (+ which value when it is not the first) : one shape everywhere
+ *  a binding is shown. */
 export function describeAnyBinding(b: MidiBinding | OscBinding): string {
   if (b.kind === 'osc') return b.arg > 0 ? `${b.address} #${b.arg + 1}` : b.address
-  return `${b.kind === 'cc' ? 'CC' : 'NOTE '}${b.number} ch${b.channel + 1}`
+  return describeMidi(b)
+}
+
+export function describeMidi(b: MidiBinding): string {
+  const ch = `ch${b.channel + 1}`
+  switch (b.kind) {
+    case 'bend': return `bend ${ch}`
+    case 'pressure': return `AT ${ch}`
+    case 'polypressure': return `AT ${b.number} ${ch}`
+    case 'note': return `NOTE ${b.number} ${ch}`
+    default: return `CC${b.number} ${ch}`
+  }
 }
 
 // ── Values ────────────────────────────────────────────────────────────
