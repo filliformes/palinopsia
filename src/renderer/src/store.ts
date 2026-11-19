@@ -98,6 +98,7 @@ import { corpusMap } from './assemble/match'
 import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { DEFAULT_TAKEOVER, makeDefaultModulator, makeDefaultModulators, modEngine } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
+import { sanitizeEnvTrigger } from './engine/envTrigger'
 import { sanitizeBodyMod } from './engine/bodyClutch'
 import { samePattern, sanitizeSteps } from './engine/stepSeq'
 import { DEPTH_RES_DEFAULT, DEPTH_RES_STEPS } from './engine/depthEstimate'
@@ -1329,6 +1330,8 @@ export function normalizeComposition(c: CompositionState): CompositionState {
           ...x, steps: sanitizeSteps(x.steps), body: sanitizeBodyMod(x.body, d.body),
           controller: { ...d.controller, ...(x.controller ?? {}) },
           ...(x.takeover ? { takeover: { ...DEFAULT_TAKEOVER, ...x.takeover } } : {}),
+          // an envelope's trigger (sound / another slot) : checked whole, or none
+          trigger: sanitizeEnvTrigger(x.trigger, i),
           // a mesh input (dataflou) : whole, or none
           mesh: x.mesh && typeof x.mesh.sku === 'string' && typeof x.mesh.path === 'string' ? { sku: x.mesh.sku, path: x.mesh.path, label: String(x.mesh.label ?? x.mesh.path).slice(0, 40) } : undefined
         }

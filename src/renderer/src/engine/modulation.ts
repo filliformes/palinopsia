@@ -22,6 +22,7 @@ import { colorOf, fitPart, hsvaOf, PART_INDEX, rgbaOf } from './colorParts'
 import { controlKey } from '../modKey'
 import { AUDIO_HZ_MAX, audioBus, hzFiltered, hzRangeState, type HzRangeState } from './audioIn'
 import { clipAudio, newClipReadState, type ClipReadState } from './clipAudio'
+import { triggerActive, trigKey, trigState, trigStep, type TrigState } from './envTrigger'
 import { visionBus } from './visionIn'
 import { bodyBus } from './bodyIn'
 import { controlBus, type ControlIn } from './controlBus'
@@ -281,6 +282,9 @@ interface SlotState {
   audioValue: number // one-pole smoothed audio feature (audio type)
   audioRange: HzRangeState // its frequency band's own memory (flux, transient, pitch)
   clipRead: ClipReadState // a clip's playhead as last read (audio type, from a clip)
+  trig: TrigState // an envelope's trigger : its edge detector (envTrigger.ts)
+  trigRange: HzRangeState // ... its frequency band's own memory, apart from the audio type's
+  trigClip: ClipReadState // ... and its clip's
   visionValue: number // one-pole smoothed picture feature (vision type)
   bodyValue: number // one-pole smoothed body feature (body type)
   ctl: InState // the controller type's input
@@ -384,6 +388,9 @@ function makeSlot(now: number): SlotState {
     audioValue: 0,
     audioRange: hzRangeState(),
     clipRead: newClipReadState(),
+    trig: trigState(),
+    trigRange: hzRangeState(),
+    trigClip: newClipReadState(),
     visionValue: 0,
     bodyValue: 0,
     ctl: inState(),
@@ -610,6 +617,13 @@ export class ModEngine {
     return this.slots[i]?.clutchShow ?? 0
   }
 
+  /** An envelope's trigger, for its card : the signal it read last (0..1) and
+   *  when it last fired (performance.now ms; -Infinity : never). */
+  trigView(i: number): { value: number; firedAt: number } | null {
+    const s = this.slots[i]
+    return s ? { value: s.trig.value, firedAt: s.trig.firedAt } : null
+  }
+
   /** The steps card's view of a slot (null : no such slot yet). */
   stepView(i: number): StepView | null {
     const s = this.slots[i]
@@ -654,6 +668,7 @@ export class ModEngine {
         coldSteps(s) // (turned back on : a new run)
         s.clutchShow = 0
         s.clutchOn = false // (turned back on : a clutch grabs again, gliding in)
+        s.trig.key = '' // (turned back on : a trigger seeds again, never fires at once)
         continue
       }
       if (cfg.type !== 'steps') coldSteps(s)
@@ -674,6 +689,29 @@ export class ModEngine {
         const p = Math.max(0, Math.min(1, cfg.slip ?? 0)) * 0.85
         return p > 0 && Math.random() < p
       }
+
+      // An envelope's trigger (envTrigger.ts) : the sound in a band, or another
+      // slot's output, rising past its line fires the card's own retrigger, so
+      // the envelope restarts this very frame. Read every frame, fired or not,
+      // so the band's flux memory stays one frame behind. Another slot is read
+      // as it stands : this frame's value for a lower slot, the last frame's for
+      // a higher one. A morph's ghost (8..15) listens to the ghost of its slot.
+      const tg = cfg.trigger
+      if (triggerActive(tg, cfg.type)) {
+        let raw = 0
+        if (tg.from === 'slot') {
+          const j = (tg.slot & 7) + (i >= 8 ? 8 : 0)
+          raw = j !== i ? this.values[j] ?? 0 : 0
+        } else {
+          const t = performance.now()
+          raw = tg.src
+            ? clipAudio.feature(tg.src, tg.feature, tg.band, s.trigClip, t)
+            : hzFiltered(tg.lo, tg.hi)
+              ? audioBus.featureInRange(tg.feature, tg.band, tg.lo, tg.hi, s.trigRange, t)
+              : audioBus.feature(tg.feature, tg.band)
+        }
+        if (trigStep(s.trig, tg, trigKey(tg), raw, now)) this.retrigger(i)
+      } else s.trig.key = '' // (switched back on : it seeds again, never fires at once)
 
       switch (cfg.type) {
         case 'lfo': {

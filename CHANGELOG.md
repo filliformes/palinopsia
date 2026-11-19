@@ -70,6 +70,40 @@ that CI builds into cross-platform releases.
   Text source's words (only while the slot plays Text; the same words again change
   nothing), and the Agent's new `set_text` tool does the same (16 tools).
 - **`/opsia/world/apply`** : the World in use applied again, on a bare message or a press.
+- **Envelopes fired by the sound or by another modulator** (`engine/envTrigger.ts`,
+  `ModulationPanel.tsx` `TriggerRows`) : a `ramp` or `adsr` card's new **↯** (in its
+  header, beside ✋) turns the card to its trigger side, in the same fixed silhouette.
+  **FIRE** : card only (as before), the sound (the audio input, or a clip on a layer or on
+  the Audio Layer, as the audio modulator's FROM) or another slot (M1 to M8). The sound :
+  a **FEAT**ure (transient by default; level, flux, band, centroid, pitch, noisiness) read
+  in an **HZ** band (the audio modulator's two-thumb log slider and `featureInRange`, no
+  new FFT), the default a kick (a hit in 40 to 120 Hz). **AT** is one track with two marks :
+  it fires as the signal rises past the right one and arms again only under the left one
+  (the hysteresis), the signal drawn live under them. **HOLD** (10 ms to 4 s) : no second
+  fire that soon (an edge inside it is dropped, never played late). A fire is the card's
+  own retrigger (`ModEngine.retrigger`), so the envelope restarts exactly as from its ⟳;
+  ↯ lights while a trigger is on and flashes at each fire.
+  - Schema : optional `ModulatorConfig.trigger` (`EnvTrigger` : from, feature, band, lo,
+    hi, src, slot, at, rearm, holdMs), checked on load (`sanitizeEnvTrigger`). Absent (or
+    `from: 'card'`) is today's behavior : the OCTOCOSME session loads and exports with no
+    `trigger` key and every modulator field the same. Saved in sessions and scenes, one
+    undo step per change; the dice and Generate never deal one (a dealt modulator drops
+    it). No OSC address : modulators have none for their settings.
+  - The detector seeds on its first reading (a session opening on a loud sound does not
+    fire), and again when what it listens to changes; a morph's ghost listens to the ghost
+    of its slot. SLIP does not apply (envelopes carry none).
+  - Measured in the test copy, a file of a 60 Hz kick every 0.5 s and 16th-note hats
+    above 7 kHz playing through the Audio Layer into the audio input (8 s) : the kick band
+    (transient) fired 16 of 16 kicks, the hats' band (6 to 16 kHz) 63 to 64 of 64 hats; the
+    hats alone fired the kick band 0 times; a 900 ms hold on the kicks : 8 (every other
+    one); a card left on card only : 0. Slot to slot : an ADSR fired by a 2 Hz square
+    fired 10 times in 5 s. The level is read in decibels, so a kick's tail stays at 0.35 to
+    0.5 for most of a beat : a level trigger needs its marks set by the live bar (0.5 / 0.9
+    caught 16 of 16); the transient is the default for that reason. With a re-arm at 0.2
+    the 16th hats never re-armed (0 of 64 : the transient falls by a fifth a frame), hence
+    0.4. Every modulator type still fits the 158 px card (`scrollHeight <= clientHeight`,
+    no scrollbar), the trigger side in each of its modes too.
+
 - **The Model and Grid Mesh in hand** (`pointerInput.ts`, `engine/heldObject.ts`) : a
   drag on the preview turns the object under the cursor in any direction (a trackball
   round the screen's axes), the wheel over it changes its **distance** (12 % a notch,

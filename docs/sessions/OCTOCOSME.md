@@ -64,6 +64,21 @@ changed there, and saving the session keeps the change.
   the blend. A modulator (audio from the voice, or an OSC controller modulator) could add it;
   or, with the voices' sound on Palinopsia's audio input, Grid Mesh's own **audio** knob (it
   adds the sound's level to the deform). The session leaves it at 0.
+- **A noise burst on each peak** (the patch's per-voice peak driving a burst of noise) :
+  an envelope can now be fired by another modulator or by the sound (the ↯ on a Ramp or
+  ADSR card), so this takes a few clicks and no change to the session file :
+  1. a free modulator slot (say M5) set to **controller**, its INPUT learned on
+     `/audio1/peak` (press **learn**, let the voice sound), or played straight in as
+     `/opsia/mod/5/in` by the Pd patch;
+  2. M6 an **adsr** (a short attack, a decay of a few hundred ms, a low sustain), its
+     **↯** on **M5**, **AT** just above the voice's quiet level (watch the live bar),
+     **HOLD** about 100 ms so one note fires once;
+  3. M6 bound (the M on the control) to layer 1's `noiseBlend`, Replace, a positive depth.
+  Each time the voice peaks, its shape bursts into noise and settles back. With the
+  voices' sound on the audio input instead, the ↯ can listen to **the sound** in the
+  voice's own frequency band. Repeat for voices 2 to 4 : the four take all eight slots (a
+  controller and an envelope each), so keep the bursts for the voices that need them when
+  slots are wanted for other things.
 - **Pitch and interval** : the patch's `hauteur` and `intervalle` scale a master rotation
   (`MeshRotaMaster`) whose exact effect was not traced; pitch turns the mesh here, interval
   is not mapped.

@@ -744,9 +744,34 @@ export interface TakeoverConfig extends ControlInputConfig {
   backMs: number
 }
 
+// What fires an envelope (ramp, adsr) besides its card's ⟳, a MIDI pad or an
+// action (engine/envTrigger.ts). 'card' : only those (today's behavior, the same
+// as no trigger at all). 'sound' : a feature of the audio input (or of a clip,
+// `src`, as the audio modulator's FROM), read between lo and hi Hz of the live
+// spectrum, rising past `at`. 'slot' : another modulator's output rising past
+// `at`. Either way it arms again only once the signal has fallen under `rearm`
+// (the hysteresis : a sustained loud sound fires once) and never fires again
+// within `holdMs` of the last time (a stuttering onset fires once). The fields
+// of the side not in use are kept, so switching back finds them.
+export interface EnvTrigger {
+  from: 'card' | 'sound' | 'slot'
+  feature: AudioFeature
+  band: number // which of the six bands, for feature 'band'
+  lo: number // Hz
+  hi: number
+  src?: ClipAudioSrc
+  slot: number // 0-based, never the envelope's own
+  at: number // 0..1 : fires as the signal rises past this
+  rearm: number // 0..at : arms again under this
+  holdMs: number // at least this long between two fires
+}
+
 export interface ModulatorConfig {
   type: ModulatorType
   enabled: boolean
+  // ramp / adsr : what fires it besides the card's ⟳ (absent : the card, a MIDI
+  // pad or an action only, as before)
+  trigger?: EnvTrigger
   // A Controller modulator played by a value of another dataflou node (a glove
   // axis) : that node's sku, the parameter's path, how it reads. Beside (not
   // instead of) a learned MIDI / OSC control; the session keeps it.

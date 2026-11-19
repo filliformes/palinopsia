@@ -463,6 +463,9 @@ function freshModulator(base: ModulatorConfig, enabled: boolean): ModulatorConfi
   return {
     ...base,
     enabled,
+    // a dealt envelope is fired by hand, never by the sound or another slot
+    // (a trigger is a choice of yours : the dice never deal one)
+    trigger: undefined,
     ...diceClock(pick(TYPE_POOL), pick(RAND_SHAPES)),
     curve: chance(0.5) ? pick(RAND_CURVES) : 'linear',
     ramp: { ...base.ramp, rampMs: range(500, 20000), curvePct: range(-80, 80), mode: 'loop' },
