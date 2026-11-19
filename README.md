@@ -481,7 +481,7 @@ override with the base value preserved, and they travel with sessions.)
 ### The Audio Layer
 
 Under Layer 4 sits the **Audio Layer** (`AU`) : the composition's sound, beside the
-picture's stack (its volume and mute are also in the audio tab's Output levels, under
+picture's stack (its volume and mute are also in the audio tab's Output block, under
 Sonify's). It has two slots, **A** and **B**, like a layer, each holding a
 **sound file** (Import audio…), a **live audio input** (the default input or any
 device in the list : an interface, a microphone, a loopback device) or the sound of an
@@ -1565,8 +1565,36 @@ The **Connect** right-column tab (key `A`) holds the control panels
   dot and what is sounding) : enable the local analyser (input device picker), or receive
   features over OSC from an audio brain (`/opsia/audio/*`). The **≈ coupling**
   button (pinned right) is the coupling master switch, the same as the Mixer's : it
-  pauses every layer's A/B coupling at once (on at each launch). Live meters show
-  level / flux / transient / centroid / **noisiness** (spectral flatness) / bands.
+  pauses every layer's A/B coupling at once (on at each launch). The section reads in
+  three blocks, top to bottom :
+  - **Input** : the device, its channel menu and a status word (**signal**; **silent**
+    when it stays under -60 dBFS for 3 s; **no device**; **gone** when it was unplugged;
+    **OSC** / **no OSC** in OSC mode; **not listening** with the analysis off), then one
+    meter per channel it really hears, named with the device's own numbers (**IN 3** and
+    **IN 4** for a 3+4 pick, one meter for a mono pick, **LAYER L / R** with the Audio
+    Layer as the input). Each meter : the bar is the average (RMS) level, the tick the
+    peak (held 1.2 s), on a dB scale from -54 to 0 dBFS (the Sonify meter's), the number
+    the peak, and a **clip** light that stays red 1.5 s after a sample reached full scale.
+    USB denoise sits under it.
+  - **Heard** : what the audio modulators and the coupling follow : **level** (how loud),
+    **change** (the spectral flux : how much the spectrum moved), **hit** (an onset, a
+    flash that fades), where it comes from (the input, the Audio Layer or OSC), and a live
+    **spectrum** (20 Hz to 20 kHz, log) with the six bands a `band` modulator reads drawn as
+    zones filled to their level, named **sub, bass, low-mid, mid, presence, air** with
+    their edges in Hz (23-70, 70-234, 234-750, 750-2.4k, 2.4k-7.5k, 7.5k+ at 48 kHz : they
+    follow the sample rate). Point at an audio modulator's **HZ** row and its band shows on
+    the spectrum as a bracket. OSC sends the bands only : no spectrum then.
+  - **Output** : Sonify's device and channels, the **Sonify**, **Audio Layer** and
+    **Monitor** faders each with a small meter (Sonify's voices before the Audio Layer
+    joins; the layer after its volume; what the monitor plays), then **OUT n** for each
+    output channel (the channel menu's real numbers; a pick the device lacks shows the 1+2
+    that plays) : what leaves after the limiter, the output EQ and the glue, with a
+    **limiter** light while the limiter holds the sound down. With Space on, one bar per
+    channel it drives.
+  The meters and the spectrum draw only while the section shows. A small dot in the top
+  bar (while the analysis is on) says the same as the status word : green signal, grey
+  silent, red no device; click it for this tab. The input's other features (centroid,
+  **noisiness**, pitch) feed the modulators without a meter.
   The section's **dot** also lights while sound is going on in the app (Sonify on,
   something in the [Audio Layer](#the-audio-layer)), named beside it; clicking it
   still turns the input analysis on and off (it never opens the microphone by
@@ -1628,9 +1656,9 @@ The **Connect** right-column tab (key `A`) holds the control panels
     everything that leaves, Sonify and the Audio Layer (see
     [Sonify](#sonify--image-to-sound-key-s)). Both are off until you turn them on, and
     each card folds to its header with its ▶ (folded at first, remembered on this
-    computer). Above them, the **Output levels** :
-    Sonify, the Audio Layer (to 200 %) and the input monitor, each with its on/off and
-    its level.
+    computer). Above them, the **Output** block's faders :
+    Sonify, the Audio Layer (to 200 %) and the input monitor, each with its on/off, its
+    level and its meter.
 - **MIDI** : controller input picker + the learned-bindings ledger, plus the
   **MIDI output** controls (see [MIDI](#midi)).
 - **OSC** : inbound listener (port, on/off, this machine's IPs), outbound

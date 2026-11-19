@@ -805,6 +805,9 @@ class SonifyEngine {
   /** Per channel, after the limiter, over the last ~100 ms : peak and RMS (linear). */
   meterL = { peak: 0, rms: 0 }
   meterR = { peak: 0, rms: 0 }
+  /** Sonify's own voices (after the master gain, before the Audio Layer joins
+   *  and before the limiter) : the audio tab's meter beside the Sonify fader. */
+  meterVoices = { peak: 0, rms: 0 }
   // live flow vectors for the overlay ([x01,y01,mag] × n)
   flowDots: Float32Array = new Float32Array(0)
   // live event onsets for the overlay ([x01,y01,mag] × n), fade painted by the UI
@@ -1113,6 +1116,7 @@ class SonifyEngine {
             this.meterL = { peak: m.pkL, rms: m.rmsL }
             this.meterR = { peak: m.pkR, rms: m.rmsR }
           }
+          if (typeof m.rmsV === 'number') this.meterVoices = { peak: m.pkV, rms: m.rmsV }
           if (m.scan) this.scan = { ...m.scan, recv: performance.now() }
           this.spaceMeter = m.spk ?? null
           this.collageCompGr = typeof m.lvGr === 'number' ? m.lvGr : -1
@@ -1350,6 +1354,7 @@ class SonifyEngine {
     this.meterPeak = 0
     this.meterL = { peak: 0, rms: 0 }
     this.meterR = { peak: 0, rms: 0 }
+    this.meterVoices = { peak: 0, rms: 0 }
     this.flowDots = new Float32Array(0)
     this.scan = null
   }

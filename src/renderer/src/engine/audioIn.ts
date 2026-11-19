@@ -14,7 +14,7 @@
 // Design rule for the chapter: prefer DISCONTINUITY (transient/flux) over gain —
 // the salient signal dominates cross-modal perception.
 
-import { CH_DEFAULT, InputPick, isDefaultPick, outputRoute, pickFits, stereoDestination, type ChPick } from '../audio/channelPick'
+import { CH_DEFAULT, clampPick, InputPick, isDefaultPick, outputRoute, pickFits, stereoDestination, type ChPick } from '../audio/channelPick'
 import { AUDIO_FORMAT_DEFAULT, contextOptions, formatKey, latencyOf, type AudioFormat, type LatencyInfo } from '../audio/audioFormat'
 const BANDS = 6
 export const AUDIO_BANDS = BANDS
@@ -66,6 +66,18 @@ export function zero(): Features {
 }
 
 const OSC_STALE_MS = 500 // in 'both', OSC older than this yields to local
+// The meters' analysers : 2048 samples (43 ms at 48 kHz) cover the interval between
+// two reads of the audio tab's meters (30 a second), so no peak falls between them.
+const METER_FFT = 2048
+
+/** RMS and peak (linear, 0..1 = full scale) of an analyser's last samples. */
+export function levelOf(an: AnalyserNode, buf: Float32Array<ArrayBuffer>): { rms: number; peak: number } {
+  const b = buf.length > an.fftSize ? buf.subarray(0, an.fftSize) : buf
+  an.getFloatTimeDomainData(b)
+  let sum = 0, pk = 0
+  for (let i = 0; i < b.length; i++) { const x = b[i]; sum += x * x; const a = x < 0 ? -x : x; if (a > pk) pk = a }
+  return { rms: Math.sqrt(sum / b.length), peak: pk }
+}
 
 // Pitch mapping span : A1 (55 Hz) to A6 (1760 Hz), log-scaled to 0..1.
 const LOG_FMIN = Math.log2(55)
@@ -228,6 +240,20 @@ export function analyseFrame(an: AnalyserNode, fb: FrameBufs, L: AudioFeatures, 
   }
 }
 
+/** The six bands' edges in Hz, as analyseFrame groups the bins (bin i sits at
+ *  i · rate / 2048; bin 0, the DC, is in no band) : [lo, hi] per band, the top
+ *  band running to half the sample rate. `bins` : the analyser's bin count. */
+export function bandEdgesHz(sampleRate: number, bins = 1024): Array<[number, number]> {
+  const binHz = sampleRate / (2 * bins)
+  const out: Array<[number, number]> = []
+  for (let b = 0; b < BANDS; b++) {
+    const lo = Math.floor(Math.pow(bins, b / BANDS))
+    const hi = Math.max(lo + 1, Math.floor(Math.pow(bins, (b + 1) / BANDS)))
+    out.push([lo * binHz, Math.min(bins, hi) * binHz])
+  }
+  return out
+}
+
 // ── A frequency band (Hz) : an audio modulator that listens to one part of the
 // spectrum only. Each feature is the same maths as the whole sound's (analyseFrame),
 // read on the bins between lo and hi of the live spectrum; flux, its transient and
@@ -294,6 +320,13 @@ class AudioBus {
   private srcOut: AudioNode | null = null // what src currently feeds (for disconnect)
   private learnAnalyser: AnalyserNode | null = null // taps RAW src (for learning)
   private learnBuf: Float32Array<ArrayBuffer> | null = null
+  // The audio tab's meters : one small analyser per picked channel (after the pick,
+  // before the denoiser : what the device gives), one after the monitor's gain
+  // (what the monitor plays). Time-domain reads only (RMS and peak), on demand.
+  private chAn: AnalyserNode[] = []
+  private monSplit: ChannelSplitterNode | null = null // the monitor's two sides, each its analyser
+  private monAn: AnalyserNode[] = []
+  private meterBuf = new Float32Array(METER_FFT)
 
   get localActive(): boolean {
     return this.localOn
@@ -422,6 +455,25 @@ class AudioBus {
       monitorGain.gain.value = this.monitorOn ? this.monitorLevel : 0
       preSplit.connect(monitorGain)
       this.monitorGain = monitorGain
+      // the meters : each picked channel (a mono pick : the same one twice), and
+      // the monitor after its gain
+      const chSplit = ctx.createChannelSplitter(2)
+      src.connect(chSplit)
+      this.chAn = [0, 1].map((i) => {
+        const a = ctx.createAnalyser()
+        a.fftSize = METER_FFT
+        chSplit.connect(a, i)
+        return a
+      })
+      // (an analyser mixes its channels down : one side alone would read 6 dB low)
+      const monSplit = ctx.createChannelSplitter(2)
+      this.monAn = [0, 1].map((i) => {
+        const a = ctx.createAnalyser()
+        a.fftSize = METER_FFT
+        monSplit.connect(a, i)
+        return a
+      })
+      this.monSplit = monSplit // (routeMonitor wires it, below)
       this.stream = stream
       this.ctx = ctx
       this.inRoute = route
@@ -495,6 +547,9 @@ class AudioBus {
     this.srcOut = null
     this.learnAnalyser = null
     this.learnBuf = null
+    this.chAn = []
+    this.monAn = []
+    this.monSplit = null
     this.filterNodes = []
     this.bufs = null
     this.layerIn = false
@@ -685,6 +740,45 @@ class AudioBus {
     this.inRoute?.set(p)
   }
 
+  /** The device channels the input really listens to, counted from 0 : the
+   *  pair, or one channel for a mono pick (empty : no device open). A pick the
+   *  device does not have plays 1+2 (clampPick), so this says which. */
+  heardChannels(): number[] {
+    if (!this.inRoute || this.layerIn) return []
+    const p = pickFits(this.inPick, this.inChannels) ? this.inPick : CH_DEFAULT
+    const [l, r] = clampPick(p, this.inChannels)
+    return p.r < 0 || l === r ? [l] : [l, r]
+  }
+
+  /** One picked channel's level now (0 : the left of the pair, 1 : the right),
+   *  RMS and peak, linear. Null : no device open. */
+  channelLevel(i: number): { rms: number; peak: number } | null {
+    const an = this.chAn[i]
+    return an ? levelOf(an, this.meterBuf) : null
+  }
+
+  /** What the monitor plays now (after its level; silence while it is off). */
+  monitorLevelNow(): { rms: number; peak: number } {
+    if (this.monAn.length < 2) return { rms: 0, peak: 0 }
+    const a = levelOf(this.monAn[0], this.meterBuf), b = levelOf(this.monAn[1], this.meterBuf)
+    return { rms: Math.max(a.rms, b.rms), peak: Math.max(a.peak, b.peak) }
+  }
+
+  /** The input was unplugged while open (it opens again when it comes back). */
+  get inputLost(): boolean {
+    return !!this.lost
+  }
+
+  /** OSC features arrived in the last half second. */
+  get oscFresh(): boolean {
+    return performance.now() - this.oscAt < OSC_STALE_MS
+  }
+
+  /** Is the Audio Layer, as the input, playing something now? */
+  get layerFed(): boolean {
+    return this.layerIn && !!this.layerAn
+  }
+
   /** Where the monitor lands on its output device (a pair, or summed onto one). */
   setMonitorChannels(p: ChPick): void {
     if (p.l === this.monitorPick.l && p.r === this.monitorPick.r) return
@@ -698,6 +792,8 @@ class AudioBus {
     const ctx = this.ctx, g = this.monitorGain
     if (!ctx || !g) return
     try { g.disconnect() } catch { /* not wired yet */ }
+    // (that took the monitor's meter off too)
+    if (this.monSplit) g.connect(this.monSplit)
     for (const n of this.monitorNodes) { try { n.disconnect() } catch { /* gone */ } }
     this.monitorNodes = []
     const dst = ctx.destination
@@ -864,6 +960,19 @@ class AudioBus {
   spectrumBytes(): Uint8Array | null {
     return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.freq ?? null : null
   }
+  /** The live spectrum in dB, off the same analyser (and the same FFT : read
+   *  in the frame the features read it) as floats, for the audio tab's display :
+   *  the bytes stop at the analyser's -30 dB top, where a -12 dBFS tone already
+   *  sits. Null : no local spectrum (OSC only, nothing open, an empty layer). */
+  spectrumDb(): Float32Array<ArrayBuffer> | null {
+    if (!this.localOn) return null
+    const an = this.layerIn ? this.layerAn : this.analyser
+    if (!an) return null
+    if (this.dbBuf.length !== an.frequencyBinCount) this.dbBuf = new Float32Array(an.frequencyBinCount)
+    an.getFloatFrequencyData(this.dbBuf)
+    return this.dbBuf
+  }
+  private dbBuf = new Float32Array(0)
   /** The live input's sample rate (Hz) : what the spectrum bins are in. */
   sampleRateHz(): number {
     return this.sampleRate
