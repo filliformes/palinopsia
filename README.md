@@ -12,10 +12,6 @@ network output, flat or under a dome. The picture also plays as sound (Sonify), 
 stereo or placed around a room of speakers, on its own or through SpatGRIS, and lights
 the room : DMX lights placed on the picture take their colors from it (the Lights page).
 
-The afterglow of a feedback compositor *is* palinopsia : the name is a
-description, not a metaphor. The house voice is matte, glitchy, digital-arts
-work: **never cheap psychedelia, never a 3D game engine.**
-
 - **Matte over neon** : near-black canvas, one accent, glitch as controlled texture.
 - **Curated, not open-ended** : a fixed instrument topology; Randomize draws from
   aesthetic sub-ranges, never raw shader min/max.
