@@ -52,13 +52,17 @@ racks, palette, World and macro biases : in one click.
 | ![Singing Plate](docs/images/shot-singing-plate.jpg)<br>**Singing Plate** : sand on a vibrating plate, gathered on the still lines of the note it rings at | ![Glasshouse](docs/images/shot-glasshouse.jpg)<br>**Glasshouse** : a soft world seen through rained-on glass, the color split at every edge | ![Print Shop](docs/images/shot-print-shop.jpg)<br>**Print Shop** : the picture run off a press, its inks out of register on the screen |
 | ![Pond](docs/images/shot-pond.jpg)<br>**Pond** : the picture under water, rain ringing it and whatever moves in it stirring it | ![Glitched Memory](docs/images/shot-glitched-memory.jpg)<br>**Glitched Memory** : time smeared and broken inside its own memory, the trails torn and crushed, then glitched again | ![Broken Glass](docs/images/shot-broken-glass.jpg)<br>**Broken Glass** : a pane over the picture, hit again and again, its cracks racing out and its shards tilting into the light |
 | ![Coral Print](docs/images/shot-coral-print.jpg)<br>**Coral Print** : mazes and spots grown over the picture, printed where its lights and edges ask for them | ![Endless Spiral](docs/images/shot-endless-spiral.jpg)<br>**Endless Spiral** : a pattern wound into itself, the whole frame spiraling inward without end | ![Noise Matte](docs/images/shot-noise-matte.jpg)<br>**Noise Matte** : raw noise shaped into mattes, cut, colored and stacked |
+| ![Chrome Idol](docs/images/shot-chrome-idol.jpg)<br>**Chrome Idol** : a mirror knot turning slowly in the dark, inside a second shape with an oily skin | ![Fragments](docs/images/shot-fragments.jpg)<br>**Fragments** : an object breaking into its triangles on the beat, the shards flung out before they gather back | ![Sounding Mesh](docs/images/shot-sounding-mesh.jpg)<br>**Sounding Mesh** : a grid mesh the sound tears open, its shards and wires thrown around a lit core |
+| ![Endless Land](docs/images/shot-endless-land.jpg)<br>**Endless Land** : flying low along a snowy ridge over a land that never ends | ![Sand on the Beat](docs/images/shot-sand-on-the-beat.jpg)<br>**Sand on the Beat** : dunes lifted into points, a figure of sand floating in the dark | ![Slick](docs/images/shot-slick.jpg)<br>**Slick** : crude oil spreading over Marbled Paper, the petrol rainbow only at its thin edges |
 
 *(The first two rows are from v1.0.0, the third from v1.2.6 (Lattice, Perspective and
 Lowercase's slant, each straight from its Space theme), the fourth from v1.3.0 : the
 **Oil Cloud** and **Cloud Study** generators and Lattice's new forms; the fifth from v1.3.1
-(Marbling), the next two from v1.3.2 (the surfaces, Glass and Print) and the last two from
-v1.3.3 (Ripple, Time Glitch, Break, Morphogen, Droste and Noise), each straight from its
-Generate theme. The older shots stay in `docs/images/`.)*
+(Marbling), the next two from v1.3.2 (the surfaces, Glass and Print), the next two from
+v1.3.3 (Ripple, Time Glitch, Break, Morphogen, Droste and Noise) and the last two from
+v1.3.5 (the Model, the Grid Mesh, the Terrain and the Point Cloud), each straight from its
+Generate theme; the Slick frame is Marbled Paper with a Slick added on the Master FX. The
+older shots stay in `docs/images/`.)*
 
 ---
 
