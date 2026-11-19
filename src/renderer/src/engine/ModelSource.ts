@@ -134,9 +134,10 @@ uniform sampler2D uTex, uSide;
 uniform vec2 uRes, uAspect;
 uniform vec3 uColor, uGround, uL;
 uniform float uGroundA, uMat, uMatcap, uFileColor, uHasFile, uHasTex, uGloss, uCav, uFacets, uFilm, uFilmNm, uLight, uAmb, uAz;
-uniform float uSkin, uSkinMode, uHasSide, uTile, uScroll, uFog, uT, uFpx;
+uniform float uSkin, uSkinMode, uHasSide, uTile, uScrollT, uFog, uFpx;
+uniform vec2 uFilmT;
 uniform float uCrude, uCrDrip, uCrSheen;
-uniform vec3 uCrDown, uCrCol;
+uniform vec3 uCrDown, uCrCol, uCrRun;
 ${NOISE}
 ${RELIEF_SHADE}
 // The frame whose depth axis looks back along the view ray : the shading written for a
@@ -198,7 +199,7 @@ vec4 shadeAll(vec3 Nf, vec3 Lf, vec3 alb, vec2 uvS, vec2 uvM, vec3 objN, vec3 ob
   float reflAmt = 0.0;
   if (pic) {
     if (uSkinMode < 0.5) {
-      vec2 w = uvM * uTile + vec2(uScroll * uT, 0.0);
+      vec2 w = uvM * uTile + vec2(uScrollT, 0.0);
       picC = texture(uSide, vec2(fract(w.x), 1.0 - fract(w.y))).rgb;
     } else if (uSkinMode < 1.5) picC = texture(uSide, uvS).rgb;
     else if (uSkinMode < 2.5) { vec3 r = reflect(vec3(0.0, 0.0, -1.0), Nf); picC = texture(uSide, clamp(uvS + r.xy * 0.34, 0.0, 1.0)).rgb; }
@@ -231,7 +232,7 @@ vec4 shadeAll(vec3 Nf, vec3 Lf, vec3 alb, vec2 uvS, vec2 uvM, vec3 objN, vec3 ob
   } else {
     // the shared materials : clay, plastic, metal, brushed metal, chrome, soap film, foil
     float M = m < 0.5 ? 0.0 : m < 1.5 ? 3.0 : m < 2.5 ? 1.0 : m < 3.5 ? 2.0 : m < 4.5 ? 4.0 : m < 6.5 ? 6.0 : 7.0;
-    float nm = 160.0 + uFilmNm * 900.0 + (vn3(objP * 2.3 + vec3(uT * 0.05, 0.0, 0.0)) + 0.5 * vn3(objP * 5.1 - vec3(0.0, uT * 0.04, 0.0))) * 380.0;
+    float nm = 160.0 + uFilmNm * 900.0 + (vn3(objP * 2.3 + vec3(uFilmT.x, 0.0, 0.0)) + 0.5 * vn3(objP * 5.1 - vec3(0.0, uFilmT.y, 0.0))) * 380.0;
     c = shadeSurface(M, alb, Nf, Lf, uAz, 0.3 + uGloss * 1.2, refl, reflAmt, uFilm, nm, P);
     c = c * uLight + alb * uAmb * 0.35;
   }
@@ -249,7 +250,7 @@ vec4 shadeAll(vec3 Nf, vec3 Lf, vec3 alb, vec2 uvS, vec2 uvM, vec3 objN, vec3 ob
     if (uCrDrip > 0.0) {
       // the streaks : columns across the down, the oil in them sliding down slowly
       float colm = smoothstep(0.52, 0.78, vn3(acr * 7.5 + 2.0));
-      float run = smoothstep(0.35, 0.75, vn3(acr * 7.5 + dn * (along * 1.6 + uT * 0.14) + 5.0));
+      float run = smoothstep(0.35, 0.75, vn3(acr * 7.5 + dn * (along * 1.6) + uCrRun + 5.0));
       drip = colm * (0.45 + 0.55 * run) * uCrDrip;
     }
     float k = uCrude * 1.35 - 0.35 + lump * 0.4 + drip * 0.7;
@@ -753,8 +754,8 @@ void main() {
 // ── Matrices (column-major, as GL reads them) ───────────────────────────────────
 type M4 = Float32Array
 const m4 = (): M4 => { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m }
-function mul4(a: M4, b: M4): M4 {
-  const o = new Float32Array(16)
+/** a times b, into o (a fresh one when none : o must be neither a nor b). */
+function mul4(a: M4, b: M4, o: M4 = new Float32Array(16)): M4 {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
     let s = 0
     for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]
@@ -762,9 +763,11 @@ function mul4(a: M4, b: M4): M4 {
   }
   return o
 }
-function rotX(t: number): M4 { const m = m4(), c = Math.cos(t), s = Math.sin(t); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m }
-function rotY(t: number): M4 { const m = m4(), c = Math.cos(t), s = Math.sin(t); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m }
-function rotZ(t: number): M4 { const m = m4(), c = Math.cos(t), s = Math.sin(t); m[0] = c; m[1] = s; m[4] = -s; m[5] = c; return m }
+/** The identity, into m. */
+function ident(m: M4): M4 { m.fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m }
+function rotX(t: number, m: M4 = m4()): M4 { ident(m); const c = Math.cos(t), s = Math.sin(t); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m }
+function rotY(t: number, m: M4 = m4()): M4 { ident(m); const c = Math.cos(t), s = Math.sin(t); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m }
+function rotZ(t: number, m: M4 = m4()): M4 { ident(m); const c = Math.cos(t), s = Math.sin(t); m[0] = c; m[1] = s; m[4] = -s; m[5] = c; return m }
 
 interface GpuMesh {
   key: string
@@ -779,9 +782,11 @@ interface GpuMesh {
   tex: WebGLTexture | null
   /** the edges' buffer (the shards' line copies read it too) */
   bE: WebGLBuffer | null
-  /** what the shards read, made the first time something breaks (null : not yet;
+  /** what the shards read, made ahead of the first hit or on it (null : not yet;
    *  ok false : too big for the data textures, it never breaks) */
   sh: Shards | null
+  /** when it was put on the GPU (performance.now) */
+  born: number
 }
 
 /** The mesh as the shards read it : its triangles and vertices in data textures, and
@@ -793,6 +798,22 @@ interface Shards {
   vcol: WebGLTexture | null
   edVao: WebGLVertexArrayObject | null
   bFace: WebGLBuffer | null
+  /** still being made (ensureShards' steps), else null */
+  job: ShardJob | null
+}
+
+/** The shards' data on its way : the stage, how far into it, the arrays being filled. */
+interface ShardJob {
+  stage: number
+  i: number
+  nV: number
+  nT: number
+  rowsV: number
+  rowsC: number
+  rowsT: number
+  vd: Float32Array | null
+  cd: Uint8Array | null
+  id: Uint32Array | null
 }
 
 const STYLE_SOLID = 0, STYLE_WIRE = 1, STYLE_EDGES = 2, STYLE_POINTS = 3, STYLE_SOLID_EDGES = 4
@@ -826,8 +847,14 @@ export class ModelSource implements NativeGenerator {
   private ax = 0 // the spin's own turn on each axis, radians
   private ay = 0
   private az = 0
+  // (the slow motions' phases, each integrated from its own speed and wrapped where
+  // its noise repeats (64, or 1 for the skin's scroll) : a knob turned never jumps
+  // one, and none of them pops after hours in an installation)
   private wobT = Math.random() * 64
-  private t = 0
+  private scrollT = 0
+  private flowT = 0
+  private filmT: [number, number] = [0, 0]
+  private dripT: [number, number, number] = [0, 0, 0]
   private bass = 0
   private mids = 0
   private lastShapeBuild = 0
@@ -855,6 +882,11 @@ export class ModelSource implements NativeGenerator {
   private cpx = new Float32Array(0)
   private cpy = new Float32Array(0)
   private cok = new Uint8Array(0)
+  // (which vertices this cover's triangles projected already : one stamp a fill)
+  private cstamp = new Uint32Array(0)
+  private cserial = 0
+  // the frame's matrices, reused (never a new array a frame)
+  private mx = { rx: m4(), ry: m4(), rz: m4(), sc: m4(), t1: m4(), t2: m4(), m0: m4(), held: m4(), v: m4(), mv: m4(), p: new Float32Array(16), nm: new Float32Array(9), mvp: m4() }
 
   constructor(gl: WebGL2RenderingContext, private w: number, private h: number) {
     const g = (this.g = new EngineGL(gl, 'model'))
@@ -868,7 +900,7 @@ export class ModelSource implements NativeGenerator {
   private get lineP(): Prog { return (this.lineP_ ??= this.g.prog(LINE_FS, LINE_VS)) }
   private get pointP(): Prog { return (this.pointP_ ??= this.g.prog(POINT_FS, POINT_VS)) }
   private get ptDepthP(): Prog { return (this.ptDepthP_ ??= this.g.prog(POINT_DEPTH_FS, POINT_VS)) }
-  // (the shards' programs only once something breaks)
+  // (the shards' programs once something breaks, or ahead of it : warmShards)
   private get solidShP(): Prog { return (this.solidShP_ ??= this.g.prog(SOLID_FS, SOLID_SHARD_VS)) }
   private get depthShP(): Prog { return (this.depthShP_ ??= this.g.prog(DEPTH_FS, SOLID_SHARD_VS)) }
   private get lineShP(): Prog { return (this.lineShP_ ??= this.g.prog(LINE_SHARD_FS, LINE_SHARD_VS)) }
@@ -938,33 +970,32 @@ export class ModelSource implements NativeGenerator {
     return e
   }
 
-  /** The data textures and the lines' vertex array the shards read, made once a mesh. */
-  private ensureShards(gp: GpuMesh): boolean {
-    if (gp.sh) return gp.sh.ok
+  /** The data textures and the lines' vertex array the shards read, made once a mesh.
+   *  In steps, so it can be made ahead of the first hit a little each frame (warmShards,
+   *  `budgetMs`) instead of all at once on the frame it breaks : the arrays filled in
+   *  slices, the textures uploaded a band of rows at a time. A hit before it is ready
+   *  finishes what is left at once (Infinity). True once the shards can draw. */
+  private ensureShards(gp: GpuMesh, budgetMs = Infinity): boolean {
+    if (gp.sh && !gp.sh.job) return gp.sh.ok
     const gl = this.g.gl
     const m = gp.mesh
-    const sh: Shards = { ok: false, idx: null, vtx: null, vcol: null, edVao: null, bFace: null }
-    gp.sh = sh
-    if (!m.idx) return false
-    const nV = m.pos.length / 3, nT = m.idx.length / 3
-    const rowsV = Math.ceil((nV * 2) / PULL_W), rowsC = Math.ceil(nV / PULL_W), rowsT = Math.ceil(nT / PULL_W)
-    if (Math.max(rowsV, rowsT) > (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number)) return false
-    const vd = new Float32Array(rowsV * PULL_W * 4)
-    for (let v = 0; v < nV; v++) {
-      const o = v * 8
-      vd[o] = m.pos[v * 3]; vd[o + 1] = m.pos[v * 3 + 1]; vd[o + 2] = m.pos[v * 3 + 2]; vd[o + 3] = m.uv[v * 2]
-      vd[o + 4] = m.nrm[v * 3]; vd[o + 5] = m.nrm[v * 3 + 1]; vd[o + 6] = m.nrm[v * 3 + 2]; vd[o + 7] = m.uv[v * 2 + 1]
+    if (!gp.sh) {
+      const sh0: Shards = { ok: false, idx: null, vtx: null, vcol: null, edVao: null, bFace: null, job: null }
+      gp.sh = sh0
+      if (!m.idx) return false
+      const nV = m.pos.length / 3, nT = m.idx.length / 3
+      const rowsV = Math.ceil((nV * 2) / PULL_W), rowsC = Math.ceil(nV / PULL_W), rowsT = Math.ceil(nT / PULL_W)
+      if (Math.max(rowsV, rowsT) > (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number)) return false
+      sh0.job = { stage: 0, i: 0, nV, nT, rowsV, rowsC, rowsT, vd: new Float32Array(rowsV * PULL_W * 4), cd: null, id: new Uint32Array(rowsT * PULL_W * 4) }
     }
-    const cd = new Uint8Array(rowsC * PULL_W * 4)
-    cd.set(m.col.subarray(0, nV * 4))
-    const id = new Uint32Array(rowsT * PULL_W * 4)
-    for (let t = 0; t < nT; t++) { id[t * 4] = m.idx[t * 3]; id[t * 4 + 1] = m.idx[t * 3 + 1]; id[t * 4 + 2] = m.idx[t * 3 + 2] }
-    const tex = (rows: number, ifmt: number, fmt: number, type: number, data: ArrayBufferView): WebGLTexture => {
+    const sh = gp.sh
+    const J = sh.job!
+    const t0 = performance.now()
+    const SLICE = 65536
+    const tex = (rows: number, ifmt: number, fmt: number, type: number): WebGLTexture => {
       const t = gl.createTexture()!
       gl.bindTexture(gl.TEXTURE_2D, t)
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
-      gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, PULL_W, rows, 0, fmt, type, data)
+      gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, PULL_W, rows, 0, fmt, type, null)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
@@ -972,33 +1003,118 @@ export class ModelSource implements NativeGenerator {
       gl.bindTexture(gl.TEXTURE_2D, null)
       return t
     }
-    sh.vtx = tex(rowsV, gl.RGBA32F, gl.RGBA, gl.FLOAT, vd)
-    sh.vcol = tex(rowsC, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, cd)
-    sh.idx = tex(rowsT, gl.RGBA32UI, gl.RGBA_INTEGER, gl.UNSIGNED_INT, id)
-    // the lines : every edge twice (its attributes step every second instance), with
-    // the two faces it borders
-    if (gp.bE && m.edgeFaces && gp.nEdge) {
-      const vao = gl.createVertexArray()!
-      gl.bindVertexArray(vao)
-      gl.bindBuffer(gl.ARRAY_BUFFER, gp.bE)
-      for (let k = 0; k < 4; k++) {
-        gl.enableVertexAttribArray(k)
-        gl.vertexAttribPointer(k, 3, gl.FLOAT, false, 48, k * 12)
-        gl.vertexAttribDivisor(k, 2)
-      }
-      const bF = gl.createBuffer()!
-      gl.bindBuffer(gl.ARRAY_BUFFER, bF)
-      gl.bufferData(gl.ARRAY_BUFFER, m.edgeFaces, gl.STATIC_DRAW)
-      gl.enableVertexAttribArray(4)
-      gl.vertexAttribIPointer(4, 2, gl.UNSIGNED_INT, 0, 0)
-      gl.vertexAttribDivisor(4, 2)
-      gl.bindVertexArray(null)
-      gl.bindBuffer(gl.ARRAY_BUFFER, null)
-      sh.edVao = vao
-      sh.bFace = bF
+    // a band of rows into its texture (about 4 MB a band while warming, all at once on a hit)
+    const band = (t: WebGLTexture, rows: number, fmt: number, type: number, data: Float32Array | Uint32Array | Uint8Array): boolean => {
+      const w = data.length / rows // numbers a row
+      const per = budgetMs === Infinity ? rows : Math.max(1, Math.floor((4 << 20) / (w * data.BYTES_PER_ELEMENT)))
+      const y0 = J.i, y1 = Math.min(rows, y0 + per)
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, y0, PULL_W, y1 - y0, fmt, type, data.subarray(y0 * w, y1 * w))
+      gl.bindTexture(gl.TEXTURE_2D, null)
+      J.i = y1
+      if (y1 < rows) return false
+      J.i = 0
+      J.stage++
+      return true
     }
+    while (J.stage < 7) {
+      if (J.stage === 0) {
+        // the vertices : place and u, then normal and v
+        const vd = J.vd!
+        const end = Math.min(J.nV, J.i + SLICE)
+        for (let v = J.i; v < end; v++) {
+          const o = v * 8
+          vd[o] = m.pos[v * 3]; vd[o + 1] = m.pos[v * 3 + 1]; vd[o + 2] = m.pos[v * 3 + 2]; vd[o + 3] = m.uv[v * 2]
+          vd[o + 4] = m.nrm[v * 3]; vd[o + 5] = m.nrm[v * 3 + 1]; vd[o + 6] = m.nrm[v * 3 + 2]; vd[o + 7] = m.uv[v * 2 + 1]
+        }
+        J.i = end
+        if (end >= J.nV) { J.i = 0; J.stage++ }
+      } else if (J.stage === 1) {
+        // the triangles, then the colors (as they are, padded to whole rows)
+        const id = J.id!, ix = m.idx!
+        const end = Math.min(J.nT, J.i + SLICE)
+        for (let t = J.i; t < end; t++) { id[t * 4] = ix[t * 3]; id[t * 4 + 1] = ix[t * 3 + 1]; id[t * 4 + 2] = ix[t * 3 + 2] }
+        J.i = end
+        if (end >= J.nT) {
+          J.cd = new Uint8Array(J.rowsC * PULL_W * 4)
+          J.cd.set(m.col.subarray(0, J.nV * 4))
+          J.i = 0
+          J.stage++
+        }
+      } else if (J.stage === 2) {
+        sh.vtx = tex(J.rowsV, gl.RGBA32F, gl.RGBA, gl.FLOAT)
+        sh.vcol = tex(J.rowsC, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE)
+        sh.idx = tex(J.rowsT, gl.RGBA32UI, gl.RGBA_INTEGER, gl.UNSIGNED_INT)
+        J.stage++
+      } else if (J.stage === 3) {
+        if (band(sh.vtx!, J.rowsV, gl.RGBA, gl.FLOAT, J.vd!)) J.vd = null
+      } else if (J.stage === 4) {
+        if (band(sh.vcol!, J.rowsC, gl.RGBA, gl.UNSIGNED_BYTE, J.cd!)) J.cd = null
+      } else if (J.stage === 5) {
+        if (band(sh.idx!, J.rowsT, gl.RGBA_INTEGER, gl.UNSIGNED_INT, J.id!)) J.id = null
+      } else {
+        // the lines : every edge twice (its attributes step every second instance), with
+        // the two faces it borders
+        if (gp.bE && m.edgeFaces && gp.nEdge) {
+          const vao = gl.createVertexArray()!
+          gl.bindVertexArray(vao)
+          gl.bindBuffer(gl.ARRAY_BUFFER, gp.bE)
+          for (let k = 0; k < 4; k++) {
+            gl.enableVertexAttribArray(k)
+            gl.vertexAttribPointer(k, 3, gl.FLOAT, false, 48, k * 12)
+            gl.vertexAttribDivisor(k, 2)
+          }
+          const bF = gl.createBuffer()!
+          gl.bindBuffer(gl.ARRAY_BUFFER, bF)
+          gl.bufferData(gl.ARRAY_BUFFER, m.edgeFaces, gl.STATIC_DRAW)
+          gl.enableVertexAttribArray(4)
+          gl.vertexAttribIPointer(4, 2, gl.UNSIGNED_INT, 0, 0)
+          gl.vertexAttribDivisor(4, 2)
+          gl.bindVertexArray(null)
+          gl.bindBuffer(gl.ARRAY_BUFFER, null)
+          sh.edVao = vao
+          sh.bFace = bF
+        }
+        J.stage++
+      }
+      if (J.stage < 7 && performance.now() - t0 > budgetMs) return false
+    }
+    sh.job = null
     sh.ok = true
     return true
+  }
+
+  /** The shards made ahead of the first hit, a little a frame, then the programs this
+   *  look draws them with, one a frame (else all of it is made on the frame of the
+   *  first hit, and the picture stalls there) : at once while a hit is likely (it
+   *  breaks on the sound or the beat, or is held broken), else once the mesh has been
+   *  on screen a few seconds (never with its loading), a dense mesh's data then left
+   *  for the hit itself (hundreds of megabytes kept for a hit that may never come). */
+  private warmShards(gp: GpuMesh, style: number): void {
+    const I = this.inputs
+    const broken = num(I, 'broken', 0) > 0.001
+    if (num(I, 'shatter', 0.7) <= 0.001 && !broken) return
+    const likely = broken || Math.round(num(I, 'breakOn', 0)) !== 0
+    if (!likely && performance.now() - gp.born < 3000) return
+    if (gp.nIdx) {
+      if (gp.sh && !gp.sh.job && !gp.sh.ok) return // too big to break
+      if ((!gp.sh || gp.sh.job) && (likely || gp.nIdx / 3 <= 250_000)) { this.ensureShards(gp, 3); return }
+    }
+
+    // [made already, make it]
+    const progs: Array<[Prog | null, () => Prog]> = []
+    const solid = style === STYLE_SOLID || style === STYLE_SOLID_EDGES
+    if (!gp.nIdx) progs.push([this.pointShP_, () => this.pointShP], [this.ptDepthShP_, () => this.ptDepthShP])
+    else if (style === STYLE_POINTS) progs.push([this.pointShP_, () => this.pointShP], [this.depthShP_, () => this.depthShP])
+    else {
+      if (solid) progs.push([this.solidShP_, () => this.solidShP])
+      progs.push([this.depthShP_, () => this.depthShP])
+      if (style !== STYLE_SOLID && gp.edVao) progs.push([this.lineShP_, () => this.lineShP])
+      if (num(I, 'dust', 0) > 0) progs.push(solid ? [this.dustP_, () => this.dustP] : [this.dustLineP_, () => this.dustLineP])
+    }
+    for (const [have, make] of progs) if (!have) { make(); return }
   }
 
   feed(_audio: WebGLTexture | null, side: WebGLTexture | null): void {
@@ -1113,7 +1229,7 @@ export class ModelSource implements NativeGenerator {
       gl.bindTexture(gl.TEXTURE_2D, null)
     }
     this.gpu = {
-      key, mesh, vao, ptVao, edVao, bufs, tex, bE, sh: null,
+      key, mesh, vao, ptVao, edVao, bufs, tex, bE, sh: null, born: performance.now(),
       nIdx: mesh.idx ? mesh.idx.length : 0, nVert: mesh.pos.length / 3, nEdge: mesh.edges ? mesh.edges.length / 12 : 0
     }
   }
@@ -1208,7 +1324,6 @@ export class ModelSource implements NativeGenerator {
     }
     const I = this.inputs
     const dt = this.clock.tick(clockSec)
-    this.t = (this.t + dt) % 4096
     let style = Math.max(0, Math.min(4, Math.round(num(I, 'style', 0))))
     const lines = style === STYLE_WIRE || style === STYLE_EDGES || style === STYLE_SOLID_EDGES
     this.pickMesh(lines)
@@ -1232,6 +1347,7 @@ export class ModelSource implements NativeGenerator {
     const shE = this.shatterStep(dt)
     this.shatterNow = shE
     const sh = shE > 1e-4 && (!gp.nIdx || this.ensureShards(gp))
+    if (!sh) this.warmShards(gp, style)
     const shThrow = Math.max(0, num(I, 'throw', 0.8))
     const shGrav = Math.max(-1, Math.min(1, num(I, 'gravity', 0.2)))
     const shDrift = Math.max(0, Math.min(1, num(I, 'drift', 0.2)))
@@ -1261,16 +1377,22 @@ export class ModelSource implements NativeGenerator {
     else { this.ay = (this.ay + spin * dt) % TWO; this.ax = (this.ax + spin * 0.63 * dt) % TWO; this.az = (this.az + spin * 0.37 * dt) % TWO }
     const scale = Math.max(0.05, num(I, 'scale', 1)) * (1 + 0.3 * this.bass)
     const wob = Math.max(0, num(I, 'wobble', 0)) + this.mids * 0.6
-    this.wobT = (this.wobT + dt * Math.max(0, num(I, 'wobbleSpeed', 0.3)) * 1.2) % 64
-    const M0 = mul4(mul4(mul4(rotX(num(I, 'tilt', 0.1) * Math.PI + this.ax), rotY(num(I, 'turn', 0) * Math.PI + this.ay)), rotZ(num(I, 'roll', 0) * Math.PI + this.az)), (() => { const s = m4(); s[0] = s[5] = s[10] = scale; return s })())
+    // (wrapped at 640 : the noise repeats every 64, and its second octave runs 1.3 times
+    // as fast, 640 and 832 both whole repeats)
+    this.wobT = (this.wobT + dt * Math.max(0, num(I, 'wobbleSpeed', 0.3)) * 1.2) % 640
+    const X = this.mx
+    ident(X.sc); X.sc[0] = X.sc[5] = X.sc[10] = scale
+    mul4(rotX(num(I, 'tilt', 0.1) * Math.PI + this.ax, X.rx), rotY(num(I, 'turn', 0) * Math.PI + this.ay, X.ry), X.t1)
+    mul4(X.t1, rotZ(num(I, 'roll', 0) * Math.PI + this.az, X.rz), X.t2)
+    const M0 = mul4(X.t2, X.sc, X.m0)
     // how the hand holds it (dragged on the preview) : the outermost turn, in the
     // camera's own axes, so its spin, turn, tilt and roll all happen in the hand
     const held = quatIn(I['orient'])
-    const M = isNoTurn(held) ? M0 : mul4(quatMat4(held), M0)
+    const M = isNoTurn(held) ? M0 : mul4(quatMat4(held), M0, X.held)
     // under full-dome fill it stands back, framed in the middle, clear of the rim
     const dist = Math.max(0.5, num(I, 'distance', 4)) * (fill ? 1.7 : 1)
-    const V = m4(); V[14] = -dist
-    const MV = mul4(V, M)
+    const V = ident(X.v); V[14] = -dist
+    const MV = mul4(V, M, X.mv)
     const reach = scale * (1 + wob * 0.6)
     // (the shards fly past the object's own reach : the clip planes open to take them,
     // its depth's range stays the object's)
@@ -1278,11 +1400,33 @@ export class ModelSource implements NativeGenerator {
     const near = Math.max(0.02, dist - (reach + shReach) * 1.2), far = dist + (reach + shReach) * 1.2
     const fov = (Math.max(5, Math.min(150, num(I, 'lens', 35))) * Math.PI) / 180
     const f = 1 / Math.tan(fov / 2)
-    const P = new Float32Array(16)
+    const P = X.p
+    P.fill(0)
     P[0] = f / asp; P[5] = f; P[10] = (far + near) / (near - far); P[11] = -1; P[14] = (2 * far * near) / (near - far)
-    const NM = new Float32Array([MV[0] / scale, MV[1] / scale, MV[2] / scale, MV[4] / scale, MV[5] / scale, MV[6] / scale, MV[8] / scale, MV[9] / scale, MV[10] / scale])
+    const NM = X.nm
+    NM[0] = MV[0] / scale; NM[1] = MV[1] / scale; NM[2] = MV[2] / scale
+    NM[3] = MV[4] / scale; NM[4] = MV[5] / scale; NM[5] = MV[6] / scale
+    NM[6] = MV[8] / scale; NM[7] = MV[9] / scale; NM[8] = MV[10] / scale
     const off: [number, number] = [num(I, 'posX', 0), num(I, 'posY', 0)]
-    this.seen = { mvp: mul4(P, MV), off, ptR: (Math.max(0.3, num(I, 'pointSize', 2.5)) / 1080) * 0.5 }
+    const ptR = (Math.max(0.3, num(I, 'pointSize', 2.5)) / 1080) * 0.5
+    mul4(P, MV, X.mvp)
+    if (this.seen) { this.seen.off = off; this.seen.ptR = ptR } else this.seen = { mvp: X.mvp, off, ptR }
+    // the slow motions : the skin's scroll (its picture repeats every 1), the soap
+    // film's swirl and the crude's drips (the noise repeats every 64 on each axis; the
+    // drips slide along the world's down as it is now, in the model's own frame)
+    const wrap = (x: number, w: number): number => ((x % w) + w) % w
+    this.scrollT = wrap(this.scrollT + dt * num(I, 'scroll', 0), 1)
+    this.flowT = wrap(this.flowT + dt * num(I, 'flowSpeed', 0.3) * 0.25, 8192)
+    this.filmT[0] = wrap(this.filmT[0] + dt * 0.05, 64)
+    this.filmT[1] = wrap(this.filmT[1] + dt * 0.04, 64)
+    {
+      const dx = -NM[1], dy = -NM[4] + 1e-5, dz = -NM[7]
+      const dl = Math.hypot(dx, dy, dz) || 1
+      const k = (dt * 0.14) / dl
+      this.dripT[0] = wrap(this.dripT[0] + dx * k, 64)
+      this.dripT[1] = wrap(this.dripT[1] + dy * k, 64)
+      this.dripT[2] = wrap(this.dripT[2] + dz * k, 64)
+    }
     // the depth of the shape's own reach : its front white, its back black
     const near0 = dist - reach, far0 = dist + reach
 
@@ -1333,10 +1477,10 @@ export class ModelSource implements NativeGenerator {
         .f1('uFilmNm', Math.max(0, Math.min(1, num(I, 'filmThick', 0.4)))).f1('uLight', Math.max(0, num(I, 'light', 1)))
         .f1('uAmb', Math.max(0, Math.min(1, num(I, 'ambient', 0.2))))
         .f1('uSkin', Math.max(0, Math.min(1, num(I, 'skin', 0)))).f1('uSkinMode', Math.round(num(I, 'skinMode', 0))).f1('uHasSide', hasSide)
-        .f1('uTile', Math.max(0.05, num(I, 'tile', 1))).f1('uScroll', num(I, 'scroll', 0)).f1('uFog', Math.max(0, Math.min(1, num(I, 'fog', 0))))
-        .f1('uT', this.t).f1('uFpx', Math.tan(fov / 2) * 2 / this.h)
+        .f1('uTile', Math.max(0.05, num(I, 'tile', 1))).f1('uScrollT', this.scrollT).f1('uFog', Math.max(0, Math.min(1, num(I, 'fog', 0))))
+        .f2('uFilmT', this.filmT[0], this.filmT[1]).f3('uCrRun', this.dripT[0], this.dripT[1], this.dripT[2]).f1('uFpx', Math.tan(fov / 2) * 2 / this.h)
         // the shared materials' extras : flowing bands, the foil
-        .f1('uFlow', Math.max(0, Math.min(1, num(I, 'flow', 0)))).f1('uFlowT', (this.t * num(I, 'flowSpeed', 0.3) * 0.25) % 1024)
+        .f1('uFlow', Math.max(0, Math.min(1, num(I, 'flow', 0)))).f1('uFlowT', this.flowT)
         .f1('uBands', 3).f1('uSplit', 0.5).f1('uRipple', 0.3)
         .f1('uFoilSat', Math.max(0, Math.min(1, num(I, 'rainbow', 0.7)))).f1('uFoilScale', 40 + 260 * Math.max(0, Math.min(1, num(I, 'flakes', 0.5))))
         .f1('uFoilGlint', Math.max(0, Math.min(1, num(I, 'glint', 0.4))))
@@ -1483,28 +1627,44 @@ export class ModelSource implements NativeGenerator {
     const c = this.cover
     c.begin(this.w / Math.max(1, this.h))
     const pos = gp.mesh.pos, n = pos.length / 3, m = s.mvp
-    if (this.cpx.length < n) { this.cpx = new Float32Array(n); this.cpy = new Float32Array(n); this.cok = new Uint8Array(n) }
-    const px = this.cpx, py = this.cpy, ok = this.cok
-    for (let k = 0; k < n; k++) {
-      const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]
-      const w = m[3] * x + m[7] * y + m[11] * z + m[15]
-      if (w < 1e-3) { ok[k] = 0; continue }
-      ok[k] = 1
-      px[k] = (m[0] * x + m[4] * y + m[8] * z + m[12]) / w + s.off[0]
-      py[k] = (m[1] * x + m[5] * y + m[9] * z + m[13]) / w + s.off[1]
-    }
+    const ox = s.off[0], oy = s.off[1]
     const idx = gp.mesh.idx
     const BUDGET = 150000
     if (idx && idx.length) {
+      // only the corners of the triangles read (at most BUDGET of them), each once :
+      // a dense mesh is never projected whole while the pointer moves
+      if (this.cpx.length < n) { this.cpx = new Float32Array(n); this.cpy = new Float32Array(n); this.cok = new Uint8Array(n); this.cstamp = new Uint32Array(n) }
+      if (++this.cserial >= 0xffffffff) { this.cstamp.fill(0); this.cserial = 1 }
+      const px = this.cpx, py = this.cpy, ok = this.cok, st = this.cstamp, ser = this.cserial
+      const at = (k: number): boolean => {
+        if (st[k] !== ser) {
+          st[k] = ser
+          const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]
+          const w = m[3] * x + m[7] * y + m[11] * z + m[15]
+          if (w < 1e-3) ok[k] = 0
+          else {
+            ok[k] = 1
+            px[k] = (m[0] * x + m[4] * y + m[8] * z + m[12]) / w + ox
+            py[k] = (m[1] * x + m[5] * y + m[9] * z + m[13]) / w + oy
+          }
+        }
+        return ok[k] === 1
+      }
       const nT = idx.length / 3
       const step = Math.max(1, Math.ceil(nT / BUDGET))
       for (let t = 0; t < nT; t += step) {
         const a = idx[t * 3], b = idx[t * 3 + 1], d = idx[t * 3 + 2]
-        if (ok[a] && ok[b] && ok[d]) c.tri(px[a], py[a], px[b], py[b], px[d], py[d])
+        if (at(a) && at(b) && at(d)) c.tri(px[a], py[a], px[b], py[b], px[d], py[d])
       }
     } else {
+      // the points read : each projected as it is laid
       const step = Math.max(1, Math.ceil(n / BUDGET))
-      for (let k = 0; k < n; k += step) if (ok[k]) c.dot(px[k], py[k], s.ptR)
+      for (let k = 0; k < n; k += step) {
+        const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2]
+        const w = m[3] * x + m[7] * y + m[11] * z + m[15]
+        if (w < 1e-3) continue
+        c.dot((m[0] * x + m[4] * y + m[8] * z + m[12]) / w + ox, (m[1] * x + m[5] * y + m[9] * z + m[13]) / w + oy, s.ptR)
+      }
     }
   }
 

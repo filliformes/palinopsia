@@ -17,8 +17,16 @@ export const MODEL_FILE_EXT = /\.(glb|gltf|obj|stl|ply)$/i
 const baseOf = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
 /** Read a model file, then put it on the slot (one undo step, once it is read : a file
- *  that cannot be read leaves the slot as it was, and says why). */
-export function loadModelInto(target: ModelTarget, path: string, name = baseOf(path)): Promise<boolean> {
+ *  that cannot be read leaves the slot as it was, and says why). `files` : the files
+ *  the session carries for it (read again with them); `before` : run on success just
+ *  before the slot takes the file, in the same undo step (a drop that makes the slot a
+ *  Model). */
+export function loadModelInto(
+  target: ModelTarget,
+  path: string,
+  name = baseOf(path),
+  opts: { files?: readonly string[]; before?: () => void } = {}
+): Promise<boolean> {
   return new Promise((resolve) => {
     const done = (st: ModelState): boolean => {
       if (st.state === 'loading') return false
@@ -27,13 +35,14 @@ export function loadModelInto(target: ModelTarget, path: string, name = baseOf(p
         resolve(false)
         return true
       }
+      opts.before?.()
       useStore.getState().setSourceModel(target, { path, name, files: st.read })
       const i = st.mesh.info
       showToast(`${name} : ${i.points ? `${i.verts.toLocaleString('en-US')} points` : `${i.tris.toLocaleString('en-US')} triangles`}${i.hasTex ? ', its texture' : ''}${i.notes.length ? ` (${i.notes.join('; ')})` : ''}`, i.notes.length ? 'warn' : 'ok', i.notes.length ? 7000 : 3400)
       resolve(true)
       return true
     }
-    modelLoader.reload(path)
+    modelLoader.reload(path, opts.files ?? [])
     if (done(modelLoader.peek(path) ?? { state: 'loading' })) return
     showToast(`${name} : reading the model…`)
     const off = modelLoader.subscribe(() => {
@@ -122,7 +131,7 @@ export function ModelStrip({
       </span>
       {line}
       {path && (
-        <button className="btn shrink-0 text-[11px]" onClick={() => void loadModelInto(target, path, name)} title="Read the file again (it changed on disk)">
+        <button className="btn shrink-0 text-[11px]" onClick={() => void loadModelInto(target, path, name, { files })} title="Read the file again (it changed on disk)">
           ↻
         </button>
       )}

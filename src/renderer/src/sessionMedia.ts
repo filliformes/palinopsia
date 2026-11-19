@@ -13,6 +13,7 @@ import { markDirty } from './sessionGuard'
 import { onSessionLoaded, sessionSerial } from './sessionEvents'
 import { showToast } from './components/Toast'
 import { playableVideoUrl } from './components/videoImport'
+import { modelLoader } from './engine/modelLoad'
 
 const URL_PREFIX = 'opsia-media://local/'
 
@@ -44,17 +45,84 @@ function mediaState(): { composition: CompositionState; scenes: unknown; audioLa
   return { composition: st.composition, scenes: st.scenes, audioLayer: st.audioLayer }
 }
 
-/** Every path the state refers to (raw paths and media URLs), keyed normalized. */
-function gather(obj: unknown, out = new Map<string, string>()): Map<string, string> {
+/** Every path the state refers to (raw paths and media URLs), keyed normalized
+ *  (`skip` : a key whose values are left out). */
+function gather(obj: unknown, out = new Map<string, string>(), skip?: string): Map<string, string> {
   if (typeof obj === 'string') {
     const p = fromMediaUrl(obj) ?? (isAbsPath(obj) ? obj : null)
     if (p) out.set(norm(p), p)
   } else if (Array.isArray(obj)) {
-    for (const x of obj) gather(x, out)
+    for (const x of obj) gather(x, out, skip)
   } else if (obj && typeof obj === 'object') {
-    for (const v of Object.values(obj as Record<string, unknown>)) gather(v, out)
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) if (k !== skip) gather(v, out, skip)
   }
   return out
+}
+
+/** Every Model file in the session, with the files the session carries for it. */
+function sessionModels(): Map<string, { path: string; files: string[] }> {
+  const out = new Map<string, { path: string; files: string[] }>()
+  eachObject(mediaState(), (o) => {
+    const mp = o.shaderId === 'gen-model' ? str(o.modelPath) : null
+    if (!mp) return
+    const cur = out.get(norm(mp)) ?? { path: mp, files: [] }
+    if (Array.isArray(o.modelFiles)) for (const f of o.modelFiles) if (typeof f === 'string' && !cur.files.some((x) => norm(x) === norm(f))) cur.files.push(f)
+    out.set(norm(mp), cur)
+  })
+  return out
+}
+
+/** The deepest folder holding every path (null : none, another drive). */
+function commonDir(paths: string[]): string | null {
+  if (!paths.length) return null
+  let parts = partsOf(dirOf(paths[0]))
+  const first = paths[0]
+  for (const p of paths.slice(1)) {
+    const q = partsOf(dirOf(p))
+    let k = 0
+    while (k < parts.length && k < q.length && parts[k].normalize('NFC').toLowerCase() === q[k].normalize('NFC').toLowerCase()) k++
+    parts = parts.slice(0, k)
+  }
+  if (!parts.length) return null
+  // (back to a path as the first one writes it : its root, its separator)
+  const lead = first.startsWith('\\\\') ? '\\\\' : first.startsWith('/') ? '/' : ''
+  return lead + parts.join(sep(first))
+}
+
+/** Each Model's files listed in the session (modelFiles) set to `to` (by the model's
+ *  path, as it is now), in the live session and every scene alike. */
+function setModelFiles(to: Map<string, string[]>): void {
+  if (!to.size) return
+  const walk = (o: unknown): unknown => {
+    if (Array.isArray(o)) {
+      let changed = false
+      const r = o.map((x) => { const y = walk(x); if (y !== x) changed = true; return y })
+      return changed ? r : o
+    }
+    if (o && typeof o === 'object') {
+      const rec = o as Record<string, unknown>
+      let changed = false
+      const r: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(rec)) { const y = walk(v); if (y !== v) changed = true; r[k] = y }
+      const mp = rec.shaderId === 'gen-model' ? str(rec.modelPath) : null
+      const want = mp ? to.get(norm(mp)) : undefined
+      if (want) {
+        const had = Array.isArray(rec.modelFiles) ? (rec.modelFiles as unknown[]) : []
+        if (had.length !== want.length || had.some((x, i) => x !== want[i])) { r.modelFiles = [...want]; changed = true }
+      }
+      return changed ? r : o
+    }
+    return o
+  }
+  const cur = mediaState()
+  const base = useStore.getState().variationBaseline
+  useStore.setState({
+    composition: walk(cur.composition) as CompositionState,
+    scenes: walk(cur.scenes) as never,
+    audioLayer: walk(cur.audioLayer) as never,
+    variationBaseline: base ? (walk(base) as typeof base) : base
+  })
+  markDirty()
 }
 
 /** Every object in `obj`, visited once (the composition, the scenes, …). */
@@ -418,6 +486,66 @@ async function collect(onProgress?: (done: number, total: number) => void): Prom
     const k = await kindsOf([...extra])
     for (const o of extra) if (k[o] === 'file') { files.push(o); known.add(norm(o)) }
   }
+  // The Models : each copied with exactly the files it reads (asked of the reader
+  // itself : a file the session lists for a model but the model does not read is
+  // never copied), into a folder of its own that keeps their places round it (a .gltf
+  // names its buffers and images by where they sit beside it), so two models never
+  // take each other's files.
+  const models = sessionModels()
+  const holderOfAny = (p: string): boolean => folders.some((d) => isUnder(p, d))
+  const elsewhere = gather(mediaState(), new Map(), 'modelFiles') // (paths named by anything but a model's file list)
+  const listed = new Set<string>()
+  for (const m of models.values()) for (const f of m.files) listed.add(norm(f))
+  // what each model reads (only those with something here to copy are asked)
+  const readOf = new Map<string, string[]>()
+  for (const [k, m] of models) {
+    if (!known.has(k) && !m.files.some((f) => known.has(norm(f)))) continue
+    if (stale(ser, 'Collect')) return false
+    const st = await modelLoader.whenRead(m.path, m.files)
+    readOf.set(k, st.state === 'ready' ? st.read : [])
+  }
+  if (stale(ser, 'Collect')) return false
+  // only what a model reads (or what something else in the session names) is copied
+  const readAll = new Set<string>()
+  for (const r of readOf.values()) for (const p of r) readAll.add(norm(p))
+  for (let i = files.length - 1; i >= 0; i--) {
+    const k = norm(files[i])
+    if (listed.has(k) && !models.has(k) && !elsewhere.has(k) && !readAll.has(k)) { files.splice(i, 1); known.delete(k) }
+  }
+  const modelDest = new Map<string, string>() // norm(source) : its place in the media folder
+  const extraItems: Array<{ src: string; dest: string }> = [] // (a file two models read : one copy each)
+  const filesAfter = new Map<string, string[]>() // norm(model, where it goes) : the files it reads, where they go
+  const reserved = new Set<string>()
+  for (const [k, read] of readOf) {
+    const m = models.get(k)!
+    const out = read.filter((p) => !inside(p))
+    if (!known.has(k) || holderOfAny(m.path)) {
+      // a model already beside the session (or inside a folder collected whole) stays;
+      // the files it reads are collected as any other
+      for (const p of out) if (!known.has(norm(p))) { files.push(p); known.add(norm(p)) }
+      continue
+    }
+    const root = commonDir([m.path, ...out])
+    const stem = baseOf(m.path).replace(/\.[^.]+$/, '') || 'model'
+    let nm = stem
+    // (a name no other folder here takes, and none already on disk from another collect)
+    for (let n = 2; ; n++) {
+      const at = joinPath(dest, nm)
+      if (!reserved.has(nm.normalize('NFC').toLowerCase()) && (await kindsOf([at]))[at] === 'none') break
+      nm = `${stem} (${n})`
+    }
+    reserved.add(nm.normalize('NFC').toLowerCase())
+    const home = joinPath(dest, nm)
+    const place = (p: string): string => (root ? joinPath(home, ...partsOf(p).slice(partsOf(root).length)) : joinPath(home, baseOf(p)))
+    modelDest.set(k, place(m.path))
+    for (const p of out) {
+      if (!modelDest.has(norm(p))) modelDest.set(norm(p), place(p))
+      else if (norm(modelDest.get(norm(p))!) !== norm(place(p))) extraItems.push({ src: p, dest: place(p) })
+      if (!known.has(norm(p))) { files.push(p); known.add(norm(p)) }
+    }
+    filesAfter.set(norm(place(m.path)), read.map((p) => (inside(p) ? p : place(p))))
+  }
+  if (stale(ser, 'Collect')) return false
   if (!files.length && !folders.length) {
     showToast('Every file is already beside the session')
     return true
@@ -425,7 +553,7 @@ async function collect(onProgress?: (done: number, total: number) => void): Prom
   // Each folder its own place in the media folder : one inside another keeps its
   // place in it, and two of the same name don't share one.
   const folderDest: Record<string, string> = {}
-  const usedNames = new Set<string>()
+  const usedNames = new Set<string>(reserved)
   const holderOf = (p: string, among: string[]): string | null => {
     let best: string | null = null
     for (const d of among) if (d !== p && isUnder(p, d) && (!best || partsOf(d).length > partsOf(best).length)) best = d
@@ -444,9 +572,12 @@ async function collect(onProgress?: (done: number, total: number) => void): Prom
   }
   // a file goes into the deepest collected folder holding it
   const items = files.map((f) => {
+    const md = modelDest.get(norm(f))
+    if (md) return { src: f, dest: md }
     const h = holderOf(f, folders)
     return { src: f, dest: h ? joinPath(folderDest[h], ...partsOf(f).slice(partsOf(h).length)) : joinPath(dest, baseOf(f)) }
   })
+  items.push(...extraItems)
   const off = window.api.onMediaCollectProgress((p) => onProgress?.(p.done, p.total))
   try {
     const res = await window.api.mediaCollect(sessionPath, items)
@@ -461,8 +592,16 @@ async function collect(onProgress?: (done: number, total: number) => void): Prom
       for (const f of folders) if (into.some((p) => isUnder(p, folderDest[f]))) map[f] = folderDest[f]
     }
     applyMap(map)
+    // each Model collected whole lists the files it reads, as they are now (its copies)
+    const after = new Map<string, string[]>()
+    const there = await kindsOf([...new Set([...filesAfter.values()].flat())])
+    if (sessionSerial() === ser) {
+      for (const [k, list] of filesAfter) if (list.every((p) => there[p] === 'file')) after.set(k, list)
+      setModelFiles(after)
+    }
     await check()
     const gb = res.bytes / 1e9
+
     const size = gb >= 1 ? gb.toFixed(1) + ' GB' : Math.round(res.bytes / 1e6) + ' MB'
     const skipped = res.refused ? ` · ${res.refused} skipped (not a film, a sound or a model file)` : ''
     if (!res.ok) showToast(`Collected ${copied} of ${items.length} files, then : ${res.error}${skipped}`, 'warn', 8000)

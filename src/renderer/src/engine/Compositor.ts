@@ -1389,9 +1389,15 @@ export class ISFLayer {
     if (slot === 'A') this.natA = next; else this.natB = next;
   }
 
-  /** A Model source's real depth (its TRUE DEPTH on and drawn), A before B. */
+  /** A Model source's real depth (its TRUE DEPTH on and drawn), from the slot the
+   *  A/B crossfade shows more : a slot faded fully out gives none. */
   modelDepth(): WebGLTexture | null {
-    return this.natA?.src.depthTexture?.() ?? this.natB?.src.depthTexture?.() ?? null;
+    const hasB = this.hasB();
+    const mix = hasB ? this.sourceMix : 0;
+    const a = mix < 1 ? this.natA?.src.depthTexture?.() ?? null : null;
+    const b = hasB && mix > 0 ? this.natB?.src.depthTexture?.() ?? null : null;
+    if (a && b) return mix > 0.5 ? b : a;
+    return a ?? b;
   }
 
   /** The slot's registry engine (pointerInput.ts : a source that takes the pointer). */

@@ -99,13 +99,26 @@ function lerpVal(av: unknown, bv: unknown, k: number): number | number[] | unkno
   return bv // strings/bools/mismatch → snap to target
 }
 
+/** A held object's turn (a quaternion : Model, Grid Mesh) : the short way round (q and
+ *  -q are the same turn), kept a unit turn on the way. Anything else : as lerpVal. */
+function lerpQuat(av: unknown, bv: unknown, k: number): number | number[] {
+  const isQ = (v: unknown): v is number[] => Array.isArray(v) && v.length === 4 && v.every((x) => typeof x === 'number' && Number.isFinite(x))
+  if (!isQ(av) || !isQ(bv)) return lerpVal(av, bv, k) as number | number[]
+  const s = av[0] * bv[0] + av[1] * bv[1] + av[2] * bv[2] + av[3] * bv[3] < 0 ? -1 : 1
+  const q = av.map((x, i) => lerpN(x, bv[i] * s, k))
+  const l = Math.hypot(q[0], q[1], q[2], q[3])
+  if (l < 1e-6) return k < 0.5 ? av : bv
+  // (at the end, exactly the target : a morph lands on the scene's own numbers)
+  return k >= 1 ? bv : q.map((x) => x / l)
+}
+
 function lerpInputs(
   a: Record<string, number | number[]>,
   b: Record<string, number | number[]>,
   k: number
 ): Record<string, number | number[]> {
   const out: Record<string, number | number[]> = {}
-  for (const key of Object.keys(b)) out[key] = lerpVal(a[key], b[key], k) as number | number[]
+  for (const key of Object.keys(b)) out[key] = key === 'orient' ? lerpQuat(a[key], b[key], k) : lerpVal(a[key], b[key], k) as number | number[]
   return out
 }
 
