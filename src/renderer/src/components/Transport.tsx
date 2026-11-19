@@ -21,6 +21,7 @@ import { tempoEdited } from '../tempoEvents'
 import { LinkBadge } from './LinkSection'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
+import { MidiClockBadge } from './MidiPanel'
 import { ToastDock } from './Toast'
 import { TBTN, TBTN_IDLE_ON, TBTN_LIT } from './buttonStyles'
 import { Blink } from './Blink'
@@ -64,10 +65,6 @@ function loadScope(): RandomizeScope {
   return s && SCOPES.some((x) => x.scope === s) ? s : 'all'
 }
 
-const loadNum = (key: string, dflt: number): number => {
-  const v = Number(localStorage.getItem(key))
-  return Number.isFinite(v) && v > 0 ? v : dflt
-}
 const pct = (v: number): string => Math.round(v * 100) + '%'
 
 // The ONE command-button look for this bar (sans, semibold : no mono-caps).
@@ -202,19 +199,13 @@ export function Transport(): JSX.Element {
   const randPulse = useStore((s) => s.randPulse)
   const [menuOpen, setMenuOpen] = useState(false)
   const [scope, setScope] = useState<RandomizeScope>(loadScope)
-  // Randomize intensity (walk↔full) and Variation spread, both persisted.
-  const [intensity, setIntensity] = useState<number>(() => loadNum('opsia.randIntensity', 1))
-  const [varAmt, setVarAmt] = useState<number>(() => loadNum('opsia.varAmount', 0.3))
+  // Randomize intensity (walk↔full) and Variation spread : this computer's,
+  // in the store so MIDI and OSC Learn move them too.
+  const intensity = useStore((s) => s.randIntensity)
+  const changeIntensity = useStore((s) => s.setRandIntensity)
+  const varAmt = useStore((s) => s.varyAmt)
+  const changeVarAmt = useStore((s) => s.setVaryAmt)
   const menuRef = useRef<HTMLDivElement | null>(null)
-
-  const changeIntensity = (v: number): void => {
-    setIntensity(v)
-    localStorage.setItem('opsia.randIntensity', String(v))
-  }
-  const changeVarAmt = (v: number): void => {
-    setVarAmt(v)
-    localStorage.setItem('opsia.varAmount', String(v))
-  }
 
   function setBpm(v: number): void {
     setComposition((s) => ({ composition: { ...s.composition, bpm: v } }))
@@ -294,6 +285,7 @@ export function Transport(): JSX.Element {
           />
         </div>
         <LinkBadge />
+        <MidiClockBadge />
       </div>
 
       {/* Global speed : scales every visual clock, 1/64×…64× (log). */}
@@ -458,16 +450,19 @@ export function Transport(): JSX.Element {
             <Blink n={globalVaryPulse} color="accent2" />
           </button>
         </span>
-        <input
-          type="range"
-          min={0.01}
-          max={1}
-          step={0.01}
-          value={varAmt}
-          onChange={(e) => changeVarAmt(Number(e.target.value))}
-          className="w-14 min-w-0 accent-accent2"
-          title={`Variation amount ${pct(varAmt)}`}
-        />
+        <span className="relative flex w-14 min-w-0 shrink">
+          <MidiLearnOverlay id="transport:varyAmount" />
+          <input
+            type="range"
+            min={0.01}
+            max={1}
+            step={0.01}
+            value={varAmt}
+            onChange={(e) => changeVarAmt(Number(e.target.value))}
+            className="w-full min-w-0 accent-accent2"
+            title={`Variation amount ${pct(varAmt)}`}
+          />
+        </span>
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(varAmt)}</span>
 
         {/* Randomize: chevron selects the mode, button fires it; the amount
@@ -478,16 +473,19 @@ export function Transport(): JSX.Element {
         >
           amt
         </span>
-        <input
-          type="range"
-          min={0.02}
-          max={1}
-          step={0.01}
-          value={intensity}
-          onChange={(e) => changeIntensity(Number(e.target.value))}
-          className="w-14 min-w-0 accent-accent"
-          title={`Randomize intensity ${pct(intensity)}`}
-        />
+        <span className="relative flex w-14 min-w-0 shrink">
+          <MidiLearnOverlay id="transport:randAmount" />
+          <input
+            type="range"
+            min={0.02}
+            max={1}
+            step={0.01}
+            value={intensity}
+            onChange={(e) => changeIntensity(Number(e.target.value))}
+            className="w-full min-w-0 accent-accent"
+            title={`Randomize intensity ${pct(intensity)}`}
+          />
+        </span>
         <span className="w-7 shrink-0 font-mono text-[9px] text-muted">{pct(intensity)}</span>
 
         <div ref={menuRef} className="relative flex shrink-0">

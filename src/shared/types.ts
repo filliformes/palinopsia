@@ -1043,10 +1043,17 @@ export const META_MAX_DESTS = 8
 
 // A learned MIDI control : a CC (knob/slider/button) or a Note (pad/key) on
 // one channel. dataFLOU's shape, verbatim — the two apps share controllers.
+// Since v1.3.5 also the pitch bend (14-bit, its middle at 0.5), the channel
+// pressure (aftertouch) and a key's own pressure (poly aftertouch), as faders :
+// `number` is 0 for the first two, the key for the third.
+export type MidiBindingKind = 'cc' | 'note' | 'bend' | 'pressure' | 'polypressure'
 export interface MidiBinding {
-  kind: 'cc' | 'note'
+  kind: MidiBindingKind
   channel: number // 0..15
-  number: number // CC# or note#
+  number: number // CC# or note# (0 for bend and pressure)
+  /** pickup (soft takeover) : the control does nothing until it reaches the
+   *  value it drives, then follows. Absent : jump (it takes the value at once). */
+  pickup?: boolean
 }
 
 // A control learned from an OSC message outside /opsia (OSC Learn : a TouchOSC
@@ -1100,7 +1107,7 @@ export interface MetaKnobState {
   value: number // committed 0..1 position
   smoothMs: number
   curve: ModCurve // shapes the 0..1 before mapping to each target's range
-  midiCc: { channel: number; number: number } | null
+  midiCc: { channel: number; number: number; pickup?: boolean } | null
   destinations: ModTarget[] // max META_MAX_DESTS
   // The knob's range (0..1 of each destination's own range) : the curved
   // position lands between min and max, so a full turn sweeps only that part.

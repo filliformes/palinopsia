@@ -7,6 +7,65 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **MIDI input hears everything : the clock in, the pitch bend, aftertouch, and catch**
+  (`midi.ts`, new `midiClockIn.ts` + `midiPickup.ts`, `MidiPanel.tsx`, `shared/types.ts`
+  `MidiBinding`, `mappingModel.ts`, `App.tsx`, `sessionGuard.ts`) :
+  - `onMessage` returned on any message under two bytes, so the realtime messages (clock
+    0xF8, Start 0xFA, Continue 0xFB, Stop 0xFC) never arrived, and thru never forwarded
+    them. System messages now go to `onSystem` : SysEx is noted and ignored, active sensing
+    dropped, the clock pulses kept out of the activity readout (which now keeps the last
+    message's bytes and writes the text only when the panel reads it, 150 ms : no string
+    per message from a fader, the bend or aftertouch);
+  - **follow MIDI clock** (`midiClockIn`, `opsia.midiClockIn`, this computer's) :
+    `ClockFollower` fits a least-squares line through the last 96 pulse times (the
+    browser's message stamps, not the handler's time), restarts the window on a 300 ms gap
+    or a tempo change (the last 8 pulses 8 % off, or the last beat 3 % off), writes the BPM
+    through `writeLinkTempo` (no undo step) at most 4 times a second and only past 0.12 BPM
+    (a tenth; whole when within 0.06). Start / Continue / Stop drive the Seq transport
+    (`seqTransportPlay` / `seqTransportStop`, Start from the top, BPM-synced steps runs
+    restarted on the downbeat), Song Position sets the count; `midi.clockBeats(now)` stands
+    in for Link's beat in `modEngine.tick` and `soniClockTick` while Link is off.
+    Precedence : `linkShared()` (Link enabled with peers) ignores it ("ignored (Link)");
+    a clock on the port Palinopsia's own clock goes out to is ignored ("own"). With the
+    clock out on, thru forwards no clock or transport (one clock per output) and the
+    clock out follows Start (resync), Continue and Stop. The Save changes? question leaves
+    the tempo out while it follows (`setTempoFollowed`). `CLK` badge beside the BPM;
+  - **pitch bend, channel and poly aftertouch learnable as faders** : `MidiBinding.kind`
+    gains `bend` / `pressure` / `polypressure` (`number` 0 for the first two), bend 14-bit
+    to 0..1 with 8192 at exactly 0.5 (`bendNorm`), all through `queueContinuous`; press
+    targets refuse them in Learn. Labels `bend ch1`, `AT ch1`, `AT 60 ch1`
+    (`describeMidi`). The computer map now loads through `sanitizeMidiMap` (it rebuilt
+    `{kind, channel, number}` and would have dropped the new kinds);
+  - **catch (soft takeover)** per mapping (named *catch* in the app; `pickup` in code and
+    files) (`MidiBinding.pickup`, `midiCc.pickup` on the
+    Macro knobs; absent = jump, so nothing changes for existing setups), default for new
+    mappings `opsia.midiPickup`. `pickupPass` lets a value through once the control
+    crosses the target's BASE value (`readContinuous(id, true)` : without modulation) or
+    comes within 1.5/127 of it; after each flush the value written is remembered, and a
+    value found different at the next message (a scene, a session load, undo, the mouse,
+    OSC, another control) re-arms it. The ledger has a jump / catch chip per fader row and
+    "waiting to catch : move it up to 42 %" while one waits; `withLiveCcs` keeps a knob's pickup
+    through scenes.
+- **MIDI and OSC Learn reach the Vary and Randomize amounts, the Audio Layer and every
+  effect chain's switch** (`midi.ts`, overlays in `Transport.tsx`, `AudioLayerPanel.tsx`,
+  `LayerPanel.tsx` `ChainSwitch`, `FinishingTouches.tsx` `FinishingToggle`) :
+  - continuous : `transport:varyAmount` (1..100 %) and `transport:randAmount` (2..100 %),
+    each over its slider's own range and step; `audiolayer:volume` (0..200 %) and
+    `audiolayer:mix`. All through `applyContinuous` (the once-a-frame CC queue), and
+    `readContinuous` answers them to OSC Learn controllers;
+  - toggles : `fx:chain:<layer|sourceA|sourceB|loop>:<i>` (a layer rack's ⏻), beside the
+    existing `master:chain` (learnable before) and `act:finishing` (the
+    finishing switch, its overlay new). A note or a button CC flips on the press edge (a CC
+    release or a note-off does nothing), an OSC button on its rise past the middle, as the
+    Master FX chain always did; OSC Learn controllers are answered 1 / 0 for a chain's state;
+  - the two amounts moved from the Transport's own state into the store (`varyAmt`,
+    `randIntensity`), still per computer under `opsia.varAmount` / `opsia.randIntensity`,
+    so a learned knob moves the slider; `fireVariation`, `fireSelectedRandomize` and the
+    `/opsia/randomize` scopes read them there. Measured in the test copy over synthetic
+    MIDI (`__midi.onMessage`) and real OSC on the copy's own port : CC 0 / 64 / 127 →
+    1 / 51 / 100 % Vary, 2 / 51 / 100 % Randomize, volume 0 / 101 / 200 %, mix 0 / 0.5 / 1;
+    each chain flipped once per press and stayed on release; a pad flip undone in one step.
+
 - **Text over OSC and the Agent** : `/opsia/layerN/source/{A|B}/text "words"` writes the
   Text source's words (only while the slot plays Text; the same words again change
   nothing), and the Agent's new `set_text` tool does the same (16 tools).

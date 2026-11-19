@@ -773,21 +773,9 @@ function loadSoniSeq(): SoniSeq {
 // which travel with the session). Malformed entries are dropped, not fatal.
 function loadMidiMap(): Record<string, MidiBinding> {
   try {
-    const raw = JSON.parse(localStorage.getItem('opsia.midiMap') || '{}') as Record<
-      string,
-      MidiBinding
-    >
-    const out: Record<string, MidiBinding> = {}
-    for (const [id, b] of Object.entries(raw)) {
-      if (
-        b &&
-        (b.kind === 'cc' || b.kind === 'note') &&
-        Number.isInteger(b.channel) &&
-        Number.isInteger(b.number)
-      ) {
-        out[id] = { kind: b.kind, channel: b.channel, number: b.number }
-      }
-    }
+    // (the same reading a session's mappings get : bend / pressure kinds and
+    // the pickup choice kept, anything malformed dropped)
+    const out = sanitizeMidiMap(JSON.parse(localStorage.getItem('opsia.midiMap') || '{}'))
     // (the Body rules load from their own key : read their ids from it)
     let rules: Array<{ id: string }> = []
     try {
@@ -1964,6 +1952,14 @@ interface StoreState {
   setMidiClockOut: (on: boolean) => void
   midiThru: boolean
   setMidiThru: (on: boolean) => void
+  // MIDI clock IN (this computer's) : the BPM follows the clock on the MIDI
+  // input, the Seq transport its Start / Continue / Stop (midi.ts, midiClockIn.ts).
+  midiClockIn: boolean
+  setMidiClockIn: (on: boolean) => void
+  // What a fader or knob learned from now on starts as : pickup (it waits to
+  // reach the value) or jump (false : it takes the value at once, as before).
+  midiPickupDefault: boolean
+  setMidiPickupDefault: (on: boolean) => void
   updateMetaKnob: (i: number, partial: Partial<MetaKnobState>) => void
   setMetaValue: (i: number, v: number) => void
   // Toggle a destination on a knob (capped at META_MAX_DESTS).
@@ -2447,6 +2443,12 @@ interface StoreState {
   // Scene/Randomize morph time in ms (0…30000, 100 = quick) : crossfade, not snap.
   morphMs: number
   setMorphMs: (ms: number) => void
+  // The Transport's Vary amount (0.01..1) and Randomize amount (0.02..1) :
+  // this computer's (localStorage), never in a session, like Speed and Morph.
+  varyAmt: number
+  setVaryAmt: (v: number) => void
+  randIntensity: number
+  setRandIntensity: (v: number) => void
 
   // OSC input config (persisted to localStorage). `enabled`/`port` are the
   // user's intent; `listening`/`addresses` reflect the main-process result.
@@ -2800,7 +2802,7 @@ const keep = (s: { composition: CompositionState; pins: string[] }, c: Compositi
 // back its knobs without the CC, and the controller stopped playing them.)
 function withLiveCcs(c: CompositionState, live: CompositionState): CompositionState {
   const same = (a: MetaKnobState['midiCc'], b: MetaKnobState['midiCc']): boolean =>
-    (a?.channel ?? -1) === (b?.channel ?? -1) && (a?.number ?? -1) === (b?.number ?? -1)
+    (a?.channel ?? -1) === (b?.channel ?? -1) && (a?.number ?? -1) === (b?.number ?? -1) && !!a?.pickup === !!b?.pickup
   if (c.metaKnobs.every((k, i) => same(k.midiCc, live.metaKnobs[i]?.midiCc ?? null))) return c
   return { ...c, metaKnobs: c.metaKnobs.map((k, i) => (same(k.midiCc, live.metaKnobs[i]?.midiCc ?? null) ? k : { ...k, midiCc: live.metaKnobs[i]?.midiCc ?? null })) }
 }
@@ -3897,6 +3899,24 @@ export const useStore = create<StoreState>((set, get) => ({
     localStorage.setItem('opsia.morphMs', String(v))
     set({ morphMs: v })
   },
+  varyAmt: (() => {
+    const v = lsNum('opsia.varAmount')
+    return Number.isFinite(v) && v > 0 ? Math.max(0.01, Math.min(1, v)) : 0.3
+  })(),
+  setVaryAmt: (x) => {
+    const v = Math.max(0.01, Math.min(1, Number.isFinite(x) ? x : 0.3))
+    localStorage.setItem('opsia.varAmount', String(v))
+    set({ varyAmt: v })
+  },
+  randIntensity: (() => {
+    const v = lsNum('opsia.randIntensity')
+    return Number.isFinite(v) && v > 0 ? Math.max(0.02, Math.min(1, v)) : 1
+  })(),
+  setRandIntensity: (x) => {
+    const v = Math.max(0.02, Math.min(1, Number.isFinite(x) ? x : 1))
+    localStorage.setItem('opsia.randIntensity', String(v))
+    set({ randIntensity: v })
+  },
   applyMasterPreset: (fx, vibe, context) =>
     set((s) => {
       // Locked finalizers (Vibe, then Context) survive a chain preset; the
@@ -4472,6 +4492,16 @@ export const useStore = create<StoreState>((set, get) => ({
   setMidiThru: (on) => {
     localStorage.setItem('opsia.midiThru', on ? '1' : '0')
     set({ midiThru: on })
+  },
+  midiClockIn: localStorage.getItem('opsia.midiClockIn') === '1',
+  setMidiClockIn: (on) => {
+    localStorage.setItem('opsia.midiClockIn', on ? '1' : '0')
+    set({ midiClockIn: on })
+  },
+  midiPickupDefault: localStorage.getItem('opsia.midiPickup') === '1',
+  setMidiPickupDefault: (on) => {
+    localStorage.setItem('opsia.midiPickup', on ? '1' : '0')
+    set({ midiPickupDefault: on })
   },
   updateMetaKnob: (i, partial) =>
     set((s) => ({

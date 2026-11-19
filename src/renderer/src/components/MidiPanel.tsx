@@ -6,10 +6,12 @@
 // by where they live : this session (its file) or this computer; each row
 // moves to the other, and each OSC controller gets its reply port here.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MappingScope, MidiBinding, OscBinding } from '@shared/types'
-import { midi, type MidiDevice } from '../midi'
-import { describeAnyBinding, silencedBySession } from '../mappingModel'
+import { isContinuousTarget, midi, pickupHints, type MidiDevice } from '../midi'
+import { describeAnyBinding, isFaderKind, silencedBySession } from '../mappingModel'
+import { pickupInputKey } from '../midiPickup'
+import { controlKeyOf } from '../engine/controlBus'
 import { useStore } from '../store'
 import { triggerLabel, triggerOptions } from '../triggerCatalog'
 import { SearchSelect } from './SearchSelect'
@@ -47,6 +49,38 @@ export function LearnScopeSwitch({ short = false }: { short?: boolean }): JSX.El
   )
 }
 
+/** Beside the BPM (and Link's badge) while Follow MIDI clock is on : CLK lit
+ *  while the BPM follows a clock (filled while it plays), quiet with no clock,
+ *  struck through while one is heard but ignored (Link wins, or a loop). */
+export function MidiClockBadge(): JSX.Element | null {
+  const on = useStore((s) => s.midiClockIn)
+  const [st, setSt] = useState('')
+  useEffect(() => {
+    if (!on) return
+    const id = window.setInterval(() => {
+      const c = midi.clockStatus()
+      setSt(!c.heard ? 'none' : c.why ? 'ignored' : c.playing ? 'playing' : 'following')
+    }, 250)
+    return () => window.clearInterval(id)
+  }, [on])
+  if (!on) return null
+  const cls =
+    st === 'playing' ? 'bg-accent text-bg ring-1 ring-accent'
+    : st === 'following' ? 'bg-accent/20 text-accent ring-1 ring-accent'
+    : st === 'ignored' ? 'text-muted line-through ring-1 ring-border'
+    : 'text-muted ring-1 ring-border'
+  const tip =
+    st === 'playing' ? 'MIDI clock : the BPM follows the clock on the MIDI input, and it plays'
+    : st === 'following' ? 'MIDI clock : the BPM follows the clock on the MIDI input (stopped)'
+    : st === 'ignored' ? 'MIDI clock : a clock is heard but ignored (Ableton Link with other apps wins, or it is the clock this app sends, looped back)'
+    : 'MIDI clock : following is on, no clock heard on the MIDI input'
+  return (
+    <span className={`shrink-0 rounded px-1 py-px font-mono text-[9px] ${cls}`} title={tip}>
+      CLK
+    </span>
+  )
+}
+
 interface Row {
   key: string
   id: string
@@ -55,7 +89,18 @@ interface Row {
   b: MidiBinding | OscBinding
   silenced: boolean
   clear: () => void
+  /** a MIDI fader on a continuous target : jump or pickup, and the switch */
+  pickup?: { on: boolean; toggle: () => void }
 }
+
+/** The pickup choice of a MIDI mapping, flipped (absent = jump). */
+function flipPickup(b: MidiBinding): MidiBinding {
+  const { pickup, ...rest } = b
+  return pickup ? rest : { ...rest, pickup: true }
+}
+
+const canPickup = (id: string, b: MidiBinding | OscBinding): boolean =>
+  b.kind !== 'osc' && isFaderKind(b.kind) && isContinuousTarget(id) && !controlKeyOf(id)
 
 export function MidiPanel(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed['midi'])
@@ -68,6 +113,10 @@ export function MidiPanel(): JSX.Element {
   const setClockOut = useStore((s) => s.setMidiClockOut)
   const thru = useStore((s) => s.midiThru)
   const setThru = useStore((s) => s.setMidiThru)
+  const clockIn = useStore((s) => s.midiClockIn)
+  const setClockIn = useStore((s) => s.setMidiClockIn)
+  const pickupDefault = useStore((s) => s.midiPickupDefault)
+  const setPickupDefault = useStore((s) => s.setMidiPickupDefault)
   const learnMode = useStore((s) => s.midiLearnMode)
   const setLearnMode = useStore((s) => s.setMidiLearnMode)
   const midiMap = useStore((s) => s.midiMap)
@@ -109,12 +158,24 @@ export function MidiPanel(): JSX.Element {
   // the follower started (with Ableton Link's start / stop sync the clock runs
   // on while Link is stopped, the follower stopped)
   const [clockFollowing, setClockFollowing] = useState(false)
+  // the clock IN, as one line of words (a string : no re-render while it holds)
+  const [clockText, setClockText] = useState('')
+  // the pickup controls still waiting to reach their value
+  const waitKey = useRef('')
+  const [waiting, setWaiting] = useState<Map<string, { at: number; value: number }>>(() => new Map())
   useEffect(() => {
     const id = window.setInterval(() => {
       setActivity(midi.lastMsg)
       setWired(midi.wiredCount)
       setClockRunning(midi.clockRunning())
       setClockFollowing(midi.clockFollowing())
+      setClockText(clockLine(midi.clockStatus()))
+      const h = pickupHints()
+      const key = [...h].map(([k, v]) => `${k}=${Math.round(v.at * 100)}/${Math.round(v.value * 100)}`).join(',')
+      if (key !== waitKey.current) {
+        waitKey.current = key
+        setWaiting(h)
+      }
     }, 150)
     return () => window.clearInterval(id)
   }, [])
@@ -143,7 +204,8 @@ export function MidiPanel(): JSX.Element {
         scope,
         b,
         silenced: scope === 'computer' && silencedBySession(b, sessionMidiMap, sessionOscMap),
-        clear: () => (kind === 'midi' ? setMidiBinding(id, null, scope) : setOscBinding(id, null, scope))
+        clear: () => (kind === 'midi' ? setMidiBinding(id, null, scope) : setOscBinding(id, null, scope)),
+        pickup: b.kind !== 'osc' && canPickup(id, b) ? { on: !!b.pickup, toggle: () => setMidiBinding(id, flipPickup(b), scope) } : undefined
       })
     }
   }
@@ -158,7 +220,15 @@ export function MidiPanel(): JSX.Element {
         scope: 'knob',
         b: { kind: 'cc', channel: k.midiCc.channel, number: k.midiCc.number },
         silenced: false,
-        clear: () => updateMetaKnob(i, { midiCc: null })
+        clear: () => updateMetaKnob(i, { midiCc: null }),
+        pickup: {
+          on: !!k.midiCc.pickup,
+          toggle: () => {
+            const cc = k.midiCc
+            if (!cc) return
+            updateMetaKnob(i, { midiCc: cc.pickup ? { channel: cc.channel, number: cc.number } : { channel: cc.channel, number: cc.number, pickup: true } })
+          }
+        }
       })
     }
   })
@@ -251,6 +321,32 @@ export function MidiPanel(): JSX.Element {
             </span>
           </div>
 
+          {/* Clock IN and pickup : this computer's. Follow clock : the BPM and
+              the Seq transport follow the MIDI clock on the input. New : what a
+              fader or knob learned from now on starts as. */}
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => {
+                setClockIn(!clockIn)
+                midi.resetClockIn()
+              }}
+              className={pillCls(clockIn)}
+              title="Follow MIDI clock : the BPM follows the clock on the MIDI input (24 pulses a beat, from a drum machine, a sequencer or a DAW), smoothed over the last four beats and written a few times a second. Its Start plays the Seq transport from the top, Continue goes on, Stop stops it, and the modulators synced to the BPM lock onto its bar. With Ableton Link enabled and other apps linked, Link wins : the clock is ignored. A clock coming back on the port this app's own clock goes out to is ignored too (a loop). This computer's setting."
+            >
+              follow clock
+            </button>
+            <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted" title={clockText}>
+              {clockText}
+            </span>
+            <button
+              onClick={() => setPickupDefault(!pickupDefault)}
+              className={pillCls(pickupDefault)}
+              title={`What a fader or knob learned from now on starts as. Jump : the value takes the fader's position at the first touch (as always). Catch : after a scene, a session load, undo or the mouse moved the value, the fader does nothing until it reaches the value, then follows (no jump). Each mapping has its own switch in the list below. Now : ${pickupDefault ? 'catch' : 'jump'}. This computer's setting.`}
+            >
+              new : {pickupDefault ? 'catch' : 'jump'}
+            </button>
+          </div>
+
           {/* Output device : where Opsia sends MIDI clock / transport + thru
               (e.g. an Ableton Move over USB). Opsia is otherwise input-only. */}
           <div className="flex min-w-0 items-center gap-2">
@@ -336,14 +432,14 @@ export function MidiPanel(): JSX.Element {
                   action={{ label: 'copy to computer', title: "Copy the session's mappings to this computer (every session) : they stay in the session too", run: () => { copyAll(); showToast("The session's mappings are on this computer too", 'ok') } }}
                 >
                   {sessionRows.map((r) => (
-                    <MapRow key={r.key} r={r} onMove={() => moveMapping(r.kind, r.id, 'computer')} />
+                    <MapRow key={r.key} r={r} waiting={waiting} onMove={() => moveMapping(r.kind, r.id, 'computer')} />
                   ))}
                 </Group>
               )}
               {knobRows.length > 0 && (
                 <Group title="macro knobs" hint="A Macro knob's MIDI CC stays on the knob itself : it travels with the session and its scenes, whatever Learn into says (as it always did). OSC learned on a knob follows Learn into.">
                   {knobRows.map((r) => (
-                    <MapRow key={r.key} r={r} />
+                    <MapRow key={r.key} r={r} waiting={waiting} />
                   ))}
                 </Group>
               )}
@@ -354,7 +450,7 @@ export function MidiPanel(): JSX.Element {
                   action={{ label: 'move all to session', title: "Move every one of this computer's mappings into this session (saved with it, gone from this computer)", run: () => { moveAll(); showToast("This computer's mappings moved into the session (save it to keep them)", 'ok') } }}
                 >
                   {computerRows.map((r) => (
-                    <MapRow key={r.key} r={r} onMove={() => moveMapping(r.kind, r.id, 'session')} />
+                    <MapRow key={r.key} r={r} waiting={waiting} onMove={() => moveMapping(r.kind, r.id, 'session')} />
                   ))}
                 </Group>
               )}
@@ -397,10 +493,12 @@ function Group({ title, hint, action, children }: { title: string; hint: string;
 
 const TAG = 'w-7 shrink-0 rounded px-0.5 text-center font-mono text-[8px] leading-[14px]'
 
-function MapRow({ r, onMove }: { r: Row; onMove?: () => void }): JSX.Element {
+function MapRow({ r, onMove, waiting }: { r: Row; onMove?: () => void; waiting: Map<string, { at: number; value: number }> }): JSX.Element {
   const label = triggerLabel(r.id)
   const gone = label.includes('(gone)')
   const osc = r.b.kind === 'osc' ? r.b : null
+  // a pickup control still on its way to the value : which way, and where to
+  const wait = r.pickup?.on && r.b.kind !== 'osc' ? waiting.get(`${pickupInputKey(r.b.kind, r.b.channel, r.b.number)}>${r.id}`) : undefined
   return (
     <div
       className={`flex min-w-0 flex-col rounded bg-panel2/40 px-1.5 py-0.5 ${r.silenced ? 'opacity-45' : ''}`}
@@ -412,6 +510,17 @@ function MapRow({ r, onMove }: { r: Row; onMove?: () => void }): JSX.Element {
         <span className="min-w-0 max-w-[45%] shrink truncate font-mono text-[9px] text-accent2" title={describeAnyBinding(r.b)}>
           {describeAnyBinding(r.b)}
         </span>
+        {r.pickup && (
+          <button
+            onClick={r.pickup.toggle}
+            className={`shrink-0 rounded px-1 font-mono text-[8.5px] leading-[14px] transition-colors ${r.pickup.on ? 'bg-accent2/20 text-accent2' : 'text-muted hover:text-text'}`}
+            title={r.pickup.on
+              ? 'Catch : after a scene, a session load, undo or the mouse moved the value, this control does nothing until it reaches the value, then follows. Click for jump'
+              : "Jump : the value takes this control's position at the first touch. Click for catch (the control waits to reach the value, then follows)"}
+          >
+            {r.pickup.on ? 'catch' : 'jump'}
+          </button>
+        )}
         {onMove && (
           <button
             onClick={onMove}
@@ -426,6 +535,11 @@ function MapRow({ r, onMove }: { r: Row; onMove?: () => void }): JSX.Element {
         </button>
       </div>
       {r.silenced && <span className="pl-8 font-mono text-[8.5px] text-muted">replaced by this session</span>}
+      {wait && (
+        <span className="pl-8 font-mono text-[8.5px] text-accent2" title="Catch : this control waits to reach the value it drives (a scene, undo or the mouse moved it), then follows">
+          waiting to catch : move it {wait.at < wait.value ? 'up' : 'down'} to {Math.round(wait.value * 100)} % (at {Math.round(wait.at * 100)} %)
+        </span>
+      )}
       {osc && <OscRange b={osc} scope={r.scope as MappingScope} id={r.id} />}
     </div>
   )
@@ -465,6 +579,16 @@ function OscRange({ b, scope, id }: { b: OscBinding; scope: MappingScope; id: st
       <span title={b.bool ? 'It sends true / false : answers go back so' : b.int ? 'It sends whole numbers : answers go back as whole numbers' : 'It sends decimals'}>{b.bool ? 'T/F' : b.int ? 'int' : ''}</span>
     </div>
   )
+}
+
+/** The clock IN as the panel says it. */
+function clockLine(c: ReturnType<typeof midi.clockStatus>): string {
+  if (!c.on) return 'clock in : off'
+  if (!c.heard) return 'clock in : no clock heard'
+  const bpm = c.bpm > 0 ? `${c.bpm.toFixed(1)} BPM` : 'reading the tempo'
+  if (c.why === 'link') return `clock in : ${bpm}, ignored (Link)`
+  if (c.why === 'own') return "clock in : ignored (this app's own clock, looped back)"
+  return `clock in : ${bpm} · ${c.playing ? 'playing' : 'stopped'}${c.src ? ` · ${c.src}` : ''}`
 }
 
 function fmtNum(v: number): string {

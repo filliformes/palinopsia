@@ -24,16 +24,14 @@ export function fireSelectedRandomize(): void {
     st.setSonify(randomSonify(st.sonify))
     return
   }
-  const i = Number(localStorage.getItem('opsia.randIntensity'))
-  const intensity = Number.isFinite(i) && i > 0 ? i : 1
-  useStore.getState().randomize(scope, intensity)
+  const st = useStore.getState()
+  st.randomize(scope, st.randIntensity)
 }
 
 /** Fire a Variation at the Transport's persisted spread (the Vary button). */
 export function fireVariation(): void {
-  const v = Number(localStorage.getItem('opsia.varAmount'))
-  const amt = Number.isFinite(v) && v > 0 ? v : 0.3
-  useStore.getState().applyVariation(amt)
+  const st = useStore.getState()
+  st.applyVariation(st.varyAmt)
 }
 
 // Panic flush needs the live Compositor (which isn't in the store), so App

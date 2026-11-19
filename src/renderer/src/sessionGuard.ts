@@ -32,6 +32,11 @@ let tempoShared: () => boolean = () => false
 export function setTempoShared(fn: () => boolean): void {
   tempoShared = fn
 }
+// The same while the BPM follows a MIDI clock (./midi.ts registers it).
+let tempoFollowed: () => boolean = () => false
+export function setTempoFollowed(fn: () => boolean): void {
+  tempoFollowed = fn
+}
 
 interface Prints {
   full: string
@@ -101,7 +106,7 @@ export function markDirty(): void {
 export function isDirty(): boolean {
   if (baseline === null) return true
   const now = prints()
-  return tempoShared() ? now.noTempo !== baseline.noTempo : now.full !== baseline.full
+  return tempoShared() || tempoFollowed() ? now.noTempo !== baseline.noTempo : now.full !== baseline.full
 }
 
 export type LeaveChoice = 'save' | 'discard' | 'cancel'

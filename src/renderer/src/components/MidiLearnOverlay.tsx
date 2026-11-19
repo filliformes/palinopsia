@@ -57,7 +57,7 @@ export function MidiLearnOverlay({ id }: { id: string }): JSX.Element | null {
         ? 'midi-learn-green midi-learn-other'
         : 'midi-learn-blue'
   const hint = isContinuousTarget(id)
-    ? 'move a knob / fader, or a fader sending OSC'
+    ? 'move a knob / fader, the pitch bend or aftertouch, or a fader sending OSC'
     : id.startsWith('rule:')
       ? 'hit a pad (each hit : on or off), move a knob (on from half way) or press an OSC button (each press : on or off)'
       : 'hit a pad / press a button, or send an OSC message'

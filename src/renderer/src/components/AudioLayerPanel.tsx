@@ -19,6 +19,7 @@ import { AUDIO_LAYER, audioLayer, type AudioSlotName, type SlotInfo } from '../a
 import { droppedPaths, dropKind, isFileDrag, openDroppedSession } from './fileDrop'
 import { showToast } from './Toast'
 import { NdiPicker } from './NdiPicker'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 
 const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.flac,.ogg,.oga,.opus,.aac,.m4a,.aif,.aiff,.wma,.caf'
 const M_FLOOR = -60
@@ -196,13 +197,16 @@ export function AudioLayerPanel(): JSX.Element {
           <span className={`font-mono text-[9px] text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}>▶</span>
           <span className="font-mono text-[11px] text-muted">AU</span>
         </button>
-        <AuSlider
-          target={AU_VOLUME} min={0} max={2} value={al.volume}
-          set={(v) => patch({ volume: v })}
-          onDoubleClick={() => patch({ volume: 1 })}
-          className="min-w-0 flex-1"
-          title={`The Audio Layer's volume ${Math.round(al.volume * 100)} % (double-click : 100 %). It plays into Sonify's mix (after Sonify's own volume) : the output EQ, the limiter, the recordings and Space have it, Sonify on or off.`}
-        />
+        <span className="relative flex min-w-0 flex-1">
+          <MidiLearnOverlay id="audiolayer:volume" />
+          <AuSlider
+            target={AU_VOLUME} min={0} max={2} value={al.volume}
+            set={(v) => patch({ volume: v })}
+            onDoubleClick={() => patch({ volume: 1 })}
+            className="w-full min-w-0"
+            title={`The Audio Layer's volume ${Math.round(al.volume * 100)} % (double-click : 100 %). It plays into Sonify's mix (after Sonify's own volume) : the output EQ, the limiter, the recordings and Space have it, Sonify on or off.`}
+          />
+        </span>
         {modChip('volume', "the Audio Layer's volume")}
         <Meter which={null} className="w-12 shrink-0" />
         <Chip label="⊘" active={al.mute} onClick={() => patch({ mute: !al.mute })} title="Mute the Audio Layer" />
@@ -221,13 +225,16 @@ export function AudioLayerPanel(): JSX.Element {
             <PlayBoth />
             <span className="shrink-0 font-mono text-[9px] uppercase text-muted">mix</span>
             <span className="shrink-0 font-mono text-[9px] text-muted">A</span>
-            <AuSlider
-              target={AU_MIX} min={0} max={1} value={al.mix}
-              set={(v) => patch({ mix: v })}
-              onDoubleClick={() => patch({ mix: 0.5 })}
-              className="min-w-0 flex-1"
-              title={`A and B : the middle plays both whole, toward an end the other one fades out (${al.mix.toFixed(2)}; double-click : the middle)`}
-            />
+            <span className="relative flex min-w-0 flex-1">
+              <MidiLearnOverlay id="audiolayer:mix" />
+              <AuSlider
+                target={AU_MIX} min={0} max={1} value={al.mix}
+                set={(v) => patch({ mix: v })}
+                onDoubleClick={() => patch({ mix: 0.5 })}
+                className="w-full min-w-0"
+                title={`A and B : the middle plays both whole, toward an end the other one fades out (${al.mix.toFixed(2)}; double-click : the middle)`}
+              />
+            </span>
             <span className="shrink-0 font-mono text-[9px] text-muted">B</span>
             {modChip('mix', "the Audio Layer's A/B mix")}
           </div>
