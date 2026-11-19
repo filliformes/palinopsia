@@ -1856,7 +1856,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     position: 'Where the plane stands when the direction is by hand : 0 = the farthest, 1 = the nearest.',
     restart: 'Starts the sweep again from its beginning (for a cue, a hit, a Body rule).',
     width: 'How deep a slice of the picture the plane lights at once.',
-    trail: 'The wake the plane leaves on the side it has passed, fading. 0 = only the plane itself.',
+    trail: 'The wake the plane leaves on the side it has passed, fading (by hand : on both sides). 0 = only the plane itself.',
     brighten: 'How much brighter what the plane crosses becomes.',
     tint: 'How far what the plane crosses turns toward the GLOW color (its brightness kept).',
     glow: 'The color of the plane : the tint and the contour line take it.',

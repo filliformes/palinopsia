@@ -527,7 +527,7 @@ const DIMS: Record<string, (q: Dim) => Why> = {
   'gen-terrain': ({ zero, side }) => {
     const d: Why = {}
     if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
-    if (side && zero('rough')) put(d, ['evolve'], 'A layer is picked as the sidechain and rock is at 0 : nothing of its own evolves.')
+    if (side) { if (zero('rough')) put(d, ['evolve'], 'A layer is picked as the sidechain and rock is at 0 : nothing of its own evolves.') }
     else put(d, ['raise', 'settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
     if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
     if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')

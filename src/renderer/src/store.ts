@@ -3619,7 +3619,10 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
       selection: { type: 'source', layer, slot }
     })),
-  setSourceText: (layer, slot, text) =>
+  setSourceText: (layer, slot, words) => {
+    // (OSC and the Agent reach this : a few thousand characters is a page of text;
+    // more would ride through every undo step and the session for nothing)
+    const text = String(words).slice(0, 4000)
     set((s) => ({
       composition: {
         ...s.composition,
@@ -3630,7 +3633,8 @@ export const useStore = create<StoreState>((set, get) => ({
           return slot === 'A' ? { ...l, sourceA: next } : { ...l, sourceB: next }
         })
       }
-    })),
+    }))
+  },
   setCollagePool: (layer, slot, folder, pool) =>
     set((s) => {
       rememberCollage(folder, pool)

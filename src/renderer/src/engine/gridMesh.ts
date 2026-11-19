@@ -402,9 +402,9 @@ export function noiseField(p: NoiseParams): Float32Array {
 
 /** A grid of twelve-value cells resampled to another size by the nearest cell (cells
  *  repeat when it grows, drop when it shrinks). */
-export function resampleNearest(src: Float32Array, sx: number, sy: number, dx: number, dy: number): Float32Array {
+export function resampleNearest(src: Float32Array, sx: number, sy: number, dx: number, dy: number, into?: Float32Array): Float32Array {
   if (sx === dx && sy === dy) return src
-  const out = new Float32Array(dx * dy * PLANES)
+  const out = into && into.length === dx * dy * PLANES ? into : new Float32Array(dx * dy * PLANES)
   for (let j = 0; j < dy; j++) {
     const ys = Math.min(sy - 1, Math.floor((j * sy) / dy))
     for (let i = 0; i < dx; i++) {
@@ -417,13 +417,20 @@ export function resampleNearest(src: Float32Array, sx: number, sy: number, dx: n
 
 /** The whole chain : the shape (already turned), the noise multiplied into it on the
  *  noise's grid, and crossfaded back (`blend` past 1 goes beyond the noisy shape). */
+// (the chain's working arrays, kept from frame to frame : no garbage every frame)
+let sSmall: Float32Array = new Float32Array(0), sProd: Float32Array = new Float32Array(0), sBack: Float32Array = new Float32Array(0), sOut: Float32Array = new Float32Array(0), sTmp: Float32Array = new Float32Array(0)
+const sized = (a: Float32Array, n: number): Float32Array => (a.length === n ? a : new Float32Array(n))
+
 export function deformGrid(shape: Float32Array, nx: number, ny: number, noise: Float32Array | null, noiseDim: number, blend: number): Float32Array {
   if (!noise || blend === 0) return shape
-  const small = resampleNearest(shape, nx, ny, noiseDim, noiseDim)
-  const prod = new Float32Array(small.length)
+  const ns = noiseDim * noiseDim * PLANES
+  sSmall = sized(sSmall, ns)
+  const small = resampleNearest(shape, nx, ny, noiseDim, noiseDim, sSmall)
+  const prod = (sProd = sized(sProd, small.length))
   for (let o = 0; o < prod.length; o++) prod[o] = small[o] * noise[o]
-  const back = resampleNearest(prod, noiseDim, noiseDim, nx, ny)
-  const out = new Float32Array(shape.length)
+  sBack = sized(sBack, shape.length)
+  const back = resampleNearest(prod, noiseDim, noiseDim, nx, ny, sBack)
+  const out = (sOut = sized(sOut, shape.length))
   for (let o = 0; o < out.length; o++) out[o] = shape[o] + (back[o] - shape[o]) * blend
   return out
 }
@@ -432,7 +439,7 @@ export function deformGrid(shape: Float32Array, nx: number, ny: number, noise: F
  *  is), written over the grid's own. */
 export function gridNormals(g: Float32Array, nx: number, ny: number): void {
   const at = (i: number, j: number): number => (Math.max(0, Math.min(ny - 1, j)) * nx + Math.max(0, Math.min(nx - 1, i))) * PLANES
-  const tmp = new Float32Array(nx * ny * 3)
+  const tmp = (sTmp = sized(sTmp, nx * ny * 3))
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const a = at(i + 1, j), b = at(i - 1, j), c = at(i, j + 1), d = at(i, j - 1)
     const ux = g[a] - g[b], uy = g[a + 1] - g[b + 1], uz = g[a + 2] - g[b + 2]

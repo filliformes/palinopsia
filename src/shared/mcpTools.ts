@@ -115,7 +115,7 @@ export const MCP_TOOLS: McpToolDef[] = [
       properties: {
         layer: { type: ['number', 'string'], description: '1-4.' },
         slot: { type: 'string', enum: ['A', 'B'], description: 'Default A.' },
-        text: { type: 'string', description: 'The words.' }
+        text: { type: 'string', maxLength: 4000, description: 'The words (at most 4000 characters).' }
       },
       required: ['layer', 'text']
     }

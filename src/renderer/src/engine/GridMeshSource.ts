@@ -93,7 +93,7 @@ float specTerm(vec3 N, vec3 L, vec3 V) {
     return nl * exp(-t2 / (a * a)) / (4.0 * 3.14159 * a * a * sqrt(nl * nv));
   }
   float m = clamp(1.0 / sh, 0.03, 1.0);                           // Cook-Torrance
-  float c2 = nh * nh;
+  float c2 = max(nh * nh, 1e-4); // (0 at a silhouette : 0/0)
   float D = exp((c2 - 1.0) / (m * m * c2)) / (3.14159 * m * m * c2 * c2);
   float vh = max(1e-3, dot(V, H));
   float G = min(1.0, min(2.0 * nh * nv / vh, 2.0 * nh * nl / vh));
@@ -319,7 +319,10 @@ export class GridMeshSource implements NativeGenerator {
   // the shape and the noise, kept until what makes them changes
   private shapeKey = ''
   private shape: Float32Array | null = null
+  private work = new Float32Array(0)
   private noiseKey = ''
+  private noiseDim = 0
+  private noiseAt = -1e9
   private noise: Float32Array | null = null
   private primKey = ''
   private prim: Primitives | null = null
@@ -494,7 +497,10 @@ export class GridMeshSource implements NativeGenerator {
     this.sy = (this.sy + axes[1] * sp * dt) % TWO
     this.sz = (this.sz + axes[2] * sp * dt) % TWO
 
-    const grid = this.shape.slice()
+    // (a copy kept from frame to frame : the shape stays as built)
+    if (this.work.length !== this.shape.length) this.work = new Float32Array(this.shape.length)
+    const grid = this.work
+    grid.set(this.shape)
     const inside = num(I, 'noiseStill', 1) > 0.5 // the shape turns inside the still noise
     const D = Math.PI / 180
     const rot: [number, number, number] = [this.sx + num(I, 'shapeRotX', 0) * D, this.sy + num(I, 'shapeRotY', 0) * D, this.sz + num(I, 'shapeRotZ', 0) * D]
@@ -510,7 +516,13 @@ export class GridMeshSource implements NativeGenerator {
       const kx = this.kick, ky = this.kick * 0.61, kz = this.kick * 0.37
       const nk = [num(I, 'noiseBasis', 6), nd, num(I, 'noiseScale', 0.9), num(I, 'noiseX', 0) + kx, num(I, 'noiseY', 0) + ky, num(I, 'noiseZ', 0) + kz, num(I, 'noiseFlip', 0), num(I, 'noiseSize', 1.8)]
         .map((v) => Math.round(v * 1000) / 1000).join(':')
-      if (nk !== this.noiseKey || !this.noise) {
+      // A new field costs 1 to 45 ms on this thread (the basis, the grid) : while its
+      // key keeps moving (a modulated offset, a Morph, the hits) it is rebuilt at
+      // most every 50 ms, the last one kept meanwhile (a new grid size : at once).
+      const now = performance.now()
+      if (!this.noise || nd !== this.noiseDim || (nk !== this.noiseKey && now - this.noiseAt >= 50)) {
+        this.noiseAt = now
+        this.noiseDim = nd
         const flip = num(I, 'noiseFlip', 0) > 0.5 ? -1 : 1
         this.noise = noiseField({
           basis: Math.round(num(I, 'noiseBasis', 6)), dim: nd, scale: num(I, 'noiseScale', 0.9),

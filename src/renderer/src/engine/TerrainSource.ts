@@ -316,7 +316,8 @@ float ownLand(vec2 uv) {
     float rr = length(d) / (0.34 * uScale);
     float wall = smoothstep(0.45, 1.0, rr);
     float bowl = rr < 1.0 ? -0.3 * (1.0 - rr * rr) + 0.3 * wall * wall : 0.0;
-    float rim = 0.26 * exp(-pow((rr - 1.0) / 0.24, 2.0));
+    float rq = (rr - 1.0) / 0.24; // (squared by hand : pow() of a negative base is undefined)
+    float rim = 0.26 * exp(-rq * rq);
     float ej = rr > 1.0 ? 0.14 * exp(-(rr - 1.0) * 1.8) : 0.0;
     float peak = 0.2 * exp(-pow(rr / 0.2, 2.0));
     float det = fbm(uv, 3.0, 5, 0.5);
@@ -1215,7 +1216,7 @@ export class TerrainSource implements NativeGenerator {
       .f1('uFar', 14)
       .f1('uMix', clamp(num(I, 'colorMix', 0.5), 0, 1))
       .f1('uLines', clamp(num(I, 'contours', 0.5), 0, 1))
-      .f1('uLineW', clamp(num(I, 'lineWidth', 1.2), 0.5, 4))
+      .f1('uLineW', clamp(num(I, 'lineWidth', 1.2), 0.5, 4) * Math.max(1, this.h / 1080)) // (as thick at 4K and on the dome)
       .f1('uLineN', n > 0 ? n : 10)
       .f1('uWater', clamp(num(I, 'water', 0), 0, 1))
       .f1('uMirror', clamp(num(I, 'mirror', 0.6), 0, 1))
