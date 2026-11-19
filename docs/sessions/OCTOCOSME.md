@@ -88,7 +88,8 @@ changed there, and saving the session keeps the change.
   their place with the saved values at rest, and was never compared with the wall live.
 - **Grid Mesh against Max** : the shapes, layout, draw modes and lights were matched on
   the patch's raw output at rest; the noises are not `jit.bfg`'s own, and the cube's fan
-  and the cone's centre still differ a little.
+  and the cone's centre still differ a little. The level and the color's alpha count once,
+  as in the patch (half level : about a quarter of the color over black).
 - **Two controllers** : one session (and one Palinopsia) per controller. Aliases do not
   filter by sender; with two controllers on one network, mute the other one's sender in
   OSC's **links** pane.
