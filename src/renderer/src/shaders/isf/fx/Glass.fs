@@ -1,5 +1,5 @@
 /*{
-  "DESCRIPTION": "Glass : the picture seen through a pane of patterned glass that really refracts. Each pattern is a surface (fluted columns, fine reeds, rippled cathedral glass, hammered dimples, a stippled pebble, prisms, or plain frost); its slope bends the light by DEPTH, red, green and blue a little apart by DISPERSION (the color split at every edge), FROST scatters it, SHINE puts the window's light on the ridges and the seams go dark. SCALE is how many across the frame, ANGLE turns the pattern, TINT colors the glass.",
+  "DESCRIPTION": "Glass : the picture seen through a pane of patterned glass that really refracts. Each pattern is a surface (fluted columns, fine reeds, rippled cathedral glass, hammered dimples, a stippled pebble, prisms, or plain frost); its slope bends the light by DEPTH, red, green and blue a little apart by DISPERSION (the color split at every edge), FROST scatters it, SHINE puts the window's light on the ridges and the seams go dark. SCALE is how many across the frame, ANGLE turns the pattern, TINT colors the glass. DRIFT lets the pane wander and flow, EVOLVE bends the pattern out of its classic shape : meandering ribbons, breathing scale, one glass turning into another.",
   "CREDIT": "Palinopsia",
   "ISFVSN": "2",
   "CATEGORIES": ["FX", "Glass", "Distortion"],
@@ -15,13 +15,18 @@
     { "NAME": "seams", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.3, "LABEL": "seams" },
     { "NAME": "lightAngle", "TYPE": "float", "MIN": 0.0, "MAX": 6.2832, "DEFAULT": 2.36, "LABEL": "light angle" },
     { "NAME": "tint", "TYPE": "color", "DEFAULT": [0.94, 0.97, 1.0, 1.0], "LABEL": "tint" },
-    { "NAME": "drift", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "drift" }
+    { "NAME": "drift", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "drift" },
+    { "NAME": "evolve", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.0, "LABEL": "evolve" }
   ]
 }*/
 
-// The pane drifts across the picture by DRIFT (an integrated phase : a knob
-// change never jumps it).
+// DRIFT and EVOLVE run on integrated phases (a knob change never jumps them) :
+// the pane wanders along a slow path in every direction and a soft current bends
+// it as it goes (DRIFT : how lively, 0 still); EVOLVE meanders the pattern into
+// ribbons, lets its scale breathe and turns regions into the next glass, on its
+// own clock (0 : the classic pattern, as before).
 uniform float PH_drift;
+uniform float PH_evolve;
 
 float gHash(vec2 p) {
   // third-party: Hash without Sine
@@ -82,6 +87,19 @@ float surf(vec2 q, int pat, out float s) {
   return 0.0;
 }
 
+// The surface with EVOLVE : regions slowly turning into the next glass.
+float surfE(vec2 q, int pat, float ev, float te, out float s) {
+  float h = surf(q, pat, s);
+  if (ev <= 0.0) return h;
+  float m = smoothstep(0.3, 0.7, gNoise(q * 0.06 + vec2(te * 0.4, -te * 0.3))) * ev;
+  if (m <= 0.001) return h;
+  float s2;
+  int pat2 = pat >= 5 ? (pat == 5 ? 2 : 3) : pat + 1;
+  float h2 = surf(q * 1.15 + 3.7, pat2, s2);
+  s = mix(s, s2, m);
+  return mix(h, h2, m);
+}
+
 void main() {
   vec2 uv = isf_FragNormCoord;
   float aspect = RENDERSIZE.x / RENDERSIZE.y;
@@ -89,16 +107,33 @@ void main() {
   float ca = cos(angle), sa = sin(angle);
   // the frame in frame heights, turned by ANGLE, SCALE elements across its height
   vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-  vec2 q = vec2(ca * p.x + sa * p.y, -sa * p.x + ca * p.y) * scale + vec2(PH_drift * 0.5, 0.0);
+  vec2 q = vec2(ca * p.x + sa * p.y, -sa * p.x + ca * p.y) * scale;
+  // DRIFT : the pane wanders (a slow meander, every direction) and a current
+  // bends it as it goes, livelier with the knob (none at 0 : the pane still)
+  float td = PH_drift;
+  q += (vec2(gNoise(vec2(td * 0.23, 1.7)), gNoise(vec2(4.3, td * 0.19))) - 0.5) * 8.0;
+  float fa = clamp(drift * 3.0, 0.0, 1.0);
+  if (fa > 0.0)
+    q += (vec2(gNoise(q * 0.21 + vec2(td * 0.35, 3.0)), gNoise(q * 0.21 + vec2(11.0, -td * 0.31))) - 0.5) * fa * 1.4;
+  // EVOLVE : the pattern meanders out of its classic shape and its scale breathes
+  float ev = evolve;
+  float te = PH_evolve * 0.25;
+  if (ev > 0.0) {
+    vec2 w = vec2(gNoise(q * 0.18 + vec2(te, 0.0)), gNoise(q * 0.18 + vec2(5.2, -te))) - 0.5;
+    w += 0.5 * (vec2(gNoise(q * 0.41 + vec2(2.0 - te * 1.3, 0.0)), gNoise(q * 0.41 + vec2(8.0, te * 1.1))) - 0.5);
+    q += w * ev * 4.0;
+    q *= 1.0 + (gNoise(q * 0.07 + vec2(te * 0.5, 1.3)) - 0.5) * ev * 0.8;
+  }
   // the slope by central differences, in the turned space, then back to the frame's
   float e = 0.03;
   float s0, s1, s2;
-  float h = surf(q, pat, s0);
-  float hx = surf(q + vec2(e, 0.0), pat, s1) - surf(q - vec2(e, 0.0), pat, s2);
-  float hy = surf(q + vec2(0.0, e), pat, s1) - surf(q - vec2(0.0, e), pat, s2);
+  float h = surfE(q, pat, ev, te, s0);
+  float hx = surfE(q + vec2(e, 0.0), pat, ev, te, s1) - surfE(q - vec2(e, 0.0), pat, ev, te, s2);
+  float hy = surfE(q + vec2(0.0, e), pat, ev, te, s1) - surfE(q - vec2(0.0, e), pat, ev, te, s2);
   vec2 gq = vec2(hx, hy) / (2.0 * e);
   vec2 g = vec2(ca * gq.x - sa * gq.y, sa * gq.x + ca * gq.y);
-  if (pat == 6) g = vec2(0.0);
+  // (frosted has no relief of its own : only what EVOLVE turns into one)
+  if (pat == 6 && ev <= 0.0) g = vec2(0.0);
   // the bend : the slope over the element's size (a fine pattern bends less far)
   vec2 off = -g * depth * 0.06 * (18.0 / max(2.0, scale)) * vec2(1.0 / aspect, 1.0);
   // frost : a few taps scattered round the bent point, per pixel

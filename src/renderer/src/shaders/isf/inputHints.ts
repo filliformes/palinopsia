@@ -74,7 +74,8 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     seams: 'How dark the grooves between the columns and dimples are.',
     lightAngle: 'Where the light on the ridges comes from.',
     tint: 'The color of the glass itself.',
-    drift: 'Slides the pane slowly across the picture.'
+    drift: 'Lets the pane wander slowly in every direction, a soft current bending the pattern as it goes : livelier as you raise it, still at 0.',
+    evolve: 'Bends the glass out of its classic shape : the pattern meanders into ribbons, its scale breathes, and regions slowly turn into another glass. It keeps changing, faster as you raise it.'
   },
   'fx-rain-pane': {
     drops: 'How many drops bead on the pane.',

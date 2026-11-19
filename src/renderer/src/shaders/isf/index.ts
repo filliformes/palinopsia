@@ -2704,7 +2704,7 @@ export const FX_SHADERS: IsfShader[] = [
   },
   {
     id: 'fx-glass', name: 'Glass', category: 'FX', source: glass,
-    curated: { pattern: [0, 6], scale: [8, 40], angle: [0, 0], depth: [0.25, 0.7], dispersion: [0, 0.6], frost: [0, 0.4], shine: [0.15, 0.55], seams: [0.1, 0.5], lightAngle: [0, 6.2832], drift: [0, 0] }
+    curated: { pattern: [0, 6], scale: [8, 40], angle: [0, 0], depth: [0.25, 0.7], dispersion: [0, 0.6], frost: [0, 0.4], shine: [0.15, 0.55], seams: [0.1, 0.5], lightAngle: [0, 6.2832], drift: [0, 0], evolve: [0, 0.6] }
   },
   {
     id: 'fx-rain-pane', name: 'Rain on Glass', category: 'FX', source: rainPane,

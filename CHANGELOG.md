@@ -372,6 +372,13 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Changed
 
+- **Glass : drift flows, and a new evolve** (`fx/Glass.fs`) : **drift** only slid the pane to
+  the right; it now wanders along a slow path in every direction (a noise meander on
+  `PH_drift`) with a soft current bending the pattern, livelier with the knob (0 : still).
+  **evolve** (new, 0 by default, `PH_evolve`) meanders the pattern into ribbons, lets its
+  scale breathe and blends regions into the next glass (`surfE`). Presets Liquid pane,
+  Melting cathedral, Shifting glass (the others written with evolve 0, unchanged); dealt
+  0..0.6; Inspector column **motion**. 60 fps at 1080p.
 - **A blue 3D mark in the source and effect menus** (`shaders/isf/threeD.ts`, drawn by
   `SearchSelect`) : after Model, Grid Mesh, Point Cloud and Terrain, and after the effects
   that read the depth map (Parallax, Depth Scan, Luma Blur, Pulfrich); a lighter, dashed

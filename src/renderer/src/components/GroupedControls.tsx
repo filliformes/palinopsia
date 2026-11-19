@@ -236,8 +236,9 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   ],
   // Glass : the pane · the light
   'fx-glass': [
-    g('pane', 'pattern', 'scale', 'angle', 'depth', 'dispersion', 'frost', 'drift'),
-    g('light', 'shine', 'seams', 'lightAngle', 'tint')
+    g('pane', 'pattern', 'scale', 'angle', 'depth', 'dispersion', 'frost'),
+    g('light', 'shine', 'seams', 'lightAngle', 'tint'),
+    g('motion', 'drift', 'evolve')
   ],
   'fx-rain-pane': [
     g('rain', 'drops', 'size', 'slide', 'trails'),
