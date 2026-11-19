@@ -1261,7 +1261,7 @@ function SourceRow({
                   ? `Layer ${k + 1}'s last frame : a loop. Effects on this slot, the mix and the layer's own feedback all run again on every pass`
                   : `Layer ${k + 1}'s picture as it is this frame (it is below : no loop unless it reads this layer back)`
             })),
-            // The body silhouette joins the live entries, then living matter, then
+            // The sources that need material (films, the Body camera) first, then living matter, then
             // analog video, then every other generator.
             ...userGens.map((u) => ({ value: u.id, label: u.name, group: 'my shaders', title: `One of your shaders (the Source Editor, ${SOURCE_EDITOR_KEY})` })),
             ...inPickerOrder(GENERATORS_ALPHA).map(

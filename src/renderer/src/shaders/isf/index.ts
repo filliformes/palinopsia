@@ -3118,8 +3118,8 @@ export function isAnalogSource(sh: IsfShader): boolean {
   return categoriesOf(sh).includes('"Analog"')
 }
 
-/** Generators tagged "Live" : sources that read the room (the Body camera's
- *  silhouette), listed with the camera and capture entries. */
+/** Generators tagged "Live" : sources that read the room. (The Body camera's
+ *  silhouette is one, but NEEDS puts it under "needs material" first.) */
 export function isLiveSource(sh: IsfShader): boolean {
   return categoriesOf(sh).includes('"Live"')
 }
