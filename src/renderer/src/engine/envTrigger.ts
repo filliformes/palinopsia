@@ -66,7 +66,7 @@ export function sanitizeEnvTrigger(x: unknown, self: number): EnvTrigger | undef
   let lo = num(o.lo, d.lo, 0, 20000)
   let hi = num(o.hi, d.hi, 0, 20000)
   if (lo > hi) [lo, hi] = [hi, lo]
-  const at = num(o.at, d.at, 0, 1)
+  const at = num(o.at, d.at, 0.01, 1) // (0 would fire over and over on silence)
   const rearm = Math.min(at, num(o.rearm, Math.max(0, at - 0.2), 0, 1))
   let slot = Math.round(num(o.slot, 0, 0, 7))
   if (slot === self) slot = (self + 1) % 8

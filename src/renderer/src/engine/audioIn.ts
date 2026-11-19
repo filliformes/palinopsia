@@ -148,6 +148,7 @@ function autoCorrelate(buf: Float32Array, sampleRate: number, corr: Float32Array
 /** The buffers one analyser's frames need (and its pitch throttle). */
 export interface FrameBufs {
   freq: Uint8Array<ArrayBuffer>
+  db: Float32Array<ArrayBuffer> // the same frame's spectrum in dB (the audio tab's display)
   time: Uint8Array<ArrayBuffer>
   timeF: Float32Array<ArrayBuffer> // float waveform (pitch)
   corr: Float32Array<ArrayBuffer> // the pitch's correlation by lag (one per analyser, not one per frame)
@@ -157,6 +158,7 @@ export interface FrameBufs {
 export function frameBufs(an: AnalyserNode): FrameBufs {
   return {
     freq: new Uint8Array(an.frequencyBinCount),
+    db: new Float32Array(an.frequencyBinCount),
     time: new Uint8Array(an.fftSize),
     timeF: new Float32Array(an.fftSize),
     corr: new Float32Array(an.fftSize),
@@ -173,7 +175,17 @@ export function analyseFrame(an: AnalyserNode, fb: FrameBufs, L: AudioFeatures, 
   const time = fb.time
   const prev = fb.prev
   an.getByteTimeDomainData(time)
-  an.getByteFrequencyData(freq)
+  // ONE spectrum read a frame : each read at a later time runs a new FFT and
+  // smooths again, so a second reader (the audio tab's spectrum) would change what
+  // the modulators hear. The floats are kept for that display; the bytes are
+  // derived from them as the analyser itself scales them.
+  const db = fb.db
+  an.getFloatFrequencyData(db)
+  const lo = an.minDecibels, k = 255 / (an.maxDecibels - an.minDecibels)
+  for (let i = 0; i < freq.length; i++) {
+    const v = (db[i] - lo) * k
+    freq[i] = v > 0 ? (v < 255 ? v : 255) : 0
+  }
 
   // level : RMS of the centred time-domain waveform, lightly gained.
   let sum = 0
@@ -965,14 +977,8 @@ class AudioBus {
    *  the bytes stop at the analyser's -30 dB top, where a -12 dBFS tone already
    *  sits. Null : no local spectrum (OSC only, nothing open, an empty layer). */
   spectrumDb(): Float32Array<ArrayBuffer> | null {
-    if (!this.localOn) return null
-    const an = this.layerIn ? this.layerAn : this.analyser
-    if (!an) return null
-    if (this.dbBuf.length !== an.frequencyBinCount) this.dbBuf = new Float32Array(an.frequencyBinCount)
-    an.getFloatFrequencyData(this.dbBuf)
-    return this.dbBuf
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.db ?? null : null
   }
-  private dbBuf = new Float32Array(0)
   /** The live input's sample rate (Hz) : what the spectrum bins are in. */
   sampleRateHz(): number {
     return this.sampleRate

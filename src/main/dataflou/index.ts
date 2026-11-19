@@ -18,7 +18,7 @@ import { encodeDeclare } from './protocol'
 import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged, visualizerScene } from './visualizer'
 import type { SceneFile } from './node'
 import {
-  DF_DECLARE_MAX, DF_SELF, cleanPublish, cleanSessionWires, cleanWireOpt, dfCppHidden, dfGroupOf, dfPublished, dfWireKey, palinopsiaTree,
+  DF_DECLARE_MAX, DF_SELF, DF_SESSION_WIRES_MAX, cleanPublish, cleanSessionWires, cleanWireOpt, dfCppHidden, dfGroupOf, dfPublished, dfWireKey, palinopsiaTree,
   type DfAction, type DfConfig, type DfParam, type DfSessionWire, type DfStatus, type DfSub, type DfValue
 } from '@shared/dataflou'
 import type { MappingScope } from '@shared/types'
@@ -291,6 +291,8 @@ function moveWire(dest: string, srcSku: string, srcPath: string, to: MappingScop
     if (inSess) return true
     if (!live && !inFile) return false
     if (sessionOf(universe).filter((w) => w.dest === dest).length >= 4) return false
+    // (a full list would drop the new wire after it left this computer's file)
+    if (sessionWires.length >= DF_SESSION_WIRES_MAX) return false
     const opt = cleanWireOpt((live ?? inFile)?.opt)
     sessionWires = cleanSessionWires([...sessionWires, { universe, dest, sku: sessSku, path: srcPath, ...(opt ? { opt } : {}) }])
     dropFromFile()
@@ -498,7 +500,10 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
       const universe = config.universe
       const w: DfSessionWire = { universe, dest: a.destPath, sku: a.srcSku === sku() ? DF_SELF : a.srcSku, path: a.srcPath }
       if (sessionOf(universe).some((x) => x.dest === w.dest && own(x.sku) === a.srcSku && x.path === w.path)) return true
+      // the same wire already on this computer : moved into the session, not doubled
+      if ((loadSubs(universe)[a.destPath] ?? []).some((x) => x.sku === a.srcSku && x.path === a.srcPath)) return moveWire(a.destPath, a.srcSku, a.srcPath, 'session')
       if (sessionOf(universe).filter((x) => x.dest === w.dest).length >= 4) return false
+      if (sessionWires.length >= DF_SESSION_WIRES_MAX) return false
       sessionWires = cleanSessionWires([...sessionWires, w])
       pushSessionWires()
       applySessionWires()

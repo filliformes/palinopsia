@@ -433,6 +433,10 @@ export function HearBlock(): JSX.Element {
     }
     // the live spectrum, log frequency, from the bus's own analyser
     if (noSpecRef.current && noSpecRef.current.style.opacity !== (freq ? '0' : '1')) noSpecRef.current.style.opacity = freq ? '0' : '1'
+    if (!freq && noSpecRef.current) {
+      const why = useStore.getState().audioSource === 'osc' ? 'no spectrum : OSC sends the bands only' : 'no spectrum : no input open'
+      if (noSpecRef.current.textContent !== why) noSpecRef.current.textContent = why
+    }
     if (freq) {
       const N = freq.length
       let gm = geo.current

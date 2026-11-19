@@ -1548,7 +1548,7 @@ function LevelRow({ index, rearm, at, onChange }: { index: number; rearm: number
   const r2 = (v: number): number => Math.round(v * 100) / 100
   const move = (which: 'lo' | 'hi', p: number): void => {
     if (which === 'lo') onChange(r2(Math.min(p, at)), at)
-    else onChange(Math.min(rearm, r2(p)), r2(p))
+    else { const a = Math.max(0.01, r2(p)); onChange(Math.min(rearm, a), a) }
   }
   const key = (which: 'lo' | 'hi') => (e: React.KeyboardEvent): void => {
     const step = e.shiftKey ? 0.1 : 0.01
@@ -1884,7 +1884,8 @@ function Row({
 // features only, so the band waits while FROM is a clip.
 const HZ_HELP =
   'The frequency band it listens to, in Hz : every feature (level, flux, transient, centroid, band, pitch, noisiness) is read only between these two. ' +
-  '0 to 20000 is the whole sound. A kick : 40 to 120; a voice : 200 to 3000; hats : 6000 to 16000. Centroid reads where the energy sits inside the band.'
+  '0 to 20000 is the whole sound. A kick : 40 to 120; a voice : 200 to 3000; hats : 6000 to 16000. Centroid reads where the energy sits inside the band. ' +
+  'With OSC as the source there is no spectrum : the band is ignored and the whole sound is read.'
 // The track is logarithmic, 20 Hz to 20 kHz (each octave the same length : a linear
 // track gave the lows, where kicks and voices live, a few pixels); its far left is 0.
 const HZ_LO = 20
