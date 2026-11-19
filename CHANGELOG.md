@@ -467,6 +467,14 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
+- **Grid Mesh level and color alpha count once.** The level and the color's alpha were
+  applied twice over (the alpha went through the source-alpha blend too, then the layer
+  took the result as straight alpha), so over black the picture showed color x level^4:
+  the OCTOCOSME level fader at half gave about 6% instead of the patch's 25%, and a
+  color alpha of 0.5 came out at an eighth. Every blend now keeps plain coverage in the
+  alpha (`blendFuncSeparate(..., ONE, ONE_MINUS_SRC_ALPHA)`) and the copy into the layer
+  divides the color back when its source factor took the alpha in
+  (`engine/GridMeshSource.ts`). At level 1 with an opaque color nothing changes.
 - **A session no longer publishes on this computer's dataflou mesh for good.** Loading
   a session used to add every path its wires need (their destinations, its own sources,
   its actions) to the publish list, saved on this computer, so they stayed published

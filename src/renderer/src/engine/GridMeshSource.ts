@@ -246,12 +246,21 @@ in vec3 vE;
 out vec4 o;
 void main() { float d = clamp((uFar0 + vE.z) / max(1e-4, uFar0 - uNear0), 0.0, 1.0); o = vec4(d, d, d, 1.0); }`
 
+// The picture holds its color as it shows over black, with plain coverage in its
+// alpha (the alpha blends ONE, 1 − source alpha whatever the color blend). When the
+// color was multiplied by its alpha on the way in (uUnpre), it goes to the layer
+// divided back (the layer takes straight alpha), so a level or a color alpha counts
+// once, as over the black of the classic patch, not twice.
 const COPY_FS = `#version 300 es
 precision highp float;
 precision highp sampler2D;
 uniform sampler2D uPic;
+uniform float uUnpre;
 out vec4 o;
-void main() { o = texelFetch(uPic, ivec2(gl_FragCoord.xy), 0); }`
+void main() {
+  vec4 c = texelFetch(uPic, ivec2(gl_FragCoord.xy), 0);
+  o = uUnpre > 0.5 ? vec4(c.a > 1e-4 ? c.rgb / c.a : vec3(0.0), c.a) : c;
+}`
 
 // ── Matrices (column-major) ──────────────────────────────────────────────────
 type M4 = Float32Array
@@ -662,16 +671,24 @@ export class GridMeshSource implements NativeGenerator {
     gl.disable(gl.CULL_FACE)
     gl.disable(gl.STENCIL_TEST)
     if (num(I, 'depthTest', 1) > 0.5) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL) } else gl.disable(gl.DEPTH_TEST)
+    // the color blends as asked; the alpha always ONE, 1 − source alpha : it keeps
+    // plain coverage (a level or color alpha multiplied in once), and the copy
+    // below divides the color back when its source factor took the alpha in
+    let unpre = false
     if (num(I, 'blendOn', 1) > 0.5) {
       gl.enable(gl.BLEND)
       gl.blendEquation(gl.FUNC_ADD)
+      const blend = (src: number, dst: number): void => {
+        gl.blendFuncSeparate(src, dst, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+        unpre = src === gl.SRC_ALPHA || src === gl.SRC_ALPHA_SATURATE
+      }
       switch (Math.round(num(I, 'blendMode', 0))) {
-        case 1: gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); break // normal
-        case 2: gl.blendFunc(gl.SRC_ALPHA, gl.ONE); break // add
-        case 3: gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR); break // screen
+        case 1: blend(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); break // normal
+        case 2: blend(gl.SRC_ALPHA, gl.ONE); break // add
+        case 3: blend(gl.ONE, gl.ONE_MINUS_SRC_COLOR); break // screen
         case 4: gl.blendEquation(gl.MAX); break // lighten
-        case 5: gl.blendFunc(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR); break // exclusion
-        default: gl.blendFunc(glFactor(gl, num(I, 'blendSrc', 6)), glFactor(gl, num(I, 'blendDst', 7)))
+        case 5: blend(gl.ONE_MINUS_DST_COLOR, gl.ONE_MINUS_SRC_COLOR); break // exclusion
+        default: blend(glFactor(gl, num(I, 'blendSrc', 6)), glFactor(gl, num(I, 'blendDst', 7)))
       }
     } else gl.disable(gl.BLEND)
 
@@ -731,6 +748,7 @@ export class GridMeshSource implements NativeGenerator {
     drawAll(this.triP, this.segP, this.ptP, setCommon, px)
     gl.disable(gl.BLEND)
     gl.blendEquation(gl.FUNC_ADD)
+    gl.blendFunc(gl.ONE, gl.ZERO)
 
     // ── its real depth, for the depth readers : nearest white over its own reach ──
     this.depthReady = false
@@ -759,7 +777,7 @@ export class GridMeshSource implements NativeGenerator {
     gl.depthFunc(gl.LESS)
 
     // ── into the layer, as it is ──
-    this.copyP.use().i1('uPic', 0)
+    this.copyP.use().i1('uPic', 0).f1('uUnpre', unpre ? 1 : 0)
     g.bind(0, this.pic!.tex)
     g.draw(targetFbo, this.w, this.h)
     g.done(4)
