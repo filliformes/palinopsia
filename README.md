@@ -270,6 +270,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `A` | Right column → **Connect** tab |
 | `D` / `X` / `I` | Collapse Modulation / Master-FX / Inspector |
 | `V` | **Big preview** : fold the panels under the preview away, and back (the expand arrows at the end of the preview's right-hand capsule) |
+| Drag / wheel on a 3D object (preview) | **Model**, **Grid Mesh** : a drag turns the one under the cursor any way, the wheel over it brings it nearer or sends it away (each drag, each run of notches : one undo step; a preset or ↺ puts it back). See [Clicking the preview](#clicking-the-preview) |
 | `R` | Fire the Transport's selected Randomize |
 | `H` | **Freeze / hold** the output (the ❄ latch : the Transport button lights while held) |
 | `L` | **Learn** (MIDI and OSC controllers) on/off : from any tab or full-page view |
@@ -3337,23 +3338,26 @@ and bound to nothing : M1 a slow sine, M2 a triangle, M3 a square (on / off), M4
 (a rise and a drop), M5 random steps, M6 smooth random, M7 a looping envelope, M8 a slow
 ramp. The M beside any control binds one. It morphs in like any Generate; what you
 pinned and the session's mappings ride through, and Sonify is left as it is. Then a
-dropdown of **162 visual themes** in 18 families
+dropdown of **184 visual themes** in 19 families
 (Analog Video Synthesis, Glitch/Datamosh (Glitch Loop : the damage goes round the feedback), Cameraless/Direct Film, Optical/Op-Art,
 Organic/Reaction-Diffusion, Data/Parametric, Feedback/Afterimage (Monitor Loop and Cross
 Loop : effects inside the feedback, two layers playing each other), **Frame Store** (Field
 Store and Revealed : stamps that never fade, a picture painted in by what moves; Shatter :
 motion broken into a pattern; Trail Crawl : bands of colour behind the motion; Store
 Zoom : a hardware zoom's uneven blocks), Cinematic/Atmospheric (Oil Sky : a cloudscape in
-thick oil, from Cloud Study), Retro Screen, Minimal/Structural, Datamosh &
+thick oil, from Cloud Study; Black Tide : a slick lapping at a coast, from Slick; Endless
+Land : a land flown over, from the Terrain), Retro Screen, Minimal/Structural (Survey Map :
+the Terrain cut into contour steps), Datamosh &
 Compression (Codec Rot : a real video codec starved of keyframes, through Codec Mosh),
 **Living Surfaces** (lichen, rust, mold, burning paper, dry earth, grown textures, and
 paint on water from Marbling : Marbled Paper and Night Bath; Drapery, Liquid Metal, Mercury,
 Clay Studio, Engraver, Geometer, Soap Skin, Chrome Type, Holo Foil, Print Shop, Glasshouse and
 Oil on Water from Relief, Inflate, Drape, Thin Film, the glass and the print; Pelt, Big Cat,
 Gale and Furred Letters from Fur; Singing Plate, Listening Plate and Sand Over from Sand Plate;
-Pond (a picture under water, from Ripple) and A Hand in It (an unseen hand pushing the picture, from Touch)),
+Pond (a picture under water, from Ripple), A Hand in It (an unseen hand pushing the picture, from Touch) and Contamination (crude oil smothering the picture, from Slick)),
 **Dome** (made for a fulldome : no vignette, nothing framing the edges, slow motion
-overhead; Pool Overhead : rings that come back from the rim), **Film Wall** (your own films through a Collage, graded and damaged, or cut
+overhead; Pool Overhead : rings that come back from the rim; Object Overhead : a Model
+turning at the zenith), **Film Wall** (your own films through a Collage, graded and damaged, or cut
 out and piled at different heights in **Paste-Up**, or the people in them treated apart
 through the Silhouette effect : **Cut Out** sets them over a painted ground, **Shadow
 Theatre** blacks them out, **Absent** takes them out of their rooms, **Afterimages**
@@ -3361,7 +3365,10 @@ leaves their ghosts over the picture, **Inhabited** makes them of a moving field
 (caustics, fire, dye, sea or stripes on a muted layer, the Silhouette's fill) : it plays
 the session's Collage folder, or the last one picked on this computer, and with none yet
 stands in with painted sources and says how to pick one), **Node Workshop** (one recipe
-node per theme, on the layer that reads the others), **Space** (points in space and line
+node per theme, on the layer that reads the others), **Objects** (a real 3D object on the
+layer : Chrome Idol, Wire Study, Second Skin, Glass Object, Point Cloud, True Depth,
+Fragments and Crude Idol with the Model; Mesh Scribbles, Shard Garden, Torn Skin and
+Sounding Mesh with the Grid Mesh), **Space** (points in space and line
 fields laid on planes : Gravity Well, Starfield, Crystal Room, Dot Sea, Spectral Floor
 with Lattice, Warp Tunnel and Orbit with its tunnel, globe, torus and galaxy, Line Wall
 and Data Floor with Lowercase through Perspective, Crossing with its slanted bars, and
