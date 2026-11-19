@@ -8,11 +8,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { dataflouBind, meshToModulator, openDataflouVisualizer, publishableParked, publishParked, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
+import { dataflouBind, dataflouWireScope, meshToModulator, openDataflouVisualizer, publishableParked, publishParked, toggleDfWatch, useDataflouStatus, useDfWatches, wireToFreeMacro } from '../dataflou'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { DataflouPublish } from './DataflouPublish'
 import { showToast } from './Toast'
-import { DF_DESTS, DF_SOURCES, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, dfWireKey, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -30,6 +30,7 @@ export function DataflouSection(): JSX.Element {
   const collapsed = useStore((s) => !!s.collapsed['dataflou'])
   const toggleSection = useStore((s) => s.toggleSection)
   const st = useDataflouStatus()
+  const sessionWires = useStore((s) => s.sessionDfWires)
   const [name, setName] = useState(cfg.label)
   const [univ, setUniv] = useState(cfg.universe)
   const [open, setOpen] = useState<string | null>(null)
@@ -44,6 +45,11 @@ export function DataflouSection(): JSX.Element {
     Object.entries(n.subs).flatMap(([dest, list]) => list.map((s) => ({ node: n, dest, src: s })))
   )
   const state = !cfg.enabled ? 'off' : st.running ? 'on' : st.error ? 'error' : 'starting'
+  // the session's wires playing now, this computer's it silences (on their
+  // destination or source), and the session's waiting for another universe
+  const sessionKeys = new Set(st.session ?? [])
+  const silenced = st.silenced ?? []
+  const elsewhere = st.sessionElsewhere ?? []
   const enterBlurs = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') e.currentTarget.blur()
   }
@@ -147,6 +153,12 @@ export function DataflouSection(): JSX.Element {
             )}
           </div>
 
+          {!st.running && sessionWires.length > 0 && (
+            <div className="font-mono text-[9px] text-accent2" title="Wires saved with this session : they play once Palinopsia is on the mesh, in the universe each was made in">
+              this session carries {sessionWires.length} {sessionWires.length === 1 ? 'wire' : 'wires'} : {sessionWires.length === 1 ? 'it plays' : 'they play'} once on the mesh
+            </div>
+          )}
+
           {/* ── what this node shows the mesh ── */}
           <DataflouPublish />
 
@@ -168,9 +180,13 @@ export function DataflouSection(): JSX.Element {
 
               {/* ── the connections across the mesh ── */}
               <div className="flex min-w-0 flex-col gap-0.5 rounded border border-accent2/30 bg-panel2/40 p-1.5">
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-accent2">
-                  connections <span className="font-normal normal-case text-muted">({connections.length})</span>
-                </span>
+                <div className="flex min-w-0 items-center gap-1">
+                  <span className="font-mono text-[9px] font-semibold uppercase tracking-wide text-accent2">
+                    connections <span className="font-normal normal-case text-muted">({connections.length})</span>
+                  </span>
+                  <div className="flex-1" />
+                  <NewWiresScope />
+                </div>
                 {connections.length === 0 && (
                   <span className="font-mono text-[9px] text-muted">nothing wired yet : open a node above to wire it to Palinopsia</span>
                 )}
@@ -194,6 +210,8 @@ export function DataflouSection(): JSX.Element {
                 {connections.map(({ node, dest, src }) => {
                   const ours = node.local || src.sku === st.sku
                   const key = `${node.sku}/${dest}<${src.sku}/${src.path}`
+                  // a wire into Palinopsia lives on this computer or in the session
+                  const scope = node.local ? (sessionKeys.has(dfWireKey(dest, src.sku, src.path)) ? 'session' : 'computer') : null
                   // a wire into Palinopsia's main node : shaped here (⚙)
                   const shapeable = node.local && DF_DESTS.some((d) => d.path === dest)
                   const shaped = !!src.opt
@@ -213,10 +231,20 @@ export function DataflouSection(): JSX.Element {
                           ⚙
                         </button>
                       )}
+                      {scope && (
+                        <ScopeChip
+                          scope={scope}
+                          onClick={() =>
+                            void dataflouWireScope(dest, src.sku, src.path, scope === 'session' ? 'computer' : 'session').then((ok) => {
+                              if (!ok) showToast('This wire could not move : a destination takes four wires of the session at most', 'warn')
+                            })
+                          }
+                        />
+                      )}
                       <button
                         onClick={() => void dataflouBind(node.sku, dest, src.sku, src.path, false)}
                         className="shrink-0 px-1 text-muted hover:text-danger"
-                        title="Unwire"
+                        title={scope === 'session' ? 'Unwire (it leaves the session too)' : 'Unwire'}
                       >
                         ✕
                       </button>
@@ -225,6 +253,36 @@ export function DataflouSection(): JSX.Element {
                     </div>
                   )
                 })}
+                {/* this computer's wires on an input the session wires : kept, silent */}
+                {silenced.map((w) => (
+                  <div key={`silenced|${w.dest}<${w.sku}/${w.path}`} className="flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted">
+                    <span
+                      className="min-w-0 truncate line-through decoration-muted/60"
+                      title={`${nameOf(w.sku)}/${w.path} → ${st.label}/${w.dest} : this computer's wire, silent while the session wires this destination or this source (it plays again in a session that does not)`}
+                    >
+                      {nameOf(w.sku)}/{w.path} <span>→</span> {st.label}/{w.dest}
+                    </span>
+                    <span className="shrink-0" title="Silent while the session wires this destination or this source : kept on this computer">silenced</span>
+                    <div className="flex-1" />
+                    <ScopeChip scope="computer" onClick={() => void dataflouWireScope(w.dest, w.sku, w.path, 'session')} />
+                    <button
+                      onClick={() => void dataflouWireScope(w.dest, w.sku, w.path, null)}
+                      className="shrink-0 px-1 text-muted hover:text-danger"
+                      title="Remove this wire from this computer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {elsewhere.map((e) => (
+                  <span
+                    key={`elsewhere|${e.universe}`}
+                    className="font-mono text-[9px] text-accent2"
+                    title={`Saved with this session in universe "${e.universe}" : they play when this node joins that universe (set it above), and stay in the session meanwhile`}
+                  >
+                    {e.count} {e.count === 1 ? 'wire' : 'wires'} of this session wait for universe "{e.universe}"
+                  </span>
+                ))}
               </div>
             </>
           )}
@@ -530,5 +588,47 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
         </select>
       )}
     </div>
+  )
+}
+
+/** Where a wire into Palinopsia lives : this computer (every session) or this
+ *  session (saved with it). A click moves it. */
+function ScopeChip({ scope, onClick }: { scope: 'computer' | 'session'; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className={`shrink-0 rounded px-1 ${scope === 'session' ? 'bg-accent2/15 text-accent2' : 'bg-panel3 text-muted hover:text-text'}`}
+      title={
+        scope === 'session'
+          ? "Saved with this session (on its destination and its source it takes the place of this computer's wires) : click to keep it on this computer instead"
+          : 'Kept on this computer, for every session : click to save it with this session instead'
+      }
+    >
+      {scope === 'session' ? 'SESSION' : 'PC'}
+    </button>
+  )
+}
+
+/** Where a new wire into Palinopsia goes : the same choice as Learn into
+ *  (MIDI and OSC learn follow it too). */
+function NewWiresScope(): JSX.Element {
+  const scope = useStore((s) => s.learnScope)
+  const setScope = useStore((s) => s.setLearnScope)
+  const seg = (v: 'computer' | 'session', label: string): JSX.Element => (
+    <button onClick={() => setScope(v)} className={`px-1 leading-none ${scope === v ? 'bg-accent2/20 text-accent2' : 'text-muted hover:text-text'}`}>
+      {label}
+    </button>
+  )
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1 font-mono text-[9px] text-muted"
+      title="Where a wire you make into Palinopsia goes : this computer (every session) or this session (saved with it). The same choice as Learn into, for MIDI and OSC. A wire made from the mesh (another node, the visualizer, a scene) is this computer's."
+    >
+      new wires
+      <span className="flex overflow-hidden rounded ring-1 ring-border">
+        {seg('computer', 'PC')}
+        {seg('session', 'SESSION')}
+      </span>
+    </span>
   )
 }

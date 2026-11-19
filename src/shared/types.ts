@@ -1093,6 +1093,10 @@ export interface SessionMappings {
   /** The session's own OSC aliases (the map table's, saved with the session) : on
    *  an address and value they take the place of this computer's. */
   aliases?: OscAlias[]
+  /** The session's own dataflou wires (into Palinopsia's destinations, with the
+   *  universe each was made in) : on their destination and source they take the
+   *  place of this computer's. */
+  dataflou?: import('./dataflou').DfSessionWire[]
 }
 
 export interface MetaKnobState {
@@ -1697,7 +1701,15 @@ export interface ExposedApi {
   /** Listened remote values, 0..1 of their range, once a frame. */
   onDataflouRemote: (cb: (batch: Array<{ sku: string; path: string; v: number }>) => void) => () => void
   dataflouValues: (values: Record<string, import('./dataflou').DfValue>) => void
-  dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) => Promise<boolean>
+  /** `scope` 'session' : a new wire into Palinopsia saved with the session (else this computer's). */
+  dataflouBind: (b: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean; scope?: MappingScope }) => Promise<boolean>
+  /** The session's wires (all universes), whenever the session's list changes. */
+  dataflouSession: (list: import('./dataflou').DfSessionWire[]) => void
+  /** A wire into Palinopsia moved to this computer or to the session (null : a
+   *  silenced computer wire removed). */
+  dataflouWireScope: (a: { dest: string; sku: string; path: string; to: MappingScope | null }) => Promise<boolean>
+  /** The session's wires as main holds them now (a wire unwired or reshaped). */
+  onDataflouSessionWires: (cb: (list: import('./dataflou').DfSessionWire[]) => void) => () => void
   dataflouForget: (sku: string) => Promise<boolean>
   onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
   onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void

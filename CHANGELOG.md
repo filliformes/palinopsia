@@ -78,6 +78,20 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
   (**PC**) or in the session (**SESSION**, **+ in session**, one click to move one); on an
   address and argument the session's takes the place of the computer's, as session
   mappings do. The session file's `mappings.aliases`.
+- **dataflou wires saved with the session** (`src/main/dataflou/index.ts`, `node.ts`
+  `replaceWires`, `DataflouSection.tsx`) : a wire into Palinopsia lives on this computer
+  (**PC**, `bindings-<universe>.json` as before) or in the session (**SESSION**, the file's
+  `mappings.dataflou` : `{ universe, dest, sku, path, opt? }`, `sku` `@self` for one of
+  Palinopsia's own sources); one click on the chip in **connections** moves it, its shape
+  with it, and **new wires** (the Learn into choice) picks where new ones go. The session's
+  wires of the node's universe play; the computer's on the same destination or the same
+  source are set aside (kept in the file, struck through), the rest play on; a session's
+  wires of another universe wait in the session. The renderer keeps the list (sent to
+  main on every change, `dataflou:session`); main merges both into the node and hands the
+  list back when a session wire is unwired or reshaped on the mesh
+  (`dataflou:sessionWires`). New empties it, Generate keeps it, an older file has none.
+  Checked headless (the real main module, electron stubbed, against a peer node : 33
+  checks) and in the test copy (see the commit).
 - **Grid Mesh looks keep the shape's place** : the OCTOCOSME presets no longer carry x and y.
 
 - **Grid Mesh, a new 3D source** (`engine/GridMeshSource.ts`, `engine/gridMesh.ts`), beside
