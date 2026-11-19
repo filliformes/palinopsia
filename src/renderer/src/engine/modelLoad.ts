@@ -3,6 +3,11 @@
 // the Inspector's line that says what was read). Every file a slot still shows stays
 // in memory (they ask for it each frame), and the last two no slot shows any more, so
 // a scene that comes back to one does not read it again.
+//
+// One file is read at a time, the rest wait their turn. A file whose reading runs
+// past WATCHDOG_MS (a damaged or hostile file that would keep the thread busy for
+// ever) is given up : the thread is ended and a new one started for the files behind
+// it, and that file says why.
 
 import ModelWorker from '../workers/modelWorker?worker&inline'
 import type { FromModelWorker, ToModelWorker } from '../workers/modelWorker'
@@ -16,11 +21,16 @@ export type ModelState =
 const KEEP = 2
 // (a file not asked for this long is no longer on screen)
 const IDLE_MS = 5000
+// (a model of two million triangles reads in a few seconds)
+const WATCHDOG_MS = 30000
 
 class ModelLoader {
   private worker: Worker | null = null
   private entries = new Map<string, ModelState>()
+  /** The file being read now (its message id), and the ones waiting their turn. */
   private pending = new Map<number, string>()
+  private queue: Array<{ id: number; path: string; files: string[] }> = []
+  private active: { id: number; path: string; timer: number } | null = null
   private used: string[] = []
   private asked = new Map<string, number>()
   private nextId = 1
@@ -34,31 +44,68 @@ class ModelLoader {
     w.onmessage = (e: MessageEvent<FromModelWorker>): void => {
       if (this.worker !== w) return
       const m = e.data
+      if (this.active?.id === m.id) this.endActive()
       const path = this.pending.get(m.id)
       this.pending.delete(m.id)
-      if (path === undefined) return
-      if (m.t === 'done') {
-        this.entries.set(path, { state: 'ready', mesh: m.mesh, read: m.read })
-        this.touch(path)
-        console.info(`[model] ${path} : ${m.mesh.info.points ? m.mesh.info.verts + ' points' : m.mesh.info.tris + ' triangles'}${m.mesh.info.notes.length ? ' (' + m.mesh.info.notes.join('; ') + ')' : ''}`)
-      } else {
-        this.entries.set(path, { state: 'error', message: m.message })
-        console.warn(`[model] ${path} : ${m.message}`)
-      }
-      this.changed()
+      if (path !== undefined) {
+        if (m.t === 'done') {
+          this.entries.set(path, { state: 'ready', mesh: m.mesh, read: m.read })
+          this.touch(path)
+          console.info(`[model] ${path} : ${m.mesh.info.points ? m.mesh.info.verts + ' points' : m.mesh.info.tris + ' triangles'}${m.mesh.info.notes.length ? ' (' + m.mesh.info.notes.join('; ') + ')' : ''}`)
+        } else {
+          this.entries.set(path, { state: 'error', message: m.message })
+          console.warn(`[model] ${path} : ${m.message}`)
+        }
+        this.changed()
+      } else if (m.t === 'done' && m.mesh.texture) m.mesh.texture.close() // (a read no longer wanted)
+      this.next()
     }
     w.onerror = (e: ErrorEvent): void => {
       e.preventDefault()
       if (this.worker !== w) return
-      // its thread stopped : every file it was reading fails, the next ask starts a new one
-      for (const [, path] of this.pending) this.entries.set(path, { state: 'error', message: e.message || 'the model reader stopped' })
-      this.pending.clear()
-      this.worker = null
-      w.terminate()
-      this.changed()
+      // its thread stopped : the file it was reading fails, the files behind it are
+      // read by a new one
+      this.fail(e.message || 'the model reader stopped')
     }
     this.worker = w
     return w
+  }
+
+  /** The file being read now is given up (its thread ended, a new one for the rest). */
+  private fail(message: string): void {
+    const a = this.active
+    this.endActive()
+    this.worker?.terminate()
+    this.worker = null
+    if (a) {
+      const path = this.pending.get(a.id)
+      this.pending.delete(a.id)
+      if (path !== undefined) {
+        this.entries.set(path, { state: 'error', message })
+        console.warn(`[model] ${path} : ${message}`)
+        this.changed()
+      }
+    }
+    this.next()
+  }
+
+  private endActive(): void {
+    if (this.active) window.clearTimeout(this.active.timer)
+    this.active = null
+  }
+
+  /** The next file waiting its turn, sent to the thread (one at a time). */
+  private next(): void {
+    while (!this.active && this.queue.length) {
+      const job = this.queue.shift()!
+      if (!this.pending.has(job.id)) continue // (asked again since : that ask reads it)
+      const msg: ToModelWorker = { t: 'load', id: job.id, path: job.path, files: job.files }
+      const timer = window.setTimeout(() => {
+        if (this.active?.id === job.id) this.fail(`took over ${WATCHDOG_MS / 1000} s to read and was given up : the file may be damaged`)
+      }, WATCHDOG_MS)
+      this.active = { id: job.id, path: job.path, timer }
+      this.start().postMessage(msg)
+    }
   }
 
   /** Forget the files no slot shows any more, beyond the last KEEP of them (run when
@@ -90,10 +137,26 @@ class ModelLoader {
     this.entries.set(path, st)
     const id = this.nextId++
     this.pending.set(id, path)
-    const msg: ToModelWorker = { t: 'load', id, path, files: [...files] }
-    this.start().postMessage(msg)
+    this.queue.push({ id, path, files: [...files] })
+    this.next()
     this.changed()
     return st
+  }
+
+  /** The file read (or failed), with the files the session carries for it : the
+   *  collect asks what each model really reads. */
+  whenRead(path: string, files: readonly string[] = []): Promise<ModelState> {
+    return new Promise((resolve) => {
+      const done = (): boolean => {
+        const st = this.peek(path)
+        if (!st || st.state === 'loading') return false
+        resolve(st)
+        return true
+      }
+      this.get(path, files)
+      if (done()) return
+      const off = this.subscribe(() => { if (done()) off() })
+    })
   }
 
   /** What is known about a file without reading it (null : never asked). */
@@ -114,9 +177,11 @@ class ModelLoader {
   }
 
   shutdown(): void {
+    this.endActive()
     this.worker?.terminate()
     this.worker = null
     this.pending.clear()
+    this.queue = []
     this.entries.clear()
     this.used = []
   }

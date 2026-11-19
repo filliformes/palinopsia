@@ -3281,7 +3281,8 @@ a green or red dot, and offers **Make converted copies again** (a converted copy
 the player can't read, missing on this computer, is made again from its original) and
 **Collect into the session's folder** : every file is copied into a `<session> media`
 folder beside the session file, nothing overwritten, and the session points at the
-copies. Save afterwards and the session plus that folder open on any computer.
+copies (a Model's file goes into a folder of its own with exactly the files it reads,
+laid out as they sit round it). Save afterwards and the session plus that folder open on any computer.
 
 **Add a session as scenes.** **Open ▾ → Add a session as scenes…** (or right-click
 **Load** → **Add “…” as scenes**, for the session picked in the list) brings another

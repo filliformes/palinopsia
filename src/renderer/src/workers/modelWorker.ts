@@ -7,8 +7,9 @@
 // Files are read over opsia-media:// (main/media.ts), the same way films are : the
 // model, then what it names beside it (a .gltf's buffers and images, an OBJ's MTL and
 // its color map), each found first by its own relative name, then among the files
-// the session carries for it (modelFiles), then by its bare name beside the model (a
-// collected session lays everything in one folder).
+// the session carries for it (modelFiles : one that ends with that relative name,
+// then one of the same bare name), then by its bare name beside the model (a session
+// collected before each model had its own folder laid everything in one).
 
 import { parseModel } from '../engine/modelParse'
 import { prepareMesh, type MeshData } from '../engine/modelMesh'
@@ -35,6 +36,20 @@ async function readFile(path: string): Promise<ArrayBuffer> {
   return r.arrayBuffer()
 }
 
+const normRel = (p: string): string => p.normalize('NFC').replace(/\\/g, '/').toLowerCase()
+/** `dir/../x` as the place it names (`dir`'s parent's x) : the list of what was read
+ *  says where each file really is (the collect lays them out by it). */
+function resolveDots(p: string, sep: string): string {
+  const lead = /^(\\\\|\/\/|\/)/.exec(p)?.[0] ?? ''
+  const out: string[] = []
+  for (const s of p.slice(lead.length).split(/[\\/]+/)) {
+    if (!s || s === '.') continue
+    if (s === '..' && out.length > 1 && out[out.length - 1] !== '..') out.pop()
+    else out.push(s)
+  }
+  return lead + out.join(sep)
+}
+
 async function load(path: string, files: string[]): Promise<{ mesh: MeshData; read: string[] }> {
   let buf: ArrayBuffer
   try {
@@ -44,19 +59,29 @@ async function load(path: string, files: string[]): Promise<{ mesh: MeshData; re
   }
   const dir = dirOf(path), sep = sepOf(path)
   const read: string[] = []
-  const mesh = prepareMesh(
-    await parseModel(path, buf, {
+  // every texture made, closed unless it is the one the mesh keeps (a file that
+  // fails, a second texture, one no face uses)
+  const made: ImageBitmap[] = []
+  const closeBut = (keep: ImageBitmap | null): void => { for (const b of made) if (b !== keep) b.close() }
+  let raw: Awaited<ReturnType<typeof parseModel>>
+  try {
+    raw = await parseModel(path, buf, {
       async fetchRel(uri: string): Promise<ArrayBuffer> {
         if (uri.startsWith('data:')) return (await fetch(uri)).arrayBuffer()
         if (/^[a-z]+:\/\//i.test(uri)) throw new Error(`${uri} is on the network : the Model only reads files on this computer`)
         let rel = uri
         try { rel = decodeURIComponent(uri) } catch { /* as written */ }
-        const tries = [dir + sep + rel.replace(/[\\/]/g, sep)]
-        const want = baseOf(rel).toLowerCase()
-        for (const f of files) if (baseOf(f).toLowerCase() === want) tries.push(f)
+        const tries = [resolveDots(dir + sep + rel, sep)]
+
+        // the session's own files : the one laid out as the model names it, then one
+        // of the same name
+        const tail = '/' + normRel(rel).split('/').filter((s) => s && s !== '.' && s !== '..').join('/')
+        for (const f of files) if (normRel(f).endsWith(tail)) tries.push(f)
+        const want = baseOf(rel).normalize('NFC').toLowerCase()
+        for (const f of files) if (baseOf(f).normalize('NFC').toLowerCase() === want) tries.push(f)
         tries.push(dir + sep + baseOf(rel))
         let last: unknown = null
-        for (const p of tries) {
+        for (const p of [...new Set(tries)]) {
           try {
             const b = await readFile(p)
             if (!read.includes(p)) read.push(p)
@@ -68,20 +93,32 @@ async function load(path: string, files: string[]): Promise<{ mesh: MeshData; re
       async image(bytes: Uint8Array, mime: string): Promise<ImageBitmap | null> {
         try {
           const bmp = await createImageBitmap(new Blob([bytes as BlobPart], { type: mime }), { premultiplyAlpha: 'none', colorSpaceConversion: 'none', imageOrientation: 'none' })
+          made.push(bmp)
           // a huge texture is brought down to 4096 a side
           const big = Math.max(bmp.width, bmp.height)
           if (big <= 4096) return bmp
           const k = 4096 / big
           const small = await createImageBitmap(bmp, { resizeWidth: Math.round(bmp.width * k), resizeHeight: Math.round(bmp.height * k), resizeQuality: 'high' })
           bmp.close()
+          made.push(small)
           return small
         } catch {
           return null
         }
       }
     })
-  )
-  return { mesh, read }
+  } catch (e) {
+    closeBut(null)
+    throw e
+  }
+  try {
+    const mesh = prepareMesh(raw)
+    closeBut(mesh.texture)
+    return { mesh, read }
+  } catch (e) {
+    closeBut(null)
+    throw e
+  }
 }
 
 g.onmessage = (e: MessageEvent<ToModelWorker>): void => {

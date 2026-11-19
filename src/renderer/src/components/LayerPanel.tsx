@@ -1099,10 +1099,14 @@ function SourceRow({
       return
     }
     if (kind === 'model') {
-      // a 3D model : the slot becomes a Model of it (once it is read)
-      const cur = useStore.getState().composition.layers[layer]?.[slotName === 'A' ? 'sourceA' : 'sourceB']
-      if (cur?.shaderId !== 'gen-model') useStore.getState().setSourceShader(layer, slotName, 'gen-model')
-      await loadModelInto({ kind: 'layer', layer, slot: slotName }, path, name)
+      // a 3D model : the slot becomes a Model of it once it is read (one undo step; a
+      // file that cannot be read leaves the slot as it was)
+      await loadModelInto({ kind: 'layer', layer, slot: slotName }, path, name, {
+        before: () => {
+          const cur = useStore.getState().composition.layers[layer]?.[slotName === 'A' ? 'sourceA' : 'sourceB']
+          if (cur?.shaderId !== 'gen-model') useStore.getState().setSourceShader(layer, slotName, 'gen-model')
+        }
+      })
       return
     }
     if ((await window.api.pathKind(path)) === 'dir') {

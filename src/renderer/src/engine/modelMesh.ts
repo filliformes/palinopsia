@@ -448,6 +448,9 @@ function faceNormals(pos: Float32Array, idx: Uint32Array): { fn: Float32Array; a
   return { fn, area }
 }
 
+/** Above this many corners at one point, its normal is the plain area-weighted mean. */
+const CROWDED = 256
+
 /** Normals for a mesh that came without : each corner the area-weighted mean of the
  *  faces round its point that bend less than the crease angle from its own face (a
  *  hard edge stays hard, a curved surface comes out smooth). Vertices are split where
@@ -457,7 +460,6 @@ function autoNormals(m: { pos: Float32Array; uv: Float32Array | null; col: Uint8
   const { pos, idx } = m
   const W = weld(pos)
   const { fn, area } = faceNormals(pos, idx)
-  const t = idx.length / 3
   // the corners round each welded point (compressed rows)
   const cnt = new Uint32Array(W.count + 1)
   for (let i = 0; i < idx.length; i++) cnt[W.id[idx[i]] + 1]++
@@ -471,9 +473,43 @@ function autoNormals(m: { pos: Float32Array; uv: Float32Array | null; col: Uint8
   const outUV = m.uv ? new GrowF32(m.uv.length) : null
   const outCol = m.col ? new GrowU8(m.col.length) : null
   const outIdx = new Uint32Array(idx.length)
+  const emit = (ov: number, nx: number, ny: number, nz: number): number => {
+    const out = outPos.n / 3
+    outPos.push3(pos[ov * 3], pos[ov * 3 + 1], pos[ov * 3 + 2])
+    outN.push3(nx, ny, nz)
+    if (outUV && m.uv) { outUV.push(m.uv[ov * 2]); outUV.push(m.uv[ov * 2 + 1]) }
+    if (outCol && m.col) for (let j = 0; j < 4; j++) outCol.push(m.col[ov * 4 + j])
+    return out
+  }
   // per point, the vertices already made : [orig vertex, nx, ny, nz, out index]
   const made: number[] = []
+  const byOv = new Map<number, number>()
   for (let w = 0; w < W.count; w++) {
+    // A point a great many faces meet at (a fan's hub, a damaged file's one point
+    // under thousands of corners) : comparing every corner with every other would
+    // cost their count squared, so it takes the area-weighted mean of all of them.
+    if (cnt[w + 1] - cnt[w] > CROWDED) {
+      let nx = 0, ny = 0, nz = 0
+      for (let k = cnt[w]; k < cnt[w + 1]; k++) {
+        const f = (corners[k] / 3) | 0
+        nx += fn[f * 3] * area[f]; ny += fn[f * 3 + 1] * area[f]; nz += fn[f * 3 + 2] * area[f]
+      }
+      const l = Math.hypot(nx, ny, nz) || 1
+      nx /= l; ny /= l; nz /= l
+      byOv.clear()
+      let one = -1
+      for (let k = cnt[w]; k < cnt[w + 1]; k++) {
+        const c = corners[k], ov = idx[c]
+        let out = keepApart ? byOv.get(ov) ?? -1 : one
+        if (out < 0) {
+          out = emit(ov, nx, ny, nz)
+          if (keepApart) byOv.set(ov, out)
+          else one = out
+        }
+        outIdx[c] = out
+      }
+      continue
+    }
     made.length = 0
     for (let k = cnt[w]; k < cnt[w + 1]; k++) {
       const c = corners[k], f = (c / 3) | 0
@@ -492,17 +528,12 @@ function autoNormals(m: { pos: Float32Array; uv: Float32Array | null; col: Uint8
         if (made[q + 1] * nx + made[q + 2] * ny + made[q + 3] * nz > 0.9995) { out = made[q + 4]; break }
       }
       if (out < 0) {
-        out = outPos.n / 3
-        outPos.push3(pos[ov * 3], pos[ov * 3 + 1], pos[ov * 3 + 2])
-        outN.push3(nx, ny, nz)
-        if (outUV && m.uv) { outUV.push(m.uv[ov * 2]); outUV.push(m.uv[ov * 2 + 1]) }
-        if (outCol && m.col) for (let j = 0; j < 4; j++) outCol.push(m.col[ov * 4 + j])
+        out = emit(ov, nx, ny, nz)
         made.push(ov, nx, ny, nz, out)
       }
       outIdx[c] = out
     }
   }
-  void t
   return { pos: outPos.done(), nrm: outN.done(), uv: outUV ? outUV.done() : null, col: outCol ? outCol.done() : null, idx: outIdx }
 }
 
@@ -551,7 +582,10 @@ export function prepareMesh(raw: RawMesh, withEdges = true): MeshData {
   const notes = [...(raw.notes ?? [])]
   let pos = raw.pos
   let idx = raw.idx && raw.idx.length >= 3 ? raw.idx : null
-  let nrm = raw.nrm && raw.nrm.length === pos.length ? raw.nrm : null
+  // (the file's normals only when there is one a vertex and every one is a number :
+  // else the Model makes its own, never a NaN that would black out the shading)
+  let nrm = raw.nrm && raw.nrm.length === pos.length && raw.nrm.every(Number.isFinite) ? raw.nrm : null
+  if (raw.nrm && !nrm) notes.push('its normals are damaged : the Model made its own')
   let uv = raw.uv && raw.uv.length === (pos.length / 3) * 2 ? raw.uv : null
   let col = raw.col && raw.col.length === (pos.length / 3) * 4 ? raw.col : null
   let vcount = pos.length / 3
@@ -652,6 +686,8 @@ export function prepareMesh(raw: RawMesh, withEdges = true): MeshData {
   if (!col) col = new Uint8Array(vcount * 4).fill(255).map((v, i) => ((i & 3) === 3 ? 0 : v))
   let hasTex = false
   if (raw.texture) for (let i = 3; i < col.length; i += 4) if (col[i] > 127) { hasTex = true; break }
+  // a texture no face uses : its memory let go now
+  if (raw.texture && !hasTex) raw.texture.close()
   const tris = idx ? idx.length / 3 : 0
   const ed = withEdges && idx && tris <= MAX_EDGE_TRIS ? buildEdges(pos, idx) : null
   if (idx && tris > MAX_EDGE_TRIS) notes.push('too dense for wireframe and edges : those looks draw it solid')
