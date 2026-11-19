@@ -17,7 +17,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { effectiveZoom } from './uiZoom'
 import { ownerWindow } from './ownerWindow'
-import { depthMark, THREE_D_TITLE, TWO_HALF_D_TITLE } from '../shaders/isf/threeD'
+import { depthMark, NEEDS, THREE_D_TITLE, TWO_HALF_D_TITLE } from '../shaders/isf/threeD'
 
 export interface SearchOption {
   value: string
@@ -70,7 +70,9 @@ export function searchScore(opt: Pick<SearchOption, 'label' | 'group' | 'keyword
 /** The search also finds a marked piece by its mark ("3d", "2.5d"). */
 function markWord(o: SearchOption): SearchOption {
   const m = depthMark(o.value)
-  return m ? { ...o, keywords: [...(o.keywords ?? []), m.toLowerCase()] } : o
+  const n = NEEDS[o.value]
+  if (!m && !n) return o
+  return { ...o, keywords: [...(o.keywords ?? []), ...(m ? [m.toLowerCase()] : []), ...(n ? [n.tag] : [])] }
 }
 
 /** The small blue 3D / 2.5D mark after a 3D piece's name (threeD.ts) : a fixed
@@ -92,6 +94,20 @@ function DepthMark({ id }: { id: string }): JSX.Element | null {
       }}
     >
       {m}
+    </span>
+  )
+}
+
+/** "needs films" / "needs camera" : a neutral grey tag (NEEDS, threeD.ts). */
+function NeedsTag({ id }: { id: string }): JSX.Element | null {
+  const n = NEEDS[id]
+  if (!n) return null
+  return (
+    <span
+      title={n.title}
+      className="ml-1.5 rounded-sm border border-muted/40 px-[3px] align-[1px] font-mono text-[8.5px] leading-none text-muted"
+    >
+      {n.tag}
     </span>
   )
 }
@@ -296,6 +312,7 @@ export function SearchSelect({
                       {o.prefix}
                       {o.label}
                       <DepthMark id={o.value} />
+                      <NeedsTag id={o.value} />
                     </button>
                   )
                 })}

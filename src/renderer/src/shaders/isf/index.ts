@@ -8,6 +8,7 @@
 // tasteful one. This table is where the instrument's taste lives: it keeps
 // randomization in the glitch register and out of kaleidoscope soup.
 
+import { NEEDS } from './threeD'
 import driftField from './DriftField.fs?raw'
 import organic from './Organic.fs?raw'
 import { TEXT_FONTS } from '../../textFonts'
@@ -3134,10 +3135,12 @@ export function isGeometrySource(sh: IsfShader): boolean {
   return categoriesOf(sh).includes('"Geometry"')
 }
 
-export type SourceSection = 'live' | 'organic' | 'painted' | 'analog' | 'geometry' | 'generators'
+export type SourceSection = 'live' | 'needs material' | 'organic' | 'painted' | 'analog' | 'geometry' | 'generators'
 
 /** A generator's section in the source pickers. */
 export function sourceSection(sh: IsfShader): SourceSection {
+  // the sources that show nothing without films or the camera, together (threeD.ts NEEDS)
+  if (NEEDS[sh.id]) return 'needs material'
   return isLiveSource(sh)
     ? 'live'
     : isOrganicSource(sh)
@@ -3164,7 +3167,7 @@ const ORDERED = new WeakMap<IsfShader[], IsfShader[]>()
 export function inPickerOrder(list: IsfShader[]): IsfShader[] {
   const hit = ORDERED.get(list)
   if (hit) return hit
-  const rank: Record<SourceSection, number> = { live: -1, organic: 0, painted: 1, analog: 2, geometry: 3, generators: 4 }
+  const rank: Record<SourceSection, number> = { live: -2, 'needs material': -1, organic: 0, painted: 1, analog: 2, geometry: 3, generators: 4 }
   const out = [...list].sort(
     (a, b) => rank[sourceSection(a)] - rank[sourceSection(b)] || a.name.localeCompare(b.name)
   )

@@ -3666,6 +3666,9 @@ compound on every pass, see [the layer stack](#the-layer-stack)), **Master FX**,
   Luma Blur, Pulfrich) in the source and effect menus, a lighter dashed **2.5D** mark the
   sources that look 3D on a flat picture but give no depth (Oil Cloud, Lattice, Relief);
   `3d` or `2.5d` in a menu's search lists them.
+- **needs material** : the source menu groups the sources that show nothing until you
+  give them something, tagged with it : Assemblage… and Collage (*needs films*),
+  Silhouette (*needs camera*).
 - **Every effect, source and modulator names itself on hover** : a plain-English
   sentence or two on the item's name in the Inspector, saying what it does.
 - **Native nodes**: the three **sidechain** nodes (Transfert, Convolution, Mosaïque) are

@@ -270,6 +270,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
   that read the depth map (Parallax, Depth Scan, Luma Blur, Pulfrich); a lighter, dashed
   **2.5D** mark after Oil Cloud, Lattice and Relief (they look 3D but give no depth);
   typing `3d` or `2.5d` in a menu finds them.
+- **A "needs material" group in the layer's source menu** (`NEEDS` in `threeD.ts`,
+  `sourceSection`) : Assemblage… and Collage (tag *needs films*) and Silhouette (*needs
+  camera*), the sources that show nothing without films or the Body camera, together
+  after the live entries; the tag's hover says what to give them; `needs` finds them.
 - **A model file opens in plastic** : a file loaded on a built-in shape starts in the plastic
   material (chrome, the default, reflected the studio and hid the file's own colors and a
   layer worn as skin); a file swapped for another keeps the material chosen.

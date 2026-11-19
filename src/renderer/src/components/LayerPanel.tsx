@@ -1227,7 +1227,7 @@ function SourceRow({
               : []),
             { value: '__video_pick__', label: 'Import video…', prefix: '🎞 ', group: 'live' },
             { value: '__audio_pick__', label: 'Import audio…', prefix: '🔊 ', group: 'live', title: 'A sound file played in the layer like a film, its waveform on screen; its sound can drive any audio modulator (FROM)' },
-            { value: '__assemble_pick__', label: 'Assemblage…', prefix: '🎬 ', group: 'live' },
+            { value: '__assemble_pick__', label: 'Assemblage…', prefix: '🎬 ', group: 'needs material' },
             { value: '__cap_webcam__', label: 'Webcam', prefix: '📷 ', group: 'live' },
             { value: '__cap_live__', label: 'Live Input…', prefix: '🎥 ', group: 'live' },
             { value: '__cap_ndi__', label: 'NDI Input…', prefix: '📶 ', group: 'live', title: 'An NDI® source on the network : a camera, a phone, OBS, NDI Tools, another Palinopsia' },
