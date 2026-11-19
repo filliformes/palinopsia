@@ -558,7 +558,7 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
             else if (v) void dataflouBind(ourSku, v, n.sku, p.path, true)
           }}
           className={select}
-          title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations. Wiring to a destination that is not published publishes it."
+          title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations. Wiring to a destination that is not published publishes it (for the session only, when the new wire is saved with the session)."
         >
           <option value="">→ Palinopsia…</option>
           <option value="__macro__">◈ a free Macro knob</option>

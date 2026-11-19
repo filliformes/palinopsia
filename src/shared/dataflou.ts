@@ -202,6 +202,11 @@ export interface DfStatus {
   cppHidden: number
   // our destinations with saved wires that wait : not published now
   parked: string[]
+  // published for the open session only (its wires need them, this computer's
+  // list does not have them) : on the tree while it is open, never saved; and
+  // how many of them one frame had no room for
+  sessionPublished?: string[]
+  sessionDropped?: number
   // the session's wires playing now (dfWireKey, with the source's SKU resolved);
   // this computer's wires set aside because the session wires their destination
   // or their source; the session's wires waiting for another universe

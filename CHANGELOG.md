@@ -467,6 +467,19 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
+- **A session no longer publishes on this computer's dataflou mesh for good.** Loading
+  a session used to add every path its wires need (their destinations, its own sources,
+  its actions) to the publish list, saved on this computer, so they stayed published
+  after the session closed, and a crafted session could expose body or audio data or
+  actions such as opening a favorite. Main now works out what the open session's wires
+  need from its (cleaned) wires and adds only Palinopsia's own known paths to the tree
+  while that session is open (`main/dataflou/index.ts` `sessionExtras`), after this
+  computer's list and only in the room left in the frame; New or another load takes
+  them away, and they are never written to the publish list. The Session heading's
+  actions (favorites, load, New) are never published by a session. A wire made with
+  Learn saved with the session publishes for the session only; a session wire moved to
+  this computer publishes its paths here (`renderer/dataflou.ts`). The publish list
+  marks them **session** and counts them (`DataflouPublish.tsx`; `DfStatus.sessionPublished`).
 - **The Model, before its release : its files, its reader and its motion** (from the
   v1.3.5 audit). **Collect** gives each model a folder of its own in `<session> media`
   with exactly the files it reads, laid out as they sit round it (`../` included), so

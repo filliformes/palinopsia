@@ -15,7 +15,7 @@ import { routeOsc } from './oscInput'
 import { readSource } from './resolume'
 import { fireTrigger } from './midi'
 import { triggerOptions } from './triggerCatalog'
-import { DF_DESTS, DF_SELF, DF_SOURCES, dfActionPath, dfGroupOf, dfPublished, type DfAction, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, dfActionPath, dfGroupOf, dfPublished, type DfAction, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
 import type { MappingScope, ModTarget } from '@shared/types'
 import { oscLeafValues } from './oscInput'
 import { controlBus } from './engine/controlBus'
@@ -525,28 +525,15 @@ export function initDataflou(): () => void {
     if (s.sessionDfWires === wiresWas) return
     wiresWas = s.sessionDfWires
     sendSessionWires()
-    publishSessionWires()
   })
   // (`?.` : a renderer hot-updated over an older main and preload has none)
   const offWiresIn = window.api.onDataflouSessionWires?.((list) => {
     wiresSent = JSON.stringify(list)
     useStore.getState().setSessionDfWires(list)
   })
-  // (and when the node starts, or moves to another universe)
-  let ranOn = ''
-  const offRun = (() => {
-    const l = (): void => {
-      const on = status.running ? status.universe : ''
-      if (on && on !== ranOn) publishSessionWires()
-      ranOn = on
-    }
-    listeners.add(l)
-    return () => listeners.delete(l)
-  })()
   return () => {
     offWires()
     offWiresIn?.()
-    offRun()
     offStatus()
     offIn()
     offRemote()
@@ -567,7 +554,10 @@ export async function openDataflouVisualizer(): Promise<{ ok: boolean; error?: s
  *  session), unless `scope` says. */
 export async function dataflouBind(destSku: string, destPath: string, srcSku: string, srcPath: string, on: boolean, scope?: MappingScope): Promise<boolean> {
   // Wiring one of ours publishes it : the node only takes wires to what it declares.
-  if (on) {
+  // A wire saved with the session publishes for that session only (main adds
+  // what the session's wires need while it is open, never to this list).
+  const toSession = (scope ?? useStore.getState().learnScope) === 'session' && destSku === status.sku
+  if (on && !toSession) {
     const mine = [destSku === status.sku ? destPath : null, srcSku === status.sku ? srcPath : null].filter((x): x is string => !!x)
     await ensurePublished(mine)
   }
@@ -576,8 +566,15 @@ export async function dataflouBind(destSku: string, destPath: string, srcSku: st
 
 /** Move a wire into Palinopsia to this computer or to the session (null : a
  *  computer wire the session silences, removed). */
-export function dataflouWireScope(dest: string, sku: string, path: string, to: MappingScope | null): Promise<boolean> {
-  return window.api.dataflouWireScope?.({ dest, sku, path, to }) ?? Promise.resolve(false)
+export async function dataflouWireScope(dest: string, sku: string, path: string, to: MappingScope | null): Promise<boolean> {
+  // kept on this computer : what it plays joins this computer's publish list (it
+  // was published for the session only)
+  if (to === 'computer') {
+    const acts = new Set(dataflouActions().map((a) => a.path))
+    const ours = [dest, ...(sku === status.sku ? [path] : [])].filter((p) => DEST_BY_PATH.has(p) || SIGNAL_BY_PATH.has(p) || acts.has(p))
+    await ensurePublished(ours)
+  }
+  return (await window.api.dataflouWireScope?.({ dest, sku, path, to })) ?? false
 }
 
 // ── the session's wires : the store keeps them (the session file's
@@ -590,28 +587,11 @@ function sendSessionWires(): void {
   wiresSent = j
   window.api.dataflouSession?.(list)
 }
-/** The session's wires of the node's universe play only on what is published :
- *  wiring publishes, so a session's wires do as they arrive (the publish list is
- *  this computer's). */
-let publishing = false
-function publishSessionWires(): void {
-  if (!status.running || publishing) return
-  const acts = new Set(dataflouActions().map((a) => a.path))
-  const paths = new Set<string>()
-  for (const w of useStore.getState().sessionDfWires) {
-    if (w.universe !== status.universe) continue
-    paths.add(w.dest)
-    if (w.sku === DF_SELF) paths.add(w.path)
-  }
-  const want = [...paths].filter((p) => !isDfPublished(p) && (DEST_BY_PATH.has(p) || SIGNAL_BY_PATH.has(p) || acts.has(p)))
-  if (!want.length) return
-  publishing = true
-  void ensurePublished(want).finally(() => {
-    publishing = false
-  })
-}
+// The session's wires need their paths published : main adds them to the tree
+// while the session is open (status.sessionPublished), never to the publish list
+// below, which is this computer's alone.
 
-/** Is one of our paths on the mesh now (the section's publish list) ? */
+/** Is one of our paths in this computer's publish list ? */
 export function isDfPublished(path: string): boolean {
   const pub = new Set(useStore.getState().dataflou.publish)
   const action = path.startsWith('act/') ? dataflouActions().find((a) => a.path === path) : undefined

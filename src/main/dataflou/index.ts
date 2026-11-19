@@ -18,7 +18,7 @@ import { encodeDeclare } from './protocol'
 import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged, visualizerScene } from './visualizer'
 import type { SceneFile } from './node'
 import {
-  DF_DECLARE_MAX, DF_SELF, DF_SESSION_WIRES_MAX, cleanPublish, cleanSessionWires, cleanWireOpt, dfCppHidden, dfGroupOf, dfPublished, dfWireKey, palinopsiaTree,
+  DF_DECLARE_MAX, DF_DESTS, DF_SELF, DF_SESSION_WIRES_MAX, DF_SOURCES, cleanPublish, cleanSessionWires, cleanWireOpt, dfCppHidden, dfGroupOf, dfPublished, dfWireKey, palinopsiaTree,
   type DfAction, type DfConfig, type DfParam, type DfSessionWire, type DfStatus, type DfSub, type DfValue
 } from '@shared/dataflou'
 import type { MappingScope } from '@shared/types'
@@ -197,6 +197,9 @@ function effectiveWires(universe: string): Record<string, DfSub[]> {
 function applySessionWires(): void {
   applyQueued = false
   if (!node || !config) return
+  // what the session's wires need published first : a wire into what is not on
+  // the tree waits, parked
+  refreshTree('the session changed')
   applying = true
   try {
     const r = node.replaceWires(effectiveWires(config.universe))
@@ -329,7 +332,7 @@ let visClients = 0
 function status(): DfStatus {
   if (node) {
     return {
-      ...node.status(), published: publishedCount, actions: actionsOn, actionsDropped, cppHidden,
+      ...node.status(), published: publishedCount, actions: actionsOn, actionsDropped, cppHidden, sessionPublished, sessionDropped,
       visualizer: visClients, visualizerAvailable: visualizerAvailable(), ...sessionStatus(config?.universe ?? '')
     }
   }
@@ -347,32 +350,101 @@ function publishedActions(): DfAction[] {
   return actions.filter((a) => dfPublished(pub, dfGroupOf(a.path, a.group), a.path))
 }
 
+// What the open session's wires need on the mesh and this computer does not
+// publish : on the tree only while that session is open (its wires change with a
+// load, New, a wire made or removed), NEVER written to the publish list, so a
+// session never makes this computer publish anything for good. Worked out here
+// from the session's wires (already cleaned) and only ever Palinopsia's own
+// paths : a fixed destination or source, or an action the session has now. The
+// Session heading's actions (open a favorite, load, New) never : a session cannot
+// expose what replaces it; this computer's publish list can.
+const DEST_PATHS = new Set<string>(DF_DESTS.map((d) => d.path))
+// (what a wire can read from us : a source, or a destination that also reports)
+const SRC_PATHS = new Set<string>([...DF_SOURCES.map((s) => s.path), ...DF_DESTS.filter((d) => d.bidir).map((d) => d.path)])
+const SESSION_NEVER_GROUP = 'Session'
+function sessionExtras(): { fixed: string[]; acts: DfAction[] } {
+  if (!config) return { fixed: [], acts: [] }
+  const pub = new Set(config.publish)
+  const byPath = new Map(actions.map((a) => [a.path, a]))
+  const fixed = new Set<string>()
+  const acts = new Map<string, DfAction>()
+  const add = (path: string, fixedOk: Set<string>): void => {
+    if (fixedOk.has(path)) {
+      if (!dfPublished(pub, dfGroupOf(path), path)) fixed.add(path)
+      return
+    }
+    const a = byPath.get(path)
+    if (a && a.group !== SESSION_NEVER_GROUP && !dfPublished(pub, dfGroupOf(a.path, a.group), a.path)) acts.set(a.path, a)
+  }
+  for (const w of sessionOf(config.universe)) {
+    add(w.dest, DEST_PATHS)
+    if (w.sku === DF_SELF && SRC_PATHS.has(w.path)) add(w.path, SRC_PATHS)
+  }
+  return { fixed: [...fixed], acts: [...acts.values()] }
+}
+// the session-only paths on the tree now, and how many did not fit
+let sessionPublished: string[] = []
+let sessionDropped = 0
+// what the tree was last built from (rebuilt only when that changes)
+let treeSig = ''
+const treeSigNow = (): string => JSON.stringify([config?.publish ?? [], publishedActions(), sessionExtras()])
+
+/** The largest count (0..total) whose tree still fits : `fits` grows false past it. */
+function fitCount(total: number, fits: (n: number) => boolean): number {
+  if (!total || fits(total)) return total
+  let lo = 0
+  let hi = total
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (fits(mid)) lo = mid
+    else hi = mid - 1
+  }
+  return lo
+}
+
 /** The tree : everything published, with as many of the published actions (in the
- *  picker's order) as fit in one frame a desktop node takes. */
+ *  picker's order) as fit in one frame a desktop node takes, then what the open
+ *  session needs (only in the room left : this computer's list comes first). */
 function tree(): DfParam[] {
   const publish = config?.publish ?? []
   const want = publishedActions()
   const label = config?.label ?? 'palinopsia'
   const id = { sku: '00000000-0000-0000-0000-000000000000', label, product: 'Palinopsia', version: 1, state: 'active' }
-  const size = (n: number): number => encodeDeclare(0, id.sku, id.sku, 2 ** 31, id, palinopsiaTree(want.slice(0, n), publish)).length
-  let n = want.length
-  if (n && size(n) > DF_DECLARE_MAX) {
-    let lo = 0
-    let hi = n
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2)
-      if (size(mid) <= DF_DECLARE_MAX) lo = mid
-      else hi = mid - 1
-    }
-    n = lo
-  }
+  const size = (acts: DfAction[], pub: readonly string[]): number => encodeDeclare(0, id.sku, id.sku, 2 ** 31, id, palinopsiaTree(acts, pub)).length
+  const n = fitCount(want.length, (k) => size(want.slice(0, k), publish) <= DF_DECLARE_MAX)
   if (n < want.length) log('warn', `[dataflou] ${label} : ${want.length - n} published actions left out, the tree would pass ${DF_DECLARE_MAX} bytes`)
-  actionsOn = n
+  // the session's extras after : its fixed paths, then its actions
+  treeSig = treeSigNow()
+  const ex = sessionExtras()
+  const items = [...ex.fixed.map((p) => ({ path: p, act: null as DfAction | null })), ...ex.acts.map((a) => ({ path: a.path, act: a }))]
+  const build = (k: number): { acts: DfAction[]; pub: string[] } => {
+    const some = items.slice(0, k)
+    return {
+      acts: [...want.slice(0, n), ...some.flatMap((i) => (i.act ? [i.act] : []))],
+      pub: [...publish, ...some.flatMap((i) => (i.act ? [] : [`p:${i.path}`]))]
+    }
+  }
+  const k = n < want.length ? 0 : fitCount(items.length, (m) => {
+    const b = build(m)
+    return size(b.acts, b.pub) <= DF_DECLARE_MAX
+  })
+  if (k < items.length) log('warn', `[dataflou] ${label} : ${items.length - k} of the session's parameters left out, the tree would pass ${DF_DECLARE_MAX} bytes`)
+  sessionPublished = items.slice(0, k).map((i) => i.path)
+  sessionDropped = items.length - k
+  const b = build(k)
+  actionsOn = b.acts.length
   actionsDropped = want.length - n
-  const params = palinopsiaTree(want.slice(0, n), publish)
+  const params = palinopsiaTree(b.acts, b.pub)
   publishedCount = params.filter((p) => p.kind !== 'group').length
   cppHidden = dfCppHidden(params)
   return params
+}
+
+/** A new tree if what it is built from changed (the session's wires, the actions). */
+function refreshTree(why: string): void {
+  if (!node || treeSigNow() === treeSig) return
+  node.setParams(tree())
+  log('info', `[dataflou] ${why} : ${publishedCount} parameters published (${sessionPublished.length} for the session only), DECLARE ${node.declareBytes()} bytes`)
 }
 
 function pushStatus(): void {
@@ -480,14 +552,13 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('dataflou:actions', (_e, list: unknown) => {
     if (!Array.isArray(list)) return
     const str = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length < 200
-    const before = JSON.stringify(publishedActions())
     actions = list
       .filter((a): a is DfAction => !!a && str(a.id) && str(a.path) && str(a.label) && str(a.group) && a.path.startsWith('act/'))
       .slice(0, 1000)
-    if (node && JSON.stringify(publishedActions()) !== before) {
-      node.setParams(tree())
-      log('info', `[dataflou] ${actionsOn} actions on ${config?.label}, DECLARE ${node.declareBytes()} bytes`)
-    }
+    // (an action the session's wires play may have just appeared, or gone)
+    const was = sessionPublished.length
+    refreshTree(`${actionsOn} actions on ${config?.label}`)
+    if (sessionPublished.length !== was) queueApply()
   })
   // Our sources' values, sampled by the renderer (only the ones someone listens to).
   ipcMain.on('dataflou:values', (_e, values: Record<string, DfValue>) => {

@@ -4496,8 +4496,12 @@ tab has the whole setup :
   kept : they play again in a session that leaves that input free), the rest of
   the computer's play on. A session's wire belongs to the universe it was made in : on
   another universe it waits, kept in the session (a line says how many, and for which
-  universe), and plays as soon as the node joins that one. Wiring publishes what it plays,
-  so a session's wires publish their destinations as they arrive. One of Palinopsia's
+  universe), and plays as soon as the node joins that one. A session's wires publish what
+  they play **for that session only** : on the mesh while it is open (marked **session**
+  in the publish list, after this computer's list, in the room the frame has left), gone
+  with New or another load, never added to this computer's list. A session never
+  publishes the Session actions (a favorite, load, New); move a wire to this computer to
+  keep what it plays published here. One of Palinopsia's
   own sources is saved as itself (each computer has its own node id), so a local wire
   travels too. **New** starts with none (the computer's wires play), **Generate** keeps
   them (the same piece, a new look), as the session's MIDI and OSC mappings do. A wire of

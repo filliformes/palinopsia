@@ -45,6 +45,8 @@ export function DataflouPublish(): JSX.Element {
   const [expanded, setExpanded] = useState<string | null>(null)
   const groups = useGroups(open)
   const pub = useMemo(() => new Set(publish), [publish])
+  // on the mesh for the open session only (its wires need them; never saved here)
+  const sessionPub = useMemo(() => new Set(st.running ? st.sessionPublished ?? [] : []), [st.running, st.sessionPublished])
 
   const write = (next: Set<string>): void => setCfg({ publish: [...next] })
   const isOn = (g: Group, path: string): boolean => pub.has(`g:${g.key}`) || pub.has(`p:${path}`)
@@ -119,6 +121,15 @@ export function DataflouPublish(): JSX.Element {
           {st.cppHidden} published {st.cppHidden === 1 ? 'parameter stays' : 'parameters stay'} hidden from a node on the C++ core : it sees 128 entries, 32 per group.
         </span>
       )}
+      {st.running && sessionPub.size > 0 && (
+        <span
+          className="font-mono text-[9px] text-accent2"
+          title={`Published while this session is open, because its wires need them : ${[...sessionPub].join(', ')}. Never added to this computer's list : they leave with the session.`}
+        >
+          + {sessionPub.size} for this session only
+          {(st.sessionDropped ?? 0) > 0 && <span className="text-danger"> ({st.sessionDropped} left out : no room in the frame)</span>}
+        </span>
+      )}
       {st.running && st.actionsDropped > 0 && (
         <span className="font-mono text-[9px] text-danger">
           {st.actionsDropped} published actions left out : one frame holds no more. Untick a group to make room.
@@ -185,6 +196,11 @@ export function DataflouPublish(): JSX.Element {
                           {i.label}
                         </span>
                         {i.source && <span className="shrink-0 text-accent2" title="Also a source : the mesh can read it">↗</span>}
+                        {!isOn(g, i.path) && sessionPub.has(i.path) && (
+                          <span className="shrink-0 text-accent2" title="Published for the open session only : its wires need it. Tick it to keep it published on this computer.">
+                            session
+                          </span>
+                        )}
                       </label>
                     ))}
                     {g.items.length === 0 && <span className="font-mono text-[9px] text-muted">nothing in it now</span>}
