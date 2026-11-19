@@ -419,6 +419,14 @@ function route(address: string, args: Args, host = ''): void {
           }
           return
         }
+        // The Text source's words : /opsia/layerN/source/A/text "hello" (only while
+        // the slot plays Text; the same words again change nothing)
+        if (input === 'text' && segs[6] === undefined) {
+          const words = firstStr(args)
+          const cur = st.composition.layers[li]?.[slot === 'A' ? 'sourceA' : 'sourceB']
+          if (words !== null && sid === 'gen-text' && cur?.text !== words) st.setSourceText(li, slot, words)
+          return
+        }
         // Marbling : a drop at a place (two numbers or more; one number is the plain trigger)
         if (input === 'drop' && args.length >= 2 && sourceEvent({ layer: li, slot }, 'drop', oscNums(args))) return
         const v = resolveOrPart(sid, input, segs[6], sourceInputs(li, slot)?.[input], args)
@@ -649,15 +657,21 @@ function route(address: string, args: Args, host = ''): void {
     case 'world': {
       // /opsia/world/amount f 0..1 : how much of the World's mood is on
       if (segs[2] === 'amount') { st.setWorldAmount(clamp01(n)); return }
+      // /opsia/world/apply : the World in use applied again (after hand edits), on
+      // a press or a bare message
+      if (segs[2] === 'apply') { if (!args.length || rising(address, n)) st.setWorld(st.world); return }
+      // Only a CHANGE applies a World : a controller that keeps sending its state
+      // would otherwise restart the morph on every message (each apply morphs the
+      // whole composition over the Morph time). /opsia/world/apply re-applies.
       const str = firstStr(args)
       if (str !== null) {
         const w = st.worlds.find((x) => x.id === str || x.name.toLowerCase() === str.trim().toLowerCase())
-        if (w) st.setWorld(w.id)
+        if (w && w.id !== st.world) st.setWorld(w.id)
         return
       }
       const idx = Math.round(n) - 1 // 1-based index into the worlds bank
       const w = st.worlds[idx]
-      if (w) st.setWorld(w.id)
+      if (w && w.id !== st.world) st.setWorld(w.id)
       return
     }
 

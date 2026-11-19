@@ -7,6 +7,10 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Text over OSC and the Agent** : `/opsia/layerN/source/{A|B}/text "words"` writes the
+  Text source's words (only while the slot plays Text; the same words again change
+  nothing), and the Agent's new `set_text` tool does the same (16 tools).
+- **`/opsia/world/apply`** : the World in use applied again, on a bare message or a press.
 - **The Model and Grid Mesh in hand** (`pointerInput.ts`, `engine/heldObject.ts`) : a
   drag on the preview turns the object under the cursor in any direction (a trackball
   round the screen's axes), the wheel over it changes its **distance** (12 % a notch,
