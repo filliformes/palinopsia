@@ -1127,6 +1127,26 @@ with `/note` for a pad (its velocity, 0 = off). Generate and the dice never deal
 controller (they can re-roll a slot that is one : pin it, right-click, to keep it). The modulator the active World installs for its audio routing carries `⊛`
 (wherever it sits) and Randomize leaves it alone; change it or its bindings and it is yours.
 
+**Envelopes that fire themselves.** A `ramp` or `adsr` starts from its **⟳**, a MIDI pad
+or note, or a Body rule / MIDI action; its **↯** (in the card's header, beside ✋) turns
+the card to what else fires it, in the same card. **FIRE** : **card only** (just those),
+**the sound** (the audio input, or the sound of a film or an audio file on a layer or on
+the Audio Layer, as an audio modulator's FROM), or **another modulator** (M1 to M8). From
+the sound, **FEAT** picks what it listens to (**transient** : each hit, the default;
+level, flux, band, centroid, pitch, noisiness) and **HZ** the band it reads it in, the
+same two-thumb slider as the audio modulator : 40 to 120 Hz (the default) fires on a kick
+and lets the hats go by, 6000 to 16000 on the hats. **AT** is one track with two marks :
+it fires as the signal rises past the right one, and is ready again only once it has
+fallen under the left one, so a held loud sound fires once and a level wobbling round the
+line never chatters; the bar under the marks is the signal now (set a **level** trigger's
+marks by it : the level is read in decibels, so a kick's tail stays high most of the
+beat). **HOLD** : after a fire, how long it ignores the next (a kick's two bumps fire
+once; a hit inside it is dropped, never played late). A modulator fires it when its own
+output rises past the line : an LFO's square, a Steps pattern, a controller played by
+OSC. Each fire restarts the envelope exactly as its ⟳ does; ↯ lights while it fires on its
+own and flashes at each fire. It travels with sessions and scenes; the dice and Generate
+never set one.
+
 **`steps`** is a **step sequencer with conditional steps and swing** : up to 16 steps,
 each a value you **draw** on the card's strip (drag up or down, across the bars to draw
 several; a click makes a step a rest or plays it again), played one per clock tick (free

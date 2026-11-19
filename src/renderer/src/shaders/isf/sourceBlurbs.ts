@@ -63,8 +63,8 @@ export const GENERATOR_BLURBS: Record<string, string> = {
 
 export const MODULATOR_BLURBS: Record<string, string> = {
   'lfo': 'A repeating wave that rises and falls forever : sine, triangle, square, saw, or the random and Spastic shapes. The everyday modulator for steady, cyclic movement. Pick the shape and the speed, and bind it to any control.',
-  'ramp': 'Sweeps once from start to finish over a set time, then stops, or loops if you ask it to. A one-shot glide rather than a repeating wave. Use it for a slow build, a fade, or a single move on a trigger.',
-  'adsr': 'An envelope with four stages (attack, decay, sustain and release) : the shape a note makes when it swells and dies. Fire it and a control rises, settles, and falls. Borrowed from synthesizers for shaping one gesture over time.',
+  'ramp': 'Sweeps once from start to finish over a set time, then stops, or loops if you ask it to. A one-shot glide rather than a repeating wave. Use it for a slow build, a fade, or a single move on a trigger : its ↯ can fire it from the sound (a kick in a band) or from another modulator.',
+  'adsr': 'An envelope with four stages (attack, decay, sustain and release) : the shape a note makes when it swells and dies. Fire it and a control rises, settles, and falls. Borrowed from synthesizers for shaping one gesture over time. Its ↯ fires it on its own : a kick in a frequency band, a hit, or another modulator crossing a line.',
   'arp': 'Steps through a row of evenly spaced levels on a clock, walking up, down, or at random. A stepped sequence rather than a smooth wave. The Slip control lets it skip beats so the rhythm turns unpredictable.',
   'random': 'Throws a fresh random value on every clock tick and holds it until the next. Jumpy, unrepeatable movement. Slip makes it skip some ticks, so the changes stop landing on an even beat.',
   'sh': 'Samples a random value and holds it, sometimes skipping a beat to keep the same value longer. The stepped, locked-in feel of a classic sample-and-hold. Optional smoothing glides between the held values instead of snapping.',

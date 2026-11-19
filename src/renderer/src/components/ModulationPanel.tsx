@@ -29,7 +29,8 @@ import { modTargetKey, useStore } from '../store'
 import { partOf } from '../modKey'
 import { PART_WORD } from '../engine/colorParts'
 import { useShallow } from 'zustand/react/shallow'
-import type { ClipAudioSrc } from '@shared/types'
+import type { ClipAudioSrc, EnvTrigger } from '@shared/types'
+import { ENV_TRIGGER_DEFAULT, ENV_TRIGGER_FEATURES, TRIG_HOLD_MAX, TRIG_HOLD_MIN, takesTrigger, triggerActive } from '../engine/envTrigger'
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { modulatorBlurb } from '../shaders/isf/sourceBlurbs'
 import { usePin } from './Pin'
@@ -197,6 +198,9 @@ function ModCard({ index }: { index: number }): JSX.Element {
   // the card's other side : its takeover (✋), in the same silhouette
   const [takeView, setTakeView] = useState(false)
   const takeSide = takeView && m.type !== 'controller'
+  // an envelope's other side : what fires it (↯), in the same silhouette
+  const [trigView, setTrigView] = useState(false)
+  const trigSide = trigView && !takeSide && takesTrigger(m.type)
 
   return (
     // Fixed height + min-w-0 so all eight cards are identical regardless of
@@ -262,11 +266,15 @@ function ModCard({ index }: { index: number }): JSX.Element {
             </optgroup>
           ))}
         </select>
-        {m.type !== 'controller' && <TakeButton index={index} open={takeSide} onToggle={() => setTakeView(!takeView)} />}
+        {m.type !== 'controller' && <TakeButton index={index} open={takeSide} onToggle={() => { setTakeView(!takeView); setTrigView(false) }} />}
+        {takesTrigger(m.type) && (
+          <TrigButton index={index} open={trigSide} active={triggerActive(m.trigger, m.type)}
+            onToggle={() => { setTrigView(!trigSide); setTakeView(false) }} />
+        )}
         <button
           onClick={() => modEngine.retrigger(index)}
           className="shrink-0 rounded bg-panel3/60 px-1 font-mono text-[9px] text-muted hover:text-accent"
-          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), Steps back to step 1 of a new run (a BPM-synced Steps card with Ableton Link enabled stays on the shared count, so its first pass starts at its next step 1), and Ramp / ADSR / Riser restart from zero. Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
+          title="Retrigger : re-sync this modulator to NOW. A running LFO / Euclid / Turing / Cellular / arp snaps back to the start of its cycle (line it up on a downbeat), Steps back to step 1 of a new run (a BPM-synced Steps card with Ableton Link enabled stays on the shared count, so its first pass starts at its next step 1), and Ramp / ADSR / Riser restart from zero (an envelope can also fire on its own from the sound or another modulator : its ↯). Modulators that run on their own clock (Random / S&H / Slew / Chaos) or follow a signal (Audio / Vision) don't move."
         >
           ⟳
         </button>
@@ -360,7 +368,7 @@ function ModCard({ index }: { index: number }): JSX.Element {
           here : modulators emit their raw signal). Bounded + scrollable so a
           param-heavy type (euclid) can never spill past the card border. */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        {takeSide ? <InputRows index={index} which="take" /> : <TypeParams index={index} />}
+        {takeSide ? <InputRows index={index} which="take" /> : trigSide ? <TriggerRows index={index} /> : <TypeParams index={index} />}
       </div>
     </div>
   )
@@ -1314,8 +1322,9 @@ function FillButton({ index }: { index: number }): JSX.Element {
 // ── Small row helpers ─────────────────────────────────────────────────
 // Where an audio modulator listens : the audio input (the audio tab), or a
 // layer slot's clip, a film's soundtrack or an audio file, read at its playhead.
-function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void }): JSX.Element {
-  const slots = useStore(
+// The clips a modulator can listen to, one key each : `<layer>:<slot>:<kind>:<name>`.
+function useClipSlots(): string[] {
+  return useStore(
     useShallow((s) => [
       ...s.composition.layers.flatMap((l, li) =>
         (['A', 'B'] as const).flatMap((sl) => {
@@ -1332,7 +1341,16 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
       })
     ])
   )
-  const where = (l: number, s: string): string => (l < 0 ? `AU ${s}` : `L${l + 1}${s}`)
+}
+const clipWhere = (l: number, s: string): string => (l < 0 ? `AU ${s}` : `L${l + 1}${s}`)
+const clipLabel = (k: string): string => {
+  const [l, s, kind, ...name] = k.split(':')
+  return `${clipWhere(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`
+}
+
+function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void }): JSX.Element {
+  const slots = useClipSlots()
+  const where = clipWhere
   const cur = value ? `${value.layer}:${value.slot}` : ''
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
   return (
@@ -1349,15 +1367,229 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
       >
         <option value="">audio input</option>
         {slots.map((k) => {
-          const [l, s, kind, ...name] = k.split(':')
+          const [l, s] = k.split(':')
           return (
             <option key={k} value={`${l}:${s}`}>
-              {`${where(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`}
+              {clipLabel(k)}
             </option>
           )
         })}
         {!known && value && <option value={cur}>{`${where(value.layer, value.slot)} (no clip there now)`}</option>}
       </select>
+    </Row>
+  )
+}
+
+// ── An envelope's trigger (engine/envTrigger.ts) : the card's ↯ side ──
+const TRIG_HELP =
+  'FIRE : what starts this envelope besides its ⟳, a MIDI pad or an action. card only : those alone. ' +
+  'sound : a feature of the sound rising past the line (AT), read in a frequency band (HZ) : a kick in 40 to 120 Hz fires it, ' +
+  'hats far above leave it alone. It listens to the audio input (the audio tab), or to a clip on a layer or on the Audio Layer, ' +
+  'as an audio modulator would. A modulator (M1 to M8) : that slot\'s output rising past the line. ' +
+  'Each fire is the card\'s own retrigger : the envelope starts again from zero.'
+const TRIG_FEAT_HELP =
+  'What it listens to : level (how loud, in the band : a kick, a voice), transient (a hit : each onset, sharp), flux (how fast the spectrum changes), ' +
+  'band (one of the six bands, cut to the HZ band), centroid (where the energy sits inside the band), pitch, noisiness.'
+const TRIG_HOLD_HELP =
+  'HOLD : after a fire, how long it ignores the next one (ms). A kick\'s two bumps, a stuttering onset fire once; ' +
+  'a hit inside the hold is dropped, never played late.'
+const trigAtHelp = (rearm: number, at: number): string =>
+  `AT : it fires when the signal rises past the right mark (${at.toFixed(2)}), then waits until it falls under the left one ` +
+  `(${rearm.toFixed(2)}) before it can fire again : a sustained loud sound fires once, a level wobbling round the line never chatters. ` +
+  'The bar under the marks is the signal now. Drag either mark; double-click : 0.40 and 0.60.'
+
+// The side's two menus with 2 px less padding above and below than the other
+// menus (same font) : the five rows of the sound fill the silhouette with ~8 px
+// to spare (at the usual padding they ran 0.4 px over and a scrollbar showed).
+const TRIG_SELECT = { paddingTop: 2, paddingBottom: 2 }
+
+/** The header's ↯ (ramp, adsr) : the card's trigger side and back. Lit : it
+ *  fires on its own (the sound or another slot); it flashes at each fire. */
+function TrigButton({ index, open, active, onToggle }: { index: number; open: boolean; active: boolean; onToggle: () => void }): JSX.Element {
+  const ref = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (!active) return
+    const win = ownerWindow(ref.current)
+    let raf = 0
+    let lit = false
+    const paint = (): void => {
+      const v = modEngine.trigView(index)
+      const on = !!v && win.performance.now() - v.firedAt < 140
+      if (on !== lit && ref.current) {
+        lit = on
+        ref.current.style.backgroundColor = on ? 'rgb(var(--c-accent2))' : ''
+        ref.current.style.color = on ? 'rgb(var(--c-bg))' : ''
+      }
+      raf = win.requestAnimationFrame(paint)
+    }
+    raf = win.requestAnimationFrame(paint)
+    return () => win.cancelAnimationFrame(raf)
+  }, [index, active])
+  return (
+    <button
+      ref={ref}
+      onClick={onToggle}
+      className={`shrink-0 rounded px-1 font-mono text-[9px] ${open ? 'bg-accent2/20 text-accent2 ring-1 ring-accent2' : active ? 'bg-accent2/15 text-accent2' : 'bg-panel3/60 text-muted hover:text-accent'}`}
+      title={`Fire : what starts this envelope on its own, the sound (a kick in a band, a hit) or another modulator crossing a line${active ? ' · on now (it flashes at each fire)' : ' · now : its ⟳, a MIDI pad or an action only'}. Click : ${open ? 'back to its own settings' : 'what fires it'}`}
+    >
+      ↯
+    </button>
+  )
+}
+
+function TriggerRows({ index }: { index: number }): JSX.Element {
+  const m = useStore((s) => s.composition.modulators[index])
+  const types = useStore(useShallow((s) => s.composition.modulators.map((x) => x.type)))
+  const update = useStore((s) => s.updateModulator)
+  const clips = useClipSlots()
+  const t: EnvTrigger = { ...ENV_TRIGGER_DEFAULT, ...(m.trigger ?? {}) }
+  if (t.slot === index) t.slot = (index + 1) % 8
+  const set = (p: Partial<EnvTrigger>): void => update(index, { trigger: { ...t, ...p } })
+  const cur = t.from === 'card' ? 'card' : t.from === 'slot' ? `slot:${t.slot}` : t.src ? `clip:${t.src.layer}:${t.src.slot}` : 'sound'
+  const clipCur = t.src ? `${t.src.layer}:${t.src.slot}` : ''
+  const clipKnown = !t.src || clips.some((k) => k.startsWith(clipCur + ':'))
+  // Tighter than the card's own gap-1 (as the ADSR rows) : the sound's five
+  // rows fill the fixed silhouette exactly.
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <Row label="FIRE" title={TRIG_HELP}>
+        <select
+          className="input select-compact min-w-0 flex-1 text-[10px]"
+          value={cur}
+          title={TRIG_HELP}
+          style={TRIG_SELECT}
+          onChange={(e) => {
+            const v = e.target.value
+            if (v === 'card') return set({ from: 'card' })
+            if (v === 'sound') return set({ from: 'sound', src: undefined })
+            const [k, a, b] = v.split(':')
+            if (k === 'slot') return set({ from: 'slot', slot: Number(a) })
+            set({ from: 'sound', src: { layer: Number(a), slot: b === 'B' ? 'B' : b === 'all' ? 'all' : 'A' } })
+          }}
+        >
+          <option value="card">card only</option>
+          <optgroup label="the sound">
+            <option value="sound">audio input</option>
+            {clips.map((k) => {
+              const [l, sl] = k.split(':')
+              return <option key={k} value={`clip:${l}:${sl}`}>{clipLabel(k)}</option>
+            })}
+            {!clipKnown && t.src && <option value={cur}>{`${clipWhere(t.src.layer, t.src.slot)} (no clip there now)`}</option>}
+          </optgroup>
+          <optgroup label="a modulator">
+            {Array.from({ length: 8 }, (_, j) => j).filter((j) => j !== index).map((j) => (
+              <option key={j} value={`slot:${j}`}>{`M${j + 1} (${types[j] ?? '?'})`}</option>
+            ))}
+          </optgroup>
+        </select>
+      </Row>
+      {t.from === 'card' ? (
+        <div className="min-w-0 px-0.5 font-mono text-[9px] leading-snug text-muted" title={TRIG_HELP}>
+          Fired by its ⟳, a MIDI pad or an action. Pick the sound or a modulator to fire it on its own.
+        </div>
+      ) : (
+        <>
+          {t.from === 'sound' && (
+            <Row label="FEAT" title={TRIG_FEAT_HELP}>
+              <select
+                className="input select-compact min-w-0 flex-1 text-[10px]"
+                value={t.feature}
+                title={TRIG_FEAT_HELP}
+                style={TRIG_SELECT}
+                onChange={(e) => set({ feature: e.target.value as AudioFeature })}
+              >
+                {ENV_TRIGGER_FEATURES.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+              {t.feature === 'band' && (
+                <BoundedNumberInput value={t.band + 1} min={1} max={AUDIO_BANDS} integer
+                  onChange={(v) => set({ band: Math.round(v) - 1 })}
+                  className="input w-7 shrink-0 px-1 py-0.5 text-right text-[10px]"
+                  title={`Which of the ${AUDIO_BANDS} bands (1 : the lows … ${AUDIO_BANDS} : the highs)`} />
+              )}
+            </Row>
+          )}
+          <LevelRow index={index} rearm={t.rearm} at={t.at} onChange={(rearm, at) => set({ rearm, at })} />
+          {t.from === 'sound' && (
+            <HzRow lo={t.lo} hi={t.hi} clip={!!t.src} onChange={(lo, hi) => set({ lo, hi })} />
+          )}
+          <SliderRow label="HOLD" value={Math.max(TRIG_HOLD_MIN, t.holdMs)} min={TRIG_HOLD_MIN} max={TRIG_HOLD_MAX} log integer
+            title={TRIG_HOLD_HELP}
+            onChange={(v) => set({ holdMs: v })} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// The trigger's line and its re-arm, two marks on one track (0..1), the signal
+// live under them : the hysteresis in one row.
+function LevelRow({ index, rearm, at, onChange }: { index: number; rearm: number; at: number; onChange: (rearm: number, at: number) => void }): JSX.Element {
+  const track = useRef<HTMLDivElement>(null)
+  const bar = useRef<HTMLDivElement>(null)
+  const drag = useRef<'lo' | 'hi' | null>(null)
+  const title = trigAtHelp(rearm, at)
+  // the signal now, painted straight into the bar (no React at 60 Hz)
+  useEffect(() => {
+    const win = ownerWindow(track.current)
+    let raf = 0
+    const paint = (): void => {
+      const v = modEngine.trigView(index)
+      if (bar.current) bar.current.style.width = `${Math.max(0, Math.min(1, v?.value ?? 0)) * 100}%`
+      raf = win.requestAnimationFrame(paint)
+    }
+    raf = win.requestAnimationFrame(paint)
+    return () => win.cancelAnimationFrame(raf)
+  }, [index])
+  const pos = (clientX: number): number => {
+    const r = track.current?.getBoundingClientRect()
+    return r && r.width > 0 ? Math.max(0, Math.min(1, (clientX - r.left) / r.width)) : 0
+  }
+  const r2 = (v: number): number => Math.round(v * 100) / 100
+  const move = (which: 'lo' | 'hi', p: number): void => {
+    if (which === 'lo') onChange(r2(Math.min(p, at)), at)
+    else onChange(Math.min(rearm, r2(p)), r2(p))
+  }
+  const key = (which: 'lo' | 'hi') => (e: React.KeyboardEvent): void => {
+    const step = e.shiftKey ? 0.1 : 0.01
+    const p = which === 'lo' ? rearm : at
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); move(which, Math.max(0, p - step)) }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); move(which, Math.min(1, p + step)) }
+  }
+  const thumb = 'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none focus-visible:ring-1 focus-visible:ring-accent'
+  return (
+    <Row label="AT" title={title}>
+      <div
+        className="h-3.5 min-w-0 flex-1 cursor-pointer touch-none select-none px-[5px]"
+        title={title}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          const p = pos(e.clientX)
+          const which = Math.abs(p - rearm) < Math.abs(p - at) || (rearm === at && p < at) ? 'lo' : 'hi'
+          drag.current = which
+          e.currentTarget.setPointerCapture(e.pointerId)
+          move(which, p)
+        }}
+        onPointerMove={(e) => { if (drag.current) move(drag.current, pos(e.clientX)) }}
+        onPointerUp={() => { drag.current = null }}
+        onPointerCancel={() => { drag.current = null }}
+        onLostPointerCapture={() => { drag.current = null }}
+        onDoubleClick={() => onChange(ENV_TRIGGER_DEFAULT.rearm, ENV_TRIGGER_DEFAULT.at)}
+      >
+        <div ref={track} className="relative h-full w-full">
+          <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border" />
+          {/* the signal now */}
+          <div ref={bar} className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-accent2/70" style={{ width: '0%' }} />
+          {/* the dead band between the two marks */}
+          <div className="absolute top-1/2 h-[3px] -translate-y-1/2 border-y border-accent/60" style={{ left: `${rearm * 100}%`, width: `${Math.max(0, at - rearm) * 100}%` }} />
+          <div role="slider" tabIndex={0} aria-label="Arms again under" aria-valuemin={0} aria-valuemax={1} aria-valuenow={rearm}
+            className={`${thumb} border border-accent bg-panel2`} style={{ left: `${rearm * 100}%` }} onKeyDown={key('lo')} />
+          <div role="slider" tabIndex={0} aria-label="Fires past" aria-valuemin={0} aria-valuemax={1} aria-valuenow={at}
+            className={`${thumb} bg-accent`} style={{ left: `${at * 100}%` }} onKeyDown={key('hi')} />
+        </div>
+      </div>
+      <span className="ml-0.5 w-[50px] shrink-0 whitespace-nowrap text-right font-mono text-[9px] tabular-nums text-text" title={title}>
+        {rearm.toFixed(2).replace(/^0/, '')}–{at.toFixed(2).replace(/^0/, '')}
+      </span>
     </Row>
   )
 }
