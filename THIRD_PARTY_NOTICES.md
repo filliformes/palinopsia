@@ -698,6 +698,13 @@ methods are free to build on; naming them is a matter of respect.
     Surfaces*, Pergamon, 1963). The toon steps are plain thresholds. In the app's menus the
     models go by what they look like (diffuse : matte, rough matte, toon, dark rim; shine :
     soft, sharp, toon, satin, glaze); the models' names stay in the hints and here.
+  - **Grid Mesh draw-mode names** (`shaders/isf/index.ts`, the Grid Mesh's draw mode
+    menu): "tri grid" and "quad grid" are the names of two values of the draw_mode
+    attribute of Cycling '74's jit.gl.mesh object in Max/Jitter (a triangle grid and a
+    quad grid drawn in the grid's own order). They are borrowed as plain descriptive
+    labels for the same two ways of drawing a grid; the other draw modes are the classic
+    OpenGL primitive names. Only the terms are taken, no code. Cycling '74 is named here
+    as the source of the terms and has no part in Palinopsia.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the

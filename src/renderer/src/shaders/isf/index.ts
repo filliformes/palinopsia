@@ -2545,6 +2545,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'shape', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], LABELS: ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'circle', 'cone', 'capsule'], DEFAULT: 9, LABEL: 'shape' },
         { NAME: 'dimX', TYPE: 'float', MIN: 2, MAX: 128, DEFAULT: 40, LABEL: 'grid x' },
         { NAME: 'dimY', TYPE: 'float', MIN: 2, MAX: 128, DEFAULT: 40, LABEL: 'grid y' },
+        // third-party: Grid Mesh draw-mode names
         { NAME: 'drawMode', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], LABELS: ['tri grid', 'quad grid', 'points', 'lines', 'line strip', 'line loop', 'triangles', 'tri fan', 'tri strip', 'quads', 'quad strip', 'polygon'], DEFAULT: 0, LABEL: 'draw mode' },
         { NAME: 'polyFront', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['filled', 'lines', 'points'], DEFAULT: 0, LABEL: 'front' },
         { NAME: 'polyBack', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['filled', 'lines', 'points'], DEFAULT: 0, LABEL: 'back' },

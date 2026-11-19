@@ -467,6 +467,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
+- **Credit for the Grid Mesh's "tri grid" and "quad grid" names.** They are the names of
+  two draw_mode values of Cycling '74's jit.gl.mesh in Max/Jitter, kept as plain labels;
+  now credited in THIRD_PARTY_NOTICES Part 6 (**Grid Mesh draw-mode names**) and tagged
+  where they are used. No code was taken.
 - **Grid Mesh level and color alpha count once.** The level and the color's alpha were
   applied twice over (the alpha went through the source-alpha blend too, then the layer
   took the result as straight alpha), so over black the picture showed color x level^4:
