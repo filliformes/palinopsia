@@ -19,8 +19,8 @@ import { AUDIO_BUFFERS, AUDIO_RATES, bufferLabel, rateLabel, type LatencyInfo } 
 import { BlockHead, FaderMeter, HearBlock, InputMeters, InputStatus, OutputMeters, usePolled } from './AudioMonitor'
 
 const SOURCES: Array<{ id: 'both' | 'osc' | 'local'; label: string; title: string }> = [
-  { id: 'both', label: 'Both', title: 'OSC (Pandore) primary, local input as fallback' },
-  { id: 'osc', label: 'OSC', title: 'Audio features from Pandore over /opsia/audio/*' },
+  { id: 'both', label: 'Both', title: 'OSC first, the local input when no OSC arrives' },
+  { id: 'osc', label: 'OSC', title: 'Audio features sent over OSC to /opsia/audio/* by another program, computer or instrument' },
   { id: 'local', label: 'Local', title: 'Analyze a local mic / line / loopback input' }
 ]
 
@@ -208,7 +208,7 @@ export function AudioPanel(): JSX.Element {
           ) : (
             <span
               className="min-w-0 flex-1 truncate font-mono text-[9px] text-muted"
-              title={!enabled ? 'The input analysis is off : click the dot beside AUDIO to listen.' : 'The features come from OSC (/opsia/audio/*), sent by an audio brain (Pandore) : no device is opened here.'}
+              title={!enabled ? 'The input analysis is off : click the dot beside AUDIO to listen.' : 'The features come from OSC (/opsia/audio/*), sent by another program, computer or instrument : no device is opened here.'}
             >
               {!enabled ? 'off : the dot by AUDIO listens' : 'OSC /opsia/audio/* : no device'}
             </span>
