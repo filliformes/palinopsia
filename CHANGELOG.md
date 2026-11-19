@@ -372,6 +372,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Changed
 
+- **OSC and audio text speak of any controller, not one instrument** (`OscPanel.tsx`,
+  `OscDestinations.tsx`, `ModulationPanel.tsx`, README, OSC reference, site) : the tooltips and
+  the manual named Pandore as the OSC sender, receiver and audio source; they now say a controller,
+  a synth, a sound computer or any OSC app.
 - **Glass : drift flows, and a new evolve** (`fx/Glass.fs`) : **drift** only slid the pane to
   the right; it now wanders along a slow path in every direction (a noise meander on
   `PH_drift`) with a soft current bending the pattern, livelier with the knob (0 : still).

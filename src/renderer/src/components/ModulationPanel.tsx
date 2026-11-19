@@ -676,7 +676,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             <select
               className="input select-compact min-w-0 flex-1 text-[10px]"
               value={vc.feature}
-              title="Which picture feature this modulator follows : the composited image played back as control (brightness, contrast, motion, edge-density, entropy, bright-mass X/Y, warmth). The return path : the picture drives parameters, and streams to Pandore over /opsia/vision/*."
+              title="Which picture feature this modulator follows : the composited image played back as control (brightness, contrast, motion, edge-density, entropy, bright-mass X/Y, warmth). The return path : the picture drives parameters, and streams out over OSC (/opsia/vision/*)."
               onChange={(e) => update(index, { vision: { ...vc, feature: e.target.value as VisionFeature } })}
             >
               {VISION_FEATURES.map((f) => (

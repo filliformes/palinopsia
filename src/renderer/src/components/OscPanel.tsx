@@ -205,7 +205,7 @@ export function OscPanel(): JSX.Element {
             <div className="flex min-w-0 items-center gap-2">
               <span
                 className="w-9 shrink-0 font-mono text-[9px] font-semibold uppercase tracking-wide text-accent"
-                title="Messages that play Palinopsia (Pandore, TouchOSC, any OSC sender)"
+                title="Messages that play Palinopsia (a controller, another computer, any OSC sender)"
               >
                 ↙ in
               </span>
@@ -230,7 +230,7 @@ export function OscPanel(): JSX.Element {
                 onKeyDown={enterBlurs}
                 className={`input box-content px-1 py-0.5 text-right text-[11px] tabular-nums ${invalid === 'port' ? 'ring-1 ring-danger' : ''}`}
                 style={{ width: PORT_W }}
-                title="Local UDP port to listen on (Pandore sends here) : 1–65535"
+                title="Local UDP port to listen on (your OSC senders send here) : 1–65535"
               />
               <div className="flex-1" />
               <span className="font-mono text-[9px] text-muted">{inState === 'live' ? `${rate.in} msg/s` : ''}</span>
@@ -263,7 +263,7 @@ export function OscPanel(): JSX.Element {
             <div className="flex min-w-0 items-center gap-1.5">
               <span
                 className="w-9 shrink-0 font-mono text-[9px] font-semibold uppercase tracking-wide text-accent2"
-                title="Messages Palinopsia sends, to every destination below (Pandore, dataFLOU, any OSC receiver)"
+                title="Messages Palinopsia sends, to every destination below (a synth, dataFLOU, any OSC receiver)"
               >
                 ↗ out
               </span>

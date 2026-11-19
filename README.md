@@ -4,7 +4,7 @@
 
 An **OSC-controlled ISF visual instrument** : the visual sibling to
 [dataFLOU](https://github.com/filliformes/dataFLOU_compositor). A lightweight Electron +
-WebGL2 **four-layer compositor**, *played* over OSC (by [Pandore](https://github.com/filliformes))
+WebGL2 **four-layer compositor**, *played* over OSC (by a controller, a sound computer or another app)
 rather than patched like a tool. It composites layers of shader synthesis and
 treated video through blend modes, per-source / per-layer / master ISF effect
 racks, a modulation brain, and a curated Randomize, into a fullscreen or
@@ -108,7 +108,7 @@ fixed and its vocabulary is curated: a seed library of glitch / generative /
 digital-arts shaders that *is* the instrument's voice. You build an image by
 stacking layers, treating each through effect racks, mastering the whole through
 three pinned finalizers, and steering all of it live : by hand, by an internal
-modulation brain, or over OSC from a companion "brain" like Pandore.
+modulation brain, or over OSC from a companion "brain" (a sound computer, a synth, any OSC app).
 
 It also **reads audio** rather than merely pulsing to it: a shared audio bus, an
 A↔B coupling engine (synchresis as balance behaviour), global World/diegesis
@@ -1121,7 +1121,7 @@ the card's header) turns the card to its takeover side, where you learn the cont
 LFO (or whatever it is) over **BACK** ms; a pad pulls the modulator to its velocity on
 its envelope and hands it back over its release. Each slot has one input (learning a
 MIDI control drops an OSC one and the other way round), learned where Learn into
-points (this computer or this session); **✕** forgets it. Pandore or dataFLOU can play
+points (this computer or this session); **✕** forgets it. Any OSC app (dataFLOU, a controller…) can play
 them straight in, no learning : `/opsia/mod/<n>/in` and `/opsia/mod/<n>/take` (0..1),
 with `/note` for a pad (its velocity, 0 = off). Generate and the dice never deal a
 controller (they can re-roll a slot that is one : pin it, right-click, to keep it). The modulator the active World installs for its audio routing carries `⊛`
@@ -3426,8 +3426,8 @@ change dissolves with a **speed-aware crossfade** (slow drag = long dissolve, fa
 a **dead-band** around each boundary keeps the shaders from flip-flopping when you sit on a seam.
 A faint **territory map** on the pad shows each scene's region (tinted by scene, soft at the
 seams), and a readout names the two scenes you're between and by how much. Scene positions travel
-in the session; the whole plane is playable over OSC : **`/opsia/surface x y`** is Pandore's
-Trill Square.
+in the session; the whole plane is playable over OSC : **`/opsia/surface x y`** plays it from any
+XY pad or touch surface.
 
 **Draw sequencer.** Flip to **draw** and sketch a path across the plane, then **play** : the cursor auto-traces the drawing so the output morphs through scene-space hands-free.
 **time** sets how long one traversal takes (up to 60 s); **way** picks the direction (forward ·
@@ -4219,7 +4219,7 @@ unless the slot actually holds a video or a sound file (Import audio).
 | `/opsia/vary` | trigger | **Vary** : a variant of the whole scene at the Transport's spread (its Vary button); advertised over OSCQuery |
 | `/opsia/touch` | f f [f] | **Touch**, **Ripple** and **Slick**, every one in the composition : a tap at `x y` (0..1, y up : a shockwave, a stone in the water, a spill of oil); a third number its strength (1 = the effect's own) |
 | `/opsia/touch/hold` · `/opsia/touch/up` | f f · trigger | A finger held at `x y` (it drags, swirls, wades, pours oil as it moves; send it again to move it; it lets go 3 s after the last one, and on New, Open and PANIC) · let it go |
-| `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (Pandore's Trill Square) |
+| `/opsia/surface` | f f | **Metasurface** cursor : two `0..1` floats (x, y) on the scene plane; sending it turns the surface on (any XY pad or touch surface plays it) |
 | `/opsia/surface/active` | bool | Enable / disable the Metasurface |
 | `/opsia/surface/play` | bool | **Draw sequencer** : auto-trace the drawn path |
 | `/opsia/surface/time` | f | Draw-path loop time (seconds, or ms if > 120) |
@@ -4244,7 +4244,7 @@ a color's part → its address plus `/hue`, `/saturation`, `/brightness` or `/al
 
 ### Outbound (instrument → control, "feedback")
 
-**Destinations.** Palinopsia can send to several places at once (Pandore, dataFLOU,
+**Destinations.** Palinopsia can send to several places at once (a synth, dataFLOU,
 TouchDesigner…), listed under ↗ out in the OSC section.
 - **Each destination has** a name, its host:port, an on/off and its own content:
   - **F**: the feedback below, optionally only under some address prefixes (⋯ or a
@@ -4314,7 +4314,7 @@ The lists are kept only while links or the monitor is open.
 
 
 When enabled, the instrument diffs its streamable parameters and pushes the changed
-ones to a peer (e.g. Pandore's UI mirrors yours). Same `/opsia/…` addresses
+ones to a peer (e.g. a controller's UI mirrors yours). Same `/opsia/…` addresses
 (layers in the canonical `layer{n}` form), same `0..1` convention; **every
 outbound value is a single float `f`** (enums/bools normalized). Streamed: every
 layer control, Macro knobs, BPM (raw), the three master finalizers' float inputs,
@@ -4342,7 +4342,7 @@ output read like an optical soundtrack, `/opsia/av/mark-signal` (32 floats) plus
 Separately, the [Body page](#body--embodied-control-key-b) emits its own bangs: with
 its **OSC out** on, each time a gesture rule fires it sends a `/body/<name>` message
 (value `1`) to each destination ticked B, so an embodied gesture can play the sound side
-in Pandore.
+on a synth or a sound computer.
 
 ### OSC Learn : any controller, in its own addresses
 
@@ -4391,7 +4391,7 @@ mappings stand in for the computer's : see [MIDI](#midi).
 ### OSCQuery
 
 An HTTP server on **OSC port + 1** (loopback only) serves a self-describing address
-tree so Pandore / dataFLOU auto-bind every parameter. `?HOST_INFO` reports the OSC
+tree so OSC apps like dataFLOU auto-bind every parameter. `?HOST_INFO` reports the OSC
 port, UDP transport, and a WebSocket value-stream on the same HTTP port
 (`LISTEN` / `IGNORE` per path; pushes `{FULL_PATH, VALUE}` frames while a client is
 attached). Advertised leaves are typed `f` (index addresses `i`) with `RANGE`, `VALUE`

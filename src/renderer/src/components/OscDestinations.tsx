@@ -120,7 +120,7 @@ function DestRow({
           onBlur={() => onChange({ name: name.trim() || 'out' })}
           onKeyDown={enterBlurs}
           className="input w-[60px] px-1 py-0 text-[10px]"
-          title="A name for this destination (Pandore, dataFLOU, TouchDesigner…)"
+          title="A name for this destination (a synth, dataFLOU, TouchDesigner…)"
         />
         <input
           value={host}
