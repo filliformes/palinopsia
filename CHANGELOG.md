@@ -7,6 +7,26 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **MIDI and OSC Learn reach the Vary and Randomize amounts, the Audio Layer and every
+  effect chain's switch** (`midi.ts`, overlays in `Transport.tsx`, `AudioLayerPanel.tsx`,
+  `LayerPanel.tsx` `ChainSwitch`, `FinishingTouches.tsx` `FinishingToggle`) :
+  - continuous : `transport:varyAmount` (1..100 %) and `transport:randAmount` (2..100 %),
+    each over its slider's own range and step; `audiolayer:volume` (0..200 %) and
+    `audiolayer:mix`. All through `applyContinuous` (the once-a-frame CC queue), and
+    `readContinuous` answers them to OSC Learn controllers;
+  - toggles : `fx:chain:<layer|sourceA|sourceB|loop>:<i>` (a layer rack's ⏻), beside the
+    existing `master:chain` (learnable before) and `act:finishing` (the
+    finishing switch, its overlay new). A note or a button CC flips on the press edge (a CC
+    release or a note-off does nothing), an OSC button on its rise past the middle, as the
+    Master FX chain always did; OSC Learn controllers are answered 1 / 0 for a chain's state;
+  - the two amounts moved from the Transport's own state into the store (`varyAmt`,
+    `randIntensity`), still per computer under `opsia.varAmount` / `opsia.randIntensity`,
+    so a learned knob moves the slider; `fireVariation`, `fireSelectedRandomize` and the
+    `/opsia/randomize` scopes read them there. Measured in the test copy over synthetic
+    MIDI (`__midi.onMessage`) and real OSC on the copy's own port : CC 0 / 64 / 127 →
+    1 / 51 / 100 % Vary, 2 / 51 / 100 % Randomize, volume 0 / 101 / 200 %, mix 0 / 0.5 / 1;
+    each chain flipped once per press and stayed on release; a pad flip undone in one step.
+
 - **The Model and Grid Mesh in hand** (`pointerInput.ts`, `engine/heldObject.ts`) : a
   drag on the preview turns the object under the cursor in any direction (a trackball
   round the screen's axes), the wheel over it changes its **distance** (12 % a notch,

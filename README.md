@@ -1669,17 +1669,22 @@ Learnable targets:
   per-knob smoothing as a mouse drag. These bindings live **in the session**
   (the per-knob **CC** button still works as a direct shortcut).
 - **Transport** : BPM (CC → 40–240), SPD, MORPH (each mirrors its slider's curve), the
-  World amount. Proximity (in Feel since v1.3.4) keeps its binding.
+  World amount, the **Vary** amount and the **Randomize** amount (**AMT**), each over its
+  slider's range (these two stay this computer's). Proximity (in Feel since v1.3.4) keeps
+  its binding.
 - **Continuous (CC)** : each of the **4 layer opacities**, their **A/B mix** and
   their A/B **hue** harmony (in the Mixer), the **Background**'s opacity, speed and
-  shadow, the **8 Feel dials**, the **Metasurface XY**, the **Sonify master**, and
+  shadow, the **Audio Layer**'s volume and A/B mix, the **8 Feel dials**, the
+  **Metasurface XY**, the **Sonify master**, and
   the **Sonify Synth**'s knobs and its ten **patchbay depths** (each mirrors its own
   curve; each Sonify voice's on / off, the Synth's too, is a fire below).
 - **Fires** (pad/note or button-CC, press edge only) : **Vary**, **Randomize**
   (the selected scope), **Tap tempo**, **Freeze**, **Panic flush**, **Black**, **Record**
   start/stop, **Sonify** on/off and each Sonify voice, the **Sequence**,
   **Sonify-sequence** and **key-sequence** transports, the Seq page's **transport** and
-  its **rule timeline**, the **Master FX chain** on/off,
+  its **rule timeline**, the **Master FX chain** on/off, every **effect chain's ⏻** (each
+  layer's FX, each source's FX, each Loop rack : a pad or a button flips it on its press),
+  the **finishing** switch,
   session **New / Load / Open**, and the dice (each layer's, the Background's, the
   master parameters', the Macro knobs', the selected Inspector unit's, the Resolume
   pins).

@@ -2447,6 +2447,12 @@ interface StoreState {
   // Scene/Randomize morph time in ms (0…30000, 100 = quick) : crossfade, not snap.
   morphMs: number
   setMorphMs: (ms: number) => void
+  // The Transport's Vary amount (0.01..1) and Randomize amount (0.02..1) :
+  // this computer's (localStorage), never in a session, like Speed and Morph.
+  varyAmt: number
+  setVaryAmt: (v: number) => void
+  randIntensity: number
+  setRandIntensity: (v: number) => void
 
   // OSC input config (persisted to localStorage). `enabled`/`port` are the
   // user's intent; `listening`/`addresses` reflect the main-process result.
@@ -3896,6 +3902,24 @@ export const useStore = create<StoreState>((set, get) => ({
     const v = Math.max(0, Math.min(30000, ms))
     localStorage.setItem('opsia.morphMs', String(v))
     set({ morphMs: v })
+  },
+  varyAmt: (() => {
+    const v = lsNum('opsia.varAmount')
+    return Number.isFinite(v) && v > 0 ? Math.max(0.01, Math.min(1, v)) : 0.3
+  })(),
+  setVaryAmt: (x) => {
+    const v = Math.max(0.01, Math.min(1, Number.isFinite(x) ? x : 0.3))
+    localStorage.setItem('opsia.varAmount', String(v))
+    set({ varyAmt: v })
+  },
+  randIntensity: (() => {
+    const v = lsNum('opsia.randIntensity')
+    return Number.isFinite(v) && v > 0 ? Math.max(0.02, Math.min(1, v)) : 1
+  })(),
+  setRandIntensity: (x) => {
+    const v = Math.max(0.02, Math.min(1, Number.isFinite(x) ? x : 1))
+    localStorage.setItem('opsia.randIntensity', String(v))
+    set({ randIntensity: v })
   },
   applyMasterPreset: (fx, vibe, context) =>
     set((s) => {

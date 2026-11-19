@@ -6,6 +6,7 @@
 import type { FxInstance, ModTarget } from '@shared/types'
 import { FX_OPACITY_INPUT } from '@shared/types'
 import { Blink } from './Blink'
+import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { useEffect, useState } from 'react'
 import { frameVals } from '../engine/frameVals'
 import { liveModValues } from '../engine/modulation'
@@ -114,6 +115,9 @@ function FinishingAssign({
 // The global finishing on/off pill : reused (mirrored) in the Master FX strip.
 export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => void }): JSX.Element {
   return (
+    <span className="relative inline-flex shrink-0">
+    {/* learnable : the finishing switch is the action act:finishing */}
+    <MidiLearnOverlay id="act:finishing" />
     <button
       onClick={onClick}
       className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
@@ -127,6 +131,7 @@ export function FinishingToggle({ on, onClick }: { on: boolean; onClick: () => v
     >
       finishing {on ? 'on' : 'off'}
     </button>
+    </span>
   )
 }
 

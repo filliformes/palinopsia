@@ -21,7 +21,7 @@
 // targets from OSC messages outside /opsia (oscLearn.ts) : the setters below
 // (applyContinuous, fireTrigger) are shared.
 
-import type { MidiBinding } from '@shared/types'
+import type { FxScope, MidiBinding } from '@shared/types'
 import { controlBus, controlKeyOf } from './engine/controlBus'
 import { BG_SPEED_MAX } from '@shared/types'
 import {
@@ -33,7 +33,7 @@ import { liveModValues, metaLiveValues, sonifyModValues } from './engine/modulat
 import { sameMidiInput } from './mappingModel'
 import { randomSonify } from './audio/autoSonify'
 import { undo, redo } from './undo'
-import { useStore } from './store'
+import { fxArrayFor, useStore } from './store'
 import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum } from './link'
 import { sonifyParamOf, withSonifyParam, type SoniConfig } from './audio/sonify'
@@ -123,8 +123,27 @@ export const TRIGGER_ACTION_IDS: string[] = [
 
 /** Persisted Randomize intensity (shared with the Transport's dice). */
 export function randIntensity(): number {
-  const i = Number(localStorage.getItem('opsia.randIntensity'))
-  return Number.isFinite(i) && i > 0 ? i : 1
+  return useStore.getState().randIntensity
+}
+
+// ── Effect chains on / off ───────────────────────────────────────────────
+// fx:chain:<layer|sourceA|sourceB|loop>:<i> : a layer rack's ⏻ (every effect
+// off, or all back on), as its button. The Master FX chain keeps its older id
+// master:chain, the finishing switch act:finishing (actions.ts).
+const CHAIN_RE = /^fx:chain:(layer|sourceA|sourceB|loop):(\d+)$/
+const CHAIN_WORD = { layer: 'FX', sourceA: 'source A FX', sourceB: 'source B FX', loop: 'loop FX' } as const
+
+/** The rack a chain id names (null when it is not one). */
+export function chainScopeOf(id: string): FxScope | null {
+  const m = CHAIN_RE.exec(id)
+  return m ? { kind: m[1] as keyof typeof CHAIN_WORD, layer: Number(m[2]) } : null
+}
+
+/** A chain's state as its button shows it : on while every effect in it is on
+ *  (null : no such rack, or nothing in it). */
+function chainOn(scope: FxScope): boolean | null {
+  const fx = fxArrayFor(useStore.getState().composition, scope).filter((f) => !f.locked)
+  return fx.length ? fx.every((f) => f.enabled) : null
 }
 
 /** Execute a discrete trigger action by id. The one place each action lives, so
@@ -172,6 +191,11 @@ export function fireTrigger(id: string): void {
     case 'session:load': fireLoadSession(); return // load the selected saved session
     case 'session:open': fireOpenSession(); return // the Open… file dialog
   }
+  const chain = chainScopeOf(id)
+  if (chain) {
+    if (chainOn(chain) !== null) st.toggleRackChain(chain)
+    return
+  }
   if (id.startsWith('rand:layer:')) {
     const i = Number(id.slice(11))
     if (Number.isFinite(i)) st.randomizeLayer(i)
@@ -199,6 +223,14 @@ export interface MidiDevice {
 // transport:speed   CC → global speed 1/64×..64× (log, like the slider)
 // transport:morph   CC → morph time (same power curve as the slider)
 // transport:prox    CC → proximity 0..1
+// transport:varyAmount  CC → the Vary amount 1..100 % (the slider beside Vary)
+// transport:randAmount  CC → the Randomize amount 2..100 % (AMT, beside Randomize)
+// audiolayer:volume CC → the Audio Layer's volume 0..200 %
+// audiolayer:mix    CC → the Audio Layer's A↔B mix
+// master:chain      note/CC press → the Master FX chain on/off
+// fx:chain:<rack>:<i>  note/CC press → a layer rack's ⏻ (layer, sourceA,
+//                   sourceB, loop; i 0-based) : all its effects off, or all on
+// act:finishing     note/CC press → the finishing switch (actions.ts)
 // field:<macro>     CC → a feel dial (density/gestureTexture/coalesce/tonicity/
 //                   drift/flow/shutter/superFlicker) — NOT mod-matrix targets,
 //                   so MIDI is the only hardware route to them
@@ -243,6 +275,8 @@ export function isContinuousTarget(id: string): boolean {
     id === 'bg:opacity' ||
     id === 'bg:speed' ||
     id === 'bg:depth' ||
+    id === 'audiolayer:volume' ||
+    id === 'audiolayer:mix' ||
     /^layer:\d+:(mix|harmony|opacity)$/.test(id) ||
     controlKeyOf(id) !== null
   )
@@ -272,6 +306,10 @@ export function midiTargetLabel(id: string): string {
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
   if (id === 'bg:speed') return 'BACKGROUND speed'
   if (id === 'bg:depth') return 'BACKGROUND shadow'
+  if (id === 'audiolayer:volume') return 'AUDIO LAYER volume'
+  if (id === 'audiolayer:mix') return 'AUDIO LAYER A↔B'
+  const ch = CHAIN_RE.exec(id)
+  if (ch) return `LAYER ${Number(ch[2]) + 1} ${CHAIN_WORD[ch[1] as keyof typeof CHAIN_WORD]} on/off`
   const lm = /^layer:(\d+):(mix|harmony|opacity)$/.exec(id)
   if (lm) return `LAYER ${Number(lm[1]) + 1} ${lm[2] === 'mix' ? 'A↔B' : lm[2] === 'harmony' ? 'A·B hue' : 'opacity'}`
   if (id.startsWith('sonify:param:')) {
@@ -328,6 +366,10 @@ export function midiTargetLabel(id: string): string {
       return 'MORPH'
     case 'transport:prox':
       return 'PROXIMITY'
+    case 'transport:varyAmount':
+      return 'VARY amount'
+    case 'transport:randAmount':
+      return 'RANDOMIZE amount'
     case 'surface:x':
       return 'SURFACE X'
     case 'surface:y':
@@ -875,6 +917,11 @@ export function applyContinuous(id: string, t: number): boolean {
     case 'transport:speed': st.setGlobalSpeed(Math.pow(2, -6 + t * 12)); return true
     case 'transport:morph': st.setMorphMs(Math.round(Math.pow(t, MORPH_POW) * 30000)); return true
     case 'transport:prox': st.setProximity(t); return true
+    // the sliders' own ranges and steps (Transport.tsx)
+    case 'transport:varyAmount': st.setVaryAmt(Math.round((0.01 + t * 0.99) * 100) / 100); return true
+    case 'transport:randAmount': st.setRandIntensity(Math.round((0.02 + t * 0.98) * 100) / 100); return true
+    case 'audiolayer:volume': st.patchAudioLayer({ volume: Math.round(t * 200) / 100 }); return true
+    case 'audiolayer:mix': st.patchAudioLayer({ mix: t }); return true
     case 'bg:opacity': st.setBackgroundOpacity(t); return true
     case 'bg:speed': st.setBackgroundSpeed(t * BG_SPEED_MAX); return true
     case 'bg:depth': st.setBackgroundDepth(t); return true
@@ -916,6 +963,11 @@ export function readContinuous(id: string): number | null {
     const r = st.bodyControl.rules.find((x) => x.id === id.slice(5))
     return r ? (r.enabled ? 1 : 0) : null
   }
+  const chain = chainScopeOf(id)
+  if (chain) {
+    const on = chainOn(chain)
+    return on === null ? null : on ? 1 : 0
+  }
   // (the World amount has a modulator target : answer what it plays)
   if (id === 'field:worldAmount') return clamp01(liveModValues.get('world:amount') ?? st.worldAmount)
   const fk = FIELD_KEYS[id]
@@ -940,6 +992,15 @@ export function readContinuous(id: string): number | null {
     case 'transport:speed': return clamp01((Math.log2(Math.max(1e-6, st.globalSpeed)) + 6) / 12)
     case 'transport:morph': return clamp01(Math.pow(st.morphMs / 30000, 1 / MORPH_POW))
     case 'transport:prox': return clamp01(st.proximity)
+    case 'transport:varyAmount': return clamp01((st.varyAmt - 0.01) / 0.99)
+    case 'transport:randAmount': return clamp01((st.randIntensity - 0.02) / 0.98)
+    case 'audiolayer:volume': return clamp01((liveModValues.get('au:volume') ?? st.audioLayer.volume) / 2)
+    case 'audiolayer:mix': return clamp01(liveModValues.get('au:mix') ?? st.audioLayer.mix)
+    // a chain's switch answers as a Body rule's box does : 1 on, 0 off
+    case 'master:chain': {
+      const on = chainOn({ kind: 'master' })
+      return on === null ? null : on ? 1 : 0
+    }
     case 'bg:opacity': return clamp01(liveModValues.get('bg:opacity') ?? st.composition.background?.opacity ?? 0)
     case 'bg:speed': return clamp01((liveModValues.get('bg:speed') ?? st.composition.background?.speed ?? 0) / BG_SPEED_MAX)
     case 'bg:depth': return clamp01(liveModValues.get('bg:depth') ?? st.composition.background?.depth ?? 0)

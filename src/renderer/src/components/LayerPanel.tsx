@@ -895,7 +895,11 @@ function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['
   const toggleRackChain = useStore((s) => s.toggleRackChain)
   const on = fx.filter((f) => f.enabled).length
   const all = on === fx.length
+  // learnable as fx:chain:<rack>:<layer> (midi.ts) : a pad or a button flips it
+  const learnId = scope.kind === 'master' || scope.kind === 'background' ? null : `fx:chain:${scope.kind}:${scope.layer}`
   return (
+    <span className="relative inline-flex shrink-0">
+    {learnId && <MidiLearnOverlay id={learnId} />}
     <button
       onClick={(e) => {
         e.stopPropagation()
@@ -912,6 +916,7 @@ function ChainSwitch({ scope, fx }: { scope: Parameters<typeof FxAddSelect>[0]['
     >
       <PowerIcon />
     </button>
+    </span>
   )
 }
 
