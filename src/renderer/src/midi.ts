@@ -739,7 +739,7 @@ class MidiManager {
         // A Body rule's box on a knob or a latching button : on from 64, off below
         // (the release of a momentary button turns it off again)
         if (id.startsWith('rule:')) { st.setBodyRuleActive(id.slice(5), value >= 64, 'midi'); ccHandled = true; continue }
-        if (isContinuousTarget(id)) { applyContinuous(id, t); ccHandled = true }
+        if (isContinuousTarget(id)) { queueContinuous(id, t); ccHandled = true }
       }
       // A CC used as a continuous control never also fires a trigger bound to
       // the same number.
@@ -750,6 +750,9 @@ class MidiManager {
     // or a zero-velocity note-off must not double-fire. Every matching trigger
     // fires — one pad can drive several actions.
     if (value <= 0) return
+    // a fader still waiting for its frame lands first : a pad recalling a scene
+    // must not be overwritten a frame later by a fader moved just before it
+    flushContinuous()
     // One pad can drive several actions : every matching DISCRETE binding fires,
     // through the shared fireTrigger (same path as a body gesture). Any
     // learnable trigger — fire:*, scene:*, sonify:voice:*, and every rand:*
@@ -764,6 +767,38 @@ class MidiManager {
       fireTrigger(id)
     }
   }
+}
+
+// ── Faders and knobs : the latest value, once a frame ───────────────────
+// A controller sends a message for every step of a fader (the Launch Control
+// XL : 128 steps, up to 800 a second for one fader moved fast). Written one by
+// one, each was a whole store write, a redraw of the interface and a sync of
+// the composition : at a few hundred a second the picture fell from 60 to 5 fps
+// (measured 11-19). Now each target keeps only its latest value and they all
+// land together once a frame (one React render for every fader moved), whatever
+// the controller sends. A timer stands in when the window draws no frames
+// (minimized : the output still plays). Pads and triggers stay immediate.
+const ccPending = new Map<string, number>()
+let ccRaf = 0
+let ccTimer: ReturnType<typeof setTimeout> | null = null
+
+function queueContinuous(id: string, t: number): void {
+  ccPending.set(id, t)
+  if (ccRaf || ccTimer) return
+  ccRaf = requestAnimationFrame(flushContinuous)
+  ccTimer = setTimeout(flushContinuous, 34)
+}
+
+/** Write the faders waiting for their frame (now). */
+export function flushContinuous(): void {
+  if (ccRaf) cancelAnimationFrame(ccRaf)
+  if (ccTimer) clearTimeout(ccTimer)
+  ccRaf = 0
+  ccTimer = null
+  if (!ccPending.size) return
+  const p = [...ccPending]
+  ccPending.clear()
+  for (const [id, t] of p) applyContinuous(id, t)
 }
 
 /** The targets a MIDI input plays : the session's mappings on it when it has

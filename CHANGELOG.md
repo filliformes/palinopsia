@@ -292,6 +292,13 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
+- **Faders on a MIDI controller no longer slow the picture down** (`midi.ts`,
+  `queueContinuous`) : every CC step was a whole store write and redraw, so a few faders
+  moved fast (a Launch Control XL sends up to 800 messages a second per fader) took the
+  picture from 60 to 5 fps. Each continuous target now keeps its latest value and they all
+  land once a frame (a timer when the window draws none); pads and triggers stay
+  immediate, and a fader still waiting lands before a pad fires. Measured : 4,200 CC
+  messages a second, 60 fps, frames under 21 ms.
 - **opsia-media:// had lost its privileges since 2026-09-15** : `main/index.ts`
   registered it and opsia-asset:// in two `registerSchemesAsPrivileged` calls, and
   Electron takes one (the second replaced the first), so fetch refused the scheme and
