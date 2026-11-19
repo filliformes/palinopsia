@@ -1563,6 +1563,10 @@ the composite live.
 
 ## Audio in
 
+![The audio tab](docs/images/interface-audio.jpg)
+
+*The Audio section with the Audio Layer playing : the input meters, what is heard (level, change, hit and the live spectrum in its six bands), then the output with its faders and OUT meters.*
+
 The **Connect** right-column tab (key `A`) holds the control panels
 (**Audio · MIDI · OSC · dataflou · Ableton Link · Resolume · Agent (MCP)**), and the **performance** tab beside it the load meter:
 
