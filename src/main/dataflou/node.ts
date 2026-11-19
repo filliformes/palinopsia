@@ -209,6 +209,7 @@ export class DataflouNode {
   // Saved wires whose destination is not published now : kept (and saved) while
   // they wait, played again as soon as their destination is published.
   private parked = new Map<string, DfSub[]>()
+  private quietSave = false
   private retired: Set<string>
   private declSize = 0
   // the visualizer : what arrived on our destinations, the remote values its
@@ -882,6 +883,7 @@ export class DataflouNode {
   }
 
   private persist(): void {
+    if (this.quietSave) return // (replaceWires saves once, at the end)
     // (the waiting wires too : a wire is never lost because its destination is
     // not published now)
     this.host.saveSubs({ ...Object.fromEntries(this.parked), ...Object.fromEntries(this.subs) })
@@ -937,6 +939,50 @@ export class DataflouNode {
     this.host.onChange()
     this.sceneTouched()
     return true
+  }
+
+  /** Make our incoming wires exactly these (main merges the session's and this
+   *  computer's) : the ones not wanted go, the wanted ones are made (into a
+   *  destination not published now : they wait, parked, as saved wires do), a
+   *  kept one takes the wanted shape. Saved once, at the end. */
+  replaceWires(want: Record<string, DfSub[]>): { added: number; removed: number } {
+    const key = (d: string, s: { sku: string; path: string }): string => `${d}\n${s.sku}\n${s.path}`
+    const wanted = new Map<string, { dest: string; sub: DfSub }>()
+    for (const [d, list] of Object.entries(want)) {
+      if (!Array.isArray(list)) continue
+      for (const s of list.slice(0, MAX_SUBS)) if (s && typeof s.sku === 'string' && typeof s.path === 'string') wanted.set(key(d, s), { dest: d, sub: s })
+    }
+    let added = 0
+    let removed = 0
+    this.quietSave = true
+    try {
+      // what waits is only what is wanted (and still waits : below)
+      this.parked.clear()
+      // removed first : room on a destination that changes source
+      for (const [d, list] of [...this.subs]) for (const s of [...list]) if (!wanted.has(key(d, s)) && this.unsubscribe(d, s.sku, s.path)) removed++
+      for (const { dest, sub } of wanted.values()) {
+        const live = this.subs.get(dest)?.find((x) => x.sku === sub.sku && x.path === sub.path)
+        if (live) {
+          const o = cleanWireOpt(sub.opt)
+          if (o) live.opt = o
+          else delete live.opt
+          continue
+        }
+        const p = this.byPath.get(dest)
+        if (p && p.kind === 'param' && p.flow !== 'source') {
+          if (this.subscribe(dest, sub.sku, sub.path, sub.opt)) added++
+        } else {
+          const list = this.parked.get(dest) ?? []
+          if (list.length < MAX_SUBS) list.push({ sku: sub.sku, path: sub.path, ...(sub.opt ? { opt: sub.opt } : {}) })
+          this.parked.set(dest, list)
+        }
+      }
+    } finally {
+      this.quietSave = false
+    }
+    this.persist()
+    this.host.onChange()
+    return { added, removed }
   }
 
   /** Bind on ANOTHER node : its destination ← some source (often one of ours). */

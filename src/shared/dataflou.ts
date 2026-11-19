@@ -76,6 +76,50 @@ export function cleanWireOpt(o: unknown): DfWireOpt | null {
   return Object.keys(out).length ? out : null
 }
 
+/** A wire saved with the session (the session file's `mappings.dataflou`) : one
+ *  of Palinopsia's destinations and the source that plays it, in the universe it
+ *  was made in. A wire of the session plays only while the node is on that
+ *  universe (the others wait in the session, kept). On its destination, and on
+ *  its source, it takes the place of this computer's wires (silenced, kept), as
+ *  a session's MIDI and OSC mappings do on their inputs. `sku` DF_SELF : one of
+ *  Palinopsia's own sources (each computer has its own SKU). */
+export interface DfSessionWire {
+  universe: string
+  dest: string
+  sku: string
+  path: string
+  opt?: DfWireOpt
+}
+export const DF_SELF = '@self'
+export const DF_SESSION_WIRES_MAX = 128
+const DF_WIRES_PER_DEST = 4 // as a node keeps (MAX_SUBS)
+
+/** One wire's key : its destination, its source's node and path. */
+export const dfWireKey = (dest: string, sku: string, path: string): string => `${dest}\n${sku}\n${path}`
+
+/** A session's wires, cleaned : well formed, no twice the same, at most four on
+ *  a destination (a node holds no more), at most DF_SESSION_WIRES_MAX. */
+export function cleanSessionWires(raw: unknown): DfSessionWire[] {
+  if (!Array.isArray(raw)) return []
+  const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
+  const out: DfSessionWire[] = []
+  const seen = new Set<string>()
+  const perDest = new Map<string, number>()
+  for (const x of raw) {
+    if (out.length >= DF_SESSION_WIRES_MAX) break
+    const w = x as Partial<DfSessionWire> | null
+    if (!w || !str(w.universe, 32) || !str(w.dest, 200) || !str(w.sku, 64) || !str(w.path, 200)) continue
+    const k = `${w.universe}\n${dfWireKey(w.dest, w.sku, w.path)}`
+    const d = `${w.universe}\n${w.dest}`
+    if (seen.has(k) || (perDest.get(d) ?? 0) >= DF_WIRES_PER_DEST) continue
+    seen.add(k)
+    perDest.set(d, (perDest.get(d) ?? 0) + 1)
+    const opt = cleanWireOpt(w.opt)
+    out.push({ universe: w.universe, dest: w.dest, sku: w.sku, path: w.path, ...(opt ? { opt } : {}) })
+  }
+  return out
+}
+
 /** A value of a remote parameter as 0..1 of its declared range (a vector : its
  *  first part; a colour : its brightness). */
 export function remote01(v: DfValue, p: { type: DfType; min: number; max: number } | null | undefined): number | null {
@@ -158,6 +202,12 @@ export interface DfStatus {
   cppHidden: number
   // our destinations with saved wires that wait : not published now
   parked: string[]
+  // the session's wires playing now (dfWireKey, with the source's SKU resolved);
+  // this computer's wires set aside because the session wires their destination
+  // or their source; the session's wires waiting for another universe
+  session?: string[]
+  silenced?: Array<{ dest: string; sku: string; path: string }>
+  sessionElsewhere?: Array<{ universe: string; count: number }>
   visualizer: number // visualizer pages open on this node now
   visualizerAvailable: boolean // does this build carry the visualizer page ?
 }

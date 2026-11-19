@@ -40,7 +40,7 @@ import type { Assemblage, AssembleCorpus, AssembleParams } from '@shared/assembl
 import type { RuleTimeline, SeqLanes } from '@shared/types'
 import { loadRuleTimeline, makeDefaultSeqLanes, sanitizeRuleTimeline, sanitizeSeqLanes } from './engine/ruleSeqModel'
 import type { ResolumeMap, ResoOutput, ResoInput, ResoCell, ResoSession } from '@shared/resolume'
-import { DF_DEFAULT_CONFIG, cleanPublish, type DfConfig } from '@shared/dataflou'
+import { DF_DEFAULT_CONFIG, cleanPublish, cleanSessionWires, type DfConfig, type DfSessionWire } from '@shared/dataflou'
 import { loadOscDests, makeDest, saveOscDests, type OscDest } from './oscDests'
 import { cleanAlias, loadOscAliases, saveOscAliases } from './oscAliases'
 import { LOOP_BLENDS, LOOP_SYNCS, type LoopBlend } from '@shared/types'
@@ -790,9 +790,14 @@ function loadMidiMap(): Record<string, MidiBinding> {
 }
 
 // The session's own mappings, from a session file (none in an older file).
-function sessionMapsFrom(m: SessionMappings | undefined): { sessionMidiMap: Record<string, MidiBinding>; sessionOscMap: Record<string, OscBinding>; sessionOscAliases: OscAlias[] } {
+function sessionMapsFrom(m: SessionMappings | undefined): {
+  sessionMidiMap: Record<string, MidiBinding>
+  sessionOscMap: Record<string, OscBinding>
+  sessionOscAliases: OscAlias[]
+  sessionDfWires: DfSessionWire[]
+} {
   const aliases = Array.isArray(m?.aliases) ? m!.aliases.map(cleanAlias).filter((a): a is OscAlias => !!a).slice(0, 256) : []
-  return { sessionMidiMap: sanitizeMidiMap(m?.midi), sessionOscMap: sanitizeOscMap(m?.osc), sessionOscAliases: aliases }
+  return { sessionMidiMap: sanitizeMidiMap(m?.midi), sessionOscMap: sanitizeOscMap(m?.osc), sessionOscAliases: aliases, sessionDfWires: cleanSessionWires(m?.dataflou) }
 }
 
 // The MIDI (or OSC) mappings of Body rules that are not there any more (a rule
@@ -2488,6 +2493,12 @@ interface StoreState {
    *  the place of this computer's). */
   sessionOscAliases: OscAlias[]
   setSessionOscAliases: (list: OscAlias[]) => void
+  /** The session's own dataflou wires (saved with it; on their destination and
+   *  source they take the place of this computer's). Main holds the node : the
+   *  list goes there whenever it changes, and comes back when a wire of it is
+   *  unwired or reshaped on the mesh. */
+  sessionDfWires: DfSessionWire[]
+  setSessionDfWires: (list: DfSessionWire[]) => void
 
   // User shader presets : app-persistent (localStorage), per shader id.
   userShaderPresets: Record<string, Array<{ name: string; values: Record<string, number | number[]> }>>
@@ -6289,6 +6300,12 @@ export const useStore = create<StoreState>((set, get) => ({
   oscAliases: loadOscAliases(),
   sessionOscAliases: [],
   setSessionOscAliases: (list) => set({ sessionOscAliases: list.map(cleanAlias).filter((a): a is OscAlias => !!a).slice(0, 256) }),
+  sessionDfWires: [],
+  setSessionDfWires: (list) =>
+    set((s) => {
+      const next = cleanSessionWires(list)
+      return JSON.stringify(next) === JSON.stringify(s.sessionDfWires) ? {} : { sessionDfWires: next }
+    }),
   setOscAliases: (list) =>
     set(() => {
       const oscAliases = list.slice(0, 256)
@@ -6768,6 +6785,7 @@ export const useStore = create<StoreState>((set, get) => ({
         sessionMidiMap: {},
         sessionOscMap: {},
         sessionOscAliases: [],
+        sessionDfWires: [],
         // Reset the draw-sequencer gesture (else a stale path exports into the
         // new session and reactivates once two scenes are placed).
         surface: { active: false, x: 0.5, y: 0.5, path: [], play: false, timeMs: 8000, way: 'forward', jump: 0, wiggle: 0, closed: false },
@@ -7121,7 +7139,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
       // its own MIDI / OSC mappings, only when it has some (a session without
       // any is written as before, byte for byte)
-      ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap, s.sessionOscAliases)),
+      ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap, s.sessionOscAliases, s.sessionDfWires)),
       ui: { theme: s.theme }
     }
   }

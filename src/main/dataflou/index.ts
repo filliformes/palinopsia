@@ -18,8 +18,10 @@ import { encodeDeclare } from './protocol'
 import { openVisualizer, stopVisualizer, visualizerAvailable, visualizerNodeChanged, visualizerScene } from './visualizer'
 import type { SceneFile } from './node'
 import {
-  DF_DECLARE_MAX, cleanPublish, dfCppHidden, dfGroupOf, dfPublished, palinopsiaTree, type DfAction, type DfConfig, type DfParam, type DfStatus, type DfSub, type DfValue
+  DF_DECLARE_MAX, DF_SELF, cleanPublish, cleanSessionWires, cleanWireOpt, dfCppHidden, dfGroupOf, dfPublished, dfWireKey, palinopsiaTree,
+  type DfAction, type DfConfig, type DfParam, type DfSessionWire, type DfStatus, type DfSub, type DfValue
 } from '@shared/dataflou'
+import type { MappingScope } from '@shared/types'
 import { log } from '../log'
 
 let node: DataflouNode | null = null
@@ -144,19 +146,196 @@ export function adoptSessionFiles(universe: string): void {
   }
 }
 
+// ── the session's wires ─────────────────────────────────────────────────────
+// A wire into Palinopsia lives on this computer (bindings-<universe>.json, every
+// session, as before) or in the session (its file's mappings.dataflou, the
+// renderer's to keep : it hands main the list whenever it changes). The node
+// plays the session's wires of its universe, and this computer's except the ones
+// on a destination or a source the session wires : those are set aside (kept in
+// the file, silenced) until the session lets go of that input, as a session's
+// MIDI and OSC mappings stand in for the computer's on their inputs. A wire made
+// from the mesh (another node, the visualizer, a scene) is this computer's; one
+// of the session's unwired or reshaped from anywhere leaves or changes in the
+// session too (the renderer hears it).
+let sessionWires: DfSessionWire[] = []
+// this computer's wires set aside now (the node's universe)
+let silenced: Record<string, DfSub[]> = {}
+let applying = false
+let applyQueued = false
+
+const own = (s: string): string => (s === DF_SELF ? sku() : s)
+const subKey = (dest: string, s: { sku: string; path: string }): string => dfWireKey(dest, s.sku, s.path)
+const sessionOf = (universe: string): DfSessionWire[] => sessionWires.filter((w) => w.universe === universe)
+
+/** What the node plays in this universe : the session's wires, then this
+ *  computer's on the inputs the session leaves free (the rest set aside). */
+function effectiveWires(universe: string): Record<string, DfSub[]> {
+  const sess = sessionOf(universe)
+  const dests = new Set(sess.map((w) => w.dest))
+  const srcs = new Set(sess.map((w) => `${own(w.sku)}\n${w.path}`))
+  const want: Record<string, DfSub[]> = {}
+  const add = (into: Record<string, DfSub[]>, dest: string, s: DfSub): void => {
+    const list = (into[dest] ??= [])
+    if (!list.some((x) => x.sku === s.sku && x.path === s.path)) list.push(s)
+  }
+  for (const w of sess) add(want, w.dest, { sku: own(w.sku), path: w.path, ...(w.opt ? { opt: { ...w.opt } } : {}) })
+  silenced = {}
+  for (const [dest, list] of Object.entries(loadSubs(universe))) {
+    if (!Array.isArray(list)) continue
+    for (const s of list) {
+      if (!s || typeof s.sku !== 'string' || typeof s.path !== 'string') continue
+      if (dests.has(dest) || srcs.has(`${s.sku}\n${s.path}`)) add(silenced, dest, s)
+      else add(want, dest, s)
+    }
+  }
+  return want
+}
+
+/** Make the node's wires what the session and this computer say (after the
+ *  session's list changed, a wire moved, or a computer wire landed on the
+ *  session's input). */
+function applySessionWires(): void {
+  applyQueued = false
+  if (!node || !config) return
+  applying = true
+  try {
+    const r = node.replaceWires(effectiveWires(config.universe))
+    if (r.added || r.removed) log('info', `[dataflou] wires : +${r.added} -${r.removed} (${sessionOf(config.universe).length} of the session's)`)
+  } finally {
+    applying = false
+  }
+  statusDirty = true
+}
+const queueApply = (): void => {
+  if (applyQueued) return
+  applyQueued = true
+  setImmediate(applySessionWires)
+}
+
+const pushSessionWires = (): void => {
+  win()?.webContents.send('dataflou:sessionWires', sessionWires)
+}
+
+/** The node saved its wires (any change : ours, the mesh's, a scene's) : this
+ *  computer's go to its file (the session's never do), the session's list
+ *  follows what became of its wires. */
+function nodeSaved(universe: string, all: Record<string, DfSub[]>): void {
+  if (applying) return // (the computer's file is what the apply read)
+  const sess = sessionOf(universe)
+  const sessKeys = new Set(sess.map((w) => dfWireKey(w.dest, own(w.sku), w.path)))
+  const dests = new Set(sess.map((w) => w.dest))
+  const srcs = new Set(sess.map((w) => `${own(w.sku)}\n${w.path}`))
+  const pc: Record<string, DfSub[]> = {}
+  let clash = false
+  for (const [dest, list] of Object.entries(all)) {
+    for (const s of list) {
+      if (sessKeys.has(subKey(dest, s))) continue
+      ;(pc[dest] ??= []).push(s)
+      // a computer wire on the session's input (made from the mesh) : set aside
+      if (dests.has(dest) || srcs.has(`${s.sku}\n${s.path}`)) clash = true
+    }
+  }
+  for (const [dest, list] of Object.entries(silenced)) {
+    for (const s of list) {
+      const into = (pc[dest] ??= [])
+      if (!into.some((x) => x.sku === s.sku && x.path === s.path)) into.push(s)
+    }
+  }
+  saveSubsTo(universe, '', pc)
+  // the session's wires : gone (unwired), or reshaped, wherever it happened
+  let changed = false
+  const next: DfSessionWire[] = []
+  for (const w of sessionWires) {
+    if (w.universe !== universe) {
+      next.push(w)
+      continue
+    }
+    const live = all[w.dest]?.find((x) => x.sku === own(w.sku) && x.path === w.path)
+    if (!live) {
+      changed = true
+      continue
+    }
+    const opt = cleanWireOpt(live.opt)
+    if (JSON.stringify(opt ?? null) !== JSON.stringify(w.opt ?? null)) {
+      changed = true
+      next.push({ universe: w.universe, dest: w.dest, sku: w.sku, path: w.path, ...(opt ? { opt } : {}) })
+    } else next.push(w)
+  }
+  if (changed) {
+    sessionWires = next
+    pushSessionWires()
+  }
+  // a session wire gone gives its input back to this computer's (and a clash is set aside)
+  if (changed || clash) queueApply()
+}
+
+/** One wire into Palinopsia moved : to the session (out of this computer's file),
+ *  to this computer (out of the session), or (null) a silenced computer wire removed. */
+function moveWire(dest: string, srcSku: string, srcPath: string, to: MappingScope | null): boolean {
+  if (!config) return false
+  const universe = config.universe
+  const me = sku()
+  const live = node ? (node.status().nodes.find((n) => n.local)?.subs[dest] ?? []).find((x) => x.sku === srcSku && x.path === srcPath) : undefined
+  const file = loadSubs(universe)
+  const inFile = (file[dest] ?? []).find((x) => x.sku === srcSku && x.path === srcPath)
+  const sessSku = srcSku === me ? DF_SELF : srcSku
+  const isSess = (w: DfSessionWire): boolean => w.universe === universe && w.dest === dest && own(w.sku) === srcSku && w.path === srcPath
+  const inSess = sessionWires.find(isSess)
+  const dropFromFile = (): void => {
+    if (!file[dest]) return
+    file[dest] = file[dest].filter((x) => !(x.sku === srcSku && x.path === srcPath))
+    if (!file[dest].length) delete file[dest]
+    saveSubsTo(universe, '', file)
+  }
+  if (to === 'session') {
+    if (inSess) return true
+    if (!live && !inFile) return false
+    if (sessionOf(universe).filter((w) => w.dest === dest).length >= 4) return false
+    const opt = cleanWireOpt((live ?? inFile)?.opt)
+    sessionWires = cleanSessionWires([...sessionWires, { universe, dest, sku: sessSku, path: srcPath, ...(opt ? { opt } : {}) }])
+    dropFromFile()
+  } else if (to === 'computer') {
+    if (!inSess) return !!inFile
+    const opt = cleanWireOpt(live?.opt ?? inSess.opt)
+    sessionWires = sessionWires.filter((w) => !isSess(w))
+    const list = (file[dest] ??= [])
+    if (!list.some((x) => x.sku === srcSku && x.path === srcPath)) list.push({ sku: srcSku, path: srcPath, ...(opt ? { opt } : {}) })
+    saveSubsTo(universe, '', file)
+  } else {
+    if (!inFile) return false
+    dropFromFile()
+  }
+  pushSessionWires()
+  applySessionWires()
+  return true
+}
+
+/** The session's wires in a status : the ones playing, the computer's set aside,
+ *  the ones waiting for another universe. */
+function sessionStatus(universe: string): Pick<DfStatus, 'session' | 'silenced' | 'sessionElsewhere'> {
+  const elsewhere = new Map<string, number>()
+  for (const w of sessionWires) if (w.universe !== universe) elsewhere.set(w.universe, (elsewhere.get(w.universe) ?? 0) + 1)
+  return {
+    session: sessionOf(universe).map((w) => dfWireKey(w.dest, own(w.sku), w.path)),
+    silenced: node ? Object.entries(silenced).flatMap(([dest, list]) => list.map((s) => ({ dest, sku: s.sku, path: s.path }))) : [],
+    sessionElsewhere: [...elsewhere].map(([u, count]) => ({ universe: u, count }))
+  }
+}
+
 let visClients = 0
 
 function status(): DfStatus {
   if (node) {
     return {
       ...node.status(), published: publishedCount, actions: actionsOn, actionsDropped, cppHidden,
-      visualizer: visClients, visualizerAvailable: visualizerAvailable()
+      visualizer: visClients, visualizerAvailable: visualizerAvailable(), ...sessionStatus(config?.universe ?? '')
     }
   }
   return {
     running: false, error: lastError, sku: '', label: config?.label ?? '', universe: config?.universe ?? '',
     address: '', tcpPort: 0, udpPort: 0, nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0,
-    declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, cppHidden: 0, parked: [], visualizer: visClients, visualizerAvailable: visualizerAvailable()
+    declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, cppHidden: 0, parked: [], visualizer: visClients, visualizerAvailable: visualizerAvailable(),
+    ...sessionStatus(config?.universe ?? '')
   }
 }
 
@@ -233,7 +412,7 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
     adoptSessionFiles(universe)
     const n = new DataflouNode(
       {
-        sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: loadSubs(universe), scenes: loadScenes(universe),
+        sku: sku(), label, universe, product: 'Palinopsia', version: 1, params: tree(), subs: effectiveWires(universe), scenes: loadScenes(universe),
         retired: [oldSessionSku()]
       },
       {
@@ -244,7 +423,7 @@ async function configureNow(next: DfConfig): Promise<DfStatus> {
         onChange: () => {
           statusDirty = true
         },
-        saveSubs: (subs) => saveSubsTo(universe, '', subs),
+        saveSubs: (subs) => nodeSaved(universe, subs),
         saveScenes: (s) => saveScenesTo(universe, '', s),
         // (the newest of each a frame : a modulator plays the latest)
         onRemote: (sku, path, v) => {
@@ -312,8 +491,34 @@ export function initDataflou(getWindow: () => BrowserWindow | null): void {
   ipcMain.on('dataflou:values', (_e, values: Record<string, DfValue>) => {
     if (node && values && typeof values === 'object') node.setValues(values)
   })
-  ipcMain.handle('dataflou:bind', (_e, a: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean }) =>
-    node ? node.subscribeRemote(a.destSku, a.destPath, a.srcSku, a.srcPath, !!a.on) : false
+  ipcMain.handle('dataflou:bind', (_e, a: { destSku: string; destPath: string; srcSku: string; srcPath: string; on: boolean; scope?: MappingScope }) => {
+    if (!node || !config) return false
+    // a new wire into Palinopsia saved with the session : straight into its list
+    if (a.on && a.scope === 'session' && a.destSku === sku() && typeof a.destPath === 'string' && typeof a.srcSku === 'string' && typeof a.srcPath === 'string') {
+      const universe = config.universe
+      const w: DfSessionWire = { universe, dest: a.destPath, sku: a.srcSku === sku() ? DF_SELF : a.srcSku, path: a.srcPath }
+      if (sessionOf(universe).some((x) => x.dest === w.dest && own(x.sku) === a.srcSku && x.path === w.path)) return true
+      if (sessionOf(universe).filter((x) => x.dest === w.dest).length >= 4) return false
+      sessionWires = cleanSessionWires([...sessionWires, w])
+      pushSessionWires()
+      applySessionWires()
+      return true
+    }
+    return node.subscribeRemote(a.destSku, a.destPath, a.srcSku, a.srcPath, !!a.on)
+  })
+  // the session's wires (all universes) : whenever the renderer's list changes
+  // (a session loaded, New, a wire made or moved)
+  ipcMain.on('dataflou:session', (_e, list: unknown) => {
+    const next = cleanSessionWires(list)
+    if (JSON.stringify(next) === JSON.stringify(sessionWires)) return
+    sessionWires = next
+    applySessionWires()
+    statusDirty = true
+  })
+  ipcMain.handle('dataflou:wireScope', (_e, a: { dest?: unknown; sku?: unknown; path?: unknown; to?: unknown }) =>
+    typeof a?.dest === 'string' && typeof a.sku === 'string' && typeof a.path === 'string' && (a.to === 'computer' || a.to === 'session' || a.to === null)
+      ? moveWire(a.dest, a.sku, a.path, a.to)
+      : false
   )
   ipcMain.handle('dataflou:io', () => (node ? [node.io()] : []))
   // the outside values watched in the data view (the renderer keeps the list)

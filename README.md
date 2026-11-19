@@ -4456,6 +4456,25 @@ tab has the whole setup :
   and **on loss** : **hold** the last value, or **glide back** (over a few seconds) to where
   the control was before the wire began to play it, once the source has been quiet for
   2 s (a glove out of battery, a computer asleep). Kept with the wire.
+- **PC / SESSION** : a wire into Palinopsia is kept on this computer (**PC** : every
+  session, in the app's `dataflou` folder, as before) or saved with the session
+  (**SESSION** : in its file, a piece's own wiring); one click on the chip moves it, its
+  shape (⚙) going with it. **new wires** in the header picks where the wires you make in
+  the section go (the same choice as MIDI and OSC **Learn into**); a wire made from the
+  mesh (another node, the visualizer, a dataflou scene) is the computer's. On its
+  **destination and on its source**, a session's wire takes the place of the computer's :
+  those play no more while the session is open (struck through, **silenced**,
+  kept : they play again in a session that leaves that input free), the rest of
+  the computer's play on. A session's wire belongs to the universe it was made in : on
+  another universe it waits, kept in the session (a line says how many, and for which
+  universe), and plays as soon as the node joins that one. Wiring publishes what it plays,
+  so a session's wires publish their destinations as they arrive. One of Palinopsia's
+  own sources is saved as itself (each computer has its own node id), so a local wire
+  travels too. **New** starts with none (the computer's wires play), **Generate** keeps
+  them (the same piece, a new look), as the session's MIDI and OSC mappings do. A wire of
+  the session unwired, or reshaped, from anywhere on the mesh leaves or changes in the
+  session too (Save keeps it). The session file's `mappings.dataflou`; an older file has
+  none and plays as before.
 
 **Mapping from the mesh, wherever you are** : every control's **M** panel has a **◈** under
 "macro" : click it, move the thing on the other node (a glove, a fader in Max), and the
@@ -4551,7 +4570,8 @@ plays again as soon as its parameter is published.
 
 dataflou maps every value from its source's range onto its destination's, so a 0..1
 here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own destinations
-is kept (per universe) and comes back by itself when the other node reappears.
+is kept (per universe, on this computer or in the session) and comes back by itself when
+the other node reappears.
 
 The node is written in TypeScript in the main process (`src/main/dataflou/`) after
 dataflou's reference core, message for message : mDNS `_dataflou._tcp` with the `sku` /

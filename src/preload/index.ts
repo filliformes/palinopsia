@@ -102,6 +102,13 @@ const api: ExposedApi = {
   dataflouValues: (values) => ipcRenderer.send('dataflou:values', values),
   dataflouBind: (b) => ipcRenderer.invoke('dataflou:bind', b),
   dataflouForget: (sku) => ipcRenderer.invoke('dataflou:forget', sku),
+  dataflouSession: (list) => ipcRenderer.send('dataflou:session', list),
+  dataflouWireScope: (a) => ipcRenderer.invoke('dataflou:wireScope', a),
+  onDataflouSessionWires: (cb) => {
+    const h = (_e: Electron.IpcRendererEvent, l: Parameters<typeof cb>[0]): void => cb(l)
+    ipcRenderer.on('dataflou:sessionWires', h)
+    return () => ipcRenderer.off('dataflou:sessionWires', h)
+  },
   onDataflouStatus: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, s: Parameters<typeof cb>[0]): void => cb(s)
     ipcRenderer.on('dataflou:status', h)
