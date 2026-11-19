@@ -467,7 +467,38 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
-- **The app icon has no black square any more** (`build/icon.png`, `build/icon.ico`) : the
+- **The Model, before its release : its files, its reader and its motion** (from the
+  v1.3.5 audit). **Collect** gives each model a folder of its own in `<session> media`
+  with exactly the files it reads, laid out as they sit round it (`../` included), so
+  two models never read each other's `scene.bin`; a file the session lists for a model
+  but the model does not read is never copied, and each model's `modelFiles` is set to
+  its copies (`sessionMedia.ts`; the worker now finds a session file by its relative
+  place first, `modelWorker.ts`). **The reader cannot hang** : one file at a time, a
+  read past 30 s is given up (its thread ended, the files behind it read by a new one,
+  that file says why : `modelLoad.ts`); a glTF scene that repeats its nodes (200,000
+  visits, 100,000 parts), counts a file cannot hold (accessors, sparse, PLY elements and
+  lists, text or binary) and piles past the limits are refused before anything is made;
+  a point thousands of faces meet at takes the area-weighted mean normal (was count
+  squared); the PLY header is found in the bytes (a non-ASCII byte before
+  `end_header` moved the data). A short or broken normal list, or an OBJ index past
+  its lists, no longer shades black (the Model makes its own normals and says so); a
+  `.tga` / `.bmp` texture is said to be a format the Model does not read (not "not
+  found"); every texture no face uses is closed. **Motion** : the wobble's noise wraps
+  where it repeats (640, it popped every few minutes), the flowing bands, the skin's
+  scroll, the soap film's swirl and the crude drips run on phases of their own (a speed
+  turned never jumps them, nothing pops after 68 minutes, and the drips no longer churn
+  faster the longer the app runs). **The first shatter no longer stalls** : the shards'
+  data is built and uploaded a little a frame ahead of time, then their programs
+  compiled one a frame (at once while it breaks on the sound or the beat or is held
+  broken, else after 3 s on screen; a mesh over 250K triangles keeps its data for the
+  hit). **Hover** projects only the corners of the triangles the hand reads (150K at
+  most), not every vertex every 120 ms. **True depth** comes from the slot the A/B
+  crossfade shows more (`Compositor.ts`). A model dropped on a layer switches the slot
+  only once it is read (one undo step), **↻** reads it again with the session's files,
+  a scene morph turns a held object the short way, and the pieces' own depth model is
+  let go 3 s after the last one stops asking (`pictureDepth.idle` each frame).
+- **The app icon has no black square any more**
+ (`build/icon.png`, `build/icon.ico`) : the
   ball sat on opaque black corners, so the taskbar, Explorer and the dock showed a square.
   Now a truly transparent, centered disc with brighter, crisper filaments on a darker
   body, its 16 / 24 / 32 px frames drawn again to read small, and the `.ico` carries

@@ -26,6 +26,7 @@ import { onSessionLoaded } from './sessionEvents'
 import { modPin } from './persist'
 import { visionBus } from './engine/visionIn'
 import { depthEngine } from './engine/depthEstimate'
+import { pictureDepth } from './engine/pictureDepth'
 import { currentFps, currentSkips, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
@@ -1864,6 +1865,9 @@ export default function App(): JSX.Element {
           if (vs) visionBus.ingest(vs.grid, vs.size)
           perfMeter.end('vision')
         }
+        // (the pieces' own depth model : released three seconds after the last piece
+        // stopped asking, even when it never said it stopped)
+        pictureDepth.idle(now)
         // 3d. Depth (2.5D) : keep the shared depth map current. Off = flat (Parallax
         //     passthrough); synth = a test bowl; estimate = the monocular model,
         //     fed a low-res frame, run async, its result EMA-smoothed into the map.

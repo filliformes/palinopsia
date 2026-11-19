@@ -237,6 +237,8 @@ export class PictureDepthReader {
     if (!this.asking) return
     this.asking = false
     this.have = false
+    // (the next map starts fresh : never glided from the one before it stopped)
+    this.rawW = this.rawH = 0
     pictureDepth.release(this)
     this.read?.dispose()
     this.read = null
