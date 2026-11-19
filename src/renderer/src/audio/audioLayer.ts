@@ -11,7 +11,7 @@
 
 import type { AudioLayerSlot, AudioLayerState } from '@shared/types'
 import { ClipPlayer } from '../engine/clipPlayer'
-import { analyseFrame, frameBufs, readFeature, zero, type AudioFeatureName, type AudioFeatures, type FrameBufs } from '../engine/audioIn'
+import { analyseFrame, frameBufs, levelOf, readFeature, zero, type AudioFeatureName, type AudioFeatures, type FrameBufs } from '../engine/audioIn'
 import { videoKey, videoPlayheads } from '../engine/videoState'
 import { setAuModBase, takeAuMods, type AuModFrame, type AuSlotMods } from '../engine/audioLayerMod'
 import { auTrim } from '@shared/auMod'
@@ -165,6 +165,9 @@ class AudioLayerEngine {
   private bus: GainNode | null = null // the slots mixed, before the layer's volume
   private send: GainNode | null = null // that, in mono : the Filter voice's line-in
   private outAn: AnalyserNode | null = null
+  // the audio tab's meters : the layer's left and right (the analyser above mixes
+  // them down), after its volume and mute
+  private sideAn: AnalyserNode[] = []
   private chains: Record<AudioSlotName, Chain | null> = { A: null, B: null }
   private armed: AudioLayerArmed = NOT_ARMED
   private seeks: Record<AudioSlotName, number | null> = { A: null, B: null }
@@ -301,6 +304,14 @@ class AudioLayerEngine {
     an.fftSize = 2048
     an.smoothingTimeConstant = 0.5
     out.connect(an)
+    const sides = ctx.createChannelSplitter(2)
+    out.connect(sides)
+    this.sideAn = [0, 1].map((i) => {
+      const a = ctx.createAnalyser()
+      a.fftSize = 2048 // (the meters read 30 times a second : no peak between two reads)
+      sides.connect(a, i)
+      return a
+    })
     this.fbufs = frameBufs(an)
     this.out = out
     this.outAn = an
@@ -322,6 +333,8 @@ class AudioLayerEngine {
     const ctx = this.ctx
     for (const s of SLOTS) this.dropChain(s, fade)
     const out = this.out, outAn = this.outAn, bus = this.bus, send = this.send
+    const sideAn = this.sideAn
+    this.sideAn = []
     this.out = null
     this.bus = null
     this.send = null
@@ -336,7 +349,7 @@ class AudioLayerEngine {
         sonifyEngine.setExternalInput(null)
         sonifyEngine.setLayerSend(null)
       }
-      try { out.disconnect(); outAn?.disconnect(); bus?.disconnect(); send?.disconnect() } catch { /* gone */ }
+      try { out.disconnect(); outAn?.disconnect(); bus?.disconnect(); send?.disconnect(); for (const a of sideAn) a.disconnect() } catch { /* gone */ }
     }
     if (fade && ctx) window.setTimeout(end, FADE_MS)
     else end()
@@ -854,6 +867,13 @@ class AudioLayerEngine {
     let sum = 0, pk = 0
     for (let i = 0; i < b.length; i++) { const x = b[i]; sum += x * x; const a = x < 0 ? -x : x; if (a > pk) pk = a }
     return { rms: Math.sqrt(sum / b.length), peak: pk }
+  }
+
+  /** The layer's left (0) or right (1) side now, after its volume and mute :
+   *  RMS and peak, linear (zero : no layer built). For the audio tab's meters. */
+  sideLevel(i: number): { rms: number; peak: number } {
+    const an = this.sideAn[i]
+    return an ? levelOf(an, this.buf) : { rms: 0, peak: 0 }
   }
 
   /** The layer's whole sound (after its volume) analysed for this frame, for the

@@ -23,6 +23,7 @@ import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { auLabel } from '@shared/auMod'
 import { AUDIO_BANDS, AUDIO_FEATURES, AUDIO_HZ_MAX } from '../engine/audioIn'
+import { setHzFocus } from './AudioMonitor'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
 import { modTargetKey, useStore } from '../store'
@@ -1898,6 +1899,16 @@ function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boole
   const track = useRef<HTMLDivElement>(null)
   const drag = useRef<'lo' | 'hi' | null>(null)
   const pLo = hzToPos(lo), pHi = hzToPos(hi)
+  // under the pointer, focused or dragged : its band is drawn on the audio tab's
+  // spectrum (a bracket), kept up to date as it moves
+  const hot = useRef(false)
+  useEffect(() => { if (hot.current && !clip) setHzFocus({ lo, hi }) })
+  useEffect(() => () => { if (hot.current) setHzFocus(null) }, [])
+  const heat = (on: boolean): void => {
+    if (on === hot.current) return
+    hot.current = on
+    setHzFocus(on && !clip ? { lo, hi } : null)
+  }
   // the pointer's place on the track, 0..1 (the rect, not the device pixels : the UI
   // zoom is CSS zoom)
   const at = (clientX: number): number => {
@@ -1918,6 +1929,8 @@ function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boole
   const thumb = 'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent outline-none focus-visible:ring-1 focus-visible:ring-accent'
   return (
     <Row label="HZ" title={title}>
+      <div className="contents" onPointerEnter={() => heat(true)} onPointerLeave={() => { if (!drag.current) heat(false) }}
+        onFocus={() => heat(true)} onBlur={() => heat(false)}>
       {/* the thumbs travel on an inner track inset by half a thumb, so neither end
           spills over the readout */}
       <div
@@ -1933,8 +1946,8 @@ function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boole
           move(which, p)
         }}
         onPointerMove={(e) => { if (drag.current) move(drag.current, at(e.clientX)) }}
-        onPointerUp={() => { drag.current = null }}
-        onPointerCancel={() => { drag.current = null }}
+        onPointerUp={(e) => { drag.current = null; if (!e.currentTarget.matches(':hover')) heat(false) }}
+        onPointerCancel={() => { drag.current = null; heat(false) }}
         onDoubleClick={() => { if (!clip) onChange(0, AUDIO_HZ_MAX) }}
       >
         <div ref={track} className="relative h-full w-full">
@@ -1950,6 +1963,7 @@ function HzRow({ lo, hi, clip, onChange }: { lo: number; hi: number; clip: boole
         title={`${Math.round(lo)} to ${Math.round(hi)} Hz`}>
         {hzLabel(lo)}–{hzLabel(hi)}
       </span>
+      </div>
     </Row>
   )
 }

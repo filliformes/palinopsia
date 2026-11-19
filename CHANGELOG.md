@@ -7,6 +7,55 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The audio tab's monitoring, redesigned : what comes in, what the modulators hear,
+  what goes out** (new `components/AudioMonitor.tsx`, `AudioPanel.tsx`, `engine/audioIn.ts`,
+  `audio/audioLayer.ts`, `audio/soni.worklet.js` + `audio/sonify.ts`, `ModulationPanel.tsx`
+  `HzRow`, `App.tsx`). The old row of eight unnamed bars (level, flux, a transient dot, the
+  six bands : none of them a channel) is gone. Three labelled blocks :
+  - **INPUT** : the device and its channel menu, a status word (**signal**, **silent** under
+    -60 dBFS for 3 s, **no device**, **gone**, **OSC** / **no OSC**, **not listening**), and
+    one meter per channel really heard, named with the device's own numbers (**IN 3** /
+    **IN 4** for a 3+4 pick, one meter for a mono pick; a pick the device does not have
+    shows the 1+2 that plays). dBFS bar (RMS) + peak tick held 1.2 s + readout + a **clip**
+    light (a sample at -0.1 dBFS or over, kept 1.5 s). With the Audio Layer as the input :
+    **LAYER L / LAYER R**. Engine : `audioIn.ts` taps the picked pair after the channel
+    pick (before the denoiser) with a 2-way splitter and two 2048-point analysers (43 ms : a
+    whole read interval)
+    (`channelLevel`, `heardChannels`, time-domain RMS / peak only, `levelOf`); the layer
+    gets the same on its output (`audioLayer.sideLevel`). USB denoise moved under the input.
+  - **HEARD** : **level**, **change** (the flux) and **hit** (the transient) named on
+    screen, where the sound comes from (input / Audio Layer / OSC), and a **live spectrum**
+    (20 Hz to 20 kHz, log) off the bus's OWN analyser (`audioBus.spectrumDb()` reads
+    `getFloatFrequencyData` in the frame the features read the bytes : the same FFT; the
+    bytes stop at -30 dB, where a -12 dBFS tone already sat) with the six bands as shaded
+    zones filled to their level, their names (**sub, bass, low-mid, mid, presence, air**)
+    and their real Hz edges from the sample rate (`bandEdgesHz`, the same grouping as
+    `analyseFrame` : 23-70, 70-234, 234-750, 750-2.4k, 2.4k-7.5k, 7.5k+ at 48 kHz).
+    Hovering (or dragging) an audio modulator's **HZ** row draws its band on the spectrum
+    as a bracket (`setHzFocus`).
+  - **OUTPUT** : the device and channels, then a meter beside each fader (**Sonify** : its
+    voices after the master, before the Audio Layer joins and the limiter, two new
+    accumulators in the worklet's master loop, `meterVoices`; **Audio Layer** : after its
+    volume and mute; **Monitor** : after its level, a splitter and two analysers on the
+    monitor's gain, wired again by `routeMonitor`, which disconnects that gain),
+    then **OUT n** per output channel with the output menu's real numbers (what leaves after
+    the limiter, the output EQ and the glue : the EQ's own out meter, no second tap), a
+    **limiter** light (the limiter working or the EQ's ceiling catching), and with Space on
+    one bar per channel Space drives (its per-channel peaks).
+  - Drawn outside React : ONE requestAnimationFrame for the whole tab (`usePaint`), 30 times a
+    second (meters and spectrum, `MON.paintFps` / `specFps`), only
+    while the section shows and no full page covers the window, writing a style only when
+    it changed; the spectrum canvas also stops off screen (IntersectionObserver). Every
+    size, color, dB range and rate in one commented block at the top of `AudioMonitor.tsx`
+    (`MON`). Same dB scale and colors as the Sonify page's meter (-54 to 0, lines at -36,
+    -18, -6).
+  - A small **input dot** in the top bar while the analysis is on (green signal, grey
+    silent, red no device / gone; 4 checks a second; click : the Connect tab).
+  - Measured on the RTX 4070 test copy, 1080p picture, Audio Layer playing : 60 fps with the
+    section open and folded; the renderer's main thread +0.69 ms a frame at 60 / 60 Hz,
+    +0.44 ms at 30 / 30 (the default); the paint itself 0.27-0.34 ms a painted frame, the
+    spectrum 0.12-0.18 ms a draw.
+
 - **MIDI input hears everything : the clock in, the pitch bend, aftertouch, and catch**
   (`midi.ts`, new `midiClockIn.ts` + `midiPickup.ts`, `MidiPanel.tsx`, `shared/types.ts`
   `MidiBinding`, `mappingModel.ts`, `App.tsx`, `sessionGuard.ts`) :

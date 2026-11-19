@@ -1465,6 +1465,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     // per channel, after the limiter : the peak and the mean square (the meter's
     // bar is the RMS level in dB, its tick the peak)
     this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
+    // Sonify's own voices after the master gain, before the Audio Layer joins and
+    // before the limiter (the audio tab's meter beside the Sonify fader)
+    this.pkV = 0; this.ssV = 0;
     // ── Space (output 1) : each voice's flushed signal and the FX return ──
     this.space = new SpaceBus(sampleRate);
     this.pL = new Float32Array(128); this.pR = new Float32Array(128);
@@ -2869,6 +2872,9 @@ class SoniProcessor extends AudioWorkletProcessor {
     for (let s = 0; s < n; s++) {
       const mg = mg0 + dmg * (s + 1); // ramped : a stepped master zippered
       let l = outL[s] * mg, r = outR[s] * mg;
+      const av = Math.max(Math.abs(l), Math.abs(r));
+      if (av > this.pkV) this.pkV = av;
+      this.ssV += (l * l + r * r) * 0.5;
       if (exL) { l += exL[s]; r += exR[s]; }
       if (bkOn) { const bk = bk0 + dbk * (s + 1); l *= bk; r *= bk; }
       if (!Number.isFinite(l)) l = 0;
@@ -2897,6 +2903,7 @@ class SoniProcessor extends AudioWorkletProcessor {
         t: 'meter', peak: this.peak, lim: this.limMin,
         pkL: this.pkL, pkR: this.pkR,
         rmsL: Math.sqrt(this.ssL / Math.max(1, this.nMeter)), rmsR: Math.sqrt(this.ssR / Math.max(1, this.nMeter)),
+        pkV: this.pkV, rmsV: Math.sqrt(this.ssV / Math.max(1, this.nMeter)),
         scan: { at: currentTime, sp: this.sweepPos, spHz: sp.sweepOn ? sp.sweepHz : 0, fi: this.fSweep, fiHz: fi.sweepOn ? fi.sweepHz : 0, tv: (this.tLine + this.tX) / GRID, tvHz: tv.lineHz / GRID },
         // Space : each output channel's peak (after its limiter)
         spk: spc.on ? spc.pk.slice(0, spc.nch) : null,
@@ -2911,6 +2918,7 @@ class SoniProcessor extends AudioWorkletProcessor {
       if (spc.on) spc.pk.fill(0);
       this.peak = 0; this.limMin = 1; this.lastMeter = currentTime;
       this.pkL = 0; this.pkR = 0; this.ssL = 0; this.ssR = 0; this.nMeter = 0;
+      this.pkV = 0; this.ssV = 0;
     }
     return true;
   }
