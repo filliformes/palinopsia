@@ -7,7 +7,7 @@ that CI builds into cross-platform releases.
 
 ### Added
 
-- **MIDI input hears everything : the clock in, the pitch bend, aftertouch, and pickup**
+- **MIDI input hears everything : the clock in, the pitch bend, aftertouch, and catch**
   (`midi.ts`, new `midiClockIn.ts` + `midiPickup.ts`, `MidiPanel.tsx`, `shared/types.ts`
   `MidiBinding`, `mappingModel.ts`, `App.tsx`, `sessionGuard.ts`) :
   - `onMessage` returned on any message under two bytes, so the realtime messages (clock
@@ -36,14 +36,15 @@ that CI builds into cross-platform releases.
     targets refuse them in Learn. Labels `bend ch1`, `AT ch1`, `AT 60 ch1`
     (`describeMidi`). The computer map now loads through `sanitizeMidiMap` (it rebuilt
     `{kind, channel, number}` and would have dropped the new kinds);
-  - **pickup (soft takeover)** per mapping (`MidiBinding.pickup`, `midiCc.pickup` on the
+  - **catch (soft takeover)** per mapping (named *catch* in the app; `pickup` in code and
+    files) (`MidiBinding.pickup`, `midiCc.pickup` on the
     Macro knobs; absent = jump, so nothing changes for existing setups), default for new
     mappings `opsia.midiPickup`. `pickupPass` lets a value through once the control
     crosses the target's BASE value (`readContinuous(id, true)` : without modulation) or
     comes within 1.5/127 of it; after each flush the value written is remembered, and a
     value found different at the next message (a scene, a session load, undo, the mouse,
-    OSC, another control) re-arms it. The ledger has a jump / pickup chip per fader row and
-    "waiting : move it up to 42 %" while one waits; `withLiveCcs` keeps a knob's pickup
+    OSC, another control) re-arms it. The ledger has a jump / catch chip per fader row and
+    "waiting to catch : move it up to 42 %" while one waits; `withLiveCcs` keeps a knob's pickup
     through scenes.
 - **MIDI and OSC Learn reach the Vary and Randomize amounts, the Audio Layer and every
   effect chain's switch** (`midi.ts`, overlays in `Transport.tsx`, `AudioLayerPanel.tsx`,

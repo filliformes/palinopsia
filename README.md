@@ -77,7 +77,7 @@ Generate theme. The older shots stay in `docs/images/`.)*
 - [Macro Controller](#macro-controller-16-knobs--xy-pads) (16 knobs + XY pads) · [Modulation brain](#modulation-brain-8-modulators--matrix) : 20 modulator types in six families · [shaping a binding](#shaping-a-binding--combine-threshold-integrate) : combine · threshold · integrate · [colors by their parts](#colors-by-their-parts) : hue · saturation · brightness · alpha
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline · light cues) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
-- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn (bend, aftertouch, pickup) + clock in and out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
+- [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn (bend, aftertouch, catch) + clock in and out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · installation · Flash safety
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
@@ -1707,17 +1707,17 @@ arm the control, move the wheel or press into a key. They show as `bend ch1`, `A
 and `AT 60 ch1`. A press target (a fire, a scene) never takes them : the aftertouch of the
 key you just hit does not bind over the note.
 
-**Jump or pickup.** After a scene recall, a session load, undo, a morph or the mouse, a
+**Jump or catch.** After a scene recall, a session load, undo, a morph or the mouse, a
 fader's physical position no longer matches the value it drives. Each fader or knob
 mapping (CC, bend, aftertouch, and the Macro knobs' own CCs) has a choice in the ledger
 below : **jump** (the default, as always : the first touch snaps the value to the fader)
-or **pickup** (soft takeover : the fader does nothing until it reaches the value, passes
+or **catch** (soft takeover : the fader does nothing until it reaches the value, passes
 it or comes within a step and a half of it, then follows; while it waits, its row says
-which way to move it and where to). Whatever moved the value meanwhile (a scene, undo, the
+which way to move it and where to : *waiting to catch*). Whatever moved the value meanwhile (a scene, undo, the
 mouse, OSC, another fader) makes it wait again; a modulator playing over the value does
-not (pickup reaches for the value set, not the one played). The **new : jump | pickup**
+not (catch reaches for the value set, not the one played). The **new : jump | catch**
 switch says what a mapping learned from now on starts as (this computer's). Notes and
-pads have no pickup.
+pads have no catch.
 
 **Follow MIDI clock.** With **follow clock** on (the MIDI section, this computer's), the
 BPM follows the **MIDI clock** on the input : 24 pulses a beat from a drum machine, a

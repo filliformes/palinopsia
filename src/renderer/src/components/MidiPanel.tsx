@@ -341,9 +341,9 @@ export function MidiPanel(): JSX.Element {
             <button
               onClick={() => setPickupDefault(!pickupDefault)}
               className={pillCls(pickupDefault)}
-              title={`What a fader or knob learned from now on starts as. Jump : the value takes the fader's position at the first touch (as always). Pickup : after a scene, a session load, undo or the mouse moved the value, the fader does nothing until it reaches the value, then follows (no jump). Each mapping has its own switch in the list below. Now : ${pickupDefault ? 'pickup' : 'jump'}. This computer's setting.`}
+              title={`What a fader or knob learned from now on starts as. Jump : the value takes the fader's position at the first touch (as always). Catch : after a scene, a session load, undo or the mouse moved the value, the fader does nothing until it reaches the value, then follows (no jump). Each mapping has its own switch in the list below. Now : ${pickupDefault ? 'catch' : 'jump'}. This computer's setting.`}
             >
-              new : {pickupDefault ? 'pickup' : 'jump'}
+              new : {pickupDefault ? 'catch' : 'jump'}
             </button>
           </div>
 
@@ -515,10 +515,10 @@ function MapRow({ r, onMove, waiting }: { r: Row; onMove?: () => void; waiting: 
             onClick={r.pickup.toggle}
             className={`shrink-0 rounded px-1 font-mono text-[8.5px] leading-[14px] transition-colors ${r.pickup.on ? 'bg-accent2/20 text-accent2' : 'text-muted hover:text-text'}`}
             title={r.pickup.on
-              ? 'Pickup : after a scene, a session load, undo or the mouse moved the value, this control does nothing until it reaches the value, then follows. Click for jump'
-              : "Jump : the value takes this control's position at the first touch. Click for pickup (the control waits to reach the value, then follows)"}
+              ? 'Catch : after a scene, a session load, undo or the mouse moved the value, this control does nothing until it reaches the value, then follows. Click for jump'
+              : "Jump : the value takes this control's position at the first touch. Click for catch (the control waits to reach the value, then follows)"}
           >
-            {r.pickup.on ? 'pickup' : 'jump'}
+            {r.pickup.on ? 'catch' : 'jump'}
           </button>
         )}
         {onMove && (
@@ -536,8 +536,8 @@ function MapRow({ r, onMove, waiting }: { r: Row; onMove?: () => void; waiting: 
       </div>
       {r.silenced && <span className="pl-8 font-mono text-[8.5px] text-muted">replaced by this session</span>}
       {wait && (
-        <span className="pl-8 font-mono text-[8.5px] text-accent2" title="Pickup : this control waits to reach the value it drives (a scene, undo or the mouse moved it), then follows">
-          waiting : move it {wait.at < wait.value ? 'up' : 'down'} to {Math.round(wait.value * 100)} % (at {Math.round(wait.at * 100)} %)
+        <span className="pl-8 font-mono text-[8.5px] text-accent2" title="Catch : this control waits to reach the value it drives (a scene, undo or the mouse moved it), then follows">
+          waiting to catch : move it {wait.at < wait.value ? 'up' : 'down'} to {Math.round(wait.value * 100)} % (at {Math.round(wait.at * 100)} %)
         </span>
       )}
       {osc && <OscRange b={osc} scope={r.scope as MappingScope} id={r.id} />}
