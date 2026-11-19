@@ -26,6 +26,7 @@
 // their published methods :
 // third-party: Grid Mesh noise methods
 
+// third-party: The built-in shape list
 export const GRID_SHAPES = ['sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'circle', 'cone', 'capsule'] as const
 
 export const NOISE_BASES = [

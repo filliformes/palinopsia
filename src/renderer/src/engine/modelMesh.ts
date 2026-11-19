@@ -102,6 +102,7 @@ export class GrowU8 {
 }
 
 // ── The built-in shapes ──────────────────────────────────────────────────────────
+// third-party: The built-in shape list
 export const SHAPES = [
   'sphere', 'torus', 'cylinder', 'open cylinder', 'cube', 'open cube', 'plane', 'disc', 'cone', 'capsule',
   'tetrahedron', 'octahedron', 'dodecahedron', 'icosahedron', 'knot'

@@ -1900,6 +1900,7 @@ function enumerateLeaves(): Leaf[] {
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
   add('/opsia/world/amount', 0, 1, st.worldAmount, 'World amount : 1 = all of the World, 0 = its push taken back off')
+  add('/opsia/world/apply', 0, 1, 0, 'Apply the World in use again (trigger)', false)
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')
   add('/opsia/seq/skip', 0, 1, 0, 'Advance to the next scene (trigger)', false)
   add('/opsia/seq/play', 0, 1, seqTransportPlaying() ? 1 : 0, 'The Seq transport : >= 0.5 plays every lane it starts, < 0.5 stops them all')

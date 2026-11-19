@@ -9,7 +9,7 @@ import { useStore } from '../store'
 import { DEPTH_RES_STEPS } from '../engine/depthEstimate'
 
 const DEPTH_TITLE = (res: number): string =>
-  `Depth engine (2.5D) : fills the depth map Parallax, Luma Blur's depth focus and Pulfrich read (set to AI, it also lets the Point Cloud and Depth Scan read the depth of their own picture). off = flat (passthrough) · synth = a test depth bowl · AI = a depth model reading the picture, on the graphics card, offline (it ships with the app). AI detail = the size it reads the picture at : ${DEPTH_RES_STEPS[0]} px costs least, ${DEPTH_RES_STEPS[DEPTH_RES_STEPS.length - 1]} px is the model's own size. Now ${res} px.`
+  `Depth engine : fills the depth map Parallax, Luma Blur's depth focus and Pulfrich read (set to AI, it also lets the Point Cloud and Depth Scan read the depth of their own picture). off = flat (passthrough) · synth = a test depth bowl · AI = a depth model reading the picture, on the graphics card, offline (it ships with the app). AI detail = the size it reads the picture at : ${DEPTH_RES_STEPS[0]} px costs least, ${DEPTH_RES_STEPS[DEPTH_RES_STEPS.length - 1]} px is the model's own size. Now ${res} px.`
 
 /** off / synth / AI, then the AI detail sizes (the ● on the one in use). */
 export function DepthMenu(): JSX.Element {

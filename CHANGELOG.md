@@ -95,8 +95,8 @@ that CI builds into cross-platform releases.
     OSC, another control) re-arms it. The ledger has a jump / catch chip per fader row and
     "waiting to catch : move it up to 42 %" while one waits; `withLiveCcs` keeps a knob's pickup
     through scenes.
-- **MIDI and OSC Learn reach the Vary and Randomize amounts, the Audio Layer and every
-  effect chain's switch** (`midi.ts`, overlays in `Transport.tsx`, `AudioLayerPanel.tsx`,
+- **MIDI and OSC Learn reach the Vary and Randomize amounts, the Audio Layer and the
+  layer, source and Loop chains' switches** (the Background chain's is not learnable yet) (`midi.ts`, overlays in `Transport.tsx`, `AudioLayerPanel.tsx`,
   `LayerPanel.tsx` `ChainSwitch`, `FinishingTouches.tsx` `FinishingToggle`) :
   - continuous : `transport:varyAmount` (1..100 %) and `transport:randAmount` (2..100 %),
     each over its slider's own range and step; `audiolayer:volume` (0..200 %) and

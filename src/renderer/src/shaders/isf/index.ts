@@ -517,7 +517,7 @@ export const NATIVE_NODES: IsfShader[] = [
     category: 'FX',
     native: true,
     source: `/*{
-      "DESCRIPTION": "Parallax : real 2.5D from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view (at SWAY RATE), with depth-of-field blur around a FOCUS plane (BLUR SHAPE : a four-way ghosted cross, or a smooth lens disc) and a FOG that sinks the planes beyond the focus depth toward black (aerial recession). It reads the depth the Depth engine fills : set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
+      "DESCRIPTION": "Parallax : real depth from the shared depth map. Near features shift more than far ones as an animated camera SWAY drifts the view (at SWAY RATE), with depth-of-field blur around a FOCUS plane (BLUR SHAPE : a four-way ghosted cross, or a smooth lens disc) and a FOG that sinks the planes beyond the focus depth toward black (aerial recession). It reads the depth the Depth engine fills : set Depth in the header (SYNTH for a test bowl, AI for estimated depth on video/capture). With Depth off (or MIX 0) it is an exact passthrough. Works on any rack; best on the MASTER chain (depth of the whole picture).",
       "CATEGORIES": ["FX", "Distortion", "Depth"],
       "INPUTS": [
         { "NAME": "amount", "TYPE": "float", "MIN": 0.0, "MAX": 1.0, "DEFAULT": 0.4, "LABEL": "parallax" },

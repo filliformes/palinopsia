@@ -27,8 +27,6 @@ export const THREE_D_IDS: ReadonlySet<string> = new Set([
 
 export const TWO_HALF_D_IDS: ReadonlySet<string> = new Set(['oil-cloud', 'gen-lattice', 'gen-relief'])
 
-export const is3D = (id: string | null | undefined): boolean => !!id && THREE_D_IDS.has(id)
-
 /** '3D', '2.5D' or null : the mark a menu row carries. */
 export const depthMark = (id: string | null | undefined): '3D' | '2.5D' | null =>
   !id ? null : THREE_D_IDS.has(id) ? '3D' : TWO_HALF_D_IDS.has(id) ? '2.5D' : null
@@ -39,7 +37,7 @@ export const NEEDS: Readonly<Record<string, { tag: string; title: string }>> = {
   'gen-collage': { tag: 'needs films', title: 'Needs a folder of films (video files) : pick it in the Inspector once it is on a slot' },
   'gen-silhouette': { tag: 'needs camera', title: 'Needs the Body camera : turn it on in the Body page (B)' },
   // the layer menu's "Assemblage…" entry : an edit cut from films analysed in Assemble
-  '__assemble_pick__': { tag: 'needs films', title: 'Needs films analysed in Assemble (E) : it plays an edit cut from them' }
+  '__assemble_pick__': { tag: 'needs films', title: 'Needs films analyzed in Assemble (E) : it plays an edit cut from them' }
 }
 
 export const THREE_D_TITLE = '3D : draws a real 3D scene or reads the depth of one'
