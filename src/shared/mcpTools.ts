@@ -107,6 +107,20 @@ export const MCP_TOOLS: McpToolDef[] = [
     }
   },
   {
+    name: 'set_text',
+    title: "Write the Text source's words",
+    description: "Change the words a Text source shows, on a layer's slot A or B (put the Text source there first with set_source). New lines are kept.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        layer: { type: ['number', 'string'], description: '1-4.' },
+        slot: { type: 'string', enum: ['A', 'B'], description: 'Default A.' },
+        text: { type: 'string', description: 'The words.' }
+      },
+      required: ['layer', 'text']
+    }
+  },
+  {
     name: 'set_controls',
     title: 'Set controls',
     description: 'Set the controls of one unit (a source, an effect, a master unit, the background).',

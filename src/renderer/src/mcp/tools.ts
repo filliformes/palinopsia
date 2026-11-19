@@ -485,6 +485,19 @@ async function setControls(args: Record<string, unknown>): Promise<McpResult> {
   return { content: [text(`${u.addr} : set ${names.join(', ') || 'nothing'}.`)] }
 }
 
+function setText(args: Record<string, unknown>): McpResult {
+  const at = layerArg(args.layer)
+  if (at === 'bg') return fail('The Text source plays on a layer (1-4), not the background.')
+  const layer: number = at
+  const slot = String(args.slot ?? 'A').toUpperCase() === 'B' ? 'B' : 'A'
+  const words = String(args.text ?? '')
+  const src = st().composition.layers[layer]?.[slot === 'A' ? 'sourceA' : 'sourceB']
+  if (!src) fail(`L${layer + 1} is not in this session.`)
+  if (src?.shaderId !== 'gen-text') fail(`L${layer + 1}.${slot} does not play the Text source : put it there first (set_source, "Text").`)
+  st().setSourceText(layer, slot, words)
+  return { content: [text(`L${layer + 1}.${slot} now reads "${words.length > 80 ? words.slice(0, 80) + '…' : words}".`)] }
+}
+
 function setLayer(args: Record<string, unknown>): McpResult {
   const layer = layerArg(args.layer)
   const s = st()
@@ -777,6 +790,7 @@ const TOOLS: Record<string, { run: Tool; writes: boolean; queued?: boolean }> = 
   describe_shader: { run: describeShader, writes: false },
   set_source: { run: setSource, writes: true },
   set_controls: { run: setControls, writes: true },
+  set_text: { run: setText, writes: true },
   set_layer: { run: setLayer, writes: true },
   add_effect: { run: addEffect, writes: true },
   edit_effect: { run: editEffect, writes: true },

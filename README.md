@@ -4061,6 +4061,7 @@ another protocol and is not shown.
 | `…/vary` | trigger | **Vary** this layer : a variant at its own amount (its Vary button) |
 | `…/source/{A\|B}` | s | Set source shader (id / name; `none` empties the slot, `loop 2` plays layer 2's picture (the Loop source), a name it does not know leaves it as it is) |
 | `…/source/{A\|B}/{input}` | f · color · point2D | A source shader input |
+| `…/source/{A\|B}/text` | s | The Text source's words (only while the slot plays Text; the same words again change nothing) |
 | `…/source/{A\|B}/preset` | i · s | Recall one of the source's presets : its number (1 = the first; a scaled value is rounded) or its name. Only on a change (a controller repeating its switches does not re-apply it) |
 | `…/source/{A\|B}/drop` | f f [f] | **Marbling** : a drop at (x, y), 0..1 of the frame (y up), its size × the drop size (default 1). Live, not logged. One number is the plain `drop ▸` trigger |
 | `…/source/{A\|B}/fx/{i}/{input}` | f · color · point2D | A Source-FX unit input |
@@ -4122,7 +4123,8 @@ unless the slot actually holds a video or a sound file (Import audio).
 |---|---|---|
 | `/opsia/macro/{1..16}` | f | Drives Macro knob *n* (smoothed). The old `/opsia/meta/{1..16}` still works (in, and in the feedback out) |
 | `/opsia/bpm` | f | Tempo : **raw**, clamped 20..800 |
-| `/opsia/world` | s / i | Select World (name, or 1-based index) |
+| `/opsia/world` | s / i | Select World (name, or 1-based index). Only a change applies it : a controller repeating its state does not restart the morph |
+| `/opsia/world/apply` | (none) / i | Apply the World in use again (after hand edits) : a bare message or a press |
 | `/opsia/world/amount` | f 0..1 | World amount : 1 = all of the World, 0 = its push taken back off (saved with the session) |
 | `/opsia/seq/run` | level | Run (≥ 0.5) / stop the sequencer |
 | `/opsia/seq/skip` | trigger | Advance to next scene |
@@ -4580,13 +4582,14 @@ claude mcp add --transport http palinopsia http://127.0.0.1:9311/mcp
 A client that only runs local (stdio) servers can reach it through a bridge such as
 `mcp-remote`.
 
-**What it can do** (15 tools) :
+**What it can do** (16 tools) :
 
 | Tool | |
 |---|---|
 | `get_state` | the four layers (sources, controls, mix, blend, opacity, speed, effects), the background, the master, the BPM, the World, the scenes |
 | `snapshot` | an image of the output, as the audience sees it |
 | `list_shaders` · `describe_shader` | the sources and effects, each control's range and default, a shader's ISF code |
+| `set_text` | the words a Text source shows, on a layer's slot A or B |
 | `set_source` · `set_controls` · `set_layer` | a generator on a slot or the background, any unit's controls, a layer's own settings (opacity, blend, A/B mix and mode, mute, solo, speed, feedback and trail, the A/B hue harmony from −1 to 1) or the background's |
 | `add_effect` · `edit_effect` | effects on any rack : add (with a position and values), on/off, mix, move, remove |
 | `write_shader` · `preview_shader` | compile an ISF shader (errors on their lines), save it as one of yours (the Source Editor's Shaders folder, "my shaders" in the menus), see it running alone, put it to work. It rewrites its own shaders freely, but never one of yours unless told to replace it (`replace: true`; the old version stays in `Shaders/.history`) |

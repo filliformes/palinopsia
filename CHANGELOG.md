@@ -27,6 +27,10 @@ that CI builds into cross-platform releases.
     1 / 51 / 100 % Vary, 2 / 51 / 100 % Randomize, volume 0 / 101 / 200 %, mix 0 / 0.5 / 1;
     each chain flipped once per press and stayed on release; a pad flip undone in one step.
 
+- **Text over OSC and the Agent** : `/opsia/layerN/source/{A|B}/text "words"` writes the
+  Text source's words (only while the slot plays Text; the same words again change
+  nothing), and the Agent's new `set_text` tool does the same (16 tools).
+- **`/opsia/world/apply`** : the World in use applied again, on a bare message or a press.
 - **The Model and Grid Mesh in hand** (`pointerInput.ts`, `engine/heldObject.ts`) : a
   drag on the preview turns the object under the cursor in any direction (a trackball
   round the screen's axes), the wheel over it changes its **distance** (12 % a notch,
@@ -319,6 +323,10 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
   land once a frame (a timer when the window draws none); pads and triggers stay
   immediate, and a fader still waiting lands before a pad fires. Measured : 4,200 CC
   messages a second, 60 fps, frames under 21 ms.
+- **The source menus no longer cost a fifth of every frame** (`shaders/isf/index.ts`) :
+  each render sorted every generator into its section with a regex over its whole shader
+  source, in all nine source menus; the categories are now read once and each list sorted
+  once. Profiled with eight faders moving : the CPU idle share rose from 8 % to 60 %.
 - **opsia-media:// had lost its privileges since 2026-09-15** : `main/index.ts`
   registered it and opsia-asset:// in two `registerSchemesAsPrivileged` calls, and
   Electron takes one (the second replaced the first), so fetch refused the scheme and
