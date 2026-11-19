@@ -296,6 +296,11 @@ Measured (RTX 4070, unthrottled test copy) : at 128 x 128 with a fractal noise a
 
 ### Fixed
 
+- **The app icon has no black square any more** (`build/icon.png`, `build/icon.ico`) : the
+  ball sat on opaque black corners, so the taskbar, Explorer and the dock showed a square.
+  Now a truly transparent, centered disc with brighter, crisper filaments on a darker
+  body, its 16 / 24 / 32 px frames drawn again to read small, and the `.ico` carries
+  16, 24, 32, 48, 64, 128 and 256 (it had four, so Windows stretched the rest).
 - **Faders on a MIDI controller no longer slow the picture down** (`midi.ts`,
   `queueContinuous`) : every CC step was a whole store write and redraw, so a few faders
   moved fast (a Launch Control XL sends up to 800 messages a second per fader) took the
