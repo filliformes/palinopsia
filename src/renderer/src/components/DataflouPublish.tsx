@@ -1,13 +1,12 @@
 // What Palinopsia shows the dataflou mesh : ONE node, carrying only what is
 // ticked here. Each group (Macro knobs, Layers, Feel… and each heading of the
 // Body rule list's actions) is ticked whole (it then follows the group : a new
-// scene's action appears by itself) or opened to tick single parameters. The
-// gauge is the node's one DECLARE frame : past 32 KB the last actions are left out.
+// scene's action appears by itself) or opened to tick single parameters.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { dataflouActions, useDataflouStatus } from '../dataflou'
-import { DF_DECLARE_MAX, DF_DECLARE_SMALL, DF_PUBLISH_GROUPS, dfGroupOf } from '@shared/dataflou'
+import { DF_PUBLISH_GROUPS, dfGroupOf } from '@shared/dataflou'
 
 interface Group {
   key: string
@@ -78,7 +77,6 @@ export function DataflouPublish(): JSX.Element {
   }
 
   const total = groups.reduce((n, g) => n + countOn(g), 0)
-  const fill = Math.min(1, st.declareBytes / DF_DECLARE_MAX)
 
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded border border-border bg-panel2/40 p-1.5">
@@ -92,47 +90,13 @@ export function DataflouPublish(): JSX.Element {
           publish
           <span className="font-normal normal-case text-muted">({total})</span>
         </button>
-        {/* the node's one frame : how full */}
-        <div
-          className="relative h-1.5 min-w-[40px] flex-1 overflow-hidden rounded-full bg-panel3"
-          title={
-            st.running
-              ? `The node's declaration : ${(st.declareBytes / 1024).toFixed(1)} KB of ${(DF_DECLARE_MAX / 1024).toFixed(1)} KB (one frame). ` +
-                `A small board (Teensy, ESP32) takes about ${(DF_DECLARE_SMALL / 1024).toFixed(0)} KB.`
-              : 'Join the mesh to measure the declaration'
-          }
-        >
-          <div
-            className={`absolute inset-y-0 left-0 ${st.actionsDropped > 0 ? 'bg-danger' : st.declareBytes > DF_DECLARE_SMALL ? 'bg-accent2' : 'bg-accent'}`}
-            style={{ width: `${(st.running ? fill : 0) * 100}%` }}
-          />
-        </div>
-        {st.running && (
-          <span className="shrink-0 font-mono text-[9px] text-muted">
-            {(st.declareBytes / 1024).toFixed(1)}/{(DF_DECLARE_MAX / 1024).toFixed(1)} KB
-          </span>
-        )}
       </div>
-      {st.running && st.cppHidden > 0 && (
-        <span
-          className="font-mono text-[9px] text-accent2"
-          title="A node built on the reference C++ core (a patch, a board) keeps the first 128 entries of a tree and 32 per group, and leaves the rest out without saying so. The actions come last."
-        >
-          {st.cppHidden} published {st.cppHidden === 1 ? 'parameter stays' : 'parameters stay'} hidden from a node on the C++ core : it sees 128 entries, 32 per group.
-        </span>
-      )}
       {st.running && sessionPub.size > 0 && (
         <span
           className="font-mono text-[9px] text-accent2"
           title={`Published while this session is open, because its wires need them : ${[...sessionPub].join(', ')}. Never added to this computer's list : they leave with the session.`}
         >
           + {sessionPub.size} for this session only
-          {(st.sessionDropped ?? 0) > 0 && <span className="text-danger"> ({st.sessionDropped} left out : no room in the frame)</span>}
-        </span>
-      )}
-      {st.running && st.actionsDropped > 0 && (
-        <span className="font-mono text-[9px] text-danger">
-          {st.actionsDropped} published actions left out : one frame holds no more. Untick a group to make room.
         </span>
       )}
       {open && (

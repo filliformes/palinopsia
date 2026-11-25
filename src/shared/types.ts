@@ -1728,7 +1728,7 @@ export interface ExposedApi {
   /** The outside values to watch in the data view (sku + path each). */
   dataflouWatch: (list: Array<{ sku: string; path: string }>) => void
   /** The remote values the modulators play (their mesh inputs). */
-  dataflouListen: (list: Array<{ sku: string; path: string }>) => void
+  dataflouListen: (list: import('./dataflou').DfListen[]) => void
   /** Learn from the mesh : start, the value that moved the most (peek), stop. */
   dataflouLearn: (op: 'start' | 'peek' | 'stop') => Promise<{ sku: string; path: string; label: string; node: string; span: number } | null>
   /** A wire into Palinopsia : its range, invert, smoothing and what happens on loss. */
@@ -1747,7 +1747,18 @@ export interface ExposedApi {
   onDataflouSessionWires: (cb: (list: import('./dataflou').DfSessionWire[]) => void) => () => void
   dataflouForget: (sku: string) => Promise<boolean>
   onDataflouStatus: (cb: (s: import('./dataflou').DfStatus) => void) => () => void
-  onDataflouIn: (cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue }>) => void) => () => void
+  /** What came in, in order : a value, a trigger's firings, how a destination stands. */
+  onDataflouIn: (
+    cb: (batch: Array<{ path: string; value: import('./dataflou').DfValue } | { path: string; fire: number } | { path: string; dest: string; live: number }>) => void
+  ) => () => void
+  /** Show where a parameter of another node is (its host flashes it). */
+  dataflouLocate: (a: { sku: string; path: string }) => Promise<boolean>
+  /** Show this node in every visualizer of the mesh. */
+  dataflouIdentify: () => void
+  /** One of ours is being located. */
+  onDataflouLocate: (cb: (l: { path: string; on: boolean }) => void) => () => void
+  /** A scene of the mesh was recalled, and Palinopsia's follows (the section's option). */
+  onDataflouScene: (cb: (slot: number) => void) => () => void
   /** The mesh visualizer moved the node to another universe (the setting is ours to keep). */
   onDataflouUniverse: (cb: (name: string) => void) => () => void
   // Ableton Link (src/main/link.ts)

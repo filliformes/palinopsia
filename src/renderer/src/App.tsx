@@ -527,11 +527,12 @@ export default function App(): JSX.Element {
   const dfEnabled = useStore((s) => s.dataflou.enabled)
   const dfLabel = useStore((s) => s.dataflou.label)
   const dfUniverse = useStore((s) => s.dataflou.universe)
+  const dfScene = useStore((s) => !!s.dataflou.sceneRecall)
   // (joined : a stable string, so a new array with the same choices does nothing)
   const dfPublish = useStore((s) => s.dataflou.publish.join('\n'))
   useEffect(() => {
     void applyDataflou()
-  }, [dfEnabled, dfLabel, dfUniverse, dfPublish])
+  }, [dfEnabled, dfLabel, dfUniverse, dfPublish, dfScene])
 
   // ── MIDI output : start/stop the clock as the output device or clock toggle
   //    changes (BPM is read live by the scheduler). Halt on teardown. ───────

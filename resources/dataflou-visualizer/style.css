@@ -48,6 +48,88 @@ body {
     color: #ffc000;
 }
 
+#halt-toggle {
+    margin-left: 10px;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
+}
+
+#halt-toggle:hover {
+    color: #c44;
+}
+
+#halt-toggle.active {
+    color: #fff;
+    background: #c44;
+    padding: 0 6px;
+    border-radius: 3px;
+}
+
+body.halted #vis {
+    outline: 2px solid #c44;
+    outline-offset: -2px;
+}
+
+.param-shape.locating {
+    animation: locate-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes locate-pulse {
+    from { stroke: #ffc000; stroke-width: 1px; }
+    to   { stroke: #ffc000; stroke-width: 5px; }
+}
+
+#incompatible {
+    margin-left: 10px;
+    color: #c84;
+    cursor: pointer;
+    user-select: none;
+}
+
+#incompatible:hover {
+    color: #ea6;
+}
+
+/* What is known of the nodes on another version (click the counter) */
+#incompatible-panel {
+    position: fixed;
+    top: 28px;
+    left: 10px;
+    z-index: 20;
+    max-width: 420px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 8px 10px;
+    background: rgba(20, 20, 20, 0.96);
+    border: 1px solid #553;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #ccc;
+}
+
+#incompatible-panel .ip-head {
+    color: #c84;
+    margin-bottom: 6px;
+}
+
+#incompatible-panel .ip-node {
+    padding: 4px 0;
+    border-top: 1px solid #333;
+}
+
+#incompatible-panel .ip-name {
+    color: #eee;
+}
+
+#incompatible-panel .ip-dim {
+    color: #777;
+}
+
+#incompatible-panel .ip-sku {
+    font-size: 10px;
+}
+
 #host-ip {
     margin-left: 10px;
     color: #777;
@@ -180,13 +262,26 @@ svg {
     stroke-width: 1;
 }
 
+/* A value changed: a yellow outline that fades. A stroke, not a drop-shadow
+   filter: with hundreds of params streaming, filters took the frame rate
+   from 60 to 45 */
 @keyframes data-flash {
-    0%   { filter: drop-shadow(0 0 4px rgba(255, 240, 80, 0.9)); }
-    100% { filter: none; }
+    0%   { stroke: rgba(255, 240, 80, 0.95); stroke-width: 2.5px; }
+    100% { stroke: rgba(255, 240, 80, 0); stroke-width: 2.5px; }
 }
 
 .param-shape.data-flash {
     animation: data-flash 0.4s ease-out;
+}
+
+/* The same, alternated with it so a flash restarts without a reflow */
+@keyframes data-flash2 {
+    0%   { stroke: rgba(255, 240, 80, 0.95); stroke-width: 2.5px; }
+    100% { stroke: rgba(255, 240, 80, 0); stroke-width: 2.5px; }
+}
+
+.param-shape.data-flash2 {
+    animation: data-flash2 0.4s ease-out;
 }
 
 .param-shape.offline {
@@ -257,8 +352,32 @@ body.graphite .node-label.node-identify {
     fill: #555;
 }
 
+/* A value due later (core 9.3): its source dated it ahead, its destinations
+   take it at its time (stamps.ts) */
+.param-value .param-due {
+    fill: #c9a227;
+}
+
 .connections path {
     pointer-events: none;
+}
+
+/* The connections and flashes are painted on canvases over the ring
+   (canvaslayer.ts); the SVG keeps the connections, not rendered (a change
+   there would repaint the whole ring), for their geometry, hit-testing and
+   transitions */
+.ring-canvas {
+    position: fixed;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+}
+body.canvas-cables #vis .connections,
+body.canvas-cables #vis .conn-halos,
+body.canvas-cables #vis .pending-links,
+body.canvas-cables #vis .drag-line,
+body.canvas-cables #vis .drop-highlight {
+    display: none;
 }
 
 .conn-label {
@@ -542,6 +661,19 @@ body.graphite .collapsed-label {
     margin-top: 4px;
 }
 
+/* Read-only (access: read): its node sets it; the value shows, greyed as on
+   the dashboard, and takes no input */
+.param-tooltip .tt-readonly {
+    font-size: 9px;
+    color: #888;
+    margin-top: 4px;
+}
+
+.param-tooltip .tt-val-readonly {
+    opacity: 0.75;
+    pointer-events: none;
+}
+
 /* Editor layout */
 .param-tooltip .tt-editor {
     margin-top: 6px;
@@ -689,7 +821,8 @@ body.graphite .collapsed-label {
     stroke: #fff !important;
 }
 
-.collapsed-dot:hover {
+.collapsed-dot:hover,
+.collapsed-hit:hover + .collapsed-dot {
     opacity: 1 !important;
     stroke-width: 2 !important;
     filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.3));
@@ -773,7 +906,11 @@ body.graphite .collapsed-label {
     border-radius: 6px;
     width: 250px;
     max-height: 70vh;
+    min-width: 180px;
+    min-height: 60px;
     overflow-y: auto;
+    /* Resizable from the bottom-right corner; a resized panel may grow past 70vh */
+    resize: both;
     z-index: 20;
     font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     color: #ccc;
@@ -942,6 +1079,12 @@ body.graphite .collapsed-label {
     pointer-events: none;
 }
 
+/* Read-only: shows the value live, takes no input */
+.dashboard-readonly .dashboard-widget {
+    opacity: 0.75;
+    pointer-events: none;
+}
+
 /* Dashboard SVG icon */
 .dashboard-icon {
     fill: #333;
@@ -1020,6 +1163,119 @@ body.graphite .dashboard-text {
 
 body.graphite .dashboard-value-only {
     color: #888;
+}
+
+/* Arrays (core 9.3): a strip of cells, a bar per number, a swatch per
+   colour, a dot per bool (src/arrays.ts stripHtml) */
+.arr-strip {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 12px;
+    vertical-align: middle;
+    flex: 1;
+    min-width: 0;
+}
+
+.arr-cell {
+    flex: 1 1 0;
+    min-width: 2px;
+    max-width: 10px;
+    height: 100%;
+    position: relative;
+}
+
+.arr-bar {
+    background: rgba(140, 200, 255, 0.12);
+}
+
+.arr-bar > span {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #8cf;
+}
+
+.arr-swatch {
+    border: 1px solid #555;
+    box-sizing: border-box;
+}
+
+.arr-dot {
+    height: 6px;
+    align-self: center;
+    border-radius: 50%;
+    border: 1px solid #8cf;
+    box-sizing: border-box;
+    max-width: 6px;
+    min-width: 6px;
+}
+
+.arr-dot.on {
+    background: #8cf;
+}
+
+.arr-cell[data-elem] {
+    cursor: pointer;
+}
+
+.arr-cell[data-sel] {
+    outline: 1px solid #fff;
+    outline-offset: 1px;
+}
+
+.param-tooltip td .arr-strip {
+    width: 128px;
+}
+
+.param-tooltip .tt-arr-index {
+    width: 42px;
+    flex-shrink: 0;
+}
+
+.param-tooltip .tt-arr-shape {
+    min-width: 0;
+    text-align: left;
+}
+
+.param-tooltip .tt-arr-list-text {
+    color: #8cf;
+    font-size: 9px;
+    word-break: break-all;
+}
+
+.param-tooltip .tt-meta-fixed {
+    font-size: 10px;
+    color: #888;
+}
+
+.param-tooltip .tt-bad {
+    border-color: #c44 !important;
+}
+
+.dashboard-array {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.dashboard-array .arr-strip {
+    height: 16px;
+}
+
+.dashboard-array .arr-cell {
+    max-width: none;
+}
+
+body.graphite .arr-bar > span,
+body.graphite .arr-dot.on {
+    background: #777;
+}
+
+body.graphite .arr-dot {
+    border-color: #777;
 }
 
 
@@ -1258,6 +1514,10 @@ body.output-mode, body.output-mode * { cursor: none !important; }
 /* Spring-loaded groups while dragging a connection (src/drag.ts springCheck):
    collapsed groups hiding a compatible parameter glow; resting on one opens it */
 @keyframes drag-candidate-pulse { 0%, 100% { stroke-opacity: 0.35; } 50% { stroke-opacity: 1; } }
+#vis .group-arc.drag-candidate-group {
+    stroke: #4fc3f7 !important; stroke-width: 2; opacity: 1 !important;
+    animation: drag-candidate-pulse 1.2s ease-in-out infinite;
+}
 #vis .collapsed-dot.drag-candidate-group {
     stroke: #4fc3f7 !important; stroke-width: 1.5;
     animation: drag-candidate-pulse 1.2s ease-in-out infinite;
@@ -1296,6 +1556,18 @@ body.no-text #vis .label-box { display: none; }
 .connection-toast.info { background: rgba(30, 30, 30, 0.92); color: #ddd; border: 1px solid #444; white-space: nowrap; }
 
 body.output-mode #history-btns { display: none !important; }
+
+/* ===== Forget offline nodes, top right (src/forget.ts) ===== */
+#forget-offline {
+    position: fixed; top: 10px; right: 16px; z-index: 10;
+    font: 10px 'SF Mono', 'Fira Code', 'Consolas', monospace; letter-spacing: 0.05em;
+    color: #777; background: none; border: 1px solid currentColor; border-radius: 3px;
+    padding: 1px 6px; cursor: pointer; opacity: 0.85;
+}
+#forget-offline:hover { opacity: 1; color: #ccc; }
+body.graphite #forget-offline { color: #888; }
+body.graphite #forget-offline:hover { color: #333; }
+body.output-mode #forget-offline { display: none !important; }
 
 /* ---- video (NDI) inside the ring: settings › video, V ---- */
 .video-layer { pointer-events: none; overflow: visible; }
@@ -1386,3 +1658,125 @@ body.output-mode #history-btns { display: none !important; }
 #scenes-panel .sc-st-offline { opacity: 0.5; }
 #scenes-panel .sc-hint { font-size: 9px; color: rgb(var(--dp-muted)); line-height: 1.45; }
 html[data-glass='on'] #scenes-panel button { border-color: rgb(255 255 255 / 0.14); }
+
+/* ===== Connection inspector (src/inspector.ts): click a cable; its links in
+   rows, the open one's curve below. Same material as the settings panel. ===== */
+#link-inspector {
+    --dp-bg: 26 26 26; --dp-text: 204 204 204; --dp-muted: 119 119 119;
+    --dp-border: 51 51 51; --dp-accent: 79 195 247;
+    position: fixed; right: 12px; top: 40px; z-index: 30; width: 312px;
+    max-height: calc(100vh - 90px); overflow-y: auto;
+    background: rgb(var(--dp-bg) / 0.94); color: rgb(var(--dp-text));
+    border: 1px solid rgb(var(--dp-border)); border-radius: 6px;
+    padding: 8px 10px; font-size: 11px;
+}
+#link-inspector button, #link-inspector select, #link-inspector input[type=number] {
+    font: inherit; font-size: 10px; color: inherit;
+    background: rgb(var(--dp-text) / 0.07);
+    border: 1px solid rgb(var(--dp-border)); border-radius: 3px;
+}
+#link-inspector button { padding: 2px 7px; cursor: pointer; }
+#link-inspector button:hover { border-color: rgb(var(--dp-accent) / 0.7); }
+#link-inspector input[type=number]::placeholder { color: rgb(var(--dp-muted) / 0.8); }
+#link-inspector input[type=checkbox] { accent-color: rgb(var(--dp-accent)); vertical-align: -2px; }
+#link-inspector .li-head { display: flex; align-items: center; gap: 6px; }
+#link-inspector .li-title { flex: 1; font-size: 11px; letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#link-inspector .li-close { background: none; border: none; color: rgb(var(--dp-muted)); font-size: 15px; line-height: 1; padding: 0 2px; }
+#link-inspector .li-close:hover { color: rgb(var(--dp-text)); }
+#link-inspector .li-arrow { color: rgb(var(--dp-muted)); }
+#link-inspector .li-sub { margin: 2px 0 6px; font-size: 9px; color: rgb(var(--dp-muted)); letter-spacing: 0.04em; }
+#link-inspector .li-rows { border-top: 1px solid rgb(var(--dp-border)); }
+#link-inspector .li-row {
+    display: flex; align-items: center; gap: 5px; padding: 3px 2px;
+    border-bottom: 1px solid rgb(var(--dp-border) / 0.6); cursor: pointer;
+}
+#link-inspector .li-row:hover { background: rgb(var(--dp-text) / 0.04); }
+#link-inspector .li-row.open { background: rgb(var(--dp-accent) / 0.10); }
+#link-inspector .li-row.unfed .li-dest { color: rgb(var(--dp-muted)); }
+#link-inspector .li-caret { width: 8px; color: rgb(var(--dp-muted)); font-size: 9px; }
+#link-inspector .li-dest, #link-inspector .li-src-name { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#link-inspector .li-src { flex: 1.5 1 0; min-width: 0; padding: 1px 2px; }
+#link-inspector .li-thumb { flex: none; width: 30px; height: 14px; }
+#link-inspector .li-thumb path { fill: none; stroke-width: 1.2; stroke-linecap: round; }
+#link-inspector .li-thumb-plain { stroke: rgb(var(--dp-muted) / 0.45); }
+#link-inspector .li-thumb-axis { stroke: rgb(var(--dp-accent)); }
+#link-inspector .li-tag { width: 26px; font-size: 9px; color: rgb(var(--dp-muted)); text-align: right; }
+#link-inspector .li-empty { padding: 6px 2px; color: rgb(var(--dp-muted)); font-size: 10px; }
+#link-inspector .li-editor { margin-top: 8px; }
+#link-inspector .li-ed-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+#link-inspector .li-ed-head > span:first-child { flex: 1; color: rgb(var(--dp-muted)); }
+#link-inspector .li-axes { display: flex; gap: 3px; }
+#link-inspector .li-axis { padding: 0 6px; opacity: 0.6; }
+#link-inspector .li-axis.on { opacity: 1; border-color: currentColor; }
+#link-inspector .li-axis.shaped { text-decoration: underline; }
+#link-inspector .li-range { display: flex; align-items: center; gap: 5px; margin: 3px 0; }
+#link-inspector .li-range label { width: 24px; color: rgb(var(--dp-muted)); }
+#link-inspector .li-range input { width: 74px; padding: 1px 4px; }
+#link-inspector .li-dots { color: rgb(var(--dp-muted)); }
+#link-inspector .li-curve { display: block; width: 100%; height: auto; margin: 5px 0 3px; touch-action: none; cursor: crosshair; }
+#link-inspector .li-box { fill: rgb(var(--dp-text) / 0.03); stroke: rgb(var(--dp-border)); }
+#link-inspector .li-grid { stroke: rgb(var(--dp-text) / 0.06); }
+#link-inspector .li-diag { stroke: rgb(var(--dp-muted) / 0.35); stroke-dasharray: 2 3; }
+#link-inspector .li-line { fill: none; stroke: rgb(var(--dp-accent)); stroke-width: 1.6; stroke-linejoin: round; }
+#link-inspector .li-pt { fill: rgb(var(--dp-bg)); stroke: rgb(var(--dp-text)); stroke-width: 1.2; cursor: grab; }
+#link-inspector .li-pt.end { cursor: ns-resize; }
+#link-inspector .li-pt.gone { opacity: 0.3; stroke-dasharray: 2 2; }
+#link-inspector .li-val { fill: rgb(var(--dp-text)); stroke: rgb(var(--dp-bg)); stroke-width: 0.8; pointer-events: none; }
+#link-inspector .li-tick { stroke: rgb(var(--dp-text) / 0.6); pointer-events: none; }
+#link-inspector .li-ctl { display: flex; align-items: center; gap: 6px; }
+#link-inspector .li-ctl label { color: rgb(var(--dp-muted)); cursor: pointer; }
+#link-inspector .li-live { flex: 1; text-align: right; color: rgb(var(--dp-muted)); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#link-inspector .li-hint { font-size: 9px; color: rgb(var(--dp-muted)); line-height: 1.45; }
+#link-inspector > .li-hint, #link-inspector .li-editor > .li-hint { margin-top: 3px; }
+#link-inspector .li-foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+#link-inspector .li-remove:hover { border-color: #c44; color: #e66; }
+/* vectors: one colour per axis (x/r, y/g, z/b, w/a) */
+#link-inspector .li-ax0 { stroke: #e0716b; color: #e0716b; }
+#link-inspector .li-ax1 { stroke: #7cc47f; color: #7cc47f; }
+#link-inspector .li-ax2 { stroke: #6fa8e8; color: #6fa8e8; }
+#link-inspector .li-ax3 { stroke: #b0b0b0; color: #b0b0b0; }
+html[data-glass='on'] #link-inspector {
+    background: rgb(var(--dp-bg) / 0.42);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
+    backdrop-filter: blur(14px) saturate(1.6);
+    border: none; border-radius: 16px;
+}
+body.output-mode #link-inspector { display: none !important; }
+/* the pointer over a cable: a click opens its connection */
+#vis svg.cable-hover { cursor: pointer; }
+/* a link with a transform (connections.ts transformMarker) */
+#vis .conn-transform-marker { pointer-events: none; }
+
+/* Connecting to one instance of a population: which one (pickmenu.ts) */
+.pick-menu {
+    position: fixed;
+    z-index: 40;
+    background: rgba(24, 24, 24, 0.96);
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    padding: 4px;
+    min-width: 180px;
+    font-size: 11px;
+    color: #ddd;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+.pick-menu .pick-title {
+    padding: 4px 8px 6px;
+    color: #888;
+}
+.pick-menu button {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.pick-menu button:hover { background: rgba(255, 255, 255, 0.1); }
+.pick-menu .pick-hint { color: #777; }

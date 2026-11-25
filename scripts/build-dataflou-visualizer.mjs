@@ -9,12 +9,12 @@
 // when that project is not there, its imports are answered by a small stand-in
 // (scripts/dataflou-visualizer-atelier-stub.ts) and the page runs without the panel.
 //
-// The output is committed and ships with the app : the page belongs to the
-// dataflou project and travels with Palinopsia with its author's permission
-// (2026-11-07; see THIRD_PARTY_NOTICES.md). Rebuild it when dataflou's page changes.
+// The output is committed and ships with the app : the page is the dataflou project's,
+// MIT (see THIRD_PARTY_NOTICES.md). Its optional fonts (web/fonts) are left out : the
+// page falls back to the system's. Rebuild it when dataflou's page changes.
 
 import { build } from 'esbuild'
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import { execFileSync } from 'child_process'
 import { fileURLToPath } from 'url'
@@ -35,6 +35,12 @@ const withAtelier = existsSync(atelier)
 rmSync(out, { recursive: true, force: true })
 mkdirSync(join(out, 'js'), { recursive: true })
 for (const f of ['index.html', 'style.css', 'lib']) cpSync(join(web, f), join(out, f), { recursive: true })
+cpSync(join(web, '..', 'LICENSE'), join(out, 'LICENSE'))
+// (LF, and no link to the fonts that are not there)
+for (const f of ['index.html', 'style.css', 'LICENSE']) {
+  const s = readFileSync(join(out, f), 'utf8').replace(/\r\n/g, '\n')
+  writeFileSync(join(out, f), f === 'index.html' ? s.replace(/^.*fonts\/fonts\.css.*\n/m, '') : s)
+}
 
 await build({
   entryPoints: [join(web, 'src', 'main.ts')],
@@ -48,6 +54,7 @@ await build({
     : [{ name: 'atelier-stand-in', setup(b) { b.onResolve({ filter: /125_atelier[\\/]editor[\\/]src[\\/](editor|types[\\/]messages)$/ }, () => ({ path: stub })) } }]
 })
 
+const version = /VERSION = '([^']+)'/.exec(readFileSync(join(web, 'src', 'state.ts'), 'utf8'))?.[1] ?? '?'
 let commit = 'unknown'
 try {
   commit = execFileSync('git', ['-C', web, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim()
@@ -56,9 +63,14 @@ try {
 }
 writeFileSync(
   join(out, 'SOURCE.md'),
-  `# dataflou mesh visualizer\n\nThe dataflou project's web visualizer, by Alexandre Burton (Artificiel), built from\n` +
-    `the dataflou repository's web/ folder at commit ${commit}${withAtelier ? '' : ', without the Atelier editor panel (that project was not there)'}.\n` +
-    `Served by Palinopsia (src/main/dataflou/visualizer.ts). Not part of Palinopsia's own code : it travels\n` +
-    `with Palinopsia with its author's permission (see THIRD_PARTY_NOTICES.md). d3 (lib/) : ISC License, Mike Bostock.\n`
+  [
+    `# dataflou mesh visualizer ${version}`,
+    '',
+    "The dataflou project's web visualizer, by Alexandre Burton (Artificiel), built from",
+    `the dataflou repository's web/ folder at commit ${commit}${withAtelier ? '' : ', without the Atelier editor panel (that project was not there)'},`,
+    'without its optional fonts. MIT (LICENSE). Served by Palinopsia (src/main/dataflou/visualizer.ts).',
+    'd3 (lib/) : ISC License, Mike Bostock. See THIRD_PARTY_NOTICES.md.',
+    ''
+  ].join('\n')
 )
 console.log(`visualizer built into ${out} from ${web} @ ${commit}${withAtelier ? '' : ' (Atelier panel left out)'}`)

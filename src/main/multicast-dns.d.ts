@@ -1,4 +1,4 @@
-// Minimal typings for `multicast-dns` (only the bits the dataflou node uses).
+// Minimal typings for `multicast-dns` (only the bits the light discovery uses).
 declare module 'multicast-dns' {
   interface Mdns {
     on(event: string, cb: (...args: never[]) => void): void

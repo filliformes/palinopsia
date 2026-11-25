@@ -1,13 +1,13 @@
 // The dataflou bridge, renderer side. The node lives in main; here :
 //   · values arriving on our destinations play exactly like OSC (each maps to a
-//     /opsia address, routed through oscInput), once per change;
-//   · our sources (audio / picture / body / modulators / Meta knobs) are read
-//     like the Resolume mapper's rows and sent to main 30 times a second, but
-//     only the ones some node listens to;
+//     /opsia address, routed through oscInput), triggers fire once each;
+//   · our sources (audio / picture / body / modulators / Macro knobs) are read like
+//     the Resolume mapper's rows, and our destinations where they stand, and sent to
+//     main as they change, for what is published;
 //   · the node's status (the monitor) is kept here, outside the store;
 //   · the Body rule picker's actions : listed for main while the node runs (it
 //     declares one trigger each, act/..., for the ones the section publishes),
-//     fired here when one goes on.
+//     fired here.
 
 import { useSyncExternalStore } from 'react'
 import { useStore } from './store'
@@ -15,7 +15,7 @@ import { routeOsc } from './oscInput'
 import { readSource } from './resolume'
 import { fireTrigger } from './midi'
 import { triggerOptions } from './triggerCatalog'
-import { DF_DESTS, DF_SOURCES, dfActionPath, dfGroupOf, dfPublished, type DfAction, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, dfActionPath, dfGroupOf, dfPublished, type DfAction, type DfListen, type DfStatus, type DfValue, type DfWireOpt } from '@shared/dataflou'
 import type { MappingScope, ModTarget } from '@shared/types'
 import { oscLeafValues } from './oscInput'
 import { controlBus } from './engine/controlBus'
@@ -28,10 +28,12 @@ const SIGNAL_BY_PATH = new Map<string, string>([
   ...DF_DESTS.filter((d) => d.bidir).map((d) => [d.path, d.bidir!] as [string, string])
 ])
 
+const ARRAY_BY_PATH = new Map<string, string[]>(DF_SOURCES.filter((s) => s.array).map((s) => [s.path, s.array!]))
+
 const EMPTY: DfStatus = {
-  running: false, error: null, sku: '', label: '', universe: '', address: '', tcpPort: 0, udpPort: 0,
-  nodes: [], listeners: {}, rxPerSec: 0, txPerSec: 0, declareBytes: 0, published: 0, actions: 0, actionsDropped: 0, cppHidden: 0, parked: [],
-  visualizer: 0, visualizerAvailable: false
+  available: true, running: false, error: null, core: '', sku: '', label: '', universe: '', address: '', tcpPort: 0,
+  nodes: [], dests: {}, listeners: {}, refused: [], universes: [], discovery: 'ok', halted: false, presentation: false,
+  rxPerSec: 0, txPerSec: 0, published: 0, actions: 0, parked: [], visualizer: 0, visualizerAvailable: false
 }
 
 // ── the actions : every entry of the Body rule picker, a trigger each ──
@@ -93,70 +95,83 @@ export function useDataflouStatus(): DfStatus {
 export const dfLastIn = new Map<string, { value: DfValue; at: number }>()
 const lastPlayed = new Map<string, number>()
 
+/** A trigger of ours fired (once each) : an action, or a destination that fires. */
+function fire(path: string, times: number): void {
+  dfLastIn.set(path, { value: true, at: performance.now() })
+  const act = actionByPath.get(path)
+  const osc = DEST_BY_PATH.get(path)?.osc
+  for (let i = 0; i < times; i++) {
+    if (act) fireTrigger(act)
+    else if (osc) {
+      // (an address that fires on its rising edge : up, then armed again)
+      routeOsc(osc, [{ type: 'f', value: 1 }])
+      routeOsc(osc, [{ type: 'f', value: 0 }])
+    }
+  }
+}
+
 function play(path: string, value: DfValue): void {
   let n = typeof value === 'boolean' ? (value ? 1 : 0) : typeof value === 'number' ? value : Array.isArray(value) ? (value[0] ?? 0) : Number(value) || 0
   if (!Number.isFinite(n)) return
-  const act = actionByPath.get(path)
-  if (act) {
-    // a trigger : fires once as it goes on, again only after it went off
-    dfLastIn.set(path, { value: n, at: performance.now() })
-    const was = lastPlayed.get(path) ?? 0
-    lastPlayed.set(path, n)
-    if (n >= 0.5 && was < 0.5) fireTrigger(act)
-    return
-  }
   const d = DEST_BY_PATH.get(path)
-  if (!d) return
+  if (!d || d.type === 'trigger') return
   // a number that picks one thing (a scene) : played once per whole step, and
   // never smoothed nor glided back (the steps on the way would each be recalled)
   if (d.discrete) n = Math.round(n)
   const glides = d.type === 'number' && !d.discrete
-  const now = performance.now()
-  // where the control was before a wire began to play it (a first value, or the
-  // first after a quiet spell) : what a glide back on loss returns to, even when
-  // that option is turned on later. A glide back cut short by the source coming
-  // back is not a new start : the place it was going back to stays.
-  const last = dfLastIn.get(path)
-  const back = anims.get(path)?.kind === 'back'
-  if (glides && !back && (!last || now - last.at > LOSS_MS)) preOf.set(path, rawNow(d))
-  dfLastIn.set(path, { value: n, at: now })
+  // (set by hand on the mesh, with no wire : where it was before is not kept)
+  dfLastIn.set(path, { value: n, at: performance.now() })
   const opt = glides ? wireOptOf(path) : undefined
-  // on loss : the first value after a quiet spell remembers where the control
-  // was, so the wire can give it back when its source goes quiet again
-  if (opt?.onLoss === 'return') {
-    const w = wired.get(path)
-    if (!w || !w.live) wired.set(path, { pre: back && w ? w.pre : preOf.get(path) ?? rawNow(d), live: true, at: now })
-    else w.at = now
-    anims.delete(path) // (a glide back stops : the source is here again)
-  }
+  if (anims.get(path)?.kind === 'back') anims.delete(path) // (the source is here again)
   // smoothing : the value is a target the control glides to (a slew)
   if (opt?.slewMs) {
     const a = anims.get(path)
     // a value sent again (a source repeats itself) : the control is there already
     if (!a && lastPlayed.get(path) === n) return
     const from = a ? a.cur : lastPlayed.get(path) ?? rawNow(d)
-    anims.set(path, { kind: 'slew', cur: from, to: n, ms: opt.slewMs, from, t0: now, osc: d.osc })
+    anims.set(path, { kind: 'slew', cur: from, to: n, ms: opt.slewMs, from, t0: performance.now(), osc: d.osc })
     startAnims()
     return
   }
-  // Once per change : a source streams at its rate whether it moved or not, and a
-  // scene or a trigger must not fire again on every packet.
+  // Once per change : a scene must not be recalled again by a value sent again.
   const prev = lastPlayed.get(path)
   if (prev !== undefined && Math.abs(prev - n) < 1e-6) return
   lastPlayed.set(path, n)
   routeOsc(d.osc, [{ type: 'f', value: n }])
 }
 
+// ── a wire begins and ends : the mesh says so (bound, waiting, free), a quiet source
+// is not a lost one (a fader sends only when it moves) ──
+const standing = new Map<string, string>()
+// where a control was before its wire began to play it
+const preOf = new Map<string, { v: number; at: number }>()
+function stands(path: string, state: string): void {
+  const was = standing.get(path) ?? 'free'
+  standing.set(path, state)
+  const d = DEST_BY_PATH.get(path)
+  if (!d || d.type !== 'number' || d.discrete) return
+  if (state === 'bound' && was !== 'bound' && was !== 'waiting') {
+    // (a glide back cut short by the source coming back is not a new start : the
+    // place it was going back to stays)
+    if (anims.get(path)?.kind !== 'back' || !preOf.has(path)) preOf.set(path, { v: rawNow(d), at: performance.now() })
+    return
+  }
+  if (state !== 'free' || was === 'free') return
+  const pre = preOf.get(path)
+  const opt = wireOptOf(path)
+  // (nothing came in since : there is nothing to give back)
+  if (opt?.onLoss !== 'return' || !pre || (dfLastIn.get(path)?.at ?? 0) < pre.at) return
+  const cur = anims.get(path)?.cur ?? lastPlayed.get(path) ?? rawNow(d)
+  anims.set(path, { kind: 'back', cur, to: pre.v, ms: (opt.returnSec ?? 2) * 1000, from: cur, t0: performance.now(), osc: d.osc })
+  startAnims()
+}
+
 // ── a wire's smoothing and its glide back (DfWireOpt, set in the connections
 // list) : one animation loop, running only while something glides ──
 type Anim = { kind: 'slew' | 'back'; cur: number; to: number; ms: number; from: number; t0: number; osc: string }
 const anims = new Map<string, Anim>()
-// destinations played by a wire whose loss glides back : where they were before
-const wired = new Map<string, { pre: number; live: boolean; at: number }>()
-const preOf = new Map<string, number>()
 let animTimer = 0
 let lastAnim = 0
-const LOSS_MS = 2000 // as the data view : quiet this long, the source is gone
 
 /** How the wires into a destination glide here. The values reach the renderer
  *  by destination, not by wire, so smoothing and on loss belong to the control :
@@ -214,32 +229,11 @@ function stepAnims(): void {
     routeOsc(a.osc, [{ type: 'f', value: next }])
     if (next === a.to) anims.delete(path)
   }
-  // (nothing gliding : the loss check below starts it again for a glide back)
   if (!anims.size) {
     window.clearInterval(animTimer)
     animTimer = 0
   }
 }
-
-// a wire gone quiet : its destination glides back where it was before
-window.setInterval(() => {
-  if (!wired.size) return
-  const now = performance.now()
-  for (const [path, w] of wired) {
-    const opt = wireOptOf(path)
-    if (opt?.onLoss !== 'return') {
-      wired.delete(path)
-      continue
-    }
-    if (!w.live || now - w.at < LOSS_MS) continue
-    w.live = false
-    const d = DEST_BY_PATH.get(path)
-    if (!d) continue
-    const cur = anims.get(path)?.cur ?? lastPlayed.get(path) ?? rawNow(d)
-    anims.set(path, { kind: 'back', cur, to: w.pre, ms: (opt.returnSec ?? 2) * 1000, from: cur, t0: now, osc: d.osc })
-    startAnims()
-  }
-}, 250)
 
 // ── a modulator played by a mesh value (its Controller input) ──
 const meshKey = (sku: string, path: string): string => `${sku}\n${path}`
@@ -248,13 +242,13 @@ let listensSent = ''
 function syncListens(): void {
   const mods = useStore.getState().composition.modulators
   const next = new Map<string, number[]>()
-  const list: Array<{ sku: string; path: string }> = []
+  const list: DfListen[] = []
   mods.forEach((m, i) => {
     if (m.type !== 'controller' || !m.mesh) return
     const k = meshKey(m.mesh.sku, m.mesh.path)
     if (!next.has(k)) {
       next.set(k, [])
-      list.push({ sku: m.mesh.sku, path: m.mesh.path })
+      list.push({ sku: m.mesh.sku, path: m.mesh.path, slot: i })
     }
     next.get(k)!.push(i)
   })
@@ -463,6 +457,60 @@ export async function applyDataflou(): Promise<void> {
     setStatus({ ...EMPTY, error: (e as Error).message })
   }
   lastPlayed.clear()
+  standing.clear()
+  sent.clear()
+}
+
+// ── what our parameters stand at, for the mesh ──
+// What was last said of each published one; only changes go out.
+const sent = new Map<string, string>()
+const ECHO_MS = 300
+/** The published paths of ours, as the node has them. */
+function ourPaths(): string[] {
+  return status.nodes.find((x) => x.local)?.params.filter((p) => p.kind === 'param').map((p) => p.path) ?? []
+}
+function say(out: Record<string, DfValue>, path: string, v: DfValue): void {
+  // the mesh is playing this one now : it says it itself (no echo of it, a rounding off)
+  const last = dfLastIn.get(path)
+  if (last && performance.now() - last.at < ECHO_MS) return
+  const k = Array.isArray(v) ? v.join() : String(v)
+  if (sent.get(path) === k) return
+  sent.set(path, k)
+  out[path] = v
+}
+const round4 = (v: number): number => (Number.isFinite(v) ? Math.round(v * 10000) / 10000 : 0)
+let leavesAt = 0
+function sampleOurs(): void {
+  if (!status.running) return
+  const out: Record<string, DfValue> = {}
+  const paths = ourPaths()
+  const now = performance.now()
+  let leaves: Map<string, number> | null = null
+  for (const p of paths) {
+    const list = ARRAY_BY_PATH.get(p)
+    if (list) {
+      say(out, p, list.map((s) => round4(readSource(s, null))))
+      continue
+    }
+    const sig = SIGNAL_BY_PATH.get(p)
+    if (sig) {
+      say(out, p, round4(readSource(sig, null)))
+      continue
+    }
+    // a destination : where its control stands, a few times a second
+    const d = DEST_BY_PATH.get(p)
+    if (!d || d.type === 'trigger') continue
+    if (!leaves) {
+      if (now - leavesAt < 250) continue
+      leaves = oscLeafValues()
+    }
+    const v = leaves.get(d.osc)
+    if (v === undefined) continue
+    const lo = d.min ?? 0, hi = d.max ?? 1
+    say(out, p, d.type === 'bool' ? v >= 0.5 : round4(lo + v * (hi - lo)))
+  }
+  if (leaves) leavesAt = now
+  if (Object.keys(out).length) window.api.dataflouValues(out)
 }
 
 /** Does someone listen to our picture features? (keeps the vision readback on) */
@@ -476,7 +524,11 @@ export function dataflouWantsVision(): boolean {
 export function initDataflou(): () => void {
   const offStatus = window.api.onDataflouStatus((s) => setStatus(s))
   const offIn = window.api.onDataflouIn((batch) => {
-    for (const v of batch) play(v.path, v.value)
+    for (const v of batch) {
+      if ('fire' in v) fire(v.path, v.fire)
+      else if ('dest' in v) stands(v.path, v.dest)
+      else play(v.path, v.value)
+    }
   })
   // the modulators played by a mesh value
   const offRemote = window.api.onDataflouRemote((batch) => {
@@ -500,21 +552,16 @@ export function initDataflou(): () => void {
   const ta = window.setInterval(() => {
     if (status.running) sendActions()
   }, 1500)
-  const t = window.setInterval(() => {
-    if (!status.running) return
-    // every source while a visualizer page is open (it shows them all live),
-    // else only the ones some node listens to
-    const paths = status.visualizer > 0 ? [...SIGNAL_BY_PATH.keys()] : Object.keys(status.listeners)
-    if (!paths.length) return
-    const out: Record<string, DfValue> = {}
-    for (const p of paths) {
-      const sig = SIGNAL_BY_PATH.get(p)
-      if (!sig) continue
-      const v = readSource(sig, null)
-      out[p] = Number.isFinite(v) ? Math.round(v * 10000) / 10000 : 0
-    }
-    window.api.dataflouValues(out)
-  }, 33)
+  const t = window.setInterval(sampleOurs, 33)
+  // one of ours is being located : say where it is
+  const offLocate = window.api.onDataflouLocate?.((l) => {
+    if (!l.on) return
+    const d = DEST_BY_PATH.get(l.path)
+    const label = d?.label ?? DF_SOURCES.find((s) => s.path === l.path)?.label ?? dataflouActions().find((a) => a.path === l.path)?.label ?? l.path
+    showToast(`Located from the dataflou mesh : ${label} (${l.path})`)
+  })
+  // a scene of the mesh recalled, and Palinopsia's scene of that number with it
+  const offScene = window.api.onDataflouScene?.((slot) => routeOsc('/opsia/scene', [{ type: 'f', value: slot }]))
   void window.api.dataflouStatus().then(setStatus).catch(() => {})
   // the session's wires : to main as they change (a load, New, a wire made or
   // moved), back from main when one is unwired or reshaped on the mesh
@@ -539,6 +586,8 @@ export function initDataflou(): () => void {
     offRemote()
     offMods()
     offUni()
+    offLocate?.()
+    offScene?.()
     window.clearInterval(t)
     window.clearInterval(ta)
   }

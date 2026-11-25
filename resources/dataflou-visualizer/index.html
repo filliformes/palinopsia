@@ -6,14 +6,17 @@
     <title>dataflou visualizer</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
-    <link rel="stylesheet" href="fonts/fonts.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="status">connecting... <span id="ver" style="color:#555"></span>
         <span id="host-ip" style="display:none"></span>
+        <span id="incompatible" style="display:none"></span>
         <span id="universe" title="Universe of this node: click to move it to another universe (Enter to switch, Escape to cancel)">universe: &hellip;</span>
-        <span id="perf-toggle" title="High performance mode (p): stop streaming remote values and periodic updates to this page">high performance: off</span></div>
+        <span id="perf-toggle" title="The mesh's phase (p): preparation shows everything; presentation keeps only the connections that carry values and pauses the values on this page. Every node follows.">preparation</span>
+        <span id="halt-toggle" title="The mesh-wide stop (Shift+Escape): every node takes no value, its destinations return to their init, its instances close. Click again to lift it. Hold Alt over a param to show where it is.">halt</span></div>
+    <div id="incompatible-panel" style="display:none"></div>
+    <button id="forget-offline" style="display:none" title="Forget every offline node, on every node of the mesh"></button>
     <div id="main-layout">
         <div id="vis"></div>
     </div>
