@@ -21,6 +21,7 @@ import { registerLiveOverlay } from './liveOverlay'
 import { numberBoxCh, numberBoxChars } from './numberBox'
 import { showToast } from './Toast'
 import { currentFps, formatHz } from '../perf'
+import { DomeRoutes, ndiDotClass, ndiLine, useNdiTrouble } from './OutputRoutes'
 import { captureScreenshot, outputRecorder, recordingFormats, encoderAccepts, DXV_MAX_EDGE, type RecordingFormat } from '../recorder'
 import { MidiLearnOverlay } from './MidiLearnOverlay'
 import { DomeSim } from './DomeSim'
@@ -671,7 +672,7 @@ export function OutputPage({
 
           <OutXformSection btn={btn} />
 
-          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} />
+          <DomeSection dome={dome} setDome={setDome} setDomeSim={setDomeSim} btn={btn} view={domeView} setView={setDomeView} onResetCam={resetSimCam} onWholeDome={wholeDome} shareKind={shareKind} />
 
           <Section title="Fullscreen output">
             <div className="flex items-center gap-1">
@@ -1074,13 +1075,9 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
   const setNdi = useStore((s) => s.setNdi)
   const st = useStore((s) => s.ndiStatus)
   const set = (p: Partial<NdiConfig>): void => setNdi(p)
-  const dot =
-    !ndi.enabled ? 'bg-muted'
-      : st.state === 'live' ? 'bg-green-500'
-        : st.state === 'starting' ? 'animate-pulse bg-yellow-500'
-          : st.state === 'no-runtime' ? 'bg-yellow-500' // an action to take, not a fault
-            : 'bg-red-500'
-  const slow = ndi.enabled && st.state === 'live' && st.connections > 0 && st.fps > 0 && st.fps < ndi.fps * 0.8
+  const domeOn = useStore((s) => s.dome.enabled)
+  const trouble = useNdiTrouble(ndi, st)
+  const dot = ndiDotClass(ndi, st, trouble)
   const label = (fps: number): string => (Number.isInteger(fps) ? String(fps) : fps.toFixed(2))
   return (
     <Section
@@ -1095,17 +1092,9 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
         <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
         <span
           className="min-w-0 flex-1 truncate font-mono text-[10px] text-muted"
-          title={st.message || (st.state === 'live' ? `${st.connections} NDI connection${st.connections === 1 ? '' : 's'} (a receiver often opens more than one) · ${st.dropped} dropped in the last second` : st.source)}
+          title={st.message || (st.state === 'live' ? `${st.connections} NDI connection${st.connections === 1 ? '' : 's'} (a receiver often opens more than one)` : st.source)}
         >
-          {!ndi.enabled
-            ? 'off'
-            : st.state === 'live'
-              ? `${st.connections > 0 ? 'receiving' : 'no receiver yet'} · ${st.fps} fps${st.width ? ` · ${st.width}×${st.height}` : ''}`
-              : st.state === 'no-runtime'
-                ? 'no NDI runtime found'
-                : st.state === 'starting'
-                  ? 'starting…'
-                  : st.message || st.state}
+          {ndiLine(ndi, st)}
         </span>
         {ndi.enabled && st.program && <span className="rounded bg-red-600 px-1.5 font-mono text-[9px] font-semibold text-white" title="Tally : a receiver has this source on program (on air)">ON AIR</span>}
         {ndi.enabled && !st.program && st.preview && <span className="rounded bg-green-700 px-1.5 font-mono text-[9px] font-semibold text-white" title="Tally : a receiver has this source on preview">PREVIEW</span>}
@@ -1115,12 +1104,21 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
           ▸ {st.source}
         </div>
       )}
-      {ndi.enabled && st.state === 'no-runtime' && <NdiRuntimeInstall />}
-      {slow && (
-        <div className="font-mono text-[10px] text-yellow-400">
-          Sending {st.fps} of {label(ndi.fps)} fps : lower the size or the rate, or use UYVY.
+      {ndi.enabled && st.state === 'live' && (
+        <div
+          className="font-mono text-[10px] text-muted"
+          title={`The last second. Captured : frames taken from the picture. Skipped : not taken, the graphics card had not finished the earlier ones. Late : taken, then dropped because NDI was still busy. Repeated : the last frame sent again, nothing new for half a second. ${st.path === 'slow' ? `Slow path : ${st.pathNote || 'no WebGPU'}` : 'Taken on the graphics card, off the window'} · NDI took up to ${st.sendMs} ms to accept a frame`}
+        >
+          captured {Math.round(st.captured)} · skipped {st.skipped} · late {st.dropped}{st.resent ? ` · repeated ${st.resent}` : ''}{st.latencyMs && st.path === 'gpu' ? ` · ${st.latencyMs} ms` : ''}{st.path === 'slow' ? ' · slow path' : ''}
         </div>
       )}
+      {domeOn && ndi.enabled && (
+        <div className="font-mono text-[10px] text-muted">
+          Carries the domemaster. The fullscreen output is not needed for it.
+        </div>
+      )}
+      {ndi.enabled && st.state === 'no-runtime' && <NdiRuntimeInstall />}
+      {trouble && <div className="font-mono text-[10px] leading-snug text-yellow-400">{trouble}</div>}
       <label className="flex items-center gap-2" title="The source name. Receivers see it as MACHINE (name).">
         <span className="w-14 shrink-0 font-mono text-[10px] text-muted">name</span>
         <CommitField value={ndi.name} onCommit={(v) => set({ name: v })} placeholder="Palinopsia" />
@@ -1377,7 +1375,7 @@ function OutXformSection({ btn }: { btn: (on: boolean) => string }): JSX.Element
 // Fulldome : master on/off + resolution + aperture, the mapping mode and its
 // controls, and the simulator's view. Port of the TD FulldomeSimulator's
 // DomeConfig page, plus the mapping it never had.
-function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam, onWholeDome }: {
+function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam, onWholeDome, shareKind }: {
   dome: DomeConfig
   setDome: (p: Partial<DomeConfig>) => void
   setDomeSim: (p: Partial<DomeConfig['sim']>) => void
@@ -1386,6 +1384,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
   setView: (v: '3d' | 'master') => void
   onResetCam: (view: 'inside' | 'outside') => void
   onWholeDome: () => void
+  shareKind: string | null
 }): JSX.Element {
   const [openMod, setOpenMod] = useState<string | null>(null)
   const mp = (f: DomeModField): DomeModProps => ({ mod: f, openMod, setOpenMod })
@@ -1462,6 +1461,7 @@ function DomeSection({ dome, setDome, setDomeSim, btn, view, setView, onResetCam
           Satosphère
         </button>
       </div>
+      <DomeRoutes shareKind={shareKind} />
       <DomeSlider label="aperture" value={dome.aperture} min={180} max={230} step={1} unit="°" reset={210} onChange={(v) => setDome({ aperture: v })} title="The dome's field of view : 180° a hemisphere, 210° the Satosphère (the rim 15° below the horizon)" />
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-[10px] text-muted">mapping</span>

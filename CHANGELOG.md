@@ -7,6 +7,40 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Where the dome goes** (new `components/OutputRoutes.tsx`, in the Output page's Fulldome
+  section) : one small block that says what is live and what is not. NDI : the master's
+  size, the rate sent against the rate asked, a receiver or none, the frames lost; the
+  fullscreen output : "not needed for NDI", and what it costs when both run; Spout / Syphon :
+  for a dome viewer on the same computer. NDI under its rate for three seconds gets a
+  warning with the reason (the picture itself, captures skipped, NDI late, the slow path), in
+  the NDI section too, which now lists what the last second captured, skipped, dropped late
+  and repeated, and the delay from the picture to NDI (`NdiStatus` : `captured`, `skipped`,
+  `resent`, `latencyMs`, `path`, `pathNote`).
+- **tools/dome-ndi-test.cjs** : the dome and NDI measured in an isolated test copy with a
+  bare NDI receiver beside it (the table, `--ops` for what a show does to it, `--soak` for
+  the memory).
+- **NDI taken on the graphics card** (new `engine/gpuCapture.ts`,
+  `workers/gpuCaptureWorker.ts`, `Compositor.cleanCanvas`) : whenever the canvas is exactly
+  the picture being sent (the domemaster with its grid, Flash safety and Black, or the flat
+  frame with no keystone), a `VideoFrame` of it goes to a worker, which converts it in a
+  WebGPU compute pass (UYVY BT.709 video range or RGB, scaled through a box of bilinear taps
+  under the size cap), maps it, copies it and passes it to the sender itself. It replaces
+  `getBufferSubData` of 33.5 MB on the window's thread (62 ms a frame). Checked byte by byte
+  against the WebGL path (ramps, saturated corners, per-pixel noise, the grid, odd sizes,
+  scaled) : never more than one level apart. Dome 4096² + NDI 60 into a receiver, RTX 4070
+  laptop : light scene 20 → 60 fps (sent 15.5 → 60), Dome Aurora 16 → 60 (15.4 → 60), Oil
+  Cloud 12 → 56 (12 → 56, what it renders at by itself), Chrome Idol 20 → 60 (15.9 → 60),
+  2048² 47 → 60 (43 → 60); 0 skipped, 0 late. A lost device, a worker error or two and a half
+  seconds of silence restart it (1 s, 2, 4 … 60 s) with the WebGL path carrying NDI meanwhile;
+  without WebGPU, or with a keystone, that path stays.
+- **NDI off the window's thread** (`preload/ndi.ts`) : its send waited up to 12 ms on the
+  window's thread at 4096²; it now runs on koffi's, one call at a time, with at most two
+  frames waiting (the oldest dropped and counted). A buffer goes back only once the next
+  send has returned; the sender is flushed and destroyed only with no call in it, the
+  status questions wait their turn, a page reload waits a call out. Frames carry their own
+  time on the rate's grid. The last frame is sent again after 500 ms with nothing new; five
+  failed sends in a row, or a wake-up or a change of network with nobody connected
+  (new `main/ndi/watch.ts`), make the sender again.
 - **Strata : a place as a scanner sees it, taken apart and put back together by the sound**
   (new `engine/StrataSource.ts`, `engine/strataPlaces.ts`, the `gen-strata` descriptor in
   `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native

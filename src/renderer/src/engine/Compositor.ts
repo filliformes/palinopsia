@@ -2471,11 +2471,22 @@ export class Compositor {
     return captureSize(o.w, o.h, maxEdge, format);
   }
 
+  /** The canvas, when it holds exactly the clean picture captureKick() would take :
+   *  the domemaster (drawn onto it texel for texel), or the flat frame with no
+   *  keystone and no mapping grid. Null otherwise. Then a capture can take the
+   *  canvas itself (engine/gpuCapture.ts). Valid right after render(). */
+  cleanCanvas(): HTMLCanvasElement | null {
+    if (!this.lastPresent || this.gl.isContextLost()) return null;
+    const { w, h } = this.outputSize();
+    if (this.canvas.width !== w || this.canvas.height !== h) return null;
+    return this.domeTex || (!this.domeCfg && !this.warpActive) ? this.canvas : null;
+  }
+
   /** Queue a capture for consumer `name`. `domeOnly` : only while the dome is on.
    *  Returns false when there was nothing to capture or the GPU is behind. */
   captureKick(name: string, format: CaptureFormat, maxEdge: number, domeOnly = false): boolean {
     const src = domeOnly ? this.domeTex : this.domeTex ?? this.outTex ?? this.lastPresent;
-    if (!src) return false;
+    if (!src || this.gl.isContextLost()) return false;
     const { w, h } = this.outputSize();
     try {
       let cap = this.captures.get(name);

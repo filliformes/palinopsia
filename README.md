@@ -2337,6 +2337,14 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   Dome on / off and NDI on / off stay yours. The square composition applies while the
   dome is on (pressed with it off : as soon as it goes on) and the previous size comes
   back when the dome goes off.
+- **Where the dome goes** : a small block under those buttons says in plain words what is
+  live and what is not. **NDI** (the way to a dome's media server) : live or not, the
+  master's size, the rate really sent against the rate asked, a receiver or none, and the
+  frames lost in the last second. **Fullscreen output** : **not needed for NDI** (it is
+  for a dome projector plugged into this computer), and what it costs while both run.
+  **Spout / Syphon** : to a dome viewer on this same computer, to check the master. When
+  NDI is under its rate it says why (the picture itself is too heavy for the card,
+  captures skipped, NDI late, or the slow path).
 - **Aperture** 180–230° (210° default : the Satosphère's 210°, its rim 15° below the
   horizon). The Satosphère takes **4096×4096 max, live over NDI** on its 10 Gb network.
   The dome records in **DXV3** at full 4096² (see Record). The live master stops at 4K :
@@ -2459,19 +2467,28 @@ mapping server driving the projectors receives). Turn it on in the **NDI** secti
 Output page; it stays on across restarts.
 
 - It sends the **clean** picture (before keystone), or the **domemaster** when the dome
-  is on : 4096×4096 at 30 fps is the Satosphère's format, and it holds that rate (measured
-  into a receiver) even with a scene that keeps the GPU full, and even when the Palinopsia
-  window is **minimized or covered** (the render loop no longer depends on the window
-  being painted).
+  is on : **4096×4096 at 60 fps** is the Satosphère's format, and on an RTX 4070 laptop it
+  holds that rate into a receiver with the picture itself still at 60 (measured on a light
+  scene and on Generate themes; a theme that fills the graphics card by itself runs, and
+  is sent, at whatever it reaches). It keeps going when the Palinopsia window is
+  **minimized or covered** (the render loop does not depend on the window being painted).
 - **Name** (receivers see `MACHINE (name)`), **rate** (25 · 29.97 · 30 · 50 · 59.94 · 60,
   declared and paced), **size** (native, capped at 4096, or 4096 / 3840 / 2048 / 1920 /
   1280), **format** (UYVY, NDI's own 4:2:2, converted on the GPU : the default; or RGB).
 - **Network** : a **Discovery Server**, the **network card** to send from, **extra IPs**
   for receivers on other subnets, and **groups**. These apply to Palinopsia's sender
   only (your machine's NDI settings are untouched) and take effect at once.
-- The status line shows whether a receiver is connected, the rate actually sent and the
-  size; **ON AIR / PREVIEW** tally lights up when a receiver's switcher has you on
-  program or preview; a warning appears when the rate falls behind.
+- The status line shows whether a receiver is connected, the size and the rate really sent
+  against the rate asked. Under it, the last second : frames **captured**, **skipped** (not
+  taken, the graphics card had not finished the earlier ones), **late** (taken, then
+  dropped because NDI was still busy), **repeated**, and how long a picture takes to
+  reach NDI. **ON AIR / PREVIEW** tally lights up when a receiver's switcher has you on
+  program or preview; three seconds under the rate bring a warning with its reason.
+- **It stays up** : with nothing new for half a second (a held frame, a stalled capture)
+  the last frame is sent again, so a receiver does not take the source for dead. A sender
+  that keeps failing is made again by itself, and so is one nobody is connected to when
+  the computer wakes up or its network changes; a receiver still connected is never cut.
+  Changing the rate, the size or the format never restarts the source.
 - **The NDI runtime** : Palinopsia uses the machine's NDI (NDI Tools / Runtime / SDK),
   else the copy another creative app carries (TouchDesigner, Resolume, vMix…). The section names the one in use. NDI is
   tested on Windows; the macOS and Linux paths are written but untested.
@@ -2486,10 +2503,16 @@ Output page; it stays on across restarts.
   exception for it. So NDI is always the user's own install on their own machine (see
   `THIRD_PARTY_NOTICES.md` and `LICENSE-EXCEPTIONS.md`).
 
-How it is fast enough : the GPU converts the frame to UYVY and reads it back
-asynchronously (a ring of six buffers; a capture is skipped rather than ever waiting on
-the GPU), the frame is **transferred** (not copied) to the sender in the window's own
-preload, and NDI reads it in place with its asynchronous send. Moving a 4K frame to any
+How it is fast enough : whenever the preview canvas is exactly the picture to send (the
+domemaster, or the flat picture with no keystone), the window only hands a picture of it,
+still on the graphics card, to a worker (a fraction of a millisecond). The worker converts
+it there with **WebGPU** (the same BT.709 numbers, within one level of the WebGL path),
+reads it back and copies it on its own thread, and passes it straight to the sender in the
+window's preload by **transfer**; NDI is called on yet another thread and reads the frame
+in place. Four frames may be on the card and two waiting for NDI : past that a frame is
+skipped, or the oldest dropped, and counted. With a keystone, or on a computer with no
+WebGPU, the frame is read back through WebGL as before, and the section says **slow path** :
+at 4096² that read alone takes the window about 60 ms a frame. Moving a 4K frame to any
 other process costs 30–90 ms in Electron, which is why the sender is not a separate process.
 
 NDI® is a registered trademark of Vizrt NDI AB.
