@@ -33,6 +33,11 @@ that CI builds into cross-platform releases.
   2048² 47 → 60 (43 → 60); 0 skipped, 0 late. A lost device, a worker error or two and a half
   seconds of silence restart it (1 s, 2, 4 … 60 s) with the WebGL path carrying NDI meanwhile;
   without WebGPU, or with a keystone, that path stays.
+- **Spout / Syphon of a 4096² master on the graphics card too** : the same worker path
+  (`gpuShare`), when the canvas is the picture and the sender in this window takes it
+  top-down. A 4096² Spout share : the app 17 → 60 fps, with NDI beside it 11 → 58 (NDI
+  12.5 → 60); beside NDI at that size it sends every other frame, so that a viewer does not
+  cost the dome its rate. Elsewhere the WebGL path stays.
 - **The projector window reads the dome at the size it shows** : the square master is
   letterboxed there, yet was read back as wide as the screen. On a 2934×1650 window 3170² →
   1650² : 20 → 60 fps alone, 10 → 55 beside NDI.

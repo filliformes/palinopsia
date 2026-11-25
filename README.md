@@ -2510,7 +2510,8 @@ it there with **WebGPU** (the same BT.709 numbers, within one level of the WebGL
 reads it back and copies it on its own thread, and passes it straight to the sender in the
 window's preload by **transfer**; NDI is called on yet another thread and reads the frame
 in place. Four frames may be on the card and two waiting for NDI : past that a frame is
-skipped, or the oldest dropped, and counted. With a keystone, or on a computer with no
+skipped, or the oldest dropped, and counted. Spout / Syphon of the same picture goes
+the same way (beside NDI at 4096², every other frame). With a keystone, or on a computer with no
 WebGPU, the frame is read back through WebGL as before, and the section says **slow path** :
 at 4096² that read alone takes the window about 60 ms a frame. Moving a 4K frame to any
 other process costs 30–90 ms in Electron, which is why the sender is not a separate process.

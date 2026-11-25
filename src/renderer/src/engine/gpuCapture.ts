@@ -1,4 +1,4 @@
-// GPU capture : the canvas → the NDI sender, off the window's thread.
+// GPU capture : the canvas → the NDI (and Spout / Syphon) sender, off the window's thread.
 //
 // NDI® is a registered trademark of Vizrt NDI AB (https://ndi.video).
 //
@@ -248,9 +248,11 @@ export async function captureOnce(canvas: HTMLCanvasElement, s: GpuSpec): Promis
 }
 
 export const gpuCapture = new GpuCapture(() => ({ want: 'opsia:want-ndiport', port: 'opsia:ndiport', stats: ndiCap }))
+/** Spout / Syphon's : its own worker, RGBX top-down, the same pipe shape. */
+export const gpuShare = new GpuCapture(() => ({ want: 'opsia:want-shareport', port: 'opsia:shareport', stats: null }))
 // A dev hot update makes a second copy of this module : the first lets go.
 if (import.meta.hot) {
   const g = globalThis as { __opsiaGpuCapture?: GpuCapture[] }
   for (const c of g.__opsiaGpuCapture ?? []) c.stop()
-  g.__opsiaGpuCapture = [gpuCapture]
+  g.__opsiaGpuCapture = [gpuCapture, gpuShare]
 }

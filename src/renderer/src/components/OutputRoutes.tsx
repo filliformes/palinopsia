@@ -110,7 +110,7 @@ export function DomeRoutes({ shareKind }: { shareKind: string | null }): JSX.Ele
           name={shareKind}
           title="To another app on this same computer : a dome viewer to check the master, a mapping app. Not needed for NDI."
         >
-          {shareActive ? `on : apps on this computer${cost('share')}` : 'off : for a dome viewer on this computer'}
+          {shareActive ? `on : apps on this computer${ndiLive && dome.enabled && dome.res > 2048 ? ', half the rate beside NDI' : cost('share')}` : 'off : for a dome viewer on this computer'}
         </Row>
       )}
       {trouble && <div className="text-yellow-400">NDI {trouble}</div>}
