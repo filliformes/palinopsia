@@ -270,7 +270,8 @@ class CxRuntime {
     const sc = st.complexOut.screens.find((x) => x.id === id)
     if (!b || !sc || sc.target.kind !== 'window' || this.draft) return
     const t = sc.target
-    if (t.x === b.x && t.y === b.y && t.ww === b.w && t.wh === b.h) return
+    // (a scaled display rounds what it was asked for by a few pixels : not a move)
+    if (t.x !== undefined && t.y !== undefined && t.ww && t.wh && Math.max(Math.abs(t.x - b.x), Math.abs(t.y - b.y), Math.abs(t.ww - b.w), Math.abs(t.wh - b.h)) <= 4) return
     runSilently(() => st.setComplexOut((s) => ({ ...s, screens: s.screens.map((x) => (x.id === id ? { ...x, target: { kind: 'window', x: b.x, y: b.y, ww: b.w, wh: b.h } } : x)) })))
   }
 

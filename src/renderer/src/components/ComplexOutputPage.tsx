@@ -537,7 +537,7 @@ function MapStep({ setup }: { setup: CxSetup }): JSX.Element {
   useEffect(() => {
     const el = root.current
     if (!el) return
-    const ro = new (ownerWindow(el) as unknown as typeof globalThis).ResizeObserver(() => setNarrow(el.clientWidth < 980))
+    const ro = new (ownerWindow(el) as unknown as typeof globalThis).ResizeObserver(() => setNarrow(el.clientWidth < 1180))
     ro.observe(el)
     tick()
     return () => ro.disconnect()
@@ -547,7 +547,7 @@ function MapStep({ setup }: { setup: CxSetup }): JSX.Element {
   if (!screen) return <div className="flex-1" />
   return (
     <div ref={root} className="flex min-h-0 flex-1">
-      <aside className="flex w-52 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel">
+      <aside className="flex w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-panel">
         <div className="flex flex-wrap gap-1 border-b border-border/60 p-2">
           {setup.screens.map((s, i) => <button key={s.id} className={btn(s.id === screen.id)} onClick={() => pickScreen(s.id)} title={`${s.name} ${s.w}×${s.h}`}>{`${i + 1} ${s.name}`}</button>)}
         </div>

@@ -113,12 +113,13 @@ export function adoptComplexWindow(child: BrowserWindow, frame: string, kiosk: b
   return true
 }
 
-/** Where a plain window is now (its drawing area, DIP), to come back there. */
+/** Where a plain window is now (its corner, and its drawing area's size, DIP : what
+ *  it is opened with), to come back there. */
 export function complexWindowBounds(id: unknown): { x: number; y: number; w: number; h: number } | null {
   const w = isId(id) ? windows.get(id) : undefined
   if (!w || w.isDestroyed() || w.isMinimized()) return null
-  const b = w.getContentBounds()
-  return { x: b.x, y: b.y, w: b.width, h: b.height }
+  const b = w.getBounds(), c = w.getContentBounds()
+  return { x: b.x, y: b.y, w: c.width, h: c.height }
 }
 
 const native = (d: Display): { width: number; height: number } => ({ width: Math.round(d.bounds.width * d.scaleFactor), height: Math.round(d.bounds.height * d.scaleFactor) })

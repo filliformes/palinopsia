@@ -13,7 +13,7 @@
 // third-party: Complex Output's mapping math (published methods, named in part 6)
 
 import type { CxColor, CxMask, CxScreen, CxSlice, CxSource, CxWarp } from '@shared/complexOut'
-import { bounds, flattenMask, inputMap, maskOnScreen, polyArea, polyInput, warpMesh, warpOutline } from './cxMath'
+import { bounds, evalWarp, flattenMask, inputMap, maskOnScreen, polyArea, polyInput, warpMesh, warpOutline } from './cxMath'
 
 const VS_SLICE = `#version 300 es
 in vec3 pos;   // the screen's 0..1 (y down), and the projective weight
@@ -42,6 +42,7 @@ uniform vec4 uEdge, uEp;    // l r t b · power, 1/gamma, luminance, black
 uniform float uOpacity, uShow;
 uniform int uPoly, uHasMask, uCard;
 uniform vec3 uTint;
+uniform vec2 uPs;           // the slice's own size, px (its sides' mean : the test card's round things stay round)
 ${COLOR_FN}
 float ramp(float x){
   x = clamp(x, 0.0, 1.0);
@@ -96,11 +97,12 @@ void main(){
     c = mix(c, uTint, line * 0.75);
     vec2 e = min(st, 1.0 - st) / fw;
     float rim = 1.0 - smoothstep(2.5, 3.5, min(e.x, e.y));
-    vec2 ps = 1.0 / fw;                      // the slice's size here, px
+    vec2 ps = uPs;
     vec2 m = (st - 0.5) * ps;
+    float mw = max(length(vec2(dFdx(m.x), dFdy(m.x))), length(vec2(dFdx(m.y), dFdy(m.y))));
     float R = 0.42 * min(ps.x, ps.y);
-    float ring = 1.0 - smoothstep(0.8, 1.8, abs(length(m) - R));
-    float cross = 1.0 - smoothstep(0.5, 1.5, min(abs(m.x), abs(m.y)));
+    float ring = 1.0 - smoothstep(0.8, 1.8, abs(length(m) - R) / mw);
+    float cross = 1.0 - smoothstep(0.5, 1.5, min(abs(st.x - 0.5) / fw.x, abs(st.y - 0.5) / fw.y));
     c = mix(c, vec3(1.0), max(max(rim, ring), cross * 0.8));
     float lw = min(ps.x * 0.7, ps.y * 1.4);
     vec2 l = m / vec2(lw, lw * 0.5) + 0.5;
@@ -639,6 +641,13 @@ export class CxRenderer {
       gl.uniform1i(this.u(p, 'uPoly'), poly)
       gl.uniform1i(this.u(p, 'uCard'), sc.card ? 1 : 0)
       gl.uniform3fv(this.u(p, 'uTint'), tag.rgb)
+      if (sc.card) {
+        const side = (s0: number, t0: number, s1: number, t1: number): number => {
+          const a = evalWarp(s.warp, s0, t0), b = evalWarp(s.warp, s1, t1)
+          return Math.hypot((a[0] - b[0]) * w, (a[1] - b[1]) * h)
+        }
+        gl.uniform2f(this.u(p, 'uPs'), (side(0, 0, 1, 0) + side(0, 1, 1, 1)) / 2, (side(0, 0, 0, 1) + side(1, 0, 1, 1)) / 2)
+      }
       gl.uniform2f(this.u(p, 'uSize'), w, h)
       gl.uniform1f(this.u(p, 'uOpacity'), opacity)
       gl.uniform1f(this.u(p, 'uShow'), opt.show)
