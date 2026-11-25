@@ -61,7 +61,7 @@ export function ndiDotClass(ndi: NdiConfig, st: NdiStatus, trouble: string): str
 function Row({ dot, name, title, children }: { dot: string; name: string; title: string; children: string }): JSX.Element {
   return (
     <div className="flex items-baseline gap-1.5" title={title}>
-      <span className={`h-1.5 w-1.5 shrink-0 self-center rounded-full ${dot}`} />
+      <span className={`mt-1 h-1.5 w-1.5 shrink-0 self-start rounded-full ${dot}`} />
       <span className="w-[4.5rem] shrink-0 text-muted">{name}</span>
       <span className="min-w-0 flex-1 text-text">{children}</span>
     </div>
@@ -110,7 +110,7 @@ export function DomeRoutes({ shareKind }: { shareKind: string | null }): JSX.Ele
           name={shareKind}
           title="To another app on this same computer : a dome viewer to check the master, a mapping app. Not needed for NDI."
         >
-          {shareActive ? `on : apps on this computer${cost('share')}` : 'off : for a dome viewer on this computer'}
+          {shareActive ? `on : apps on this computer${ndiLive && dome.enabled && dome.res > 2048 ? ', half the rate beside NDI' : cost('share')}` : 'off : for a dome viewer on this computer'}
         </Row>
       )}
       {trouble && <div className="text-yellow-400">NDI {trouble}</div>}

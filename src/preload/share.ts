@@ -23,7 +23,8 @@ type ShareAddon = {
 let mod: ShareAddon | null = null
 let loadError = ''
 let open = false
-let port: MessagePort | null = null
+// One pipe from the page, one from the GPU capture worker (engine/gpuCapture.ts).
+const ports: Record<string, MessagePort | null> = { page: null, gpu: null }
 
 function addonPath(kind: string): string {
   // out/preload → the project (dev) or app.asar (packaged, unpacked beside it);
@@ -78,22 +79,24 @@ export function shareLocal(on: boolean): { ok: boolean; topDown: boolean; error?
   }
 }
 
-function openPort(): void {
-  try { port?.close() } catch { /* ignore */ }
+function openPort(kind: string): void {
+  try { ports[kind]?.close() } catch { /* ignore */ }
   const mc = new MessageChannel()
-  port = mc.port1
+  const port = mc.port1
+  ports[kind] = port
   port.onmessage = (ev): void => {
     const d = ev.data as { t: string; w: number; h: number; topDown: boolean; buf: ArrayBuffer }
     if (d.t !== 'frame') return
     if (open && mod) {
       try { mod.send(Buffer.from(d.buf), d.w, d.h, d.topDown) } catch { /* a bad frame : skip it */ }
     }
-    try { port?.postMessage({ t: 'return', buf: d.buf }, [d.buf]) } catch { /* page gone */ }
+    try { port.postMessage({ t: 'return', buf: d.buf }, [d.buf]) } catch { /* page gone */ }
   }
-  window.postMessage('opsia:shareport', '*', [mc.port2])
+  window.postMessage({ t: 'opsia:shareport', kind }, '*', [mc.port2])
 }
 window.addEventListener('message', (ev) => {
-  if (ev.data === 'opsia:want-shareport') openPort()
+  const d = ev.data as { t?: string; kind?: string } | null
+  if (d?.t === 'opsia:want-shareport' && (d.kind === 'page' || d.kind === 'gpu')) openPort(d.kind)
 })
 window.addEventListener('beforeunload', () => {
   if (open) { try { mod?.close() } catch { /* ignore */ } }

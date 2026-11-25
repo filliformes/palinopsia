@@ -108,6 +108,8 @@ let held: Frame | null = null
 let sending: Send | null = null
 let idleWaits: Array<() => void> = [] // who waits for `sending` to be back
 let closing = false // the sender is being taken down : nothing new goes to it
+let stuck = false // a call that never came back is still in the library : never unload it
+let recreatedAt = 0
 let queue: Frame[] = []
 const QUEUE_MAX = 2
 const KEEP_ALIVE_MS = 500
@@ -235,6 +237,7 @@ async function destroySender(): Promise<void> {
       // Stuck inside NDI : destroying it under the call would take the app down.
       // It is left to the process; so is the frame it reads.
       console.warn('[ndi] a send never came back : its sender was abandoned')
+      stuck = true
       sending = null
     }
   }
@@ -281,8 +284,10 @@ function initLib(candidates: Array<{ path: string; origin: string }>, configDir:
     beforeUnload()
     const prev = lib
     lib = null
-    try { prev.destroy() } catch { /* ignore */ }
-    try { prev.unload() } catch { /* ignore */ }
+    if (!stuck) {
+      try { prev.destroy() } catch { /* ignore */ }
+      try { prev.unload() } catch { /* ignore */ }
+    }
   }
   const tried: string[] = []
   for (const c of candidates) {
@@ -315,6 +320,7 @@ function retryLater(): void {
 /** A live sender made again, same name and groups (it kept failing, or the
  *  network moved under it with nobody connected). */
 function recreate(why: string): void {
+  recreatedAt = performance.now()
   busy = busy.then(async () => {
     if (!lib || !sender || !lastCfg?.enabled) return { ...status }
     console.warn('[ndi] the sender starts again :', why)
@@ -410,7 +416,7 @@ function sendDone(job: Send, err: unknown): void {
   if (err) {
     status.message = `send failed : ${(err as Error).message ?? err}`
     if (!job.resend) { dropped++; giveBack(job.f) }
-    if (++sendErrors === 5) recreate(status.message)
+    if (++sendErrors >= 5 && now - recreatedAt > 5000) recreate(status.message)
   } else {
     if (sendErrors) { sendErrors = 0; status.message = '' }
     // The async contract : NDI has let go of the PREVIOUS frame now.
@@ -486,7 +492,7 @@ window.addEventListener('beforeunload', () => {
   sender = null
   held = null
   beforeUnload()
-  try { lib?.destroy() } catch { /* ignore */ }
+  if (!stuck) { try { lib?.destroy() } catch { /* ignore */ } }
 })
 
 let busy: Promise<NdiStatus> = Promise.resolve({ ...status })

@@ -106,7 +106,8 @@ async function start(): Promise<void> {
   try {
     const gpu = (navigator as any).gpu
     if (!gpu) throw new Error('no WebGPU in this window')
-    const ad = await gpu.requestAdapter({ powerPreference: 'high-performance' })
+    // (Windows ignores the preference, and says so in the log each time)
+    const ad = await gpu.requestAdapter(/Windows/.test(navigator.userAgent) ? {} : { powerPreference: 'high-performance' })
     if (!ad) throw new Error('no WebGPU graphics card')
     if (ad.info?.isFallbackAdapter || ad.isFallbackAdapter) throw new Error('WebGPU runs on the processor here')
     const d = await ad.requestDevice({
@@ -127,7 +128,8 @@ async function start(): Promise<void> {
     smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear' })
     uni = d.createBuffer({ size: 16, usage: 0x40 | 0x8 }) // UNIFORM | COPY_DST
     await makePipe('uyvy')
-    if (dev === d) post({ t: 'ready', gpu: ad.info?.description || ad.info?.vendor || '' })
+    if (dev === d) post({ t: 'ready' })
+    void makePipe('rgbx').catch(() => { /* asked again when it is used */ }) // ready for a change of format
   } catch (e) {
     post({ t: 'failed', message: (e as Error).message })
   }
@@ -226,7 +228,7 @@ async function kick(d: GpuKick): Promise<void> {
         new Uint8Array(buf).set(new Uint8Array(b.getMappedRange()))
         lastSeq = my
         const fourcc = d.format === 'uyvy' ? 'UYVY' : 'RGBX'
-        port.postMessage({ t: 'frame', w: d.w, h: d.h, fourcc, stride, fpsN: d.fpsN, fpsD: d.fpsD, tc: d.tc, cap: d.cap, buf }, [buf])
+        port.postMessage({ t: 'frame', w: d.w, h: d.h, fourcc, stride, fpsN: d.fpsN, fpsD: d.fpsD, tc: d.tc, cap: d.cap, topDown: true, buf }, [buf])
       } else late = true
     }
     b.unmap()
@@ -247,6 +249,18 @@ self.onmessage = (e: MessageEvent): void => {
   const d = e.data as { t: string; port?: MessagePort } & Partial<GpuKick>
   if (d.t === 'frame') { void kick(d as GpuKick); return }
   if (d.t === 'start') { void start(); return }
+  if (d.t === 'end') {
+    // The whole of it back to the card now, not when a collector gets to it.
+    const d0 = dev
+    dev = null
+    freeRing()
+    pool = []
+    try { port?.close() } catch { /* ignore */ }
+    port = null
+    try { d0?.destroy() } catch { /* lost */ }
+    self.close()
+    return
+  }
   if (d.t === 'port' && d.port) {
     try { port?.close() } catch { /* ignore */ }
     port = d.port
@@ -260,5 +274,4 @@ self.onmessage = (e: MessageEvent): void => {
     }
     return
   }
-  if (d.t === 'warm' && d.format) void makePipe(d.format)
 }

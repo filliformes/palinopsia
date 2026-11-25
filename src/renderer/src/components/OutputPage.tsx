@@ -1083,7 +1083,7 @@ function NdiSection({ btn, defaultCollapsed }: { btn: (on: boolean) => string; d
           captured {Math.round(st.captured)} · skipped {st.skipped} · late {st.dropped}{st.resent ? ` · repeated ${st.resent}` : ''}{st.latencyMs && st.path === 'gpu' ? ` · ${st.latencyMs} ms` : ''}{st.path === 'slow' ? ' · slow path' : ''}
         </div>
       )}
-      {domeOn && (
+      {domeOn && ndi.enabled && (
         <div className="font-mono text-[10px] text-muted">
           Carries the domemaster. The fullscreen output is not needed for it.
         </div>

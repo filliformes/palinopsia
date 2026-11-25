@@ -2487,7 +2487,7 @@ export class Compositor {
    *  Returns false when there was nothing to capture or the GPU is behind. */
   captureKick(name: string, format: CaptureFormat, maxEdge: number, domeOnly = false): boolean {
     const src = domeOnly ? this.domeTex : this.domeTex ?? this.outTex ?? this.lastPresent;
-    if (!src) return false;
+    if (!src || this.gl.isContextLost()) return false;
     const { w, h } = this.outputSize();
     try {
       let cap = this.captures.get(name);

@@ -183,12 +183,12 @@ async function main() {
     const a = JSON.parse(await c.ev(`(()=>{clearInterval(window.__iv);const g=window.__gaps.slice().sort((a,b)=>a-b),q=k=>+(g[Math.min(g.length-1,Math.floor(g.length*k))]||0).toFixed(1);
       const sm=window.__sm,avg=k=>sm.length?+(sm.reduce((a,b)=>a+(b[k]||0),0)/sm.length).toFixed(1):0,mx=k=>sm.length?+Math.max(...sm.map(x=>x[k]||0)).toFixed(1):0,sum=k=>sm.reduce((a,b)=>a+(b[k]||0),0);
       const last=sm[sm.length-1]||{};
-      return JSON.stringify({app:avg('app'),rafP50:q(.5),rafP95:q(.95),rafMax:q(1),guard:__comp.backlogSkips-window.__sk,sent:avg('fps'),captured:avg('captured'),skipped:sum('skipped'),late:sum('dropped'),resent:sum('resent'),sendMs:mx('sendMs'),latency:avg('latencyMs'),path:last.path||'',size:(last.width||0)+'x'+(last.height||0),conn:last.connections,state:last.state,perf:Object.fromEntries(Object.entries(__perf.read()).filter(e=>e[1]>0.3).map(e=>[e[0],+e[1].toFixed(1)]))})})()`))
+      return JSON.stringify({app:avg('app'),rafP50:q(.5),rafP95:q(.95),rafMax:q(1),guard:__comp.backlogSkips-window.__sk,sent:avg('fps'),captured:avg('captured'),skipped:sum('skipped'),late:sum('dropped'),resent:sum('resent'),sendMs:mx('sendMs'),latency:avg('latencyMs'),path:last.path||'',size:(last.width||0)+'x'+(last.height||0),conn:last.connections,state:last.state,paths:[...new Set(sm.map(x=>x.path))].join('+'),caps:[...__comp.captures.keys()].join(' '),perf:Object.fromEntries(Object.entries(__perf.read()).filter(e=>e[1]>0.3).map(e=>[e[0],+e[1].toFixed(1)]))})})()`))
     const b = r ? await r : null
     const m = memory(port)
     console.log(`${label.padEnd(28)} app ${a.app} (rAF p95 ${a.rafP95} max ${a.rafMax}, guard ${a.guard}) · sent ${a.sent} captured ${a.captured} skipped ${a.skipped} late ${a.late} resent ${a.resent} · send max ${a.sendMs} ms · ${a.path} ${a.size} latency ${a.latency}` +
       (b ? (b.error ? ` · RECV ${b.error}` : ` · recv ${b.fps} fps ${b.w}x${b.h} p95 ${b.p95} worst ${b.worst} dropped ${b.dropped}/${b.seen} tc ${b.tcP50}/${b.tcP95} back ${b.tcBack}`) : '') + ` · mem ${m.mb} MB, vram ${m.vram} MB, gpu ${m.util}%`)
-    console.log('     cpu ms', JSON.stringify(a.perf))
+    console.log('     cpu ms', JSON.stringify(a.perf), a.caps ? `WebGL captures : ${a.caps}` : '', a.paths !== a.path ? `paths ${a.paths}` : '')
     return { label, ...a, recv: b, mem: m }
   }
 

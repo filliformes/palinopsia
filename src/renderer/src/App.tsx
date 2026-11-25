@@ -30,7 +30,7 @@ import { pictureDepth } from './engine/pictureDepth'
 import { currentFps, currentSkips, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
-import { captureOnce, gpuCapture, ndiCap } from './engine/gpuCapture'
+import { captureOnce, gpuCapture, gpuShare, ndiCap } from './engine/gpuCapture'
 import StreamRelay from './workers/streamRelay?worker&inline'
 import { setPointerHost, attachPreviewPointer } from './pointerInput'
 import PreviewPointerOverlay from './components/PreviewPointerOverlay'
@@ -568,7 +568,7 @@ export default function App(): JSX.Element {
   // can't show more than its own pixels anyway) nor upscaled-soft (a 1080p stream
   // on a 1440p panel). 1920 is a safe default for the first frames before the
   // output has reported in.
-  const outCapRef = useRef(1920)
+  const outCapRef = useRef({ w: 1920, h: 1920 })
   useEffect(() => {
     const onMsg = (e: MessageEvent): void => {
       if (e.data === 'opsia:pixelport' && e.ports[0]) {
@@ -577,7 +577,7 @@ export default function App(): JSX.Element {
           relay.onmessage = (m: MessageEvent): void => {
             const d = m.data as { t: string; data?: { type?: string; w?: number; h?: number } }
             if (d.t === 'sent') streamInFlight.current = Math.max(0, streamInFlight.current - 1)
-            else if (d.t === 'out' && d.data?.type === 'outsize' && d.data.w && d.data.h) outCapRef.current = Math.max(d.data.w, d.data.h)
+            else if (d.t === 'out' && d.data?.type === 'outsize' && d.data.w && d.data.h) outCapRef.current = { w: d.data.w, h: d.data.h }
           }
           streamRelayRef.current = relay
         }
@@ -646,9 +646,10 @@ export default function App(): JSX.Element {
   //    'share' capture : the CLEAN picture (before keystone), like NDI's; buffers
   //    come back to be refilled. The main-process fallback gets them over IPC.
   const sharePortRef = useRef<MessagePort | null>(null)
+  const shareTurn = useRef(1)
   useEffect(() => {
     const onMsg = (e: MessageEvent): void => {
-      if (e.data !== 'opsia:shareport' || !e.ports[0]) return
+      if (e.data?.t !== 'opsia:shareport' || e.data.kind !== 'page' || !e.ports[0]) return
       try { sharePortRef.current?.close() } catch { /* ignore */ }
       const port = e.ports[0]
       port.onmessage = (m: MessageEvent): void => {
@@ -658,7 +659,7 @@ export default function App(): JSX.Element {
       sharePortRef.current = port
     }
     window.addEventListener('message', onMsg)
-    window.postMessage('opsia:want-shareport', '*')
+    window.postMessage({ t: 'opsia:want-shareport', kind: 'page' }, '*')
     return () => {
       window.removeEventListener('message', onMsg)
       try { sharePortRef.current?.close() } catch { /* ignore */ }
@@ -708,7 +709,9 @@ export default function App(): JSX.Element {
   const domeRes = useStore((s) => s.dome.res)
   // Spout / Syphon off : release the capture's GPU buffers.
   useEffect(() => {
-    if (!shareActive) compositorRef.current?.captureRelease('share')
+    if (shareActive) return
+    compositorRef.current?.captureRelease('share')
+    gpuShare.stop()
   }, [shareActive])
 
   // ── Embodied control : drive the MediaPipe tracker from the (machine-local)
@@ -1789,7 +1792,10 @@ export default function App(): JSX.Element {
               comp!.captureRecycle('stream', fr.buf) // the window is behind : skip
             }
           }
-          comp!.captureKick('stream', 'rgba-up', outCapRef.current)
+          // (the square domemaster is letterboxed there : its height is all that
+          // shows; as wide as the screen, it was read back 2.5 to 3 times too big)
+          const win = outCapRef.current
+          comp!.captureKick('stream', 'rgba-up', st.dome.enabled ? Math.min(win.w, win.h) : Math.max(win.w, win.h))
           perfMeter.end('output')
         } else if (comp!.capturePending('stream') > 0 || lastStreamOn) {
           comp!.captureRelease('stream')
@@ -1841,17 +1847,33 @@ export default function App(): JSX.Element {
         if (st.shareActive) {
           perfMeter.begin('share')
           const route = st.shareRoute
-          const fr = comp!.captureHarvest('share', true)
-          if (fr) {
-            const topDown = fr.format === 'rgbx'
-            if (route.local && sharePortRef.current) {
-              sharePortRef.current.postMessage({ t: 'frame', w: fr.w, h: fr.h, topDown, buf: fr.buf }, [fr.buf])
-            } else if (!topDown) {
-              window.api.shareFrame(fr.w, fr.h, new Uint8Array(fr.buf))
-              comp!.captureRecycle('share', fr.buf)
+          // Taken on the graphics card by a worker too, whenever the canvas is the
+          // picture and the sender here takes it top-down (engine/gpuCapture.ts) :
+          // read through the window, a 4096² master held the app at 17 fps.
+          const clean = route.local && route.topDown ? comp!.cleanCanvas() : null
+          const fast = clean ? gpuShare.want(now) : 'no'
+          if (fast !== 'no') {
+            if (comp!.capturePending('share') > 0) comp!.captureRelease('share')
+            // Beside NDI at that size, every other frame : a viewer's picture must not
+            // cost the dome its rate (measured : NDI 38 fps with both at 60).
+            const beside = st.ndi.enabled && st.ndiStatus.state === 'live' && clean!.width * clean!.height > 8_300_000
+            shareTurn.current = beside ? shareTurn.current ^ 1 : 1
+            if (fast === 'ready' && shareTurn.current) {
+              gpuShare.kick(clean!, { ...comp!.captureSizeFor('rgbx', 4096), format: 'rgbx', fpsN: 60, fpsD: 1, tc: 0, cap: performance.timeOrigin + performance.now() })
             }
+          } else {
+            const fr = comp!.captureHarvest('share', true)
+            if (fr) {
+              const topDown = fr.format === 'rgbx'
+              if (route.local && sharePortRef.current) {
+                sharePortRef.current.postMessage({ t: 'frame', w: fr.w, h: fr.h, topDown, buf: fr.buf }, [fr.buf])
+              } else if (!topDown) {
+                window.api.shareFrame(fr.w, fr.h, new Uint8Array(fr.buf))
+                comp!.captureRecycle('share', fr.buf)
+              }
+            }
+            comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 4096)
           }
-          comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 4096)
           perfMeter.end('share')
         }
         //     Dome viewer : a new master is on the canvas. It takes it itself, card

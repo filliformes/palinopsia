@@ -1,4 +1,4 @@
-// GPU capture : the canvas → the NDI sender, off the window's thread.
+// GPU capture : the canvas → the NDI (and Spout / Syphon) sender, off the window's thread.
 //
 // NDI® is a registered trademark of Vizrt NDI AB (https://ndi.video).
 //
@@ -19,7 +19,7 @@ import type { GpuFormat } from '../workers/gpuCaptureWorker'
 
 const MAX_OUT = 4
 const START_MS = 4000 // a start slower than this counts as failed
-const STALL_KICKS = 240 // captures due with no answer : the worker is gone (4 s at 60)
+const STALL_KICKS = 150 // captures due with no answer : the worker is gone (2.5 s at 60)
 
 export interface GpuSpec {
   w: number
@@ -33,7 +33,15 @@ export interface GpuSpec {
 
 type State = 'off' | 'starting' | 'ready' | 'failed' | 'none'
 
+/** Who a capture is for : the pipe its frames go down, and who counts them. */
+interface Route {
+  want: string // the window message that asks the preload for a pipe
+  port: string // the one it answers with
+  stats: { captured: number; skipped: number; late: number; latency: (ms: number) => void } | null
+}
+
 class GpuCapture {
+  constructor(private route: () => Route) {}
   private worker: Worker | null = null
   private state: State = 'off'
   private message = ''
@@ -46,7 +54,7 @@ class GpuCapture {
   private goodAt = 0
   private msg = (e: MessageEvent): void => {
     const d = e.data as { t?: string; kind?: string } | null
-    if (d?.t !== 'opsia:ndiport' || d.kind !== 'gpu' || !e.ports[0]) return
+    if (d?.t !== this.route().port || d.kind !== 'gpu' || !e.ports[0]) return
     if (this.worker) this.worker.postMessage({ t: 'port', port: e.ports[0] }, [e.ports[0]])
     else e.ports[0].close()
   }
@@ -88,13 +96,18 @@ class GpuCapture {
       w.onerror = (e): void => { if (this.worker === w) this.fail(e.message || 'the capture worker stopped') }
       window.addEventListener('message', this.msg)
       w.postMessage({ t: 'start' })
-      window.postMessage({ t: 'opsia:want-ndiport', kind: 'gpu' }, '*')
+      this.askPipe()
     } catch (e) {
       this.fail((e as Error).message)
     }
   }
 
+  private askPipe(): void {
+    window.postMessage({ t: this.route().want, kind: 'gpu' }, '*')
+  }
+
   private onAnswer(d: Answer): void {
+    const stats = this.route().stats
     if (d.t === 'ready') {
       this.state = 'ready'
       this.unanswered = 0
@@ -102,21 +115,20 @@ class GpuCapture {
       this.out = Math.max(0, this.out - 1)
       this.unanswered = 0
       if (d.ok) {
-        ndiCap.captured++
-        ndiCap.latency(d.ms ?? 0)
+        if (stats) { stats.captured++; stats.latency(d.ms ?? 0) }
         this.noRoom = 0
         // ten good seconds : the next fault starts over with a short wait
         const now = performance.now()
         if (!this.goodAt) this.goodAt = now
         else if (now - this.goodAt > 10000) this.fails = 0
       } else if (d.why === 'sender') {
-        ndiCap.late++
+        if (stats) stats.late++
         // Its buffers are not coming back (a sender that went) : a fresh pipe.
         if (++this.noRoom > 120) {
           this.noRoom = 0
-          window.postMessage({ t: 'opsia:want-ndiport', kind: 'gpu' }, '*')
+          this.askPipe()
         }
-      } else if (d.why === 'gpu') ndiCap.skipped++
+      } else if (d.why === 'gpu' && stats) stats.skipped++
     } else if (d.t === 'lost' || d.t === 'failed') this.fail(d.message ?? 'capture error')
   }
 
@@ -134,8 +146,15 @@ class GpuCapture {
 
   private drop(): void {
     window.removeEventListener('message', this.msg)
-    this.worker?.terminate() // its frames, buffers and device go with it
+    const w = this.worker
     this.worker = null
+    if (w) {
+      // It gives its device and buffers back and closes; one that does not answer
+      // any more is ended.
+      w.onmessage = w.onerror = null
+      w.postMessage({ t: 'end' })
+      setTimeout(() => w.terminate(), 2000)
+    }
     this.out = 0
     this.unanswered = 0
     this.noRoom = 0
@@ -160,7 +179,7 @@ class GpuCapture {
     }
   }
 
-  /** NDI off : everything goes (the worker, its device, its buffers). */
+  /** Switched off : everything goes (the worker, its device, its buffers). */
   stop(): void {
     if (this.state === 'off') return
     this.drop()
@@ -170,7 +189,6 @@ class GpuCapture {
     this.message = ''
   }
 
-  shutdown(): void { this.stop() }
 }
 
 interface Answer { t: string; ok?: boolean; why?: string; ms?: number; message?: string }
@@ -218,8 +236,7 @@ export async function captureOnce(canvas: HTMLCanvasElement, s: GpuSpec): Promis
       w.onmessage = (e: MessageEvent): void => {
         const d = e.data as Answer
         if (d.t === 'ready') {
-          w.postMessage({ t: 'warm', format: s.format })
-          setTimeout(() => w.postMessage({ t: 'frame', f, ...s }, [f as unknown as Transferable]), 500)
+          setTimeout(() => w.postMessage({ t: 'frame', f, ...s }, [f as unknown as Transferable]), 2500)
         } else if (d.t === 'failed' || d.t === 'lost' || (d.t === 'done' && !d.ok)) rej(new Error(d.message ?? d.why))
       }
       w.postMessage({ t: 'port', port: mc.port2 }, [mc.port2])
@@ -230,10 +247,12 @@ export async function captureOnce(canvas: HTMLCanvasElement, s: GpuSpec): Promis
   }
 }
 
-export const gpuCapture = new GpuCapture()
+export const gpuCapture = new GpuCapture(() => ({ want: 'opsia:want-ndiport', port: 'opsia:ndiport', stats: ndiCap }))
+/** Spout / Syphon's : its own worker, RGBX top-down, the same pipe shape. */
+export const gpuShare = new GpuCapture(() => ({ want: 'opsia:want-shareport', port: 'opsia:shareport', stats: null }))
 // A dev hot update makes a second copy of this module : the first lets go.
 if (import.meta.hot) {
-  const g = globalThis as { __opsiaGpuCapture?: GpuCapture }
-  g.__opsiaGpuCapture?.shutdown()
-  g.__opsiaGpuCapture = gpuCapture
+  const g = globalThis as { __opsiaGpuCapture?: GpuCapture[] }
+  for (const c of g.__opsiaGpuCapture ?? []) c.stop()
+  g.__opsiaGpuCapture = [gpuCapture, gpuShare]
 }
