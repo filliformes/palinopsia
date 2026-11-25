@@ -313,6 +313,12 @@ class AudioBus {
   private monitorNodes: AudioNode[] = []
   /** How many channels the open input delivers (0 : none open). */
   inChannels = 0
+  // STEMS : the device's other channels, each pair (or one channel) analysed apart
+  // for the modulators that ask for it (each layer hears its own stem : a DAW's
+  // tracks, Pure Data's voices on separate outputs). Made on the first ask, let go
+  // with the input.
+  private rawSrc: MediaStreamAudioSourceNode | null = null
+  private stems = new Map<number, { an: AnalyserNode; fb: FrameBufs; feats: AudioFeatures; at: number }>()
   // The sample rate and buffer asked of the device; the one the input was
   // opened with (another reopens it : App compares them).
   private fmt: AudioFormat = { ...AUDIO_FORMAT_DEFAULT }
@@ -444,6 +450,7 @@ class AudioBus {
       const ctx = new AudioContext(contextOptions(this.fmt))
       this.openedFormat = formatKey(this.fmt)
       const raw = ctx.createMediaStreamSource(stream)
+      this.rawSrc = raw
       // the picked channels : a pair, or one on both sides
       const nIn = Math.max(1, Math.min(32, tr?.getSettings().channelCount ?? 2))
       const route = new InputPick(ctx, raw, nIn, this.inPick)
@@ -548,6 +555,8 @@ class AudioBus {
     this.ctx?.close().catch(() => {})
     this.stream = null
     this.ctx = null
+    this.rawSrc = null
+    this.stems.clear()
     this.analyser = null
     this.monitorGain = null
     this.monitorNodes = []
@@ -898,14 +907,96 @@ class AudioBus {
     return readFeature(this.current, name, band)
   }
 
+  /** A stem's analysis this frame (null : no local device input open, the Audio
+   *  Layer as the input, or the device has no such channel). `code` : see stemOf. */
+  private stem(code: number, now: number): { an: AnalyserNode; fb: FrameBufs; feats: AudioFeatures; at: number } | null {
+    const ch = stemChannels(code)
+    if (!ch || !this.ctx || !this.rawSrc || this.layerIn || !this.localOn) return null
+    if (ch[0] >= this.inChannels || ch[1] >= this.inChannels) return null
+    let st = this.stems.get(code)
+    if (!st) {
+      const ctx = this.ctx
+      const split = ctx.createChannelSplitter(this.inChannels)
+      const merge = ctx.createChannelMerger(2)
+      this.rawSrc.connect(split)
+      split.connect(merge, ch[0], 0)
+      split.connect(merge, ch[1], 1)
+      const an = ctx.createAnalyser()
+      an.fftSize = 2048
+      an.smoothingTimeConstant = 0.5
+      merge.connect(an)
+      st = { an, fb: frameBufs(an), feats: zero(), at: 0 }
+      this.stems.set(code, st)
+    }
+    // analysed once a frame, whoever asks first
+    if (now - st.at > 4) {
+      const dt = st.at ? Math.min(0.1, (now - st.at) / 1000) : 1 / 60
+      analyseFrame(st.an, st.fb, st.feats, dt, this.sampleRate)
+      st.at = now
+    }
+    return st
+  }
+
+  /** One feature (0..1) of a stem (its channels apart from the input's pick); the
+   *  whole input's when the stem cannot be heard (no such channel, OSC, the layer). */
+  stemFeature(code: number, name: AudioFeatureName, band: number, now: number): number {
+    const st = this.stem(code, now)
+    return st ? readFeature(st.feats, name, band) : this.feature(name, band)
+  }
+
+  /** A stem's feature read only between lo and hi Hz of its own spectrum. */
+  stemFeatureInRange(code: number, name: AudioFeatureName, band: number, lo: number, hi: number, hs: HzRangeState, now: number): number {
+    const st = this.stem(code, now)
+    if (!st) return this.featureInRange(name, band, lo, hi, hs, now)
+    return rangeFeature(st.fb.freq, this.sampleRate, st.feats.pitch, name, band, lo, hi, hs, now)
+  }
+
+  /** The stems the open input offers : its pairs, then each channel alone. */
+  stemChoices(): Array<{ code: number; label: string }> {
+    const n = this.localOn && !this.layerIn ? this.inChannels : 0
+    const out: Array<{ code: number; label: string }> = []
+    for (let k = 1; 2 * k <= n; k++) out.push({ code: k, label: `IN ${2 * k - 1}+${2 * k}` })
+    for (let c = 1; c <= n && n > 1; c++) out.push({ code: 100 + c, label: `IN ${c}` })
+    return out
+  }
+
   /** One feature (0..1) read only between lo and hi Hz of the live spectrum.
    *  Without a spectrum (OSC features only, no local input) : the whole sound's. */
   featureInRange(name: AudioFeatureName, band: number, lo: number, hi: number, st: HzRangeState, now: number): number {
     const freq = this.mode === 'off' || this.mode === 'osc' ? null : this.spectrumBytes()
     if (!freq || !this.sampleRate) return this.feature(name, band)
+    return rangeFeature(freq, this.sampleRate, this.current.pitch, name, band, lo, hi, st, now)
+  }
+
+  /** Live spectrum magnitudes (0..255) : null unless LOCAL audio is running
+   *  (OSC mode carries only reduced features, not the buffer). For the
+   *  Parametric generator's audio-buffer→texture read. */
+  spectrumBytes(): Uint8Array | null {
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.freq ?? null : null
+  }
+  /** The live spectrum in dB, off the same analyser (and the same FFT : read
+   *  in the frame the features read it) as floats, for the audio tab's display :
+   *  the bytes stop at the analyser's -30 dB top, where a -12 dBFS tone already
+   *  sits. Null : no local spectrum (OSC only, nothing open, an empty layer). */
+  spectrumDb(): Float32Array<ArrayBuffer> | null {
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.db ?? null : null
+  }
+  /** The live input's sample rate (Hz) : what the spectrum bins are in. */
+  sampleRateHz(): number {
+    return this.sampleRate
+  }
+  /** Live time-domain waveform (0..255, centred at 128) : local only. */
+  waveformBytes(): Uint8Array | null {
+    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.time ?? null : null
+  }
+}
+
+/** One feature (0..1) read only between lo and hi Hz of a spectrum (freq : the
+ *  analyser's bytes; pitch : the source's pitch, 0..1, kept while inside the band). */
+function rangeFeature(freq: Uint8Array, sampleRate: number, pitchNow: number, name: AudioFeatureName, band: number, lo: number, hi: number, st: HzRangeState, now: number): number {
     if (lo > hi) { const t = lo; lo = hi; hi = t }
     const N = freq.length
-    const binHz = this.sampleRate / (2 * N)
+    const binHz = sampleRate / (2 * N)
     const i0 = Math.max(0, Math.min(N - 1, Math.floor(lo / binHz)))
     const i1 = Math.min(N, Math.max(i0 + 1, Math.floor(hi / binHz) + 1)) // exclusive
     const n = i1 - i0
@@ -929,7 +1020,7 @@ class AudioBus {
     flux = Math.min(1, flux / (n * 0.15))
     st.transient = flux > 0.32 ? 1 : st.transient * Math.pow(0.82, dt * 60)
     // the pitch : the input's, kept only while it falls inside the band (held else)
-    const p = this.current.pitch
+    const p = pitchNow
     if (p > 0) {
       const hz = Math.pow(2, LOG_FMIN + p * (LOG_FMAX - LOG_FMIN))
       if (hz >= lo && hz <= hi) st.pitch = p
@@ -966,27 +1057,13 @@ class AudioBus {
     }
   }
 
-  /** Live spectrum magnitudes (0..255) : null unless LOCAL audio is running
-   *  (OSC mode carries only reduced features, not the buffer). For the
-   *  Parametric generator's audio-buffer→texture read. */
-  spectrumBytes(): Uint8Array | null {
-    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.freq ?? null : null
-  }
-  /** The live spectrum in dB, off the same analyser (and the same FFT : read
-   *  in the frame the features read it) as floats, for the audio tab's display :
-   *  the bytes stop at the analyser's -30 dB top, where a -12 dBFS tone already
-   *  sits. Null : no local spectrum (OSC only, nothing open, an empty layer). */
-  spectrumDb(): Float32Array<ArrayBuffer> | null {
-    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.db ?? null : null
-  }
-  /** The live input's sample rate (Hz) : what the spectrum bins are in. */
-  sampleRateHz(): number {
-    return this.sampleRate
-  }
-  /** Live time-domain waveform (0..255, centred at 128) : local only. */
-  waveformBytes(): Uint8Array | null {
-    return this.localOn && (!this.layerIn || this.layerAn) ? this.bufs?.time ?? null : null
-  }
+/** A stem's code to its two channels (0-based) : 1..16 the pair 2k-1 + 2k; 101..132 one
+ *  channel on both sides. 0 (or anything else) : none, the input as picked. */
+export function stemChannels(code: number | undefined): [number, number] | null {
+  if (!code) return null
+  if (code >= 1 && code <= 16) return [2 * code - 2, 2 * code - 1]
+  if (code >= 101 && code <= 132) return [code - 101, code - 101]
+  return null
 }
 
 // One bus per renderer. The App loop ticks it; audio modulators + the Audio

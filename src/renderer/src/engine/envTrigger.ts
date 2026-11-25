@@ -75,9 +75,11 @@ export function sanitizeEnvTrigger(x: unknown, self: number): EnvTrigger | undef
     s && typeof s === 'object' && Number.isFinite(s.layer) && (s.slot === 'A' || s.slot === 'B' || s.slot === 'all')
       ? { layer: Math.round(s.layer), slot: s.slot }
       : undefined
+  // a stem of the input (audioIn.ts stemChannels : 1..16 a pair, 101..132 one channel)
+  const ch = typeof o.ch === 'number' && ((o.ch >= 1 && o.ch <= 16) || (o.ch >= 101 && o.ch <= 132)) ? Math.round(o.ch) : undefined
   return {
     from, feature, band: Math.round(num(o.band, 0, 0, 5)), lo, hi,
-    ...(src ? { src } : {}),
+    ...(src ? { src } : ch ? { ch } : {}),
     slot, at, rearm, holdMs: Math.round(num(o.holdMs, d.holdMs, 0, TRIG_HOLD_MAX))
   }
 }
@@ -96,7 +98,7 @@ export const trigState = (): TrigState => ({ key: '', high: false, firedAt: -Inf
 export function trigKey(t: EnvTrigger): string {
   return t.from === 'slot'
     ? `slot:${t.slot}`
-    : `sound:${t.feature}:${t.band}:${t.lo}:${t.hi}:${t.src ? `${t.src.layer}${t.src.slot}` : ''}`
+    : `sound:${t.feature}:${t.band}:${t.lo}:${t.hi}:${t.src ? `${t.src.layer}${t.src.slot}` : ''}:${t.ch ?? ''}`
 }
 
 /** One reading of the signal at `now` (ms) : true when the envelope fires. The

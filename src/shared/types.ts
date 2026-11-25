@@ -760,6 +760,7 @@ export interface EnvTrigger {
   lo: number // Hz
   hi: number
   src?: ClipAudioSrc
+  ch?: number // a stem of the audio input (as the audio modulator's ch)
   slot: number // 0-based, never the envelope's own
   at: number // 0..1 : fires as the signal rises past this
   rearm: number // 0..at : arms again under this
@@ -826,7 +827,9 @@ export interface ModulatorConfig {
   chaos: { r: number } // logistic-map r in [3.4, 4.0]
   // follows the audio bus, or a slot's clip; lo / hi (Hz) : only that part of the
   // live spectrum (absent, or 0 to 20000 : the whole sound, as before)
-  audio: { feature: AudioFeature; band: number; smooth: number; src?: ClipAudioSrc; lo?: number; hi?: number }
+  // ch : a STEM of the audio input (engine/audioIn.ts stemChannels : 1..16 a pair, 101..132
+  // one channel; absent : the input as the audio tab picks it)
+  audio: { feature: AudioFeature; band: number; smooth: number; src?: ClipAudioSrc; lo?: number; hi?: number; ch?: number }
   organic: { variation: number } // 0 = near-LFO, 1 = very irregular (never repeats)
   physics: { motion: PhysicsMotion; damping: number } // force-driven motion
   motion: { shape: MotionShape } // named motion archetype / force behaviour

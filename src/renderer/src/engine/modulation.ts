@@ -706,9 +706,13 @@ export class ModEngine {
           const t = performance.now()
           raw = tg.src
             ? clipAudio.feature(tg.src, tg.feature, tg.band, s.trigClip, t)
-            : hzFiltered(tg.lo, tg.hi)
-              ? audioBus.featureInRange(tg.feature, tg.band, tg.lo, tg.hi, s.trigRange, t)
-              : audioBus.feature(tg.feature, tg.band)
+            : tg.ch
+              ? hzFiltered(tg.lo, tg.hi)
+                ? audioBus.stemFeatureInRange(tg.ch, tg.feature, tg.band, tg.lo, tg.hi, s.trigRange, t)
+                : audioBus.stemFeature(tg.ch, tg.feature, tg.band, t)
+              : hzFiltered(tg.lo, tg.hi)
+                ? audioBus.featureInRange(tg.feature, tg.band, tg.lo, tg.hi, s.trigRange, t)
+                : audioBus.feature(tg.feature, tg.band)
         }
         if (trigStep(s.trig, tg, trigKey(tg), raw, now)) this.retrigger(i)
       } else s.trig.key = '' // (switched back on : it seeds again, never fires at once)
@@ -1117,11 +1121,16 @@ export class ModEngine {
           const a = cfg.audio
           if (a) {
             // (a frequency band reads the live spectrum : a clip's sound has none)
+            // (a stem : the input's own channels, apart from the audio tab's pick)
             const raw = a.src
               ? clipAudio.feature(a.src, a.feature, a.band, s.clipRead, performance.now())
-              : hzFiltered(a.lo, a.hi)
-                ? audioBus.featureInRange(a.feature, a.band, a.lo ?? 0, a.hi ?? AUDIO_HZ_MAX, s.audioRange, performance.now())
-                : audioBus.feature(a.feature, a.band)
+              : a.ch
+                ? hzFiltered(a.lo, a.hi)
+                  ? audioBus.stemFeatureInRange(a.ch, a.feature, a.band, a.lo ?? 0, a.hi ?? AUDIO_HZ_MAX, s.audioRange, performance.now())
+                  : audioBus.stemFeature(a.ch, a.feature, a.band, performance.now())
+                : hzFiltered(a.lo, a.hi)
+                  ? audioBus.featureInRange(a.feature, a.band, a.lo ?? 0, a.hi ?? AUDIO_HZ_MAX, s.audioRange, performance.now())
+                  : audioBus.feature(a.feature, a.band)
             const sm = Math.max(0, Math.min(0.99, a.smooth ?? 0))
             // dt-normalized one-pole : retain `sm` per 60fps frame, then scale by
             // the real dt so the follower's speed doesn't ride the frame rate

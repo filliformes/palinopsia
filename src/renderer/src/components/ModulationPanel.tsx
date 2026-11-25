@@ -22,7 +22,7 @@ import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { auLabel } from '@shared/auMod'
-import { AUDIO_BANDS, AUDIO_FEATURES, AUDIO_HZ_MAX } from '../engine/audioIn'
+import { AUDIO_BANDS, AUDIO_FEATURES, AUDIO_HZ_MAX, audioBus } from '../engine/audioIn'
 import { setHzFocus } from './AudioMonitor'
 import { VISION_FEATURES } from '../engine/visionIn'
 import { SHADER_BY_ID } from '../shaders/isf'
@@ -665,7 +665,7 @@ function TypeParams({ index }: { index: number }): JSX.Element | null {
             onChange={(v) => update(index, { audio: { ...a, smooth: v } })} />
           <HzRow lo={a.lo ?? 0} hi={a.hi ?? AUDIO_HZ_MAX} clip={!!a.src}
             onChange={(lo, hi) => update(index, { audio: { ...a, lo, hi } })} />
-          <ClipFromRow value={a.src} onChange={(src) => update(index, { audio: { ...a, src } })} />
+          <ClipFromRow value={a.src} onChange={(src) => update(index, { audio: { ...a, src, ch: undefined } })} ch={a.ch} onCh={(ch) => update(index, { audio: { ...a, src: undefined, ch } })} />
         </>
       )
     }
@@ -1349,24 +1349,35 @@ const clipLabel = (k: string): string => {
   return `${clipWhere(Number(l), s)} ${kind === 'mix' ? '🎚' : kind === 'audio' ? '🔊' : '🎞'} ${name.join(':') || kind}`
 }
 
-function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void }): JSX.Element {
+function ClipFromRow({ value, onChange, ch, onCh }: { value: ClipAudioSrc | undefined; onChange: (v: ClipAudioSrc | undefined) => void; ch?: number; onCh?: (ch: number | undefined) => void }): JSX.Element {
   const slots = useClipSlots()
   const where = clipWhere
-  const cur = value ? `${value.layer}:${value.slot}` : ''
+  // the input's STEMS : its channel pairs and each channel alone (a multichannel device)
+  const stems = onCh ? audioBus.stemChoices() : []
+  const cur = value ? `${value.layer}:${value.slot}` : ch ? `ch:${ch}` : ''
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
+  const stemKnown = !ch || stems.some((x) => x.code === ch)
   return (
-    <Row label="FROM" title="Where it listens : the audio input (the audio tab); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
+    <Row label="FROM" title="Where it listens : the audio input (the audio tab, as its channel menu picks it); one STEM of that input, its own channels apart (IN 3+4, IN 5 : each layer can hear its own track of a DAW or its own voice of a Pure Data patch, sent to separate outputs of a multichannel device); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
       <select
         className="input select-compact min-w-0 flex-1 text-[10px]"
         value={cur}
         onChange={(e) => {
           const v = e.target.value
-          if (!v) return onChange(undefined)
+          // (one update a pick : the caller clears the other field itself)
+          if (!v) return onCh ? onCh(undefined) : onChange(undefined)
+          if (v.startsWith('ch:')) return onCh?.(Number(v.slice(3)))
           const [l, s] = v.split(':')
           onChange({ layer: Number(l), slot: s === 'B' ? 'B' : s === 'all' ? 'all' : 'A' })
         }}
       >
         <option value="">audio input</option>
+        {stems.map((x) => (
+          <option key={x.code} value={`ch:${x.code}`}>
+            {`input · ${x.label}`}
+          </option>
+        ))}
+        {!stemKnown && ch && <option value={`ch:${ch}`}>{`input · ${stemLabel(ch)} (not on this device now)`}</option>}
         {slots.map((k) => {
           const [l, s] = k.split(':')
           return (
@@ -1380,6 +1391,9 @@ function ClipFromRow({ value, onChange }: { value: ClipAudioSrc | undefined; onC
     </Row>
   )
 }
+
+/** A stem's name, whether or not the device has it now. */
+const stemLabel = (code: number): string => (code > 100 ? `IN ${code - 100}` : `IN ${2 * code - 1}+${2 * code}`)
 
 // ── An envelope's trigger (engine/envTrigger.ts) : the card's ↯ side ──
 const TRIG_HELP =
@@ -1446,7 +1460,9 @@ function TriggerRows({ index }: { index: number }): JSX.Element {
   const t: EnvTrigger = { ...ENV_TRIGGER_DEFAULT, ...(m.trigger ?? {}) }
   if (t.slot === index) t.slot = (index + 1) % 8
   const set = (p: Partial<EnvTrigger>): void => update(index, { trigger: { ...t, ...p } })
-  const cur = t.from === 'card' ? 'card' : t.from === 'slot' ? `slot:${t.slot}` : t.src ? `clip:${t.src.layer}:${t.src.slot}` : 'sound'
+  const cur = t.from === 'card' ? 'card' : t.from === 'slot' ? `slot:${t.slot}` : t.src ? `clip:${t.src.layer}:${t.src.slot}` : t.ch ? `ch:${t.ch}` : 'sound'
+  const stems = audioBus.stemChoices()
+  const stemKnown = !t.ch || stems.some((x) => x.code === t.ch)
   const clipCur = t.src ? `${t.src.layer}:${t.src.slot}` : ''
   const clipKnown = !t.src || clips.some((k) => k.startsWith(clipCur + ':'))
   // Tighter than the card's own gap-1 (as the ADSR rows) : the sound's five
@@ -1462,15 +1478,18 @@ function TriggerRows({ index }: { index: number }): JSX.Element {
           onChange={(e) => {
             const v = e.target.value
             if (v === 'card') return set({ from: 'card' })
-            if (v === 'sound') return set({ from: 'sound', src: undefined })
+            if (v === 'sound') return set({ from: 'sound', src: undefined, ch: undefined })
             const [k, a, b] = v.split(':')
             if (k === 'slot') return set({ from: 'slot', slot: Number(a) })
-            set({ from: 'sound', src: { layer: Number(a), slot: b === 'B' ? 'B' : b === 'all' ? 'all' : 'A' } })
+            if (k === 'ch') return set({ from: 'sound', src: undefined, ch: Number(a) })
+            set({ from: 'sound', ch: undefined, src: { layer: Number(a), slot: b === 'B' ? 'B' : b === 'all' ? 'all' : 'A' } })
           }}
         >
           <option value="card">card only</option>
           <optgroup label="the sound">
             <option value="sound">audio input</option>
+            {stems.map((x) => <option key={x.code} value={`ch:${x.code}`}>{`input · ${x.label}`}</option>)}
+            {!stemKnown && t.ch && <option value={cur}>{`input · ${stemLabel(t.ch)} (not on this device now)`}</option>}
             {clips.map((k) => {
               const [l, sl] = k.split(':')
               return <option key={k} value={`clip:${l}:${sl}`}>{clipLabel(k)}</option>

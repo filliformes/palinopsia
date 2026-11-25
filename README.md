@@ -1253,7 +1253,11 @@ Your open left hand as a fader on a layer's opacity :
 3. Layer 2's opacity at full, its **M** : bind that modulator, Multiply, depth 1.
 4. Open the hand and sweep from left to right; close it to leave the opacity where it is.
 
-The **`audio`** follower listens **FROM** the audio input (the audio tab), from the
+The **`audio`** follower listens **FROM** the audio input (the audio tab), from one
+**stem** of it (`input · IN 3+4`, `input · IN 5` : that pair or that channel of a
+multichannel device, apart from the audio tab's pick, so each layer can hear its own track
+of a DAW or its own voice of a Pure Data patch sent to separate outputs; an envelope's
+FIRE offers them too), from the
 [Audio Layer](#the-audio-layer) (`AU A`, `AU B`, or `AU all` : its whole sound, live
 inputs included), or from a **layer's clip** : the soundtrack of an imported film or an
 imported sound file, **read at its playhead**. The sound is analysed once (the same analysis the live input runs,

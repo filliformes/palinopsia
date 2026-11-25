@@ -25,6 +25,17 @@ that CI builds into cross-platform releases.
   Model serves it too (`modelSources.ts` : the sources that take a model file; the store,
   the session's collect and relink, the Inspector and a drop on the layer know it). The
   idea is credited in THIRD_PARTY_NOTICES (part 6).
+- **Stems : each layer hears its own sound** (`engine/audioIn.ts`, `modulation.ts`,
+  `envTrigger.ts`, `ModulationPanel.tsx`). The audio input opens every channel of its
+  device; an audio modulator (and an envelope's FIRE) can now listen **FROM** one stem of
+  it, a pair (`input · IN 3+4`) or one channel (`input · IN 5`), apart from the audio
+  tab's pick : a DAW's tracks or a Pure Data patch's voices on separate outputs of a
+  multichannel device each drive their own layer (OCTOCOSME's four voices, without the
+  `/audioN/peak` messages). Each stem is analysed apart (its own analyser, made on the
+  first ask, once a frame), frequency bands included; a stem the device does not have
+  reads the whole input and says so in the menu. Kept with the session (`ch`). Checked in
+  the app on a fake two-channel device : the stems listed, each read apart, a modulator
+  following its stem.
 - **The sound as land** (Terrain, `raised by : the sound`) : the spectrum heard now is
   laid down as a strip of land at the camera's feet (bass to the left, treble to the right,
   the loud bands rising into hills) and moves away toward the horizon as new strips come,
