@@ -79,17 +79,24 @@ export interface NdiStatus {
   connections: number // NDI connections (one receiver may open several)
   program: boolean // tally : a receiver has us on program (on air)
   preview: boolean // tally : on preview
-  fps: number // frames actually sent in the last second
+  fps: number // new frames actually sent in the last second (repeats not counted)
   width: number
   height: number
-  dropped: number // frames that could not be sent in the last second
+  captured: number // frames taken from the picture in the last second
+  skipped: number // frames NOT taken : the graphics card had not finished the earlier ones
+  dropped: number // frames taken, then dropped : NDI was late accepting the ones before
+  resent: number // the last frame sent again (nothing new for half a second)
   sendMs: number // the longest NDI took to accept a frame in the last second, ms
+  latencyMs: number // the picture to the sender, ms
+  path: '' | 'gpu' | 'slow' // how frames are taken : WebGPU off the window's thread · WebGL through it
+  pathNote: string // why the slow path
 }
 
 export function idleNdiStatus(): NdiStatus {
   return {
     state: 'off', message: '', source: '', runtime: '', version: '',
-    connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0, sendMs: 0
+    connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0,
+    captured: 0, skipped: 0, dropped: 0, resent: 0, sendMs: 0, latencyMs: 0, path: '', pathNote: ''
   }
 }
 
