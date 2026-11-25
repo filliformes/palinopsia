@@ -102,7 +102,7 @@ import { bumpGlGeneration } from './engine/glGeneration'
 import type { BodyGesture } from '@shared/types'
 import { SceneBank } from './components/SceneBank'
 import { SurfacePad, SurfaceOnToggle } from './components/SurfacePad'
-import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream } from './oscInput'
+import { initOscInput, applyOscListen, applyOscOutput, initOscQueryStream, routeOsc } from './oscInput'
 import { morphedComposition, consumeSceneChange, noteMorphSync, consumeLayerSwaps, relayEnvelopes, relaySoundEnvelopes, morphDebug } from './morph'
 import { blackLevel } from './black'
 
@@ -215,6 +215,9 @@ import { eqPresets } from './audio/eqPresets'
 import { AudioLayerPanel } from './components/AudioLayerPanel'
 import { randomizeInputs, DICE_SOURCES, DICE_FX_IDS } from './randomize'
 import { lightRuntime } from './lights/lightRuntime'
+import { cxRuntime } from './complex/cxWindows'
+import { loadLive as complexWasLive } from './complex/cxSaved'
+import { ComplexOutputPage } from './components/ComplexOutputPage'
 import { LightsPage } from './components/LightsPage'
 
 let lightsFaulted = false // the lights' tick threw once : logged once
@@ -652,6 +655,8 @@ export default function App(): JSX.Element {
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const lightsPageOpen = useStore((s) => s.lightsPageOpen)
   const outputPageWindow = useStore((s) => s.outputPageWindow)
+  const complexPageOpen = useStore((s) => s.complexPageOpen)
+  const complexPageWindow = useStore((s) => s.complexPageWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const renderScale = useStore((s) => s.renderScale)
@@ -846,6 +851,7 @@ export default function App(): JSX.Element {
   //    launching again next time. ───────
   useEffect(() => {
     return window.api.onKioskExited(() => {
+      useStore.setState({ complexLive: false }) // (its screens close; the next launch brings them back)
       showToast('Exited installation mode. Turn off "Enable on next restart" in Output → Installation to stop it launching again.', 'warn', 8000)
     })
   }, [])
@@ -1024,6 +1030,12 @@ export default function App(): JSX.Element {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'm') {
         e.preventDefault()
         useStore.getState().toggleMixerView()
+        return
+      }
+      // Shift+O: Complex Output, in its own window (raised when it is open).
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !inField && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        useStore.getState().setComplexPageOpen(true)
         return
       }
       // O: open/close the Output / Mapping view (in the app). While it is in its
@@ -1208,6 +1220,11 @@ export default function App(): JSX.Element {
           st.setLightsPageOpen(false)
           return
         }
+        if (st.complexPageOpen && !st.complexPageWindow) {
+          e.preventDefault()
+          st.setComplexPageOpen(false)
+          return
+        }
         if (st.outputPageOpen && !st.outputPageWindow) {
           e.preventDefault()
           st.setOutputPageOpen(false)
@@ -1328,7 +1345,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __cx: cxRuntime, __osc: routeOsc, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1720,6 +1737,7 @@ export default function App(): JSX.Element {
           const k = (relaySnd?.[i] ?? 1) * blk
           if (k < 0.999) comp!.scaleLayerSound(i, k)
         }
+        cxRuntime.frame(comp!) // Complex Output : its windows draw from this frame
         // 3. Render the frame.
         perfMeter.begin('render'); comp!.render(now - start); perfMeter.end('render')
         // Timer clock (the window doesn't paint) : wait for THIS render before
@@ -2571,6 +2589,7 @@ export default function App(): JSX.Element {
       {bodyPageOpen && !bodyPageWindow && <BodyPage />}
       {resolumePageOpen && <ResolumePage />}
       {/* ...or each in a window of its own (its button's right-click menu) */}
+      {complexPageOpen && (complexPageWindow ? <PageWindow page="complex"><ComplexOutputPage inWindow /></PageWindow> : <ComplexOutputPage />)}
       {outputPageOpen && outputPageWindow && (
         <PageWindow page="output">
           <OutputPage canvasRef={canvasRef} inWindow />
@@ -2647,6 +2666,12 @@ let engineFrames = 0
 
 /** Open an installation's output on its display (main finds it, by id or name). */
 async function openKioskOutput(windowed: boolean): Promise<void> {
+  // set up to come back on its screens : the Complex Output instead of the one window
+  if (complexWasLive() && useStore.getState().complexOut.screens.length) {
+    cxRuntime.unattended = true
+    useStore.getState().setComplexLive(true)
+    return
+  }
   try {
     const id = await window.api.kioskTargetDisplay()
     await window.api.outputOpen(id, windowed)

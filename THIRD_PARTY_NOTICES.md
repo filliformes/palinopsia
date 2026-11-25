@@ -758,6 +758,34 @@ methods are free to build on; naming them is a matter of respect.
     labels for the same two ways of drawing a grid; the other draw modes are the classic
     OpenGL primitive names. Only the terms are taken, no code. Cycling '74 is named here
     as the source of the terms and has no part in Palinopsia.
+- **STLT** by Alfonso Stillet (https://github.com/alfonsostillet/STLT), published under "GPL-3.0"
+  with no "or later" grant: the inspiration for the Complex Output (`src/shared/complexOut.ts`,
+  `src/renderer/src/complex/`). Its user documentation was the reference for what a
+  multi-screen mapping window offers: screens and slices with an input beside an output, the kinds
+  of warp, polygons pinned point for point, masks and soft edges, two steps in one window,
+  a list of what is wrong. Its source code was neither read nor ported: everything here is
+  written independently, from the published methods below. The import of an
+  `AdvancedOutput.xml` was written from the owner's own file, as it can be observed;
+  Resolume, whose program writes such files, has no part in Palinopsia.
+- **Complex Output's mapping math** (`src/renderer/src/complex/cxMath.ts`, `cxRender.ts`),
+  written from:
+  - four corners: the projective map of a square onto a quadrilateral, as P. S. Heckbert
+    derives it ("Fundamentals of Texture Mapping and Image Warping", Report No. UCB/CSD
+    89/516, Computer Science Division, University of California, Berkeley, June 1989);
+  - curved grids and rounded masks: E. Catmull and R. Rom, "A Class of Local Interpolating
+    Splines", in R. E. Barnhill and R. F. Riesenfeld (eds.), *Computer Aided Geometric
+    Design*, Academic Press, 317-326 (1974), DOI 10.1016/B978-0-12-079050-0.50020-5; the
+    Bezier patches are the textbook tensor product of cubic Bernstein polynomials;
+  - polygons: K. Hormann and M. S. Floater, "Mean value coordinates for arbitrary planar
+    polygons", *ACM Transactions on Graphics* 25(4), 1424-1441 (2006), DOI
+    10.1145/1183287.1183295;
+  - soft edges: R. Raskar, G. Welch and H. Fuchs, "Seamless Projection Overlaps Using Image
+    Warping and Intensity Blending", Fourth International Conference on Virtual Systems and
+    Multimedia, Gifu, Japan (November 1998), for blending overlapping projectors by intensity;
+    the curve with its power, luminance and gamma is the one Paul Bourke gives in "Edge
+    blending using commodity projectors" (March 2004,
+    https://paulbourke.net/miscellaneous/edgeblend/). The raised black outside the seam is
+    Palinopsia's own.
 - **The research behind the instrument**: every paper, book, thesis and talk Palinopsia
   draws on is listed, with what it shaped, in [docs/bibliography.md](docs/bibliography.md).
   That includes the theses of Corbeil-Perron, Boucher and Basanta, whose ideas the

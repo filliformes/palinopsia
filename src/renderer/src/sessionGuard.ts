@@ -56,8 +56,9 @@ function prints(): Prints {
   // turn the session "changed". Both prints are kept for the clean session, so
   // Link turned on or off since is compared against the right one.
   const st = useStore.getState()
-  const { warp, ...rest } = st.exportSession()
-  const print = (o: typeof rest): string => fnv(JSON.stringify(st.warpFromSession ? { ...o, warp } : o))
+  // (the Complex Output setup counts on the same terms as the warp)
+  const { warp, complexOut, ...rest } = st.exportSession()
+  const print = (o: typeof rest): string => fnv(JSON.stringify({ ...o, ...(st.warpFromSession ? { warp } : {}), ...(st.complexFromSession ? { complexOut } : {}) }))
   const full = print(rest)
   return { full, noTempo: rest.composition ? print({ ...rest, composition: { ...rest.composition, bpm: 0 } }) : full }
 }

@@ -49,6 +49,7 @@ import { installNdiRuntime } from './ndi/install'
 import { sanitizeNdiConfig } from '@shared/ndi'
 import { DmxSender, discoverLights, type DmxPacket } from './light'
 import { openLightSetupFile, saveLightSetupFile } from './lightSetup'
+import { adoptComplexWindow, closeComplexWindows, complexDisplays, complexWindowBounds, complexWindowOptions, complexWindowsOpen, identifyDisplays, onComplexWindows, openComplexFile, prepareComplexWindow, saveComplexFile } from './complexOut'
 import { displayHz, samplePerf } from './perf'
 import * as recording from './recording'
 import { installLogging, log, logFrom } from './log'
@@ -294,7 +295,7 @@ function checkAlive(): void {
 // from napping the app.
 let sleepBlock: number | null = null
 function updateSleepBlock(): void {
-  const want = kioskActive() || (!!outputWindow && !outputWindow.isDestroyed())
+  const want = kioskActive() || (!!outputWindow && !outputWindow.isDestroyed()) || complexWindowsOpen()
   if (want && sleepBlock === null) {
     sleepBlock = powerSaveBlocker.start('prevent-display-sleep')
     log('info', '[power] the display stays awake')
@@ -513,6 +514,7 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     outputWindow?.close()
     closePageWindows()
+    closeComplexWindows()
     mainWindow = null
     // A quit asked for while the window was open (Cmd+Q, the Dock) goes on once
     // the window has closed through its Save prompt (see before-quit).
@@ -536,12 +538,21 @@ function createWindow(): void {
         }
       }
     }
+    // A Complex Output screen, where the page said it goes (complexOut.ts).
+    if (details.url === 'about:blank' || details.url === '') {
+      const cx = complexWindowOptions(details.frameName)
+      if (cx) return { action: 'allow', overrideBrowserWindowOptions: { ...cx, icon: windowIcon() } }
+    }
     // Only hand http(s) URLs to the OS shell; never file:/other schemes.
     if (/^https?:\/\//i.test(details.url)) shell.openExternal(details.url)
     return { action: 'deny' }
   })
   mainWindow.webContents.on('did-create-window', (child, details) => {
     const frame = details.frameName
+    if (adoptComplexWindow(child, frame, kioskActive(), mainWindow)) {
+      if (kioskActive()) guardKioskKeys(child)
+      return
+    }
     if (!Object.hasOwn(PAGE_WINDOW_TITLES, frame)) return
     pageWindows.set(frame, child)
     child.setMenuBarVisibility(false)
@@ -582,6 +593,7 @@ function createWindow(): void {
   mainWindow.webContents.on('did-start-navigation', (d) => {
     if (!d.isMainFrame || d.isSameDocument) return
     closePageWindows()
+    closeComplexWindows()
   })
 
   guardNavigation(mainWindow)
@@ -1187,6 +1199,35 @@ app.whenReady().then(async () => {
   safeHandle('light:discover', () => discoverLights())
   safeHandle('light:setupSave', (_e, text, name) => saveLightSetupFile(mainWindow, text as string, name as string))
   safeHandle('light:setupOpen', () => openLightSetupFile(mainWindow))
+
+  // ---------- IPC: Complex Output (the screens' windows, the displays, files) ----------
+  onComplexWindows(() => updateSleepBlock())
+  safeHandle('complex:displays', () => complexDisplays(mainWindow))
+  safeHandle('complex:prepare', (_e, id, cfg) => prepareComplexWindow(id, cfg, mainWindow))
+  safeHandle('complex:bounds', (_e, id) => complexWindowBounds(id))
+  safeHandle('complex:identify', (_e, names) => { identifyDisplays(names); return true })
+  safeHandle('complex:save', (_e, text, name) => saveComplexFile(mainWindow, text, name))
+  safeHandle('complex:open', (_e, kind) => openComplexFile(mainWindow, kind))
+  // Esc on a projector's window : the keyboard goes back to the controls.
+  safeHandle('complex:focusControls', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    return true
+  })
+  // A display plugged in, unplugged, resized, moved : the page puts its screens back.
+  let displaysTimer: ReturnType<typeof setTimeout> | null = null
+  const displaysChanged = (): void => {
+    if (displaysTimer) clearTimeout(displaysTimer)
+    displaysTimer = setTimeout(() => {
+      displaysTimer = null
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('complex:displaysChanged')
+    }, 800)
+  }
+  screen.on('display-added', displaysChanged)
+  screen.on('display-removed', displaysChanged)
+  screen.on('display-metrics-changed', displaysChanged)
 
   // ---------- IPC: Kiosk / installation mode ----------
   safeHandle('kiosk:config', () => getKioskConfig())

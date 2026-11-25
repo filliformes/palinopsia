@@ -79,6 +79,7 @@ older shots stay in `docs/images/`.)*
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn (bend, aftertouch, catch) + clock in and out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
 - [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · installation · Flash safety
+- [Complex Output](#complex-output--several-screens-shifto) (`Shift+O`, or **COMPLEX OUTPUT** in the Output page's header) : several projectors at once · slices of the picture or of one layer · corners, grid, curved and Bezier warps, polygons · masks · soft edges · a list of what is wrong
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
 - [Assemble : the automatic editor](#assemble--the-automatic-editor-key-e) : corpus point cloud · matching modes · cut pace + time curves · export
@@ -259,6 +260,7 @@ Bare keys are ignored while typing in a text field; `Ctrl/Cmd+S` always fires.
 | `C` / `Shift+C` | Open Context / cycle its presets |
 | `M` / `F` / `G` | Right column → Mixer / Finishing / **Feel** (Layers is the default view : `M` toggles Mixer↔Layers, or click the tab) |
 | `O` | Output / Mapping page (while it is in its own window : brings it forward) |
+| `Shift+O` | Complex Output, in its own window (raised when it is open) |
 | `T` | **Lights** page : DMX lights placed on the picture (also the **LIGHTS** button in the Output page's header) |
 | `W` | World editor |
 | `Q` | Sequence page (while it is in its own window : brings it forward) |
@@ -2500,6 +2502,78 @@ the output window listen for WebGL context loss and rebuild their compositor whe
 the context comes back, with a forced rebuild after 6 s as a fallback. You lose
 what was in the feedback and Context history buffers; you do not lose the session
 or need to restart.
+
+## Complex Output : several screens (`Shift+O`)
+
+Projection mapping over several projectors : as many **screens** as you need, each with
+**slices** of the picture bent, cut and blended onto what it lights. It opens in a window of its
+own, from **COMPLEX OUTPUT** in the Output page's header, `Shift+O` or `Ctrl+K`. With nothing set
+up, the Output (one projector, its keystone, the dome) works exactly as before; the two can run
+together.
+
+The header reads as a path : the picture, **1 Screens**, **2 Map**, how many screens are on. Nothing
+opens until **LIVE**.
+
+**1 Screens**
+- Every display is listed with its size and rate; **identify** puts a big number on each for three
+  seconds. **+ a screen here** makes a screen at that display's own size; **+ window** one in a plain
+  window, to try without a projector; **split** makes several side by side, each with its share of
+  the picture, overlapping by the percent you give and already blended.
+- A screen has a name, a size, on / off, a **test card** (its frame to the last pixel, a grid,
+  circles, gray steps, its slices numbered in their colors), brightness, contrast, gamma and red,
+  green, blue.
+- The display the controls are on is never covered without asking : its screen waits until **cover
+  the controls' display** (`Esc` on it closes it again). On any other, `Esc` gives the keyboard
+  back to the controls.
+- A display unplugged closes its screen; plugged back, the screen opens there again (found by its
+  id, else by its name and size). A window comes back where it was.
+
+**2 Map** : the **input** (what each slice takes) and the **output** (where it goes on that screen)
+side by side; a slice has the same number and color on both.
+- **Takes from** the picture as the output shows it (the domemaster in dome mode), the **flat
+  picture** even then, or **one layer alone** (after its own effects, with its opacity, mute and mask,
+  before the Master FX), so several surfaces can each have their own layer.
+- **Input** : a rectangle, or four free corners (`Alt` frees one); flips, quarter turns, exact pixels.
+- **Warp** : **corners** (true perspective), **grid** (straight lines), **curved** (smooth
+  curves through the points), **bezier** (patches with handles; `Alt` moves a handle alone).
+  Columns and rows are added and taken away without losing the shape; **reset warp**,
+  **straighten**, **copy** and **paste warp**, **fill the screen**, **as the input**, **keep its
+  shape**.
+- **Polygons** : ready-made or drawn point by point (**draw**), each point pinned on both sides;
+  a double click on the line adds one, `Del` takes the picked ones away.
+- **Masks** on a slice or on the whole screen : **hide** or **show** what is inside, hard or soft
+  (in screen pixels), straight or rounded. A slice's masks follow its warp.
+- **Soft edges** : a width per side, **power**, the projector's **gamma**, **luminance** (the middle
+  of the seam) and **black level** (raises the black outside the seam to meet the two blacks adding
+  up inside it). **From the overlaps** / **blend the seams** set the widths from what the slices
+  share.
+- Opacity, color, solo, on / off, lock, order, duplicate (`Ctrl+D`), move to another screen.
+- **Hands** : drag a slice or its points (`Shift` locks an axis, `Ctrl` drops the snap), **transform**
+  puts a box around it (scale, turn), a drag on nothing picks several points, arrows move by 1 pixel
+  (`Shift` 10, `Alt` 0.1), the wheel zooms, `Space` or the middle button pans.
+
+**Problems**, along the bottom, lists what is wrong, worst first (a screen going nowhere, a display
+missing or used twice, a size that does not match, a slice off its screen, folded, hidden or empty,
+the same strip on two screens with no soft edge); a click goes there.
+
+**Kept** on this computer, like the keystone, with named **presets**, **export** and **import** as a
+file. **with session** saves it in the session too (and lets sessions bring theirs, whose edits then
+stay in them). Every edit is one undo step. **file ▾ → Import an AdvancedOutput.xml…** reads the
+screens, sizes, slices and warps of such a file (the format is not documented : check the warped
+slices after; polygons and masks are left out and counted). In an **installation** left LIVE, the
+screens open at boot instead of the single output.
+
+**Played** : a screen's brightness and on / off, a slice's opacity and on / off take a modulator, a
+Macro knob, MIDI / OSC Learn and `/opsia/complex/...`. Black and Flash safety rule every screen,
+also the slices that take one layer.
+
+**How it draws** : each screen is a window of the same process as the engine, with a canvas that
+reads the engine's GPU to GPU : no pixel goes through the processor or to another process.
+Measured on an RTX 4070 laptop : 60 fps in the engine and in every window, with one, two or three
+screens at 1080p and at 4K, from a 1080p or a 4K picture, the control window in front or minimized,
+for 0.1 to 0.4 ms of the frame (screens in windows on one monitor; real projectors are yours to
+try). Not yet : a sender (NDI, Spout, Syphon) per screen, a 3D view of the room, chases across the
+slices.
 
 ## Lights : DMX fixtures on the picture (key `T`)
 

@@ -70,6 +70,9 @@ interface Snapshot {
   // step all the same. Its on / off switch is not : like Black, an undo never
   // turns the lights off or on (see sameRig, apply).
   lightRig: FullState['lightRig']
+  // The Complex Output setup (screens, slices, masks), this computer's like the rig :
+  // an edit to it is a step. Whether it is live is not.
+  complexOut: FullState['complexOut']
 }
 
 function snap(): Snapshot {
@@ -101,7 +104,8 @@ function snap(): Snapshot {
     ruleSeq: s.ruleSeq,
     seqLanes: s.seqLanes,
     lightsSession: s.lightsSession,
-    lightRig: s.lightRig
+    lightRig: s.lightRig,
+    complexOut: s.complexOut
   }
 }
 
@@ -145,7 +149,8 @@ function differs(a: Snapshot, b: Snapshot): boolean {
     a.ruleSeq !== b.ruleSeq ||
     a.seqLanes !== b.seqLanes ||
     a.lightsSession !== b.lightsSession ||
-    !sameRig(a.lightRig, b.lightRig)
+    !sameRig(a.lightRig, b.lightRig) ||
+    a.complexOut !== b.complexOut
   )
 }
 
@@ -222,6 +227,8 @@ function apply(s: Snapshot): void {
       })
     }
   }
+  // (through its action : saved on this computer as any edit of it)
+  useStore.getState().setComplexOut(s.complexOut)
   // Keep the persisted active-World id in step with what the user now sees.
   localStorage.setItem('opsia.world', s.world)
   // Sonify goes through setSonify so the sound engine (and its localStorage)
@@ -400,6 +407,7 @@ function describeDiff(a: Snapshot, b: Snapshot): string {
   if (a.ruleSeq !== b.ruleSeq) return 'rule timeline'
   if (a.seqLanes !== b.seqLanes) return 'Seq transport'
   if (a.lightsSession !== b.lightsSession || !sameRig(a.lightRig, b.lightRig)) return 'lights'
+  if (a.complexOut !== b.complexOut) return 'Complex Output'
   if (a.worlds !== b.worlds || a.world !== b.world) return 'world'
   if (a.sonify !== b.sonify) return 'sonify'
   if (a.audioLayer !== b.audioLayer) return 'audio layer'

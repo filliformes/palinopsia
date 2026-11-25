@@ -300,6 +300,18 @@ const api: ExposedApi = {
   lightDiscover: () => ipcRenderer.invoke('light:discover'),
   lightSetupSave: (text: string, name: string) => ipcRenderer.invoke('light:setupSave', text, name),
   lightSetupOpen: () => ipcRenderer.invoke('light:setupOpen'),
+  complexDisplays: () => ipcRenderer.invoke('complex:displays'),
+  complexPrepare: (id: string, cfg: unknown) => ipcRenderer.invoke('complex:prepare', id, cfg),
+  complexBounds: (id: string) => ipcRenderer.invoke('complex:bounds', id),
+  complexIdentify: (names: Record<string, string>) => ipcRenderer.invoke('complex:identify', names),
+  complexSave: (text: string, name: string) => ipcRenderer.invoke('complex:save', text, name),
+  complexOpen: (kind: 'setup' | 'xml') => ipcRenderer.invoke('complex:open', kind),
+  complexFocusControls: () => ipcRenderer.invoke('complex:focusControls'),
+  onComplexDisplays: (cb: () => void) => {
+    const h = (): void => cb()
+    ipcRenderer.on('complex:displaysChanged', h)
+    return () => ipcRenderer.off('complex:displaysChanged', h)
+  },
 
   // ── Kiosk / installation mode ────────────────────────────────────
   kioskConfig: () => ipcRenderer.invoke('kiosk:config'),

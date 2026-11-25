@@ -10,6 +10,7 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     title: 'Full-page views',
     rows: [
       ['O', 'Output / mapping (in its own window : brings it up)'],
+      ['⇧O', 'Complex Output, in its own window : several screens, slices, warps, masks, soft edges'],
       ['T', 'Lights : DMX lights on the picture, shows, cues, the console (on the map : arrows move the selected light, Delete removes it (press again to remove several), Ctrl+D duplicates it)'],
       ['W', 'World editor'],
       ['Q', 'Sequence : the scenes, the Sonify keys and the Body rule timeline (in its own window : brings it up)'],

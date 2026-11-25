@@ -75,6 +75,7 @@ import { FrameCapture, captureSize, type CaptureFormat, type CapturedFrame } fro
 import { HARMONY_GLSL, MEANS_FS, abSwatches, abSwatchWanted } from './abHarmony';
 import { GridReadback } from './gridReadback';
 import { BLEND_MODES, LOOP_BLENDS } from '@shared/types';
+import type { CxSource } from '@shared/complexOut';
 import { LOOP_DELAY_MAX_MS, LoopDelayRing } from './loopDelay';
 export type { BlendMode };
 
@@ -2574,6 +2575,40 @@ export class Compositor {
    *  the newest strip that has landed, a frame or two later. A change of sources
    *  drops what was in flight (it would be read against the new list). */
   private lightMips = new Map<number, { tex: WebGLTexture; fbo: WebGLFramebuffer }>();
+  /** Complex Output (complex/cxWindows.ts) : called once a frame, just before the
+   *  picture goes on the canvas, with a way to put each of its sources there instead
+   *  (the windows read the canvas, GPU to GPU). `show` : the whole show's Black. */
+  cxTap: ((put: (key: CxSource) => boolean, canvas: HTMLCanvasElement, show: number) => void) | null = null;
+  private cxLayer: { fbo: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private cxLimit: (StrobeLimiter | null)[] = [null, null, null, null];
+  private runCxTap(present: WebGLTexture, shown: WebGLTexture, dt: number): void {
+    const gl = this.gl;
+    const put = (key: CxSource): boolean => {
+      let tex: WebGLTexture = key === 'flat' ? present : this.domeTex ?? shown;
+      if (key.startsWith('layer:')) {
+        // One layer alone, as the stack would see it over black (its opacity, mute,
+        // solo and mask), under Black and Flash safety like the whole picture. A
+        // frozen show keeps the frame each window has.
+        if (this.freezeActive && this.freezeCaptured) return false;
+        const i = Number(key.slice(6)), L = this.layers[i];
+        if (!L) return false;
+        const vis = (this.layers.some((x) => x.solo) ? L.solo : !L.mute) ? L.opacity : 0;
+        if (!this.cxLayer) this.cxLayer = makeTarget(gl, this.w, this.h);
+        this.blendInto(this.cxLayer.fbo, this.blackTex(), vis > 0 ? L.texture() : this.blackTex(), 'normal', vis * this.blackLevel, L.mask);
+        tex = this.cxLayer.tex;
+        if (this.strobeSafe > 0.02) tex = (this.cxLimit[i] ??= new StrobeLimiter(gl)).apply(tex, this.strobeSafe, dt, this.w, this.h);
+        else this.cxLimit[i]?.reset();
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      gl.bindVertexArray(this.vao);
+      gl.useProgram(this.copyProg);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(this.uCTex, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      return true;
+    };
+    try { this.cxTap?.(put, this.canvas, this.blackLevel); } catch (e) { console.error('[complex]', (e as Error).message); }
+  }
   private lightRead: GridReadback | null = null;
   private lightList = '';
   private lightSrcs: number[] = [];
@@ -4179,6 +4214,7 @@ export class Compositor {
         setDomeGrain(false); // the Finalizer draws its grain again
       }
     }
+    if (this.cxTap) this.runCxTap(present, shown, rawDt); // Complex Output's windows
     // Present to canvas : warped (keystone quad) or straight full-screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -4248,6 +4284,8 @@ export class Compositor {
     this.cameraless?.dispose();
     this.filmDamage?.dispose();
     this.strobeLimiter?.dispose();
+    for (const l of this.cxLimit) l?.dispose();
+    if (this.cxLayer) disposeTarget(gl, this.cxLayer);
     this.dome?.dispose();
     for (const cap of this.captures.values()) cap.dispose();
     this.captures.clear();

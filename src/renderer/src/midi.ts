@@ -41,6 +41,7 @@ import { describeMidi, isFaderKind, sameMidiInput } from './mappingModel'
 import { randomSonify } from './audio/autoSonify'
 import { undo, redo, writeLinkTempo } from './undo'
 import { fxArrayFor, useStore } from './store'
+import { CX_MOD_RANGE, cxBaseValue, findSlice } from '@shared/complexOut'
 import { tempoEdited } from './tempoEvents'
 import { linkBeats, linkPlay, linkQuantum, linkShared } from './link'
 import { ClockFollower } from './midiClockIn'
@@ -127,7 +128,7 @@ function toggleSoniVoice(i: number): void {
 // key, Audio Layer and output lives in ./actions.ts (ids act:...), handed over
 // below; ./triggerCatalog.ts lists them all for the pickers.
 export const TRIGGER_ACTION_IDS: string[] = [
-  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:lightsblack', 'fire:lightsgo', 'fire:lightsback', 'fire:lightscues', 'fire:freeze', 'fire:record',
+  'fire:randomize', 'fire:vary', 'fire:flush', 'fire:black', 'fire:cxlive', 'fire:lightsblack', 'fire:lightsgo', 'fire:lightsback', 'fire:lightscues', 'fire:freeze', 'fire:record',
   'fire:sonify', 'fire:tap', 'fire:seq', 'fire:soniseq', 'fire:keyseq', 'fire:transport', 'fire:ruleseq', 'fire:undo', 'fire:redo',
   'scene:next', 'scene:prev'
 ]
@@ -164,6 +165,12 @@ export function fireTrigger(id: string): void {
   // keyboard, OSC or a gesture is not overwritten by it a frame later)
   flushContinuous()
   const st = useStore.getState()
+  // a Complex Output screen or slice turned over
+  if (id.startsWith('cx:on:')) {
+    const who = id.slice(6), b = cxBaseValue(st.complexOut, who, 'on')
+    if (b !== null) st.setComplexValue(who, 'on', b >= 0.5 ? 0 : 1)
+    return
+  }
   switch (id) {
     case 'fire:vary': fireVariation(); return
     case 'fire:randomize': fireSelectedRandomize(); return
@@ -171,6 +178,7 @@ export function fireTrigger(id: string): void {
     case 'fire:flush': firePanic(); return
     case 'fire:black': st.setBlack('toggle'); return
     case 'fire:lightsblack': st.setLightsBlack(!st.lightsBlack); return
+    case 'fire:cxlive': st.setComplexLive(!st.complexLive); return
     case 'fire:lightsgo': st.goLightCue(1); return
     case 'fire:lightsback': st.goLightCue(-1); return
     case 'fire:lightscues': st.setLightCueRun(!st.lightCueRun); return
@@ -282,6 +290,7 @@ export function isContinuousTarget(id: string): boolean {
     id.startsWith('transport:') ||
     id.startsWith('field:') ||
     id.startsWith('lights:') ||
+    /^cx:(brightness|opacity):/.test(id) ||
     id === 'surface:x' ||
     id === 'surface:y' ||
     id === 'sonify:master' ||
@@ -316,6 +325,11 @@ export function midiTargetLabel(id: string): string {
   if (id.startsWith('lights:group:')) {
     const g = useStore.getState().lightRig.groups.find((x) => x.id === id.slice(13))
     return `LIGHTS ${g ? g.name : 'group'} fader`
+  }
+  const cx = /^cx:(brightness|opacity|on):(.+)$/.exec(id)
+  if (cx) {
+    const s = useStore.getState().complexOut
+    return `${(findSlice(s, cx[2])?.slice ?? s.screens.find((x) => x.id === cx[2]))?.name ?? 'SCREEN (gone)'} ${cx[1] === 'on' ? 'on/off' : cx[1]}`
   }
   if (id === 'bg:opacity') return 'BACKGROUND opacity'
   if (id === 'bg:speed') return 'BACKGROUND speed'
@@ -402,6 +416,8 @@ export function midiTargetLabel(id: string): string {
       return 'BLACK on/off'
     case 'fire:lightsblack':
       return 'LIGHTS black on/off'
+    case 'fire:cxlive':
+      return 'COMPLEX OUTPUT live on/off'
     case 'fire:lightsgo':
       return 'LIGHTS cue GO'
     case 'fire:lightsback':
@@ -1167,6 +1183,14 @@ export function applyContinuous(id: string, t: number): boolean {
   if (id in FIELD_SETTERS) { FIELD_SETTERS[id](t); return true }
   // a Lights group's fader (its id after the prefix)
   if (id.startsWith('lights:group:')) { st.setLightGroupLevel(id.slice(13), t); return true }
+  // a Complex Output screen's brightness (0..2) or a slice's opacity
+  const cx = /^cx:(brightness|opacity):(.+)$/.exec(id)
+  if (cx) {
+    const f = cx[1] as 'brightness' | 'opacity'
+    if (cxBaseValue(st.complexOut, cx[2], f) === null) return false
+    st.setComplexValue(cx[2], f, t * CX_MOD_RANGE[f].max)
+    return true
+  }
   // a Sonify parameter (a Synth knob, a patchbay depth) : over the span its modulation uses
   if (id.startsWith('sonify:param:')) {
     const p = id.slice(13), d = SONIFY_MOD_DESCS[p]
@@ -1299,6 +1323,11 @@ export function readContinuous(id: string, base = false): number | null {
     case 'lights:blacksec': return clamp01(st.lightsSession.master.blackSec / 20)
   }
   if (id.startsWith('lights:group:')) return clamp01(st.lightsSession.groups?.[id.slice(13)] ?? 1)
+  const cx = /^cx:(brightness|opacity):(.+)$/.exec(id)
+  if (cx) {
+    const f = cx[1] as 'brightness' | 'opacity', b = cxBaseValue(st.complexOut, cx[2], f)
+    return b === null ? null : clamp01(b / CX_MOD_RANGE[f].max)
+  }
   return null
 }
 

@@ -21,6 +21,7 @@ import { shapeActive } from '../engine/modShape'
 import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
+import { CX_MOD_RANGE, findSlice } from '@shared/complexOut'
 import { auLabel } from '@shared/auMod'
 import { AUDIO_BANDS, AUDIO_FEATURES, AUDIO_HZ_MAX, audioBus } from '../engine/audioIn'
 import { setHzFocus } from './AudioMonitor'
@@ -2199,6 +2200,10 @@ export function describeModTarget(t: ModTarget, composition: CompositionState): 
   if (t.kind === 'outx') return `Output ${OUTX_MOD_RANGE[t.field].label}`
   if (t.kind === 'world') return 'World amount'
   if (t.kind === 'au') return auLabel(t)
+  if (t.kind === 'cx') {
+    const s = useStore.getState().complexOut
+    return `${(findSlice(s, t.who)?.slice ?? s.screens.find((x) => x.id === t.who))?.name ?? 'Screen (gone)'} ${CX_MOD_RANGE[t.field].label}`
+  }
   if (t.kind === 'light') {
     const rig = useStore.getState().lightRig
     if (t.fixture.startsWith('grp:')) {

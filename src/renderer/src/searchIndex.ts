@@ -775,6 +775,7 @@ function parameterItems(s: St, units: UnitInfo[]): SearchItem[] {
 // The full pages, then the right column's tabs.
 const PAGES: Array<{ id: string; label: string; key: string; hint: string; keywords: string[]; open: (s: St) => void }> = [
   { id: 'output', label: 'Output', key: 'O', hint: 'mapping, the dome, the fullscreen output, recording, the senders', keywords: ['mapping', 'dome', 'record', 'projector', 'keystone', 'ndi', 'spout'], open: (s) => s.setOutputPageOpen(true) },
+  { id: 'complex', label: 'Complex Output', key: '⇧O', hint: 'several screens : slices of the picture mapped, warped, masked and blended onto projectors', keywords: ['projection', 'mapping', 'multi', 'projector', 'slice', 'warp', 'blend', 'soft edge', 'mask', 'screens', 'advanced output'], open: (s) => s.setComplexPageOpen(true) },
   { id: 'world', label: 'World', key: 'W', hint: 'how the picture listens to the sound : the coupling, the air, the film', keywords: ['diegesis', 'mood', 'coupling', 'listen', 'film', 'amount'], open: (s) => s.setWorldPageOpen(true) },
   { id: 'sequence', label: 'Sequence', key: 'Q', hint: 'macro-form : the scenes over time', keywords: ['macro', 'form', 'scenes', 'sequencer'], open: (s) => s.setSequencePageOpen(true) },
   { id: 'sonify', label: 'Sonify', key: 'S', hint: 'the picture as sound : voices, mixer, sequencers, Space', keywords: ['sound', 'audio', 'voices', 'synth'], open: (s) => s.setSonifyPageOpen(true) },

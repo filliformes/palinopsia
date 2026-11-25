@@ -83,6 +83,8 @@ import {
 } from '@shared/lights'
 import { addressedInOrder, chainOf, lightsFromLine, duplicate, kindPatch, loadSetupName, loadSetups, persistSetupName, persistSetups, readSetup, withProfile, type LightSetup, lightBaseValue, loadRig, newFixture, newOutput, persistRig, rowOf } from './lights/lightStore'
 import { showLooks } from './lights/lightShows'
+import { CX_MOD_RANGE, cxBaseValue, cxSetValue, sanitizeSetup, type CxModField, type CxSetup } from '@shared/complexOut'
+import { loadInSession, loadSetup, saveInSession, saveLive, saveSetup } from './complex/cxSaved'
 import { auBaseOf, auFileField, auSpan, auTargetAlive } from '@shared/auMod'
 import { defaultVoicePlaces, sanitizeSpaceConfig, sanitizeVoicePlaces, validSpaceHost, type SpaceConfig, type SpaceVoice, type VoicePlace } from '@shared/spatial'
 import { defaultInputs, inputsForShader } from './shaders/isf/inputs'
@@ -95,7 +97,7 @@ import { colorOf, hsvaOf, PART_INDEX } from './engine/colorParts'
 import { graftPins, isPinnedTarget, keepPersistent, keepPinnedUnits, layerPin, movePins, sameDeep, slotPin, SONIFY_PIN } from './persist'
 import { defaultAssembleParams } from '@shared/assemble'
 import { corpusMap } from './assemble/match'
-import { BLEND_MODES, BODY_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
+import { BLEND_MODES, BODY_PAGE_FRAME, COMPLEX_PAGE_FRAME, DEFAULT_LAYER_VARY, FX_OPACITY_INPUT, MAX_MOD_ASSIGNMENTS, META_KNOB_COUNT, META_MAX_DESTS, OUTPUT_PAGE_FRAME, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { DEFAULT_TAKEOVER, makeDefaultModulator, makeDefaultModulators, modEngine } from './engine/modulation'
 import { sanitizeModShape } from './engine/modShape'
 import { sanitizeEnvTrigger } from './engine/envTrigger'
@@ -926,6 +928,7 @@ function shaderInputOf(
  *  modulation modes drive a toggle by the same law, so the mul/rep chip shows
  *  a fixed label for it. */
 export function isToggleTarget(st: { composition: CompositionState }, t: ModTarget): boolean {
+  if (t.kind === 'cx') return t.field === 'on'
   try {
     const r = shaderInputOf(st, t)
     if (!r) return false
@@ -938,9 +941,16 @@ export function isToggleTarget(st: { composition: CompositionState }, t: ModTarg
 
 /** Normalized (0..1) CURRENT base of a mod target, for assignMod's automatic
  *  mode choice. 0.5 (→ multiply) wherever the base can't be resolved. */
-function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number; audioLayer?: AudioLayerState; lightRig?: LightRig; lightsSession?: LightsSession }, t: ModTarget): number {
+function baseNormForTarget(st: { composition: CompositionState; dome?: DomeConfig; outXform?: OutXform; worldAmount?: number; audioLayer?: AudioLayerState; lightRig?: LightRig; lightsSession?: LightsSession; complexOut?: CxSetup }, t: ModTarget): number {
   try {
     if (t.kind === 'meta') return st.composition.metaKnobs[t.knob]?.value ?? 0.5
+    if (t.kind === 'cx') {
+      if (t.field === 'on') return 0 // a toggle : Replace (it follows the modulator's upper half)
+      const b = st.complexOut ? cxBaseValue(st.complexOut, t.who, t.field) : null
+      if (b === null) return 0.5
+      const r = CX_MOD_RANGE[t.field]
+      return (b - r.min) / (r.max - r.min)
+    }
     if (t.kind === 'light') {
       const b = st.lightRig && st.lightsSession ? lightBaseValue(st.lightRig, st.lightsSession, t.fixture, t.field) : null
       if (b === null) return 0.5
@@ -2302,6 +2312,24 @@ interface StoreState {
   // the page always opens in the app otherwise.
   outputPageWindow: boolean
   setOutputPageWindow: (on: boolean) => void
+  // ── Complex Output (shared/complexOut.ts, complex/) : the screens and their
+  // slices. This computer's, like the keystone; a session brings its own only when
+  // "with session" is on (then its edits are the session's, as with the keystone).
+  complexOut: CxSetup
+  setComplexOut: (next: CxSetup | ((s: CxSetup) => CxSetup)) => void
+  /** one control of it (OSC, MIDI, a Macro knob let go) */
+  setComplexValue: (who: string, field: CxModField, v: number) => void
+  /** the screens are open. Never on by itself but in an installation. */
+  complexLive: boolean
+  setComplexLive: (on: boolean) => void
+  complexInSession: boolean
+  setComplexInSession: (on: boolean) => void
+  complexFromSession: boolean
+  complexPageOpen: boolean
+  setComplexPageOpen: (on: boolean) => void
+  /** in its window (false : no window could open, it shows over the instrument) */
+  complexPageWindow: boolean
+  setComplexPageWindow: (on: boolean) => void
   // Global modulation mute (transient) : freezes every modulator output.
   modBypass: boolean
   toggleModBypass: () => void
@@ -2751,6 +2779,8 @@ function restoreMachineWarp(
  *  or on a live input's transport, is dead); without it, alive. */
 export function targetAlive(c: CompositionState, t: ModTarget, al?: AudioLayerState): boolean {
   if (t.kind === 'au') return !al || auTargetAlive(al, t)
+  // a Complex Output control : alive while its screen or slice is in the setup
+  if (t.kind === 'cx') return cxBaseValue(useStore.getState().complexOut, t.who, t.field) !== null
   // a light's slider : alive while its light (or its group) is in the rig
   if (t.kind === 'light') {
     if (t.fixture === '') return true
@@ -5711,6 +5741,34 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   outputPageWindow: false,
   setOutputPageWindow: (on) => set({ outputPageWindow: on }),
+  complexOut: loadSetup(),
+  setComplexOut: (next) => {
+    const cur = get().complexOut
+    const s = typeof next === 'function' ? next(cur) : next
+    if (s === cur) return
+    if (!get().complexFromSession) saveSetup(s)
+    set({ complexOut: s })
+  },
+  setComplexValue: (who, field, v) => get().setComplexOut((s) => cxSetValue(s, who, field, v)),
+  complexLive: false,
+  setComplexLive: (on) => {
+    saveLive(on)
+    set({ complexLive: on })
+  },
+  complexInSession: loadInSession(),
+  setComplexInSession: (on) => {
+    saveInSession(on)
+    set({ complexInSession: on })
+    if (!on && get().complexFromSession) set({ complexOut: loadSetup(), complexFromSession: false })
+  },
+  complexFromSession: false,
+  complexPageOpen: false,
+  setComplexPageOpen: (on) => {
+    if (on && get().complexPageOpen) void window.api.pageWindowFocus(COMPLEX_PAGE_FRAME).catch(() => {})
+    set(on ? { complexPageOpen: true } : { complexPageOpen: false, complexPageWindow: true })
+  },
+  complexPageWindow: true,
+  setComplexPageWindow: (on) => set({ complexPageWindow: on }),
 
   // Global modulation mute (transient) : one click freezes every modulator's
   // output so all sliders revert to their base values. Not persisted — a live
@@ -6760,6 +6818,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const activeWorld = s.worlds.find((w) => w.id === s.world) ?? null
       // A New session carries no warp : this computer's own comes back.
       restoreMachineWarp(set, get)
+      if (get().complexFromSession) set({ complexOut: loadSetup(), complexFromSession: false })
       const fresh = seedRandomStart(makeDefaultComposition())
       // NEW is a clean slate. Even under a direct-film World (Griffé/Peint/Pressé),
       // strip the Finalizer's film stage back off so a New session never opens with
@@ -7081,6 +7140,9 @@ export const useStore = create<StoreState>((set, get) => ({
     } else {
       restoreMachineWarp(set, get)
     }
+    // Its Complex Output setup, on the same terms.
+    if (get().complexInSession && s.complexOut) set({ complexOut: sanitizeSetup(s.complexOut), complexFromSession: true })
+    else if (get().complexFromSession) set({ complexOut: loadSetup(), complexFromSession: false })
     // The session's sound patch (post-set so setSonify's engine push sees it).
     if (s.sonify) {
       const curSoni = get().sonify
@@ -7157,6 +7219,7 @@ export const useStore = create<StoreState>((set, get) => ({
       })(),
       audioLayer: s.audioLayer,
       ...(s.warpInSession ? { warp: { enabled: s.warpEnabled, corners: [...s.warpCorners], feather: s.warpFeather } } : {}),
+      ...(s.complexInSession ? { complexOut: s.complexOut } : {}),
       // its own MIDI / OSC mappings, only when it has some (a session without
       // any is written as before, byte for byte)
       ...((m) => (m ? { mappings: m } : {}))(sessionMappingsOut(s.sessionMidiMap, s.sessionOscMap, s.sessionOscAliases, s.sessionDfWires)),

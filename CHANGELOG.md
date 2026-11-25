@@ -7,6 +7,24 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **Complex Output : several screens, mapped** (new `shared/complexOut.ts`, `complex/`,
+  `components/ComplexOutputPage.tsx`, `main/complexOut.ts`; `Shift+O`, or COMPLEX OUTPUT in the
+  Output page's header). A window of its own, in two steps : **Screens** (each on a display,
+  found again when it is unplugged and replugged, or in a plain window; size, test card,
+  brightness / contrast / gamma / RGB, identify) and **Map** (slices with their input beside
+  their output). A slice takes the presented picture, the flat one, or one layer alone (under
+  Black and its own flash limiter), and goes through four corners, a linear grid, a curved
+  grid, Bezier patches or a polygon pinned point for point; masks (show / hide, soft, rounded)
+  on slices and screens; soft edges per side with power, gamma, luminance and black level, set
+  from the overlaps in one click; solo, opacity, color, order, lock, duplicate, snapping,
+  nudging, a transform box, numbers. A list of what is wrong. Kept per computer, presets,
+  files, with the session if asked, undo; an installation left live brings its screens back.
+  A screen's brightness and on / off and a slice's opacity and on / off take modulators (a new
+  target kind `cx`), Macro knobs, MIDI / OSC Learn and `/opsia/complex/...`. Reads an
+  `AdvancedOutput.xml`. No readback : the screens' windows live in the engine's process and
+  read its canvas GPU to GPU (`Compositor.cxTap`). Measured : 60 fps with three 4K screens, the control window in front or minimized, 0.1 to 0.4 ms of the frame. 316 checks
+  of the geometry in node (`tools/cx-test.ts`), the rest by pixels in the app. Credits in
+  THIRD_PARTY_NOTICES (part 6).
 - **Strata : a place as a scanner sees it, taken apart and put back together by the sound**
   (new `engine/StrataSource.ts`, `engine/strataPlaces.ts`, the `gen-strata` descriptor in
   `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native
