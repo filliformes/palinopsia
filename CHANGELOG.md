@@ -3,7 +3,7 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
-## Unreleased (for v1.3.6)
+## Unreleased
 
 ### Added
 
@@ -12,19 +12,20 @@ that CI builds into cross-platform releases.
   `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native
   source drawing a cloud of points, up to four million, from one of four places it carries
   (a colonnade ruin taken back by plants, a grove, a cliff in layers of sediment, a nebula :
-  each dealt once from a fixed seed, like a scan with its colors), from a file (a scan or a
+  each dealt once from a fixed seed, in a worker, like a scan with its colors), from a file (a scan or a
   model : the Model's own reader, so PLY, OBJ, glTF, STL, and now XYZ and PTS), or from the
   layer picked as sidechain lifted by its depth (the picture-depth reader, as the Point
   Cloud). In the vertex shader, from each point at rest : **natural ⇄ structural** (own
-  colors to an ink color, finer points, **links** to the two nearest neighbours, found by a
-  spatial hash a slice per frame), **sections** sweeping through it along five axes, free or
+  colors to an ink color, finer points, **links** to the two nearest neighbors, found by a
+  spatial hash in the worker), **sections** sweeping through it along five axes, free or
   on the beat, **break** (on hits, the beat or the trigger, blocks jump along an axis, hold
   and are put back in steps or smoothly; a broken block can **reveal** its structure; a hit
   can **cut** the whole picture to the other state), **erode**, **voxel**, and **panels**
   (two to four views : other angles, the other state, other cuts). The file picker of the
   Model serves it too (`modelSources.ts` : the sources that take a model file; the store,
-  the session's collect and relink, the Inspector and a drop on the layer know it). The
-  idea is credited in THIRD_PARTY_NOTICES (part 6).
+  the session's collect and relink, the Inspector and a drop on the layer know it). Four
+  Generate themes (Scanned Place, Taken Apart, Three Views, Excavation) and a **Scan** group
+  of four master chains. The idea is credited in THIRD_PARTY_NOTICES (part 6).
 - **Stems : each layer hears its own sound** (`engine/audioIn.ts`, `modulation.ts`,
   `envTrigger.ts`, `ModulationPanel.tsx`). The audio input opens every channel of its
   device; an audio modulator (and an envelope's FIRE) can now listen **FROM** one stem of
@@ -32,7 +33,7 @@ that CI builds into cross-platform releases.
   tab's pick : a DAW's tracks or a Pure Data patch's voices on separate outputs of a
   multichannel device each drive their own layer (OCTOCOSME's four voices, without the
   `/audioN/peak` messages). Each stem is analysed apart (its own analyser, made on the
-  first ask, once a frame), frequency bands included; a stem the device does not have
+  first ask, read once a frame, let go five seconds after the last one), frequency bands included; a stem the device does not have
   reads the whole input and says so in the menu. Kept with the session (`ch`). Checked in
   the app on a fake two-channel device : the stems listed, each read apart, a modulator
   following its stem.
@@ -42,7 +43,8 @@ that CI builds into cross-platform releases.
   at **sound speed**, the land **surging** forward on the sound's hits; **sound gain** sets
   how tall a loud band stands. A 256-strip history texture of its own, read by Terrain's
   passes as a picture's brightness; no sidechain needed (RAISED BY stays open without
-  one). Two presets, The sound as land and Spectrum survey. The idea is credited in
+  one). Two presets (The sound as land, Spectrum survey), two Generate themes (Sounding
+  Land, Night Sounding) and two Landscape chains (Sounding Chart, Long Memory). The idea is credited in
   THIRD_PARTY_NOTICES (part 6, Form Vision).
 - **Gaussian splats read as colored points** (`modelParse.ts`) : a splat PLY (3D Gaussian
   Splatting's, what Scaniverse exports) has no red green blue; its color is read from its
@@ -50,10 +52,10 @@ that CI builds into cross-platform releases.
   opaque, the floaters) are left out. Checked on a synthetic splat file.
 - **LiDAR scans : LAS and LAZ** (new `engine/lasParse.ts`) : the Model and Strata read
   `.las` (the ASPRS format, versions 1.0 to 1.4, point formats 0 to 10 : coordinates, RGB,
-  or the intensity as greys) and `.laz` (the same compressed, decompressed by laz-perf,
+  or the intensity as grays, from its 1st to its 99th hundredth) and `.laz` (the same compressed, decompressed by laz-perf,
   Apache-2.0, its WebAssembly inside the Model's worker : `electron.vite.config.ts` gains a
   `?base64` import for it). Survey coordinates are taken relative to the first point in
-  double precision (no lost centimetres), Z up turned to Y up, and a scan of more points
+  double precision (no lost centimeters), Z up turned to Y up, and a scan of more points
   than the Model draws is thinned while it is read. Checked on laz-perf's test scans (the
   Autzen aerial patch : the same 110,000 points and colors from its LAS and its LAZ) and
   in the app.
@@ -61,10 +63,11 @@ that CI builds into cross-platform releases.
   `pointColors` : the color under each vertex's texture coordinates, times its vertex
   color, as the Model shows it). Fixed on the way : a file without colors (a plain STL, an
   untextured OBJ) drew no points at all in Strata (its colors' alpha, 0, read as "no
-  point"); it shows in a soft grey.
+  point"); it shows in a soft gray.
 - **Text point clouds** (`modelParse.ts`) : the Model and Strata read `.xyz` and `.pts`
   (x y z a line, with colors 0..1 or 0..255 or an intensity, a header of names placing the
-  columns; PTS's leading count skipped). The media scheme serves the two extensions; a
+  columns; PTS's leading count skipped; six columns with a negative one are a normal, not a
+  color; coordinates relative to the first point, as for LAS). The media scheme serves the two extensions; a
   `.csv` is not served (it could be any table on the disk) : a CSV of points reads once
   renamed `.xyz`.
 
