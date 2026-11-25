@@ -1,8 +1,10 @@
 // Complex Output's geometry and reader, checked in node :
 //   npx esbuild tools/cx-test.ts --bundle --platform=node --alias:@shared=./src/shared --outfile=%TEMP%/cx-test.cjs && node %TEMP%/cx-test.cjs
 import { blendLight, blendValue, evalWarp, invWarp, meanValueMap, movePoint, quadSound, quadToQuad, apply3, resampleWarp, squareToQuad, warpMesh, warpFolded, maskCover, polyDistance, maskOnScreen, inputMap, polyInput, insidePoly, rectWarp, flattenMask, bounds } from '../src/renderer/src/complex/cxMath'
+import type { CxTarget } from '../src/shared/complexOut'
+import type { CxDisplay } from '../src/renderer/src/complex/cxProblems'
 import { copySlice, cxBaseValue, cxSetValue, findSlice, newScreen, newSlice, newMask, patchSlice, rectPts, sanitizeSetup, sliceNumber, type CxWarp } from '../src/shared/complexOut'
-import { findProblems } from '../src/renderer/src/complex/cxProblems'
+import { findProblems, matchDisplay } from '../src/renderer/src/complex/cxProblems'
 import { autoBlend } from '../src/renderer/src/complex/cxBlend'
 import { importAdvancedOutput } from '../src/renderer/src/complex/cxImport'
 import { readFileSync, existsSync } from 'fs'
@@ -201,6 +203,16 @@ const Q = [0.1, 0.05, 0.9, 0.12, 0.8, 0.95, 0.2, 0.8]
   ok(ks().includes('offscreen'), 'off its screen'); ok(ks().includes('own'), 'over the controls')
   st = { v: 1, screens: [newScreen('One', { slices: [], target: { kind: 'display', displayId: 9, label: 'gone', dw: 1920, dh: 1080 } })] }
   ok(ks().includes('missing') && ks().includes('empty'), 'display unplugged, no slice')
+}
+// ── a display found again
+{
+  const t = (over: object): { target: CxTarget } => ({ target: { kind: 'display', displayId: 5, label: 'EPSON', dw: 1920, dh: 1080, ...over } })
+  const d = (id: number, label: string, w = 1920, h = 1080): CxDisplay => ({ id, label, width: w, height: h, isPrimary: false, isControl: false })
+  ok(matchDisplay(t({}), [d(5, 'EPSON'), d(6, 'EPSON')])?.id === 5, 'by its id')
+  ok(matchDisplay(t({}), [d(5, 'DELL'), d(9, 'EPSON')])?.id === 9, 'its id taken by another panel : by its name')
+  ok(matchDisplay(t({}), [d(9, 'EPSON', 1280, 720)])?.id === 9, 'another mode : by its name')
+  ok(matchDisplay(t({}), [d(8, 'EPSON'), d(9, 'EPSON')]) === null, 'two alike : neither, rather than the wrong one')
+  ok(matchDisplay(t({}), [d(1, 'DELL')]) === null, 'gone')
 }
 // ── the import
 {
