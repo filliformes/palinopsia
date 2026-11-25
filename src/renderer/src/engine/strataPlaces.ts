@@ -385,18 +385,36 @@ export function placeCloud(i: number): Cloud {
 }
 
 // ── the links : each point's two nearest neighbours, by a spatial hash ──────────
-/** Builds each point's two nearest neighbours a slice at a time (a scan of millions
- *  of points must not stall a frame). `out` : 4 floats a point, the two neighbours'
+/** The web of links : every STRIDE-th point of the cloud (about LINK_POINTS of them) and
+ *  its two nearest neighbours among those, so a link is longer than a point is wide and
+ *  reads as a line over the cloud. Built a slice at a time (a scan of millions of points
+ *  must not stall a frame). `out` : 4 floats a web point, its two neighbours' web
  *  indices (-1 : none within reach) and their distances. */
+export const LINK_POINTS = 30000
 export class LinkBuilder {
   readonly out: Float32Array
+  /** the cloud's index of web point k is k * stride */
+  readonly stride: number
+  readonly m: number
   private head: Int32Array
   private next: Int32Array
   private mask: number
   private cell: number
   private at = 0
   done = false
-  constructor(private pos: Float32Array, private n: number) {
+  private pos: Float32Array
+  private n: number
+  constructor(cloudPos: Float32Array, cloudN: number) {
+    this.stride = Math.max(1, Math.ceil(cloudN / LINK_POINTS))
+    const m = (this.m = Math.ceil(cloudN / this.stride))
+    const pos = new Float32Array(m * 3)
+    for (let k = 0; k < m; k++) {
+      const i = k * this.stride
+      pos[k * 3] = cloudPos[i * 3]; pos[k * 3 + 1] = cloudPos[i * 3 + 1]; pos[k * 3 + 2] = cloudPos[i * 3 + 2]
+    }
+    this.pos = pos
+    this.n = m
+    const n = m
     this.out = new Float32Array(n * 4)
     // the reach : about two spacings of the cloud, as if spread over a surface
     // (scans are surfaces) of the fitted ball's size

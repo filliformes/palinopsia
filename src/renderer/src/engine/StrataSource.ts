@@ -130,6 +130,9 @@ void placed(int i, out vec3 P, out vec3 col, out float keep, out float moved) {
   keep = C.a;
   moved = 0.0;
   vec3 h = hash33(vec3(float(i % 4093), float(i / 4093), 7.0));
+  float q = mix(0.006, 0.09, uVoxel);
+  // (with VOXEL on, a whole cell erodes at once : a cell's other points would fill it)
+  if (uVoxel > 0.001) h.x = hash33(floor(P / q) + 3.0).x;
   // ERODE : the points fall away, at random or from a side
   if (uErode > 0.001) {
     float t = 0.5;
@@ -140,10 +143,7 @@ void placed(int i, out vec3 P, out vec3 col, out float keep, out float moved) {
     if (h.x < uErode * w) keep = 0.0;
   }
   // VOXEL : snapped to a grid
-  if (uVoxel > 0.001) {
-    float q = mix(0.006, 0.09, uVoxel);
-    P = (floor(P / q) + 0.5) * q;
-  }
+  if (uVoxel > 0.001) P = (floor(P / q) + 0.5) * q;
   vec3 P0 = P;
   // BREAK : the blocks jump along an axis, hold, and are put back
   for (int k = 0; k < ${MAX_BREAK}; k++) {
@@ -216,7 +216,7 @@ void main() {
   if (!project(P, s, depth)) { cull(); return; }
   float state = clamp(uState + uReveal * moved, 0.0, 1.0);
   // a voxel's point fills its cell : the place reads as blocks, not as a grid of dots
-  float world = uSize * mix(1.0, 0.75, state);
+  float world = uSize * mix(1.0, 0.6, state);
   if (uVoxel > 0.001) world = max(world, mix(0.006, 0.09, uVoxel) * 0.5);
   float rPx = world * uFocal / depth * uRes.y;
   rPx = min(rPx, uRes.y * 0.05);
@@ -257,21 +257,27 @@ precision highp int;
 precision highp sampler2D;
 ${PLACE_GLSL}
 uniform float uLinks;
+uniform int uLinkStep;       // a web point is every STEP-th point (a cloud), every STEP-th row and column (the picture)
+uniform ivec2 uLinkGrid;     // the picture's web : columns, rows
 out vec4 vCol;
 void cull() { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vCol = vec4(0.0); }
 void main() {
   int pair = gl_InstanceID;
-  int a = int(float(pair / 2) * uStride);
-  int b = -1;
+  int k = pair / 2;
+  int a, b = -1;
   float rest0 = 0.0;
   if (uSrc == 0) {
-    vec4 L = texelFetch(uLink, ivec2(a % uTexW, a / uTexW), 0);
-    b = int((pair & 1) == 0 ? L.x : L.y);
+    vec4 L = texelFetch(uLink, ivec2(k % uTexW, k / uTexW), 0);
+    float nb = (pair & 1) == 0 ? L.x : L.y;
+    a = k * uLinkStep;
+    if (nb >= 0.0) b = int(nb) * uLinkStep;
     rest0 = (pair & 1) == 0 ? L.z : L.w;
   } else {
-    int ix = a % uGrid.x, iy = a / uGrid.x;
-    if ((pair & 1) == 0) { if (ix + 1 < uGrid.x) b = a + 1; }
-    else if (iy + 1 < uGrid.y) b = a + uGrid.x;
+    int sx = k % uLinkGrid.x, sy = k / uLinkGrid.x;
+    int ix = sx * uLinkStep, iy = sy * uLinkStep;
+    a = iy * uGrid.x + ix;
+    if ((pair & 1) == 0) { if (ix + uLinkStep < uGrid.x) b = a + uLinkStep; }
+    else if (iy + uLinkStep < uGrid.y) b = a + uLinkStep * uGrid.x;
   }
   if (b < 0) { cull(); return; }
   vec3 Pa, Pb, ca, cb; float ka, kb, ma, mb;
@@ -280,7 +286,7 @@ void main() {
   if (ka < 0.004 || kb < 0.004) { cull(); return; }
   // a link across a break, or (the picture) across a cliff in the depth, is cut
   float L = length(Pa - Pb);
-  if (uSrc == 0 ? abs(L - rest0) > 0.01 + rest0 * 0.5 : L > 3.0 / float(uGrid.y)) { cull(); return; }
+  if (uSrc == 0 ? abs(L - rest0) > 0.01 + rest0 * 0.5 : L > 3.0 * float(uLinkStep) / float(uGrid.y)) { cull(); return; }
   bool first = gl_VertexID == 0;
   vec3 P = first ? Pa : Pb;
   vec2 s; float depth;
@@ -329,6 +335,9 @@ interface GpuCloud {
   col: WebGLTexture
   link: WebGLTexture | null
   builder: LinkBuilder | null
+  /** the web : a web point is every linkStep-th point, linkN of them */
+  linkStep: number
+  linkN: number
 }
 
 export class StrataSource implements NativeGenerator {
@@ -467,7 +476,7 @@ export class StrataSource implements NativeGenerator {
     }
     const colA = new Uint8Array(TEX_W * rows * 4)
     colA.set(c.col.subarray(0, c.n * 4))
-    this.gpu = { src: c, n: c.n, rows, pos: this.dataTex(rows, pos, true), col: this.dataTex(rows, colA, false), link: null, builder: null }
+    this.gpu = { src: c, n: c.n, rows, pos: this.dataTex(rows, pos, true), col: this.dataTex(rows, colA, false), link: null, builder: null, linkStep: 1, linkN: 0 }
     return this.gpu
   }
 
@@ -587,13 +596,17 @@ export class StrataSource implements NativeGenerator {
       // the neighbours, found a slice a frame once the links are wanted
       if (links > 0.001 && !gpu.link) {
         if (!gpu.builder) gpu.builder = new LinkBuilder(cloud.pos, cloud.n)
-        if (gpu.builder.step(40000)) {
-          const data = new Float32Array(TEX_W * gpu.rows * 4)
-          data.set(gpu.builder.out)
-          for (let i = gpu.n * 4; i < data.length; i += 4) { data[i] = -1; data[i + 1] = -1 }
+        if (gpu.builder.step(20000)) {
+          const B = gpu.builder
+          const rows = Math.max(1, Math.ceil(B.m / TEX_W))
+          const data = new Float32Array(TEX_W * rows * 4)
+          data.set(B.out)
+          for (let i = B.m * 4; i < data.length; i += 4) { data[i] = -1; data[i + 1] = -1 }
           // the rest lengths, in the drawn scale
-          for (let i = 0; i < gpu.n; i++) { data[i * 4 + 2] *= SCALE; data[i * 4 + 3] *= SCALE }
-          gpu.link = this.dataTex(gpu.rows, data, true)
+          for (let i = 0; i < B.m; i++) { data[i * 4 + 2] *= SCALE; data[i * 4 + 3] *= SCALE }
+          gpu.link = this.dataTex(rows, data, true)
+          gpu.linkStep = B.stride
+          gpu.linkN = B.m
           gpu.builder = null
         }
       }
@@ -716,8 +729,11 @@ export class StrataSource implements NativeGenerator {
       // the links
       if (links > 0.001 && (picture || gpu?.link)) {
         setPlace(this.linkP)
-        this.linkP.f1('uLinks', links)
-        gl.drawArraysInstanced(gl.LINES, 0, 2, drawN * 2)
+        // the picture's web : about 90 rows of it, whatever the points
+        const ls = picture ? Math.max(1, Math.round(gy / 90)) : gpu!.linkStep
+        const lgx = picture ? Math.ceil(gx / ls) : 0, lgy = picture ? Math.ceil(gy / ls) : 0
+        this.linkP.f1('uLinks', links).i1('uLinkStep', ls).i2('uLinkGrid', lgx, lgy)
+        gl.drawArraysInstanced(gl.LINES, 0, 2, (picture ? lgx * lgy : gpu!.linkN) * 2)
       }
       gl.bindVertexArray(null)
     }
