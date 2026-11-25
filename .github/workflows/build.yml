@@ -125,6 +125,23 @@ jobs:
           # arm64 code must carry a signature to load at all : an ad-hoc one is enough.
           if [ "$(uname)" = Darwin ]; then codesign --force --sign - build/Release/link.node; fi
           node -e "const l = require('./build/Release/link.node'); l.setTempo(123); console.log(JSON.stringify(l.state(4))); l.close()"
+      - name: Build dataflou addon
+        # native/dataflou : the vendored dataflou core 9.3 and its libraries, every
+        # platform, no npm package and no network beyond Electron's headers. A failure
+        # here only leaves the dataflou section saying MISSING, never blocks a release
+        # (see native/dataflou/README.md).
+        continue-on-error: true
+        shell: bash
+        working-directory: native/dataflou
+        run: |
+          ARCH=x64; [ "${{ matrix.platform }}" = mac ] && ARCH=arm64
+          npx --yes node-gyp@11 rebuild \
+            --target=$(node -p "require('electron/package.json').version") \
+            --dist-url=https://electronjs.org/headers \
+            --arch=$ARCH
+          # arm64 code must carry a signature to load at all : an ad-hoc one is enough.
+          if [ "$(uname)" = Darwin ]; then codesign --force --sign - build/Release/dataflou.node; fi
+          node -e "console.log(JSON.stringify(require('./build/Release/dataflou.node').version()))"
       # THIRD_PARTY_NOTICES.md must cover everything the build ships (scripts/notices.mjs).
       - run: npm run check:notices
       # The community catalog : every entry pinned, credited, under an accepted license.

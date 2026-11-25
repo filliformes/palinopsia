@@ -7,8 +7,9 @@ directories:
 # The engine is pure WebGL2 + ISF in the renderer and OSC is pure-JS. The native
 # addons are the texture-share senders : Spout (DX11, native/spout, vendored
 # leadedge SDK) on Windows and Syphon (Metal, native/syphon, + its framework) on
-# macOS, the macOS USB input (native/avcapture : an iPhone by USB), and Ableton
-# Link on every platform (native/link, the vendored Link SDK). Their
+# macOS, the macOS USB input (native/avcapture : an iPhone by USB), and on every
+# platform Ableton Link (native/link, the vendored Link SDK) and the dataflou node
+# (native/dataflou, the vendored dataflou core). Their
 # prebuilt .node files are bundled and asarUnpack'd (a .node can't be loaded from
 # inside the asar). Rebuild per Electron ABI : see their READMEs.
 npmRebuild: false
@@ -21,6 +22,7 @@ files:
   - native/syphon/build/Release/Syphon.framework/**/*
   - native/avcapture/build/Release/avcapture.node
   - native/link/build/Release/link.node
+  - native/dataflou/build/Release/dataflou.node
   - "!**/*.map"
   - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
 asar: true
@@ -42,6 +44,7 @@ asarUnpack:
   - native/syphon/build/Release/**
   - native/avcapture/build/Release/*.node
   - native/link/build/Release/*.node
+  - native/dataflou/build/Release/*.node
   # ffmpeg-static ships a platform binary that must be spawned from disk (not
   # loaded from inside the asar) — unpack it so recording transcodes work.
   - node_modules/ffmpeg-static/**
@@ -76,7 +79,7 @@ extraResources:
     to: mediapipe
   # The dataflou mesh visualizer page (the dataflou section's "visualizer"),
   # served by main/dataflou/visualizer.ts; built by `npm run build:visualizer`
-  # from a dataflou checkout, committed, and carried with its author's permission.
+  # from a dataflou checkout, committed (MIT, its LICENSE inside).
   - from: resources/dataflou-visualizer
     to: dataflou-visualizer
   # The AI depth engine : Transformers.js, its WebAssembly runtime and Depth
@@ -165,12 +168,13 @@ mac:
     # one, and no app can prompt for it either. It is granted by hand under
     # Privacy & Security, and read only at launch, so the capture picker asks the
     # system for the answer and says so itself (capture:screenAccess in main).
-    NSLocalNetworkUsageDescription: Palinopsia sends and receives OSC, NDI video, Art-Net and WLED light data and HIVE streams on your local network.
+    NSLocalNetworkUsageDescription: Palinopsia sends and receives OSC, the dataflou mesh, NDI video, Art-Net and WLED light data and HIVE streams on your local network.
     NSDocumentsFolderUsageDescription: Palinopsia keeps its sessions and recordings in Documents/Palinopsia.
     NSBonjourServices:
       - _ndi._tcp
       - _oscjson._tcp
       - _osc._udp
+      - _dataflou._tcp
     # No App Nap : macOS slows an app it judges idle (a covered window, no input),
     # and an installation that renders behind its own fullscreen output is exactly that.
     NSAppSleepDisabled: true

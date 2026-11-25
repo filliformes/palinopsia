@@ -1,0 +1,7 @@
+{
+  "name": "palinopsia-dataflou",
+  "version": "1.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "description": "The dataflou node (N-API addon on the dataflou C interface)"
+}

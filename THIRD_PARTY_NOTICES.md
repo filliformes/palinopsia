@@ -8,8 +8,7 @@ file and of `licenses/` ships inside every build, beside the app.
 
 Palinopsia itself is GPL-3.0-or-later ([LICENSE](LICENSE)), with the section 7
 permission in [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md). All the licenses below are
-compatible with it: MIT, BSD, ISC, Boost, Apache-2.0, LGPL, GPL, OFL and CC0. The one
-exception is the dataflou visualizer, which ships with its author's permission.
+compatible with it: MIT, BSD, ISC, Boost, Apache-2.0, LGPL, GPL, OFL and CC0.
 
 **The rule.** Whatever comes from someone else gets its entry here in the same commit that
 brings it in. That covers code, shaders, an algorithm ported line by line, a binary, a
@@ -78,7 +77,7 @@ Butterworth) & vade (Anton Marini). BSD 2-Clause-style license, whose text is in
 
 ### node-addon-api (`native/*`)
 
-The four native addons (Spout, Syphon, the USB input and Ableton Link) are written
+Four of the native addons (Spout, Syphon, the USB input and Ableton Link) are written
 against **node-addon-api** 8 (https://github.com/nodejs/node-addon-api), the C++ wrapper of
 Node's N-API. Its headers are compiled into `spout.node`, `syphon.node`, `avcapture.node`
 and `link.node`. Copyright (c) 2017 Node.js API collaborators, MIT License.
@@ -215,26 +214,50 @@ notebook `texture_nca_pytorch.ipynb` from google-research/self-organising-system
 License 2.0 ([`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)). The method is credited in
 Part 6.
 
-### The dataflou core (`src/main/dataflou/node.ts`, `protocol.ts`, `stream.ts`)
+### The dataflou core (`native/dataflou/sdk/dataflou`)
 
-Palinopsia's dataflou node is a TypeScript port of the dataflou library's reference core,
-by **Alexandre Burton** (Artificiel). It follows these parts, message for message:
-- the node (`src/core/node.cpp`);
-- the topology protocol and its CBOR fields (`src/core/protocol.cpp`);
-- the UDP value stream (`stream_codec.cpp`).
+Palinopsia's dataflou node is the **dataflou** library itself: its core 9.3, its desktop and
+Apple platform layers and its C interface (API 0.6), compiled into `dataflou.node`
+(`native/dataflou`), from commit 6d5c707 of 25 November 2026 (its Windows port). By **Alexandre
+Burton** (Artificiel). Copyright (c) 2026 alexandre burton, MIT License
+(`native/dataflou/sdk/dataflou/LICENSE`). Two lines are added to its
+`src/core/node_messages.cpp` (marked `PALINOPSIA FIX`, see `native/dataflou/VENDOR.md`); nothing
+else is changed. `src/main/dataflou/addon.ts`
+speaks to it, and `visualizer.ts` serves its page as its own host does.
 
-It is ported and shipped with its author's permission, given in November 2026. The
-mDNS announcer (`mdns.ts`) and the CBOR codec (`cbor.ts`) are Palinopsia's own, written
-to interoperate with it.
+Up to v1.3.5 the node was a TypeScript port of the core's earlier protocol, shipped with its
+author's permission (November 2026), before the library had a license.
+
+The libraries the core is built on, vendored beside it (`native/dataflou/VENDOR.md`):
+
+- **ETL** 20.45.0 (`native/dataflou/sdk/etl`), the Embedded Template Library
+  (https://github.com/ETLCPP/etl). Copyright (c) 2014-2024 John Wellbelove; Copyright (c) 2020
+  Phil Wise (phil@phil-wise.com); Copyright (c) 2020 John Lagerquist (in the files that name
+  them). MIT License.
+- **QCBOR** 1.6 (`native/dataflou/sdk/qcbor`, https://github.com/laurencelundblade/QCBOR).
+  Copyright (c) 2016-2018, The Linux Foundation; Copyright (c) 2018-2025, Laurence Lundblade;
+  Copyright (c) 2020, Patrick Uiterwijk; Copyright (c) 2021, Arm Limited. All rights reserved.
+  BSD 3-Clause License: its text, and the slightly different one of the files from The Linux
+  Foundation, are in [`licenses/QCBOR-License.txt`](licenses/QCBOR-License.txt).
+- **cJSON** 1.7.19 (`native/dataflou/sdk/cjson`, https://github.com/DaveGamble/cJSON).
+  Copyright (c) 2009-2017 Dave Gamble and cJSON contributors. MIT License.
+- **asio** 1.36.0, standalone (`native/dataflou/sdk/asio`,
+  https://github.com/chriskohlhoff/asio). Copyright (c) 2003-2025 Christopher M. Kohlhoff (chris at
+  kohlhoff dot com), and in the files that name them: Rep Invariant Systems, Inc. (2008),
+  Oliver Kowalke (2014), Boris Schaeling (2011), Stefan Arentz (2005), Roelof Naude (2008),
+  Klemens D. Morgenstern (2021). Boost Software License 1.0
+  (`native/dataflou/sdk/asio/asio/LICENSE_1_0.txt`).
+- **mdns** 1.4.3 (`native/dataflou/sdk/mdns`, https://github.com/mjansson/mdns), by Mattias
+  Jansson, 2017. Public domain (Unlicense).
 
 ### The dataflou mesh visualizer (`resources/dataflou-visualizer`)
 
 The dataflou section's **visualizer** button opens the dataflou project's own web
-visualizer, by **Alexandre Burton** (Artificiel). It is built from its repository (`web/`,
-commit 518c67f of 2026-11-11) by `scripts/build-dataflou-visualizer.mjs`, without its
-Atelier editor panel. Palinopsia serves it (`src/main/dataflou/visualizer.ts`), but it is
-not part of Palinopsia's own code and not under its license. It is included with its
-author's permission (2026-11-07), and all rights remain with its author.
+visualizer (version 66), by **Alexandre Burton** (Artificiel). It is built from its repository
+(`web/`, commit 6d5c707) by `scripts/build-dataflou-visualizer.mjs`, without its Atelier editor
+panel and its optional fonts. Palinopsia serves it (`src/main/dataflou/visualizer.ts`), but it
+is not part of Palinopsia's own code. Copyright (c) 2026 alexandre burton, MIT License
+(`resources/dataflou-visualizer/LICENSE`).
 
 - **d3** 7.9.0 (`resources/dataflou-visualizer/lib/d3.v7.min.js`, https://d3js.org),
   Copyright 2010-2023 Mike Bostock. ISC License:
@@ -820,5 +843,7 @@ methods are free to build on; naming them is a matter of respect.
 | [`licenses/fonts.txt`](licenses/fonts.txt) | each font's copyright line and license |
 | [`licenses/npm-dependencies.txt`](licenses/npm-dependencies.txt) | each npm package's license file (generated) |
 | `native/link/sdk/link/LICENSE.md`, `native/link/sdk/asio/LICENSE_1_0.txt` | Ableton Link (GPL-2.0-or-later), asio (Boost) |
+| [`licenses/QCBOR-License.txt`](licenses/QCBOR-License.txt) | QCBOR (BSD 3-Clause) |
+| `native/dataflou/sdk/*/LICENSE`, `native/dataflou/sdk/asio/asio/LICENSE_1_0.txt` | dataflou, ETL, cJSON (MIT), QCBOR (BSD 3-Clause), mdns (Unlicense), asio (Boost) |
 | `resources/*/LICENSE`, `resources/*/licenses/` | the license files shipped with each runtime and model |
 | Part 1 above | the MIT and ISC texts |

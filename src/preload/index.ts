@@ -94,6 +94,18 @@ const api: ExposedApi = {
   dataflouListen: (list) => ipcRenderer.send('dataflou:listen', list),
   dataflouLearn: (op) => ipcRenderer.invoke('dataflou:learn', op),
   dataflouWireOpt: (a) => ipcRenderer.invoke('dataflou:wireOpt', a),
+  dataflouLocate: (a) => ipcRenderer.invoke('dataflou:locate', a),
+  dataflouIdentify: () => ipcRenderer.send('dataflou:identify'),
+  onDataflouLocate: (cb) => {
+    const h = (_e: unknown, l: { path: string; on: boolean }): void => cb(l)
+    ipcRenderer.on('dataflou:locate', h)
+    return () => ipcRenderer.off('dataflou:locate', h)
+  },
+  onDataflouScene: (cb) => {
+    const h = (_e: unknown, slot: number): void => cb(slot)
+    ipcRenderer.on('dataflou:scene', h)
+    return () => ipcRenderer.off('dataflou:scene', h)
+  },
   onDataflouRemote: (cb) => {
     const h = (_e: Electron.IpcRendererEvent, b: Parameters<typeof cb>[0]): void => cb(b)
     ipcRenderer.on('dataflou:remote', h)

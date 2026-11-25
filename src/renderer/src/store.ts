@@ -327,7 +327,8 @@ function loadDataflou(): DfConfig {
         publish: (j as { v?: number }).v === 3 ? cleanPublish(j.publish) : [...DF_DEFAULT_CONFIG.publish],
         // (and what its saved wires play, the first time the node runs : the
         // update must not cut a wire)
-        ...((j as { v?: number }).v !== 3 || j.migrate ? { migrate: true } : {})
+        ...((j as { v?: number }).v !== 3 || j.migrate ? { migrate: true } : {}),
+        ...(j.sceneRecall === true ? { sceneRecall: true } : {})
       }
     }
   } catch {

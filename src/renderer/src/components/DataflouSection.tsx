@@ -12,7 +12,7 @@ import { dataflouBind, dataflouWireScope, meshToModulator, openDataflouVisualize
 import { BoundedNumberInput } from './BoundedNumberInput'
 import { DataflouPublish } from './DataflouPublish'
 import { showToast } from './Toast'
-import { DF_DESTS, DF_SOURCES, dfWireKey, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
+import { DF_DESTS, DF_SOURCES, dfStateWords, dfWireKey, type DfDestView, type DfIo, type DfIoRow, type DfNodeView, type DfParam, type DfSub, type DfValue, type DfWireOpt } from '@shared/dataflou'
 
 const OUR_SOURCES = [
   ...DF_SOURCES.map((s) => ({ path: s.path, label: s.label })),
@@ -44,7 +44,7 @@ export function DataflouSection(): JSX.Element {
   const connections = st.nodes.flatMap((n) =>
     Object.entries(n.subs).flatMap(([dest, list]) => list.map((s) => ({ node: n, dest, src: s })))
   )
-  const state = !cfg.enabled ? 'off' : st.running ? 'on' : st.error ? 'error' : 'starting'
+  const state = !st.available ? 'missing' : !cfg.enabled ? 'off' : st.running ? 'on' : st.error ? 'error' : 'starting'
   // the session's wires playing now, this computer's it silences (on their
   // destination or source), and the session's waiting for another universe
   const sessionKeys = new Set(st.session ?? [])
@@ -67,21 +67,36 @@ export function DataflouSection(): JSX.Element {
         </button>
         <button
           onClick={() => setCfg({ enabled: !cfg.enabled })}
+          disabled={state === 'missing' && !cfg.enabled}
           className={`flex shrink-0 items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[10px] transition-colors ${
             state === 'on'
               ? 'bg-accent/20 text-accent ring-1 ring-accent'
-              : state === 'error'
+              : state === 'error' || (state === 'missing' && cfg.enabled)
                 ? 'bg-danger/20 text-danger ring-1 ring-danger'
                 : 'bg-panel2 text-muted hover:text-text'
           }`}
-          title={cfg.enabled ? 'Leave the dataflou mesh' : 'Join the dataflou mesh : the nodes on this network see Palinopsia and can wire to it'}
+          title={state === 'missing' ? `This build does not carry the dataflou node : ${st.error ?? 'its module did not load'}` : cfg.enabled ? 'Leave the dataflou mesh' : 'Join the dataflou mesh : the nodes on this network see Palinopsia and can wire to it'}
         >
           {state === 'on' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
-          {state === 'on' ? 'ON THE MESH' : state === 'error' ? 'FAILED' : state === 'starting' ? 'JOINING' : 'OFF'}
+          {state === 'on' ? 'ON THE MESH' : state === 'missing' ? 'MISSING' : state === 'error' ? 'FAILED' : state === 'starting' ? 'JOINING' : 'OFF'}
         </button>
         {st.running && (
           <span className="shrink-0 font-mono text-[9px] text-muted" title={`${online} of ${others.length} other nodes online`}>
             {online} {online === 1 ? 'node' : 'nodes'}
+          </span>
+        )}
+        {st.running && st.halted && (
+          <span
+            className="flex shrink-0 animate-pulse items-center gap-1 rounded bg-danger/20 px-1.5 py-0.5 font-mono text-[9px] text-danger ring-1 ring-danger"
+            title="The mesh is halted (its emergency stop) : no node takes a value, what was fed goes back to rest. Any node may lift it, the visualizer too."
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-danger" />
+            HALT
+          </span>
+        )}
+        {st.running && st.presentation && (
+          <span className="shrink-0 font-mono text-[9px] text-accent2" title="The mesh is in presentation (the show) : discovery and the page's values go quiet, the connections play on">
+            presentation
           </span>
         )}
         <div className="flex-1" />
@@ -131,6 +146,21 @@ export function DataflouSection(): JSX.Element {
             >
               visualizer ↗{st.visualizer > 0 ? ` (${st.visualizer})` : ''}
             </button>
+            <button
+              onClick={() => window.api.dataflouIdentify()}
+              disabled={!st.running}
+              className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted hover:text-text disabled:opacity-40"
+              title="Show this Palinopsia in every visualizer open on the mesh"
+            >
+              identify
+            </button>
+            <label
+              className="flex shrink-0 cursor-pointer items-center gap-1 font-mono text-[9px] text-muted hover:text-text"
+              title="A scene of the mesh recalls connections only. Ticked : Palinopsia also recalls its own scene of that number (1 to 9 as in the scenes row, and on)"
+            >
+              <input type="checkbox" checked={!!cfg.sceneRecall} onChange={(e) => setCfg({ sceneRecall: e.target.checked })} className="h-2.5 w-2.5 accent-accent" />
+              mesh scenes recall ours
+            </label>
           </div>
           <div className="font-mono text-[9px] leading-relaxed text-muted">
             {state === 'on' ? (
@@ -144,8 +174,11 @@ export function DataflouSection(): JSX.Element {
                     (<span className="text-text">{st.actions}</span> of them actions from the Body rule list)
                   </>
                 )}
-                {' '}: choose them under publish
+                {' '}: choose them under publish. Core {st.core}
+                {st.discovery !== 'ok' && <span className="text-danger"> · cannot look around the network : {st.discovery}</span>}
               </>
+            ) : state === 'missing' ? (
+              <span className={cfg.enabled ? 'text-danger' : undefined}>this build does not carry the dataflou node : its module (native/dataflou) did not load. The rest of Palinopsia runs as usual.</span>
             ) : state === 'error' ? (
               <span className="text-danger">{st.error}</span>
             ) : (
@@ -173,6 +206,25 @@ export function DataflouSection(): JSX.Element {
                 {others.map((n) => (
                   <NodeRow key={n.sku} n={n} open={open === n.sku} onToggle={() => setOpen(open === n.sku ? null : n.sku)} ourSku={st.sku} />
                 ))}
+                {/* seen here, speaking an older protocol : by name */}
+                {st.refused.map((r) => (
+                  <div
+                    key={`refused|${r.sku}`}
+                    className="flex min-w-0 items-center gap-1.5 font-mono text-[9px]"
+                    title={`${r.label} speaks an older dataflou (${r.core}) : it cannot join this mesh until it is updated to 9.x${r.address ? ` · ${r.address}` : ''}`}
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
+                    <span className="min-w-0 truncate text-danger">{r.label || r.sku.slice(0, 8)}</span>
+                    <span className="min-w-0 truncate text-muted">{r.product}</span>
+                    <div className="flex-1" />
+                    <span className="shrink-0 text-danger">refused : core {r.core}, 9.x needed</span>
+                  </div>
+                ))}
+                {st.universes.length > 0 && (
+                  <span className="font-mono text-[9px] text-muted" title="Other universes nodes on this network are in : only nodes of the same universe see each other">
+                    also on this network : {st.universes.map((u) => `"${u}"`).join(', ')}
+                  </span>
+                )}
               </div>
 
               {/* ── what flows in and out, live ── */}
@@ -222,6 +274,7 @@ export function DataflouSection(): JSX.Element {
                         {nameOf(src.sku)}/{src.path} <span className="text-accent2">→</span> {node.local ? st.label : node.label}/{dest}
                       </span>
                       <div className="flex-1" />
+                      {node.local && <StateChip d={st.dests[dest]} parked={st.parked.includes(dest)} />}
                       {shapeable && (
                         <button
                           onClick={() => setShapeOf(shapeOf === key ? null : key)}
@@ -236,7 +289,7 @@ export function DataflouSection(): JSX.Element {
                           scope={scope}
                           onClick={() =>
                             void dataflouWireScope(dest, src.sku, src.path, scope === 'session' ? 'computer' : 'session').then((ok) => {
-                              if (!ok) showToast('This wire could not move : a destination takes four wires of the session at most', 'warn')
+                              if (!ok) showToast('This wire could not move : the session holds 128 wires at most', 'warn')
                             })
                           }
                         />
@@ -249,7 +302,7 @@ export function DataflouSection(): JSX.Element {
                         ✕
                       </button>
                     </div>
-                    {shapeOf === key && <WireShape dest={dest} src={src} />}
+                    {shapeOf === key && <WireShape dest={dest} src={src} fromTrigger={st.nodes.find((x) => x.sku === src.sku)?.params.find((p) => p.path === src.path)?.type === 'trigger'} />}
                     </div>
                   )
                 })}
@@ -297,22 +350,23 @@ export function DataflouSection(): JSX.Element {
 // wire (in ↙), the outside values you chose to WATCH (◉, from the node list :
 // wired or not), and what Palinopsia SENDS over a wire (out ↗); each with its
 // value now, its last seconds as a line, where it comes from or goes, how many a
-// second. Palinopsia's own values that other nodes merely monitor (a visualizer
-// page asks for all of them) are not wires : one line says who, and how many.
+// second.
 // Asked of main ten times a second, only while it is open.
 const HIST = 80
+// (a color comes as four whole numbers 0..255; a list of floats is an array)
+const isColour = (v: number[]): boolean => v.length === 4 && v.every((x) => Number.isInteger(x) && x >= 0 && x <= 255)
 function numOf(v: DfValue | null): number | null {
   if (v === null || v === undefined) return null
   if (typeof v === 'number') return Number.isFinite(v) ? v : null
   if (typeof v === 'boolean') return v ? 1 : 0
-  if (Array.isArray(v)) return v.length >= 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : typeof v[0] === 'number' ? v[0] : null
+  if (Array.isArray(v)) return isColour(v) ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : typeof v[0] === 'number' ? v[0] : null
   return null
 }
 function fmt(v: DfValue | null): string {
   if (v === null || v === undefined) return '—'
   if (typeof v === 'boolean') return v ? 'on' : 'off'
   if (typeof v === 'number') return Math.abs(v) >= 100 ? v.toFixed(0) : String(Math.round(v * 1000) / 1000)
-  if (Array.isArray(v)) return v.length >= 3 ? `${v.slice(0, 3).join(' ')}` : v.join(' ')
+  if (Array.isArray(v)) return v.slice(0, isColour(v) ? 3 : 4).map((x) => Math.round(x * 100) / 100).join(' ')
   return `"${String(v).slice(0, 24)}"`
 }
 function Spark({ pts }: { pts: number[] }): JSX.Element {
@@ -365,8 +419,8 @@ function DataView({ running }: { running: boolean }): JSX.Element {
   const total = io.reduce((n, x) => n + x.in.length + x.out.length + (x.watched?.length ?? 0), 0)
   const row = (sku: string, dir: 'in' | 'out' | 'watch', r: DfIoRow): JSX.Element => {
     const k = `${sku}|${dir}|${r.path}|${r.peers.join(',')}`
-    const stale = !r.live || r.ageMs === null || r.ageMs > 2000
-    const colour = Array.isArray(r.value) && r.value.length >= 3
+    const stale = !r.live || (dir !== 'out' && r.value === null)
+    const colour = Array.isArray(r.value) && isColour(r.value)
     return (
       <div key={k} className={`flex min-w-0 items-center gap-1.5 font-mono text-[9px] ${stale ? 'text-muted' : 'text-text'}`}
         title={`${dir === 'in' ? `${r.peers.join(', ')} → ${r.path}` : `${r.path} → ${r.peers.join(', ')}`}${r.ageMs !== null ? ` · last ${(r.ageMs / 1000).toFixed(1)} s ago` : ' · nothing yet'}${r.live ? '' : ' · not connected'}`}>
@@ -379,7 +433,7 @@ function DataView({ running }: { running: boolean }): JSX.Element {
         )}
         <span className="w-14 shrink-0 truncate text-right">{fmt(r.value)}</span>
         <span className="min-w-0 flex-1 truncate text-muted">{dir === 'in' ? 'from ' : dir === 'watch' ? '' : 'to '}{r.peers.join(', ')}</span>
-        <span className="w-9 shrink-0 text-right text-muted">{r.perSec}/s</span>
+        <span className="w-9 shrink-0 text-right text-muted">{dir === 'out' ? '' : `${r.perSec}/s`}</span>
         {dir === 'watch' && r.sku && (
           <button onClick={() => toggleDfWatch(r.sku!, r.path)} className="shrink-0 px-0.5 text-muted hover:text-danger" title="Stop watching this value">
             ✕
@@ -411,12 +465,6 @@ function DataView({ running }: { running: boolean }): JSX.Element {
           {/* out : Palinopsia's values wired to other nodes */}
           {io.some((n) => n.out.length) && <span className="mt-0.5 font-mono text-[8px] uppercase tracking-wide text-muted">from Palinopsia</span>}
           {io.flatMap((n) => n.out.map((r) => row(n.sku, 'out', r)))}
-          {/* monitored, not wired : one line */}
-          {io.some((n) => n.watchedBy?.length) && (
-            <span className="mt-0.5 font-mono text-[9px] text-muted" title="A visualizer page (or a node watching) asks for every value of Palinopsia to show it : these are not wires, and they cost nothing on Palinopsia's side to speak of">
-              monitored : {io.flatMap((n) => n.watchedBy ?? []).map((w) => `${w.count} values by ${w.label}`).join(' · ')}
-            </span>
-          )}
         </>
       )}
     </div>
@@ -425,7 +473,7 @@ function DataView({ running }: { running: boolean }): JSX.Element {
 
 /** A wire into Palinopsia, shaped : the part of the destination's range it covers,
  *  turned the other way, smoothed, and on loss hold or glide back. */
-function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
+function WireShape({ dest, src, fromTrigger }: { dest: string; src: DfSub; fromTrigger?: boolean }): JSX.Element {
   const d = DF_DESTS.find((x) => x.path === dest)
   const o: DfWireOpt = src.opt ?? {}
   const num = d?.type === 'number'
@@ -447,9 +495,18 @@ function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
           <BoundedNumberInput fixedWidth className={box} value={o.hi ?? 1} min={0} max={1} maxFrac={2} onCommit={(v) => set({ hi: v })} />
         </span>
       )}
-      <button onClick={() => set({ invert: !o.invert })} className={chip(!!o.invert)} title="Turned the other way : the source's low end plays the high end">
-        invert
-      </button>
+      {fromTrigger ? (
+        <span>a trigger to a trigger : it fires when the other does</span>
+      ) : (
+        <button
+          onClick={() => set({ invert: !o.invert })}
+          className={chip(!!o.invert)}
+          title={d?.type === 'trigger' ? 'It fires as the source goes up past its middle; inverted, as it goes down' : "Turned the other way : the source's low end plays the high end"}
+        >
+          invert
+        </button>
+      )}
+      {o.mesh && <span className="text-accent2" title="Its curve or its source's range was set on the mesh (the visualizer) : kept, until the range or invert is set here">shaped on the mesh</span>}
       {glides && (
         <span className="flex items-center gap-1" title="Smoothing : the control glides to each new value over about this long (ms; 0 : at once). For a jittery sensor. Shared by every wire into this control : the longest counts">
           smooth
@@ -458,7 +515,7 @@ function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
         </span>
       )}
       {glides && (
-        <span className="flex items-center gap-1" title="When the source goes quiet for 2 s (a glove out of battery, a computer asleep) : hold its last value, or glide back to where the control was before the wire played it. Shared by every wire into this control : one asking to glide back is enough">
+        <span className="flex items-center gap-1" title="When the source is gone (a glove out of battery, a computer asleep, its program quit) : hold its last value, or glide back to where the control was before the wire played it. Shared by every wire into this control : one asking to glide back is enough">
           on loss
           <button onClick={() => set({ onLoss: o.onLoss === 'return' ? 'hold' : 'return', returnSec: o.returnSec ?? 2 })} className={chip(o.onLoss === 'return')}>
             {o.onLoss === 'return' ? 'glide back' : 'hold'}
@@ -481,8 +538,20 @@ function WireShape({ dest, src }: { dest: string; src: DfSub }): JSX.Element {
   )
 }
 
+/** How one of our destinations stands, in the mesh's words. */
+function StateChip({ d, parked }: { d: DfDestView | undefined; parked: boolean }): JSX.Element {
+  const st = parked ? 'dormant' : (d?.state ?? 'free')
+  const look = st === 'bound' ? 'bg-accent/15 text-accent' : st === 'waiting' || st === 'grounding' ? 'bg-accent2/20 text-accent2' : 'bg-panel3 text-muted'
+  return (
+    <span className={`shrink-0 rounded px-1 ${look}`} title={parked ? 'This destination is not published now : its connection is kept, and plays again when it is' : dfStateWords(d)}>
+      {st}
+    </span>
+  )
+}
+
 function NodeRow({ n, open, onToggle, ourSku }: { n: DfNodeView; open: boolean; onToggle: () => void; ourSku: string }): JSX.Element {
   const params = n.params.filter((p) => p.kind === 'param')
+  const populations = n.params.filter((p) => p.kind === 'group' && p.slots)
   const sources = params.filter((p) => p.flow !== 'destination')
   const dests = params.filter((p) => p.flow !== 'source')
   return (
@@ -513,6 +582,13 @@ function NodeRow({ n, open, onToggle, ourSku }: { n: DfNodeView; open: boolean; 
           {params.map((p) => (
             <ParamRow key={p.path} p={p} n={n} ourSku={ourSku} />
           ))}
+          {populations.map((p) => (
+            <div key={p.path} className="flex min-w-0 items-center gap-1 font-mono text-[9px] text-muted" title={`${p.path} : a population of ${p.slots} instances (touches, notes, bodies). Wire one of its instances from the visualizer.`}>
+              <span className="shrink-0">∷</span>
+              <span className="min-w-0 truncate">{p.label || p.path}</span>
+              <span className="shrink-0">population of {p.slots}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -521,14 +597,17 @@ function NodeRow({ n, open, onToggle, ourSku }: { n: DfNodeView; open: boolean; 
 
 function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string }): JSX.Element {
   const watching = useDfWatches().some((w) => w.sku === n.sku && w.path === p.path)
-  // dataflou casts between bool, numbers, vectors and colors, never into a string
+  // dataflou casts between bool, numbers, vectors, colors and arrays, never into a
+  // string; anything fires a trigger, and a trigger fires only a trigger
   const castable = p.type !== 'string' && p.type !== 'blob'
   const isSource = p.flow !== 'destination' && castable
-  const isDest = p.flow !== 'source' && castable
+  const isDest = p.flow !== 'source' && castable && p.access !== 'read'
+  const trig = p.type === 'trigger'
+  const dests = trig ? DF_DESTS.filter((d) => d.type === 'trigger') : DF_DESTS
   const segs = p.path.split('/')
   const group = segs.length > 1 ? segs[segs.length - 2] : ''
-  const range = p.type === 'number' ? `${+p.min.toFixed(3)}..${+p.max.toFixed(3)}${p.unit ? ` ${p.unit}` : ''}` : p.type
-  const select = 'min-w-0 max-w-[118px] shrink rounded bg-panel2 px-1 py-0 font-mono text-[9px] text-muted hover:text-text'
+  const range = p.type === 'number' ? `${+p.min.toFixed(3)}..${+p.max.toFixed(3)}${p.unit ? ` ${p.unit}` : ''}` : p.type === 'array' ? `array of ${p.size ?? '?'}` : p.type
+  const select = 'min-w-0 max-w-[104px] shrink rounded bg-panel2 px-1 py-0 font-mono text-[9px] text-muted hover:text-text'
   return (
     <div className="flex min-w-0 items-center gap-1 font-mono text-[9px]" title={`${p.path} · ${p.flow} · ${range}${p.desc ? ` · ${p.desc}` : ''}`}>
       <span className={`shrink-0 ${p.flow === 'source' ? 'text-accent2' : p.flow === 'destination' ? 'text-accent' : 'text-text'}`}>
@@ -540,6 +619,17 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
       </span>
       <span className="shrink-0 text-muted">{range}</span>
       <div className="flex-1" />
+      <button
+        onClick={() =>
+          void window.api.dataflouLocate({ sku: n.sku, path: p.path }).then((ok) => {
+            if (!ok) showToast('That node is not reached directly : it cannot be asked to show itself', 'warn')
+          })
+        }
+        className="shrink-0 rounded px-1 text-muted hover:text-text"
+        title="Locate : ask that node to show where this parameter is (a light, a nudge)"
+      >
+        ⌖
+      </button>
       <button
         onClick={() => toggleDfWatch(n.sku, p.path)}
         className={`shrink-0 rounded px-1 ${watching ? 'bg-accent/20 text-accent ring-1 ring-accent' : 'text-muted hover:text-text'}`}
@@ -561,10 +651,10 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
           title="Wire this to Palinopsia : a free Macro knob (then give it any controls, with its range and curve), a free modulator (then bind it to any control with its M), or one of Palinopsia's destinations. Wiring to a destination that is not published publishes it (for the session only, when the new wire is saved with the session)."
         >
           <option value="">→ Palinopsia…</option>
-          <option value="__macro__">◈ a free Macro knob</option>
-          <option value="__mod__">◈ a free modulator</option>
+          {!trig && <option value="__macro__">◈ a free Macro knob</option>}
+          {!trig && <option value="__mod__">◈ a free modulator</option>}
           <optgroup label="a destination">
-            {DF_DESTS.map((d) => (
+            {dests.map((d) => (
               <option key={d.path} value={d.path}>
                 {d.label}
               </option>

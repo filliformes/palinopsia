@@ -4590,47 +4590,56 @@ config persists to `localStorage`.
 
 ## dataflou mesh
 
-Palinopsia can be a **node of a dataflou mesh**, the decentralized parameter network
-its sibling instruments speak : nodes on the same local network find each other (mDNS),
+Palinopsia can be a **node of a dataflou mesh** (core **9.3**), the decentralized parameter
+network its sibling instruments speak : nodes on the same local network find each other,
 exchange what parameters they have, and wire any node's sources to any node's
-destinations, with no central controller. The **dataflou** section of the Connect
-tab has the whole setup :
+destinations, with no central controller. The node is dataflou's own core, built in.
+**Every node of the mesh must be 9.x** : a node of core 8 (or 9.0) is refused, and the
+section names it. The **dataflou** section of the Connect tab has the whole setup :
 
 - **ON THE MESH / OFF** joins or leaves (off by default, remembered on this machine).
+  **MISSING** : this build does not carry the node (the rest runs as usual). A red **HALT**
+  beside it : the mesh is stopped (its emergency stop), no node takes a value.
+  **presentation** : the mesh is in its show phase.
 - **name** : how the other nodes see this Palinopsia. **universe** : only nodes of the
   same universe see each other (`default` unless you split a room into several).
 - **network** : every other node, online or remembered (dataflou never forgets a node
   that went offline; **forget** removes it from the whole mesh), with what it publishes
-  (↗) and takes (↙). Open one to see its parameters, each with a picker : **→ Palinopsia…**
+  (↗) and takes (↙); then the nodes **refused** (an older core), and the other universes on
+  this network. Open one to see its parameters, each with a picker : **→ Palinopsia…**
   wires that source to **◈ a free Macro knob** (the first with no destination and no wire,
   named after it, "glove-l pitch", the Macro row opening : give it any controls with
   their M, its range and curve shape it), to **◈ a free modulator** (it becomes a
   Controller played by that value : bind it to any control with its M, with depth,
   curve and shaping), or to one of Palinopsia's destinations; **← Palinopsia…** feeds that
   destination from one of Palinopsia's sources, and **◉** watches it in the data view
-  (wired or not : a glove's sensors before you decide what they play).
+  (wired or not : a glove's sensors before you decide what they play). **⌖** asks that
+  node to show where the parameter is. A trigger wires to what fires (vary, next, a
+  randomize); a population (touches, notes, bodies) is one line : wire one of its instances
+  from the visualizer.
 - **data** : what matters in a connected show, live, in three parts. **into Palinopsia** :
   each destination another node feeds (↙ : from which node and parameter); **watching** :
   the outside values you picked with ◉ (✕ stops one; kept on this computer, per
   universe); **from Palinopsia** : each of its values wired to another node (↗ : to where).
   Each row has the value now, its last seconds as a small line (a swatch for a color) and
-  how many values a second; it goes grey when nothing has arrived for two seconds or the
-  other node is gone. Values set on Palinopsia from elsewhere (the visualizer, a SETVAL)
-  show too, for ten seconds. Palinopsia's own values that a node merely monitors (a
-  visualizer page open on it asks for every value) are not wires : one line says who and
-  how many (**monitored : 256 values by gloves**). Click **data** to fold it (remembered);
-  it only asks for the values while it is open.
+  how many values a second; it goes grey when the other node is gone (a fader at rest
+  sends nothing, and is not gone). A watched value is read ten times a second. Click
+  **data** to fold it (remembered); it only asks for the values while it is open.
 - **connections** : every wire on the mesh that Palinopsia knows of (its own, and the ones
   the other nodes announce), with ✕ to unwire. The header shows the values received and
-  sent per second. A wire into Palinopsia has a **⚙** : the part of the destination's range
+  sent per second. A wire into Palinopsia says how its destination stands : **bound** (a live
+  source feeds it), **waiting** (its source just went), **grounding**, **free**, **dormant**
+  (not published now); the tooltip says where its last end came from. It has a **⚙** : the part of the destination's range
   it covers (**range** 0.2 to 0.4 : the source's whole sweep lands there), **invert**,
   **smooth** (the control glides to each new value over that many ms : a jittery sensor),
   and **on loss** : **hold** the last value, or **glide back** (over a few seconds) to where
-  the control was before the wire began to play it, once the source has been quiet for
-  2 s (a glove out of battery, a computer asleep). Kept with the wire.
+  the control was before the wire began to play it, once its source is gone (a glove out
+  of battery, a computer asleep, a program quit). Kept with the wire. The range and the
+  invert are dataflou's own link transform, so the visualizer shows them; a curve drawn
+  there is kept and reads **shaped on the mesh**.
 - **PC / SESSION** : a wire into Palinopsia is kept on this computer (**PC** : every
   session, in the app's `dataflou` folder, as before) or saved with the session
-  (**SESSION** : in its file, a piece's own wiring); one click on the chip moves it, its
+  (**SESSION** : in its file, a piece's own wiring, 128 wires at most); one click on the chip moves it, its
   shape (⚙) going with it. **new wires** in the header picks where the wires you make in
   the section go (the same choice as MIDI and OSC **Learn into**); a wire made from the
   mesh (another node, the visualizer, a dataflou scene) is the computer's. On its
@@ -4641,8 +4650,8 @@ tab has the whole setup :
   another universe it waits, kept in the session (a line says how many, and for which
   universe), and plays as soon as the node joins that one. A session's wires publish what
   they play **for that session only** : on the mesh while it is open (marked **session**
-  in the publish list, after this computer's list, in the room the frame has left), gone
-  with New or another load, never added to this computer's list. A session never
+  in the publish list), withdrawn from the mesh with New or another load, never added to
+  this computer's list (after a crash too). A session never
   publishes the Session actions (a favorite, load, New); move a wire to this computer to
   keep what it plays published here. One of Palinopsia's
   own sources is saved as itself (each computer has its own node id), so a local wire
@@ -4660,20 +4669,24 @@ modulator's input row has the same ◈ : the moved value plays that modulator (b
 instead of a learned MIDI / OSC control; the session keeps it). A control another node
 plays shows a **◈** beside it (the layer strip's opacity, A/B mix and vary, the
 Background's opacity, the Macro tiles) : lit while values arrive, its tooltip says from
-where, right-click unwires. The values a modulator plays stream only to Palinopsia (they
-add nothing to Palinopsia's own parameter list on the mesh).
+where, right-click unwires. A modulator's mesh value comes in on a parameter of its own,
+`input/1..8`, on the mesh only while the modulator uses it.
 - **visualizer ↗** opens the dataflou project's mesh visualizer (by Alexandre Burton) in
   your browser : every node a colored arc of its parameters around one circle, the wires
   between them, the values live; drag a source onto a destination to wire them, click a
   wire to cut it. Palinopsia serves it itself, on this computer only (127.0.0.1), from its
   view of the mesh, the way dataflou's own nodes serve it; while a page is open every
   other node's parameters stream to it, and the button shows how many pages are open.
-  The page travels with Palinopsia with its author's permission (credited in
-  `THIRD_PARTY_NOTICES.md`); `npm run build:visualizer` rebuilds it from a dataflou checkout
+  The page (version 66, MIT, credited in `THIRD_PARTY_NOTICES.md`) ships with Palinopsia;
+  `npm run build:visualizer` rebuilds it from a dataflou checkout
   beside this repo (or give the path to its `web/` folder). Its editor panel needs
   dataflou's sibling Atelier project; without it the page runs without that panel.
   The page's status bar shows this computer's address and the universe : picking another
-  universe there moves Palinopsia's node to it (the Connect tab follows). Its video inside
+  universe there moves Palinopsia's node to it (the Connect tab follows). It also sets the
+  phase (preparation, presentation), halts the mesh, locates a parameter (hold Alt over it),
+  forgets the nodes that are away, and shapes Palinopsia's links; another node's links and
+  parameters are edited from that node's own page. **identify**, beside the button, shows
+  this Palinopsia in every page of the mesh. Its video inside
   the ring needs dataflou's own NDI bridge (`ndi-pont`), not part of Palinopsia.
 
 **Scenes** (dataflou's own, not Palinopsia's scenes) : a scene is a state of the mesh's
@@ -4686,18 +4699,15 @@ ones it has). A node away during a recall catches up when it comes back; a node 
 slot n keeps its connections (**missing**); connections changed by hand after a recall
 read **modified**; a node that restarts in the same scene keeps its hand changes. Values
 are not in scenes (Palinopsia's own scenes and presets keep those). Palinopsia's node keeps
-its slots per universe, beside the bindings in the app's `dataflou` folder.
+its slots per universe, with its connections, in the app's `dataflou` folder.
+**mesh scenes recall ours** (off by default) : a scene recalled on the mesh also recalls
+Palinopsia's scene of that number.
 
-**When a node drops out and comes back** (a computer asleep, a cable pulled, the Wi-Fi
-gone for a moment), Palinopsia calls it back by itself : every node it lost without a
-goodbye is dialled again from where it was last seen, after a few seconds, then less and
-less often (up to every 30 s) until it answers, and the wires come back with it (values
-flow again within about seven seconds of the other side being reachable). Nothing to
-restart on either side, Max included : the other node does not need to call back itself.
-When this computer wakes up, or its network address changes, Palinopsia drops the
-connections that went quiet, announces itself again from its new address and calls every
-lost node at once. A node that leaves properly (it closes, or leaves the mesh) is not
-called back.
+**When a node drops out and comes back** (a computer asleep, a cable pulled, a program
+restarted), the mesh finds it again by itself and its wires come back with it. Until then
+the wire **waits** a second, then its destination is **free** and keeps its value (or glides
+back). When this computer wakes up, or its network address changes, Palinopsia joins the
+mesh again from where it now is.
 
 **What Palinopsia shows the mesh is yours to choose : one node, carrying what you tick
 under publish.**
@@ -4707,38 +4717,32 @@ under publish.**
   actions. A ticked group follows itself : a new scene's action appears by itself.
 - **Or open a group and tick single parameters.**
 - **Wiring one of Palinopsia's parameters from the section publishes it.**
-- **A gauge shows how full the node's one frame is.** A frame holds 32 KB, and a
-  microcontroller node takes about 8 KB : the gauge turns amber past that, and red when
-  published actions had to be left out to fit.
-
 Before v1.3.4, every parameter was published, and the actions rode on a second node,
 `<name>-session`. Both are gone : there is one node, and the Macro knobs until you choose
 more. The update keeps your wires : the first time the node runs, every destination a
 saved wire plays is published too (one by one), and the second node's wires and scene
 slots join the one node's (its actions are at the same paths). The other nodes are asked
-to forget the second node. A field whose value is every decoder's default is left out, as the core's own terse
-DECLARE does.
+to forget the second node. **Before v1.3.6** the node spoke dataflou's older protocol : the
+first time it runs, its saved wires and mesh scenes are given to the new node as they
+were (the old files stay beside, as `.v135`). A small board (Teensy, ESP32) says how big a
+message it takes (about 16 KB) and is not sent a bigger tree : publish what you play.
 
 Everything that can be published :
 
 | | Paths | Notes |
 |---|---|---|
-| ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary · mute` (bools), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow`, `feel/drift` (Wander : it plays `/opsia/wander`, the path keeps its old name so a wire to it stays), `feel/tonicity · shutter`, `feel/superimposition` (plays `/opsia/superflicker`), `world/amount` (the World amount, 1 = all of the World), `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (bools : the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (bools), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy · reset` (bools), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change |
-| ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, sent 30 times a second, only while a node listens |
+| ↙ destinations | `meta/1..16` (the Macro knobs, also sources), `layer/1..4/opacity · speed · mix`, `layer/1..4/vary` (a trigger) and `mute` (a bool), `bg/opacity`, `feel/density · proximity · gesture · coalesce · flow`, `feel/drift` (Wander : it plays `/opsia/wander`, the path keeps its old name so a wire to it stays), `feel/tonicity · shutter`, `feel/superimposition` (plays `/opsia/superflicker`), `world/amount` (the World amount, 1 = all of the World), `scene/recall` (0 to 9), `scene/next`, `scene/randomize`, `scene/vary` (triggers; the last is the global Vary), `randomize/sources · sourceparams · sourcefx · sourcefxonly · layerfxonly · layer · master · finishing · modulators · masterparams · meta · inspector · sonify · resolume · background` (triggers), `output/x · y · scale · rotate · spin · feather · edge` (0 to 1) and `output/flipx · flipy` (bools) and `output/reset` (a trigger), `bpm` (20 to 800) | each plays exactly like its `/opsia` OSC address, once per change; readable : its value is where the control stands |
+| ↗ sources | `audio/level · flux · transient · centroid · pitch · noisiness`, `audio/bands` (the six bands as one array of floats; one alone is `audio/bands/1..6`), `vision/brightness · contrast · motion · edges · warmth · saturation · hue · centroidX · centroidY`, `body/bodyPresent · bodyMotion · handLeftHeight · handRightHeight · handLeftX · handRightX · handsApart · moveEnergy`, `mod/1..8` | 0 to 1, up to 30 times a second, to whoever listens (the picture's are measured while something wants them) |
 
 **The actions** (a group per heading of the Body rule list, under publish) cover the
 layers' moves, Randomize, scenes, Worlds, Generate, the Macro knobs and modulators, Feel,
 tempo and key, the Audio Layer, the Sonify voices, the transport, the output, the session,
 your own Body rules and the triggers of what is loaded. They appear under
 `act/<heading>/<action>` (`act/l1/mute`, `act/scene/3`, `act/sonify/voice-8`,
-`act/feel/density-up`...). Each is a trigger : it fires once as it goes on (0.5 or more),
-and again only after it went off. A ticked heading follows the session (a new scene, a
+`act/feel/density-up`...). Each is a **trigger** : from a trigger it fires exactly as often
+as the other does (over TCP, never lost nor doubled); from a fader or a switch it fires as
+the value goes up past its middle, and again only after it came down. A ticked heading follows the session (a new scene, a
 rule, an effect with a trigger), and the other nodes see the new tree a moment later.
-
-All of it does not fit in one frame (about 500 actions with a large session) : publish
-the headings you play. A reference C++ node keeps the first 128 entries of a tree and 32
-per group, and the actions come last : when what you publish passes that, a line under
-**publish** says how many parameters such a node cannot see.
 
 A wire into a parameter you stop publishing is not lost : it waits (kept, saved), the
 **connections** box says which parameters it waits for, with a **publish** button, and it
@@ -4749,11 +4753,10 @@ here meets a synth's 20..20000 Hz there. A wire Palinopsia makes on its own dest
 is kept (per universe, on this computer or in the session) and comes back by itself when
 the other node reappears.
 
-The node is written in TypeScript in the main process (`src/main/dataflou/`) after
-dataflou's reference core, message for message : mDNS `_dataflou._tcp` with the `sku` /
-`univ` TXT keys, the CBOR topology protocol over TCP (HELLO, DECLARE, DIGEST, SUBREQ,
-STREAMREQ…) and the UDP data plane on the TCP port + 1. It was tested against the
-reference C++ node in both directions.
+The node is dataflou's core 9.3 behind its C interface, in a native module
+(`native/dataflou`, its sources vendored and pinned), on a thread of its own in the main
+process (`src/main/dataflou/`). What was decided and measured :
+[docs/dataflou-9.3.md](docs/dataflou-9.3.md).
 
 ## Ableton Link
 
@@ -4886,7 +4889,7 @@ the UI (`src/renderer/src/mcp/tools.ts`, listed in `src/shared/mcpTools.ts`).
 |---|---|
 | Shell | Electron + electron-vite + TypeScript + React 18 + Tailwind + Zustand; CodeMirror 6 for the Source Editor |
 | Engine | WebGL2 + [`interactive-shader-format`](https://github.com/msfeldstein/interactive-shader-format-js) runtime; WebGPU compute is post-MVP |
-| Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer; the Ableton Link SDK in an N-API addon (main); a dataflou mesh node (main); an MCP server for the Agent (Streamable HTTP, 127.0.0.1 only) |
+| Control | `osc` (main) in/out + OSCQuery HTTP tree; Web MIDI in the renderer; the Ableton Link SDK in an N-API addon (main); a dataflou mesh node (the core 9.3 in an N-API addon, main); an MCP server for the Agent (Streamable HTTP, 127.0.0.1 only) |
 | Video | `ffmpeg-static` ingest (DXV/HAP/ProRes… → all-intra cache) + `<video>` hardware decode; WebCodecs (HEVC) for HIVE and (H.264) for Codec Mosh; ffmpeg for recording delivery and the clips' sound analysis |
 | Audio | Web Audio (local analyser + the Sonify AudioWorklet engine, which also plays the Audio Layer) + OSC audio bus |
 | Depth | Transformers.js 3.0.2 + onnxruntime-web (WebGPU, else WebAssembly) running Depth Anything V2 Small on a worker thread; shipped in the app, offline |
@@ -5032,8 +5035,8 @@ model (Apache-2.0), shipped in the app. The Body page's trackers run
 runs the RTMO-s model from [MMPose](https://github.com/open-mmlab/mmpose) (Apache-2.0)
 on ONNX Runtime Web. Drape's cloth and the foil finish are adapted from
 [Holocloth](https://github.com/dmitrykurash/holocloth) by Dmitry Kurash (MIT). The
-dataflou mesh visualizer is the dataflou project's own page, by **Alexandre Burton**
-(Artificiel), shipped with his permission, with [d3](https://d3js.org) (ISC). Recording
+dataflou node is the dataflou library itself, and its mesh visualizer the project's own
+page, by **Alexandre Burton** (Artificiel, MIT), with [d3](https://d3js.org) (ISC). Recording
 and video conversion run [FFmpeg](https://ffmpeg.org) (GPL-3.0 builds), and the fonts are
 OFL-1.1 and Apache-2.0.
 

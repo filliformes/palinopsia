@@ -83,6 +83,25 @@ that CI builds into cross-platform releases.
   time on the rate's grid. The last frame is sent again after 500 ms with nothing new; five
   failed sends in a row, or a wake-up or a change of network with nobody connected
   (new `main/ndi/watch.ts`), make the sender again.
+- **dataflou 9.3 : the node is the core itself** (new `native/dataflou`, `src/main/dataflou/addon.ts`
+  and `wires.ts`; `node.ts`, `index.ts`, `visualizer.ts`, `shared/dataflou.ts`, the section). The
+  node was a TypeScript port of protocol 2, which a 9.x mesh refuses; it is now dataflou's core
+  9.3 (protocol 4) behind its C interface, vendored and pinned (etl, QCBOR, cJSON, asio and mdns
+  with it), an N-API addon built like Link, each node polling on its own thread (late 1.0 ms on
+  average, never over 5 ms). **Every node of the mesh must be 9.x : 8.x nodes are refused**, and
+  named in the section. New there : how each wire's destination stands (bound, waiting,
+  grounding, free, and why), a HALT light, the presentation phase, the other universes of the
+  network, **⌖** locate and **identify**, **mesh scenes recall ours** (off by default), MISSING
+  when the module is not there. What fires once (the actions, vary, next, the randomizes,
+  output reset) is a trigger, exact from a trigger, on the rising edge from a fader or a switch;
+  every destination is readable where its control stands; `audio/bands`, the six bands as one
+  array; a modulator's mesh value on `input/1..8`; a wire's range and invert are the core's link
+  transform; the 32 KB frame, the 128 entries, the four wires on a destination and the 128-node
+  warnings are gone. Glide back starts when the source is gone, not when it is quiet. The saved
+  wires and scenes of v1.3.5 are given to the new node once (`.v135` copies kept). The session's
+  wires never outlive their session, after a crash too. The visualizer is version 66. dataflou is
+  MIT now : the register says so. Decisions and measurements : `docs/dataflou-9.3.md`;
+  `tools/dataflou-test` runs the node against itself.
 - **Strata : a place as a scanner sees it, taken apart and put back together by the sound**
   (new `engine/StrataSource.ts`, `engine/strataPlaces.ts`, the `gen-strata` descriptor in
   `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native

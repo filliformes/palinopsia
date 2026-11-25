@@ -39,7 +39,7 @@ import { registerMcp } from './mcp'
 import { installAvcaptureHost } from './avcaptureHost'
 import { installSyphonIn } from './syphonIn'
 import { registerResolume } from './resolume'
-import { initDataflou } from './dataflou'
+import { closeDataflou, initDataflou } from './dataflou'
 import { closeLink, initLink } from './link'
 import { hiveBrowse, hiveConnect, hiveDisconnect, hiveDisconnectAll } from './hive'
 import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
@@ -370,6 +370,7 @@ function shutdown(): void {
   // leave the Link session now : the installation's relaunch exits with
   // app.exit(), which skips will-quit (where Link would otherwise close)
   closeLink()
+  closeDataflou()
   globalShortcut.unregisterAll()
 }
 

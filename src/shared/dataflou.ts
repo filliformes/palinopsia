@@ -1,11 +1,10 @@
-// dataflou : the decentralized parameter mesh (mDNS discovery, a CBOR topology
-// protocol over TCP, a UDP data plane). Palinopsia joins it as a node : it
-// declares a small tree of parameters (what it senses as SOURCES, what can play
-// it as DESTINATIONS), and every other node on the same universe sees them and
-// can wire them to its own. Shared between main (the node) and the renderer
-// (the section in the Connect tab, the value bridge).
+// dataflou : the decentralized parameter mesh (core 9.3, through its C interface :
+// native/dataflou). Palinopsia joins it as a node : it declares a tree of parameters
+// (what it senses as SOURCES, what can play it as DESTINATIONS), and every other node
+// on the same universe sees them and can wire them to its own. Shared between main
+// (the node) and the renderer (the section in the Connect tab, the value bridge).
 
-export type DfType = 'bool' | 'number' | 'string' | 'v2' | 'v3' | 'v4' | 'blob' | 'colour'
+export type DfType = 'bool' | 'number' | 'string' | 'v2' | 'v3' | 'v4' | 'blob' | 'colour' | 'trigger' | 'array'
 export type DfMode = 'streaming' | 'discrete' | 'polling'
 export type DfFlow = 'source' | 'destination' | 'bidir'
 export type DfAccess = 'read' | 'write' | 'readwrite'
@@ -13,7 +12,7 @@ export type DfNature = 'lin' | 'log' | 'exp'
 export type DfTopology = 'span' | 'centered' | 'cyclic' | 'free'
 export type DfValue = boolean | number | string | number[]
 
-/** One entry of a node's parameter tree (dataflou's ParamMeta, as declared). */
+/** One entry of a node's parameter tree. */
 export interface DfParam {
   path: string // 'meta/1' : no leading slash, '/'-separated
   kind: 'group' | 'param'
@@ -22,17 +21,16 @@ export interface DfParam {
   flow: DfFlow
   access: DfAccess
   rate: number // Hz, 0 = unspecified
-  ground: boolean
-  hardware: boolean
   min: number
   max: number
   init: number
-  smooth: [number, number]
   unit: string
   label: string
   desc: string
   nature: DfNature
   topology: DfTopology
+  size?: number // an array : how many elements (floats, ours)
+  slots?: number // a population : how many slots (its children are left out)
 }
 
 export interface DfSub {
@@ -43,10 +41,10 @@ export interface DfSub {
 }
 
 /** A wire into Palinopsia, shaped : the part of the destination's range it covers
- *  (lo..hi, 0..1 of that range), turned the other way, smoothed (a slew in ms,
- *  the renderer's), and what happens when its source goes quiet : hold the last
- *  value, or glide back over returnSec to where the control was before the wire
- *  began to play it. */
+ *  (lo..hi, 0..1 of that range) and turned the other way (dataflou's own link
+ *  transform), smoothed (a slew in ms, the renderer's), and what happens when its
+ *  source is gone : hold the last value, or glide back over returnSec to where the
+ *  control was before the wire began to play it. */
 export interface DfWireOpt {
   lo?: number
   hi?: number
@@ -54,6 +52,9 @@ export interface DfWireOpt {
   slewMs?: number
   onLoss?: 'hold' | 'return'
   returnSec?: number
+  /** Shaped on the mesh (the visualizer) in a way these words cannot say : a curve,
+   *  a source range. Kept as it is until this wire's range or invert is set here. */
+  mesh?: boolean
 }
 
 /** Clean a wire's options : only what differs from the plain wire is kept
@@ -92,48 +93,28 @@ export interface DfSessionWire {
 }
 export const DF_SELF = '@self'
 export const DF_SESSION_WIRES_MAX = 128
-const DF_WIRES_PER_DEST = 4 // as a node keeps (MAX_SUBS)
 
 /** One wire's key : its destination, its source's node and path. */
 export const dfWireKey = (dest: string, sku: string, path: string): string => `${dest}\n${sku}\n${path}`
 
-/** A session's wires, cleaned : well formed, no twice the same, at most four on
- *  a destination (a node holds no more), at most DF_SESSION_WIRES_MAX. */
+/** A session's wires, cleaned : well formed, no twice the same, at most
+ *  DF_SESSION_WIRES_MAX. */
 export function cleanSessionWires(raw: unknown): DfSessionWire[] {
   if (!Array.isArray(raw)) return []
   const str = (v: unknown, max: number): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
   const out: DfSessionWire[] = []
   const seen = new Set<string>()
-  const perDest = new Map<string, number>()
   for (const x of raw) {
     if (out.length >= DF_SESSION_WIRES_MAX) break
     const w = x as Partial<DfSessionWire> | null
     if (!w || !str(w.universe, 32) || !str(w.dest, 200) || !str(w.sku, 64) || !str(w.path, 200)) continue
     const k = `${w.universe}\n${dfWireKey(w.dest, w.sku, w.path)}`
-    const d = `${w.universe}\n${w.dest}`
-    if (seen.has(k) || (perDest.get(d) ?? 0) >= DF_WIRES_PER_DEST) continue
+    if (seen.has(k)) continue
     seen.add(k)
-    perDest.set(d, (perDest.get(d) ?? 0) + 1)
     const opt = cleanWireOpt(w.opt)
     out.push({ universe: w.universe, dest: w.dest, sku: w.sku, path: w.path, ...(opt ? { opt } : {}) })
   }
   return out
-}
-
-/** A value of a remote parameter as 0..1 of its declared range (a vector : its
- *  first part; a colour : its brightness). */
-export function remote01(v: DfValue, p: { type: DfType; min: number; max: number } | null | undefined): number | null {
-  let n: number
-  if (typeof v === 'boolean') return v ? 1 : 0
-  if (typeof v === 'number') n = v
-  else if (Array.isArray(v)) {
-    if (p?.type === 'colour') return v.length >= 3 ? (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255 : null
-    n = typeof v[0] === 'number' ? v[0] : NaN
-  } else return null
-  if (!Number.isFinite(n)) return null
-  const lo = p ? p.min : 0, hi = p ? p.max : 1
-  if (!(hi > lo)) return Math.max(0, Math.min(1, n))
-  return Math.max(0, Math.min(1, (n - lo) / (hi - lo)))
 }
 
 /** Another node as Palinopsia sees it (the monitor). */
@@ -141,16 +122,43 @@ export interface DfNodeView {
   sku: string
   label: string
   product: string
-  version: number
-  state: string
   online: boolean
   local: boolean
-  connected: boolean // a direct TCP link (a node can be known only through gossip)
+  connected: boolean // a direct TCP link (a node can be known only through another)
   address: string
-  lastSeenMs: number // ms since epoch
+  lastSeenMs: number // ms since epoch (offline : when it left, or when we first saw it so)
   params: DfParam[]
-  // bindings ending on this node's params : dest path → its sources
+  // its connections : destination path → its sources
   subs: Record<string, DfSub[]>
+}
+
+/** How one of our destinations stands (the mesh's own words) : fed by a live
+ *  connection, waiting (its last source just went), returning to its rest value, or
+ *  free; and where its last end came from. A later core may add words. */
+export type DfDestState = 'free' | 'bound' | 'waiting' | 'grounding'
+export type DfEndOrigin = 'none' | 'source' | 'connection' | 'destination' | 'outside' | 'lost'
+export interface DfDestView {
+  state: DfDestState
+  origin: DfEndOrigin
+  connections: number
+  live: number
+}
+
+const END_WORDS: Record<DfEndOrigin, string> = {
+  none: '',
+  source: 'its source finished',
+  connection: 'the connection undid itself',
+  destination: 'unwired here',
+  outside: 'undone from the mesh',
+  lost: 'its source is gone'
+}
+/** How a destination stands, in words ("waiting : its source is gone"). */
+export function dfStateWords(d: DfDestView | undefined): string {
+  if (!d) return 'free'
+  if (d.state === 'bound') return d.live < d.connections ? `bound, ${d.live} of ${d.connections} sources here` : 'bound'
+  const why = END_WORDS[d.origin] ?? ''
+  const words = d.state === 'grounding' ? 'going back to rest' : d.state
+  return why ? `${words} : ${why}` : words
 }
 
 /** One row of the Connect tab's data view : a destination of ours and what feeds
@@ -172,41 +180,43 @@ export interface DfIo {
   out: DfIoRow[]
   /** Outside values watched (◉ in the node list) : streamed here only to be seen. */
   watched: DfIoRow[]
-  /** The nodes that monitor ours (a visualizer page on them asks for every value) :
-   *  how many of our values each takes. Not wires : shown as one line. */
-  watchedBy: Array<{ label: string; count: number }>
   rxPerSec: number
   txPerSec: number
 }
 
 export interface DfStatus {
+  /** Is the dataflou node in this build ? (its native module loaded) */
+  available: boolean
   running: boolean
   error: string | null
+  /** The core's version ('9.3'), '' when the module is missing. */
+  core: string
   sku: string
   label: string
   universe: string
   address: string // the address the others reach us on
   tcpPort: number
-  udpPort: number
   nodes: DfNodeView[] // every node of the world, ourselves first
+  // how our destinations stand : local path → state (those never wired are left out)
+  dests: Record<string, DfDestView>
   // our sources someone streams from : local path → destinations (node label + path)
   listeners: Record<string, string[]>
-  rxPerSec: number // UDP values received per second
-  txPerSec: number // UDP values sent per second
-  declareBytes: number // our whole tree, as one DECLARE frame
+  // nodes on this universe that speak another protocol (8.x, 9.0) : seen, refused
+  refused: Array<{ sku: string; label: string; product: string; core: string; address: string }>
+  // the other universes nodes on this network were seen in
+  universes: string[]
+  discovery: string // 'ok', or why the network cannot be browsed
+  halted: boolean // the mesh-wide stop is on : no value is taken anywhere
+  presentation: boolean // the mesh's phase : preparation, or presentation (the show)
+  rxPerSec: number // values that came in per second
+  txPerSec: number // values given to what listens, per second
   published: number // the parameters on the mesh now (groups aside)
   actions: number // of which actions (Body rule list triggers)
-  actionsDropped: number // published actions left out : the tree would pass one frame
-  // published parameters a node on the reference C++ core cannot see : it keeps
-  // 128 entries of a tree and 32 children per group, silently (see dfCppHidden)
-  cppHidden: number
   // our destinations with saved wires that wait : not published now
   parked: string[]
   // published for the open session only (its wires need them, this computer's
-  // list does not have them) : on the tree while it is open, never saved; and
-  // how many of them one frame had no room for
+  // list does not have them) : on the tree while it is open, never saved
   sessionPublished?: string[]
-  sessionDropped?: number
   // the session's wires playing now (dfWireKey, with the source's SKU resolved);
   // this computer's wires set aside because the session wires their destination
   // or their source; the session's wires waiting for another universe
@@ -232,6 +242,9 @@ export interface DfConfig {
   // time the node runs, the destinations its saved wires play are published too,
   // so they keep playing. The renderer's alone (main ignores it).
   migrate?: boolean
+  // A scene recalled on the mesh (which changes connections only) also recalls
+  // Palinopsia's scene of that number. Off by default.
+  sceneRecall?: boolean
 }
 
 export const DF_DEFAULT_CONFIG: DfConfig = { enabled: false, label: 'palinopsia', universe: 'default', publish: ['g:meta'] }
@@ -260,11 +273,6 @@ export interface DfAction {
   group: string // the picker's heading
 }
 
-// A desktop node takes frames up to 32 KB (32 768 bytes); the actions stop short.
-export const DF_DECLARE_MAX = 31_500
-// What the smallest boards take (their receive buffer is 8 KB, the length in it).
-export const DF_DECLARE_SMALL = 8_000
-
 const segOf = (s: string): string =>
   s
     .toLowerCase()
@@ -277,14 +285,14 @@ function hash6(s: string): string {
   return (h >>> 0).toString(36).slice(0, 6)
 }
 
-/** A path segment : dataflou names are at most 32 characters, with no spaces. */
+/** A path segment, short and without spaces (the paths the wires already use). */
 function seg32(s: string, from: string): string {
   const t = segOf(s)
   return t.length <= 32 ? t : `${t.slice(0, 25)}-${hash6(from)}`
 }
 
 // Each heading's short path, and the start of an id it makes redundant (layer-1
-// under l1, meta under macro...) : the whole tree must fit in one frame.
+// under l1, meta under macro...).
 const ACT_GROUPS: Record<string, { seg: string; strip?: RegExp }> = {
   Randomize: { seg: 'rand', strip: /^(rand|fire)-/ },
   'Layer 1': { seg: 'l1', strip: /^layer-1-/ },
@@ -327,11 +335,10 @@ export function dfActionPath(id: string, group: string, taken?: Set<string>): st
 }
 
 // ── Palinopsia's tree ─────────────────────────────────────────────────────
-// Kept small on purpose : the whole DECLARE must stay well under 8 KB, since
-// microcontroller nodes (and every node relaying it to them by gossip) drop a
-// frame bigger than their receive buffer. Every value is normalized 0..1 (bpm
-// excepted) : dataflou maps a source's range onto a destination's, so 0..1 here
-// meets any other node's range.
+// Every value is normalized 0..1 (bpm and the scene number excepted) : dataflou maps a
+// source's range onto a destination's, so 0..1 here meets any other node's range.
+// What fires something once (an action, vary, next, a randomize) is a trigger : sent
+// over TCP, never lost nor doubled.
 
 /** A destination : where an incoming value goes, as a /opsia OSC address (the
  *  same routes OSC input uses, so a dataflou value plays exactly like OSC). */
@@ -339,7 +346,7 @@ export interface DfDest {
   path: string
   label: string
   osc: string
-  type: 'number' | 'bool'
+  type: 'number' | 'bool' | 'trigger'
   min?: number
   max?: number
   init?: number
@@ -354,6 +361,8 @@ export interface DfSource {
   path: string
   label: string
   signal: string // 'audio:level' · 'vision:motion' · 'body:bodyMotion' · 'mod:1'
+  /** An array of these signals, one element each (its elements are paths too : bands/3). */
+  array?: string[]
 }
 
 const range = (n: number, from = 1): number[] => Array.from({ length: n }, (_, i) => i + from)
@@ -364,7 +373,7 @@ export const DF_DESTS: DfDest[] = [
     { path: `layer/${l}/opacity`, label: `L${l} opacity`, osc: `/opsia/layer${l}/opacity`, type: 'number' as const },
     { path: `layer/${l}/speed`, label: `L${l} speed`, osc: `/opsia/layer${l}/speed`, type: 'number' as const },
     { path: `layer/${l}/mix`, label: `L${l} A/B mix`, osc: `/opsia/layer${l}/mix`, type: 'number' as const },
-    { path: `layer/${l}/vary`, label: `L${l} vary`, osc: `/opsia/layer${l}/vary`, type: 'bool' as const },
+    { path: `layer/${l}/vary`, label: `L${l} vary`, osc: `/opsia/layer${l}/vary`, type: 'trigger' as const },
     { path: `layer/${l}/mute`, label: `L${l} mute`, osc: `/opsia/layer${l}/mute`, type: 'bool' as const }
   ]),
   { path: 'bg/opacity', label: 'background opacity', osc: '/opsia/bg/opacity', type: 'number' },
@@ -380,14 +389,14 @@ export const DF_DESTS: DfDest[] = [
   { path: 'feel/superimposition', label: 'superimposition', osc: '/opsia/superflicker', type: 'number' },
   { path: 'world/amount', label: 'World amount', osc: '/opsia/world/amount', type: 'number', init: 1 },
   { path: 'scene/recall', label: 'scene (1-9)', osc: '/opsia/scene', type: 'number', min: 0, max: 9, discrete: true },
-  { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'bool' },
-  { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'bool' },
-  { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'bool' },
+  { path: 'scene/next', label: 'next scene', osc: '/opsia/seq/skip', type: 'trigger' },
+  { path: 'scene/randomize', label: 'randomize', osc: '/opsia/randomize', type: 'trigger' },
+  { path: 'scene/vary', label: 'vary (global)', osc: '/opsia/vary', type: 'trigger' },
   { path: 'bpm', label: 'BPM', osc: '/opsia/bpm', type: 'number', min: 20, max: 800, init: 120 },
   // Every other randomize (scene/randomize is the whole thing) : the Transport's
   // scopes, then the ones only MIDI Learn fired before.
   ...(['sources', 'sourceparams', 'sourcefx', 'sourcefxonly', 'layerfxonly', 'layer', 'master', 'finishing', 'modulators', 'masterparams', 'meta', 'inspector', 'sonify', 'resolume', 'background'] as const).map((sc) => ({
-    path: `randomize/${sc}`, label: `randomize ${sc}`, osc: `/opsia/randomize/${sc}`, type: 'bool' as const
+    path: `randomize/${sc}`, label: `randomize ${sc}`, osc: `/opsia/randomize/${sc}`, type: 'trigger' as const
   })),
   // The output transform : the whole frame moved as one picture (0.5 = none for
   // offset, scale, rotate and spin).
@@ -400,11 +409,12 @@ export const DF_DESTS: DfDest[] = [
   { path: 'output/flipx', label: 'output flip x', osc: '/opsia/output/flipx', type: 'bool' },
   { path: 'output/flipy', label: 'output flip y', osc: '/opsia/output/flipy', type: 'bool' },
   { path: 'output/edge', label: 'output edge', osc: '/opsia/output/edge', type: 'number' },
-  { path: 'output/reset', label: 'output reset', osc: '/opsia/output/reset', type: 'bool' }
+  { path: 'output/reset', label: 'output reset', osc: '/opsia/output/reset', type: 'trigger' }
 ]
 
 export const DF_SOURCES: DfSource[] = [
   ...(['level', 'flux', 'transient', 'centroid', 'pitch', 'noisiness'] as const).map((f) => ({ path: `audio/${f}`, label: `audio ${f}`, signal: `audio:${f}` })),
+  { path: 'audio/bands', label: 'audio bands (6, low to high)', signal: '', array: range(6).map((i) => `audio:band${i}`) },
   ...(['brightness', 'contrast', 'motion', 'edges', 'warmth', 'saturation', 'hue', 'centroidX', 'centroidY'] as const).map((f) => ({
     path: `vision/${f}`, label: `picture ${f}`, signal: `vision:${f}`
   })),
@@ -439,70 +449,16 @@ export const DF_PUBLISH_GROUPS: Array<{ key: string; label: string; items: Array
   return out
 })()
 
-/** How many of a tree's parameters a node on the reference C++ core cannot see.
- *  Its store keeps 128 entries (groups included, the root aside) and 32 children
- *  per group, root included, and silently stops adding : an entry past a full
- *  group still takes one of the 128, and whatever hangs under it is out of reach.
- *  Played here exactly as its ParamStore declares a tree, entry by entry. */
-export function dfCppHidden(params: readonly DfParam[], cap = 128, children = 32): number {
-  type N = { name: string; kids: N[] }
-  const root: N = { name: '', kids: [] }
-  let used = 0
-  const alloc = (name: string): N | null => (used >= cap ? null : (used++, { name, kids: [] }))
-  const attach = (parent: N, n: N): void => {
-    if (parent.kids.length < children) parent.kids.push(n)
-  }
-  const segs = (path: string): string[] => path.split('/').filter(Boolean).map((x) => x.slice(0, 32))
-  const groupAt = (path: string[]): N => {
-    let cur = root
-    for (const seg of path) {
-      const had = cur.kids.find((k) => k.name === seg)
-      if (had) {
-        cur = had
-        continue
-      }
-      const n = alloc(seg)
-      if (!n) continue // (the store full : the walk stays where it is, as the core's)
-      attach(cur, n)
-      cur = n
-    }
-    return cur
-  }
-  const kinds = new Map<N, 'group' | 'param'>()
-  for (const p of params) {
-    const s = segs(p.path)
-    if (!s.length) continue
-    const parent = groupAt(s.slice(0, -1))
-    const name = s[s.length - 1]
-    if (parent.kids.some((k) => k.name === name)) continue
-    const n = alloc(name)
-    if (!n) continue
-    kinds.set(n, p.kind)
-    attach(parent, n)
-  }
-  let seen = 0
-  const walk = (n: N): void => {
-    for (const k of n.kids) {
-      if (kinds.get(k) === 'param') seen++
-      walk(k)
-    }
-  }
-  walk(root)
-  return params.filter((p) => p.kind === 'param').length - seen
-}
-
 function param(path: string, label: string, p: Partial<DfParam>): DfParam {
   return {
     path, kind: 'param', type: 'number', mode: 'streaming', flow: 'destination', access: 'readwrite',
-    rate: 60, ground: false, hardware: false, min: 0, max: 1, init: 0, smooth: [0, 0],
-    unit: '', label, desc: '', nature: 'lin', topology: 'span', ...p
+    rate: 60, min: 0, max: 1, init: 0, unit: '', label, desc: '', nature: 'lin', topology: 'span', ...p
   }
 }
 
 /** The tree Palinopsia declares : what `publish` names, groups before their
- *  children, depth first. The actions come last : a reference node keeps the
- *  first 128 entries of a tree, so it still sees the whole of the rest. The
- *  actions given are the ones to declare (already chosen and fitted). */
+ *  children, depth first (the actions given are the ones to declare). A destination is
+ *  readable too : its value is where the control stands in Palinopsia. */
 export function palinopsiaTree(actions: DfAction[] = [], publish: readonly string[] = DF_DEFAULT_CONFIG.publish): DfParam[] {
   const pub = new Set(publish)
   const out: DfParam[] = []
@@ -523,20 +479,126 @@ export function palinopsiaTree(actions: DfAction[] = [], publish: readonly strin
     addGroups(d.path)
     out.push(param(d.path, d.label, {
       type: d.type,
-      mode: d.type === 'bool' || d.discrete ? 'discrete' : 'streaming',
+      mode: 'discrete',
       flow: d.bidir ? 'bidir' : 'destination',
-      min: d.min ?? 0, max: d.max ?? (d.type === 'bool' ? 1 : 1), init: d.init ?? 0,
-      rate: d.type === 'bool' ? 0 : 60
+      min: d.min ?? 0, max: d.max ?? 1, init: d.init ?? 0,
+      rate: d.type === 'number' ? 60 : 0
     }))
   }
   for (const s of DF_SOURCES.filter((x) => dfPublished(pub, dfGroupOf(x.path), x.path))) {
     addGroups(s.path)
-    out.push(param(s.path, s.label, { flow: 'source', access: 'read', rate: 30 }))
+    out.push(param(s.path, s.label, { flow: 'source', access: 'read', rate: 30, ...(s.array ? { type: 'array' as const, size: s.array.length } : {}) }))
   }
-  // a trigger each : fires once when it goes on (>= 0.5), like OSC's triggers
+  // a trigger each
   for (const a of actions) {
     addGroups(a.path)
-    out.push(param(a.path, a.label, { type: 'bool', mode: 'discrete', flow: 'destination', access: 'write', rate: 0, min: 0, max: 1 }))
+    out.push(param(a.path, a.label, { type: 'trigger', mode: 'discrete', flow: 'destination', rate: 0 }))
   }
   return out
+}
+
+// ── the modulators' mesh inputs ───────────────────────────────────────────
+// A Controller modulator played by a value of another node : a destination of ours of
+// its own, declared only while a modulator uses it, its connection made and undone
+// with the modulator (the composition's, never this computer's list of wires).
+export const DF_INPUT_GROUP = 'input'
+export const dfInputPath = (slot: number): string => `${DF_INPUT_GROUP}/${slot + 1}`
+export interface DfListen {
+  sku: string
+  path: string
+  slot: number
+}
+export function inputTree(listens: readonly DfListen[]): DfParam[] {
+  if (!listens.length) return []
+  return [
+    param(DF_INPUT_GROUP, 'Modulator inputs', { kind: 'group', rate: 0, flow: 'source', access: 'read', mode: 'discrete' }),
+    ...listens.map((l) => param(dfInputPath(l.slot), `Modulator ${l.slot + 1} input`, { mode: 'discrete', desc: 'A value that plays a modulator in Palinopsia' }))
+  ]
+}
+
+/** A tree as the config the core takes ({ "params": [...] }). */
+export function dfTreeJson(params: readonly DfParam[]): string {
+  type J = Record<string, unknown> & { children?: J[] }
+  const roots: J[] = []
+  const groups = new Map<string, J>()
+  for (const p of params) {
+    const cut = p.path.lastIndexOf('/')
+    const name = p.path.slice(cut + 1)
+    const into = cut < 0 ? roots : (groups.get(p.path.slice(0, cut))?.children ?? roots)
+    if (p.kind === 'group') {
+      const g: J = { name, kind: 'group', label: p.label, children: [] }
+      groups.set(p.path, g)
+      into.push(g)
+      continue
+    }
+    const j: J = { name, kind: 'param', type: p.type, flow: p.flow, mode: p.mode, rate: p.rate, access: p.access, label: p.label }
+    if (p.unit) j.unit = p.unit
+    if (p.desc) j.desc = p.desc
+    if (p.nature !== 'lin') j.nature = p.nature
+    if (p.topology !== 'span') j.topology = p.topology
+    if (p.type === 'array') {
+      j.of = 'float'
+      j.size = p.size ?? 1
+    }
+    if (p.type === 'number' || p.type === 'array') j.range = { min: p.min, max: p.max, init: p.init }
+    into.push(j)
+  }
+  return JSON.stringify({ params: roots })
+}
+
+// ── a wire's range and invert, as the core's link transform says them ──────
+export interface DfAxis {
+  in?: [number, number]
+  out?: [number, number]
+  curve?: Array<[number, number]>
+  free?: boolean
+}
+
+/** The transform of a wire onto a destination of range min..max ([] : plain). */
+export function optToAxes(opt: DfWireOpt | null | undefined, d: { type: DfType; min: number; max: number }): DfAxis[] {
+  if (!opt || (d.type !== 'number' && d.type !== 'bool')) return []
+  const a: DfAxis = {}
+  const lo = opt.lo ?? 0, hi = opt.hi ?? 1
+  if (d.type === 'number' && (lo !== 0 || hi !== 1)) {
+    const span = d.max - d.min
+    a.out = [d.min + lo * span, d.min + hi * span]
+  }
+  if (opt.invert) a.curve = [[0, 1], [1, 0]]
+  return Object.keys(a).length ? [a] : []
+}
+
+/** What a transform says in a wire's words; `mesh` when they cannot say it. */
+export function axesToOpt(axes: readonly DfAxis[] | undefined, d: { type: DfType; min: number; max: number } | undefined): DfWireOpt {
+  const a = axes?.[0]
+  if (!a || (!a.in && !a.out && !a.curve?.length)) return {}
+  const out: DfWireOpt = {}
+  const near = (x: number, y: number): boolean => Math.abs(x - y) < 1e-4
+  if (a.out && d && d.type === 'number' && d.max !== d.min) {
+    const lo = (a.out[0] - d.min) / (d.max - d.min), hi = (a.out[1] - d.min) / (d.max - d.min)
+    if (!near(lo, 0)) out.lo = Math.round(lo * 1e4) / 1e4
+    if (!near(hi, 1)) out.hi = Math.round(hi * 1e4) / 1e4
+  }
+  const c = a.curve ?? []
+  const inverted = c.length === 2 && near(c[0][0], 0) && near(c[0][1], 1) && near(c[1][0], 1) && near(c[1][1], 0)
+  const straight = !c.length || (c.length === 2 && near(c[0][0], 0) && near(c[0][1], 0) && near(c[1][0], 1) && near(c[1][1], 1))
+  if (inverted) out.invert = true
+  if (a.in || !(inverted || straight)) out.mesh = true
+  return out
+}
+
+/** What this app keeps of a wire beside the mesh (its smoothing, what loss does). */
+export function appOpt(opt: DfWireOpt | null | undefined): DfWireOpt | null {
+  const c = cleanWireOpt(opt)
+  if (!c) return null
+  const { slewMs, onLoss, returnSec } = c
+  const out: DfWireOpt = { ...(slewMs ? { slewMs } : {}), ...(onLoss ? { onLoss, returnSec } : {}) }
+  return Object.keys(out).length ? out : null
+}
+/** What the mesh keeps of it (the link's transform). */
+export function linkOpt(opt: DfWireOpt | null | undefined): DfWireOpt | null {
+  const c = cleanWireOpt(opt)
+  if (!c) return null
+  const { lo, hi, invert } = c
+  const out: DfWireOpt = { ...(lo !== undefined ? { lo } : {}), ...(hi !== undefined ? { hi } : {}), ...(invert ? { invert } : {}) }
+  return Object.keys(out).length ? out : null
 }
