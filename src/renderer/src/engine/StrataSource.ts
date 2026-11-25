@@ -38,6 +38,7 @@ import { Onset } from './touchInput'
 import { tempoBpm } from './tempoSignal'
 import { PictureDepthReader, pictureDepth } from './pictureDepth'
 import { modelLoader } from './modelLoad'
+import type { MeshData } from './modelMesh'
 import { placeCloud, fitCloud, LinkBuilder, PLACE_NAMES, type Cloud } from './strataPlaces'
 
 /** The most points drawn from the picture (POINTS 1). */
@@ -483,7 +484,7 @@ export class StrataSource implements NativeGenerator {
   /** The cloud from a file (a model's vertices, a scan's points), once read. */
   private fileCloud(): Cloud | null {
     if (!this.path) {
-      this.note = 'no file : open one in the Inspector (ply, xyz, pts, obj, glb, gltf, stl)'
+      this.note = 'no file : open one in the Inspector (ply, las, laz, xyz, pts, obj, glb, gltf, stl)'
       return null
     }
     const st = modelLoader.get(this.path, this.files)
@@ -492,14 +493,7 @@ export class StrataSource implements NativeGenerator {
     const m = st.mesh
     let c = fileClouds.get(m)
     if (!c) {
-      const n = m.pos.length / 3
-      let colA = m.col
-      if (!colA) {
-        colA = new Uint8Array(n * 4)
-        colA.fill(200)
-      }
-      // (a file without colors in a soft grey; a texture's colors are left to the Model)
-      c = fitCloud({ pos: m.pos, col: colA, n })
+      c = fitCloud({ pos: m.pos, col: pointColors(m), n: m.pos.length / 3 })
       fileClouds.set(m, c)
     }
     this.note = ''
@@ -780,5 +774,47 @@ export class StrataSource implements NativeGenerator {
 
 // a file's cloud, made once per mesh read (shared by every slot that shows it)
 const fileClouds = new WeakMap<object, Cloud>()
+
+/** Each point's color, as the Model shows the file : its vertex color, times its
+ *  texture under the point's texture coordinates where the file has one (the mesh's
+ *  colors carry alpha 255 where the texture applies, 0 where the file gave no color);
+ *  a file with neither in a soft grey. Always opaque : Strata draws a point by alpha. */
+function pointColors(m: MeshData): Uint8Array {
+  const n = m.pos.length / 3
+  const out = new Uint8Array(n * 4)
+  const src = m.col
+  let tex: { data: Uint8ClampedArray; w: number; h: number } | null = null
+  if (m.texture && m.uv) {
+    try {
+      const w = m.texture.width, h = m.texture.height
+      const cv = new OffscreenCanvas(w, h)
+      const cx = cv.getContext('2d')!
+      cx.drawImage(m.texture, 0, 0)
+      tex = { data: cx.getImageData(0, 0, w, h).data, w, h }
+    } catch {
+      tex = null // (a texture closed meanwhile : the vertex colors alone)
+    }
+  }
+  const fr = (x: number): number => x - Math.floor(x)
+  for (let i = 0; i < n; i++) {
+    const o = i * 4
+    const a = src[o + 3]
+    if (!m.info.hasColor && !(tex && a > 127)) {
+      out[o] = out[o + 1] = out[o + 2] = 200
+    } else {
+      let r = src[o], g = src[o + 1], b = src[o + 2]
+      if (tex && a > 127) {
+        // the Model samples its texture uploaded unflipped : the image's first row at v = 0
+        const x = Math.min(tex.w - 1, Math.floor(fr(m.uv[i * 2]) * tex.w))
+        const y = Math.min(tex.h - 1, Math.floor(fr(m.uv[i * 2 + 1]) * tex.h))
+        const t = (y * tex.w + x) * 4
+        r = (r * tex.data[t]) / 255; g = (g * tex.data[t + 1]) / 255; b = (b * tex.data[t + 2]) / 255
+      }
+      out[o] = r; out[o + 1] = g; out[o + 2] = b
+    }
+    out[o + 3] = 255
+  }
+  return out
+}
 
 export { PLACE_NAMES }

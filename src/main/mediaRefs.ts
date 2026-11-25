@@ -15,7 +15,7 @@ export type PathKind = 'file' | 'dir' | 'none'
  *  relink only proposes these, and a collect only copies these. */
 // (films, sounds, and the Model's files : the model and the buffers, images and
 // material files it names beside it)
-const MEDIA_FILE = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp|wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf|glb|gltf|bin|obj|mtl|stl|ply|xyz|pts|png|jpg|jpeg|webp)$/i
+const MEDIA_FILE = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp|wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf|glb|gltf|bin|obj|mtl|stl|ply|xyz|pts|las|laz|png|jpg|jpeg|webp)$/i
 
 async function kindOf(p: string): Promise<PathKind> {
   try {

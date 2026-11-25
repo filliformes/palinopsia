@@ -857,7 +857,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     restore: "Heals every mark of the hand at once."
   },
   'gen-strata': {
-    cloud: "What the points are : a place Strata carries (a COLONNADE ruin taken back by plants, a GROVE, a CLIFF in layers of sediment, a NEBULA of gas and dust), THE PICTURE (the layer picked as SIDECHAIN, lifted by its depth or brightness), or A FILE you open above (a scan or a model : PLY, XYZ, PTS, OBJ, glTF, STL).",
+    cloud: "What the points are : a place Strata carries (a COLONNADE ruin taken back by plants, a GROVE, a CLIFF in layers of sediment, a NEBULA of gas and dust), THE PICTURE (the layer picked as SIDECHAIN, lifted by its depth or brightness), or A FILE you open above (a scan or a model : PLY, LAS, LAZ, XYZ, PTS, OBJ, glTF, STL; a textured model's points take its texture's colors).",
     raise: "With the picture as the cloud : what raises its points toward you, DEPTH (the depth model reading that layer, with depth: AI on), BRIGHTNESS or DARKNESS.",
     depth: "With the picture as the cloud : how far its near parts stand out.",
     settle: "With the picture as the cloud : seconds its relief takes to follow the picture (0 = at once).",

@@ -349,6 +349,18 @@ Palinopsia uses that install. The release check refuses a build while a copy sit
 old `resources/ndi` folder. See [LICENSE-EXCEPTIONS.md](LICENSE-EXCEPTIONS.md). NDI® is a
 registered trademark of Vizrt NDI AB.
 
+### laz-perf (LAZ decompression, inside the Model's worker)
+
+The Model and Strata decompress LAZ point clouds with **laz-perf**
+(https://github.com/hobuinc/laz-perf, npm package `laz-perf` 0.0.7, Copyright (c) Hobu, Inc.
+and its contributors), an alternative implementation of the LASzip compression. It is
+under the **Apache License 2.0** (its `COPYING`; the full text in
+[`licenses/npm-dependencies.txt`](licenses/npm-dependencies.txt)). Its WebAssembly build
+(`lib/worker/laz-perf.wasm`) is embedded in the app's bundle as is; Palinopsia's code
+calls it from `engine/lasParse.ts`. LASzip itself, the format laz-perf reads, was
+relicensed from the LGPL to the Apache License 2.0 by rapidlasso GmbH in January 2022
+(https://laszip.org; the Debian package's copyright file records it).
+
 ### Electron and Chromium
 
 Palinopsia runs on **Electron** (https://www.electronjs.org, MIT, Copyright (c) Electron
@@ -361,7 +373,8 @@ app on Windows and Linux, and in `Palinopsia.app/Contents/Resources` on macOS.
 The JavaScript libraries bundled into the app include:
 - React (MIT, Meta Platforms);
 - CodeMirror (MIT, Marijn Haverbeke and others);
-- zustand, osc.js, ws, interactive-shader-format, multicast-dns, bonjour-service and koffi;
+- zustand, osc.js, ws, interactive-shader-format, multicast-dns, bonjour-service, koffi and
+  laz-perf (above);
 - their own dependencies.
 
 Each one is listed with its version, license and full license file in
@@ -670,6 +683,11 @@ methods are free to build on; naming them is a matter of respect.
     text forms, as publicly documented.
   - **PLY format**: Greg Turk's polygon file format (Stanford University, 1994), as
     documented at https://paulbourke.net/dataformats/ply/.
+  - **LAS format**: ASPRS (the American Society for Photogrammetry and Remote Sensing),
+    *LAS Specification*, versions 1.0 to 1.4, published by ASPRS (https://www.asprs.org).
+    The header's scale, offset and point counts, the point records' coordinates,
+    intensity and RGB; read by Palinopsia's own code (`engine/lasParse.ts`). LAZ through
+    laz-perf (part 2).
   - **XYZ and PTS point clouds**: the plain-text point lists scanners and photogrammetry
     export (x y z per line, with colors or an intensity; PTS with a leading count), a
     common practice without an owner or a specification; read by Palinopsia's own code.

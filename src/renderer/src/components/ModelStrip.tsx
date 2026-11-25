@@ -11,8 +11,8 @@ import { showToast } from './Toast'
 
 export type ModelTarget = { kind: 'layer'; layer: number; slot: 'A' | 'B' } | { kind: 'background' }
 
-export const MODEL_ACCEPT = '.glb,.gltf,.obj,.stl,.ply,.xyz,.pts'
-export const MODEL_FILE_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts)$/i
+export const MODEL_ACCEPT = '.glb,.gltf,.obj,.stl,.ply,.xyz,.pts,.las,.laz'
+export const MODEL_FILE_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts|las|laz)$/i
 
 const baseOf = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 
@@ -122,7 +122,7 @@ export function ModelStrip({
       <button
         className="btn shrink-0 text-[11px]"
         onClick={() => input.current?.click()}
-        title="Open a model file : glTF 2.0 (.glb, or .gltf with its files beside it), OBJ (with its MTL colors and color map), STL, PLY (vertex colors, point clouds), or a text point cloud (.xyz, .pts : x y z per line, with colors or an intensity; a .csv of points renamed .xyz). It is centered and sized to fit, up to 2 million triangles. Draco or meshopt compressed glTF cannot be read : export it again uncompressed. You can also drop a model file on the layer."
+        title="Open a model file : glTF 2.0 (.glb, or .gltf with its files beside it), OBJ (with its MTL colors and color map), STL, PLY (vertex colors, point clouds), a text point cloud (.xyz, .pts : x y z per line, with colors or an intensity; a .csv of points renamed .xyz), or a LiDAR scan (.las, .laz). It is centered and sized to fit, up to 2 million triangles. Draco or meshopt compressed glTF cannot be read : export it again uncompressed. You can also drop a model file on the layer."
       >
         open…
       </button>

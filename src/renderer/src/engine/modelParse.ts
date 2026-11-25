@@ -15,6 +15,7 @@
 // third-party: PLY format
 
 import { GrowF32, GrowU32, GrowU8, MAX_POINTS, MAX_TRIS, type RawMesh } from './modelMesh'
+import { parseLAS } from './lasParse'
 
 export interface ParseCtx {
   /** A file beside the model, by the relative name the model gives it. */
@@ -23,7 +24,7 @@ export interface ParseCtx {
   image(bytes: Uint8Array, mime: string): Promise<ImageBitmap | null>
 }
 
-export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts)$/i
+export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts|las|laz)$/i
 
 // The images the Model reads as a texture (what the media scheme serves and the
 // browser decodes); another (.tga, .bmp, .tif) is said to be in a format it does not read.
@@ -51,8 +52,9 @@ export async function parseModel(name: string, buf: ArrayBuffer, ctx: ParseCtx):
   if (ext === 'stl') return parseSTL(buf)
   if (ext === 'ply') return parsePLY(buf)
   if (ext === 'xyz' || ext === 'pts' || ext === 'csv') return parseXYZ(new TextDecoder().decode(buf), ext)
+  if (ext === 'las' || ext === 'laz') return parseLAS(buf)
   if (ext === 'glb') throw new Error('not a glTF binary (its header is wrong)')
-  throw new Error(`${ext ? '.' + ext : 'this file'} is not a model the Model reads (glb, gltf, obj, stl, ply, xyz, pts)`)
+  throw new Error(`${ext ? '.' + ext : 'this file'} is not a model the Model reads (glb, gltf, obj, stl, ply, xyz, pts, las, laz)`)
 }
 
 // ── glTF 2.0 ────────────────────────────────────────────────────────────────────

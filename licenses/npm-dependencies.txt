@@ -2115,6 +2115,11 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
+laz-perf@0.0.7  (Apache-2.0)
+
+(this package ships no license file; its package.json declares Apache-2.0)
+
+------------------------------------------------------------------------------
 long@4.0.0  (Apache-2.0)
 
 Apache License

@@ -25,6 +25,20 @@ that CI builds into cross-platform releases.
   Model serves it too (`modelSources.ts` : the sources that take a model file; the store,
   the session's collect and relink, the Inspector and a drop on the layer know it). The
   idea is credited in THIRD_PARTY_NOTICES (part 6).
+- **LiDAR scans : LAS and LAZ** (new `engine/lasParse.ts`) : the Model and Strata read
+  `.las` (the ASPRS format, versions 1.0 to 1.4, point formats 0 to 10 : coordinates, RGB,
+  or the intensity as greys) and `.laz` (the same compressed, decompressed by laz-perf,
+  Apache-2.0, its WebAssembly inside the Model's worker : `electron.vite.config.ts` gains a
+  `?base64` import for it). Survey coordinates are taken relative to the first point in
+  double precision (no lost centimetres), Z up turned to Y up, and a scan of more points
+  than the Model draws is thinned while it is read. Checked on laz-perf's test scans (the
+  Autzen aerial patch : the same 110,000 points and colors from its LAS and its LAZ) and
+  in the app.
+- **A textured model's points take its texture's colors** in Strata (`StrataSource.ts`
+  `pointColors` : the color under each vertex's texture coordinates, times its vertex
+  color, as the Model shows it). Fixed on the way : a file without colors (a plain STL, an
+  untextured OBJ) drew no points at all in Strata (its colors' alpha, 0, read as "no
+  point"); it shows in a soft grey.
 - **Text point clouds** (`modelParse.ts`) : the Model and Strata read `.xyz` and `.pts`
   (x y z a line, with colors 0..1 or 0..255 or an intensity, a header of names placing the
   columns; PTS's leading count skipped). The media scheme serves the two extensions; a

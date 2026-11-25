@@ -48,6 +48,9 @@ const MIME: Record<string, string> = {
   // text point clouds (scanners, photogrammetry, science : Strata and the Model)
   xyz: 'text/plain',
   pts: 'text/plain',
+  // LiDAR scans
+  las: 'application/octet-stream',
+  laz: 'application/octet-stream',
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
