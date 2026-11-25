@@ -129,6 +129,12 @@
     {
       "target_name": "dataflou",
       "sources": [ "df_addon.cc" ],
+      # (node-gyp's addon defaults turn C++ exceptions off on macOS for the module
+      # itself, after target_defaults : the addon catches the core's, so on again here)
+      "xcode_settings": {
+        "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
+        "OTHER_CPLUSPLUSFLAGS": [ "-fexceptions" ]
+      },
       "dependencies": [ "df_capi", "df_desktop", "df_core", "df_libs" ],
       "conditions": [
         [ "OS=='win'", {
