@@ -325,8 +325,9 @@ export class DataflouNode {
     }
     this.nodes = nodes
     this.mine = mine
+    // (seen by its announcement only : its name comes with the start of its sku)
     this.refused = (j.incompatible ?? []).map((x) => ({
-      sku: String(x.sku ?? ''), label: String(x.label ?? ''), product: String(x.product ?? ''), address: String(x.address ?? ''),
+      sku: String(x.sku ?? ''), label: String(x.label ?? '').replace(`-${String(x.sku ?? '').slice(0, 8)}`, ''), product: String(x.product ?? ''), address: String(x.address ?? ''),
       core: String(x.core_ver ?? (x.core_major ? `${x.core_major}.x` : x.proto ? `protocol ${x.proto}` : 'an older core'))
     }))
     for (const p of [...this.dests.keys()]) if (!this.byPath.has(p)) this.dests.delete(p)

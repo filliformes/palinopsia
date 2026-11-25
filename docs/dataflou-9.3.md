@@ -47,8 +47,10 @@ nothing, which is the ghost we do not want. A wire another node had on one of th
 dormant there, and plays again when it is published again. Quitting removes nothing : the
 node is absent, its parameters and everyone's connections stay.
 
-A removed parameter's few hundred bytes are not given back by the core until the node closes :
-sessions opened and closed do not add up to anything that matters (measured below).
+A removed parameter's memory is not given back by the core until the node closes. Measured : the
+test process went from 52 to 61 MB over 30 minutes in which a session was opened and closed
+908 times, about 10 KB each time; without sessions it stayed at 52.7 MB (12 minutes, 60 values
+and 60 sets a second).
 
 ## Where a wire lives
 
