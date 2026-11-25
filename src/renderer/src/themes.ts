@@ -2486,7 +2486,7 @@ export const THEMES: Theme[] = [
     bgSources: ['solid-color'],
     bgOpacity: 0,
     presets: { 'gen-terrain': ['The sound as land', 'Spectrum survey'] },
-    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], palette: [0, 2, 4, 6], soundSpeed: [0.2, 0.35, 0.5], surge: [0.3, 0.5, 0.8], terraces: [0, 0, 14], rough: [0, 0.15] } },
+    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], palette: [0, 2, 4], contours: [0, 0.35, 0.7], soundSpeed: [0.2, 0.35, 0.5], surge: [0.3, 0.5, 0.8], terraces: [0, 0, 14], rough: [0, 0.15] } },
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
@@ -2502,8 +2502,8 @@ export const THEMES: Theme[] = [
     stack: [['gen-terrain']],
     bgSources: ['solid-color'],
     bgOpacity: 0,
-    presets: { 'gen-terrain': ['Spectrum survey'] },
-    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], palette: [3, 5], terraces: [8, 12, 18], contours: [0.8, 1], soundGain: [1.4, 1.8], sunHeight: [0.1, 0.2] } },
+    presets: { 'gen-terrain': ['Night sounding'] },
+    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], terraces: [12, 18, 26], contours: [0.8, 1], soundGain: [1.4, 1.8], ambient: [0.7, 0.85], sunHeight: [0.35, 0.5], height: [0.6, 0.7] }, 'fx-grade': { brightness: [0.02, 0.05], contrast: [1], lift: [0.02], gamma: [1, 1.1] } },
     layerFx: ['fx-grade'],
     blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
@@ -2580,7 +2580,7 @@ export const THEMES: Theme[] = [
     blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
-    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_STRATA }
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_STRATA.replace('spread|', 'spread|spin|') }
   }),
   mk({
     id: 'depth-sweep', name: 'Depth Sweep', family: 'Space',

@@ -298,7 +298,8 @@ export function Inspector(): JSX.Element {
       }
       if (slot.kind === 'audio') audioCfg = { layer: li, slot: sl, state: slot }
       if (slot.shaderId === 'gen-model' || slot.shaderId === 'gen-strata') {
-        modelCfg = { target: { kind: 'layer', layer: li, slot: sl }, slot, setSide: (r) => setSourceSidechain(li, sl, r), hostLayer: li }
+        // (the Model's skin is picked in its strip; Strata's picture in the SIDECHAIN row)
+        modelCfg = { target: { kind: 'layer', layer: li, slot: sl }, slot, setSide: slot.shaderId === 'gen-model' ? (r) => setSourceSidechain(li, sl, r) : null, hostLayer: li }
       }
       if (slot.shaderId === 'gen-text') {
         textCfg = {
@@ -760,6 +761,7 @@ export function Inspector(): JSX.Element {
           side={modelCfg.slot.sidechain ?? null}
           setSide={modelCfg.setSide}
           hostLayer={modelCfg.hostLayer}
+          scan={modelCfg.slot.shaderId === 'gen-strata'}
           onFile={
             modelCfg.slot.shaderId === 'gen-strata'
               ? Math.round(Number(modelCfg.slot.inputs.cloud ?? 0)) === 5

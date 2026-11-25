@@ -375,8 +375,9 @@ void main() {
 // take the spectrum heard now (the shared audio texture's log spectrum, its row at v
 // 0.75); the others move up by SHIFT rows, toward the horizon (the land's far side is
 // the picture's top). Between two strips the first row keeps the loudest of what it
-// heard : at a slow speed a hit fell between two strips and left no hill. Gray, so the
-// height pass reads it as brightness.
+// heard : at a slow speed a hit fell between two strips and left no hill. Under the sound
+// lies a low rolling ground, laid with each strip and moving with it : silence is a quiet
+// country, never a blank plane. Gray, so the height pass reads it as brightness.
 const SOUND_FS = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -384,12 +385,27 @@ in vec2 vUV;
 out vec4 o;
 uniform sampler2D uPrev, uAudio;
 uniform float uShift, uGain;
+uniform float uStrip; // how many strips have been laid (wraps at 4096 : the ground's own period)
+// third-party: Hash without Sine
+float h21(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float quiet(vec2 p, float per) {
+  vec2 i = floor(p), f = p - i;
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mod(i.y, per), b = mod(i.y + 1.0, per);
+  return mix(mix(h21(vec2(i.x, a)), h21(vec2(i.x + 1.0, a)), f.x), mix(h21(vec2(i.x, b)), h21(vec2(i.x + 1.0, b)), f.x), f.y);
+}
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
   float v;
   if (float(px.y) < max(uShift, 1.0)) {
     float s = texture(uAudio, vec2(vUV.x, 0.75)).r;
-    v = clamp(pow(max(s, 0.0), 1.3) * uGain, 0.0, 1.0);
+    float row = uStrip - float(px.y);
+    float low = 0.7 * quiet(vec2(vUV.x * 5.0, row / 64.0), 64.0) + 0.3 * quiet(vec2(vUV.x * 13.0 + 7.0, row / 32.0), 128.0);
+    v = clamp(pow(max(s, 0.0), 1.3) * uGain + 0.34 * low * low, 0.0, 1.0);
     if (uShift < 0.5) v = max(v, texelFetch(uPrev, px, 0).r);
   } else v = texelFetch(uPrev, ivec2(px.x, px.y - int(uShift)), 0).r;
   o = vec4(v, v, v, 1.0);
@@ -817,6 +833,7 @@ export class TerrainSource implements NativeGenerator {
   private snd: [Target, Target] | null = null
   private si = 0
   private sndAcc = 0
+  private sndStrip = 0
   private audio: WebGLTexture | null = null
   private onset = new Onset()
   private sounding = false
@@ -1288,6 +1305,8 @@ export class TerrainSource implements NativeGenerator {
   private soundLand(dt: number): WebGLTexture | null {
     const g = this.g
     if (!this.audio) return null
+    // (the first time, the whole field is laid : the quiet ground out to the horizon)
+    const start = !this.snd
     if (!this.snd) this.snd = [g.target(256, 256, { float: false, linear: true }), g.target(256, 256, { float: false, linear: true })]
     const I = this.inputs
     // 6 to 120 strips a second; a hit throws the land forward by up to 32 strips
@@ -1295,9 +1314,11 @@ export class TerrainSource implements NativeGenerator {
     const hit = this.onset.hit()
     if (hit > 0) this.sndAcc += 32 * clamp(num(I, 'surge', 0.4), 0, 1) * Math.min(hit, 1.2)
     const whole = Math.floor(this.sndAcc)
-    const shift = Math.min(256, whole)
+    const shift = start ? 256 : Math.min(256, whole)
     this.sndAcc -= whole
-    this.soundP.use().i1('uPrev', 0).i1('uAudio', 1).f1('uShift', shift).f1('uGain', clamp(num(I, 'soundGain', 1.5), 0, 4))
+    this.sndStrip = (this.sndStrip + whole) % 4096
+    this.soundP.use().i1('uPrev', 0).i1('uAudio', 1).f1('uShift', shift).f1('uStrip', this.sndStrip + 4096)
+      .f1('uGain', start ? 0 : clamp(num(I, 'soundGain', 1.5), 0, 4))
     g.bind(0, this.snd[this.si].tex)
     g.bind(1, this.audio)
     g.draw(this.snd[1 - this.si].fbo, 256, 256)

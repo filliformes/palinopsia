@@ -808,7 +808,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   },
   'gen-terrain': {
     own: "The land when no layer is picked as its sidechain : rolling hills, ridges (a mountain range), dunes, a crater, or islands in a flat sea floor (raise WATER LEVEL to flood it).",
-    raise: "What raises the land : DEPTH (with the depth engine on AI, the depth model reads the picture this land stands on, not the whole frame; with depth off, brightness stands in), BRIGHTNESS or DARKNESS of the sidechain layer, or THE SOUND (no layer needed) : the spectrum laid down as a strip of land at your feet, bass to the left, treble to the right, moving away toward the horizon.",
+    raise: "What raises the land : DEPTH (with the depth engine on AI, the depth model reads the picture this land stands on, not the whole frame; with depth off, brightness stands in), BRIGHTNESS or DARKNESS of the sidechain layer, or THE SOUND (no layer needed) : the spectrum laid down as a strip of land at your feet, bass to the left, treble to the right, moving away toward the horizon over a low rolling ground (in silence, that ground alone).",
     soundSpeed: "With the sound raising the land : how fast the strips move away toward the horizon (slow : a long memory of the piece; fast : only the last seconds).",
     soundGain: "With the sound raising the land : how tall a loud band stands.",
     surge: "With the sound raising the land : how far the land jumps forward on each of the sound's hits.",
@@ -870,7 +870,7 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
     gain: "How bright the points and links are.",
     fog: "The far side of the cloud dims with distance.",
     ground: "The color behind the points, and its opacity (0 : the layers below show between them).",
-    state: "From NATURAL (each point in its own color) to STRUCTURAL (the ink color, finer points, the links stronger). Ride it, or let a hit CUT to the other side.",
+    state: "0 : NATURAL (each point in its own color). 1 : STRUCTURAL (the ink color, finer points, the links stronger). Ride it, or let a hit CUT to the other side.",
     ink: "The color of the structural state, the cuts and the revealed blocks.",
     links: "Thin lines between each point and its nearest neighbors, over about 30,000 of them. Stronger in the structural state; a link across a break is cut.",
     voxel: "Snaps every point to a grid : the place turned into blocks, finer to coarser.",

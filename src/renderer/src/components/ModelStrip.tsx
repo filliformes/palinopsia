@@ -72,7 +72,8 @@ export function ModelStrip({
   side,
   setSide,
   hostLayer,
-  onFile
+  onFile,
+  scan = false
 }: {
   target: ModelTarget
   path?: string
@@ -82,6 +83,8 @@ export function ModelStrip({
   setSide: ((r: SidechainRef | null) => void) | null
   hostLayer: number
   onFile: boolean
+  /** Strata's strip : its file is a cloud (one of its CLOUD choices), not a shape. */
+  scan?: boolean
 }): JSX.Element {
   const input = useRef<HTMLInputElement | null>(null)
   const st = useModelState(path, files)
@@ -107,7 +110,7 @@ export function ModelStrip({
         )
   return (
     <div className="flex items-center gap-2 border-b border-border bg-panel2/40 px-2 py-1">
-      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">model</span>
+      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-muted">{scan ? 'scan' : 'model'}</span>
       <input
         ref={input}
         type="file"
@@ -122,12 +125,12 @@ export function ModelStrip({
       <button
         className="btn shrink-0 text-[11px]"
         onClick={() => input.current?.click()}
-        title="Open a model file : glTF 2.0 (.glb, or .gltf with its files beside it), OBJ (with its MTL colors and color map), STL, PLY (vertex colors, point clouds), a text point cloud (.xyz, .pts : x y z per line, with colors or an intensity; a .csv of points renamed .xyz), or a LiDAR scan (.las, .laz). It is centered and sized to fit, up to 2 million triangles. Draco or meshopt compressed glTF cannot be read : export it again uncompressed. You can also drop a model file on the layer."
+        title="Open a model file : glTF 2.0 (.glb, or .gltf with its files beside it), OBJ (with its MTL colors and color map), STL, PLY (vertex colors, point clouds), a text point cloud (.xyz, .pts : x y z per line, with colors or an intensity; a .csv of points renamed .xyz), or a LiDAR scan (.las, .laz). It is centered and sized to fit, up to 2 million triangles or 4 million points. Draco or meshopt compressed glTF cannot be read : export it again uncompressed. You can also drop a model file on the layer."
       >
         open…
       </button>
       <span className={`min-w-0 flex-1 truncate text-[11px] ${onFile ? 'text-fg' : 'text-muted'}`} title={path || undefined}>
-        {path ? (name || baseOf(path)) + (onFile ? '' : ' (not on the file now)') : <span className="text-muted">no file</span>}
+        {path ? (name || baseOf(path)) + (onFile ? '' : ' (not on the file now)') : <span className="text-muted">{scan ? 'no file' : 'built-in shape'}</span>}
       </span>
       {line}
       {path && (
@@ -136,7 +139,7 @@ export function ModelStrip({
         </button>
       )}
       {path && (
-        <button className="btn shrink-0 text-[11px]" onClick={() => useStore.getState().setSourceModel(target, null)} title="Forget the file : back to the built-in shapes">
+        <button className="btn shrink-0 text-[11px]" onClick={() => useStore.getState().setSourceModel(target, null)} title={scan ? 'Forget the file : back to the colonnade' : 'Forget the file : back to the built-in shapes'}>
           ×
         </button>
       )}

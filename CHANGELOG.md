@@ -43,7 +43,7 @@ that CI builds into cross-platform releases.
   at **sound speed**, the land **surging** forward on the sound's hits; **sound gain** sets
   how tall a loud band stands. A 256-strip history texture of its own, read by Terrain's
   passes as a picture's brightness; no sidechain needed (RAISED BY stays open without
-  one). Two presets (The sound as land, Spectrum survey), two Generate themes (Sounding
+  one). Three presets (The sound as land, Spectrum survey, Night sounding), two Generate themes (Sounding
   Land, Night Sounding) and two Landscape chains (Sounding Chart, Long Memory). The idea is credited in
   THIRD_PARTY_NOTICES (part 6, Form Vision).
 - **Gaussian splats read as colored points** (`modelParse.ts`) : a splat PLY (3D Gaussian

@@ -394,7 +394,7 @@ function nebula(): Cloud {
     const x = ((i + R()) / G - 0.5) * sx, y = ((j + R()) / G - 0.5) * sy, z = ((k + R()) / G - 0.5) * sz
     const d = Math.sqrt(dens[lo])
     // hydrogen red on one side, oxygen teal on the other, blended across
-    const mixT = 0.5 + 0.6 * (x / sx) + 1.6 * (fbm(x * 1.1 + 11, y * 1.1, z * 1.1, 2) - 0.5)
+    const mixT = 0.4 + 0.9 * (x / sx) + 1.8 * (fbm(x * 1.1 + 11, y * 1.1, z * 1.1, 2) - 0.5)
     let c = mixC(ha, oiii, Math.max(0, Math.min(1, mixT)))
     if (d < 0.25) c = mixC(dust, c, d / 0.25)
     c = mixC(c, [1, 0.95, 0.9], Math.min(1, Math.max(0, d - 0.6) * 2))

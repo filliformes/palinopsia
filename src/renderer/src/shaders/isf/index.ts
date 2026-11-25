@@ -2656,7 +2656,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'density', TYPE: 'float', MIN: 0.02, MAX: 1, DEFAULT: 0.6, LABEL: 'points' },
         { NAME: 'size', TYPE: 'float', MIN: 0.1, MAX: 4, DEFAULT: 1, LABEL: 'size' },
         { NAME: 'shape', TYPE: 'long', VALUES: [0, 1], LABELS: ['square', 'round'], DEFAULT: 1, LABEL: 'shape' },
-        { NAME: 'state', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'natural ⇄ structural' },
+        { NAME: 'state', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'structural' },
         { NAME: 'ink', TYPE: 'color', DEFAULT: [0.92, 0.94, 0.96, 1], LABEL: 'ink' },
         { NAME: 'ground', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'ground' },
         { NAME: 'gain', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'brightness' },
@@ -2690,7 +2690,7 @@ export const GENERATORS: IsfShader[] = [
         { NAME: 'gap', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'gap' },
         { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
         { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.12, LABEL: 'tilt' },
-        { NAME: 'distance', TYPE: 'float', MIN: 0.3, MAX: 4, DEFAULT: 1.2, LABEL: 'distance' },
+        { NAME: 'distance', TYPE: 'float', MIN: 0.3, MAX: 4, DEFAULT: 0.95, LABEL: 'distance' },
         { NAME: 'lens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'lens' },
         { NAME: 'sway', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'sway' },
         { NAME: 'swayRate', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'sway rate' },
@@ -2705,7 +2705,7 @@ export const GENERATORS: IsfShader[] = [
       sections: [0, 0.8], axis: [0, 4], slices: [3, 14], thick: [0.06, 0.3], between: [0.1, 0.5], sweep: [-0.4, 0.4], sweepSync: [0, 0],
       break: [0.3, 0.8], breakOn: [0, 0], breakAxis: [0, 3], blocks: [0.06, 0.25], share: [0.3, 0.7], hold: [0.05, 0.4], rebuild: [0.6, 3], steps: [0, 8], reveal: [0.3, 1],
       cut: [0, 0.3], cutHold: [0.1, 0.4], panels: [1, 1], panelMode: [0, 0], spread: [0.5, 0.5], gap: [0.3, 0.3],
-      turn: [-0.3, 0.3], tilt: [0, 0.3], distance: [1, 1.5], lens: [0.3, 0.7], sway: [0.2, 0.5], swayRate: [0.15, 0.5], spin: [-0.15, 0.15]
+      turn: [-0.3, 0.3], tilt: [0, 0.3], distance: [0.6, 1.1], lens: [0.3, 0.7], sway: [0.2, 0.5], swayRate: [0.15, 0.5], spin: [-0.15, 0.15]
     }
   }
 ]

@@ -222,7 +222,9 @@ void main() {
   float rPx = world * uFocal / depth * uRes.y;
   rPx = min(rPx, uRes.y * 0.05);
   float amp = keep * fogged(depth);
-  if (rPx < 0.7) { amp *= (rPx / 0.7) * (rPx / 0.7); rPx = 0.7; }
+  // (under a pixel the points outnumber the pixels they cover, and the depth test keeps
+  // one of them : dimmed by their area, a scan of four million was nearly black)
+  if (rPx < 0.7) { amp *= max(rPx / 0.7, 0.6); rPx = 0.7; }
   float ext = uShape == 0 ? rPx : rPx + 1.0;
   int vid = gl_VertexID;
   vec2 corner = vec2((vid & 1) == 0 ? -1.0 : 1.0, (vid & 2) == 0 ? -1.0 : 1.0);
@@ -603,11 +605,17 @@ export class StrataSource implements NativeGenerator {
     const links = clamp(num(I, 'links', 0), 0, 1)
     let gpu: GpuCloud | null = null
     let drawN = 0
+    let spaced = 1 // the points a point's size is made for
     let gx = 0, gy = 0
     if (cloud) {
       gpu = this.useCloud(cloud)
       // (its points are shuffled : the first ones are an even sample of it)
       drawN = Math.max(1, Math.round(gpu.n * density))
+      spaced = drawN
+      // with VOXEL on, forty points a cell of its surface fill every block : the rest of a
+      // scan of millions drew the same blocks again (27 ms a frame at four million)
+      const vox = clamp(num(I, 'voxel', 0), 0, 1)
+      if (vox > 0.001) drawN = Math.min(drawN, Math.max(60000, Math.round(480 / (0.006 + 0.084 * vox) ** 2)))
     } else {
       // the picture : its height first
       const raise = Math.round(clamp(num(I, 'raise', 0), 0, 2))
@@ -665,7 +673,7 @@ export class StrataSource implements NativeGenerator {
     this.breaks.forEach((b, i) => brkU.set([b.age, b.strength, b.seed, b.axis], i * 4))
     const size = clamp(num(I, 'size', 1), 0.1, 4)
     // a point's radius : about half the spacing of the drawn points
-    const radius = picture ? (0.5 / Math.max(2, gy)) * size : (1.6 / Math.sqrt(Math.max(1, drawN))) * size * 0.5
+    const radius = picture ? (0.5 / Math.max(2, gy)) * size : (1.6 / Math.sqrt(Math.max(1, spaced))) * size * 0.5
 
     gl.enable(gl.SCISSOR_TEST)
     for (let p = 0; p < panels; p++) {
@@ -686,7 +694,7 @@ export class StrataSource implements NativeGenerator {
       const pitch = clamp(clamp(num(I, 'tilt', 0.12), -1, 1) * MAX_LEAN + sway * 0.16 * Math.sin(this.swayB), -MAX_LEAN, MAX_LEAN)
       const lens = clamp(num(I, 'lens', 0.5), 0, 1)
       const focal = 0.6 * Math.pow(10, 1 - lens)
-      const D = focal * clamp(num(I, 'distance', 1.2), 0.3, 4) * (fill ? 1.4 : 1) * (panels > 1 ? Math.max(1, 1.15 / Math.max(0.3, vAsp)) : 1)
+      const D = focal * clamp(num(I, 'distance', 0.95), 0.3, 4) * (fill ? 1.4 : 1) * (panels > 1 ? Math.max(1, 1.15 / Math.max(0.3, vAsp)) : 1)
       const C: V3 = [D * Math.sin(yaw) * Math.cos(pitch), D * Math.sin(pitch), D * Math.cos(yaw) * Math.cos(pitch)]
       const F = norm([-C[0], -C[1], -C[2]])
       const R = norm(cross(F, [0, 1, 0]))
