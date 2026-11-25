@@ -2178,6 +2178,12 @@ interface StoreState {
   setSpace: (patch: Partial<SpaceConfig>) => void
   setSpaceVoice: (voice: SpaceVoice, patch: Partial<VoicePlace>) => void
   setDomeSim: (patch: Partial<DomeConfig['sim']>) => void
+  // The dome viewer (DomeViewer.tsx) : what it shows, and whether it is alone in a
+  // window of its own rather than on the Output page. Transient.
+  domeView: '3d' | 'master' | 'equirect'
+  setDomeView: (v: '3d' | 'master' | 'equirect') => void
+  domeViewWindow: boolean
+  setDomeViewWindow: (on: boolean) => void
   resolumePageOpen: boolean
   setResolumePageOpen: (on: boolean) => void
   setResolume: (patch: Partial<ResolumeMap>) => void
@@ -5558,6 +5564,10 @@ export const useStore = create<StoreState>((set, get) => ({
       space: persistSpace(sanitizeSpaceConfig({ ...s.space, voices: { ...s.space.voices, [voice]: { ...s.space.voices[voice], ...patch } } }))
     })),
   setDomeSim: (patch) => set((s) => ({ dome: persistDome(sanitizeDome({ ...s.dome, sim: { ...s.dome.sim, ...patch } })) })),
+  domeView: '3d',
+  setDomeView: (domeView) => set({ domeView }),
+  domeViewWindow: false,
+  setDomeViewWindow: (on) => set({ domeViewWindow: on }),
   resolumePageOpen: false,
   setResolumePageOpen: (on) => set({ resolumePageOpen: on }),
   setResolume: (patch) =>
@@ -7108,8 +7118,12 @@ export const useStore = create<StoreState>((set, get) => ({
     // keep whatever the machine had. On/off stays yours, so does the alignment
     // grid : a setup aid of this room, never the piece's (a session saved while
     // aligning would burn it into the show).
-    if (s.dome && typeof s.dome === 'object')
-      set({ dome: persistDome({ ...sanitizeDome(s.dome), enabled: get().dome.enabled, grid: get().dome.grid }) })
+    // (a file from before the viewer had a room says nothing about it : yours stays)
+    if (s.dome && typeof s.dome === 'object') {
+      const { room, radius, center, marks, wash, readings } = get().dome.sim
+      const sim = { room, radius, center, marks, wash, readings, ...((s.dome.sim ?? {}) as Partial<DomeConfig['sim']>) }
+      set({ dome: persistDome({ ...sanitizeDome({ ...s.dome, sim }), enabled: get().dome.enabled, grid: get().dome.grid }) })
+    }
     // The output transform is the piece's : its own, or none (an older file must
     // not open turned the way the last piece was left).
     set({ outXform: sanitizeOutXform(s.outXform ?? null), outXformReset: get().outXformReset + 1 })

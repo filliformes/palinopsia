@@ -78,7 +78,7 @@ older shots stay in `docs/images/`.)*
 - [Sequencer](#sequencer-key-q) (in the app, or in a window of its own) : lanes under one transport (scenes · Sonify keys · the Body rule timeline · light cues) · auto-pilot · long-forms (Burial · Long-Take · Frame-Weave)
 - [Worlds / diegesis](#worlds--diegesis-key-w) : the World editor · World amount
 - [Audio in](#audio-in) : analyser · monitoring · denoiser · Performance · [MIDI](#midi) : learn (bend, aftertouch, catch) + clock in and out · [Body : embodied control](#body--embodied-control-key-b) (in the app, or in a window of its own) · [Depth (2.5D)](#depth-25d) : the picture's own depth, by a model that ships in the app
-- [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, 3D dome simulator) · composition size · installation · Flash safety
+- [Output & mapping](#output--mapping-key-o) : the Output page (in the app, or in a window of its own) · **output transform** (the whole frame moved, turned, spun) · **fulldome** (210° domemaster, every mapping slider playable, a dome viewer at real size you can walk in) · composition size · installation · Flash safety
 - [Complex Output](#complex-output--several-screens-shifto) (`Shift+O`, or **COMPLEX OUTPUT** in the Output page's header) : several projectors at once · slices of the picture or of one layer · corners, grid, curved and Bezier warps, polygons · masks · soft edges · a list of what is wrong
 - [Lights](#lights--dmx-fixtures-on-the-picture-key-t) (key `T`, or **LIGHTS** in the Output page's header) : DMX lights (bars, spots, rings, matrices) placed on the picture · a five-step **Set up** guide for an Enttec DMX USB Pro · Art-Net, sACN, WLED · looks, classic and digital effects, tuning · groups · shows · cues · light setups · the console
 - [Sonify : image to sound](#sonify--image-to-sound-key-s) (in the app, or in a window of its own) : twelve voices (Spectra · Filter · Orbit · Raster · Transmission · Flow · Events · Signal · Chord · Synth · Collage · Assemblage) · quantizer (18 scales) · output EQ + glue · audio in recordings · [Space](#space--the-voices-in-the-room) : the voices on a speaker dome, or as objects for SpatGRIS
@@ -2161,7 +2161,7 @@ bottom:
   **Close Output** while one is open; **Output page…**; **Output page in a window**.
 - **The Output page in a window of its own** : right-click the Output button, **Output
   page in a window**, and the whole page opens in its own window, to keep beside the
-  instrument or on another screen : the mapping, the dome simulator, the senders and
+  instrument or on another screen : the mapping, the dome viewer, the senders and
   the recorder stay in view and live while you play, even with the instrument
   minimized. Your keys still play the instrument from there (typing in its fields stays
   in them), except `Esc`, `Enter`, the arrows, `Delete` and `Backspace`, which stay in
@@ -2407,18 +2407,43 @@ recordings and stills. Keystone warp is off in dome mode (a dome is mapped by it
   modulated color and follows the live value. A screen that drifts around the room, a
   panorama breathing between the horizon and the zenith, a full-dome frame that swells
   on the beat. Aperture and resolution are the venue's and stay put.
-- **3D dome simulator** (the in-app port of the TouchDesigner *FulldomeSimulator*) : the
-  live master wrapped back onto a dome. **inside** puts you in the seat (drag to look
-  around; wheel out widens the lens, then keeps going by **backing off** away from the
-  centre, the wall it passes through hidden, until the whole inside is in view; wheel in
-  comes back); **whole dome** jumps straight to the entire inside at once, seen from
-  below the opening; **outside** is a cutaway orbit (the near shell hidden so
-  the far half reads the right way round). **tilt** (for tilted planetariums; the
-  Satosphère is level), an alignment **template** at low opacity, and the **sweet spot**
-  patch (width, low / high elevation, off by default) where an audience facing front
-  naturally looks. It reads a small copy of the master straight from the engine, so
-  the Output page keeps full frame rate even with a 4K master.
-  **master** shows the flat domemaster instead. Double-click the view to reset the camera.
+- **The dome viewer** : the live master back on a dome, **at its real size in meters**, with
+  you in it.
+  - **room** : **Satosphère 210°** (a sphere of 9.50 m radius, its center 2.56 m over the
+    floor, the rim 0.10 m over it), the same sphere as a **180°** hemisphere (the rim at
+    2.56 m, so a 210° master is cut there and the viewer says so), or a **free** dome : its
+    radius, how high its center is, as open as the master. A meter grid lies on the floor
+    (a red line marks the front).
+  - **Where from** : **best seat** (the center of the sphere, the one point the master is
+    made for), **center**, **back row**, **side** and **lying** (on your back), each at the
+    eye's real height (**standing** 1.65 m, **seated** 1.20 m, **lying** 0.35 m, or any);
+    **whole dome** shows the entire inside from below the opening, **outside** is a cutaway
+    orbit (the near shell hidden so the far half reads the right way round, you drawn in it).
+  - **Moving** : drag to look; wheel out widens the lens, then backs away (the wall it passes
+    through hidden), wheel in comes back. Click the view, then **WASD** or the **arrows**
+    walk, **Shift** runs, **F** switches **walk** (the eye kept at its height) and **fly**
+    (forward goes where you look, **E** up, **Q** down), **R** is the best seat, **Esc** lets
+    the keyboard go. The keys are the viewer's only while its frame is lit; nothing else is
+    taken from the instrument. A **gamepad** works too (sticks to move and look, A runs, B
+    best seat, Y walk / fly, the shoulders down / up). You stay inside the screen. Click or
+    drag on the **floor plan** to stand there. Your place is this computer's : it never
+    makes a session ask to be saved.
+  - **Numbers** (**numbers + plan**) : where you are, the point you look at, the master's
+    **pixels per degree** there as seen from your place (19.5 up and down from the center of
+    a 4096 master at 210°; a sharp eye resolves about 60), how far the screen is, and how fast
+    the picture **turns around you** : what the mapping's spin sets, and what the picture itself
+    does, read off it ten times a second (nothing when there is no turn to follow).
+  - **Judging** : the alignment **template**, **seam + zenith** (the seam behind the audience
+    in magenta, the zenith in yellow), the **sweet spot** patch (off by default), **tilt**, and
+    **approx wash** : an approximate look of a real screen, whose bright parts light its own blacks
+    (off at 0; worked out as a matte sphere, with no projectors in it).
+  - **master** shows the square domemaster, **equirect** the whole dome laid out flat (front in
+    the middle, zenith at the top). All of this is preview only : nothing reaches the output.
+  - **⤢ expand** puts the viewer over the whole page (**Esc** comes back), **⧉ window** in a
+    window of its own, for a second screen.
+  - It takes the full master straight from the graphics card (no readback), mipmapped, up to
+    4096² at the display's rate, and takes fewer frames by itself the moment the show slows;
+    hidden, covered or closed, it costs nothing.
 - The dome mapping lives on the machine (the venue) **and** travels with the session (the
   piece), its grid excepted. The dome itself always starts **off** (a restart or a session load never switches
   it on) and its section starts collapsed. The section's **↺** puts every dome setting and

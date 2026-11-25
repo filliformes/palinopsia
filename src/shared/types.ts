@@ -1045,7 +1045,8 @@ export const DEFAULT_LAYER_VARY = 0.15
 export const MAX_MOD_ASSIGNMENTS = 32
 
 /** The window.open names of the pages that can open in a window of their own
- *  (the Output, Body, Seq and Sonify buttons' right-click menus) : a blank page the
+ *  (the Output, Body, Seq and Sonify buttons' right-click menus; the dome viewer
+ *  from its own button) : a blank page the
  *  control window draws the page into (renderer PageWindow.tsx), which main lets
  *  open (and only these). */
 export const OUTPUT_PAGE_FRAME = 'opsia-output-page'
@@ -1055,13 +1056,15 @@ export const SEQUENCE_PAGE_FRAME = 'opsia-sequence-page'
 export const COMPLEX_PAGE_FRAME = 'opsia-complex-page'
 /** A Complex Output screen's window : this and the screen's id (main/complexOut.ts). */
 export const CX_FRAME = 'opsia-cx:'
+export const DOME_VIEW_FRAME = 'opsia-dome-view'
 /** Each page window's title, by its window.open name. */
 export const PAGE_WINDOW_TITLES: Record<string, string> = {
   [OUTPUT_PAGE_FRAME]: 'Palinopsia · Output',
   [BODY_PAGE_FRAME]: 'Palinopsia · Body',
   [SONIFY_PAGE_FRAME]: 'Palinopsia · Sonify',
   [SEQUENCE_PAGE_FRAME]: 'Palinopsia · Sequencer',
-  [COMPLEX_PAGE_FRAME]: 'Palinopsia · Complex Output'
+  [COMPLEX_PAGE_FRAME]: 'Palinopsia · Complex Output',
+  [DOME_VIEW_FRAME]: 'Palinopsia · Dome'
 }
 // What the AUTOMATIC binders may use (Randomize, Generate, a World's audio
 // route) : the old 12, so a randomized session keeps the amount of motion it

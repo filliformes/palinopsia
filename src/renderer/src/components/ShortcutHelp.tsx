@@ -82,6 +82,16 @@ const GROUPS: Array<{ title: string; rows: Array<[string, string]> }> = [
     ]
   },
   {
+    title: 'In the dome viewer (Output, once clicked)',
+    rows: [
+      ['W A S D / ↑ ↓ ← →', 'Walk or fly  ·  ⇧ runs'],
+      ['E / Q', 'Up / down while flying'],
+      ['F', 'Walk / fly'],
+      ['R', 'The best seat (the center of the sphere)'],
+      ['Esc', 'Leave the expanded view, or let the keyboard go']
+    ]
+  },
+  {
     title: 'In the search (Ctrl K)',
     rows: [
       ['↑ ↓', 'Choose  ·  PgUp / PgDn by eight'],

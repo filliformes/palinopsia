@@ -51,8 +51,15 @@ export interface DomeConfig {
   offsetX: number // -1..1
   offsetY: number // -1..1
 
-  // simulator (preview only, never in the output)
+  // simulator (preview only, never in the output). Where you stand in it is
+  // this computer's (renderer engine/domeView.ts), not the piece's.
   sim: {
+    room: DomeRoomId // the building, at real scale
+    radius: number // free room : the screen's radius, meters
+    center: number // free room : the height of the sphere's center over the floor, meters
+    marks: boolean // the back seam and the zenith, marked
+    wash: number // 0..0.9 : an approximate projector look, how much light the screen throws back on itself (0 = off)
+    readings: boolean // the numbers over the viewer (pixels per degree, the turning speed) and the floor plan
     tilt: number // dome tilt in degrees (TD default −15 for a tilted planetarium; Satosphère is level)
     fov: number // camera field of view, degrees
     back: number // inside view : how far the camera backs away from the centre (0 = the seat, up to 3 radii)
@@ -89,6 +96,26 @@ export const DOME_MOD_RANGE: Record<DomeModField, { min: number; max: number; la
   offsetY: { min: -1, max: 1, label: 'offset y' }
 }
 
+// The rooms the viewer can build. The Satosphère's own numbers : an exact sphere
+// cap, radius 9.50 m, its center 2.56 m over the floor. At 210° the rim comes
+// down to 0.10 m over the floor; the hemisphere stops at the center's height.
+// third-party: DomeportPro (measured facts and the feature list only, no code)
+export type DomeRoomId = 'sat210' | 'sat180' | 'free'
+export const SATOSPHERE = { radius: 9.5, center: 2.56 } as const
+
+/** The room as meters and radians : R the screen's radius, cy its center's
+ *  height over the floor, halfAp half its opening, rimY / rimR the rim circle's
+ *  height and radius. A free room opens as wide as the master does. */
+export interface DomeRoom { R: number; cy: number; halfAp: number; rimY: number; rimR: number }
+export function domeRoom(cfg: Pick<DomeConfig, 'aperture' | 'sim'>): DomeRoom {
+  const s = cfg.sim
+  const R = s.room === 'free' ? s.radius : SATOSPHERE.radius
+  const cy = s.room === 'free' ? s.center : SATOSPHERE.center
+  const ap = s.room === 'sat210' ? 210 : s.room === 'sat180' ? 180 : cfg.aperture
+  const halfAp = (ap * Math.PI) / 360
+  return { R, cy, halfAp, rimY: cy + R * Math.cos(halfAp), rimR: R * Math.sin(halfAp) }
+}
+
 export const DOME_RES = [2048, 4096] as const // no live 8K : ~1.9 GB more VRAM (measured), a blue-screen risk
 
 export function defaultDomeConfig(): DomeConfig {
@@ -116,7 +143,7 @@ export function defaultDomeConfig(): DomeConfig {
     scale: 1,
     offsetX: 0,
     offsetY: 0,
-    sim: { tilt: 0, fov: 100, back: 0, template: 0.19, sweet: false, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
+    sim: { room: 'sat210', radius: SATOSPHERE.radius, center: SATOSPHERE.center, marks: false, wash: 0, readings: true, tilt: 0, fov: 100, back: 0, template: 0.19, sweet: false, sweetW: 90, sweetLo: 10, sweetHi: 55, view: 'inside' }
   }
 }
 
@@ -127,10 +154,11 @@ export function sanitizeDome(raw: unknown): DomeConfig {
   const num = (v: unknown, fb: number, lo: number, hi: number): number =>
     typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : fb
   const sim = (r.sim && typeof r.sim === 'object' ? r.sim : {}) as Partial<DomeConfig['sim']>
+  const aperture = num(r.aperture, d.aperture, 180, 230)
   return {
     enabled: !!r.enabled,
     res: (DOME_RES as readonly number[]).includes(Number(r.res)) ? Number(r.res) : d.res,
-    aperture: num(r.aperture, d.aperture, 180, 230),
+    aperture,
     mode: r.mode === 'screen' || r.mode === 'fisheye' || r.mode === 'wrap' ? r.mode : d.mode,
     spin: num(r.spin, d.spin, -360, 360),
     rotate: num(r.rotate, d.rotate, -180, 180),
@@ -152,6 +180,14 @@ export function sanitizeDome(raw: unknown): DomeConfig {
     offsetX: num(r.offsetX, d.offsetX, -1, 1),
     offsetY: num(r.offsetY, d.offsetY, -1, 1),
     sim: {
+      // (no room yet, an older file : the Satosphère for a 210° master, else a
+      // room as open as the master : the view it had)
+      room: sim.room === 'sat210' || sim.room === 'sat180' || sim.room === 'free' ? sim.room : aperture === 210 ? 'sat210' : 'free',
+      radius: num(sim.radius, d.sim.radius, 2, 30),
+      center: num(sim.center, d.sim.center, 0, 20),
+      marks: !!sim.marks,
+      wash: num(sim.wash, d.sim.wash, 0, 0.9),
+      readings: sim.readings === undefined ? d.sim.readings : !!sim.readings,
       tilt: num(sim.tilt, d.sim.tilt, -30, 30),
       fov: num(sim.fov, d.sim.fov, 30, 150),
       back: num(sim.back, d.sim.back, 0, 3),

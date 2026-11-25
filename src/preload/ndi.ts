@@ -11,20 +11,34 @@
 // both JS worlds (the page's, ours) would deserialize each frame, and a second
 // world's copy of a transferred 33 MB buffer is pure garbage-collector load.
 //
+// Frames come from two places, each with its own pipe : the GPU capture worker
+// (engine/gpuCapture.ts, the fast path : the page never sees the frame) and the
+// page itself (engine/frameCapture.ts, the WebGL path).
+//
 // Zero copy from there : koffi hands NDI the ArrayBuffer's own memory as the
-// frame pointer, and NDI's ASYNC send returns at once and encodes on NDI's own
-// threads. NDI keeps reading that memory until the NEXT async call, so we hold
-// the buffer until then, and then transfer it BACK to the page to be refilled
+// frame pointer, and NDI's ASYNC send encodes on NDI's own threads. NDI keeps
+// reading that memory until the NEXT async call, so we hold the buffer until that
+// one has RETURNED, and then transfer it BACK where it came from to be refilled
 // (a small pool : a 4K stream would otherwise allocate 16 MB per frame).
 // Not koffi.alloc + koffi.view : Electron forbids ArrayBuffers over foreign
 // memory, and trying one takes the renderer down.
+//
+// "Async" is NDI's word : the call itself still waits for the frame before it to
+// be out of its way, up to 12 ms (p95) and 27 ms (max) at 4096² (measured). So it
+// is made on koffi's worker thread, one at a time (`sending`), and a new frame
+// that finds it busy waits in a queue of QUEUE_MAX (the oldest dropped, counted).
+// Nothing touches the sender while a call is in it : the status poll waits its
+// turn, and a sender is flushed and destroyed only once the call is back.
+//
+// A receiver must never think the source died : with nothing new for half a
+// second (a held frame, a stalled capture) the last frame is sent again.
 //
 // The NDI runtime is called directly through koffi (FFI) : nothing is compiled
 // against Electron.
 
 import { ipcRenderer } from 'electron'
 import { hostname } from 'os'
-import type { NdiConfig, NdiStatus } from '../shared/ndi'
+import { idleNdiStatus, type NdiConfig, type NdiStatus } from '../shared/ndi'
 
 type Koffi = typeof import('koffi')
 type Ptr = unknown
@@ -35,8 +49,10 @@ interface Lib {
   destroy: () => void
   version: () => string
   send_create: (s: { p_ndi_name: string; p_groups: string | null; clock_video: boolean; clock_audio: boolean }) => Ptr
-  send_destroy: (i: Ptr) => void
-  send_async: (i: Ptr, f: Record<string, unknown> | null) => void
+  send_destroy: ((i: Ptr) => void) & { async: (i: Ptr, cb: (err: unknown) => void) => void }
+  send_async: ((i: Ptr, f: Record<string, unknown> | null) => void) & {
+    async: (i: Ptr, f: Record<string, unknown> | null, cb: (err: unknown) => void) => void
+  }
   send_conn: (i: Ptr, timeoutMs: number) => number
   send_tally: (i: Ptr, out: Record<string, unknown>, timeoutMs: number) => boolean
   // receive (NDI input)
@@ -66,7 +82,15 @@ interface Frame {
   stride: number
   fpsN: number
   fpsD: number
+  tc?: number // its time on the sender's grid, ms since the epoch
   buf: ArrayBuffer
+  from: MessagePort | null // the pipe it came on : its buffer goes back there
+}
+/** A send in NDI's hands, on koffi's thread. */
+interface Send {
+  f: Frame
+  resend: boolean
+  since: number
 }
 
 const FOURCC = (s: string): number =>
@@ -80,9 +104,22 @@ let cfgName = ''
 let cfgGroups = ''
 let netKey = ''
 // The frame NDI may still be reading (until the next async call or a flush).
-let held: ArrayBuffer | null = null
+let held: Frame | null = null
+let sending: Send | null = null
+let idleWaits: Array<() => void> = [] // who waits for `sending` to be back
+let closing = false // the sender is being taken down : nothing new goes to it
+let queue: Frame[] = []
+const QUEUE_MAX = 2
+const KEEP_ALIVE_MS = 500
+let lastSend = 0 // when the last send came back
+let sendErrors = 0 // in a row
+let pollDue = false
+let aliveTimer: ReturnType<typeof setInterval> | null = null
+let polledAt = 0
 let sent = 0
+let resent = 0
 let dropped = 0
+let sendMax = 0 // the longest NDI call of the second, ms
 let lastW = 0
 let lastH = 0
 let listener: ((s: NdiStatus) => void) | null = null
@@ -92,18 +129,15 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 let lastCfg: NdiConfig | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-const status: NdiStatus = {
-  state: 'off', message: '', source: '', runtime: '', version: '',
-  connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0
-}
+const status: NdiStatus = idleNdiStatus()
 const emit = (): void => { try { listener?.({ ...status }) } catch { /* page gone */ } }
 
-// The frame pipe to the page (see the header).
-let port: MessagePort | null = null
+// The frame pipes (see the header) : the page's, and the GPU capture worker's.
+const ports: Record<string, MessagePort | null> = { page: null, gpu: null }
 
-/** Hand a frame buffer back to the page's pool (transfer : no copy). */
-function giveBack(buf: ArrayBuffer): void {
-  try { port?.postMessage({ t: 'return', buf }, [buf]) } catch { /* detached : drop it */ }
+/** Hand a frame buffer back to the pool it came from (transfer : no copy). */
+function giveBack(f: Frame): void {
+  try { f.from?.postMessage({ t: 'return', buf: f.buf }, [f.buf]) } catch { /* detached, or a pipe that closed : drop it */ }
 }
 
 function loadKoffi(): Koffi | null {
@@ -167,22 +201,52 @@ function bind(k: Koffi, path: string): Lib {
   } as unknown as Lib
 }
 
-/** Make NDI let go of the frame it holds (a NULL async send is the SDK's flush),
- *  then return that buffer to the page. */
-function flush(): void {
-  if (lib && sender) { try { lib.send_async(sender, null) } catch { /* ignore */ } }
-  if (held) { giveBack(held); held = null }
+/** No send in NDI's hands (or `ms` over : false). */
+function sendIdle(ms: number): Promise<boolean> {
+  if (!sending) return Promise.resolve(true)
+  return new Promise((res) => {
+    const t = setTimeout(() => { idleWaits = idleWaits.filter((f) => f !== done); res(false) }, ms)
+    const done = (): void => { clearTimeout(t); res(true) }
+    idleWaits.push(done)
+  })
+}
+const offThread = (call: (cb: (err: unknown) => void) => void): Promise<void> =>
+  new Promise((res) => { try { call(() => res()) } catch { res() } })
+
+/** Frames waiting for the sender go back unsent. */
+function dropQueue(): void {
+  for (const f of queue) giveBack(f)
+  queue = []
 }
 
-function destroySender(): void {
-  flush()
-  if (lib && sender) { try { lib.send_destroy(sender) } catch { /* ignore */ } }
+/** Take the sender down : once the call in it is back, make NDI let go of the
+ *  frame it holds (a NULL async send is the SDK's flush), destroy it, and return
+ *  that buffer. All off the window's thread. */
+async function destroySender(): Promise<void> {
+  closing = true
+  dropQueue()
+  const l = lib, s = sender
+  if (l && s) {
+    if (await sendIdle(4000)) {
+      await offThread((cb) => l.send_async.async(s, null, cb))
+      await offThread((cb) => l.send_destroy.async(s, cb))
+      if (held) giveBack(held)
+    } else {
+      // Stuck inside NDI : destroying it under the call would take the app down.
+      // It is left to the process; so is the frame it reads.
+      console.warn('[ndi] a send never came back : its sender was abandoned')
+      sending = null
+    }
+  }
+  held = null
   sender = null
+  closing = false
 }
 
 function createSender(): boolean {
   if (!lib) return false
-  destroySender()
+  sendErrors = 0
+  lastSend = performance.now()
   try {
     sender = lib.send_create({ p_ndi_name: cfgName, p_groups: cfgGroups || null, clock_video: false, clock_audio: false })
   } catch (e) {
@@ -192,6 +256,7 @@ function createSender(): boolean {
   if (!sender) {
     status.state = 'error'
     status.message = status.message || 'NDI refused to create the sender (name or groups invalid?)'
+    retryLater()
     return false
   }
   status.state = 'live'
@@ -241,8 +306,52 @@ function initLib(candidates: Array<{ path: string; origin: string }>, configDir:
   return false
 }
 
+/** Not live, though it should be : try the whole thing again in a moment. */
+function retryLater(): void {
+  if (retryTimer) clearTimeout(retryTimer)
+  retryTimer = setTimeout(() => { if (lastCfg?.enabled) void ndiConfigure(lastCfg, true) }, 3000)
+}
+
+/** A live sender made again, same name and groups (it kept failing, or the
+ *  network moved under it with nobody connected). */
+function recreate(why: string): void {
+  busy = busy.then(async () => {
+    if (!lib || !sender || !lastCfg?.enabled) return { ...status }
+    console.warn('[ndi] the sender starts again :', why)
+    await destroySender()
+    createSender()
+    emit()
+    return { ...status }
+  })
+}
+
 function poll(): void {
-  if (lib && sender) {
+  // While a send is in NDI's hands the questions wait for it to be back (they
+  // would queue behind it inside NDI, on this thread).
+  if (sending && performance.now() - sending.since < 3000) pollDue = true
+  else ask()
+  const now = performance.now()
+  const dt = polledAt ? Math.max(0.2, (now - polledAt) / 1000) : 1
+  polledAt = now
+  status.fps = Math.round((sent / dt) * 10) / 10
+  status.dropped = dropped
+  status.resent = resent
+  if (sending) sendMax = Math.max(sendMax, now - sending.since)
+  status.sendMs = Math.round(sendMax * 10) / 10
+  sendMax = 0
+  status.width = lastW
+  status.height = lastH
+  sent = 0
+  dropped = 0
+  resent = 0
+  if (netCheckUntil) netCheck(now)
+  emit()
+}
+
+/** Connections and tally. Never while a send is in NDI's hands. */
+function ask(): void {
+  pollDue = false
+  if (lib && sender && !closing && !sending) {
     try { status.connections = lib.send_conn(sender, 0) } catch { /* ignore */ }
     try {
       const t: Record<string, unknown> = {}
@@ -251,59 +360,131 @@ function poll(): void {
       status.preview = !!t.on_preview
     } catch { /* ignore */ }
   }
-  status.fps = sent
-  status.dropped = dropped
-  status.width = lastW
-  status.height = lastH
-  sent = 0
-  dropped = 0
-  emit()
 }
 
 function onFrame(f: Frame): void {
   const bytes = f.stride * f.h
   // A detached / short buffer can't be sent (and there is nothing to give back).
   if (!isBuf(f.buf) || f.buf.byteLength < bytes) { dropped++; return }
-  if (!lib || !sender) { giveBack(f.buf); return }
-  try {
-    lib.send_async(sender, {
-      xres: f.w, yres: f.h, FourCC: FOURCC(f.fourcc), frame_rate_N: f.fpsN, frame_rate_D: f.fpsD,
-      picture_aspect_ratio: f.w / f.h, frame_format_type: 1 /* progressive */,
-      timecode: 9223372036854775807n /* synthesize */, p_data: f.buf,
-      line_stride_in_bytes: f.stride, p_metadata: null, timestamp: 0n
-    })
-  } catch (e) {
-    dropped++
-    status.message = `send failed : ${(e as Error).message}`
-    giveBack(f.buf)
-    return
-  }
-  // The async contract : NDI has let go of the PREVIOUS frame now.
-  if (held) giveBack(held)
-  held = f.buf
-  sent++
-  lastW = f.w
-  lastH = f.h
+  if (!lib || !sender || closing) { giveBack(f); return }
+  queue.push(f)
+  // NDI is behind : the oldest waiting frame goes, the stream stays current.
+  while (queue.length > QUEUE_MAX) { giveBack(queue.shift()!); dropped++ }
+  pump()
 }
 
-/** A fresh pipe for the page (it asks on mount; a remount asks again). */
-function openPort(): void {
-  try { port?.close() } catch { /* ignore */ }
-  const mc = new MessageChannel()
-  port = mc.port1
-  port.onmessage = (ev): void => {
-    const d = ev.data as Frame | null
-    if (d && d.t === 'frame') onFrame(d)
+/** The next waiting frame into NDI, when no call is in it. */
+function pump(): void {
+  if (sending || closing || !lib || !sender) return
+  const f = queue.shift()
+  if (f) startSend(f, false)
+}
+
+function startSend(f: Frame, resend: boolean): void {
+  const l = lib!
+  const job: Send = { f, resend, since: performance.now() }
+  const wall = !resend && f.tc ? f.tc : performance.timeOrigin + performance.now()
+  sending = job
+  try {
+    l.send_async.async(sender, {
+      xres: f.w, yres: f.h, FourCC: FOURCC(f.fourcc), frame_rate_N: f.fpsN, frame_rate_D: f.fpsD,
+      picture_aspect_ratio: f.w / f.h, frame_format_type: 1 /* progressive */,
+      // Its place on the frame grid (100 ns units, the Unix epoch) : frames reach
+      // NDI a few ms early or late, their own times are even.
+      timecode: BigInt(Math.round(wall * 1000)) * 10n, p_data: f.buf,
+      line_stride_in_bytes: f.stride, p_metadata: null, timestamp: 0n
+    }, (err) => {
+      if (sending !== job) return // abandoned meanwhile (see destroySender)
+      sendDone(job, err)
+    })
+  } catch (e) {
+    sendDone(job, e)
   }
-  window.postMessage('opsia:ndiport', '*', [mc.port2])
+}
+
+function sendDone(job: Send, err: unknown): void {
+  const now = performance.now()
+  sending = null
+  sendMax = Math.max(sendMax, now - job.since)
+  lastSend = now
+  if (err) {
+    status.message = `send failed : ${(err as Error).message ?? err}`
+    if (!job.resend) { dropped++; giveBack(job.f) }
+    if (++sendErrors === 5) recreate(status.message)
+  } else {
+    if (sendErrors) { sendErrors = 0; status.message = '' }
+    // The async contract : NDI has let go of the PREVIOUS frame now.
+    if (held && held !== job.f) giveBack(held)
+    held = job.f
+    if (job.resend) resent++
+    else sent++
+    lastW = job.f.w
+    lastH = job.f.h
+  }
+  const waits = idleWaits
+  idleWaits = []
+  for (const w of waits) w()
+  if (pollDue) ask()
+  if (!closing) pump()
+}
+
+/** Ten times a second : the last frame again when nothing new came. */
+function keepAlive(): void {
+  if (!lib || !sender || closing || sending || queue.length || !held) return
+  if (performance.now() - lastSend >= KEEP_ALIVE_MS) startSend(held, true)
+}
+
+// The network moved under a live sender (another address, a cable, the machine
+// woke up : main/ndi/watch.ts says so). NDI follows most of it by itself, and a
+// receiver still connected must not blink : only a sender nobody is connected to,
+// in the half minute that follows, is made again, which announces it anew.
+let netCheckUntil = 0
+let netCheckFrom = 0
+ipcRenderer.on('ndi:network', () => {
+  netCheckFrom = performance.now() + 3000
+  netCheckUntil = netCheckFrom + 27000
+})
+function netCheck(now: number): void {
+  if (now < netCheckFrom) return
+  if (now > netCheckUntil) { netCheckUntil = 0; return }
+  if (status.connections > 0 || !sender) return
+  netCheckUntil = 0
+  recreate('the network changed')
+}
+
+/** A fresh pipe (the page asks on mount, the GPU capture with each worker). */
+function openPort(kind: string): void {
+  try { ports[kind]?.close() } catch { /* ignore */ }
+  const mc = new MessageChannel()
+  const p = mc.port1
+  ports[kind] = p
+  p.onmessage = (ev): void => {
+    const d = ev.data as Frame | null
+    if (d && d.t === 'frame') onFrame({ ...d, from: p })
+  }
+  window.postMessage({ t: 'opsia:ndiport', kind }, '*', [mc.port2])
 }
 window.addEventListener('message', (ev) => {
-  if (ev.data === 'opsia:want-ndiport') openPort()
+  const d = ev.data as { t?: string; kind?: string } | null
+  if (d?.t === 'opsia:want-ndiport' && (d.kind === 'page' || d.kind === 'gpu')) openPort(d.kind)
 })
 // A reload / close must take the source OFF the network (else a stale
-// "Palinopsia" lingers, and the next page would publish "Palinopsia (2)").
+// "Palinopsia" lingers, and the next page would publish "Palinopsia (2)"). No
+// waiting for a callback here : a send still in NDI's hands is waited out by the
+// clock (27 ms was the longest measured at 4096²; a first reload can be slower).
 window.addEventListener('beforeunload', () => {
-  destroySender()
+  closing = true
+  queue = []
+  if (sending) {
+    const until = sending.since + 250
+    while (performance.now() < until) { /* the send is on another thread */ }
+  }
+  if (lib && sender) {
+    try { lib.send_async(sender, null) } catch { /* ignore */ }
+    try { lib.send_destroy(sender) } catch { /* ignore */ }
+  }
+  sender = null
+  held = null
   beforeUnload()
   try { lib?.destroy() } catch { /* ignore */ }
 })
@@ -318,9 +499,12 @@ export function ndiConfigure(cfg: NdiConfig, quiet = false): Promise<NdiStatus> 
   busy = busy.then(async () => {
     try {
       if (!cfg.enabled) {
-        destroySender()
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
-        Object.assign(status, { state: 'off', message: '', connections: 0, program: false, preview: false, fps: 0, dropped: 0 })
+        if (aliveTimer) { clearInterval(aliveTimer); aliveTimer = null }
+        await destroySender()
+        Object.assign(status, { state: 'off', message: '', connections: 0, program: false, preview: false, fps: 0, dropped: 0, resent: 0, sendMs: 0, width: 0, height: 0 })
+        polledAt = 0
+        sent = dropped = resent = lastW = lastH = 0
         emit()
         return { ...status }
       }
@@ -334,16 +518,14 @@ export function ndiConfigure(cfg: NdiConfig, quiet = false): Promise<NdiStatus> 
           status.state = 'starting'
           emit()
         }
+        await destroySender()
         if (needInit) {
-          destroySender()
           const prep = (await ipcRenderer.invoke('ndi:prepare', cfg)) as {
             candidates: Array<{ path: string; origin: string }>
             configDir: string | null
           }
           if (!initLib(prep.candidates, prep.configDir)) {
-            if (status.state === 'no-runtime') {
-              retryTimer = setTimeout(() => { if (lastCfg?.enabled) void ndiConfigure(lastCfg, true) }, 3000)
-            }
+            if (status.state === 'no-runtime') retryLater()
             emit()
             return { ...status }
           }
@@ -354,9 +536,11 @@ export function ndiConfigure(cfg: NdiConfig, quiet = false): Promise<NdiStatus> 
         createSender()
       }
       if (!pollTimer) pollTimer = setInterval(poll, 1000)
+      if (!aliveTimer) aliveTimer = setInterval(keepAlive, 100)
     } catch (e) {
       status.state = 'error'
       status.message = (e as Error).message
+      if (cfg.enabled) retryLater()
     }
     emit()
     return { ...status }

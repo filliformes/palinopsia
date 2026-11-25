@@ -30,6 +30,7 @@ import { pictureDepth } from './engine/pictureDepth'
 import { currentFps, currentSkips, formatHz, tickFrame, tickSkip } from './perf'
 import { videoSeekRequests } from './engine/videoState'
 import { outputRecorder, encoderAccepts, warmUpRecorder } from './recorder'
+import { captureOnce, gpuCapture, ndiCap } from './engine/gpuCapture'
 import StreamRelay from './workers/streamRelay?worker&inline'
 import { setPointerHost, attachPreviewPointer } from './pointerInput'
 import PreviewPointerOverlay from './components/PreviewPointerOverlay'
@@ -74,6 +75,7 @@ import { DepthMenu } from './components/DepthMenu'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
+import { DomeViewerPage } from './components/DomeViewer'
 import { PageWindow } from './components/PageWindow'
 import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
@@ -92,8 +94,8 @@ import { markUserShadersReady, registerUserShader, takeShaderReloads, userShader
 import { SourceEditor } from './components/SourceEditor'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
-import { domePreview, DOME_PREVIEW } from './engine/domePreview'
-import { ndiRate, NDI_MAX_EDGE } from '@shared/ndi'
+import { domeCam, domeFrame } from './engine/domeView'
+import { ndiRate, NDI_MAX_EDGE, type NdiStatus } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
 import { roomTracker } from './engine/roomTracker'
 import { bodyBus } from './engine/bodyIn'
@@ -141,7 +143,6 @@ let contextPresetIndex = -1
 let depthModePrev = ''
 // The first engine of this window was built (its layer-1 safety net is spent).
 let firstEngineBuilt = false
-let lastDomePreview = 0
 let lastStreamOn = false
 // what the output window was last sent (compared value by value : a string
 // built every frame to spot a change)
@@ -600,15 +601,29 @@ export default function App(): JSX.Element {
   //    (transferred, no copy) once NDI is done with them, to be refilled.
   const ndiCfg = useStore((s) => s.ndi)
   useEffect(() => {
-    void window.api.ndiConfigure(ndiCfg).then((st) => useStore.getState().setNdiStatus(st)).catch(() => {})
-    if (!ndiCfg.enabled) compositorRef.current?.captureRelease('ndi')
+    const merge = (st: NdiStatus): void => {
+      useStore.getState().setNdiStatus({
+        ...st, captured: ndiCap.last.captured, skipped: ndiCap.last.skipped, dropped: st.dropped + ndiCap.last.late,
+        path: ndiCap.path, pathNote: ndiCap.note, latencyMs: Math.round(ndiCap.lat)
+      })
+    }
+    void window.api.ndiConfigure(ndiCfg).then(merge).catch(() => {})
+    if (!ndiCfg.enabled) {
+      compositorRef.current?.captureRelease('ndi')
+      gpuCapture.stop()
+      ndiCap.reset()
+    }
+    // The sender's status, once a second, with what its captures came to here.
+    return window.api.onNdiStatus((st) => {
+      ndiCap.roll(performance.now())
+      merge(st)
+    })
   }, [ndiCfg])
-  useEffect(() => window.api.onNdiStatus((st) => useStore.getState().setNdiStatus(st)), [])
   useEffect(() => {
     // The frame pipe to the sender : a private MessageChannel from the preload
     // (window messages would be deserialized by every listener in both worlds).
     const onMsg = (e: MessageEvent): void => {
-      if (e.data !== 'opsia:ndiport' || !e.ports[0]) return
+      if (e.data?.t !== 'opsia:ndiport' || e.data.kind !== 'page' || !e.ports[0]) return
       try { ndiPortRef.current?.close() } catch { /* ignore */ }
       const port = e.ports[0]
       port.onmessage = (m: MessageEvent): void => {
@@ -618,7 +633,7 @@ export default function App(): JSX.Element {
       ndiPortRef.current = port
     }
     window.addEventListener('message', onMsg)
-    window.postMessage('opsia:want-ndiport', '*')
+    window.postMessage({ t: 'opsia:want-ndiport', kind: 'page' }, '*')
     return () => {
       window.removeEventListener('message', onMsg)
       try { ndiPortRef.current?.close() } catch { /* ignore */ }
@@ -657,6 +672,7 @@ export default function App(): JSX.Element {
   const outputPageWindow = useStore((s) => s.outputPageWindow)
   const complexPageOpen = useStore((s) => s.complexPageOpen)
   const complexPageWindow = useStore((s) => s.complexPageWindow)
+  const domeViewWindow = useStore((s) => s.domeViewWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const renderScale = useStore((s) => s.renderScale)
@@ -1345,7 +1361,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __cx: cxRuntime, __osc: routeOsc, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __lights: lightRuntime, __cx: cxRuntime, __osc: routeOsc, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats, __captureOnce: captureOnce, __gpuCapture: gpuCapture, __domeView: { cam: domeCam, frame: domeFrame }, __ndiCap: ndiCap })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1779,15 +1795,28 @@ export default function App(): JSX.Element {
           comp!.captureRelease('stream')
         }
         lastStreamOn = st.outputActive
-        //     NDI : every finished frame in order to the sender (this window's
-        //     preload, transferred), then the next capture at the NDI rate.
+        //     NDI, at its own rate. The fast path hands the canvas to a worker that
+        //     converts it and passes it to the sender itself (engine/gpuCapture.ts);
+        //     otherwise every finished frame in order goes to the sender (this
+        //     window's preload, transferred), then the next capture is queued.
         const ndiPort = ndiPortRef.current
         if (st.ndi.enabled && st.ndiStatus.state === 'live' && ndiPort) {
           perfMeter.begin('ndi')
-          for (let fr = comp!.captureHarvest('ndi'); fr; fr = comp!.captureHarvest('ndi')) {
-            const [fpsN, fpsD] = ndiRate(st.ndi.fps)
-            const fourcc = fr.format === 'uyvy' ? 'UYVY' : 'RGBX'
-            ndiPort.postMessage({ t: 'frame', w: fr.w, h: fr.h, fourcc, stride: fr.stride, fpsN, fpsD, buf: fr.buf }, [fr.buf])
+          const clean = comp!.cleanCanvas()
+          const fast = clean ? gpuCapture.want(now) : 'no'
+          const [fpsN, fpsD] = ndiRate(st.ndi.fps)
+          if (fast !== 'no') {
+            if (ndiCap.path !== 'gpu') comp!.captureRelease('ndi') // the slow path's buffers
+            ndiCap.path = 'gpu'
+            ndiCap.note = ''
+          } else {
+            ndiCap.path = 'slow'
+            ndiCap.note = clean ? gpuCapture.why() : 'the keystone is on'
+            for (let fr = comp!.captureHarvest('ndi'); fr; fr = comp!.captureHarvest('ndi')) {
+              const fourcc = fr.format === 'uyvy' ? 'UYVY' : 'RGBX'
+              ndiCap.captured++
+              ndiPort.postMessage({ t: 'frame', w: fr.w, h: fr.h, fourcc, stride: fr.stride, fpsN, fpsD, buf: fr.buf }, [fr.buf])
+            }
           }
           const interval = 1000 / st.ndi.fps
           const since = now - ndiLastKick.current
@@ -1795,7 +1824,15 @@ export default function App(): JSX.Element {
             // Step on the grid (last + interval, not "now") so the average rate is
             // exact; re-anchor only after falling more than two frames behind.
             ndiLastKick.current = since > interval * 2 ? now : ndiLastKick.current + interval
-            comp!.captureKick('ndi', st.ndi.format, st.ndi.maxSize > 0 ? Math.min(st.ndi.maxSize, NDI_MAX_EDGE) : NDI_MAX_EDGE)
+            const edge = st.ndi.maxSize > 0 ? Math.min(st.ndi.maxSize, NDI_MAX_EDGE) : NDI_MAX_EDGE
+            const took = fast === 'no'
+              ? comp!.captureKick('ndi', st.ndi.format, edge)
+              : fast === 'wait' || gpuCapture.kick(clean!, {
+                ...comp!.captureSizeFor(st.ndi.format, edge), format: st.ndi.format, fpsN, fpsD,
+                // its time on the grid (what receivers pace on), and the real one
+                tc: performance.timeOrigin + ndiLastKick.current, cap: performance.timeOrigin + performance.now()
+              })
+            if (!took) ndiCap.skipped++
           }
           perfMeter.end('ndi')
         }
@@ -1817,23 +1854,11 @@ export default function App(): JSX.Element {
           comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 4096)
           perfMeter.end('share')
         }
-        //     Fulldome simulator : a 1024² read of the master, ~30 Hz, only while
-        //     the Output page shows it.
-        if (st.outputPageOpen && st.dome.enabled) {
-          const fr = comp!.captureHarvest('domePrev', true)
-          if (fr) {
-            if (domePreview.px) comp!.captureRecycle('domePrev', domePreview.px.buffer as ArrayBuffer)
-            domePreview.px = new Uint8Array(fr.buf)
-            domePreview.size = fr.w
-            domePreview.serial++
-          }
-          if (now - lastDomePreview > 33) {
-            lastDomePreview = now
-            comp!.captureKick('domePrev', 'rgba-up', DOME_PREVIEW, true)
-          }
-        } else if (domePreview.px) {
-          comp!.captureRelease('domePrev')
-          domePreview.px = null
+        //     Dome viewer : a new master is on the canvas. It takes it itself, card
+        //     to card, when it is shown (components/DomeSim.tsx).
+        if (st.dome.enabled) {
+          domeFrame.serial++
+          domeFrame.spin = comp!.domeParam('spin') ?? 0
         }
         //     A real-time (DXV3) recording captures on its own rate's grid.
         outputRecorder.tick(now)
@@ -2593,6 +2618,11 @@ export default function App(): JSX.Element {
       {outputPageOpen && outputPageWindow && (
         <PageWindow page="output">
           <OutputPage canvasRef={canvasRef} inWindow />
+        </PageWindow>
+      )}
+      {domeViewWindow && (
+        <PageWindow page="dome">
+          <DomeViewerPage />
         </PageWindow>
       )}
       {bodyPageOpen && bodyPageWindow && (

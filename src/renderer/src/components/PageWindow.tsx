@@ -2,7 +2,7 @@
 // second screen, or just moved aside) : the Output page, so the mapping, the
 // dome and the senders stay in view while you play; Body, to watch the camera
 // and its rules; Sonify, to play the sound beside the picture; the Sequencer, to
-// steer the auto-pilot beside the picture. The control
+// steer the auto-pilot beside the picture; the dome viewer alone, large. The control
 // window opens a blank page of its own and draws the page into it through a
 // React portal : one app, one store, one engine, every control live. The window
 // only borrows the control window's styles, theme and zoom, and hands its keys
@@ -12,14 +12,14 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { BODY_PAGE_FRAME, COMPLEX_PAGE_FRAME, OUTPUT_PAGE_FRAME, PAGE_WINDOW_TITLES, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
+import { BODY_PAGE_FRAME, COMPLEX_PAGE_FRAME, DOME_VIEW_FRAME, OUTPUT_PAGE_FRAME, PAGE_WINDOW_TITLES, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { useStore } from '../store'
 import { installSliderLens } from '../glass'
 import { watchUserInput } from '../sessionGuard'
 import { Toaster, showToast } from './Toast'
 import { MenuHost } from './ContextMenu'
 
-export type WindowPage = 'output' | 'body' | 'sonify' | 'sequence' | 'complex'
+export type WindowPage = 'output' | 'body' | 'sonify' | 'sequence' | 'complex' | 'dome'
 
 /** Each page : its window's name (main allows only these), where its place is
  *  kept, its first size, what it is called, and how it closes (the page closes)
@@ -67,6 +67,14 @@ const PAGES: Record<
     name: 'Complex Output',
     close: () => useStore.getState().setComplexPageOpen(false),
     stayHere: () => useStore.getState().setComplexPageWindow(false)
+  },
+  dome: {
+    frame: DOME_VIEW_FRAME,
+    boundsKey: 'opsia.domeViewBounds',
+    size: 'width=1280,height=760',
+    name: 'The dome viewer',
+    close: () => useStore.getState().setDomeViewWindow(false),
+    stayHere: () => useStore.getState().setDomeViewWindow(false)
   }
 }
 

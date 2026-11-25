@@ -46,6 +46,7 @@ import { hiveSendStart, hiveSendChunk, hiveSendStop } from './hiveSend'
 import { OutputSender } from './output'
 import { prepareNdi } from './ndi/prepare'
 import { installNdiRuntime } from './ndi/install'
+import { watchNetworkForNdi } from './ndi/watch'
 import { sanitizeNdiConfig } from '@shared/ndi'
 import { DmxSender, discoverLights, type DmxPacket } from './light'
 import { openLightSetupFile, saveLightSetupFile } from './lightSetup'
@@ -1183,7 +1184,10 @@ app.whenReady().then(async () => {
   // ---------- IPC: External output (NDI · Spout / Syphon) ----------
   // NDI : the sender lives in the main window's preload (frames never leave the
   // renderer); main only finds the runtime and writes the network config.
-  safeHandle('ndi:prepare', (_e, cfg) => prepareNdi(sanitizeNdiConfig(cfg)))
+  safeHandle('ndi:prepare', (e, cfg) => {
+    watchNetworkForNdi((e as Electron.IpcMainInvokeEvent).sender)
+    return prepareNdi(sanitizeNdiConfig(cfg))
+  })
   // A computer with no NDI : fetch NDI's official runtime installer and open it.
   safeHandle('ndi:installRuntime', (e) => installNdiRuntime((e as Electron.IpcMainInvokeEvent).sender))
   // Spout (Windows) / Syphon (macOS) : texture sharing with apps on this machine.

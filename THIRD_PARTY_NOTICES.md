@@ -470,6 +470,20 @@ methods are free to build on; naming them is a matter of respect.
 
   They are behind the Point Cloud (`engine/PointCloudSource.ts`) and Depth Scan
   (`engine/depthScanNode.ts`), both written for Palinopsia. No code was taken.
+- **DomeportPro** by the SAT, Société des arts technologiques
+  (https://github.com/sat-mtl/DomeportPro), a program for looking at domemasters inside a
+  model of a dome. Its licensing is mixed (a GPL-3 license file, at least one file under
+  AGPL-3.0-or-later, its views, meshes and images without a stated license), so no code,
+  mesh, image or test pattern of it was taken. Taken from it:
+  - the list of what such a viewer should do, from its README: a dome at real size in a
+    210° and a 180° form, walking and flying, the keyboard and a gamepad, running, a locked
+    eye height;
+  - facts measured from its model of the Satosphère: an exact sphere cap of 9.50 m radius,
+    its center 2.56 m above the floor, the 210° rim 0.10 m above the floor, an equidistant
+    mapping.
+
+  They are behind the dome viewer (`engine/domeView.ts`, `components/DomeViewer.tsx`,
+  `components/DomeSim.tsx`, the rooms of `shared/dome.ts`), all written for Palinopsia.
 - **Hex Composer** (https://hexcomposer.com; a closed, paid program, and its documentation
   repository plmn95/hxc-docs has no license): its POINTCLOUD module, which draws a picture
   as a 3D field of points with brightness or another picture as the depth, in square, round
