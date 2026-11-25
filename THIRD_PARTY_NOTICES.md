@@ -501,6 +501,11 @@ methods are free to build on; naming them is a matter of respect.
   generator and its presets are not named after him or after any of his works
   (CLAUDE.md). These pages were read through search excerpts on 2026-11-25 (see the
   bibliography's "To verify").
+- **Form Vision** by Exo Audio (https://exoaudio.com/plugins/form-vision; a closed, paid
+  program): its Survey module, the spectrum laid down as a fresh strip of land that recedes
+  to the horizon, loud bands rising into hills, the land surging forward on each kick.
+  Behind Terrain's "raised by : the sound" (`engine/TerrainSource.ts`), written for
+  Palinopsia from that description alone. No code was taken.
 - **ReactDrops** (https://reactdrops.dev; its components are source-available under the
   ReactDrops Component License 1.0, which allows them in finished sites and apps but not
   their redistribution, and is not an open-source license): its Topographic Terrain, a

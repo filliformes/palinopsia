@@ -29,6 +29,14 @@
 // ripples where it is thick (oil damps them) and drifts slowly with the water.
 // third-party: Oil appearance code (the order from the thin edge in : rainbow, then black)
 //
+// THE SOUND AS LAND (raised by : the sound) : the spectrum heard now is laid down as a
+// strip of land at the camera's feet, bass to the left, treble to the right, the loud
+// bands rising into hills; each strip moves away toward the horizon as new ones come,
+// at SOUND SPEED, and the land SURGES forward on the sound's hits. A history texture
+// of its own (256 strips), drawn by the same passes as a picture's brightness.
+// third-party: Form Vision (the idea : the spectrum laid down as a strip of land that
+// recedes to the horizon, and the land surging forward on a hit)
+//
 // Dome (full-dome fill) : stretched like any picture, the view kept square so the
 // land keeps its proportions. Never re-projected to true directions.
 //
@@ -42,7 +50,7 @@
 import { EngineGL, SlotClock, Edge, num, col, type Prog, type Target } from './organicGL'
 import type { NativeGenerator, SourcePointer } from './nativeGenerators'
 import { domeFill } from './domeSignal'
-import { TouchPoints } from './touchInput'
+import { TouchPoints, Onset } from './touchInput'
 import { PictureDepthReader, pictureDepth } from './pictureDepth'
 import { FILM_GLSL } from './reliefShade'
 
@@ -359,6 +367,27 @@ void main() {
     } else t = l;
   }
   o = vec4(mix(texture(uPrev, vUV).r, clamp(t, 0.0, 1.0), uK), 0.0, 0.0, 1.0);
+}`
+
+// THE SOUND AS LAND : the history of the spectrum, a strip a row. The rows under SHIFT
+// take the spectrum heard now (the shared audio texture's log spectrum, its row at v
+// 0.75); the others move up by SHIFT rows, toward the horizon (the land's far side is
+// the picture's top). Grey, so the height pass reads it as brightness.
+const SOUND_FS = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+in vec2 vUV;
+out vec4 o;
+uniform sampler2D uPrev, uAudio;
+uniform float uShift, uGain;
+void main() {
+  ivec2 px = ivec2(gl_FragCoord.xy);
+  float v;
+  if (float(px.y) < uShift) {
+    float s = texture(uAudio, vec2(vUV.x, 0.75)).r;
+    v = clamp(pow(s, 1.3) * uGain, 0.0, 1.0);
+  } else v = texelFetch(uPrev, ivec2(px.x, px.y - int(uShift)), 0).r;
+  o = vec4(v, v, v, 1.0);
 }`
 
 // SMOOTH : a gaussian, one axis a pass (taps a quarter sigma apart).
@@ -779,6 +808,13 @@ interface Pyramid { tex: WebGLTexture; fbos: WebGLFramebuffer[] }
 export class TerrainSource implements NativeGenerator {
   private g: EngineGL
   private heightP: Prog
+  private soundP: Prog
+  private snd: [Target, Target] | null = null
+  private si = 0
+  private sndAcc = 0
+  private audio: WebGLTexture | null = null
+  private onset = new Onset()
+  private sounding = false
   private blurP: Prog
   private fieldP: Prog
   private max0P: Prog
@@ -830,6 +866,7 @@ export class TerrainSource implements NativeGenerator {
     gl.getExtension('EXT_color_buffer_float')
     const g = (this.g = new EngineGL(gl, 'terrain'))
     this.heightP = g.prog(HEIGHT_FS)
+    this.soundP = g.prog(SOUND_FS)
     this.blurP = g.prog(BLUR_FS)
     this.fieldP = g.prog(FIELD_FS)
     this.max0P = g.prog(MAX0_FS)
@@ -850,8 +887,9 @@ export class TerrainSource implements NativeGenerator {
     if (name === 'restore' && typeof value === 'number' && this.restore.fired(value)) this.clearMarks()
   }
 
-  feed(_audio: WebGLTexture | null, side: WebGLTexture | null): void {
+  feed(audio: WebGLTexture | null, side: WebGLTexture | null): void {
     this.side = side
+    this.audio = audio
   }
 
   pointer(ev: SourcePointer): void {
@@ -864,7 +902,7 @@ export class TerrainSource implements NativeGenerator {
   }
 
   status(): string {
-    return this.mode === 0 ? 'its own land' : this.mode === 3 ? 'raised by the depth map' : this.mode === 2 ? 'raised by darkness' : 'raised by brightness'
+    return this.sounding ? 'raised by the sound' : this.mode === 0 ? 'its own land' : this.mode === 3 ? 'raised by the depth map' : this.mode === 2 ? 'raised by darkness' : 'raised by brightness'
   }
 
   event(name: string): void {
@@ -1121,12 +1159,15 @@ export class TerrainSource implements NativeGenerator {
     const defTex = DF[this.di].tex
 
     // ── 3. the height : its own land, the picture's brightness, darkness or depth ──
-    const raise = Math.round(clamp(num(I, 'raise', 1), 0, 2))
+    const raise = Math.round(clamp(num(I, 'raise', 1), 0, 3))
+    // the sound as land : its history stands in for the picture
+    this.sounding = raise === 3
+    const landPic = this.sounding ? this.soundLand(dt) : this.side
     const wantModel = raise === 0 && !!this.side && pictureDepth.wanted()
     const map = wantModel ? this.depthRead.step(this.side!, asp, dt) : null
     if (!wantModel) this.depthRead.stop()
     this.haveMap = !!map
-    const mode = !this.side ? 0 : map ? 3 : raise === 2 ? 2 : 1
+    const mode = !landPic ? 0 : map ? 3 : raise === 2 ? 2 : 1
     if (mode !== this.mode) this.first = this.first || (mode === 0) !== (this.mode === 0)
     this.mode = mode
     const settle = clamp(num(I, 'settle', 0.3), 0, 2)
@@ -1139,7 +1180,7 @@ export class TerrainSource implements NativeGenerator {
       .i1('uOwn', Math.round(clamp(num(I, 'own', 1), 0, 4)))
       .f1('uScale', clamp(num(I, 'scale', 1), 0.3, 3)).f1('uEvo', this.evoPh).f1('uAsp', tileAsp)
     g.bind(0, H[this.hi].tex)
-    g.bind(1, this.side ?? this.blank())
+    g.bind(1, landPic ?? this.blank())
     g.bind(2, map ?? this.blank())
     g.bind(3, defTex)
     g.draw(H[1 - this.hi].fbo, fw, fh)
@@ -1235,8 +1276,31 @@ export class TerrainSource implements NativeGenerator {
     g.done(4)
   }
 
+  /** THE SOUND AS LAND : the spectrum's history, moved on by SOUND SPEED and the hits'
+   *  SURGE; null without the audio texture (the land of its own stands in). */
+  private soundLand(dt: number): WebGLTexture | null {
+    const g = this.g
+    if (!this.audio) return null
+    if (!this.snd) this.snd = [g.target(256, 256, { float: false, linear: true }), g.target(256, 256, { float: false, linear: true })]
+    const I = this.inputs
+    // 6 to 120 strips a second; a hit throws the land forward by up to 32 strips
+    this.sndAcc += dt * (6 + 114 * clamp(num(I, 'soundSpeed', 0.3), 0, 1))
+    const hit = this.onset.hit()
+    if (hit > 0) this.sndAcc += 32 * clamp(num(I, 'surge', 0.4), 0, 1) * Math.min(hit, 1.2)
+    const shift = Math.min(256, Math.floor(this.sndAcc))
+    this.sndAcc -= shift
+    this.soundP.use().i1('uPrev', 0).i1('uAudio', 1).f1('uShift', shift).f1('uGain', clamp(num(I, 'soundGain', 1.5), 0, 4))
+    g.bind(0, this.snd[this.si].tex)
+    g.bind(1, this.audio)
+    g.draw(this.snd[1 - this.si].fbo, 256, 256)
+    this.si = 1 - this.si
+    return this.snd[this.si].tex
+  }
+
   dispose(): void {
     const g = this.g, gl = g.gl
+    if (this.snd) for (const t of this.snd) g.freeTarget(t)
+    this.snd = null
     this.depthRead.dispose()
     this.freeField()
     if (this.probe) for (const t of this.probe) g.freeTarget(t)

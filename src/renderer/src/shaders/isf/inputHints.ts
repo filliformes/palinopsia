@@ -808,7 +808,10 @@ export const INPUT_HINTS: Record<string, Record<string, string>> = {
   },
   'gen-terrain': {
     own: "The land when no layer is picked as its sidechain : rolling hills, ridges (a mountain range), dunes, a crater, or islands in a flat sea floor (raise WATER LEVEL to flood it).",
-    raise: "What raises the land : DEPTH (with the depth engine on AI, the depth model reads the picture this land stands on, not the whole frame; with depth off, brightness stands in), BRIGHTNESS or DARKNESS.",
+    raise: "What raises the land : DEPTH (with the depth engine on AI, the depth model reads the picture this land stands on, not the whole frame; with depth off, brightness stands in), BRIGHTNESS or DARKNESS of the sidechain layer, or THE SOUND (no layer needed) : the spectrum laid down as a strip of land at your feet, bass to the left, treble to the right, moving away toward the horizon.",
+    soundSpeed: "With the sound raising the land : how fast the strips move away toward the horizon (slow : a long memory of the piece; fast : only the last seconds).",
+    soundGain: "With the sound raising the land : how tall a loud band stands.",
+    surge: "With the sound raising the land : how far the land jumps forward on each of the sound's hits.",
     height: "How tall the land stands.",
     smooth: "Blurs the height before it is raised : 0 = every detail of the picture becomes a ridge, more = rounded hills (a silhouette needs a lot to become a range of hills).",
     peaks: "Draws the summits up out of the raised mass : a plateau becomes a mountain, the low ground flattens.",

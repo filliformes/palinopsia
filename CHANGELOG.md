@@ -25,6 +25,18 @@ that CI builds into cross-platform releases.
   Model serves it too (`modelSources.ts` : the sources that take a model file; the store,
   the session's collect and relink, the Inspector and a drop on the layer know it). The
   idea is credited in THIRD_PARTY_NOTICES (part 6).
+- **The sound as land** (Terrain, `raised by : the sound`) : the spectrum heard now is
+  laid down as a strip of land at the camera's feet (bass to the left, treble to the right,
+  the loud bands rising into hills) and moves away toward the horizon as new strips come,
+  at **sound speed**, the land **surging** forward on the sound's hits; **sound gain** sets
+  how tall a loud band stands. A 256-strip history texture of its own, read by Terrain's
+  passes as a picture's brightness; no sidechain needed (RAISED BY stays open without
+  one). Two presets, The sound as land and Spectrum survey. The idea is credited in
+  THIRD_PARTY_NOTICES (part 6, Form Vision).
+- **Gaussian splats read as colored points** (`modelParse.ts`) : a splat PLY (3D Gaussian
+  Splatting's, what Scaniverse exports) has no red green blue; its color is read from its
+  zero-order spherical harmonic (0.5 + C0 x f_dc) and the nearly clear splats (under 10 %
+  opaque, the floaters) are left out. Checked on a synthetic splat file.
 - **LiDAR scans : LAS and LAZ** (new `engine/lasParse.ts`) : the Model and Strata read
   `.las` (the ASPRS format, versions 1.0 to 1.4, point formats 0 to 10 : coordinates, RGB,
   or the intensity as greys) and `.laz` (the same compressed, decompressed by laz-perf,

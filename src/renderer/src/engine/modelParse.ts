@@ -565,6 +565,15 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
   const hasN = inx >= 0 && iny >= 0 && inz >= 0
   const hasUV = iu >= 0 && iv >= 0
   const hasC = ir >= 0 && ig >= 0 && ib >= 0
+  // A Gaussian splat (3D Gaussian Splatting's PLY, what Scaniverse and others export) :
+  // its color is the zero-order spherical harmonic (f_dc_0..2), its opacity a logit.
+  // Read as colored points : color = 0.5 + C0 * f_dc (C0 = 1 / (2 sqrt(pi)), the
+  // published convention), and the nearly clear splats (the floaters) left out.
+  const idc = [pi('f_dc_0'), pi('f_dc_1'), pi('f_dc_2')]
+  const iop = pi('opacity')
+  const isSplat = !hasC && idc.every((i) => i >= 0)
+  const SH_C0 = 0.28209479177387814
+  const opac = isSplat && iop >= 0 ? new Float32Array(nv) : null
   const colScale = (p: PlyProp): number => (p.type === 'float' || p.type === 'float32' || p.type === 'double' || p.type === 'float64' ? 255 : p.type === 'ushort' || p.type === 'uint16' ? 1 / 257 : 1)
   // the counts the header gives, checked against the data before anything is made :
   // each element at least as many bytes as its fixed numbers and list counts (binary),
@@ -593,14 +602,18 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
   const pos = new Float32Array(nv * 3)
   const nrm = hasN ? new Float32Array(nv * 3) : null
   const uv = hasUV ? new Float32Array(nv * 2) : null
-  const col = hasC ? new Uint8Array(nv * 4) : null
+  const col = hasC || isSplat ? new Uint8Array(nv * 4) : null
   const I = new GrowU32(1 << 16)
   const vals = new Float64Array(vert.props.length)
   const putVertex = (i: number): void => {
     pos[i * 3] = vals[ix]; pos[i * 3 + 1] = vals[iy]; pos[i * 3 + 2] = vals[iz]
     if (nrm) { nrm[i * 3] = vals[inx]; nrm[i * 3 + 1] = vals[iny]; nrm[i * 3 + 2] = vals[inz] }
     if (uv) { uv[i * 2] = vals[iu]; uv[i * 2 + 1] = 1 - vals[iv] }
-    if (col) {
+    if (col && isSplat) {
+      for (let c = 0; c < 3; c++) col[i * 4 + c] = Math.max(0, Math.min(255, Math.round((0.5 + SH_C0 * vals[idc[c]]) * 255)))
+      col[i * 4 + 3] = 0
+      if (opac) opac[i] = 1 / (1 + Math.exp(-vals[iop]))
+    } else if (col) {
       col[i * 4] = Math.max(0, Math.min(255, Math.round(vals[ir] * colScale(vert.props[ir]))))
       col[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(vals[ig] * colScale(vert.props[ig]))))
       col[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(vals[ib] * colScale(vert.props[ib]))))
@@ -671,6 +684,21 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
     }
   }
   const idx = I.n ? I.done() : null
+  if (isSplat && !idx) {
+    // the splats as points : the nearly clear ones (under 10 % opaque) left out
+    let n = 0
+    for (let i = 0; i < nv; i++) if (!opac || opac[i] >= 0.1) n++
+    const P = new Float32Array(n * 3), C = new Uint8Array(n * 4)
+    for (let i = 0, k = 0; i < nv; i++) {
+      if (opac && opac[i] < 0.1) continue
+      P[k * 3] = pos[i * 3]; P[k * 3 + 1] = pos[i * 3 + 1]; P[k * 3 + 2] = pos[i * 3 + 2]
+      C.set(col!.subarray(i * 4, i * 4 + 4), k * 4)
+      k++
+    }
+    const notes = [`a Gaussian splat : ${n.toLocaleString('en-US')} splats read as colored points`]
+    if (n < nv) notes.push(nv - n === 1 ? 'one nearly clear one left out' : `${(nv - n).toLocaleString('en-US')} nearly clear ones left out`)
+    return { pos: P, col: C, format: 'PLY (splat)', notes }
+  }
   return { pos, nrm, uv, col, idx, format: 'PLY', notes: idx ? [] : ['a point cloud : drawn as points'] }
 }
 

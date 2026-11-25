@@ -66,7 +66,7 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
   ],
   'gen-terrain': [
     // (three columns of 17, 16 and 15)
-    g('land, steps, colors', 'own', 'raise', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor', 'palette', 'colorMix'),
+    g('land, steps, colors', 'own', 'raise', 'soundSpeed', 'soundGain', 'surge', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor', 'palette', 'colorMix'),
     g('light, air, water', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'),
     g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
   ],
@@ -531,11 +531,15 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     return d
   },
   // Terrain : its own land or a picture (the sidechain), what each one reads.
-  'gen-terrain': ({ zero, side }) => {
+  'gen-terrain': ({ zero, side, is }) => {
     const d: Why = {}
-    if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
-    if (side) { if (zero('rough')) put(d, ['evolve'], 'A layer is picked as the sidechain and rock is at 0 : nothing of its own evolves.') }
-    else put(d, ['raise', 'settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
+    const sound = is('raise', 3)
+    if (!sound) put(d, ['soundSpeed', 'soundGain', 'surge'], 'Raised by the sound only.')
+    if (sound) put(d, ['own', 'scale'], 'The sound raises the land.')
+    else if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
+    if (side || sound) { if (zero('rough')) put(d, ['evolve'], 'The land is a picture or the sound and rock is at 0 : nothing of its own evolves.') }
+    // (RAISED BY stays open with no sidechain : the sound needs no layer)
+    else put(d, ['settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
     if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
     if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')
     if (zero('contours')) put(d, ['lineWidth', 'lineColor'], 'Contour lines is at 0.')
