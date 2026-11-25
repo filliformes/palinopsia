@@ -112,6 +112,13 @@ one more hop for every value; nothing seen here asked for it.
 | a modulator's mesh input as a hidden stream | a destination of its own, `input/<n>`, declared while in use |
 | bools momentarily on for actions | triggers |
 
+## Found in the core
+
+Two bugs met while testing are fixed in the vendored copy (one line each) and are to be proposed
+to dataflou : see `native/dataflou/VENDOR.md`. The first one matters to the others : **until their
+core has it, a node that listens to Palinopsia may not hear a Macro knob for a while after
+Palinopsia restarts** (its first packets are taken for late ones).
+
 ## Limits, known
 
 - The visualizer served by Palinopsia shapes Palinopsia's own links; another node's link, and any

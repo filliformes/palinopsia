@@ -9,7 +9,7 @@ process (`src/main/dataflou/`), each node on a thread of its own : see the head 
 wake)` → a handle, `go(handle)`, `drain(handle)` → what the node said, `call(handle, id,
 op, args)` and `close(handle)`. JavaScript's side is `src/main/dataflou/addon.ts`.
 
-`sdk/` is vendored, pinned and unchanged : see [VENDOR.md](VENDOR.md).
+`sdk/` is vendored and pinned (two lines of the core are fixed) : see [VENDOR.md](VENDOR.md).
 
 ## Build
 

@@ -22,4 +22,4 @@ await build({
   alias: { '@shared': path.join(repo, 'src', 'shared') },
   logLevel: 'error'
 })
-spawn(process.execPath, [out, ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, DF_ADDON: process.env.DF_ADDON ?? path.join(repo, 'native', 'dataflou', 'build', 'Release', 'dataflou.node') } }).on('exit', (c) => process.exit(c ?? 1))
+spawn(process.execPath, ['--expose-gc', out, ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, DF_ADDON: process.env.DF_ADDON ?? path.join(repo, 'native', 'dataflou', 'build', 'Release', 'dataflou.node') } }).on('exit', (c) => process.exit(c ?? 1))

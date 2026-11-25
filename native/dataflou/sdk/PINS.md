@@ -1,6 +1,6 @@
 # What is vendored here
 
-Written by scripts/vendor-dataflou.mjs. No file is changed (line endings aside).
+Written by scripts/vendor-dataflou.mjs. Changed : line endings, and 2 lines of the core marked PALINOPSIA FIX (a source that came back is heard at once; a destination fed by a connection kept from the last run is bound when its source is met).
 
 | library | version | from | files |
 |---|---|---|---|

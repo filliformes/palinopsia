@@ -154,6 +154,7 @@ class Node {
     std::string sku, path;
     bool invert = false;
     bool is_bool = false;
+    bool unknown = false;  // its node has not declared it yet (just met)
     double lo = 0, hi = 1;
     int on = -1;  // -1 : not seen yet
   };
@@ -537,23 +538,24 @@ class Node {
       if (!dest || !from || !src || !declared_triggers.count(dest)) continue;
       ++sources[dest];
       const auto w = world.find(from);
-      if (w == world.end()) continue;
-      auto p = w->second.find(src);
+      const std::map<std::string, P> none;
+      const auto& tree = w == world.end() ? none : w->second;
+      const auto p = tree.find(src);
       P one;
-      if (p != w->second.end()) one = p->second;
+      if (p != tree.end()) one = p->second;
       else {
         // one element of an array
         const std::string sp = src;
         const size_t cut = sp.rfind('/');
-        const auto arr = cut == std::string::npos ? w->second.end() : w->second.find(sp.substr(0, cut));
-        if (arr == w->second.end() || arr->second.type != "array") continue;
-        one = arr->second;
+        const auto arr = cut == std::string::npos ? tree.end() : tree.find(sp.substr(0, cut));
+        if (arr != tree.end() && arr->second.type == "array") one = arr->second;
       }
       if (one.type == "trigger" || one.type == "string" || one.type == "blob") continue;
       Gate g;
       g.sku = from;
       g.path = src;
       g.is_bool = one.type == "bool";
+      g.unknown = one.type.empty();
       g.lo = one.lo;
       g.hi = one.hi;
       g.invert = gate_invert.count(std::string(dest) + "\n" + from + "\n" + src) > 0;
@@ -600,7 +602,14 @@ class Node {
       int out = times;
       if (g != gates.end()) {
         int rose = 0, moved = 0;
+        bool unknown = false;
         for (auto& x : g->second) {
+          // what it is is not known yet : what it sends as it is met is its state, not
+          // an event
+          if (x.unknown) {
+            unknown = true;
+            continue;
+          }
           const int now = gate_now(x, seen);
           if (now < 0) continue;
           if (x.on >= 0 && now == x.on && x.is_bool && g->second.size() == 1 && times >= 2) {
@@ -615,7 +624,8 @@ class Node {
         // what else fired it (a trigger wired too, a hand on the mesh)
         const bool others = !gate_pure.count(path);
         out = rose;
-        if (others && rose == 0 && moved == 0) out = times;
+        if (others && rose == 0 && moved == 0 && !unknown) out = times;
+        if (unknown) gates_stale = true;
       }
       if (out <= 0) continue;
       Event e;

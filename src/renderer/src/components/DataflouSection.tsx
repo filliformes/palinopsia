@@ -607,7 +607,7 @@ function ParamRow({ p, n, ourSku }: { p: DfParam; n: DfNodeView; ourSku: string 
   const segs = p.path.split('/')
   const group = segs.length > 1 ? segs[segs.length - 2] : ''
   const range = p.type === 'number' ? `${+p.min.toFixed(3)}..${+p.max.toFixed(3)}${p.unit ? ` ${p.unit}` : ''}` : p.type === 'array' ? `array of ${p.size ?? '?'}` : p.type
-  const select = 'min-w-0 max-w-[118px] shrink rounded bg-panel2 px-1 py-0 font-mono text-[9px] text-muted hover:text-text'
+  const select = 'min-w-0 max-w-[104px] shrink rounded bg-panel2 px-1 py-0 font-mono text-[9px] text-muted hover:text-text'
   return (
     <div className="flex min-w-0 items-center gap-1 font-mono text-[9px]" title={`${p.path} · ${p.flow} · ${range}${p.desc ? ` · ${p.desc}` : ''}`}>
       <span className={`shrink-0 ${p.flow === 'source' ? 'text-accent2' : p.flow === 'destination' ? 'text-accent' : 'text-text'}`}>

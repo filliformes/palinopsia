@@ -12,7 +12,19 @@ each folder with its license :
 | `sdk/asio` | asio 1.36.0 (headers, standalone) | BSL-1.0 |
 | `sdk/mdns` | mdns 1.4.3 (one header) | public domain (Unlicense) |
 
-**No file is changed** (line endings aside) : a fix goes to the dataflou repository, then here.
+**Two lines of the core are added** (`src/core/node_messages.cpp`, marked `PALINOPSIA FIX`,
+line endings aside nothing else is changed) : found while testing, to be proposed to the dataflou
+repository, put back by the vendoring script until they are in it.
+
+1. When a node says HELLO, its streams' packet counts start over here. Without it a source that
+   comes back (a program restarted) has its packets taken for late ones until its count passes
+   where it was, if it had sent fewer than 64 : a fader was not heard for up to a minute.
+   **The other nodes of the mesh need it too, to hear Palinopsia after it restarts.**
+2. A source met for the first time in a run is in the world only after its destinations are
+   settled : a connection kept from the last run fed its destination, which still read "free"
+   (and never waited when that source left). They are settled again once it is there.
+
+Not changed, known : a trigger source sends one firing a poll (two within a few ms are one).
 
 The dataflou repository is on a private gitlab, so CI cannot clone it : that is why a copy
 lives here. To refresh it, from a checkout of dataflou and the dependencies a CMake configure

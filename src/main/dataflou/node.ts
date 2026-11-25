@@ -241,13 +241,6 @@ export class DataflouNode {
         case 'dest': {
           flush()
           const d: DfDestView = { state: STATES[e.state] ?? 'bound', origin: ORIGINS[e.origin] ?? 'none', connections: e.connections, live: e.live }
-          // The core (9.3) leaves a destination "free" when its connection was kept
-          // from the last run and its source is met for the first time in this one,
-          // though it is fed : its live sources say it.
-          if (d.state === 'free' && d.live > 0 && !this.halted) {
-            d.state = 'bound'
-            d.origin = 'none'
-          } else if (d.state === 'free' && d.origin === 'none' && d.connections > 0 && this.dests.get(e.path)?.state === 'bound') d.origin = 'lost'
           this.dests.set(e.path, d)
           this.host.onDest(e.path, d)
           break
@@ -271,7 +264,8 @@ export class DataflouNode {
           this.worldStale = true
           break
         case 'log':
-          this.host.log(e.text)
+          // (its keepalives, every 15 s a stream, are not worth a line)
+          if (!/^(Sent StreamRequest|StreamRequest from|send_stream_request)/.test(e.text)) this.host.log(e.text)
           break
         case 'failed':
           if (this.running) {

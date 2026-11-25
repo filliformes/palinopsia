@@ -466,8 +466,14 @@ export async function applyDataflou(): Promise<void> {
 const sent = new Map<string, string>()
 const ECHO_MS = 300
 /** The published paths of ours, as the node has them. */
+let ours: string[] = []
+let oursOf: DfStatus | null = null
 function ourPaths(): string[] {
-  return status.nodes.find((x) => x.local)?.params.filter((p) => p.kind === 'param').map((p) => p.path) ?? []
+  if (oursOf !== status) {
+    oursOf = status
+    ours = status.nodes.find((x) => x.local)?.params.filter((p) => p.kind === 'param' && p.type !== 'trigger').map((p) => p.path) ?? []
+  }
+  return ours
 }
 function say(out: Record<string, DfValue>, path: string, v: DfValue): void {
   // the mesh is playing this one now : it says it itself (no echo of it, a rounding off)
@@ -499,7 +505,7 @@ function sampleOurs(): void {
     }
     // a destination : where its control stands, a few times a second
     const d = DEST_BY_PATH.get(p)
-    if (!d || d.type === 'trigger') continue
+    if (!d) continue
     if (!leaves) {
       if (now - leavesAt < 250) continue
       leaves = oscLeafValues()

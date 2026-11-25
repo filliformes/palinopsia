@@ -51,6 +51,23 @@ const START = [
   ['cjson', 'cJSON.c']
 ]
 
+// Two fixes of the core found here, waiting upstream (VENDOR.md says what they are).
+// Each must find its place : when the core has it, it is dropped from this list.
+const FIXES = [
+  {
+    file: 'src/core/node_messages.cpp',
+    why: 'a source that came back is heard at once',
+    find: "        peer.hello_ms = clock_.millis();\n",
+    put: "        peer.hello_ms = clock_.millis();\n        restart_stream_names(msg.from_sku.c_str());   // PALINOPSIA FIX 1 : its packet counts start over\n"
+  },
+  {
+    file: 'src/core/node_messages.cpp',
+    why: 'a destination fed by a connection kept from the last run is bound when its source is met',
+    find: "            entry->online = true;\n            entry->last_seen_ms = clock_.millis();\n",
+    put: "            entry->online = true;\n            entry->last_seen_ms = clock_.millis();\n            settle_fed_by(msg.from_sku.c_str(), EndOrigin::None);   // PALINOPSIA FIX 2 : met for the first time, it is in the world only now\n"
+  }
+]
+
 const seen = new Set()
 const queue = []
 const take = (lib, rel) => {
@@ -80,7 +97,13 @@ const copy = (lib, rel) => {
   const to = path.join(out, lib, rel)
   fs.mkdirSync(path.dirname(to), { recursive: true })
   // (LF, as the sources have them : a checkout's line endings do not matter)
-  fs.writeFileSync(to, fs.readFileSync(path.join(LIBS[lib].root, rel), 'utf8').replace(/\r\n/g, '\n'))
+  let s = fs.readFileSync(path.join(LIBS[lib].root, rel), 'utf8').replace(/\r\n/g, '\n')
+  for (const f of FIXES) {
+    if (lib !== 'dataflou' || f.file !== rel) continue
+    if (s.split(f.find).length !== 2) throw new Error(`${rel} : no single place for the fix "${f.why}" (is it in the core now ?)`)
+    s = s.replace(f.find, () => f.put)
+  }
+  fs.writeFileSync(to, s)
   counts[lib] = (counts[lib] ?? 0) + 1
 }
 for (const k of seen) copy(...k.split('\n'))
@@ -101,6 +124,6 @@ const rows = Object.entries(LIBS).map(([lib, c]) => {
   const t = c.tag ? tagOf(c.tag) : null
   return `| ${lib} | ${t ? `${t[2]} (${head(c.root).slice(0, 12)})` : full} | ${t ? t[1] : 'the dataflou repository (private gitlab)'} | ${counts[lib]} |`
 })
-fs.writeFileSync(path.join(out, 'PINS.md'), `# What is vendored here\n\nWritten by scripts/vendor-dataflou.mjs. No file is changed (line endings aside).\n\n| library | version | from | files |\n|---|---|---|---|\n${rows.join('\n')}\n`)
+fs.writeFileSync(path.join(out, 'PINS.md'), `# What is vendored here\n\nWritten by scripts/vendor-dataflou.mjs. Changed : line endings, and ${FIXES.length} lines of the core marked PALINOPSIA FIX (${FIXES.map((f) => f.why).join('; ')}).\n\n| library | version | from | files |\n|---|---|---|---|\n${rows.join('\n')}\n`)
 fs.rmSync(src, { recursive: true, force: true })
 console.log(counts)

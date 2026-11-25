@@ -220,7 +220,9 @@ Palinopsia's dataflou node is the **dataflou** library itself: its core 9.3, its
 Apple platform layers and its C interface (API 0.6), compiled into `dataflou.node`
 (`native/dataflou`), from commit 6d5c707 of 25 November 2026 (its Windows port). By **Alexandre
 Burton** (Artificiel). Copyright (c) 2026 alexandre burton, MIT License
-(`native/dataflou/sdk/dataflou/LICENSE`). No file is changed. `src/main/dataflou/addon.ts`
+(`native/dataflou/sdk/dataflou/LICENSE`). Two lines are added to its
+`src/core/node_messages.cpp` (marked `PALINOPSIA FIX`, see `native/dataflou/VENDOR.md`); nothing
+else is changed. `src/main/dataflou/addon.ts`
 speaks to it, and `visualizer.ts` serves its page as its own host does.
 
 Up to v1.3.5 the node was a TypeScript port of the core's earlier protocol, shipped with its

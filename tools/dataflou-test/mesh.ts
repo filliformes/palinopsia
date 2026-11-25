@@ -49,7 +49,10 @@ class Peer {
   got: DfEvent[] = []
   constructor(public name: string, public sku: string, public dir: string) {
     this.n = new DfNative((l) => {
-      for (const e of l) if (e.k !== 'log') this.got.push(e)
+      for (const e of l) {
+        if (e.k !== 'log') this.got.push(e)
+        else if (process.env.DF_LOG) console.log(`      ${Date.now() % 1e6} ${this.name}: ${e.text}`)
+      }
     })
   }
   async start(universe = UNI): Promise<void> {
@@ -123,7 +126,7 @@ class Opsia {
     const t = this.tree()
     this.sig = JSON.stringify(t)
     const n = new DataflouNode({ sku: this.sku, label: 'opsia', universe, product: 'Palinopsia', dir: nodeDir(this.base, universe), params: t }, {
-      log: () => {},
+      log: (m) => process.env.DF_LOG && console.log(`      ${Date.now() % 1e6} opsia: ${m}`),
       onValues: (l) => this.values.push(...l),
       onFire: (p, k) => (this.fired[p] = (this.fired[p] ?? 0) + k),
       onDest: (path, d) => this.dests.push({ path, state: d.state, origin: d.origin }),
@@ -289,6 +292,25 @@ async function main(): Promise<void> {
   peer.set('k/fader', 30)
   ok('values flow after the restart', await until(() => again.values.some((v) => v.path === 'meta/1')), `${Date.now() - t0} ms`)
 
+  // the other way : what listens to us hears us again (not at the next keepalive)
+  let outMs: number[] = []
+  for (let i = 0; i < Number(process.env.DF_RESTARTS ?? 6); i++) {
+    const n0 = peer.values('k/dest').length
+    const to = Date.now()
+    const heard = await until(async () => {
+      again.node!.setValues({ 'meta/5': ((Date.now() % 900) + 50) / 1000 })
+      await wait(30)
+      return peer.values('k/dest').length > n0
+    }, 20_000)
+    outMs.push(heard ? Date.now() - to : -1)
+    if (process.env.DF_LOG) console.log('RESTART', i, outMs[i])
+    again.stop()
+    await wait(i % 2 ? 1500 : 300)
+    await again.start()
+    await until(() => !!again.node!.nodes.find((n) => n.sku === PSKU)?.online)
+  }
+  ok('what listens to us hears us again at once, 6 restarts', outMs.every((x) => x >= 0 && x < 2500), outMs)
+
   // triggers after a restart : what the sources hold fires nothing
   await wait(500)
   ok('a restart fires nothing', Object.keys(again.fired).length === 0, again.fired)
@@ -391,7 +413,7 @@ async function soak(opsia: Opsia, peer: Peer, minutes: number): Promise<void> {
     opsia.node!.setValues({ 'audio/bands': [0, 1, 2, 3, 4, 5].map((k) => ((i + k) % 60) / 60), 'meta/5': (i % 50) / 50 })
     if (i % 8 === 0) peer.n.post('setRemote', { s: [PSKU2(), 'k/hit', 'fire'] })
     // a session opened and closed every 2 s : parameters published and withdrawn
-    if (i % 120 === 0) {
+    if (i % 120 === 0 && !process.env.DF_NO_SESSIONS) {
       sessions++
       opsia.wires.setSession(sessions % 2 ? [{ universe: UNI, dest: 'output/x', sku: PSKU2(), path: 'k/stream' }, { universe: UNI, dest: 'output/y', sku: PSKU2(), path: 'k/fader' }] : [])
     }

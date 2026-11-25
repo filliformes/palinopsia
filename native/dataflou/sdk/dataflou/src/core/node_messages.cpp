@@ -183,6 +183,7 @@ void Node::handle_message(PeerConnection& peer, etl::span<const uint8_t> data) {
         peer.sku = msg.from_sku;
         peer.hello_received = true;
         peer.hello_ms = clock_.millis();
+        restart_stream_names(msg.from_sku.c_str());   // PALINOPSIA FIX 1 : its packet counts start over
         peer.max_frame = msg.hello.max_frame;
         peer.role = msg.hello.role;
         peer.features = msg.hello.features;
@@ -233,6 +234,7 @@ void Node::handle_message(PeerConnection& peer, etl::span<const uint8_t> data) {
             entry->mem = msg.hello.mem;
             entry->online = true;
             entry->last_seen_ms = clock_.millis();
+            settle_fed_by(msg.from_sku.c_str(), EndOrigin::None);   // PALINOPSIA FIX 2 : met for the first time, it is in the world only now
             if (entry->first_seen_ms == 0) {
                 entry->first_seen_ms = entry->last_seen_ms;
             }
