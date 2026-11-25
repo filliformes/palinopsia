@@ -33,6 +33,9 @@ that CI builds into cross-platform releases.
   2048² 47 → 60 (43 → 60); 0 skipped, 0 late. A lost device, a worker error or two and a half
   seconds of silence restart it (1 s, 2, 4 … 60 s) with the WebGL path carrying NDI meanwhile;
   without WebGPU, or with a keystone, that path stays.
+- **The projector window reads the dome at the size it shows** : the square master is
+  letterboxed there, yet was read back as wide as the screen. On a 2934×1650 window 3170² →
+  1650² : 20 → 60 fps alone, 10 → 55 beside NDI.
 - **NDI off the window's thread** (`preload/ndi.ts`) : its send waited up to 12 ms on the
   window's thread at 4096²; it now runs on koffi's, one call at a time, with at most two
   frames waiting (the oldest dropped and counted). A buffer goes back only once the next

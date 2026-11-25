@@ -565,7 +565,7 @@ export default function App(): JSX.Element {
   // can't show more than its own pixels anyway) nor upscaled-soft (a 1080p stream
   // on a 1440p panel). 1920 is a safe default for the first frames before the
   // output has reported in.
-  const outCapRef = useRef(1920)
+  const outCapRef = useRef({ w: 1920, h: 1920 })
   useEffect(() => {
     const onMsg = (e: MessageEvent): void => {
       if (e.data === 'opsia:pixelport' && e.ports[0]) {
@@ -574,7 +574,7 @@ export default function App(): JSX.Element {
           relay.onmessage = (m: MessageEvent): void => {
             const d = m.data as { t: string; data?: { type?: string; w?: number; h?: number } }
             if (d.t === 'sent') streamInFlight.current = Math.max(0, streamInFlight.current - 1)
-            else if (d.t === 'out' && d.data?.type === 'outsize' && d.data.w && d.data.h) outCapRef.current = Math.max(d.data.w, d.data.h)
+            else if (d.t === 'out' && d.data?.type === 'outsize' && d.data.w && d.data.h) outCapRef.current = { w: d.data.w, h: d.data.h }
           }
           streamRelayRef.current = relay
         }
@@ -1770,7 +1770,10 @@ export default function App(): JSX.Element {
               comp!.captureRecycle('stream', fr.buf) // the window is behind : skip
             }
           }
-          comp!.captureKick('stream', 'rgba-up', outCapRef.current)
+          // (the square domemaster is letterboxed there : its height is all that
+          // shows; as wide as the screen, it was read back 2.5 to 3 times too big)
+          const win = outCapRef.current
+          comp!.captureKick('stream', 'rgba-up', st.dome.enabled ? Math.min(win.w, win.h) : Math.max(win.w, win.h))
           perfMeter.end('output')
         } else if (comp!.capturePending('stream') > 0 || lastStreamOn) {
           comp!.captureRelease('stream')
