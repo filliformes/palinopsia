@@ -11,7 +11,7 @@ import { showToast } from './Toast'
 export const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|avi|mpg|mpeg|mxf|m2v|dxv|ogv|wmv|flv|ts|mts|m2ts|3gp)$/i
 export const AUDIO_EXT = /\.(wav|mp3|flac|ogg|oga|opus|aac|m4a|aif|aiff|wma|caf)$/i
 export const SESSION_EXT = /\.json$/i
-export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply)$/i
+export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts)$/i
 
 export type DropKind = 'video' | 'audio' | 'session' | 'model' | 'other'
 

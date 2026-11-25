@@ -461,6 +461,33 @@ methods are free to build on; naming them is a matter of respect.
   repository plmn95/hxc-docs has no license): its POINTCLOUD module, which draws a picture
   as a 3D field of points with brightness or another picture as the depth, in square, round
   or soft points. Behind the Point Cloud. Idea only, no code taken.
+- **Ryoichi Kurokawa, audiovisual works** (an artist born in Osaka and based in Berlin;
+  https://www.instagram.com/ryoichikurokawa). Strata (`engine/StrataSource.ts`,
+  `engine/strataPlaces.ts`) was asked for by Vincent as inspired by Kurokawa's work, and
+  the credit is given here at Vincent's request. Only ideas were taken, from what institutions,
+  festivals and interviews say of the works; no code, footage, scan or data of his:
+  - "time sculptures" composed from field recordings and digitally generated structures,
+    the audiovisual phenomenon reconstructed architecturally (MUTEK Montréal 2024,
+    https://2024.montreal.mutek.org/en/artists/ryoichi-kurokawa; Mira Festival,
+    https://mirafestival.com/en/artista/ryoichi-kurokawa/);
+  - image and sound made together as one unit (Sedition, "Interview with Ryoichi
+    Kurokawa: Synesthetic Experience",
+    https://www.seditionart.com/magazine/interview-ryoichi-kurokawa-synesthetic-experience);
+  - *s.asmbli / subassemblies*: nature and the human-made at the scale of architecture,
+    built from laser-scanned 3D data and filmed footage, the point clouds turned into
+    renderings with shading programs, shown as a concert, an installation of four screens,
+    a cube and prints (Ars Electronica, https://ars.electronica.art/outofthebox/en/tag/prints;
+    Dialog Festival, "Subassemblies of reality: an interview with Ryoichi Kurokawa",
+    https://dialogfestival.pl/en/subassemblies-of-reality-an-interview-with-ryoichi-kurokawa/;
+    Cifra, https://cifra.com/project/subassemblies);
+  - *unfold* (2016): a work built on scientific data from giant molecular clouds in space
+    (ZKM, https://zkm.de/en/node/71677).
+
+  Strata's places, its natural and structural states, its sections, its blocks broken on
+  the hits and its panels are Palinopsia's own reading of these descriptions. The
+  generator and its presets are not named after him or after any of his works
+  (CLAUDE.md). These pages were read through search excerpts on 2026-11-25 (see the
+  bibliography's "To verify").
 - **ReactDrops** (https://reactdrops.dev; its components are source-available under the
   ReactDrops Component License 1.0, which allows them in finished sites and apps but not
   their redistribution, and is not an open-source license): its Topographic Terrain, a
@@ -643,6 +670,9 @@ methods are free to build on; naming them is a matter of respect.
     text forms, as publicly documented.
   - **PLY format**: Greg Turk's polygon file format (Stanford University, 1994), as
     documented at https://paulbourke.net/dataformats/ply/.
+  - **XYZ and PTS point clouds**: the plain-text point lists scanners and photogrammetry
+    export (x y z per line, with colors or an intensity; PTS with a leading count), a
+    common practice without an owner or a specification; read by Palinopsia's own code.
   - **The Lit Sphere**: P.-P. J. Sloan, W. Martin, A. Gooch and B. Gooch, "The Lit Sphere:
     A Model for Capturing NPR Shading from Art", *Proceedings of Graphics Interface 2001*.
     The matcap material (a picture of a lit ball read by the surface's normal, the skin

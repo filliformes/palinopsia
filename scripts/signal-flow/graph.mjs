@@ -99,7 +99,7 @@ node("p-present", 1372, 596, "Presentation", "fade · freeze · Black · flash l
 node("p-out", 1380, 762, "Transform · dome", "flat or dome", "pic", "The output transform (flat output) or the dome master, never both. NDI, Spout / Syphon, the projector stream and DXV recording take the picture here, before the keystone.", "Compositor OutXformStage, DomeStage · captureKick")
 node("p-warp", 1380, 830, "Keystone", "the operator canvas", "pic", "The operator canvas, drawn with the keystone (or as a plain copy). HIVE, encoder recordings, MARK and the agent's snapshot read it.", "Compositor warpProg · App.tsx loop")
 node("p-depth", 1050, 712, "Depth AI", "every 85 ms · late", "pic", "Depth Anything V2 estimates the depth of the presented picture in a worker. Every native node (Parallax, the master rack's too) reads it on later frames; the vision bus reads its mean and spread. While a seen layer plays a Model (or a Grid Mesh) with true depth on, the nodes read that real depth instead (drawn with it, the same frame) and the AI rests.", "engine/depthEstimate.ts · App.tsx loop depthEngine.update / take · nodeCtx.depth · Compositor.modelDepthTex")
-node("p-pdepth", 640, 770, "Picture depth", "one layer's picture · every 85 ms · late", "pic", "A second copy of the depth model, for the pieces that need the depth of their OWN picture rather than of the presented one, which holds their result: the Point Cloud (the layer it lifts) and Depth Scan (the picture entering it). Running only while the depth menu is on AI and one of them asks; several take turns, and each map is smoothed into the next.", "engine/pictureDepth.ts PictureDepthReader · PointCloudSource · depthScanNode")
+node("p-pdepth", 640, 770, "Picture depth", "one layer's picture · every 85 ms · late", "pic", "A second copy of the depth model, for the pieces that need the depth of their OWN picture rather than of the presented one, which holds their result: the Point Cloud and Strata (the layer they lift) and Depth Scan (the picture entering it). Running only while the depth menu is on AI and one of them asks; several take turns, and each map is smoothed into the next.", "engine/pictureDepth.ts PictureDepthReader · PointCloudSource · StrataSource · depthScanNode")
 node("p-read", 1190, 690, "Readbacks", "vision 32² · Sonify 96² · lights · after presentation", "pic", "Small asynchronous reads of the presented picture (before transform and keystone), one or two frames late: for the vision bus, Sonify and the lights. Sonify and the lights can also tap single layers.", "Compositor visionSample, readSonifyGrids, kickLights, depthFrame")
 
 // ── Outputs ────────────────────────────────────────────────
@@ -382,7 +382,7 @@ export const TEXT = {
     },
     {
       "name": "The depth of one picture",
-      "path": "a layer's picture → Picture depth (a second model, every 85 ms) → the Point Cloud that lifts it, the Depth Scan it enters",
+      "path": "a layer's picture → Picture depth (a second model, every 85 ms) → the Point Cloud or Strata that lifts it, the Depth Scan it enters",
       "st": "inside"
     },
     {

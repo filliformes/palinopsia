@@ -271,7 +271,7 @@ export function Inspector(): JSX.Element {
           edls: slot.collageEdls ?? []
         }
       }
-      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud' || slot.shaderId === 'gen-terrain' || slot.shaderId === 'gen-gridmesh') {
+      if (slot.shaderId === 'lowercase' || slot.shaderId === 'gen-lattice' || slot.shaderId === 'gen-sandplate' || slot.shaderId === 'gen-fur' || slot.shaderId === 'gen-relief' || slot.shaderId === 'gen-pointcloud' || slot.shaderId === 'gen-terrain' || slot.shaderId === 'gen-gridmesh' || slot.shaderId === 'gen-strata') {
         sideCfg = {
           ref: slot.sidechain ?? null,
           setRef: (r) => setSourceSidechain(li, sl, r),
@@ -281,6 +281,8 @@ export function Inspector(): JSX.Element {
               ? 'The layer the mesh wears as its SKIN : wrapped by its grid (the noise tears it with the shape) or projected from the front. Raise SKIN to see it. None = its own color.'
               : slot.shaderId === 'gen-terrain'
               ? "The layer raised into the land, by SIDECHAIN : its brightness, darkness or depth (with depth: AI on, the model reads this layer itself, not the whole frame) is the height, and its colors color the land as far as PICTURE TO RAMP says. None = the land of its own."
+              : slot.shaderId === 'gen-strata'
+              ? "The layer Strata lifts into points when its CLOUD is THE PICTURE : each point takes its color, raised by its depth (with depth: AI on) or its brightness. None = one of Strata's own places."
               : slot.shaderId === 'gen-pointcloud'
               ? "The layer the cloud lifts into points, by SIDECHAIN : each point takes its color, and its depth (with depth: AI on, the model reads this layer itself, not the whole frame) or its brightness raises them. None = the cloud's own picture."
               : slot.shaderId === 'gen-relief'
@@ -295,7 +297,7 @@ export function Inspector(): JSX.Element {
         }
       }
       if (slot.kind === 'audio') audioCfg = { layer: li, slot: sl, state: slot }
-      if (slot.shaderId === 'gen-model') {
+      if (slot.shaderId === 'gen-model' || slot.shaderId === 'gen-strata') {
         modelCfg = { target: { kind: 'layer', layer: li, slot: sl }, slot, setSide: (r) => setSourceSidechain(li, sl, r), hostLayer: li }
       }
       if (slot.shaderId === 'gen-text') {
@@ -327,7 +329,7 @@ export function Inspector(): JSX.Element {
       onChange = (n, v) => setBackgroundInput(n, v)
       modTargetFor = (input) => ({ kind: 'bgSource', input })
       // (the slab reads no other layer : no skin there)
-      if (bg.source.shaderId === 'gen-model') modelCfg = { target: { kind: 'background' }, slot: bg.source, setSide: null, hostLayer: -1 }
+      if (bg.source.shaderId === 'gen-model' || bg.source.shaderId === 'gen-strata') modelCfg = { target: { kind: 'background' }, slot: bg.source, setSide: null, hostLayer: -1 }
       if (bg.source.shaderId === 'gen-collage') {
         collageCfg = {
           target: { kind: 'background' },
@@ -758,7 +760,11 @@ export function Inspector(): JSX.Element {
           side={modelCfg.slot.sidechain ?? null}
           setSide={modelCfg.setSide}
           hostLayer={modelCfg.hostLayer}
-          onFile={Math.round(Number(modelCfg.slot.inputs.shape ?? 14)) === 15}
+          onFile={
+            modelCfg.slot.shaderId === 'gen-strata'
+              ? Math.round(Number(modelCfg.slot.inputs.cloud ?? 0)) === 5
+              : Math.round(Number(modelCfg.slot.inputs.shape ?? 14)) === 15
+          }
         />
       )}
       {textCfg && (

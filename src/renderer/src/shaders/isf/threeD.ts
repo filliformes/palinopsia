@@ -18,6 +18,7 @@ export const THREE_D_IDS: ReadonlySet<string> = new Set([
   'gen-model',
   'gen-gridmesh',
   'gen-pointcloud',
+  'gen-strata',
   'gen-terrain',
   'node-parallax',
   'node-depthscan',

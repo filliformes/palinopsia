@@ -1104,7 +1104,8 @@ function SourceRow({
       await loadModelInto({ kind: 'layer', layer, slot: slotName }, path, name, {
         before: () => {
           const cur = useStore.getState().composition.layers[layer]?.[slotName === 'A' ? 'sourceA' : 'sourceB']
-          if (cur?.shaderId !== 'gen-model') useStore.getState().setSourceShader(layer, slotName, 'gen-model')
+          // (a Strata keeps the file as its cloud; anything else becomes a Model)
+          if (cur?.shaderId !== 'gen-model' && cur?.shaderId !== 'gen-strata') useStore.getState().setSourceShader(layer, slotName, 'gen-model')
         }
       })
       return

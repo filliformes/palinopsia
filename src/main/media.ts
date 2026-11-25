@@ -45,6 +45,9 @@ const MIME: Record<string, string> = {
   mtl: 'model/mtl',
   stl: 'model/stl',
   ply: 'application/octet-stream',
+  // text point clouds (scanners, photogrammetry, science : Strata and the Model)
+  xyz: 'text/plain',
+  pts: 'text/plain',
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',

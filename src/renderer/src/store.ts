@@ -200,6 +200,7 @@ import {
 } from './randomize'
 import { BG_DEFAULT_SPEED, BG_SPEED_MAX, BG_SOURCES } from './bgPresets'
 import { GEN_INIT, THEME_BY_ID, motionFor, type Theme } from './themes'
+import { takesModelFile } from './modelSources'
 
 export type { FxScope }
 
@@ -3664,6 +3665,21 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => {
       const FILE = 15 // the shape menu's last entry (modelMesh.ts SHAPE_FILE)
       const withFile = (cur: SourceSlot): SourceSlot => {
+        if (cur.shaderId === 'gen-strata') {
+          // Strata : a file sets its CLOUD to the file; forgotten, back to its first place
+          const STRATA_FILE = 5
+          const next: SourceSlot = { ...cur, inputs: { ...cur.inputs, cloud: file ? STRATA_FILE : cur.inputs.cloud === STRATA_FILE ? 0 : (cur.inputs.cloud ?? 0) } }
+          if (file) {
+            next.modelPath = file.path
+            next.modelName = file.name
+            next.modelFiles = file.files
+          } else {
+            delete next.modelPath
+            delete next.modelName
+            delete next.modelFiles
+          }
+          return next
+        }
         const shape = cur.inputs.shape
         const next: SourceSlot = {
           ...cur,
@@ -3687,11 +3703,11 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       if (target.kind === 'background') {
         const bg = s.composition.background
-        if (!bg || bg.source.shaderId !== 'gen-model') return s
+        if (!bg || !takesModelFile(bg.source.shaderId)) return s
         return { composition: { ...s.composition, background: { ...bg, source: withFile(bg.source) } } }
       }
       const cur = target.slot === 'A' ? s.composition.layers[target.layer]?.sourceA : s.composition.layers[target.layer]?.sourceB
-      if (!cur || cur.shaderId !== 'gen-model') return s
+      if (!cur || !takesModelFile(cur.shaderId)) return s
       return {
         composition: updateLayer2(s.composition, target.layer, (l) =>
           target.slot === 'A' ? { ...l, sourceA: withFile(l.sourceA) } : { ...l, sourceB: withFile(l.sourceB!) }

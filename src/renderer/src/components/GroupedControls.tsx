@@ -70,6 +70,13 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('light, air, water', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'),
     g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
   ],
+  'gen-strata': [
+    g('cloud', 'cloud', 'raise', 'depth', 'settle', 'density', 'size', 'shape', 'gain', 'fog', 'ground'),
+    g('natural ⇄ structural', 'state', 'ink', 'links', 'voxel', 'erode', 'erodeFrom'),
+    g('sections', 'sections', 'axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync'),
+    g('break and cut', 'break', 'breakOn', 'breakAxis', 'blocks', 'share', 'hold', 'rebuild', 'steps', 'reveal', 'cut', 'cutHold', 'burst'),
+    g('panels and camera', 'panels', 'panelMode', 'spread', 'gap', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin')
+  ],
   'gen-pointcloud': [
     g('picture and points', 'own', 'raise', 'depth', 'settle', 'stipple', 'gain', 'ground', 'density', 'size', 'shape', 'jitter', 'fog'),
     g('camera and scan', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin', 'scan', 'scanPeriod', 'scanSync'),
@@ -536,6 +543,18 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     else if (zero('slick')) put(d, ['slickSpread'], 'Oil on the water is at 0 : the lake is clean.')
     if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
     if (zero('handAmount')) put(d, ['hand', 'handSize', 'heal', 'people'], 'Hand strength is at 0 : the hand leaves no mark.')
+    return d
+  },
+  'gen-strata': ({ zero, is, isnt }) => {
+    const d: Why = {}
+    if (isnt('cloud', 4)) put(d, ['raise', 'depth', 'settle'], 'The cloud is not the picture.')
+    if (zero('erode')) put(d, ['erodeFrom'], 'Erode is at 0.')
+    if (zero('sections')) put(d, ['axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync'], 'Sections is at 0 : nothing is cut.')
+    if (zero('break')) put(d, ['breakAxis', 'blocks', 'share', 'hold', 'rebuild', 'steps', 'reveal'], 'Break is at 0 : the blocks stay in place.')
+    if (zero('break') && zero('cut')) put(d, ['breakOn'], 'Break and cut are at 0.')
+    if (zero('cut')) put(d, ['cutHold'], 'Cut on a hit is at 0.')
+    if (is('panels', 1)) put(d, ['panelMode', 'spread', 'gap'], 'One panel.')
+    if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
     return d
   },
   'gen-pointcloud': ({ zero, is }) => {

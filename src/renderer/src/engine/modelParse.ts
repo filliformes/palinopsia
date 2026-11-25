@@ -23,7 +23,7 @@ export interface ParseCtx {
   image(bytes: Uint8Array, mime: string): Promise<ImageBitmap | null>
 }
 
-export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply)$/i
+export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts)$/i
 
 // The images the Model reads as a texture (what the media scheme serves and the
 // browser decodes); another (.tga, .bmp, .tif) is said to be in a format it does not read.
@@ -50,8 +50,9 @@ export async function parseModel(name: string, buf: ArrayBuffer, ctx: ParseCtx):
   if (ext === 'obj') return parseOBJ(new TextDecoder().decode(buf), ctx)
   if (ext === 'stl') return parseSTL(buf)
   if (ext === 'ply') return parsePLY(buf)
+  if (ext === 'xyz' || ext === 'pts' || ext === 'csv') return parseXYZ(new TextDecoder().decode(buf), ext)
   if (ext === 'glb') throw new Error('not a glTF binary (its header is wrong)')
-  throw new Error(`${ext ? '.' + ext : 'this file'} is not a model the Model reads (glb, gltf, obj, stl, ply)`)
+  throw new Error(`${ext ? '.' + ext : 'this file'} is not a model the Model reads (glb, gltf, obj, stl, ply, xyz, pts)`)
 }
 
 // ── glTF 2.0 ────────────────────────────────────────────────────────────────────
@@ -669,4 +670,85 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
   }
   const idx = I.n ? I.done() : null
   return { pos, nrm, uv, col, idx, format: 'PLY', notes: idx ? [] : ['a point cloud : drawn as points'] }
+}
+
+
+// ── XYZ and PTS point clouds ───────────────────────────────────────────────────
+// Plain text, one point a line : what scanners, photogrammetry and science export
+// (a CSV of points reads the same once renamed .xyz : the media scheme serves no
+// .csv, which could be any table on the disk).
+// The columns by their count : 3 x y z; 4 x y z and an intensity; 6 x y z r g b;
+// 7 x y z, an intensity, r g b (PTS : its first line, a lone count, is skipped).
+// A header line of names (x, y, z, r / red, g / green, b / blue, i / intensity /
+// value) places the columns by name instead. Colors 0..255, or 0..1 when no value
+// passes 1; an intensity is a grey (0..1, 0..255 or a scanner's -2048..2047).
+// Separated by spaces, tabs, commas or semicolons; lines starting with # or // and
+// lines that are not numbers are left out.
+function parseXYZ(text: string, ext: string): RawMesh {
+  // every point's values, flat, in the first point line's column count
+  const flat = new GrowF32(1 << 16)
+  let n0 = 0
+  let names: string[] | null = null
+  let skipped = 0
+  let count = 0
+  const SEP = /[\s,;]+/
+  let start = 0
+  while (start < text.length) {
+    let end = text.indexOf('\n', start)
+    if (end < 0) end = text.length
+    const line = text.slice(start, end).trim()
+    start = end + 1
+    if (!line || line.startsWith('#') || line.startsWith('//')) continue
+    const cells = line.split(SEP).filter((c) => c.length)
+    const vals = cells.map(Number)
+    if (vals.some((v) => !Number.isFinite(v))) {
+      // a header of names (only before any point), or a line to leave out
+      if (!count && !names && cells.every((c) => /^[a-z_"' ]+$/i.test(c))) names = cells.map((c) => c.replace(/["']/g, '').toLowerCase())
+      else skipped++
+      continue
+    }
+    if (vals.length === 1 && !count) continue // the PTS count
+    if (vals.length < 3) { skipped++; continue }
+    if (!n0) n0 = Math.min(vals.length, 7)
+    if (vals.length < n0) { skipped++; continue }
+    if (count >= MAX_PILED_POINTS) throw new Error(`more than ${(MAX_PILED_POINTS / 1e6).toFixed(0)} million points : too many to read`)
+    for (let j = 0; j < n0; j++) flat.push(vals[j])
+    count++
+  }
+  if (!count) throw new Error(`the .${ext} file holds no line of three numbers (x y z)`)
+  const F = flat.done()
+  // where each value sits
+  let ix = 0, iy = 1, iz = 2, ir = -1, ig = -1, ib = -1, ii = -1
+  if (names && names.length >= n0) {
+    const at = (...k: string[]): number => { const i = names!.findIndex((nm) => k.includes(nm)); return i < n0 ? i : -1 }
+    ix = at('x'); iy = at('y'); iz = at('z')
+    if (ix < 0 || iy < 0 || iz < 0) { ix = 0; iy = 1; iz = 2 }
+    ir = at('r', 'red'); ig = at('g', 'green'); ib = at('b', 'blue')
+    ii = at('i', 'intensity', 'value', 'scalar')
+  } else if (n0 >= 7) { ii = 3; ir = 4; ig = 5; ib = 6 }
+  else if (n0 >= 6) { ir = 3; ig = 4; ib = 5 }
+  else if (n0 === 4) ii = 3
+  const hasRGB = ir >= 0 && ig >= 0 && ib >= 0
+  let maxC = 0, minI = Infinity, maxI = -Infinity
+  for (let p = 0; p < F.length; p += n0) {
+    if (hasRGB) maxC = Math.max(maxC, F[p + ir], F[p + ig], F[p + ib])
+    if (ii >= 0) { minI = Math.min(minI, F[p + ii]); maxI = Math.max(maxI, F[p + ii]) }
+  }
+  const cK = maxC > 1.0001 ? 1 : 255
+  const useI = !hasRGB && ii >= 0 && maxI > minI
+  const pos = new Float32Array(count * 3)
+  const col = hasRGB || useI ? new Uint8Array(count * 4) : null
+  const c8 = (v: number): number => Math.max(0, Math.min(255, Math.round(v * cK)))
+  for (let i = 0, p = 0; i < count; i++, p += n0) {
+    pos[i * 3] = F[p + ix]; pos[i * 3 + 1] = F[p + iy]; pos[i * 3 + 2] = F[p + iz]
+    if (col) {
+      const k = i * 4
+      if (hasRGB) { col[k] = c8(F[p + ir]); col[k + 1] = c8(F[p + ig]); col[k + 2] = c8(F[p + ib]) }
+      else col[k] = col[k + 1] = col[k + 2] = Math.round(((F[p + ii] - minI) / (maxI - minI)) * 255)
+      col[k + 3] = 255
+    }
+  }
+  const notes: string[] = []
+  if (skipped) notes.push(skipped === 1 ? 'one line that is not a point left out' : `${skipped.toLocaleString('en-US')} lines that are not points left out`)
+  return { pos, col, format: ext.toUpperCase(), notes }
 }

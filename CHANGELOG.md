@@ -3,6 +3,34 @@
 All notable changes to Palinopsia. Dates are ISO. Versions follow the `v*` tags
 that CI builds into cross-platform releases.
 
+## Unreleased (for v1.3.6)
+
+### Added
+
+- **Strata : a place as a scanner sees it, taken apart and put back together by the sound**
+  (new `engine/StrataSource.ts`, `engine/strataPlaces.ts`, the `gen-strata` descriptor in
+  `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native
+  source drawing a cloud of points, up to four million, from one of four places it carries
+  (a colonnade ruin taken back by plants, a grove, a cliff in layers of sediment, a nebula :
+  each dealt once from a fixed seed, like a scan with its colors), from a file (a scan or a
+  model : the Model's own reader, so PLY, OBJ, glTF, STL, and now XYZ and PTS), or from the
+  layer picked as sidechain lifted by its depth (the picture-depth reader, as the Point
+  Cloud). In the vertex shader, from each point at rest : **natural ⇄ structural** (own
+  colors to an ink color, finer points, **links** to the two nearest neighbours, found by a
+  spatial hash a slice per frame), **sections** sweeping through it along five axes, free or
+  on the beat, **break** (on hits, the beat or the trigger, blocks jump along an axis, hold
+  and are put back in steps or smoothly; a broken block can **reveal** its structure; a hit
+  can **cut** the whole picture to the other state), **erode**, **voxel**, and **panels**
+  (two to four views : other angles, the other state, other cuts). The file picker of the
+  Model serves it too (`modelSources.ts` : the sources that take a model file; the store,
+  the session's collect and relink, the Inspector and a drop on the layer know it). The
+  idea is credited in THIRD_PARTY_NOTICES (part 6).
+- **Text point clouds** (`modelParse.ts`) : the Model and Strata read `.xyz` and `.pts`
+  (x y z a line, with colors 0..1 or 0..255 or an intensity, a header of names placing the
+  columns; PTS's leading count skipped). The media scheme serves the two extensions; a
+  `.csv` is not served (it could be any table on the disk) : a CSV of points reads once
+  renamed `.xyz`.
+
 ## v1.3.5 — 2026-11-19
 
 ### Added

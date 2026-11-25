@@ -87,6 +87,8 @@ export function depthOffText(
     return 'depth is off : the land is raised by brightness instead'
   if (shaderId === 'gen-pointcloud' && (modulated.has('raise') || pick('raise', 0) === 0))
     return 'depth is off : the points are raised by brightness instead'
+  if (shaderId === 'gen-strata' && pick('cloud', 0) === 4 && (modulated.has('raise') || pick('raise', 0) === 0))
+    return 'depth is off : the picture is raised by brightness instead'
   return null
 }
 

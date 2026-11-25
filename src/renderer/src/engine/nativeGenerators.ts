@@ -27,6 +27,7 @@ import { PointCloudSource } from './PointCloudSource'
 import { ModelSource } from './ModelSource'
 import { GridMeshSource } from './GridMeshSource'
 import { TerrainSource } from './TerrainSource'
+import { StrataSource } from './StrataSource'
 import type { HandGestureLog } from '@shared/types'
 
 /** A pointer on the picture (the mouse on the preview, a pinching hand), for a
@@ -100,7 +101,8 @@ const REGISTRY: Record<string, Factory> = {
   'gen-pointcloud': (gl, w, h) => new PointCloudSource(gl, w, h),
   'gen-terrain': (gl, w, h) => new TerrainSource(gl, w, h),
   'gen-model': (gl, w, h) => new ModelSource(gl, w, h),
-  'gen-gridmesh': (gl, w, h) => new GridMeshSource(gl, w, h)
+  'gen-gridmesh': (gl, w, h) => new GridMeshSource(gl, w, h),
+  'gen-strata': (gl, w, h) => new StrataSource(gl, w, h)
 }
 
 export const NATIVE_GENERATOR_IDS: readonly string[] = Object.keys(REGISTRY)

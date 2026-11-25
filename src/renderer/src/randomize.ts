@@ -210,6 +210,8 @@ const RANDOMIZE_SKIP: Record<string, RegExp> = {
   'gen-relief': /^(color[1-5]|ground|edgeColor)$/,
   // Point Cloud : the points carry the picture's colors on the house ground.
   'gen-pointcloud': /^ground$/,
+  // Strata : the ink and the ground are a pair chosen together (its presets).
+  'gen-strata': /^(ground|ink)$/,
   // Terrain : the sun, the sky, the haze, the water and the lines are a weather chosen
   // together (its presets); a rolled sky over a rolled sun reads as a broken monitor.
   'gen-terrain': /^(sunColor|shadowColor|haze|sky|lineColor|waterColor)$/,

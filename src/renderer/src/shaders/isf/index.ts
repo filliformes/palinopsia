@@ -2642,6 +2642,78 @@ export const FX_SHADERS: IsfShader[] = [
     curated: { levels: [3, 10], gamma: [0.8, 1.4] }
   },
   {
+    // Native (engine/StrataSource.ts) : a place as a scanner sees it, a cloud of
+    // points taken apart and put back together by the sound.
+    id: 'gen-strata',
+    name: 'Strata',
+    category: 'Generator',
+    native: true,
+    dice: true,
+    source: `/*${JSON.stringify({
+      DESCRIPTION:
+        'Strata : a place as a scanner sees it, a cloud of points, taken apart and put back together by the sound. The CLOUD is one of four places it carries (a colonnade ruin, a grove, a cliff in layers, a nebula), a scan or a model you open (PLY, XYZ, PTS, OBJ, glTF, STL : photogrammetry, a phone\'s LiDAR, science data), or the layer picked as SIDECHAIN lifted by its depth or brightness. STATE runs from NATURAL (the points in their own colors) to STRUCTURAL (the INK color, finer points, the LINKS between neighbours as thin lines). SECTIONS cut planes through it along an axis, lighting what they cross and dimming the rest; they SWEEP, free or on the beat. On the sound\'s hits (or the beat, or the trigger) the cloud BREAKS into blocks that jump along an axis, HOLD, and are put back over REBUILD seconds, in STEPS or smoothly, a broken block showing its structure (REVEAL); a hit can also CUT the whole picture to the other state for a moment. ERODE takes points away (from the top, the bottom, one side), VOXEL snaps them into blocks, and PANELS split the frame into two to four views : from other angles, in the other state, or cut along other axes.',
+      CATEGORIES: ['Generator', 'Geometry'],
+      INPUTS: [
+        { NAME: 'cloud', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['colonnade', 'grove', 'cliff', 'nebula', 'the picture', 'a file'], DEFAULT: 0, LABEL: 'cloud' },
+        { NAME: 'raise', TYPE: 'long', VALUES: [0, 1, 2], LABELS: ['depth', 'brightness', 'darkness'], DEFAULT: 0, LABEL: 'raised by' },
+        { NAME: 'depth', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'depth' },
+        { NAME: 'settle', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'settle (s)' },
+        { NAME: 'density', TYPE: 'float', MIN: 0.02, MAX: 1, DEFAULT: 0.6, LABEL: 'points' },
+        { NAME: 'size', TYPE: 'float', MIN: 0.1, MAX: 4, DEFAULT: 1, LABEL: 'size' },
+        { NAME: 'shape', TYPE: 'long', VALUES: [0, 1], LABELS: ['square', 'round'], DEFAULT: 1, LABEL: 'shape' },
+        { NAME: 'state', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'natural ⇄ structural' },
+        { NAME: 'ink', TYPE: 'color', DEFAULT: [0.92, 0.94, 0.96, 1], LABEL: 'ink' },
+        { NAME: 'ground', TYPE: 'color', DEFAULT: [0, 0, 0, 1], LABEL: 'ground' },
+        { NAME: 'gain', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 1, LABEL: 'brightness' },
+        { NAME: 'fog', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'fog' },
+        { NAME: 'links', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'links' },
+        { NAME: 'voxel', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'voxel' },
+        { NAME: 'erode', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'erode' },
+        { NAME: 'erodeFrom', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['anywhere', 'the top', 'the bottom', 'one side'], DEFAULT: 1, LABEL: 'erode from' },
+        { NAME: 'sections', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'sections' },
+        { NAME: 'axis', TYPE: 'long', VALUES: [0, 1, 2, 3, 4], LABELS: ['across', 'height', 'depth', 'around', 'from the eye'], DEFAULT: 1, LABEL: 'cut along' },
+        { NAME: 'slices', TYPE: 'float', MIN: 1, MAX: 40, DEFAULT: 6, LABEL: 'cuts' },
+        { NAME: 'thick', TYPE: 'float', MIN: 0.01, MAX: 0.9, DEFAULT: 0.15, LABEL: 'cut width' },
+        { NAME: 'between', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.35, LABEL: 'between' },
+        { NAME: 'sweep', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.2, LABEL: 'sweep' },
+        { NAME: 'sweepSync', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['free', 'beat', '2 beats', 'bar', '2 bars', '4 bars'], DEFAULT: 0, LABEL: 'sweep sync' },
+        { NAME: 'break', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'break' },
+        { NAME: 'breakOn', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['hits', 'beat', '2 beats', 'bar', '2 bars', 'trigger only'], DEFAULT: 0, LABEL: 'break on' },
+        { NAME: 'breakAxis', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['across', 'height', 'depth', 'each block its own'], DEFAULT: 0, LABEL: 'break along' },
+        { NAME: 'blocks', TYPE: 'float', MIN: 0.02, MAX: 0.6, DEFAULT: 0.12, LABEL: 'block size' },
+        { NAME: 'share', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'blocks moved' },
+        { NAME: 'hold', TYPE: 'float', MIN: 0, MAX: 4, DEFAULT: 0.15, LABEL: 'hold (s)' },
+        { NAME: 'rebuild', TYPE: 'float', MIN: 0.05, MAX: 8, DEFAULT: 1.5, LABEL: 'rebuild (s)' },
+        { NAME: 'steps', TYPE: 'float', MIN: 0, MAX: 16, DEFAULT: 4, LABEL: 'rebuild steps' },
+        { NAME: 'reveal', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.6, LABEL: 'reveal' },
+        { NAME: 'cut', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0, LABEL: 'cut on a hit' },
+        { NAME: 'cutHold', TYPE: 'float', MIN: 0.03, MAX: 3, DEFAULT: 0.25, LABEL: 'cut length (s)' },
+        { NAME: 'burst', TYPE: 'event', LABEL: 'break ▸' },
+        { NAME: 'panels', TYPE: 'long', VALUES: [1, 2, 3, 4], LABELS: ['1', '2', '3', '4'], DEFAULT: 1, LABEL: 'panels' },
+        { NAME: 'panelMode', TYPE: 'long', VALUES: [0, 1, 2, 3], LABELS: ['other angles', 'other state', 'other cuts', 'all three'], DEFAULT: 0, LABEL: 'panels show' },
+        { NAME: 'spread', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'angle apart' },
+        { NAME: 'gap', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'gap' },
+        { NAME: 'turn', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0, LABEL: 'turn' },
+        { NAME: 'tilt', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.12, LABEL: 'tilt' },
+        { NAME: 'distance', TYPE: 'float', MIN: 0.3, MAX: 4, DEFAULT: 1.2, LABEL: 'distance' },
+        { NAME: 'lens', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.5, LABEL: 'lens' },
+        { NAME: 'sway', TYPE: 'float', MIN: 0, MAX: 1, DEFAULT: 0.3, LABEL: 'sway' },
+        { NAME: 'swayRate', TYPE: 'float', MIN: 0, MAX: 2, DEFAULT: 0.3, LABEL: 'sway rate' },
+        { NAME: 'spin', TYPE: 'float', MIN: -1, MAX: 1, DEFAULT: 0.08, LABEL: 'spin' }
+      ]
+    })}*/`,
+    // The dice keep a place (a file or the picture is the player's choice) and a
+    // camera that still reads it; panels and cuts on the hit are staging.
+    curated: {
+      cloud: [0, 3], raise: [0, 1], depth: [0.3, 0.7], settle: [0.2, 0.5], density: [0.4, 0.9], size: [0.6, 1.6], shape: [0, 1],
+      state: [0, 1], gain: [0.9, 1.3], fog: [0.1, 0.5], links: [0, 0.6], voxel: [0, 0.3], erode: [0, 0.3], erodeFrom: [0, 3],
+      sections: [0, 0.8], axis: [0, 4], slices: [3, 14], thick: [0.06, 0.3], between: [0.1, 0.5], sweep: [-0.4, 0.4], sweepSync: [0, 0],
+      break: [0.3, 0.8], breakOn: [0, 0], breakAxis: [0, 3], blocks: [0.06, 0.25], share: [0.3, 0.7], hold: [0.05, 0.4], rebuild: [0.6, 3], steps: [0, 8], reveal: [0.3, 1],
+      cut: [0, 0.3], cutHold: [0.1, 0.4], panels: [1, 1], panelMode: [0, 0], spread: [0.5, 0.5], gap: [0.3, 0.3],
+      turn: [-0.3, 0.3], tilt: [0, 0.3], distance: [1, 1.5], lens: [0.3, 0.7], sway: [0.2, 0.5], swayRate: [0.15, 0.5], spin: [-0.15, 0.15]
+    }
+  },
+  {
     id: 'fx-dither', name: 'Dither', category: 'FX', source: dither,
     curated: { levels: [2, 5], scale: [1, 4], amount: [0.6, 1], pattern: [0, 8], color: [0, 2], angle: [0, 3.1416], boil: [0, 0.3] }
   },

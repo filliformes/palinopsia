@@ -762,6 +762,7 @@ Wright, M., & Freed, A. (1997). Open SoundControl: A new protocol for communicat
 
 Entries above whose details could not all be confirmed against a primary source:
 
+- Ryoichi Kurokawa (the Strata credit in THIRD_PARTY_NOTICES.md, part 6): the MUTEK, Mira, Sedition, Ars Electronica, Dialog Festival, Cifra and ZKM pages were read through search excerpts on 2026-11-25, not opened (the session's network refused those hosts); each claim is to check against its page.
 - Bayer (1973): the page numbering (26-11 to 26-15 in volume 1 of the ICC '73 Conference Record) comes from library indexes, not from the proceedings themselves.
 - Sobel and Feldman (1968): the talk was never published; the title follows the form cited in later literature (first described in print by Duda and Hart, 1973, pp. 271–272).
 - Tessendorf (2001): the notes circulate in several revisions (copyright 1999–2001, hosted copy revised later); the SIGGRAPH course number is not confirmed.

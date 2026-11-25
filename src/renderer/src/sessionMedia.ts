@@ -14,6 +14,7 @@ import { onSessionLoaded, sessionSerial } from './sessionEvents'
 import { showToast } from './components/Toast'
 import { playableVideoUrl } from './components/videoImport'
 import { modelLoader } from './engine/modelLoad'
+import { takesModelFile } from './modelSources'
 
 const URL_PREFIX = 'opsia-media://local/'
 
@@ -59,11 +60,11 @@ function gather(obj: unknown, out = new Map<string, string>(), skip?: string): M
   return out
 }
 
-/** Every Model file in the session, with the files the session carries for it. */
+/** Every Model (and Strata) file in the session, with the files the session carries for it. */
 function sessionModels(): Map<string, { path: string; files: string[] }> {
   const out = new Map<string, { path: string; files: string[] }>()
   eachObject(mediaState(), (o) => {
-    const mp = o.shaderId === 'gen-model' ? str(o.modelPath) : null
+    const mp = takesModelFile(str(o.shaderId)) ? str(o.modelPath) : null
     if (!mp) return
     const cur = out.get(norm(mp)) ?? { path: mp, files: [] }
     if (Array.isArray(o.modelFiles)) for (const f of o.modelFiles) if (typeof f === 'string' && !cur.files.some((x) => norm(x) === norm(f))) cur.files.push(f)
@@ -104,7 +105,7 @@ function setModelFiles(to: Map<string, string[]>): void {
       let changed = false
       const r: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(rec)) { const y = walk(v); if (y !== v) changed = true; r[k] = y }
-      const mp = rec.shaderId === 'gen-model' ? str(rec.modelPath) : null
+      const mp = takesModelFile(str(rec.shaderId)) ? str(rec.modelPath) : null
       const want = mp ? to.get(norm(mp)) : undefined
       if (want) {
         const had = Array.isArray(rec.modelFiles) ? (rec.modelFiles as unknown[]) : []
