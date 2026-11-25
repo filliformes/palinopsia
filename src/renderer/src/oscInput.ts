@@ -100,6 +100,7 @@
 //   /opsia/surface/loop {0|1}                            bool : close the path into a loop
 
 import { LIGHT_SHOWS } from './lights/lightShows'
+import { CX_MOD_RANGE, type CxModField } from '@shared/complexOut'
 import { resolumeLearn } from './resolume'
 import { controlBus } from './engine/controlBus'
 import { oscLearn } from './oscLearn'
@@ -1359,6 +1360,39 @@ function route(address: string, args: Args, host = ''): void {
       return
     }
 
+    case 'complex': {
+      // Complex Output : /opsia/complex/live (a value, or none to turn it over) ·
+      // screen/<number or name>/brightness (0..1 : 0..2) · on ·
+      // screen/<..>/slice/<number on that screen, or name>/opacity · on ·
+      // slice/<its number in the whole setup, or name>/opacity · on
+      const k = segs[2]
+      if (k === 'live') { st.setComplexLive(args.length ? n >= 0.5 : !st.complexLive); return }
+      const named = <T extends { name: string }>(list: T[], raw: string | undefined): T | undefined => {
+        let key = raw ?? ''
+        try { key = decodeURIComponent(key) } catch { /* a stray % : as typed */ }
+        key = key.trim().toLowerCase()
+        return /^\d+$/.test(key) ? list[Number(key) - 1] : list.find((x) => x.name.toLowerCase() === key || x.name.toLowerCase().replace(/\s+/g, '-') === key)
+      }
+      const put = (who: string, field: CxModField, now: boolean): void => {
+        if (field === 'on') st.setComplexValue(who, 'on', args.length ? (n >= 0.5 ? 1 : 0) : now ? 0 : 1)
+        else if (args.length) st.setComplexValue(who, field, Math.max(0, Math.min(1, n)) * CX_MOD_RANGE[field].max)
+      }
+      const screens = st.complexOut.screens
+      if (k === 'screen') {
+        const sc = named(screens, segs[3])
+        if (!sc) return
+        if (segs[4] === 'brightness' || segs[4] === 'on') put(sc.id, segs[4], sc.on)
+        else if (segs[4] === 'slice') {
+          const l = named(sc.slices, segs[5])
+          if (l && (segs[6] === 'opacity' || segs[6] === 'on')) put(l.id, segs[6], l.on)
+        }
+      } else if (k === 'slice') {
+        const l = named(screens.flatMap((s) => s.slices), segs[3])
+        if (l && (segs[4] === 'opacity' || segs[4] === 'on')) put(l.id, segs[4], l.on)
+      }
+      return
+    }
+
     case 'black': {
       // Black : the whole show to black over the Morph time (>= 0.5) or back. A
       // value, not a trigger : a controller's toggle stays in step with it (a
@@ -1899,6 +1933,17 @@ function enumerateLeaves(): Leaf[] {
   // World selection (accepts a string id/name, or a 1-based index) + transport.
   const worldIdx = Math.max(1, st.worlds.findIndex((w) => w.id === st.world) + 1)
   add('/opsia/world', 1, Math.max(1, st.worlds.length), worldIdx, 'Active World (send an id/name string, or a 1-based index)')
+  // Complex Output : each screen's and slice's controls, by number
+  add('/opsia/complex/live', 0, 1, st.complexLive ? 1 : 0, 'Complex Output : its screens on (>= 0.5) or off')
+  st.complexOut.screens.forEach((sc, i) => {
+    const p = `/opsia/complex/screen/${i + 1}`
+    add(`${p}/brightness`, 0, 1, sc.brightness / 2, `Complex Output, ${sc.name} : brightness (0.5 as it is)`)
+    add(`${p}/on`, 0, 1, sc.on ? 1 : 0, `Complex Output, ${sc.name} : on / off`)
+    sc.slices.forEach((l, k) => {
+      add(`${p}/slice/${k + 1}/opacity`, 0, 1, l.opacity, `Complex Output, ${sc.name}, ${l.name} : opacity`)
+      add(`${p}/slice/${k + 1}/on`, 0, 1, l.on ? 1 : 0, `Complex Output, ${sc.name}, ${l.name} : on / off`)
+    })
+  })
   add('/opsia/world/amount', 0, 1, st.worldAmount, 'World amount : 1 = all of the World, 0 = its push taken back off')
   add('/opsia/world/apply', 0, 1, 0, 'Apply the World in use again (trigger)', false)
   add('/opsia/seq/run', 0, 1, st.sequence.running ? 1 : 0, 'Sequencer running (>= 0.5)')

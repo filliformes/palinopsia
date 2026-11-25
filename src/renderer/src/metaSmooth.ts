@@ -25,6 +25,7 @@ import { DOME_MOD_RANGE } from '@shared/dome'
 import { OUTX_MOD_RANGE } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { commitLightValue } from './lights/lightStore'
+import { CX_MOD_RANGE } from '@shared/complexOut'
 import { parseSpaceModParam, placePatch } from '@shared/spatial'
 import { posToEvery } from './audio/soniKeyModel'
 import { isPinnedTarget } from './persist'
@@ -139,6 +140,12 @@ function applyDest(target: ModTarget, shaped: number): void {
   if (target.kind === 'light') {
     const r = LIGHT_MOD_RANGE[target.field]
     commitLightValue(st, target.fixture, target.field, r.min + Math.max(0, Math.min(1, shaped)) * (r.max - r.min))
+    return
+  }
+  // A Complex Output control : committed into its setup.
+  if (target.kind === 'cx') {
+    const r = CX_MOD_RANGE[target.field]
+    st.setComplexValue(target.who, target.field, r.min + Math.max(0, Math.min(1, shaped)) * (r.max - r.min))
     return
   }
   // A dome slider : committed into the (machine-local) dome settings.

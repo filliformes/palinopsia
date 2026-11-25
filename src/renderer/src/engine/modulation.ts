@@ -32,6 +32,8 @@ import { DOME_MOD_RANGE, type DomeModField } from '@shared/dome'
 import { OUTX_MOD_RANGE, type OutXformField } from '@shared/outXform'
 import { LIGHT_MOD_RANGE } from '@shared/lights'
 import { lightBaseOf, lightModKey, lightMods } from '../lights/lightMods'
+import { CX_MOD_RANGE } from '@shared/complexOut'
+import { cxBaseOf, cxModKey, cxMods } from '../complex/cxMods'
 import { SPACE_FIELDS, SPACE_FIELD_RANGE, SPACE_VOICES } from '@shared/spatial'
 import { layerRackOf } from '../layerRack'
 
@@ -1621,6 +1623,7 @@ function liveKey(t: import('@shared/types').ModTarget): string {
   if (t.kind === 'world') return 'world:amount'
   if (t.kind === 'au') return t.slot ? `au:${t.slot}:${t.field}` : `au:${t.field}`
   if (t.kind === 'light') return `light:${t.fixture}:${t.field}`
+  if (t.kind === 'cx') return `cx:${t.who}:${t.field}`
   const s = t.scope
   const scopeKey =
     s.kind === 'master' || s.kind === 'background' ? s.kind : `${s.kind}:${s.layer}`
@@ -1931,6 +1934,15 @@ export function writeModTarget(
     lightMods.set(lightModKey(t.fixture, t.field), value)
     return
   }
+  // A Complex Output control : absolute over its span, onto the screens' drawing.
+  if (t.kind === 'cx') {
+    const r = CX_MOD_RANGE[t.field]
+    const value = r.min + Math.max(0, Math.min(1, shaped01)) * (r.max - r.min)
+    if (!Number.isFinite(value)) return
+    liveModValues.set(liveKey(t), value)
+    cxMods.set(cxModKey(t.who, t.field), value)
+    return
+  }
   // An output-transform slider : absolute over its span.
   if (t.kind === 'outx') {
     const r = OUTX_MOD_RANGE[t.field]
@@ -2083,6 +2095,7 @@ export function applyModulation(
   // writing into the slider forever, so the control never reverts to its base.
   liveModValues.clear()
   lightMods.clear() // (a binding removed : its light goes back to its own value)
+  cxMods.clear() // (and a Complex Output control to its own)
   colorFrame.clear()
   liveColorValues.clear()
   // Global modulation mute: with the maps cleared and no writes issued, the
@@ -2183,6 +2196,16 @@ export function applyModulation(
       if (final === null || typeof final !== 'number' || !Number.isFinite(final)) continue
       liveModValues.set(liveKey(a.target), final)
       lightMods.set(lightModKey(a.target.fixture, a.target.field), final)
+      continue
+    }
+    if (a.target.kind === 'cx') {
+      const base = cxBaseOf(a.target.who, a.target.field)
+      if (base === null) continue // the screen or the slice is gone
+      const r = CX_MOD_RANGE[a.target.field]
+      const final = a.target.field === 'on' ? (toggleFromMod(base, v, a.depth)) : inputValueForMode({ type: 'float', min: r.min, max: r.max, def: base }, base, v, a.depth, a.mode)
+      if (final === null || typeof final !== 'number' || !Number.isFinite(final)) continue
+      liveModValues.set(liveKey(a.target), final)
+      cxMods.set(cxModKey(a.target.who, a.target.field), final)
       continue
     }
     if (a.target.kind === 'outx') {

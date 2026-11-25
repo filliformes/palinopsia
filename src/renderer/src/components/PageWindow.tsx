@@ -12,14 +12,14 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { BODY_PAGE_FRAME, OUTPUT_PAGE_FRAME, PAGE_WINDOW_TITLES, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
+import { BODY_PAGE_FRAME, COMPLEX_PAGE_FRAME, OUTPUT_PAGE_FRAME, PAGE_WINDOW_TITLES, SEQUENCE_PAGE_FRAME, SONIFY_PAGE_FRAME } from '@shared/types'
 import { useStore } from '../store'
 import { installSliderLens } from '../glass'
 import { watchUserInput } from '../sessionGuard'
 import { Toaster, showToast } from './Toast'
 import { MenuHost } from './ContextMenu'
 
-export type WindowPage = 'output' | 'body' | 'sonify' | 'sequence'
+export type WindowPage = 'output' | 'body' | 'sonify' | 'sequence' | 'complex'
 
 /** Each page : its window's name (main allows only these), where its place is
  *  kept, its first size, what it is called, and how it closes (the page closes)
@@ -59,6 +59,14 @@ const PAGES: Record<
     name: 'The Sequencer',
     close: () => useStore.getState().setSequencePageOpen(false),
     stayHere: () => useStore.getState().setSequencePageWindow(false)
+  },
+  complex: {
+    frame: COMPLEX_PAGE_FRAME,
+    boundsKey: 'opsia.complexPageBounds',
+    size: 'width=1480,height=900',
+    name: 'Complex Output',
+    close: () => useStore.getState().setComplexPageOpen(false),
+    stayHere: () => useStore.getState().setComplexPageWindow(false)
   }
 }
 

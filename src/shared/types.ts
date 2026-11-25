@@ -971,6 +971,10 @@ export type ModTarget =
   // The Lights' sliders (shared/lights.ts LIGHT_MOD_RANGE) : a fixture's look and
   // tuning, or the masters (fixture ''). A final override on the Lights engine.
   | { kind: 'light'; fixture: string; field: import('./lights').LightModField }
+  // A Complex Output screen's brightness or on / off, a slice's opacity or on / off
+  // (shared/complexOut.ts CX_MOD_RANGE) : `who` is the screen's or the slice's id. A
+  // final override on the screens' drawing.
+  | { kind: 'cx'; who: string; field: import('./complexOut').CxModField }
 
 // The Background's clock : grounds move slowly by default, up to 4× (every
 // path : the slider, the store, OSC, modulation, the Meta knobs).
@@ -1048,12 +1052,16 @@ export const OUTPUT_PAGE_FRAME = 'opsia-output-page'
 export const BODY_PAGE_FRAME = 'opsia-body-page'
 export const SONIFY_PAGE_FRAME = 'opsia-sonify-page'
 export const SEQUENCE_PAGE_FRAME = 'opsia-sequence-page'
+export const COMPLEX_PAGE_FRAME = 'opsia-complex-page'
+/** A Complex Output screen's window : this and the screen's id (main/complexOut.ts). */
+export const CX_FRAME = 'opsia-cx:'
 /** Each page window's title, by its window.open name. */
 export const PAGE_WINDOW_TITLES: Record<string, string> = {
   [OUTPUT_PAGE_FRAME]: 'Palinopsia · Output',
   [BODY_PAGE_FRAME]: 'Palinopsia · Body',
   [SONIFY_PAGE_FRAME]: 'Palinopsia · Sonify',
-  [SEQUENCE_PAGE_FRAME]: 'Palinopsia · Sequencer'
+  [SEQUENCE_PAGE_FRAME]: 'Palinopsia · Sequencer',
+  [COMPLEX_PAGE_FRAME]: 'Palinopsia · Complex Output'
 }
 // What the AUTOMATIC binders may use (Randomize, Generate, a World's audio
 // route) : the old 12, so a randomized session keeps the amount of motion it
@@ -1461,6 +1469,9 @@ export interface Session {
   // (shared/lights.ts LightsSession). The rig itself is the computer's. Absent in
   // older files : every light follows the picture.
   lights?: unknown
+  // The Complex Output setup (shared/complexOut.ts), when it is saved with the
+  // session (its "with session" switch). Read only on a computer that lets it.
+  complexOut?: unknown
   // Space : where each Sonify voice sits in the room (the venue setup itself,
   // speakers / objects / OSC, belongs to the computer, not the piece).
   spaceVoices?: Record<string, import('./spatial').VoicePlace>
@@ -1931,6 +1942,17 @@ export interface ExposedApi {
   lightDmx: (packets: Array<{ kind: 'artnet' | 'sacn' | 'wled' | 'artsync'; host: string; universe: number; data?: Uint8Array }>) => void
   /** A light setup to a file the user picks, and one read back (its text). */
   lightSetupSave: (text: string, name: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+  /** Complex Output (main/complexOut.ts) : the displays; a screen's window given its
+   *  place before the page opens it (false : its display is gone), and read back; a
+   *  number on every display (names : what goes there, by display id); setups as files. */
+  complexDisplays: () => Promise<Array<{ id: number; label: string; width: number; height: number; isPrimary: boolean; isControl: boolean; hz: number }>>
+  complexPrepare: (id: string, cfg: { kind: 'display'; displayId: number; title: string } | { kind: 'window'; x?: number; y?: number; w?: number; h?: number; title: string }) => Promise<boolean>
+  complexBounds: (id: string) => Promise<{ x: number; y: number; w: number; h: number } | null>
+  complexIdentify: (names: Record<string, string>) => Promise<boolean>
+  complexSave: (text: string, name: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+  complexOpen: (kind: 'setup' | 'xml') => Promise<{ ok: boolean; text?: string; name?: string; error?: string }>
+  complexFocusControls: () => Promise<boolean>
+  onComplexDisplays: (cb: () => void) => () => void
   lightSetupOpen: () => Promise<{ ok: boolean; text?: string; name?: string; error?: string }>
   /** Who is on the network (about 1.5 s) : Art-Net nodes and WLED controllers. */
   lightDiscover: () => Promise<{ artnet: Array<{ ip: string; name: string; long: string; universes: number[] }>; wled: Array<{ ip: string; name: string }> }>

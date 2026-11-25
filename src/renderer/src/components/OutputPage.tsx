@@ -80,6 +80,7 @@ export function OutputPage({
   const ndiActive = useStore((s) => s.ndiActive)
   const shareActive = useStore((s) => s.shareActive)
   const setShareActive = useStore((s) => s.setShareActive)
+  const complexLive = useStore((s) => s.complexLive)
   const lightsOn = useStore((s) => s.lightRig.on && s.lightRig.fixtures.length > 0 && s.lightRig.outputs.some((o) => o.enabled))
   // Installation mode : a persisted "enable on next restart" launch config (main
   // owns kiosk.json). Load it once; toggling writes it back.
@@ -353,6 +354,17 @@ export function OutputPage({
           title={`Lights : DMX fixtures (LED bars, spots, matrices) placed on the picture, with shows, light scenes and a console (T). Lit while they send.${inWindow ? ' It opens in the app window.' : ''}`}
         >
           {lightsOn ? '◉ LIGHTS' : 'LIGHTS'}
+        </button>
+        {/* Complex Output : several screens (also Shift+O), in a window of its own.
+            Lit while its screens are on. */}
+        <button
+          onClick={() => useStore.getState().setComplexPageOpen(true)}
+          className={`rounded border px-3 py-1 font-mono text-[11px] font-semibold tracking-[0.15em] transition-colors ${
+            complexLive ? 'border-accent/60 bg-accent/15 text-accent' : 'border-border text-muted hover:text-accent'
+          }`}
+          title="Complex Output : several screens at once, with slices of the picture mapped, warped, masked and blended (Shift+O). Opens in its own window. Lit while its screens are on."
+        >
+          {complexLive ? '◉ COMPLEX OUTPUT' : 'COMPLEX OUTPUT'}
         </button>
         <div className="flex-1" />
         {/* In its own window (from the Output button's right-click menu) : back
