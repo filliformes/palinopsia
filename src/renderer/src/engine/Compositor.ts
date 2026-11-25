@@ -2449,8 +2449,8 @@ export class Compositor {
   }
 
   /** Outside consumers of the finished picture : NDI, Spout / Syphon ('share'),
-   *  recording ('rec'), the projector window ('stream'), the dome simulator
-   *  ('domePrev'). Each has its own GPU conversion + asynchronous readback ring
+   *  recording ('rec'), the projector window ('stream'). (The dome viewer takes
+   *  the canvas itself, no readback.) Each has its own GPU conversion + async readback ring
    *  (see frameCapture.ts) : none of them ever stalls the render loop (the
    *  synchronous readbacks the projector and the dome simulator used before
    *  stalled the whole GPU pipeline on every frame they ran). They all read the
@@ -2458,7 +2458,7 @@ export class Compositor {
    *  (a mapping server, a recording or a receiving app does its own warping; the
    *  projector window applies the keystone itself). */
   private captures = new Map<string, FrameCapture>();
-  private static readonly CAPTURE_SLOTS: Record<string, number> = { ndi: 6, rec: 6, share: 4, stream: 3, domePrev: 2 };
+  private static readonly CAPTURE_SLOTS: Record<string, number> = { ndi: 6, rec: 6, share: 4, stream: 3 };
 
   /** The clean output's size (the dome master's in dome mode). */
   outputSize(): { w: number; h: number } {

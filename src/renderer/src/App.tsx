@@ -75,6 +75,7 @@ import { DepthMenu } from './components/DepthMenu'
 import { AssemblePanel } from './components/AssemblePanel'
 import { BackgroundPanel } from './components/BackgroundPanel'
 import { OutputPage } from './components/OutputPage'
+import { DomeViewerPage } from './components/DomeViewer'
 import { PageWindow } from './components/PageWindow'
 import { SonifyPage } from './components/SonifyPage'
 import { WorldPage } from './components/WorldPage'
@@ -93,7 +94,7 @@ import { markUserShadersReady, registerUserShader, takeShaderReloads, userShader
 import { SourceEditor } from './components/SourceEditor'
 import { applyResolume } from './resolume'
 import { initDataflou, applyDataflou, dataflouWantsVision } from './dataflou'
-import { domePreview, DOME_PREVIEW } from './engine/domePreview'
+import { domeCam, domeFrame } from './engine/domeView'
 import { ndiRate, NDI_MAX_EDGE, type NdiStatus } from '@shared/ndi'
 import { bodyTracker } from './engine/bodyTracker'
 import { roomTracker } from './engine/roomTracker'
@@ -142,7 +143,6 @@ let contextPresetIndex = -1
 let depthModePrev = ''
 // The first engine of this window was built (its layer-1 safety net is spent).
 let firstEngineBuilt = false
-let lastDomePreview = 0
 let lastStreamOn = false
 // what the output window was last sent (compared value by value : a string
 // built every frame to spot a change)
@@ -667,6 +667,7 @@ export default function App(): JSX.Element {
   const outputPageOpen = useStore((s) => s.outputPageOpen)
   const lightsPageOpen = useStore((s) => s.lightsPageOpen)
   const outputPageWindow = useStore((s) => s.outputPageWindow)
+  const domeViewWindow = useStore((s) => s.domeViewWindow)
   const sonifyPageOpen = useStore((s) => s.sonifyPageOpen)
   const sonifyPageWindow = useStore((s) => s.sonifyPageWindow)
   const renderScale = useStore((s) => s.renderScale)
@@ -1343,7 +1344,7 @@ export default function App(): JSX.Element {
       compositorRef.current = comp
       // Isolated test builds only (built with VITE_OPSIA_TEST=1) : hand the
       // store and the engine to a debugger. Compiled out of real builds.
-      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __gpuCapture: gpuCapture, __ndiCap: ndiCap, __captureOnce: captureOnce, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats })
+      if (import.meta.env.VITE_OPSIA_TEST) Object.assign(window, { __store: useStore, __comp: comp, __midi: midi, __midiHints: pickupHints, __vision: visionBus, __body: bodyBus, __bodyTracker: bodyTracker, __room: roomTracker, __sonify: sonifyEngine, __space: spaceEngine, __rec: outputRecorder, __perf: perfMeter, __morph: morphDebug, __meta: { setKnobImmediate, commitKnob }, __undo: { runSilently, undo }, __personStatus: personStatus, __modEngine: modEngine, __clipAudio: clipAudio, __audioLayer: audioLayer, __audioBus: audioBus, __eqPresets: eqPresets, __sessionMedia: sessionMedia, __link: { linkBeats, linkSettings, setLinkSettings, soniBeats, linkPlay, setLinkPlaying }, __asm: { placeAssemblage }, __depth: depthEngine, __ruleSeq: { ruleSeqPlayhead, seqTransportPlay, seqTransportStop }, __perfRates: { fps: currentFps, skips: () => currentSkips(performance.now()) }, __rand: { randomizeInputs, sources: () => DICE_SOURCES.map((g) => g.id), fx: DICE_FX_IDS }, __gpuCapture: gpuCapture, __ndiCap: ndiCap, __captureOnce: captureOnce, __lights: lightRuntime, __chan: { InputPick, outputRoute, probeOutputChannels }, __audioMon: monStats, __domeView: { cam: domeCam, frame: domeFrame } })
       // Recording, NDI, Spout / Syphon, the projector and the dome simulator all
       // capture from the render loop (Compositor.captureKick) : a rebuilt engine
       // needs no re-attaching. A real-time recording finds it through this.
@@ -1835,23 +1836,11 @@ export default function App(): JSX.Element {
           comp!.captureKick('share', route.local && route.topDown ? 'rgbx' : 'rgba-up', 4096)
           perfMeter.end('share')
         }
-        //     Fulldome simulator : a 1024² read of the master, ~30 Hz, only while
-        //     the Output page shows it.
-        if (st.outputPageOpen && st.dome.enabled) {
-          const fr = comp!.captureHarvest('domePrev', true)
-          if (fr) {
-            if (domePreview.px) comp!.captureRecycle('domePrev', domePreview.px.buffer as ArrayBuffer)
-            domePreview.px = new Uint8Array(fr.buf)
-            domePreview.size = fr.w
-            domePreview.serial++
-          }
-          if (now - lastDomePreview > 33) {
-            lastDomePreview = now
-            comp!.captureKick('domePrev', 'rgba-up', DOME_PREVIEW, true)
-          }
-        } else if (domePreview.px) {
-          comp!.captureRelease('domePrev')
-          domePreview.px = null
+        //     Dome viewer : a new master is on the canvas. It takes it itself, card
+        //     to card, when it is shown (components/DomeSim.tsx).
+        if (st.dome.enabled) {
+          domeFrame.serial++
+          domeFrame.spin = comp!.domeParam('spin') ?? 0
         }
         //     A real-time (DXV3) recording captures on its own rate's grid.
         outputRecorder.tick(now)
@@ -2610,6 +2599,11 @@ export default function App(): JSX.Element {
       {outputPageOpen && outputPageWindow && (
         <PageWindow page="output">
           <OutputPage canvasRef={canvasRef} inWindow />
+        </PageWindow>
+      )}
+      {domeViewWindow && (
+        <PageWindow page="dome">
+          <DomeViewerPage />
         </PageWindow>
       )}
       {bodyPageOpen && bodyPageWindow && (

@@ -7,6 +7,22 @@ that CI builds into cross-platform releases.
 
 ### Added
 
+- **The dome viewer : walk in the dome at its real size** (`components/DomeViewer.tsx`,
+  `components/DomeSim.tsx`, `engine/domeView.ts`, `shared/dome.ts`). Rooms in meters
+  (Satosphère 210° and 180°, or a free dome) with a floor, the rim and the wall under it;
+  seats (best, center, back row, side, lying, whole dome, outside) at the eye's real height;
+  walk, run and fly with WASD, the arrows or a gamepad, kept inside the screen, the keyboard
+  taken only while the viewer has the focus; a floor plan to stand anywhere; pixels per degree
+  where you look, the turning speed set and seen, seam and zenith marks, an approximate wash
+  of the screen's own light (off by default), an equirectangular view; expand, or a window of
+  its own. Your place stays on this computer. A session's dome settings load as they were.
+- **The dome viewer's picture** : the whole master (4096², mipmapped, anisotropic) taken from
+  the engine's canvas card to card, with no readback, up to the display's rate; it was a 1024²
+  readback 30 times a second. A governor takes every second, fourth or eighth frame as soon
+  as the render loop slows, and nothing is taken while the viewer is hidden, covered or closed.
+  Measured on an RTX 4070 laptop, dome 4096² : 0.03 ms of the window's thread a take; a light
+  scene 60 fps closed and open, also with NDI at 4096² 60; a scene that fills the card 50.5 fps
+  closed, 49.6 open (before : 51.5 closed, 46.2 open).
 - **Strata : a place as a scanner sees it, taken apart and put back together by the sound**
   (new `engine/StrataSource.ts`, `engine/strataPlaces.ts`, the `gen-strata` descriptor in
   `shaders/isf/index.ts`, eleven presets, its groups, hints, blurb and keywords). A native
