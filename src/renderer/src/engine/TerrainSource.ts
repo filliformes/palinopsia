@@ -347,6 +347,7 @@ out vec4 o;
 uniform sampler2D uPrev, uSide, uMap, uDef;
 uniform int uMode;    // 0 its own land, 1 brightness, 2 darkness, 3 the depth model's map
 uniform float uK;
+uniform float uSlide; // the sound : how far it has moved between two strips (v)
 uniform vec2 uCell;
 ${OWN_GLSL}
 float lumaA(vec2 uv) {
@@ -355,6 +356,7 @@ float lumaA(vec2 uv) {
 }
 void main() {
   vec2 uv = vUV - texture(uDef, vUV).gb;
+  uv.y -= uSlide;
   float t;
   if (uMode == 0) t = ownLand(uv);
   else if (uMode == 3) t = texture(uMap, uv).r;
@@ -372,7 +374,9 @@ void main() {
 // THE SOUND AS LAND : the history of the spectrum, a strip a row. The rows under SHIFT
 // take the spectrum heard now (the shared audio texture's log spectrum, its row at v
 // 0.75); the others move up by SHIFT rows, toward the horizon (the land's far side is
-// the picture's top). Grey, so the height pass reads it as brightness.
+// the picture's top). Between two strips the first row keeps the loudest of what it
+// heard : at a slow speed a hit fell between two strips and left no hill. Gray, so the
+// height pass reads it as brightness.
 const SOUND_FS = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -383,9 +387,10 @@ uniform float uShift, uGain;
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
   float v;
-  if (float(px.y) < uShift) {
+  if (float(px.y) < max(uShift, 1.0)) {
     float s = texture(uAudio, vec2(vUV.x, 0.75)).r;
-    v = clamp(pow(s, 1.3) * uGain, 0.0, 1.0);
+    v = clamp(pow(max(s, 0.0), 1.3) * uGain, 0.0, 1.0);
+    if (uShift < 0.5) v = max(v, texelFetch(uPrev, px, 0).r);
   } else v = texelFetch(uPrev, ivec2(px.x, px.y - int(uShift)), 0).r;
   o = vec4(v, v, v, 1.0);
 }`
@@ -1171,9 +1176,11 @@ export class TerrainSource implements NativeGenerator {
     if (mode !== this.mode) this.first = this.first || (mode === 0) !== (this.mode === 0)
     this.mode = mode
     const settle = clamp(num(I, 'settle', 0.3), 0, 2)
-    const k = this.first || settle < 0.01 ? 1 : 1 - Math.exp(-dt / settle)
+    // (the sound's land is laid once and only travels : settling it would smear it along its way)
+    const k = this.first || this.sounding || settle < 0.01 ? 1 : 1 - Math.exp(-dt / settle)
     for (const t of [H[0].tex, H[1].tex, this.tmp!.tex]) this.setWrap(t, edge === 1 ? 1 : 2, false)
-    this.heightP.use()
+    // (the land glides between its strips : moved a whole strip at a time it stepped)
+    this.heightP.use().f1('uSlide', this.sounding && landPic ? this.sndAcc / 256 : 0)
       .i1('uPrev', 0).i1('uSide', 1).i1('uMap', 2).i1('uDef', 3)
       .i1('uMode', mode).f1('uK', k)
       .f2('uCell', 1 / fw, 1 / fh)
@@ -1287,8 +1294,9 @@ export class TerrainSource implements NativeGenerator {
     this.sndAcc += dt * (6 + 114 * clamp(num(I, 'soundSpeed', 0.3), 0, 1))
     const hit = this.onset.hit()
     if (hit > 0) this.sndAcc += 32 * clamp(num(I, 'surge', 0.4), 0, 1) * Math.min(hit, 1.2)
-    const shift = Math.min(256, Math.floor(this.sndAcc))
-    this.sndAcc -= shift
+    const whole = Math.floor(this.sndAcc)
+    const shift = Math.min(256, whole)
+    this.sndAcc -= whole
     this.soundP.use().i1('uPrev', 0).i1('uAudio', 1).f1('uShift', shift).f1('uGain', clamp(num(I, 'soundGain', 1.5), 0, 4))
     g.bind(0, this.snd[this.si].tex)
     g.bind(1, this.audio)

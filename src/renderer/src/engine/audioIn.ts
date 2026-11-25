@@ -278,6 +278,21 @@ export function hzFiltered(lo?: number, hi?: number): boolean {
 export interface HzRangeState { prev: Float32Array | null; transient: number; pitch: number; at: number }
 export const hzRangeState = (): HzRangeState => ({ prev: null, transient: 0, pitch: 0, at: 0 })
 
+/** One stem : its two channels taken off the device's, analysed apart. */
+interface Stem {
+  an: AnalyserNode
+  split: ChannelSplitterNode
+  merge: ChannelMergerNode
+  fb: FrameBufs
+  feats: AudioFeatures
+  /** when it was last analysed (ms), and in which frame */
+  at: number
+  frame: number
+  /** when a modulator last asked for it (ms) */
+  asked: number
+}
+const STEM_IDLE_MS = 5000
+
 class AudioBus {
   /** Ingest mode : set by the App effect from the store. */
   mode: AudioMode = 'off'
@@ -316,9 +331,12 @@ class AudioBus {
   // STEMS : the device's other channels, each pair (or one channel) analysed apart
   // for the modulators that ask for it (each layer hears its own stem : a DAW's
   // tracks, Pure Data's voices on separate outputs). Made on the first ask, let go
-  // with the input.
+  // five seconds after the last one (another stem picked, the slot off) and with
+  // the input.
   private rawSrc: MediaStreamAudioSourceNode | null = null
-  private stems = new Map<number, { an: AnalyserNode; fb: FrameBufs; feats: AudioFeatures; at: number }>()
+  private stems = new Map<number, Stem>()
+  /** One a tick : a stem is analysed on the frame's first ask, never twice a frame. */
+  private frame = 0
   // The sample rate and buffer asked of the device; the one the input was
   // opened with (another reopens it : App compares them).
   private fmt: AudioFormat = { ...AUDIO_FORMAT_DEFAULT }
@@ -873,6 +891,14 @@ class AudioBus {
 
   // ── Per-frame merge (App loop calls this before modEngine.tick) ─────
   tick(now: number): void {
+    this.frame++
+    for (const [code, st] of this.stems) {
+      if (now - st.asked < STEM_IDLE_MS) continue
+      try { this.rawSrc?.disconnect(st.split) } catch { /* gone with the input */ }
+      st.split.disconnect()
+      st.merge.disconnect()
+      this.stems.delete(code)
+    }
     const dt = this.lastTick ? Math.min(0.1, (now - this.lastTick) / 1000) : 1 / 60
     this.lastTick = now
     if (this.localOn) this.computeLocal(dt)
@@ -909,7 +935,7 @@ class AudioBus {
 
   /** A stem's analysis this frame (null : no local device input open, the Audio
    *  Layer as the input, or the device has no such channel). `code` : see stemOf. */
-  private stem(code: number, now: number): { an: AnalyserNode; fb: FrameBufs; feats: AudioFeatures; at: number } | null {
+  private stem(code: number, now: number): Stem | null {
     const ch = stemChannels(code)
     if (!ch || !this.ctx || !this.rawSrc || this.layerIn || !this.localOn) return null
     if (ch[0] >= this.inChannels || ch[1] >= this.inChannels) return null
@@ -925,13 +951,17 @@ class AudioBus {
       an.fftSize = 2048
       an.smoothingTimeConstant = 0.5
       merge.connect(an)
-      st = { an, fb: frameBufs(an), feats: zero(), at: 0 }
+      st = { an, split, merge, fb: frameBufs(an), feats: zero(), at: 0, frame: -1, asked: now }
       this.stems.set(code, st)
     }
-    // analysed once a frame, whoever asks first
-    if (now - st.at > 4) {
-      const dt = st.at ? Math.min(0.1, (now - st.at) / 1000) : 1 / 60
+    st.asked = now
+    // Analysed once a frame, whoever asks first : a second read of the spectrum in the
+    // same frame runs its FFT again and smooths again, and a modulator would then hear
+    // another sound than the one beside it (the audio tab's rule, analyseFrame).
+    if (st.frame !== this.frame) {
+      const dt = st.at ? Math.max(0.001, Math.min(0.1, (now - st.at) / 1000)) : 1 / 60
       analyseFrame(st.an, st.fb, st.feats, dt, this.sampleRate)
+      st.frame = this.frame
       st.at = now
     }
     return st
@@ -994,68 +1024,68 @@ class AudioBus {
 /** One feature (0..1) read only between lo and hi Hz of a spectrum (freq : the
  *  analyser's bytes; pitch : the source's pitch, 0..1, kept while inside the band). */
 function rangeFeature(freq: Uint8Array, sampleRate: number, pitchNow: number, name: AudioFeatureName, band: number, lo: number, hi: number, st: HzRangeState, now: number): number {
-    if (lo > hi) { const t = lo; lo = hi; hi = t }
-    const N = freq.length
-    const binHz = sampleRate / (2 * N)
-    const i0 = Math.max(0, Math.min(N - 1, Math.floor(lo / binHz)))
-    const i1 = Math.min(N, Math.max(i0 + 1, Math.floor(hi / binHz) + 1)) // exclusive
-    const n = i1 - i0
-    const dt = st.at ? Math.min(0.1, (now - st.at) / 1000) : 1 / 60
-    st.at = now
-    // the band's level : the RMS of its magnitudes, gained like the six bands (a
-    // mean let one loud tone in a wide band read almost nothing)
-    let sum = 0
-    for (let i = i0; i < i1; i++) { const m = freq[i] / 255; sum += m * m }
-    const level = Math.min(1, Math.sqrt(sum / n) * 1.5)
-    // flux (and its transient) on the band's own bins, every call, so the memory
-    // stays one frame behind whatever feature is read
-    if (!st.prev || st.prev.length !== N) st.prev = new Float32Array(N)
-    let flux = 0
-    for (let i = i0; i < i1; i++) {
-      const m = freq[i] / 255
-      const d = m - st.prev[i]
-      if (d > 0) flux += d
-      st.prev[i] = m
-    }
-    flux = Math.min(1, flux / (n * 0.15))
-    st.transient = flux > 0.32 ? 1 : st.transient * Math.pow(0.82, dt * 60)
-    // the pitch : the input's, kept only while it falls inside the band (held else)
-    const p = pitchNow
-    if (p > 0) {
-      const hz = Math.pow(2, LOG_FMIN + p * (LOG_FMAX - LOG_FMIN))
-      if (hz >= lo && hz <= hi) st.pitch = p
-    }
-    switch (name) {
-      case 'level': return level
-      case 'flux': return flux
-      case 'transient': return st.transient
-      case 'pitch': return st.pitch
-      case 'band': {
-        // one of the six log bands, cut to the band (empty : 0)
-        const b = Math.max(0, Math.min(BANDS - 1, band))
-        const blo = Math.max(i0, Math.floor(Math.pow(N, b / BANDS)))
-        const bhi = Math.min(i1, Math.max(Math.floor(Math.pow(N, b / BANDS)) + 1, Math.floor(Math.pow(N, (b + 1) / BANDS))))
-        if (bhi <= blo) return 0
-        let s = 0
-        for (let i = blo; i < bhi; i++) s += freq[i]
-        return Math.min(1, (s / ((bhi - blo) * 255)) * 1.5)
-      }
-      case 'centroid': {
-        // where the energy sits inside the band : 0 at lo, 1 at hi
-        let num = 0, den = 0
-        for (let i = i0; i < i1; i++) { num += (i - i0) * freq[i]; den += freq[i] }
-        return den > 0 && n > 1 ? Math.min(1, num / den / (n - 1)) : 0
-      }
-      case 'noisiness': {
-        if (level <= 0.02 || n < 2) return 0
-        let logSum = 0, linSum = 0
-        for (let i = i0; i < i1; i++) { const m = freq[i] / 255 + 1e-6; logSum += Math.log(m); linSum += m }
-        const flat = linSum > 1e-6 ? Math.exp(logSum / n) / (linSum / n) : 0
-        return Math.min(1, flat * 2)
-      }
-      default: return 0
-    }
+  if (lo > hi) { const t = lo; lo = hi; hi = t }
+  const N = freq.length
+  const binHz = sampleRate / (2 * N)
+  const i0 = Math.max(0, Math.min(N - 1, Math.floor(lo / binHz)))
+  const i1 = Math.min(N, Math.max(i0 + 1, Math.floor(hi / binHz) + 1)) // exclusive
+  const n = i1 - i0
+  const dt = st.at ? Math.min(0.1, (now - st.at) / 1000) : 1 / 60
+  st.at = now
+  // the band's level : the RMS of its magnitudes, gained like the six bands (a
+  // mean let one loud tone in a wide band read almost nothing)
+  let sum = 0
+  for (let i = i0; i < i1; i++) { const m = freq[i] / 255; sum += m * m }
+  const level = Math.min(1, Math.sqrt(sum / n) * 1.5)
+  // flux (and its transient) on the band's own bins, every call, so the memory
+  // stays one frame behind whatever feature is read
+  if (!st.prev || st.prev.length !== N) st.prev = new Float32Array(N)
+  let flux = 0
+  for (let i = i0; i < i1; i++) {
+    const m = freq[i] / 255
+    const d = m - st.prev[i]
+    if (d > 0) flux += d
+    st.prev[i] = m
   }
+  flux = Math.min(1, flux / (n * 0.15))
+  st.transient = flux > 0.32 ? 1 : st.transient * Math.pow(0.82, dt * 60)
+  // the pitch : the input's, kept only while it falls inside the band (held else)
+  const p = pitchNow
+  if (p > 0) {
+    const hz = Math.pow(2, LOG_FMIN + p * (LOG_FMAX - LOG_FMIN))
+    if (hz >= lo && hz <= hi) st.pitch = p
+  }
+  switch (name) {
+    case 'level': return level
+    case 'flux': return flux
+    case 'transient': return st.transient
+    case 'pitch': return st.pitch
+    case 'band': {
+      // one of the six log bands, cut to the band (empty : 0)
+      const b = Math.max(0, Math.min(BANDS - 1, band))
+      const blo = Math.max(i0, Math.floor(Math.pow(N, b / BANDS)))
+      const bhi = Math.min(i1, Math.max(Math.floor(Math.pow(N, b / BANDS)) + 1, Math.floor(Math.pow(N, (b + 1) / BANDS))))
+      if (bhi <= blo) return 0
+      let s = 0
+      for (let i = blo; i < bhi; i++) s += freq[i]
+      return Math.min(1, (s / ((bhi - blo) * 255)) * 1.5)
+    }
+    case 'centroid': {
+      // where the energy sits inside the band : 0 at lo, 1 at hi
+      let num = 0, den = 0
+      for (let i = i0; i < i1; i++) { num += (i - i0) * freq[i]; den += freq[i] }
+      return den > 0 && n > 1 ? Math.min(1, num / den / (n - 1)) : 0
+    }
+    case 'noisiness': {
+      if (level <= 0.02 || n < 2) return 0
+      let logSum = 0, linSum = 0
+      for (let i = i0; i < i1; i++) { const m = freq[i] / 255 + 1e-6; logSum += Math.log(m); linSum += m }
+      const flat = linSum > 1e-6 ? Math.exp(logSum / n) / (linSum / n) : 0
+      return Math.min(1, flat * 2)
+    }
+    default: return 0
+  }
+}
 
 /** A stem's code to its two channels (0-based) : 1..16 the pair 2k-1 + 2k; 101..132 one
  *  channel on both sides. 0 (or anything else) : none, the input as picked. */

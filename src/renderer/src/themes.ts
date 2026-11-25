@@ -207,6 +207,9 @@ const K: Rgba = [0.02, 0.02, 0.025, 1] // the near-black base almost every theme
 // Terrain's motion : never the choices (its own land, what raises it, the ramp, the edge of
 // the field), the flight, the water (a lake appearing from 0) or the hand.
 const SKIP_TERRAIN = '^(own|raise|edges|palette|hand|handAmount|handSize|heal|people|restore|fly|spin|settle|evolve|scale|water|skyOp|camHeight|bloom|lift|haze)$'
+// Strata's motion : never the choices (which cloud, what breaks it and when, the panels), nor
+// what would wear the place away unasked (erode, voxel).
+const SKIP_STRATA = '^(cloud|raise|shape|voxel|erode|erodeFrom|axis|sweepSync|breakOn|breakAxis|blocks|steps|hold|rebuild|cut|cutHold|panels|panelMode|gap|spread|slices|gain|distance|burst|bloom|lift|haze)$'
 const INK: Rgba = [0.015, 0.015, 0.02, 1]
 const PAPER: Rgba = [0.9, 0.88, 0.83, 1]
 const WHITE: Rgba = [0.95, 0.95, 0.95, 1]
@@ -2471,6 +2474,113 @@ export const THEMES: Theme[] = [
     vibe: { mixSrc: 1 },
     context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
     motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
+  }),
+  // ── The sound laid down as land (Terrain raised by the sound) ──
+  mk({
+    id: 'sounding-land', name: 'Sounding Land', family: 'Space',
+    blurb: 'The sound becomes a country : each moment of the spectrum laid at your feet as a strip of hills, drifting away to the horizon, the land jumping forward on the hits.',
+    world: 'parametric',
+    palette: [K, [0.36, 0.34, 0.28, 1], [0.92, 0.88, 0.78, 1]],
+    sources: ['gen-terrain'],
+    stack: [['gen-terrain']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-terrain': ['The sound as land', 'Spectrum survey'] },
+    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], palette: [0, 2, 4, 6], soundSpeed: [0.2, 0.35, 0.5], surge: [0.3, 0.5, 0.8], terraces: [0, 0, 14], rough: [0, 0.15] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
+  }),
+  mk({
+    id: 'night-sounding', name: 'Night Sounding', family: 'Data / Parametric',
+    blurb: 'The spectrum as a chart in the dark : terraces and thin contour lines of what was just heard, flowing away under a low moon.',
+    world: 'parametric',
+    palette: [K, [0.1, 0.14, 0.24, 1], [0.66, 0.76, 0.92, 1]],
+    sources: ['gen-terrain'],
+    stack: [['gen-terrain']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-terrain': ['Spectrum survey'] },
+    pickInputs: { 'gen-terrain': { people: [0], raise: [3], fly: [0], palette: [3, 5], terraces: [8, 12, 18], contours: [0.8, 1], soundGain: [1.4, 1.8], sunHeight: [0.1, 0.2] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_TERRAIN }
+  }),
+  // ── A place scanned, taken apart and put back (Strata) ──
+  mk({
+    id: 'scanned-place', name: 'Scanned Place', family: 'Space',
+    blurb: 'A ruin, a grove or a cloud of gas as a scanner sees it, in its own colors, the camera drifting round it; the hits break it into blocks and it puts itself back.',
+    world: 'parametric',
+    palette: [K, [0.3, 0.27, 0.23, 1], [0.88, 0.85, 0.78, 1]],
+    sources: ['gen-strata'],
+    stack: [['gen-strata']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-strata': ['Ruin', 'Grove in slices', 'Nebula', 'Eroded cliff'] },
+    pickInputs: { 'gen-strata': { state: [0.1, 0.25, 0.4], spin: [-0.1, 0.06, 0.1] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_STRATA }
+  }),
+  mk({
+    id: 'taken-apart', name: 'Taken Apart', family: 'Data / Parametric',
+    blurb: 'A place cut by sweeping sections and broken into blocks on the beat, its structure showing where it is open, put back in hard steps.',
+    world: 'musical',
+    palette: [K, [0.2, 0.22, 0.25, 1], [0.9, 0.93, 0.96, 1]],
+    sources: ['gen-strata'],
+    stack: [['gen-strata']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-strata': ['Strata on the beat', 'Hard cuts', 'Survey'] },
+    pickInputs: { 'gen-strata': { cloud: [0, 0, 1, 2], break: [0.6, 0.8, 1], breakOn: [1, 2, 3], reveal: [0.6, 1], cut: [0, 0.3], links: [0.3, 0.6] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.01, 0.05], skip: SKIP_STRATA }
+  }),
+  mk({
+    id: 'three-views', name: 'Three Views', family: 'Minimal / Structural',
+    blurb: 'One scanned place in panels side by side, like the plates of a survey : other angles, other cuts, its colors beside its drawing.',
+    world: 'parametric',
+    palette: [K, [0.4, 0.4, 0.4, 1], [0.94, 0.94, 0.92, 1]],
+    sources: ['gen-strata'],
+    stack: [['gen-strata']],
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-strata': ['Triptych', 'Data sky', 'White plan'] },
+    pickInputs: { 'gen-strata': { panels: [2, 3, 3, 4], panelMode: [0, 1, 3], links: [0.4, 0.7] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [1, 1], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_STRATA }
+  }),
+  mk({
+    id: 'excavation', name: 'Excavation', family: 'Space',
+    blurb: 'A picture lifted off the wall as a scan : its points raised by their light, webbed by thin lines, opened in slices that travel through its depth.',
+    world: 'parametric',
+    palette: [K, [0.28, 0.24, 0.2, 1], [0.9, 0.84, 0.74, 1]],
+    sources: ['gen-strata'],
+    // the picture, muted : seen only as the cloud it becomes
+    stack: [['scan', 'erosion', 'gen-marble', 'cloud-study'], ['gen-strata']],
+    muted: [0],
+    reads: { 'gen-strata': 0 },
+    bgSources: ['solid-color'],
+    bgOpacity: 0,
+    presets: { 'gen-strata': ['Lifted picture'] },
+    pickInputs: { 'gen-strata': { cloud: [4], raise: [1, 2], depth: [0.5, 0.8], state: [0.1, 0.25], sections: [0, 0.3, 0.5], gain: [1.2, 1.4], links: [0.2, 0.5], tilt: [0.15, 0.3] } },
+    layerFx: ['fx-grade'],
+    blends: ['normal'], layers: [2, 2], useB: 0, feedback: 0, density: 0.5, drift: 0.1,
+    vibe: { mixSrc: 1 },
+    context: { trails: 0, haze: 0, bloom: 0, depth: 0, lightGlow: 0, pbrTexture: 0 },
+    motion: { ...SLOW, rate: [0.005, 0.02], skip: SKIP_STRATA }
   }),
   mk({
     id: 'depth-sweep', name: 'Depth Sweep', family: 'Space',

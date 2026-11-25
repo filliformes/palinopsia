@@ -2340,7 +2340,7 @@ export const GENERATORS: IsfShader[] = [
     // The camera stays above the land for the dice (a buried or upside-down view reads as
     // noise); the hand, the people, the flight and the edge of the field are staging.
     curated: {
-      own: [0, 4], raise: [1, 1], height: [0.35, 0.75], smooth: [0.15, 0.5], peaks: [0, 0.4], rough: [0, 0.4], settle: [0.2, 0.6], scale: [0.7, 1.6], evolve: [0, 0.2],
+      own: [0, 4], raise: [1, 1], soundSpeed: [0.15, 0.5], soundGain: [1.2, 2], surge: [0.2, 0.6], height: [0.35, 0.75], smooth: [0.15, 0.5], peaks: [0, 0.4], rough: [0, 0.4], settle: [0.2, 0.6], scale: [0.7, 1.6], evolve: [0, 0.2],
       terraces: [0, 24], sharp: [0.5, 1], contours: [0, 0.8], lineWidth: [0.8, 1.8], palette: [0, 6], colorMix: [0.3, 1],
       sunAngle: [0, 6.2832], sunHeight: [0.12, 0.6], shadows: [0.5, 1], ambient: [0.2, 0.45], fog: [0.15, 0.5], skyOp: [1, 1],
       water: [0, 0], mirror: [0.4, 0.8], ripple: [0.1, 0.5],
@@ -2635,14 +2635,6 @@ export const GENERATORS: IsfShader[] = [
       light1Az: [30, 30], light1El: [30, 30], light2Az: [-60, -60], light2El: [10, 10],
       blendOn: [1, 1], blendMode: [1, 4], blendSrc: [6, 6], blendDst: [7, 7], depthTest: [1, 1], depthOut: [0, 0], level: [1, 1]
     }
-  }
-]
-
-// The glitch/digital-arts FX vocabulary (brief §5).
-export const FX_SHADERS: IsfShader[] = [
-  {
-    id: 'fx-posterize', name: 'Posterize', category: 'FX', source: posterize,
-    curated: { levels: [3, 10], gamma: [0.8, 1.4] }
   },
   {
     // Native (engine/StrataSource.ts) : a place as a scanner sees it, a cloud of
@@ -2654,7 +2646,7 @@ export const FX_SHADERS: IsfShader[] = [
     dice: true,
     source: `/*${JSON.stringify({
       DESCRIPTION:
-        'Strata : a place as a scanner sees it, a cloud of points, taken apart and put back together by the sound. The CLOUD is one of four places it carries (a colonnade ruin, a grove, a cliff in layers, a nebula), a scan or a model you open (PLY, LAS, LAZ, XYZ, PTS, OBJ, glTF, STL : a phone\'s LiDAR, photogrammetry, survey and science data), or the layer picked as SIDECHAIN lifted by its depth or brightness. STATE runs from NATURAL (the points in their own colors) to STRUCTURAL (the INK color, finer points, the LINKS between neighbours as thin lines). SECTIONS cut planes through it along an axis, lighting what they cross and dimming the rest; they SWEEP, free or on the beat. On the sound\'s hits (or the beat, or the trigger) the cloud BREAKS into blocks that jump along an axis, HOLD, and are put back over REBUILD seconds, in STEPS or smoothly, a broken block showing its structure (REVEAL); a hit can also CUT the whole picture to the other state for a moment. ERODE takes points away (from the top, the bottom, one side), VOXEL snaps them into blocks, and PANELS split the frame into two to four views : from other angles, in the other state, or cut along other axes.',
+        'Strata : a place as a scanner sees it, a cloud of points, taken apart and put back together by the sound. The CLOUD is one of four places it carries (a colonnade ruin, a grove, a cliff in layers, a nebula), a scan or a model you open (PLY, LAS, LAZ, XYZ, PTS, OBJ, glTF, STL : a phone\'s LiDAR, photogrammetry, survey and science data), or the layer picked as SIDECHAIN lifted by its depth or brightness. STATE runs from NATURAL (the points in their own colors) to STRUCTURAL (the INK color, finer points, the LINKS between neighbors as thin lines). SECTIONS cut planes through it along an axis, lighting what they cross and dimming the rest; they SWEEP, free or on the beat. On the sound\'s hits (or the beat, or the trigger) the cloud BREAKS into blocks that jump along an axis, HOLD, and are put back over REBUILD seconds, in STEPS or smoothly, a broken block showing its structure (REVEAL); a hit can also CUT the whole picture to the other state for a moment. ERODE takes points away (from the top, the bottom, one side), VOXEL snaps them into blocks, and PANELS split the frame into two to four views : from other angles, in the other state, or cut along other axes.',
       CATEGORIES: ['Generator', 'Geometry'],
       INPUTS: [
         { NAME: 'cloud', TYPE: 'long', VALUES: [0, 1, 2, 3, 4, 5], LABELS: ['colonnade', 'grove', 'cliff', 'nebula', 'the picture', 'a file'], DEFAULT: 0, LABEL: 'cloud' },
@@ -2715,6 +2707,14 @@ export const FX_SHADERS: IsfShader[] = [
       cut: [0, 0.3], cutHold: [0.1, 0.4], panels: [1, 1], panelMode: [0, 0], spread: [0.5, 0.5], gap: [0.3, 0.3],
       turn: [-0.3, 0.3], tilt: [0, 0.3], distance: [1, 1.5], lens: [0.3, 0.7], sway: [0.2, 0.5], swayRate: [0.15, 0.5], spin: [-0.15, 0.15]
     }
+  }
+]
+
+// The glitch/digital-arts FX vocabulary (brief §5).
+export const FX_SHADERS: IsfShader[] = [
+  {
+    id: 'fx-posterize', name: 'Posterize', category: 'FX', source: posterize,
+    curated: { levels: [3, 10], gamma: [0.8, 1.4] }
   },
   {
     id: 'fx-dither', name: 'Dither', category: 'FX', source: dither,

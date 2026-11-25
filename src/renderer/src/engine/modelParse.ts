@@ -22,6 +22,8 @@ export interface ParseCtx {
   fetchRel(uri: string): Promise<ArrayBuffer>
   /** An image's bytes as a texture (null when the format can't be decoded). */
   image(bytes: Uint8Array, mime: string): Promise<ImageBitmap | null>
+  /** Still reading (a long file, every second or so) : the loader's patience starts over. */
+  alive?(): void
 }
 
 export const MODEL_EXT = /\.(glb|gltf|obj|stl|ply|xyz|pts|las|laz)$/i
@@ -52,7 +54,7 @@ export async function parseModel(name: string, buf: ArrayBuffer, ctx: ParseCtx):
   if (ext === 'stl') return parseSTL(buf)
   if (ext === 'ply') return parsePLY(buf)
   if (ext === 'xyz' || ext === 'pts' || ext === 'csv') return parseXYZ(new TextDecoder().decode(buf), ext)
-  if (ext === 'las' || ext === 'laz') return parseLAS(buf)
+  if (ext === 'las' || ext === 'laz') return parseLAS(buf, ctx.alive)
   if (ext === 'glb') throw new Error('not a glTF binary (its header is wrong)')
   throw new Error(`${ext ? '.' + ext : 'this file'} is not a model the Model reads (glb, gltf, obj, stl, ply, xyz, pts, las, laz)`)
 }
@@ -573,7 +575,6 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
   const iop = pi('opacity')
   const isSplat = !hasC && idc.every((i) => i >= 0)
   const SH_C0 = 0.28209479177387814
-  const opac = isSplat && iop >= 0 ? new Float32Array(nv) : null
   const colScale = (p: PlyProp): number => (p.type === 'float' || p.type === 'float32' || p.type === 'double' || p.type === 'float64' ? 255 : p.type === 'ushort' || p.type === 'uint16' ? 1 / 257 : 1)
   // the counts the header gives, checked against the data before anything is made :
   // each element at least as many bytes as its fixed numbers and list counts (binary),
@@ -603,6 +604,7 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
   const nrm = hasN ? new Float32Array(nv * 3) : null
   const uv = hasUV ? new Float32Array(nv * 2) : null
   const col = hasC || isSplat ? new Uint8Array(nv * 4) : null
+  const opac = isSplat && iop >= 0 ? new Float32Array(nv) : null
   const I = new GrowU32(1 << 16)
   const vals = new Float64Array(vert.props.length)
   const putVertex = (i: number): void => {
@@ -688,6 +690,7 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
     // the splats as points : the nearly clear ones (under 10 % opaque) left out
     let n = 0
     for (let i = 0; i < nv; i++) if (!opac || opac[i] >= 0.1) n++
+    if (!n) throw new Error('a Gaussian splat with every splat nearly clear : nothing to draw')
     const P = new Float32Array(n * 3), C = new Uint8Array(n * 4)
     for (let i = 0, k = 0; i < nv; i++) {
       if (opac && opac[i] < 0.1) continue
@@ -710,10 +713,13 @@ function parsePLY(buf: ArrayBuffer): RawMesh {
 // The columns by their count : 3 x y z; 4 x y z and an intensity; 6 x y z r g b;
 // 7 x y z, an intensity, r g b (PTS : its first line, a lone count, is skipped).
 // A header line of names (x, y, z, r / red, g / green, b / blue, i / intensity /
-// value) places the columns by name instead. Colors 0..255, or 0..1 when no value
-// passes 1; an intensity is a grey (0..1, 0..255 or a scanner's -2048..2047).
+// value) places the columns by name instead. Colors 0..255, 0..1 when no value passes
+// 1, or 0..65535; six columns with a negative one are x y z and a normal, not a color.
+// An intensity is a gray, from its lowest to its highest (a scanner's -2048..2047 too).
 // Separated by spaces, tabs, commas or semicolons; lines starting with # or // and
-// lines that are not numbers are left out.
+// lines that are not numbers are left out. Coordinates are taken relative to the first
+// point in double precision (survey coordinates run to millions of meters, where a
+// 32-bit float loses the centimeters).
 function parseXYZ(text: string, ext: string): RawMesh {
   // every point's values, flat, in the first point line's column count
   const flat = new GrowF32(1 << 16)
@@ -721,6 +727,8 @@ function parseXYZ(text: string, ext: string): RawMesh {
   let names: string[] | null = null
   let skipped = 0
   let count = 0
+  let ix = 0, iy = 1, iz = 2
+  let o: [number, number, number] = [0, 0, 0]
   const SEP = /[\s,;]+/
   let start = 0
   while (start < text.length) {
@@ -739,8 +747,16 @@ function parseXYZ(text: string, ext: string): RawMesh {
     }
     if (vals.length === 1 && !count) continue // the PTS count
     if (vals.length < 3) { skipped++; continue }
-    if (!n0) n0 = Math.min(vals.length, 7)
+    if (!n0) {
+      n0 = Math.min(vals.length, 7)
+      if (names && names.length >= n0) {
+        const c = ['x', 'y', 'z'].map((k) => names!.indexOf(k))
+        if (c.every((i) => i >= 0 && i < n0)) [ix, iy, iz] = c
+      }
+      o = [vals[ix], vals[iy], vals[iz]]
+    }
     if (vals.length < n0) { skipped++; continue }
+    vals[ix] -= o[0]; vals[iy] -= o[1]; vals[iz] -= o[2]
     if (count >= MAX_PILED_POINTS) throw new Error(`more than ${(MAX_PILED_POINTS / 1e6).toFixed(0)} million points : too many to read`)
     for (let j = 0; j < n0; j++) flat.push(vals[j])
     count++
@@ -748,23 +764,25 @@ function parseXYZ(text: string, ext: string): RawMesh {
   if (!count) throw new Error(`the .${ext} file holds no line of three numbers (x y z)`)
   const F = flat.done()
   // where each value sits
-  let ix = 0, iy = 1, iz = 2, ir = -1, ig = -1, ib = -1, ii = -1
+  let ir = -1, ig = -1, ib = -1, ii = -1
   if (names && names.length >= n0) {
     const at = (...k: string[]): number => { const i = names!.findIndex((nm) => k.includes(nm)); return i < n0 ? i : -1 }
-    ix = at('x'); iy = at('y'); iz = at('z')
-    if (ix < 0 || iy < 0 || iz < 0) { ix = 0; iy = 1; iz = 2 }
     ir = at('r', 'red'); ig = at('g', 'green'); ib = at('b', 'blue')
     ii = at('i', 'intensity', 'value', 'scalar')
   } else if (n0 >= 7) { ii = 3; ir = 4; ig = 5; ib = 6 }
   else if (n0 >= 6) { ir = 3; ig = 4; ib = 5 }
   else if (n0 === 4) ii = 3
-  const hasRGB = ir >= 0 && ig >= 0 && ib >= 0
-  let maxC = 0, minI = Infinity, maxI = -Infinity
+  let hasRGB = ir >= 0 && ig >= 0 && ib >= 0
+  let maxC = 0, minC = 0, minI = Infinity, maxI = -Infinity
   for (let p = 0; p < F.length; p += n0) {
-    if (hasRGB) maxC = Math.max(maxC, F[p + ir], F[p + ig], F[p + ib])
+    if (hasRGB) {
+      maxC = Math.max(maxC, F[p + ir], F[p + ig], F[p + ib])
+      minC = Math.min(minC, F[p + ir], F[p + ig], F[p + ib])
+    }
     if (ii >= 0) { minI = Math.min(minI, F[p + ii]); maxI = Math.max(maxI, F[p + ii]) }
   }
-  const cK = maxC > 1.0001 ? 1 : 255
+  if (minC < -0.001) hasRGB = false // (a normal)
+  const cK = maxC > 255.5 ? 255 / 65535 : maxC > 1.0001 ? 1 : 255
   const useI = !hasRGB && ii >= 0 && maxI > minI
   const pos = new Float32Array(count * 3)
   const col = hasRGB || useI ? new Uint8Array(count * 4) : null

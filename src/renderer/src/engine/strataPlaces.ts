@@ -1,5 +1,6 @@
 // Strata's clouds : the four places it carries (drawn here as if laser-scanned :
-// points on surfaces, with their colors), and the links between neighbouring points.
+// points on surfaces, with their colors), and the links between neighboring points. Made in a worker
+// (workers/strataWorker.ts : a place takes up to a quarter second).
 //
 // - COLONNADE : a ruined portico on a stepped base, broken columns, fallen drums,
 //   plants at their feet. Architecture taken back by nature.
@@ -9,15 +10,24 @@
 // - NEBULA : a cloud of gas and dust in space, filaments and dense cores, a few stars.
 //
 // Every place is dealt from a fixed seed (the same cloud every time), fitted like a
-// file (its centre at the origin, its farthest point at 1) and kept once made.
+// file (its center at the origin, its farthest point at 1) and kept once made.
 // Written for Palinopsia : plain sampling of shapes and value noise, no code taken.
 
 export interface Cloud {
-  /** x y z of each point, fitted : the centre at the origin, the farthest at 1 */
+  /** x y z of each point, fitted : the center at the origin, the farthest at 1 */
   pos: Float32Array
   /** r g b a of each point, 0..255 */
   col: Uint8Array
   n: number
+}
+
+/** A cloud ready to draw : its points in a shuffled order (the first N of them are an
+ *  even sample of the whole, the same ones whatever else is drawn), and its web. */
+export interface DrawCloud extends Cloud {
+  /** the web (LinkBuilder) : 4 floats a web point */
+  link: Float32Array
+  linkStep: number
+  linkN: number
 }
 
 export const PLACE_NAMES = ['colonnade', 'grove', 'cliff', 'nebula'] as const
@@ -84,7 +94,11 @@ class Pts {
   }
 }
 
-/** The centre of the box to the origin, the farthest point at 1 (a new array). */
+const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x)
+
+/** The center of the box to the origin, the farthest point at 1 (a new array). A few
+ *  stray points far out (birds, dust, a mirror's ghost : every survey has some) do not
+ *  count : the fit is then the rest's, and they stand where they are, outside it. */
 export function fitCloud(c: Cloud): Cloud {
   const p = c.pos
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity
@@ -94,13 +108,36 @@ export function fitCloud(c: Cloud): Cloud {
     if (y < y0) y0 = y; if (y > y1) y1 = y
     if (z < z0) z0 = z; if (z > z1) z1 = z
   }
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2
+  let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2
   let r2 = 0
   for (let i = 0; i < c.n * 3; i += 3) {
     const dx = p[i] - cx, dy = p[i + 1] - cy, dz = p[i + 2] - cz
     r2 = Math.max(r2, dx * dx + dy * dy + dz * dz)
   }
-  const k = r2 > 0 ? 1 / Math.sqrt(r2) : 1
+  // the body of the cloud : all but one point in two thousand, over an even sample
+  let reach = Math.sqrt(r2)
+  if (c.n >= 4000) {
+    const m = Math.min(c.n, 60000), step = c.n / m
+    const axis = new Float32Array(m)
+    const mid: number[] = []
+    for (let a = 0; a < 3; a++) {
+      for (let j = 0; j < m; j++) axis[j] = p[Math.floor(j * step) * 3 + a]
+      axis.sort()
+      mid.push((axis[Math.floor(m * 0.0005)] + axis[Math.min(m - 1, Math.ceil(m * 0.9995))]) / 2)
+    }
+    for (let j = 0; j < m; j++) {
+      const i = Math.floor(j * step) * 3
+      axis[j] = Math.hypot(p[i] - mid[0], p[i + 1] - mid[1], p[i + 2] - mid[2])
+    }
+    axis.sort()
+    const body = axis[Math.floor(m * 0.9995)]
+    // (an ordinary cloud's corners reach a third past that : fitted whole, as before)
+    if (body > 0 && reach > body * 1.6) {
+      ;[cx, cy, cz] = mid
+      reach = body * 1.15
+    }
+  }
+  const k = reach > 0 ? 1 / reach : 1
   const out = new Float32Array(c.n * 3)
   for (let i = 0; i < c.n * 3; i += 3) {
     out[i] = (p[i] - cx) * k
@@ -233,7 +270,7 @@ function colonnade(): Cloud {
       // what grows at its foot
       if (R() < 0.6) foliage(P, R, [x + (R() - 0.5) * 0.2, top + 0.04, z + (row === 0 ? -1 : 1) * 0.12], 0.09 + R() * 0.06, 1500, [0.26, 0.4, 0.17])
     }
-    // the architrave where neighbours both stand
+    // the architrave where neighbors both stand
     for (let i = 0; i + 1 < xs.length; i++) {
       if (heights[row][i] >= full && heights[row][i + 1] >= full) {
         box(P, R, (xs[i] + xs[i + 1]) / 2, top + full + 0.1, z, 0.46, 0.1, 0.2, 3500, stone)
@@ -384,13 +421,42 @@ export function placeCloud(i: number): Cloud {
   return c
 }
 
-// ── the links : each point's two nearest neighbours, by a spatial hash ──────────
+/** The points in a shuffled order, always the same for a cloud : its first N are then an
+ *  even sample (POINTS under a modulator adds and takes points, the others hold still;
+ *  in the file's own order every step of it picked others, and the cloud boiled). */
+export function shuffleCloud(c: Cloud): Cloud {
+  const R = rng(c.n ^ 0x5bd1)
+  const pos = c.pos.slice(0, c.n * 3), col = c.col.slice(0, c.n * 4)
+  const w = new Uint32Array(col.buffer, 0, c.n)
+  for (let i = c.n - 1; i > 0; i--) {
+    const j = Math.floor(R() * (i + 1))
+    const a = i * 3, b = j * 3
+    const x = pos[a], y = pos[a + 1], z = pos[a + 2]
+    pos[a] = pos[b]; pos[a + 1] = pos[b + 1]; pos[a + 2] = pos[b + 2]
+    pos[b] = x; pos[b + 1] = y; pos[b + 2] = z
+    const t = w[i]; w[i] = w[j]; w[j] = t
+  }
+  return { pos, col, n: c.n }
+}
+
+/** A fitted cloud made ready to draw : shuffled, its web found. */
+export function drawCloud(fitted: Cloud): DrawCloud {
+  const c = shuffleCloud(fitted)
+  const B = new LinkBuilder(c.pos, c.n)
+  B.step(Infinity)
+  return { ...c, link: B.out, linkStep: B.stride, linkN: B.m }
+}
+
+// ── the links : each point's two nearest neighbors, by a spatial hash ──────────
 /** The web of links : every STRIDE-th point of the cloud (about LINK_POINTS of them) and
- *  its two nearest neighbours among those, so a link is longer than a point is wide and
+ *  its two nearest neighbors among those, so a link is longer than a point is wide and
  *  reads as a line over the cloud. Built a slice at a time (a scan of millions of points
- *  must not stall a frame). `out` : 4 floats a web point, its two neighbours' web
+ *  must not stall a frame). `out` : 4 floats a web point, its two neighbors' web
  *  indices (-1 : none within reach) and their distances. */
 export const LINK_POINTS = 30000
+/** The most candidates looked at for one point (a scan with most of its points in one
+ *  clump : thousands share a cell, and looking at them all took minutes). */
+const LINK_LOOKS = 600
 export class LinkBuilder {
   readonly out: Float32Array
   /** the cloud's index of web point k is k * stride */
@@ -434,7 +500,7 @@ export class LinkBuilder {
   private key(x: number, y: number, z: number): number {
     return ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791)) >>> 0) & this.mask
   }
-  /** Find the neighbours of up to `budget` more points; true when every point has them. */
+  /** Find the neighbors of up to `budget` more points; true when every point has them. */
   step(budget: number): boolean {
     if (this.done) return true
     const p = this.pos, inv = 1 / this.cell, r2 = this.cell * this.cell
@@ -443,24 +509,83 @@ export class LinkBuilder {
       const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2]
       const cx = Math.floor(x * inv), cy = Math.floor(y * inv), cz = Math.floor(z * inv)
       let b1 = -1, b2 = -1, d1 = r2, d2 = r2
+      let looks = 0
       for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
         for (let j = this.head[this.key(cx + dx, cy + dy, cz + dz)]; j >= 0; j = this.next[j]) {
-          if (j === i) continue
+          if (++looks > LINK_LOOKS) break
+          // (two cells can share a hash : the same point met twice)
+          if (j === i || j === b1 || j === b2) continue
           const ex = p[j * 3] - x, ey = p[j * 3 + 1] - y, ez = p[j * 3 + 2] - z
           const d = ex * ex + ey * ey + ez * ez
           if (d >= d2) continue
-          // (a link drawn once : each pair from its lower index)
           if (d < d1) { b2 = b1; d2 = d1; b1 = j; d1 = d } else { b2 = j; d2 = d }
         }
       }
       const o = i * 4
-      this.out[o] = b1 > i ? b1 : -1
-      this.out[o + 1] = b2 > i ? b2 : -1
+      this.out[o] = b1
+      this.out[o + 1] = b2
       this.out[o + 2] = Math.sqrt(d1)
       this.out[o + 3] = Math.sqrt(d2)
     }
     this.at = end
-    this.done = end >= this.n
-    return this.done
+    if (end < this.n) return false
+    // a pair that names each other is drawn once, from its lower index
+    for (let i = 0; i < this.n; i++) for (let k = 0; k < 2; k++) {
+      const j = this.out[i * 4 + k]
+      if (j >= 0 && j < i && (this.out[j * 4] === i || this.out[j * 4 + 1] === i)) this.out[i * 4 + k] = -1
+    }
+    this.done = true
+    return true
   }
+}
+
+// ── a file's colors ─────────────────────────────────────────────────────────────
+export interface MeshColors {
+  pos: Float32Array
+  uv: Float32Array | null
+  col: Uint8Array
+  hasColor: boolean
+  texture: ImageBitmap | null
+}
+
+/** Each point's color, as the Model shows the file : its vertex color, times its
+ *  texture under the point's texture coordinates where the file has one (the mesh's
+ *  colors carry alpha 255 where the texture applies, 0 where the file gave no color);
+ *  a file with neither in a soft gray. Always opaque : Strata draws a point by alpha. */
+export function pointColors(m: MeshColors): Uint8Array {
+  const n = m.pos.length / 3
+  const out = new Uint8Array(n * 4)
+  const src = m.col
+  let tex: { data: Uint8ClampedArray; w: number; h: number } | null = null
+  if (m.texture && m.uv) {
+    try {
+      const w = m.texture.width, h = m.texture.height
+      const cv = new OffscreenCanvas(w, h)
+      const cx = cv.getContext('2d')!
+      cx.drawImage(m.texture, 0, 0)
+      tex = { data: cx.getImageData(0, 0, w, h).data, w, h }
+    } catch {
+      tex = null // (a texture closed meanwhile : the vertex colors alone)
+    }
+  }
+  const fr = (x: number): number => clamp01(x - Math.floor(x))
+  for (let i = 0; i < n; i++) {
+    const o = i * 4
+    const a = src[o + 3]
+    if (!m.hasColor && !(tex && a > 127)) {
+      out[o] = out[o + 1] = out[o + 2] = 200
+    } else {
+      let r = src[o], g = src[o + 1], b = src[o + 2]
+      if (tex && m.uv && a > 127) {
+        // the Model samples its texture uploaded unflipped : the image's first row at v = 0
+        const x = Math.min(tex.w - 1, Math.floor(fr(m.uv[i * 2]) * tex.w))
+        const y = Math.min(tex.h - 1, Math.floor(fr(m.uv[i * 2 + 1]) * tex.h))
+        const t = (y * tex.w + x) * 4
+        r = (r * tex.data[t]) / 255; g = (g * tex.data[t + 1]) / 255; b = (b * tex.data[t + 2]) / 255
+      }
+      out[o] = r; out[o + 1] = g; out[o + 2] = b
+    }
+    out[o + 3] = 255
+  }
+  return out
 }

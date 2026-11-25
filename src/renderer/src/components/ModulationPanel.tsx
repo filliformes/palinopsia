@@ -1358,7 +1358,7 @@ function ClipFromRow({ value, onChange, ch, onCh }: { value: ClipAudioSrc | unde
   const known = !value || slots.some((k) => k.startsWith(cur + ':'))
   const stemKnown = !ch || stems.some((x) => x.code === ch)
   return (
-    <Row label="FROM" title="Where it listens : the audio input (the audio tab, as its channel menu picks it); one STEM of that input, its own channels apart (IN 3+4, IN 5 : each layer can hear its own track of a DAW or its own voice of a Pure Data patch, sent to separate outputs of a multichannel device); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
+    <Row label="FROM" title="Where it listens : the audio input (the audio tab, as its channel menu picks it); one STEM of that input, its own channels apart (IN 3+4, IN 5 : each layer can hear its own track, or its own voice of a patch, sent to separate outputs of a multichannel device); the sound of a film or an audio file on a layer or on the Audio Layer (AU A / B), read where its playhead is (at any speed, reversed or scrubbed; a stopped clip is silent); or the Audio Layer's whole sound (AU all : both slots mixed, a live input too, after their volumes, analysed as it plays)">
       <select
         className="input select-compact min-w-0 flex-1 text-[10px]"
         value={cur}

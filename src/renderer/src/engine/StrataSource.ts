@@ -10,7 +10,7 @@
 // What it does to it, all in the vertex shader from each point's place at rest
 // (nothing is simulated, so nothing drifts) :
 // - STATE : from NATURAL (the points in their own colors) to STRUCTURAL (the ink
-//   color, finer points, the LINKS between neighbours drawn as thin lines).
+//   color, finer points, the LINKS between neighbors drawn as thin lines).
 // - SECTIONS : planes cut through the cloud along an axis; the points in a cut are
 //   lit, the rest dim (BETWEEN), the cuts SWEEP through, free or on the beat.
 // - BREAK : on the sound's hits (or the beat, or the trigger) the cloud splits into
@@ -38,8 +38,8 @@ import { Onset } from './touchInput'
 import { tempoBpm } from './tempoSignal'
 import { PictureDepthReader, pictureDepth } from './pictureDepth'
 import { modelLoader } from './modelLoad'
-import type { MeshData } from './modelMesh'
-import { placeCloud, fitCloud, LinkBuilder, PLACE_NAMES, type Cloud } from './strataPlaces'
+import { strataClouds, type CloudState } from './strataClouds'
+import type { DrawCloud } from './strataPlaces'
 
 /** The most points drawn from the picture (POINTS 1). */
 export const STRATA_PICTURE_MAX = 360000
@@ -86,7 +86,7 @@ uniform int uSrc;              // 0 a cloud (textures), 1 the picture (a grid)
 uniform sampler2D uPos, uCol, uLink, uSide, uH;
 uniform int uTexW;
 uniform ivec2 uGrid;
-uniform float uAsp, uDepthAmt, uStride;
+uniform float uAsp, uDepthAmt;
 uniform float uVoxel, uErode;
 uniform int uErodeFrom;
 uniform float uSec, uSecN, uSecThick, uSecBetween, uSecPh;
@@ -209,7 +209,7 @@ out float vRad;
 out vec4 vCol;
 void cull() { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vLocal = vec2(0.0); vRad = 0.0; vCol = vec4(0.0); }
 void main() {
-  int i = int(float(gl_InstanceID) * uStride);
+  int i = gl_InstanceID;
   vec3 P, c; float keep, moved;
   placed(i, P, c, keep, moved);
   if (keep < 0.004) { cull(); return; }
@@ -250,7 +250,7 @@ void main() {
   o = vec4(vCol.rgb * s, s);
 }`
 
-// The links : two ends a line. A cloud's from its neighbours (uLink), the picture's
+// The links : two ends a line. A cloud's from its neighbors (uLink), the picture's
 // from its grid (right and down).
 const LINK_VS = `#version 300 es
 precision highp float;
@@ -327,19 +327,20 @@ const clamp = (x: number, a: number, b: number): number => (x < a ? a : x > b ? 
 
 interface Break { age: number; strength: number; seed: number; axis: number }
 
-/** A cloud on the GPU : its points, colors and (once found) neighbours. */
+/** A cloud on the GPU : its points, its colors and its web. */
 interface GpuCloud {
-  src: Cloud
+  src: DrawCloud
   n: number
   rows: number
+  /** the rows of points sent so far (a band a frame) */
+  sent: number
   pos: WebGLTexture
   col: WebGLTexture
-  link: WebGLTexture | null
-  builder: LinkBuilder | null
-  /** the web : a web point is every linkStep-th point, linkN of them */
-  linkStep: number
-  linkN: number
+  link: WebGLTexture
 }
+// The points sent a frame, in rows of TEX_W : 262,144 (4 MB of places, 1 MB of colors),
+// so a scan of four million fills in over sixteen frames, none of them late.
+const BAND = 128
 
 export class StrataSource implements NativeGenerator {
   private g: EngineGL
@@ -365,7 +366,10 @@ export class StrataSource implements NativeGenerator {
   private time = 0
   private cutUntil = -1
   private breaks: Break[] = []
+  // the trigger as the slot holds it and as a modulator plays it : one edge each (a
+  // modulator's gate held open would be a new edge every frame against the slot's 0)
   private burst = new Edge()
+  private burstMod = new Edge()
   private onset = new Onset()
   private depthRead: PictureDepthReader
   private gpu: GpuCloud | null = null
@@ -391,7 +395,7 @@ export class StrataSource implements NativeGenerator {
 
   setInput(name: string, value: number | number[]): void {
     this.inputs[name] = value
-    if (name === 'burst' && typeof value === 'number' && this.burst.fired(value)) this.fire(1, true)
+    if (name === 'burst' && typeof value === 'number' && this.burstMod.fired(value)) this.fire(1, true)
   }
 
   feed(_audio: WebGLTexture | null, side: WebGLTexture | null): void {
@@ -439,14 +443,14 @@ export class StrataSource implements NativeGenerator {
     return t
   }
 
-  private dataTex(rows: number, data: Float32Array | Uint8Array, float: boolean): WebGLTexture {
+  private dataTex(rows: number, data: Float32Array | Uint8Array | null, float: boolean): WebGLTexture {
     const gl = this.g.gl
     const t = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, t)
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-    if (float) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, TEX_W, rows, 0, gl.RGBA, gl.FLOAT, data as Float32Array)
-    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, TEX_W, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, data as Uint8Array)
+    if (float) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, TEX_W, rows, 0, gl.RGBA, gl.FLOAT, data as Float32Array | null)
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, TEX_W, rows, 0, gl.RGBA, gl.UNSIGNED_BYTE, data as Uint8Array | null)
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
@@ -459,45 +463,55 @@ export class StrataSource implements NativeGenerator {
     if (!this.gpu) return
     gl.deleteTexture(this.gpu.pos)
     gl.deleteTexture(this.gpu.col)
-    if (this.gpu.link) gl.deleteTexture(this.gpu.link)
+    gl.deleteTexture(this.gpu.link)
     this.gpu = null
   }
 
-  /** Put a cloud on the GPU (kept while it stays the same object). */
-  private useCloud(c: Cloud): GpuCloud {
-    if (this.gpu && this.gpu.src === c) return this.gpu
-    this.freeCloud()
-    const rows = Math.max(1, Math.ceil(c.n / TEX_W))
-    const pos = new Float32Array(TEX_W * rows * 4)
-    for (let i = 0; i < c.n; i++) {
-      pos[i * 4] = c.pos[i * 3] * SCALE
-      pos[i * 4 + 1] = c.pos[i * 3 + 1] * SCALE
-      pos[i * 4 + 2] = c.pos[i * 3 + 2] * SCALE
-      pos[i * 4 + 3] = 1
+  /** Put a cloud on the GPU (kept while it stays the same object), a band of it a frame :
+   *  the points not sent yet have no alpha, so it fills in as it comes. */
+  private useCloud(c: DrawCloud): GpuCloud {
+    const gl = this.g.gl
+    if (!this.gpu || this.gpu.src !== c) {
+      this.freeCloud()
+      const rows = Math.max(1, Math.ceil(c.n / TEX_W))
+      const lr = Math.max(1, Math.ceil(c.linkN / TEX_W))
+      const link = new Float32Array(TEX_W * lr * 4)
+      link.set(c.link.subarray(0, c.linkN * 4))
+      for (let i = c.linkN * 4; i < link.length; i += 4) { link[i] = -1; link[i + 1] = -1 }
+      // the rest lengths, in the drawn scale
+      for (let i = 0; i < c.linkN; i++) { link[i * 4 + 2] *= SCALE; link[i * 4 + 3] *= SCALE }
+      this.gpu = { src: c, n: c.n, rows, sent: 0, pos: this.dataTex(rows, null, true), col: this.dataTex(rows, null, false), link: this.dataTex(lr, link, true) }
     }
-    const colA = new Uint8Array(TEX_W * rows * 4)
-    colA.set(c.col.subarray(0, c.n * 4))
-    this.gpu = { src: c, n: c.n, rows, pos: this.dataTex(rows, pos, true), col: this.dataTex(rows, colA, false), link: null, builder: null, linkStep: 1, linkN: 0 }
-    return this.gpu
+    const G = this.gpu
+    if (G.sent < G.rows) {
+      const r = Math.min(BAND, G.rows - G.sent)
+      const from = G.sent * TEX_W, to = Math.min(c.n, from + r * TEX_W)
+      const pos = new Float32Array(TEX_W * r * 4)
+      const colA = new Uint8Array(TEX_W * r * 4)
+      for (let i = from, o = 0; i < to; i++, o += 4) {
+        pos[o] = c.pos[i * 3] * SCALE
+        pos[o + 1] = c.pos[i * 3 + 1] * SCALE
+        pos[o + 2] = c.pos[i * 3 + 2] * SCALE
+        pos[o + 3] = 1
+      }
+      colA.set(c.col.subarray(from * 4, to * 4))
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+      gl.bindTexture(gl.TEXTURE_2D, G.pos)
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, G.sent, TEX_W, r, gl.RGBA, gl.FLOAT, pos)
+      gl.bindTexture(gl.TEXTURE_2D, G.col)
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, G.sent, TEX_W, r, gl.RGBA, gl.UNSIGNED_BYTE, colA)
+      gl.bindTexture(gl.TEXTURE_2D, null)
+      G.sent += r
+    }
+    return G
   }
 
   /** The cloud from a file (a model's vertices, a scan's points), once read. */
-  private fileCloud(): Cloud | null {
-    if (!this.path) {
-      this.note = 'no file : open one in the Inspector (ply, las, laz, xyz, pts, obj, glb, gltf, stl)'
-      return null
-    }
-    const st = modelLoader.get(this.path, this.files)
+  private fileCloud(): CloudState | null {
+    const st = modelLoader.get(this.path!, this.files)
     if (st.state === 'loading') { this.note = 'reading the scan…'; return null }
     if (st.state === 'error') { this.note = st.message; return null }
-    const m = st.mesh
-    let c = fileClouds.get(m)
-    if (!c) {
-      c = fitCloud({ pos: m.pos, col: pointColors(m), n: m.pos.length / 3 })
-      fileClouds.set(m, c)
-    }
-    this.note = ''
-    return c
+    return strataClouds.mesh(st.mesh)
   }
 
   private ensure(asp: number): void {
@@ -561,49 +575,39 @@ export class StrataSource implements NativeGenerator {
 
     // ── the cloud ──
     const which = Math.round(clamp(num(I, 'cloud', 0), 0, CLOUD_FILE))
-    let cloud: Cloud | null = null
+    let state: CloudState | null = null
     let picture = false
+    this.note = ''
     if (which === CLOUD_PICTURE) {
-      if (this.side) { picture = true; this.note = '' }
-      else { cloud = placeCloud(0); this.note = 'no layer picked as SIDECHAIN : the colonnade meanwhile' }
+      if (this.side) picture = true
+      else { state = strataClouds.place(0); this.note = 'no layer picked as SIDECHAIN : the colonnade meanwhile' }
     } else if (which === CLOUD_FILE) {
-      cloud = this.fileCloud()
-    } else {
-      cloud = placeCloud(which)
-      this.note = ''
-    }
+      if (this.path) state = this.fileCloud()
+      else { state = strataClouds.place(0); this.note = 'no file opened : the colonnade meanwhile' }
+    } else state = strataClouds.place(which)
+    if (!picture) this.depthRead.stop() // (the depth model let go : no picture to read)
+    let cloud: DrawCloud | null = null
+    if (state && state !== 'making') {
+      if ('error' in state) this.note = state.error
+      else cloud = state
+    } else if (state === 'making' && !this.note) this.note = 'laying out the points…'
     if (!picture && !cloud) {
-      // nothing to draw yet (a file being read) : the ground alone
-      this.clearTo(targetFbo)
-      return
+      // not made or not read yet : the cloud that was there goes on; else the ground alone
+      if (this.gpu && (state === 'making' || this.note === 'reading the scan…')) cloud = this.gpu.src
+      else {
+        this.clearTo(targetFbo)
+        return
+      }
     }
     const density = clamp(num(I, 'density', 0.6), 0.02, 1)
     const links = clamp(num(I, 'links', 0), 0, 1)
     let gpu: GpuCloud | null = null
     let drawN = 0
-    let stride = 1
     let gx = 0, gy = 0
     if (cloud) {
       gpu = this.useCloud(cloud)
+      // (its points are shuffled : the first ones are an even sample of it)
       drawN = Math.max(1, Math.round(gpu.n * density))
-      stride = gpu.n / drawN
-      // the neighbours, found a slice a frame once the links are wanted
-      if (links > 0.001 && !gpu.link) {
-        if (!gpu.builder) gpu.builder = new LinkBuilder(cloud.pos, cloud.n)
-        if (gpu.builder.step(20000)) {
-          const B = gpu.builder
-          const rows = Math.max(1, Math.ceil(B.m / TEX_W))
-          const data = new Float32Array(TEX_W * rows * 4)
-          data.set(B.out)
-          for (let i = B.m * 4; i < data.length; i += 4) { data[i] = -1; data[i + 1] = -1 }
-          // the rest lengths, in the drawn scale
-          for (let i = 0; i < B.m; i++) { data[i * 4 + 2] *= SCALE; data[i * 4 + 3] *= SCALE }
-          gpu.link = this.dataTex(rows, data, true)
-          gpu.linkStep = B.stride
-          gpu.linkN = B.m
-          gpu.builder = null
-        }
-      }
     } else {
       // the picture : its height first
       const raise = Math.round(clamp(num(I, 'raise', 0), 0, 2))
@@ -676,7 +680,7 @@ export class StrataSource implements NativeGenerator {
       const angles = panelMode === 0 || panelMode === 3
       const states = panelMode === 1 || panelMode === 3
       const cuts = panelMode === 2 || panelMode === 3
-      // the camera, orbiting the cloud's centre
+      // the camera, orbiting the cloud's center
       const sway = clamp(num(I, 'sway', 0.3), 0, 1)
       const yaw = num(I, 'turn', 0) * Math.PI + this.spinA + sway * 0.45 * Math.sin(this.swayA) + (panels > 1 && angles ? off * spread * 1.2 : 0)
       const pitch = clamp(clamp(num(I, 'tilt', 0.12), -1, 1) * MAX_LEAN + sway * 0.16 * Math.sin(this.swayB), -MAX_LEAN, MAX_LEAN)
@@ -696,7 +700,7 @@ export class StrataSource implements NativeGenerator {
         pr.use()
           .i1('uPos', 0).i1('uCol', 1).i1('uLink', 2).i1('uSide', 3).i1('uH', 4)
           .i1('uSrc', picture ? 1 : 0).i1('uTexW', TEX_W)
-          .i2('uGrid', gx, gy).f1('uAsp', asp).f1('uDepthAmt', clamp(num(I, 'depth', 0.5), 0, 1)).f1('uStride', stride)
+          .i2('uGrid', gx, gy).f1('uAsp', asp).f1('uDepthAmt', clamp(num(I, 'depth', 0.5), 0, 1))
           .f1('uVoxel', clamp(num(I, 'voxel', 0), 0, 1)).f1('uErode', clamp(num(I, 'erode', 0), 0, 1)).i1('uErodeFrom', Math.round(clamp(num(I, 'erodeFrom', 1), 0, 3)))
           .f1('uSec', sec).f1('uSecN', clamp(num(I, 'slices', 6), 1, 40)).f1('uSecThick', clamp(num(I, 'thick', 0.15), 0.01, 0.9))
           .f1('uSecBetween', clamp(num(I, 'between', 0.35), 0, 1)).f1('uSecPh', this.secPh).i1('uSecAxis', axis)
@@ -712,7 +716,7 @@ export class StrataSource implements NativeGenerator {
       }
       g.bind(0, gpu ? gpu.pos : this.blank())
       g.bind(1, gpu ? gpu.col : this.blank())
-      g.bind(2, gpu?.link ?? this.blank())
+      g.bind(2, gpu ? gpu.link : this.blank())
       g.bind(3, picture ? this.side! : this.blank())
       g.bind(4, picture ? this.hgt![this.hi].tex : this.blank())
       gl.bindVertexArray(g.pointVao)
@@ -721,13 +725,13 @@ export class StrataSource implements NativeGenerator {
       this.dotP.f1('uSize', radius).i1('uShape', Math.round(clamp(num(I, 'shape', 1), 0, 1)))
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, drawN)
       // the links
-      if (links > 0.001 && (picture || gpu?.link)) {
+      if (links > 0.001) {
         setPlace(this.linkP)
         // the picture's web : about 90 rows of it, whatever the points
-        const ls = picture ? Math.max(1, Math.round(gy / 90)) : gpu!.linkStep
+        const ls = picture ? Math.max(1, Math.round(gy / 90)) : gpu!.src.linkStep
         const lgx = picture ? Math.ceil(gx / ls) : 0, lgy = picture ? Math.ceil(gy / ls) : 0
         this.linkP.f1('uLinks', links).i1('uLinkStep', ls).i2('uLinkGrid', lgx, lgy)
-        gl.drawArraysInstanced(gl.LINES, 0, 2, (picture ? lgx * lgy : gpu!.linkN) * 2)
+        gl.drawArraysInstanced(gl.LINES, 0, 2, (picture ? lgx * lgy : gpu!.src.linkN) * 2)
       }
       gl.bindVertexArray(null)
     }
@@ -750,9 +754,11 @@ export class StrataSource implements NativeGenerator {
   private clearTo(targetFbo: WebGLFramebuffer): void {
     const gl = this.g.gl
     const [gr, gg, gb] = col(this.inputs, 'ground', [0, 0, 0])
+    const gv = this.inputs.ground
     gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo)
     gl.viewport(0, 0, this.w, this.h)
-    gl.clearColor(gr, gg, gb, 1)
+    // (a clear ground stays clear while a file is read : never a black slab over the layers)
+    gl.clearColor(gr, gg, gb, Array.isArray(gv) && gv.length >= 4 ? clamp(gv[3], 0, 1) : 1)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
@@ -771,50 +777,3 @@ export class StrataSource implements NativeGenerator {
     releaseMsaa(gl)
   }
 }
-
-// a file's cloud, made once per mesh read (shared by every slot that shows it)
-const fileClouds = new WeakMap<object, Cloud>()
-
-/** Each point's color, as the Model shows the file : its vertex color, times its
- *  texture under the point's texture coordinates where the file has one (the mesh's
- *  colors carry alpha 255 where the texture applies, 0 where the file gave no color);
- *  a file with neither in a soft grey. Always opaque : Strata draws a point by alpha. */
-function pointColors(m: MeshData): Uint8Array {
-  const n = m.pos.length / 3
-  const out = new Uint8Array(n * 4)
-  const src = m.col
-  let tex: { data: Uint8ClampedArray; w: number; h: number } | null = null
-  if (m.texture && m.uv) {
-    try {
-      const w = m.texture.width, h = m.texture.height
-      const cv = new OffscreenCanvas(w, h)
-      const cx = cv.getContext('2d')!
-      cx.drawImage(m.texture, 0, 0)
-      tex = { data: cx.getImageData(0, 0, w, h).data, w, h }
-    } catch {
-      tex = null // (a texture closed meanwhile : the vertex colors alone)
-    }
-  }
-  const fr = (x: number): number => x - Math.floor(x)
-  for (let i = 0; i < n; i++) {
-    const o = i * 4
-    const a = src[o + 3]
-    if (!m.info.hasColor && !(tex && a > 127)) {
-      out[o] = out[o + 1] = out[o + 2] = 200
-    } else {
-      let r = src[o], g = src[o + 1], b = src[o + 2]
-      if (tex && a > 127) {
-        // the Model samples its texture uploaded unflipped : the image's first row at v = 0
-        const x = Math.min(tex.w - 1, Math.floor(fr(m.uv[i * 2]) * tex.w))
-        const y = Math.min(tex.h - 1, Math.floor(fr(m.uv[i * 2 + 1]) * tex.h))
-        const t = (y * tex.w + x) * 4
-        r = (r * tex.data[t]) / 255; g = (g * tex.data[t + 1]) / 255; b = (b * tex.data[t + 2]) / 255
-      }
-      out[o] = r; out[o + 1] = g; out[o + 2] = b
-    }
-    out[o + 3] = 255
-  }
-  return out
-}
-
-export { PLACE_NAMES }

@@ -907,6 +907,56 @@ export const MASTER_PRESETS: MasterPreset[] = [
     fx: [{ shaderId: 'fx-dither', inputs: {levels: 2, scale: 2, amount: 1, pattern: 8, color: 2, ink: [0.07, 0.07, 0.09, 1], paper: [0.93, 0.91, 0.86, 1], angle: 0.785, boil: 0} }],
     vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
   },
+  {
+    // (for the sound as land : a sea chart, depths in ink blue)
+    name: 'Sounding Chart', group: 'Landscape',
+    fx: [
+      { shaderId: 'fx-palette', inputs: { stops: 4, blend: 1, dither: 0.12, mixSrc: 0.2, colorA: [0.03, 0.07, 0.14, 1], colorB: [0.14, 0.33, 0.46, 1], colorC: [0.6, 0.74, 0.72, 1], colorD: [0.95, 0.91, 0.8, 1] } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.08, size: 1.4, chroma: 0, parasites: 0.1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    // (the hills just gone linger : the land's own memory of the sound)
+    name: 'Long Memory', group: 'Landscape',
+    fx: [
+      { shaderId: 'node-afterimage', inputs: { decay: 0.7, amount: 0.45, chroma: 0.4, dwell: 0.35, mix: 0.8 } },
+      { shaderId: 'fx-grade', inputs: { brightness: 0, contrast: 1.06, saturation: 0.9, lift: 0.01, gamma: 1 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 0.95, gamma: 1, autoLevel: 0, splitTone: 0.08 }
+  },
+  // ── Scan : chains for a Strata (points, links and cuts on black) ──
+  {
+    name: 'Site Blueprint', group: 'Scan',
+    fx: [
+      { shaderId: 'fx-palette', inputs: { stops: 3, blend: 1, dither: 0.12, mixSrc: 0.15, colorA: [0.02, 0.05, 0.12, 1], colorB: [0.2, 0.42, 0.62, 1], colorC: [0.92, 0.96, 0.98, 1] } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.07, size: 1.3, chroma: 0, parasites: 0 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Phosphor Survey', group: 'Scan',
+    fx: [
+      { shaderId: 'fx-light-trails', inputs: { decay: 0.88, drift: 0, angle: 1.5708, knee: 0.05 } },
+      { shaderId: 'fx-colorizer', inputs: { gain: 1.15, bias: 0, fold: 0, mixSrc: 0.3, low: [0, 0.01, 0.01, 1], mid: [0.12, 0.5, 0.42, 1], high: [0.85, 1, 0.92, 1], invert: 0 } },
+      { shaderId: 'fx-scanlines', inputs: { count: 540, darkness: 0.2, roll: 0.01 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.03, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Plate Print', group: 'Scan',
+    fx: [{ shaderId: 'fx-riso', inputs: {inks: 2, ink1: [0.12, 0.2, 0.34, 1], ink2: [0.78, 0.36, 0.2, 1], ink3: [1, 0.91, 0, 1], screen: 0, cell: 3, contrast: 1.2, misreg: 0.3, drift: 0.1, seed: 11, starve: 0.3, paper: [0.94, 0.92, 0.87, 1], tooth: 0.35, amount: 1} }],
+    vibe: { mixSrc: 1, contrast: 1.02, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0 }
+  },
+  {
+    name: 'Torn Section', group: 'Scan',
+    fx: [
+      { shaderId: 'fx-rgb-shift', inputs: { offset: 0.004, scale: 0.008, angle: 0, wobble: 0.1, wobRate: 0.2 } },
+      { shaderId: 'node-afterimage', inputs: { decay: 0.5, amount: 0.5, chroma: 0.5, dwell: 0.25, mix: 0.85 } },
+      { shaderId: 'fx-grain', inputs: { character: 1, amount: 0.1, size: 1.3, chroma: 0, parasites: 0.15 } }
+    ],
+    vibe: { mixSrc: 1, contrast: 1.04, saturation: 1, gamma: 1, autoLevel: 0, splitTone: 0.05 }
+  },
   // ── Objects : chains for a Model source, most of them reading its true depth ──
   {
     name: 'Object in Depth', group: 'Objects',

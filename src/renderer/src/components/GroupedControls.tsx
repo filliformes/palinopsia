@@ -65,17 +65,16 @@ export const CONTROL_GROUPS: Record<string, ControlGroup[]> = {
     g('material', 'relief', 'gloss', 'grain', 'dents', 'bevel', 'cavity', 'shadow', 'edge', 'edgeColor', 'film', 'filmThick', 'rainbow', 'flakes', 'glint', 'flow', 'flowSpeed', 'bands', 'split', 'ripple', 'side', 'sideUse', 'dispersion', 'rim', 'ground', 'groundOp')
   ],
   'gen-terrain': [
-    // (three columns of 17, 16 and 15)
-    g('land, steps, colors', 'own', 'raise', 'soundSpeed', 'soundGain', 'surge', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor', 'palette', 'colorMix'),
-    g('light, air, water', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'),
+    // (three columns of 18, 18 and 15)
+    g('land and steps', 'own', 'raise', 'soundSpeed', 'soundGain', 'surge', 'height', 'smooth', 'peaks', 'rough', 'settle', 'scale', 'evolve', 'edges', 'terraces', 'sharp', 'contours', 'lineWidth', 'lineColor'),
+    g('colors, light, air, water', 'palette', 'colorMix', 'sunAngle', 'sunHeight', 'shadows', 'ambient', 'sunColor', 'shadowColor', 'fog', 'haze', 'sky', 'skyOp', 'water', 'waterColor', 'mirror', 'ripple', 'slick', 'slickSpread'),
     g('camera and hand', 'tilt', 'turn', 'camHeight', 'distance', 'lens', 'fly', 'spin', 'sway', 'swayRate', 'hand', 'handAmount', 'handSize', 'heal', 'people', 'restore')
   ],
   'gen-strata': [
-    g('cloud', 'cloud', 'raise', 'depth', 'settle', 'density', 'size', 'shape', 'gain', 'fog', 'ground'),
-    g('natural ⇄ structural', 'state', 'ink', 'links', 'voxel', 'erode', 'erodeFrom'),
-    g('sections', 'sections', 'axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync'),
-    g('break and cut', 'break', 'breakOn', 'breakAxis', 'blocks', 'share', 'hold', 'rebuild', 'steps', 'reveal', 'cut', 'cutHold', 'burst'),
-    g('panels and camera', 'panels', 'panelMode', 'spread', 'gap', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin')
+    // (three columns of 16, 14 and 16)
+    g('cloud and state', 'cloud', 'raise', 'depth', 'settle', 'density', 'size', 'shape', 'gain', 'fog', 'ground', 'state', 'ink', 'links', 'voxel', 'erode', 'erodeFrom'),
+    g('sections and camera', 'sections', 'axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync', 'turn', 'tilt', 'distance', 'lens', 'sway', 'swayRate', 'spin'),
+    g('break, cut, panels', 'break', 'breakOn', 'breakAxis', 'blocks', 'share', 'hold', 'rebuild', 'steps', 'reveal', 'burst', 'cut', 'cutHold', 'panels', 'panelMode', 'spread', 'gap')
   ],
   'gen-pointcloud': [
     g('picture and points', 'own', 'raise', 'depth', 'settle', 'stipple', 'gain', 'ground', 'density', 'size', 'shape', 'jitter', 'fog'),
@@ -538,8 +537,9 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     if (sound) put(d, ['own', 'scale'], 'The sound raises the land.')
     else if (side) put(d, ['own', 'scale'], 'A layer is picked as the sidechain : the land is that picture.')
     if (side || sound) { if (zero('rough')) put(d, ['evolve'], 'The land is a picture or the sound and rock is at 0 : nothing of its own evolves.') }
+    if (sound) put(d, ['settle'], 'The land the sound laid down only travels : it follows nothing.')
     // (RAISED BY stays open with no sidechain : the sound needs no layer)
-    else put(d, ['settle', 'colorMix'], 'No layer is picked as the sidechain : the land is its own, colored by the ramp.')
+    if (!side) put(d, sound ? ['colorMix'] : ['settle', 'colorMix'], 'No layer is picked as the sidechain : the land is colored by the ramp.')
     if (side && zero('colorMix')) put(d, ['palette'], 'Picture to ramp is at 0 : the land wears the picture\'s colors only.')
     if (zero('terraces')) put(d, ['sharp'], 'Terraces is at 0 : the land is smooth.')
     if (zero('contours')) put(d, ['lineWidth', 'lineColor'], 'Contour lines is at 0.')
@@ -553,11 +553,12 @@ const DIMS: Record<string, (q: Dim) => Why> = {
     const d: Why = {}
     if (isnt('cloud', 4)) put(d, ['raise', 'depth', 'settle'], 'The cloud is not the picture.')
     if (zero('erode')) put(d, ['erodeFrom'], 'Erode is at 0.')
-    if (zero('sections')) put(d, ['axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync'], 'Sections is at 0 : nothing is cut.')
+    if (zero('sections') && (is('panels', 1) || is('panelMode', 0) || is('panelMode', 1))) put(d, ['axis', 'slices', 'thick', 'between', 'sweep', 'sweepSync'], 'Sections is at 0 : nothing is cut.')
     if (zero('break')) put(d, ['breakAxis', 'blocks', 'share', 'hold', 'rebuild', 'steps', 'reveal'], 'Break is at 0 : the blocks stay in place.')
-    if (zero('break') && zero('cut')) put(d, ['breakOn'], 'Break and cut are at 0.')
+    if (zero('break') && zero('cut')) put(d, ['breakOn', 'burst'], 'Break and cut are at 0.')
     if (zero('cut')) put(d, ['cutHold'], 'Cut on a hit is at 0.')
     if (is('panels', 1)) put(d, ['panelMode', 'spread', 'gap'], 'One panel.')
+    else if (is('panelMode', 1) || is('panelMode', 2)) put(d, ['spread'], 'The panels share one angle.')
     if (zero('sway')) put(d, ['swayRate'], 'Sway is at 0.')
     return d
   },

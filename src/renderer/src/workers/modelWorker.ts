@@ -18,6 +18,7 @@ export type ToModelWorker = { t: 'load'; id: number; path: string; files: string
 export type FromModelWorker =
   | { t: 'done'; id: number; mesh: MeshData; read: string[] }
   | { t: 'error'; id: number; message: string }
+  | { t: 'alive'; id: number }
 
 const g = self as unknown as {
   onmessage: ((e: MessageEvent<ToModelWorker>) => void) | null
@@ -50,7 +51,7 @@ function resolveDots(p: string, sep: string): string {
   return lead + out.join(sep)
 }
 
-async function load(path: string, files: string[]): Promise<{ mesh: MeshData; read: string[] }> {
+async function load(path: string, files: string[], alive: () => void): Promise<{ mesh: MeshData; read: string[] }> {
   let buf: ArrayBuffer
   try {
     buf = await readFile(path)
@@ -66,6 +67,7 @@ async function load(path: string, files: string[]): Promise<{ mesh: MeshData; re
   let raw: Awaited<ReturnType<typeof parseModel>>
   try {
     raw = await parseModel(path, buf, {
+      alive,
       async fetchRel(uri: string): Promise<ArrayBuffer> {
         if (uri.startsWith('data:')) return (await fetch(uri)).arrayBuffer()
         if (/^[a-z]+:\/\//i.test(uri)) throw new Error(`${uri} is on the network : the Model only reads files on this computer`)
@@ -124,7 +126,7 @@ async function load(path: string, files: string[]): Promise<{ mesh: MeshData; re
 g.onmessage = (e: MessageEvent<ToModelWorker>): void => {
   const m = e.data
   if (m.t !== 'load') return
-  load(m.path, m.files).then(
+  load(m.path, m.files, () => g.postMessage({ t: 'alive', id: m.id })).then(
     ({ mesh, read }) => {
       const tr: Transferable[] = [mesh.pos.buffer, mesh.nrm.buffer, mesh.uv.buffer, mesh.col.buffer]
       if (mesh.idx) tr.push(mesh.idx.buffer)

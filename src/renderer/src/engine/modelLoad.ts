@@ -23,6 +23,9 @@ const KEEP = 2
 const IDLE_MS = 5000
 // (a model of two million triangles reads in a few seconds)
 const WATCHDOG_MS = 30000
+// (a compressed scan of tens of millions of points takes longer, and says it is still
+// reading : its turn starts over each time, up to this)
+const READING_MS = 240000
 
 class ModelLoader {
   private worker: Worker | null = null
@@ -30,7 +33,7 @@ class ModelLoader {
   /** The file being read now (its message id), and the ones waiting their turn. */
   private pending = new Map<number, string>()
   private queue: Array<{ id: number; path: string; files: string[] }> = []
-  private active: { id: number; path: string; timer: number } | null = null
+  private active: { id: number; path: string; timer: number; since: number } | null = null
   private used: string[] = []
   private asked = new Map<string, number>()
   private nextId = 1
@@ -44,6 +47,14 @@ class ModelLoader {
     w.onmessage = (e: MessageEvent<FromModelWorker>): void => {
       if (this.worker !== w) return
       const m = e.data
+      if (m.t === 'alive') {
+        const a = this.active
+        if (a && a.id === m.id && performance.now() - a.since < READING_MS) {
+          window.clearTimeout(a.timer)
+          a.timer = this.watch(a.id)
+        }
+        return
+      }
       if (this.active?.id === m.id) this.endActive()
       const path = this.pending.get(m.id)
       this.pending.delete(m.id)
@@ -94,16 +105,19 @@ class ModelLoader {
     this.active = null
   }
 
+  private watch(id: number): number {
+    return window.setTimeout(() => {
+      if (this.active?.id === id) this.fail('took too long to read and was given up : the file may be damaged')
+    }, WATCHDOG_MS)
+  }
+
   /** The next file waiting its turn, sent to the thread (one at a time). */
   private next(): void {
     while (!this.active && this.queue.length) {
       const job = this.queue.shift()!
       if (!this.pending.has(job.id)) continue // (asked again since : that ask reads it)
       const msg: ToModelWorker = { t: 'load', id: job.id, path: job.path, files: job.files }
-      const timer = window.setTimeout(() => {
-        if (this.active?.id === job.id) this.fail(`took over ${WATCHDOG_MS / 1000} s to read and was given up : the file may be damaged`)
-      }, WATCHDOG_MS)
-      this.active = { id: job.id, path: job.path, timer }
+      this.active = { id: job.id, path: job.path, timer: this.watch(job.id), since: performance.now() }
       this.start().postMessage(msg)
     }
   }
