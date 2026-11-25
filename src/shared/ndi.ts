@@ -83,12 +83,13 @@ export interface NdiStatus {
   width: number
   height: number
   dropped: number // frames that could not be sent in the last second
+  sendMs: number // the longest NDI took to accept a frame in the last second, ms
 }
 
 export function idleNdiStatus(): NdiStatus {
   return {
     state: 'off', message: '', source: '', runtime: '', version: '',
-    connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0
+    connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0, sendMs: 0
   }
 }
 

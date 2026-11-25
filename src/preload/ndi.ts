@@ -83,6 +83,7 @@ let netKey = ''
 let held: ArrayBuffer | null = null
 let sent = 0
 let dropped = 0
+let sendMax = 0 // the longest NDI call of the second, ms
 let lastW = 0
 let lastH = 0
 let listener: ((s: NdiStatus) => void) | null = null
@@ -94,7 +95,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null
 
 const status: NdiStatus = {
   state: 'off', message: '', source: '', runtime: '', version: '',
-  connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0
+  connections: 0, program: false, preview: false, fps: 0, width: 0, height: 0, dropped: 0, sendMs: 0
 }
 const emit = (): void => { try { listener?.({ ...status }) } catch { /* page gone */ } }
 
@@ -253,6 +254,8 @@ function poll(): void {
   }
   status.fps = sent
   status.dropped = dropped
+  status.sendMs = Math.round(sendMax * 10) / 10
+  sendMax = 0
   status.width = lastW
   status.height = lastH
   sent = 0
@@ -265,6 +268,7 @@ function onFrame(f: Frame): void {
   // A detached / short buffer can't be sent (and there is nothing to give back).
   if (!isBuf(f.buf) || f.buf.byteLength < bytes) { dropped++; return }
   if (!lib || !sender) { giveBack(f.buf); return }
+  const t0 = performance.now()
   try {
     lib.send_async(sender, {
       xres: f.w, yres: f.h, FourCC: FOURCC(f.fourcc), frame_rate_N: f.fpsN, frame_rate_D: f.fpsD,
@@ -281,6 +285,7 @@ function onFrame(f: Frame): void {
   // The async contract : NDI has let go of the PREVIOUS frame now.
   if (held) giveBack(held)
   held = f.buf
+  sendMax = Math.max(sendMax, performance.now() - t0)
   sent++
   lastW = f.w
   lastH = f.h
